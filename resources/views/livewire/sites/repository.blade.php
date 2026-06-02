@@ -7,6 +7,13 @@
     $isLocked = ($lockedTab ?? '') !== '';
 @endphp
 
+{{-- Single, unconditional root element. The $isEmbedded / full-page chrome is
+     chosen INSIDE this wrapper: a root-level @if/@else would make Livewire emit
+     leading `[if BLOCK]` comment markers before the root, leaving the component
+     with no stable single root — when embedded, Livewire then fails to attach a
+     wire:id boundary and inner wire:click="selectTab" bubbles to the host
+     (DeploymentsList), which only has setTab → MethodNotFoundException. --}}
+<div>
 @if (! $isEmbedded)
 <div class="max-w-7xl mx-auto px-4 pt-8 pb-16 sm:px-6 lg:px-8">
     @include('livewire.sites.partials.workspace-breadcrumb-bar', [
@@ -81,20 +88,38 @@
                         @foreach ($tabs as $entry)
                             <x-server-workspace-tab
                                 id="repository-tab-{{ $entry['id'] }}"
-                                :active="$tab === $entry['id']"
+                                :active="$activeTab === $entry['id']"
                                 :icon="$entry['icon']"
-                                wire:click="$set('tab', '{{ $entry['id'] }}')"
+                                wire:click="selectTab('{{ $entry['id'] }}')"
                             >{{ $entry['label'] }}</x-server-workspace-tab>
                         @endforeach
                     </x-server-workspace-tablist>
                 @endunless
 
-                <div wire:key="repository-tab-{{ $tab }}-{{ $branchInUse }}-{{ $filesPath }}">
-                    @includeWhen($tab === 'overview',   'livewire.sites.repository.partials.overview')
-                    @includeWhen($tab === 'commits',    'livewire.sites.repository.partials.commits')
-                    @includeWhen($tab === 'files',      'livewire.sites.repository.partials.files')
-                    @includeWhen($tab === 'branches',   'livewire.sites.repository.partials.branches')
-                    @includeWhen($tab === 'connection', 'livewire.sites.repository.partials.connection')
+                <div class="relative" wire:key="repository-tab-{{ $activeTab }}-{{ $branchInUse }}-{{ $filesPath }}">
+                    {{-- Switching sub-tabs hits the provider (commits / files /
+                         branches reads), so cover the panel with a spinner while
+                         the new tab loads instead of leaving the old content
+                         frozen and unresponsive. --}}
+                    <div
+                        wire:loading.flex
+                        wire:target="selectTab"
+                        class="absolute inset-0 z-10 items-start justify-center rounded-2xl bg-brand-cream/65 pt-20 backdrop-blur-[1px]"
+                    >
+                        <span class="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-medium text-brand-moss shadow-sm ring-1 ring-brand-ink/10">
+                            <x-spinner class="h-4 w-4" />
+                            {{ __('Loading…') }}
+                        </span>
+                    </div>
+
+                    <div wire:loading.class="opacity-40 pointer-events-none" wire:target="selectTab">
+                        @includeWhen($activeTab === 'overview',   'livewire.sites.repository.partials.overview')
+                        @includeWhen($activeTab === 'commits',    'livewire.sites.repository.partials.commits')
+                        @includeWhen($activeTab === 'files',      'livewire.sites.repository.partials.files')
+                        @includeWhen($activeTab === 'branches',   'livewire.sites.repository.partials.branches')
+                        @includeWhen($activeTab === 'connection', 'livewire.sites.repository.partials.connection')
+                        @includeWhen($activeTab === 'webhook',    'livewire.sites.repository.partials.webhook')
+                    </div>
                 </div>
             @endif
 
@@ -105,3 +130,4 @@
 @else
 </div>
 @endif
+</div>{{-- /single root --}}

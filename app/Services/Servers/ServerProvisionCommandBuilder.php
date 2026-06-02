@@ -664,12 +664,58 @@ final class ServerProvisionCommandBuilder
             $lines[] = 'systemctl enable --now fail2ban || true';
         }
 
+        if (config('server_provision.install_unattended_upgrades', true)) {
+            $lines[] = $this->stepMarker('Enabling automatic security updates');
+            // The package ships in the base bootstrap; make sure it is present,
+            // write our security-only policy, then (re)enable the apt timers.
+            // Provisioning preempts cloud-init's copy earlier to avoid apt-lock
+            // contention, so we own the final, enabled state here.
+            $lines = array_merge($lines, $this->ensurePackagesInstalled(
+                ['unattended-upgrades'],
+                '[dply] unattended-upgrades already installed; skipping package install.'
+            ));
+            $lines[] = $this->writeFileWithRollback(
+                '/etc/apt/apt.conf.d/20auto-upgrades',
+                "APT::Periodic::Update-Package-Lists \"1\";\nAPT::Periodic::Unattended-Upgrade \"1\";\nAPT::Periodic::AutocleanInterval \"7\";\n"
+            );
+            // Sorts after the distro's 50unattended-upgrades so our keys win,
+            // without clobbering (and being rollback-safe for) the original.
+            $lines[] = $this->writeFileWithRollback(
+                '/etc/apt/apt.conf.d/52dply-unattended-upgrades',
+                $this->unattendedUpgradesPolicy()
+            );
+            $lines[] = 'systemctl enable --now unattended-upgrades.service >/dev/null 2>&1 || true';
+            $lines[] = 'systemctl enable --now apt-daily.timer apt-daily-upgrade.timer >/dev/null 2>&1 || true';
+        }
+
         $lines = array_merge($lines, $this->roleHardening($role));
         $lines[] = $this->stepMarker('Finalizing server');
         $lines[] = 'ufw --force enable || true';
         $lines[] = 'echo "[dply] provision finished"';
 
         return $lines;
+    }
+
+    /**
+     * Security-only unattended-upgrades policy. Reboots stay manual (dply owns
+     * maintenance windows); unused kernels and deps are cleaned up. The apt
+     * `${distro_id}` / `${distro_codename}` variables are resolved by APT at
+     * runtime — they are written verbatim (the content is base64-encoded, so
+     * the shell never expands them).
+     */
+    private function unattendedUpgradesPolicy(): string
+    {
+        return <<<'CONF'
+        Unattended-Upgrade::Allowed-Origins {
+            "${distro_id}:${distro_codename}-security";
+            "${distro_id}ESMApps:${distro_codename}-apps-security";
+            "${distro_id}ESM:${distro_codename}-infra-security";
+        };
+        Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+        Unattended-Upgrade::Remove-Unused-Dependencies "true";
+        Unattended-Upgrade::Automatic-Reboot "false";
+
+        CONF;
     }
 
     /**

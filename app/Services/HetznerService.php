@@ -497,6 +497,43 @@ class HetznerService
     }
 
     /**
+     * Create a Hetzner DNS zone, or return the existing one if it's already
+     * registered under this project. Idempotent. Used by the testing-zone
+     * auto-provision path so the operator doesn't have to pre-create the
+     * Dply-owned testing zones (e.g. on-dply.cc) in their Hetzner project.
+     *
+     * @return array<string, mixed>
+     */
+    public function createZone(string $zoneName): array
+    {
+        $zoneName = strtolower(trim($zoneName));
+        if ($zoneName === '') {
+            throw new \RuntimeException('Zone name is required.');
+        }
+
+        $existing = $this->findZone($zoneName);
+        if ($existing !== null) {
+            return $existing;
+        }
+
+        // Hetzner DNS requires a `mode` on create — `primary` for zones
+        // where Hetzner is authoritative (the case for Dply-owned testing
+        // zones), `secondary` for slave zones pulled from another master.
+        $response = $this->request('post', '/zones', [
+            'name' => $zoneName,
+            'mode' => 'primary',
+        ]);
+        $this->assertSuccess($response, 'create zone');
+
+        $created = $response->json('zone');
+        if (! is_array($created)) {
+            $created = $this->findZone($zoneName);
+        }
+
+        return is_array($created) ? $created : ['name' => $zoneName];
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     public function findZone(string $zoneName): ?array

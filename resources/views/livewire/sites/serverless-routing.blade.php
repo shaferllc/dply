@@ -20,8 +20,7 @@
 
             @php
                 $tabs = [
-                    ['id' => 'hostname',   'label' => __('Hostname & DNS'), 'icon' => 'heroicon-o-globe-alt'],
-                    ['id' => 'domains',    'label' => __('Custom domains'), 'icon' => 'heroicon-o-link'],
+                    ['id' => 'domains',    'label' => __('Domains'),        'icon' => 'heroicon-o-globe-alt'],
                     ['id' => 'redirects',  'label' => __('Redirects'),      'icon' => 'heroicon-o-arrow-uturn-right'],
                     ['id' => 'headers',    'label' => __('Headers & CORS'), 'icon' => 'heroicon-o-shield-check'],
                     ['id' => 'invocation', 'label' => __('Invocation URLs'),'icon' => 'heroicon-o-bolt'],
@@ -40,7 +39,6 @@
             </x-server-workspace-tablist>
 
             <div wire:key="routing-tab-{{ $tab }}">
-                @includeWhen($tab === 'hostname',   'livewire.sites.serverless-routing.partials.hostname')
                 @includeWhen($tab === 'domains',    'livewire.sites.serverless-routing.partials.custom-domains')
                 @includeWhen($tab === 'redirects',  'livewire.sites.serverless-routing.partials.redirects')
                 @includeWhen($tab === 'headers',    'livewire.sites.serverless-routing.partials.headers')

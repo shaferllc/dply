@@ -2441,6 +2441,29 @@ class Site extends Model
     }
 
     /**
+     * Managed testing-domain hostnames provisioned per tenant (so the app can be
+     * reached as a given tenant on a dply testing zone before the customer's real
+     * DNS is in place). These must also be in the vhost server_name so the
+     * webserver answers for them — see {@see webserverHostnames()}.
+     *
+     * @return list<string>
+     */
+    public function tenantTestingHostnames(): array
+    {
+        $tenantDomains = $this->relationLoaded('tenantDomains')
+            ? $this->tenantDomains
+            : $this->tenantDomains()->get();
+
+        return $tenantDomains
+            ->map(fn ($tenant): ?string => $tenant->testingHostname())
+            ->filter(fn (?string $hostname): bool => is_string($hostname) && trim($hostname) !== '')
+            ->map(fn (string $hostname): string => strtolower(trim($hostname)))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
      * @return list<string>
      */
     public function webserverHostnames(): array
@@ -2449,6 +2472,7 @@ class Site extends Model
             ...$this->customerDomainHostnames(),
             ...$this->aliasHostnames(),
             ...$this->tenantHostnames(),
+            ...$this->tenantTestingHostnames(),
             ...$this->previewHostnames(),
         ])->unique()->values()->all();
     }

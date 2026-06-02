@@ -128,6 +128,81 @@ class SiteReachabilityChecker
     }
 
     /**
+     * Reachability for a SPECIFIC hostname (vs. the site's primary hostnames) —
+     * used to gate "Add SSL" so we don't queue an HTTP-01 challenge for a domain
+     * that doesn't point here yet (it would just fail at the CA).
+     *
+     * @return array{
+     *   ok: bool,
+     *   resolves: bool,
+     *   points_here: bool,
+     *   http_ok: bool,
+     *   resolved_ips: list<string>,
+     *   server_ip: string,
+     *   error: ?string,
+     *   checked_at: string
+     * }
+     */
+    public function checkHostname(Site $site, string $hostname): array
+    {
+        $hostname = strtolower(trim($hostname));
+        $serverIp = trim((string) ($site->server?->ip_address ?? ''));
+        $resolved = @gethostbynamel($hostname) ?: [];
+        $resolves = $resolved !== [];
+        $pointsHere = $serverIp !== '' && in_array($serverIp, $resolved, true);
+
+        // Only probe HTTP when DNS already points here — otherwise the GET would
+        // hit whatever third party the domain currently resolves to (and could
+        // hang), which tells us nothing about this server.
+        $httpOk = false;
+        $httpError = null;
+        if ($pointsHere) {
+            try {
+                $response = Http::timeout(5)
+                    ->withoutRedirecting()
+                    ->withHeaders(['Host' => $hostname])
+                    ->get('http://'.$hostname);
+                $httpOk = $this->statusMeansReachable($response->status());
+                if (! $httpOk) {
+                    $httpError = 'HTTP '.$response->status();
+                }
+            } catch (\Throwable $e) {
+                $httpError = $e->getMessage();
+            }
+        }
+
+        $error = null;
+        if (! $resolves) {
+            $error = __('“:host” does not resolve in DNS yet. Point an A record at :ip, then re-check.', [
+                'host' => $hostname,
+                'ip' => $serverIp !== '' ? $serverIp : __('this server'),
+            ]);
+        } elseif (! $pointsHere) {
+            $error = __('“:host” resolves to :got, not this server (:ip). Update its A record before requesting SSL.', [
+                'host' => $hostname,
+                'got' => implode(', ', $resolved),
+                'ip' => $serverIp !== '' ? $serverIp : __('unknown'),
+            ]);
+        } elseif (! $httpOk) {
+            $error = __('“:host” points here but isn’t answering over HTTP yet (:err). The site must serve on port 80 for HTTP validation.', [
+                'host' => $hostname,
+                'err' => $httpError ?? __('no response'),
+            ]);
+        }
+
+        return [
+            'ok' => $pointsHere && $httpOk,
+            'resolves' => $resolves,
+            'points_here' => $pointsHere,
+            'http_ok' => $httpOk,
+            'resolved_ips' => array_values($resolved),
+            'server_ip' => $serverIp,
+            'error' => $error,
+            'checked_at' => now()->toIso8601String(),
+        ];
+    }
+
+    /**
      * Whether an HTTP status means the webserver is actively answering on this
      * hostname — i.e. the site is reachable, even if the response itself isn't
      * a 2xx. Crucially this includes 401/403 so a site gated by basic auth or

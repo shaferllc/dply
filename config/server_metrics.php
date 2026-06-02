@@ -143,7 +143,11 @@ return [
     'ingest' => [
         'enabled' => (bool) env('DPLY_METRICS_INGEST_ENABLED', false),
 
-        'url' => env('DPLY_METRICS_INGEST_URL', 'https://dplyi.tunnel.dply.io/api/metrics'),
+        // No baked-in default: when DPLY_METRICS_INGEST_URL is unset, the guest
+        // callback URL falls through to DPLY_PUBLIC_APP_URL (then APP_URL) — see
+        // ServerMetricsGuestPushService::guestPushUrl(). A hardcoded default here
+        // would always win that preference order and pin callbacks to a stale host.
+        'url' => env('DPLY_METRICS_INGEST_URL'),
 
         /** Bearer token for outbound POST and inbound POST /api/metrics (must match) */
         'token' => env('DPLY_METRICS_INGEST_TOKEN'),

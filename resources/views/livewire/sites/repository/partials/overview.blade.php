@@ -116,7 +116,7 @@
                     {{ __('No README found at the branch root.') }}
                 </div>
             @else
-                <div class="prose prose-sm max-w-none">{!! $overviewReadme['content_html'] !!}</div>
+                <div class="prose prose-sm max-w-none dark:prose-invert">{!! $overviewReadme['content_html'] !!}</div>
             @endif
         </div>
     </div>

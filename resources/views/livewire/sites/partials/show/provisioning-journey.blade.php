@@ -48,16 +48,77 @@
                                             <span wire:loading wire:target="retryProvisioning">{{ __('Retrying…') }}</span>
                                         </button>
                                     @endif
-                                    <button
-                                        type="button"
-                                        wire:click="openRestartProvisioningFreshModal"
-                                        wire:loading.attr="disabled"
-                                        wire:target="openRestartProvisioningFreshModal,restartProvisioningFresh"
-                                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-900 shadow-sm transition-colors hover:border-amber-300 hover:bg-amber-100 disabled:opacity-60"
-                                    >
-                                        <x-heroicon-o-arrow-uturn-left class="h-4 w-4" />
-                                        {{ __('Restart fresh') }}
-                                    </button>
+                                    @unless ($site->usesEdgeRuntime())
+                                        <div x-data="{ open: false, busy: false }">
+                                            <button
+                                                type="button"
+                                                x-on:click="open = true"
+                                                x-bind:disabled="busy"
+                                                class="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-900 shadow-sm transition-colors hover:border-amber-300 hover:bg-amber-100 disabled:opacity-60"
+                                            >
+                                                <x-heroicon-o-arrow-uturn-left class="h-4 w-4" />
+                                                <span x-show="!busy">{{ __('Restart fresh') }}</span>
+                                                <span x-show="busy" class="inline-flex items-center gap-1.5">
+                                                    <x-spinner size="sm" />
+                                                    {{ __('Queuing…') }}
+                                                </span>
+                                            </button>
+
+                                            <template x-teleport="body">
+                                                <div
+                                                    x-show="open"
+                                                    x-cloak
+                                                    class="fixed inset-0 isolate z-[100] overflow-y-auto"
+                                                    role="dialog"
+                                                    aria-modal="true"
+                                                    aria-labelledby="restart-fresh-modal-title"
+                                                    x-on:keydown.escape.window="open = false"
+                                                >
+                                                    <div class="fixed inset-0 z-0 bg-brand-ink/60 backdrop-blur-sm" x-on:click="open = false"></div>
+                                                    <div class="relative z-10 flex min-h-full items-center justify-center px-4 py-10 sm:px-6">
+                                                        <div class="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-brand-ink/5">
+                                                            <div class="flex items-start gap-4 px-6 py-5 sm:px-7">
+                                                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-50 ring-1 ring-amber-100">
+                                                                    <x-heroicon-o-arrow-uturn-left class="h-5 w-5 text-amber-700" aria-hidden="true" />
+                                                                </span>
+                                                                <div class="flex-1 pt-0.5">
+                                                                    <h2 id="restart-fresh-modal-title" class="text-base font-semibold text-brand-ink">{{ __('Restart provisioning from scratch?') }}</h2>
+                                                                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                                                                        {{ __('This removes the testing DNS record, any certificates issued so far, and web server configuration written for this site on the server, then runs the full install again. Domains and site settings in Dply are kept.') }}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                            <div class="flex flex-col-reverse gap-2 border-t border-brand-sand/60 bg-brand-cream/30 px-6 py-4 sm:flex-row sm:justify-end sm:px-7">
+                                                                <button
+                                                                    type="button"
+                                                                    x-on:click="open = false"
+                                                                    x-bind:disabled="busy"
+                                                                    class="inline-flex justify-center rounded-lg border border-brand-ink/10 bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:bg-brand-sand/30 disabled:cursor-not-allowed disabled:opacity-60"
+                                                                >
+                                                                    {{ __('Cancel') }}
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    x-on:click="busy = true; $wire.call('restartProvisioningFresh').then(() => { busy = false; open = false; })"
+                                                                    x-bind:disabled="busy"
+                                                                    class="inline-flex min-w-[9rem] items-center justify-center gap-2 rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-800 focus:outline-none focus:ring-2 focus:ring-amber-500/40 disabled:cursor-not-allowed disabled:bg-amber-300"
+                                                                >
+                                                                    <span x-show="!busy" class="inline-flex items-center gap-2">
+                                                                        <x-heroicon-o-arrow-uturn-left class="h-4 w-4" aria-hidden="true" />
+                                                                        {{ __('Restart fresh') }}
+                                                                    </span>
+                                                                    <span x-show="busy" class="inline-flex items-center gap-2">
+                                                                        <x-spinner size="sm" variant="white" />
+                                                                        {{ __('Queuing…') }}
+                                                                    </span>
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    @endunless
                                     <button
                                         type="button"
                                         wire:click="openCancelProvisioningModal"

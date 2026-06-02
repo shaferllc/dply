@@ -8,6 +8,7 @@ use App\Models\Site;
 use App\Models\SiteUptimeMonitor;
 use App\Services\Notifications\NotificationPublisher;
 use App\Services\Sites\SiteUptimeCheckUrlResolver;
+use App\Services\Sites\UptimeProbeWorkerResolver;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
@@ -85,7 +86,16 @@ class RunSiteUptimeMonitorCheckJob implements ShouldBeUnique, ShouldQueue
             ],
         ]);
 
-        self::dispatch($monitor->id, $userId);
+        self::dispatch($monitor->id, $userId)->onQueue(self::queueForMonitor($monitor));
+    }
+
+    /**
+     * Horizon queue this monitor's check runs on — the probe worker's queue
+     * (regional egress), or the central `default` queue when it has none.
+     */
+    public static function queueForMonitor(SiteUptimeMonitor $monitor): string
+    {
+        return app(UptimeProbeWorkerResolver::class)->queueFor($monitor->probe_worker);
     }
 
     public function handle(SiteUptimeCheckUrlResolver $resolver, NotificationPublisher $notificationPublisher): void

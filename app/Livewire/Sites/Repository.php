@@ -92,6 +92,12 @@ class Repository extends Component
 
     public string $connectionAccountId = '';
 
+    /** Pagination cursor for the "Repositories on this account" library list. */
+    public int $repoPage = 1;
+
+    /** Filter box for the "Repositories on this account" library list (matches name / url). */
+    public string $repoSearch = '';
+
     public function mount(Server $server, Site $site): void
     {
         abort_unless($site->server_id === $server->id, 404);
@@ -102,9 +108,13 @@ class Repository extends Component
         $this->server = $server;
         $this->site = $site;
 
-        if ($this->lockedTab !== '') {
-            $this->tab = $this->lockedTab;
-        }
+        // Intentionally do NOT mirror $lockedTab into $tab here. $tab is
+        // bound to ?repo_tab=… via the Url attribute; assigning lockedTab
+        // to it would push that value into the browser URL, which other
+        // embeds of this same component (e.g. the Repository top-level tab
+        // on the Deployments page) then inherit, causing them to render the
+        // locked partial too. activeTab() resolves the effective tab at
+        // render time without touching the URL-bound property.
 
         $this->connectionRepositoryUrl = (string) ($site->git_repository_url ?? '');
         $this->connectionBranch = (string) ($site->git_branch ?? '');
@@ -153,6 +163,35 @@ class Repository extends Component
     public function onSourceControlLinked(): void
     {
         // Re-render loads fresh accounts in renderConnectionPayload().
+    }
+
+    /** Switching the linked account loads a different repo set — jump back to page 1. */
+    public function updatedConnectionAccountId(): void
+    {
+        $this->repoPage = 1;
+    }
+
+    /** Typing in the repo filter should always land you on the first page of results. */
+    public function updatedRepoSearch(): void
+    {
+        $this->repoPage = 1;
+    }
+
+    /**
+     * Switch the active sub-tab. Backed by a real action (rather than a bare
+     * `$set('tab', …)`) so `wire:loading wire:target="selectTab"` can scope a
+     * spinner to the switch — `$set` magic actions aren't reliably matchable
+     * as loading targets. Guarded to the tabs the unlocked view actually
+     * exposes; lockedTab embeds never render the tablist, so they can't reach
+     * this.
+     */
+    public function selectTab(string $tab): void
+    {
+        if (! in_array($tab, self::UNLOCKED_TABS, true)) {
+            return;
+        }
+
+        $this->tab = $tab;
     }
 
     /* ──────────── Files navigation ──────────── */
@@ -350,13 +389,50 @@ class Repository extends Component
             return view('livewire.sites.repository', $payload + $this->renderConnectionPayload($browser, $user));
         }
 
-        return view('livewire.sites.repository', match ($this->tab) {
+        $activeTab = $this->activeTab();
+        $payload['activeTab'] = $activeTab;
+
+        return view('livewire.sites.repository', match ($activeTab) {
             'files' => $payload + $this->renderFilesPayload($reader, $user, $branchInUse),
             'branches' => $payload + $this->renderBranchesPayload($reader, $user),
             'commits' => $payload + $this->renderCommitsPayload($commitsFetcher, $user, $branchInUse),
             'connection' => $payload + $this->renderConnectionPayload($browser, $user),
+            // Webhook (Quick deploy) shares the same backing data as
+            // Connection — connectionDeployHookUrl + connectionQuickDeploy
+            // live on the Connection payload. We render only the webhook
+            // card via lockedTab="webhook" on the embedded component.
+            'webhook' => $payload + $this->renderConnectionPayload($browser, $user),
             default => $payload + $this->renderOverviewPayload($reader, $commitsFetcher, $user, $branchInUse),
         });
+    }
+
+    /**
+     * Tabs the user can actually reach via the visible sub-tab strip in
+     * the unlocked Repository view. 'webhook' is intentionally NOT here —
+     * it's only ever reachable through a locked embed.
+     */
+    private const UNLOCKED_TABS = ['overview', 'commits', 'files', 'branches', 'connection'];
+
+    /** Page size for the "Repositories on this account" library list. */
+    private const REPO_LIBRARY_PER_PAGE = 8;
+
+    /**
+     * The tab that should actually render. When the component is embedded
+     * with a `lockedTab` prop, that wins over the URL-bound $tab; otherwise
+     * fall back to the URL state — but only if it's a tab the unlocked
+     * view actually supports. A stale ?repo_tab=webhook in the URL (left
+     * over from an earlier build that mirrored lockedTab into $tab) would
+     * otherwise cause the Repository top-level tab to render the webhook
+     * partial because the URL-restored property says so. Falling back to
+     * 'overview' for unrecognised values is the safe default.
+     */
+    private function activeTab(): string
+    {
+        if ($this->lockedTab !== '') {
+            return $this->lockedTab;
+        }
+
+        return in_array($this->tab, self::UNLOCKED_TABS, true) ? $this->tab : 'overview';
     }
 
     /**
@@ -456,9 +532,41 @@ class Repository extends Component
             }
         }
 
+        // Total repos under the account (pre-filter) — drives whether the
+        // Library card (and its search box) renders at all.
+        $accountTotal = count($repositories);
+
+        // Filter by name / url before pinning + paginating so search spans the
+        // whole account, not just the current page.
+        $search = trim($this->repoSearch);
+        if ($search !== '') {
+            $needle = mb_strtolower($search);
+            $repositories = array_values(array_filter($repositories, fn (array $r): bool =>
+                str_contains(mb_strtolower((string) ($r['label'] ?? '')), $needle)
+                || str_contains(mb_strtolower((string) ($r['url'] ?? '')), $needle)));
+        }
+
+        // Pin the currently-connected repo to the very top (PHP 8 sort is
+        // stable, so the rest keep the browser's order), then paginate — an
+        // account can expose hundreds of repos and the unpaginated list ran
+        // off the page.
+        $currentUrl = (string) ($this->site->git_repository_url ?: '');
+        usort($repositories, fn (array $a, array $b): int =>
+            (((string) ($b['url'] ?? '')) === $currentUrl ? 1 : 0)
+            <=> (((string) ($a['url'] ?? '')) === $currentUrl ? 1 : 0));
+
+        $perPage = self::REPO_LIBRARY_PER_PAGE;
+        $total = count($repositories);
+        $pages = max(1, (int) ceil($total / $perPage));
+        $page = min(max(1, $this->repoPage), $pages);
+
         return [
             'connectionAccounts' => $accounts,
-            'connectionRepositories' => $repositories,
+            'connectionRepositories' => array_slice($repositories, ($page - 1) * $perPage, $perPage),
+            'connectionRepositoriesTotal' => $total,
+            'connectionRepositoriesAccountTotal' => $accountTotal,
+            'connectionRepositoriesPage' => $page,
+            'connectionRepositoriesPages' => $pages,
             'connectionQuickDeploy' => (bool) ($this->site->repositoryMeta()['quick_deploy_enabled'] ?? ($this->site->meta['quick_deploy_enabled'] ?? false)),
             'connectionDeployHookUrl' => method_exists($this->site, 'deployHookUrl') ? $this->site->deployHookUrl() : null,
         ];

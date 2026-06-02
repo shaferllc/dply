@@ -68,6 +68,8 @@
                 <div wire:key="deployments-panel-{{ $tab }}">
                     @if ($tab === \App\Livewire\Sites\DeploymentsList::TAB_OVERVIEW)
                         @include('livewire.sites.partials.deployments._overview-panel')
+                    @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_REPOSITORY)
+                        @include('livewire.sites.partials.deployments._repository-panel')
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_DEPLOY)
                         @include('livewire.sites.partials.deployments._deploy-panel')
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_COMMITS)
@@ -84,6 +86,10 @@
                         @include('livewire.sites.partials.deployments._releases-panel')
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_HISTORY)
                         @include('livewire.sites.partials.deployments._history-panel')
+                    @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_WEBHOOK)
+                        @include('livewire.sites.partials.deployments._webhook-panel')
+                    @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_HOOKS)
+                        @include('livewire.sites.partials.deployments._hooks-panel')
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_SETTINGS)
                         @include('livewire.sites.partials.deployments._settings-panel')
                     @else

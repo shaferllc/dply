@@ -19,6 +19,7 @@ class SiteUptimeMonitor extends Model
         'label',
         'path',
         'probe_region',
+        'probe_worker',
         'sort_order',
         'last_checked_at',
         'last_ok',

@@ -14,7 +14,25 @@ foreach (['SERVER_CRON_RUN_QUEUE', 'SERVER_MANAGE_REMOTE_TASK_QUEUE', 'SERVER_ME
         $horizonExtraQueues[] = $q;
     }
 }
-$horizonWorkerQueues = array_values(array_unique(array_merge(['default'], $horizonExtraQueues)));
+// Uptime probe queues, one per configured worker. A dedicated regional probe
+// box consumes ONLY its own queue (set DPLY_PROBE_WORKER_QUEUE on the box) so
+// checks for that region egress from that location. Central/dev Horizon drains
+// every probe queue as a fallback, so regions without a deployed worker still
+// get checked from the center instead of going stale.
+$siteUptimeConfig = require __DIR__.'/site_uptime.php';
+$probeQueues = [];
+foreach (($siteUptimeConfig['probe_workers'] ?? []) as $worker) {
+    if (is_string($worker['queue'] ?? null) && $worker['queue'] !== '') {
+        $probeQueues[] = $worker['queue'];
+    }
+}
+
+$probeWorkerQueue = env('DPLY_PROBE_WORKER_QUEUE');
+if (is_string($probeWorkerQueue) && $probeWorkerQueue !== '') {
+    $horizonWorkerQueues = [$probeWorkerQueue];
+} else {
+    $horizonWorkerQueues = array_values(array_unique(array_merge(['default'], $horizonExtraQueues, $probeQueues)));
+}
 
 return [
 

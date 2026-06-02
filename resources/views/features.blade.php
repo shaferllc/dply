@@ -392,7 +392,7 @@
                                     ['Backups', 'ok', 'Database and file backup planning, storage destinations, retention, and restore-oriented guidance.'],
                                     ['Teams &amp; audit', 'ok', 'Organizations, invitations, roles, and audit-log entries for infrastructure actions.'],
                                     ['WordPress', 'partial', 'Run WordPress as a PHP site; there is no dedicated WP installer or WP-CLI panel today.'],
-                                    ['OS hardening (Fail2Ban, auto-updates)', 'partial', 'TLS and Nginx come from the panel; OS-level hardening is your image or run via remote commands and recipes.'],
+                                    ['OS hardening (Fail2Ban, auto-updates)', 'ok', 'Fail2Ban and unattended-upgrades (security-only, no auto-reboot) are configured at provision time, alongside UFW and TLS. Deeper, image-specific hardening can still live in server recipes.'],
                                     ['Redis &amp; extra services', 'roadmap', 'Install and configure on the server outside the dedicated DB wizard, or encode it in server recipes.'],
                                 ];
                                 $badge = [

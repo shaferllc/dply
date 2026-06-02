@@ -76,6 +76,10 @@ class Caching extends Component
         abort_unless($site->server_id === $server->id, 404);
         abort_unless($server->organization_id === auth()->user()->currentOrganization()?->id, 404);
 
+        // Worker hosts run Caddy only to attach testing URLs — page caching
+        // doesn't apply, so the tab is hidden and this route is unreachable.
+        abort_if($server->isWorkerHost(), 404);
+
         Gate::authorize('view', $site);
 
         $this->server = $server;

@@ -683,16 +683,24 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites/{site}/schedule', Schedule::class)->name('sites.schedule');
     Route::livewire('servers/{server}/sites/{site}/workers', Workers::class)->name('sites.workers');
     Route::livewire('servers/{server}/sites/{site}/resources', Resources::class)->name('sites.resources');
-    // NETWORKING group for serverless workspaces — manages the dply edge
-    // proxy (hostname/DNS, custom domains, redirects, headers + CORS,
-    // invocation URLs). Distinct from VM `routing` which edits nginx.
-    Route::livewire('servers/{server}/sites/{site}/routing', ServerlessRouting::class)->name('sites.routing');
-    // Repository now lives as the "Settings → Repository" section inside
-    // the Deployments page. The /source URL redirects there so existing
+    // NETWORKING group for serverless / container workspaces — manages the dply
+    // edge proxy (hostname/DNS, custom domains, redirects, headers + CORS,
+    // invocation URLs). MUST live on its own path: the generic VM routing surface
+    // is `sites.show` section=routing → `/sites/{site}/routing`. Sharing that path
+    // let this literal route shadow the wildcard for *every* site, so a VM site's
+    // /routing hit ServerlessRouting, which redirects VM sites back to
+    // section=routing → the same URL → an infinite redirect loop. The dedicated
+    // `/edge-routing` path keeps the two surfaces separate (name unchanged, so
+    // callers using route('sites.routing') need no edits).
+    Route::livewire('servers/{server}/sites/{site}/edge-routing', ServerlessRouting::class)->name('sites.routing');
+    // Repository now lives as the top-level "Repository" tab on the
+    // Deployments page (it used to be the "Settings → Repository" section,
+    // but Settings was split into the Webhook/Hooks tabs and Repository was
+    // promoted to its own tab). The /source URL redirects there so existing
     // bookmarks keep working. Any incoming `?tab=` query (e.g. ?tab=commits
     // from the commits redirect above) is forwarded as `?repo_tab=` so the
-    // embedded Repository component can pick it up without colliding with
-    // the deployments page's own ?tab= param.
+    // embedded Repository component can pick its sub-tab without colliding
+    // with the deployments page's own ?tab= param.
     Route::get('servers/{server}/sites/{site}/source', function (Server $server, Site $site) {
         $query = request()->query();
         if (isset($query['tab'])) {
@@ -703,8 +711,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         return redirect()->route('sites.deployments.index', [
             'server' => $server,
             'site' => $site,
-            'tab' => 'settings',
-            'section' => 'repository',
+            'tab' => 'repository',
         ] + $query);
     })->name('sites.repository');
     Route::livewire('servers/{server}/sites/{site}/caching', Caching::class)->name('sites.caching');

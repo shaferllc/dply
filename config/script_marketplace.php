@@ -81,6 +81,7 @@ SH,
     ],
     'nginx-test-and-reload' => [
         'name' => 'Nginx: test config and reload',
+        'webservers' => ['nginx'],
         'run_as_user' => 'root',
         'content' => <<<'SH'
 #!/bin/bash
@@ -96,6 +97,7 @@ SH,
     ],
     'certbot-certificates' => [
         'name' => 'Certbot: list certificates',
+        'webservers' => ['nginx', 'apache'],
         'run_as_user' => 'root',
         'content' => <<<'SH'
 #!/bin/bash
@@ -110,6 +112,7 @@ SH,
     ],
     'certbot-renew-dry-run' => [
         'name' => 'Certbot: renew dry run',
+        'webservers' => ['nginx', 'apache'],
         'run_as_user' => 'root',
         'content' => <<<'SH'
 #!/bin/bash
@@ -290,6 +293,7 @@ SH,
     ],
     'log-tail-nginx-error' => [
         'name' => 'Tail nginx error log (last 80 lines)',
+        'webservers' => ['nginx'],
         'run_as_user' => 'root',
         'content' => <<<'SH'
 #!/bin/bash
@@ -525,6 +529,7 @@ SH,
     ],
     'curl-self-https' => [
         'name' => 'Curl localhost over HTTPS',
+        'webservers' => ['*'],
         'run_as_user' => null,
         'content' => <<<'SH'
 #!/bin/bash
@@ -584,6 +589,7 @@ SH,
     ],
     'ufw-allow-http-https' => [
         'name' => 'UFW: allow HTTP + HTTPS',
+        'webservers' => ['*'],
         'run_as_user' => 'root',
         'content' => <<<'SH'
 #!/bin/bash
@@ -848,6 +854,7 @@ SH,
     // ─── Web servers ──────────────────────────────────────────────────────────
     'apache-test-and-reload' => [
         'name' => 'Apache: test config and reload',
+        'webservers' => ['apache'],
         'run_as_user' => 'root',
         'content' => <<<'SH'
 #!/bin/bash
@@ -860,6 +867,7 @@ SH,
     ],
     'caddy-validate-and-reload' => [
         'name' => 'Caddy: validate + reload',
+        'webservers' => ['caddy'],
         'run_as_user' => 'root',
         'content' => <<<'SH'
 #!/bin/bash
@@ -880,6 +888,7 @@ SH,
     ],
     'nginx-show-active-vhosts' => [
         'name' => 'Nginx: list active server_names',
+        'webservers' => ['nginx'],
         'run_as_user' => 'root',
         'content' => <<<'SH'
 #!/bin/bash
@@ -889,6 +898,7 @@ SH,
     ],
     'nginx-access-log-top-paths' => [
         'name' => 'Nginx: top paths in access log',
+        'webservers' => ['nginx'],
         'run_as_user' => 'root',
         'content' => <<<'SH'
 #!/bin/bash
@@ -899,6 +909,7 @@ SH,
     ],
     'nginx-access-log-top-ips' => [
         'name' => 'Nginx: top client IPs',
+        'webservers' => ['nginx'],
         'run_as_user' => 'root',
         'content' => <<<'SH'
 #!/bin/bash
@@ -909,6 +920,7 @@ SH,
     ],
     'nginx-5xx-ratio-recent' => [
         'name' => 'Nginx: 5xx ratio in last 1k requests',
+        'webservers' => ['nginx'],
         'run_as_user' => 'root',
         'content' => <<<'SH'
 #!/bin/bash
@@ -1221,6 +1233,7 @@ SH,
     // ─── TLS / certificates ───────────────────────────────────────────────────
     'tls-expiry-localhost' => [
         'name' => 'TLS expiry (localhost:443)',
+        'webservers' => ['*'],
         'run_as_user' => null,
         'content' => <<<'SH'
 #!/bin/bash
@@ -1230,6 +1243,7 @@ SH,
     ],
     'tls-expiry-domain' => [
         'name' => 'TLS expiry for a domain',
+        'webservers' => ['*'],
         'run_as_user' => null,
         'content' => <<<'SH'
 #!/bin/bash
@@ -1240,6 +1254,7 @@ SH,
     ],
     'letsencrypt-expiry-list' => [
         'name' => "Let's Encrypt: certs expiring soon",
+        'webservers' => ['nginx', 'apache'],
         'run_as_user' => 'root',
         'content' => <<<'SH'
 #!/bin/bash
@@ -1254,6 +1269,7 @@ SH,
     ],
     'tls-cipher-test' => [
         'name' => 'TLS ciphers offered (localhost)',
+        'webservers' => ['*'],
         'run_as_user' => null,
         'content' => <<<'SH'
 #!/bin/bash
@@ -1316,6 +1332,7 @@ SH,
     ],
     'php-fpm-pools' => [
         'name' => 'PHP-FPM: list pools',
+        'webservers' => ['nginx', 'caddy', 'apache'],
         'run_as_user' => 'root',
         'content' => <<<'SH'
 #!/bin/bash
@@ -1325,6 +1342,7 @@ SH,
     ],
     'php-fpm-status-summary' => [
         'name' => 'PHP-FPM: status summary (curl)',
+        'webservers' => ['nginx', 'caddy', 'apache'],
         'run_as_user' => null,
         'content' => <<<'SH'
 #!/bin/bash
@@ -1625,6 +1643,221 @@ set -euo pipefail
 if [ -d /sys/fs/cgroup ]; then
   find /sys/fs/cgroup -name memory.current -print -exec cat {} \; 2>/dev/null | paste - - | sort -k2 -rn | head -n 20
 fi
+SH,
+    ],
+    'nginx-version' => [
+        'name' => 'Nginx: version and build flags',
+        'run_as_user' => 'root',
+        'webservers' => ['nginx'],
+        'content' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+nginx -V 2>&1
+SH,
+    ],
+    'nginx-enabled-sites' => [
+        'name' => 'Nginx: enabled site configs',
+        'run_as_user' => 'root',
+        'webservers' => ['nginx'],
+        'content' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+echo "== sites-enabled =="; ls -1 /etc/nginx/sites-enabled/ 2>/dev/null || echo "(none)"
+echo "== conf.d =="; ls -1 /etc/nginx/conf.d/ 2>/dev/null || echo "(none)"
+SH,
+    ],
+    'nginx-tail-access-log' => [
+        'name' => 'Nginx: tail access log',
+        'run_as_user' => 'root',
+        'webservers' => ['nginx'],
+        'content' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+LOG=${NGINX_ACCESS_LOG:-/var/log/nginx/access.log}
+tail -n 80 "$LOG"
+SH,
+    ],
+    'caddy-version' => [
+        'name' => 'Caddy: version',
+        'run_as_user' => null,
+        'webservers' => ['caddy'],
+        'content' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+caddy version
+SH,
+    ],
+    'caddy-show-config' => [
+        'name' => 'Caddy: show Caddyfile',
+        'run_as_user' => 'root',
+        'webservers' => ['caddy'],
+        'content' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+cat /etc/caddy/Caddyfile
+SH,
+    ],
+    'caddy-adapted-config' => [
+        'name' => 'Caddy: adapted JSON config',
+        'run_as_user' => 'root',
+        'webservers' => ['caddy'],
+        'content' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+caddy adapt --config /etc/caddy/Caddyfile --pretty 2>/dev/null | head -n 200
+SH,
+    ],
+    'caddy-fmt-check' => [
+        'name' => 'Caddy: format check (diff)',
+        'run_as_user' => 'root',
+        'webservers' => ['caddy'],
+        'content' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+caddy fmt --diff /etc/caddy/Caddyfile || echo "Caddyfile is not canonically formatted (see diff above)."
+SH,
+    ],
+    'caddy-tail-log' => [
+        'name' => 'Caddy: tail service log',
+        'run_as_user' => 'root',
+        'webservers' => ['caddy'],
+        'content' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+journalctl -u caddy -n 80 --no-pager 2>/dev/null || tail -n 80 /var/log/caddy/*.log 2>/dev/null || echo "No Caddy logs found."
+SH,
+    ],
+    'caddy-list-certificates' => [
+        'name' => 'Caddy: managed certificates',
+        'run_as_user' => 'root',
+        'webservers' => ['caddy'],
+        'content' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+DIR=/var/lib/caddy/.local/share/caddy/certificates
+if [ ! -d "$DIR" ]; then DIR=$(find /var/lib/caddy /root -type d -name certificates 2>/dev/null | head -n1); fi
+[ -z "${DIR:-}" ] && { echo "No Caddy certificate store found."; exit 0; }
+find "$DIR" -name '*.crt' 2>/dev/null | while read -r c; do
+  echo "== $c =="
+  openssl x509 -in "$c" -noout -subject -enddate 2>/dev/null
+done
+SH,
+    ],
+    'caddy-service-status' => [
+        'name' => 'Caddy: service status',
+        'run_as_user' => 'root',
+        'webservers' => ['caddy'],
+        'content' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+systemctl status caddy --no-pager 2>/dev/null | head -n 30 || service caddy status
+SH,
+    ],
+    'apache-version' => [
+        'name' => 'Apache: version',
+        'run_as_user' => null,
+        'webservers' => ['apache'],
+        'content' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+apache2 -v 2>/dev/null || httpd -v
+SH,
+    ],
+    'apache-show-vhosts' => [
+        'name' => 'Apache: virtual host dump',
+        'run_as_user' => 'root',
+        'webservers' => ['apache'],
+        'content' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+if command -v apache2ctl >/dev/null 2>&1; then apache2ctl -S; else apachectl -S; fi
+SH,
+    ],
+    'apache-list-modules' => [
+        'name' => 'Apache: loaded modules',
+        'run_as_user' => 'root',
+        'webservers' => ['apache'],
+        'content' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+if command -v apache2ctl >/dev/null 2>&1; then apache2ctl -M; else apachectl -M; fi
+SH,
+    ],
+    'apache-enabled-sites' => [
+        'name' => 'Apache: enabled sites',
+        'run_as_user' => 'root',
+        'webservers' => ['apache'],
+        'content' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+ls -1 /etc/apache2/sites-enabled/ 2>/dev/null || ls -1 /etc/httpd/conf.d/ 2>/dev/null || echo "(none)"
+SH,
+    ],
+    'apache-error-log-tail' => [
+        'name' => 'Apache: tail error log',
+        'run_as_user' => 'root',
+        'webservers' => ['apache'],
+        'content' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+tail -n 80 /var/log/apache2/error.log 2>/dev/null || tail -n 80 /var/log/httpd/error_log 2>/dev/null || echo "No Apache error log found."
+SH,
+    ],
+    'apache-access-log-top-paths' => [
+        'name' => 'Apache: top paths in access log',
+        'run_as_user' => 'root',
+        'webservers' => ['apache'],
+        'content' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+LOG=/var/log/apache2/access.log
+[ -f "$LOG" ] || LOG=/var/log/httpd/access_log
+awk '{print $7}' "$LOG" | sort | uniq -c | sort -rn | head -n 25
+SH,
+    ],
+    'apache-graceful-restart' => [
+        'name' => 'Apache: graceful restart',
+        'run_as_user' => 'root',
+        'webservers' => ['apache'],
+        'content' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+if command -v apache2ctl >/dev/null 2>&1; then apache2ctl -k graceful; else apachectl -k graceful; fi
+echo "Graceful restart requested."
+SH,
+    ],
+    'detect-active-webserver' => [
+        'name' => 'Detect active web server',
+        'run_as_user' => 'root',
+        'webservers' => ['*'],
+        'content' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+found=0
+for s in nginx caddy apache2 httpd; do
+  if systemctl is-active --quiet "$s" 2>/dev/null; then echo "active: $s"; found=1; fi
+done
+[ "$found" = 0 ] && echo "No nginx/caddy/apache service is active."
+SH,
+    ],
+    'http-response-headers' => [
+        'name' => 'HTTP response headers (localhost)',
+        'run_as_user' => null,
+        'webservers' => ['*'],
+        'content' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+curl -sSI http://127.0.0.1/ 2>/dev/null | head -n 40 || echo "No response on http://127.0.0.1/"
+SH,
+    ],
+    'web-port-listeners' => [
+        'name' => 'Listeners on :80 and :443',
+        'run_as_user' => 'root',
+        'webservers' => ['*'],
+        'content' => <<<'SH'
+#!/bin/bash
+set -euo pipefail
+ss -ltnp 2>/dev/null | grep -E ':80 |:443 ' || echo "Nothing listening on 80/443."
 SH,
     ],
 ];

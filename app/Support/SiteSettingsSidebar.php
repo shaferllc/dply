@@ -100,14 +100,19 @@ final class SiteSettingsSidebar
             $base = array_values(array_filter($base, fn (array $item): bool => $item['id'] !== 'platform'));
         }
 
+        // Worker hosts run Caddy purely to attach testing URLs to background/
+        // queue workloads — page caching and CDN/edge delivery don't apply, so
+        // those tabs are omitted (and their routes 404 — see Caching/Cdn::mount).
+        $showCachingAndCdn = ! $server->isWorkerHost();
+
         $withWebserver = $showWebserverConfigEditor
             ? collect($base)
-                ->flatMap(function (array $item): array {
+                ->flatMap(function (array $item) use ($showCachingAndCdn): array {
                     if ($item['id'] !== 'routing') {
                         return [$item];
                     }
 
-                    return [
+                    $expanded = [
                         $item,
                         [
                             'id' => 'webserver-config',
@@ -116,7 +121,10 @@ final class SiteSettingsSidebar
                             'group' => 'networking',
                             'route' => 'sites.webserver-config',
                         ],
-                        [
+                    ];
+
+                    if ($showCachingAndCdn) {
+                        $expanded[] = [
                             'id' => 'caching',
                             'label' => __('Caching'),
                             'icon' => 'heroicon-o-bolt-slash',
@@ -124,8 +132,8 @@ final class SiteSettingsSidebar
                             'route' => 'sites.caching',
                             'feature' => 'workspace.site_caching',
                             'preview_feature' => 'workspace.site_caching_preview',
-                        ],
-                        [
+                        ];
+                        $expanded[] = [
                             'id' => 'cdn',
                             'label' => __('CDN / Edge'),
                             'icon' => 'heroicon-o-globe-alt',
@@ -133,8 +141,10 @@ final class SiteSettingsSidebar
                             'route' => 'sites.cdn',
                             'feature' => 'workspace.site_cdn',
                             'preview_feature' => 'workspace.site_cdn_preview',
-                        ],
-                    ];
+                        ];
+                    }
+
+                    return $expanded;
                 })
                 ->values()
                 ->all()

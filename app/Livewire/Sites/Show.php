@@ -726,7 +726,7 @@ class Show extends Component
         );
     }
 
-    public function restartProvisioningFresh(SiteProvisioningRestarter $restarter): void
+    public function restartProvisioningFresh(SiteProvisioner $siteProvisioner): void
     {
         $this->authorize('update', $this->site);
 
@@ -744,16 +744,24 @@ class Show extends Component
             return;
         }
 
-        try {
-            $restarter->restart($this->site->fresh(['server', 'domains', 'previewDomains', 'certificates']));
-        } catch (\Throwable $e) {
-            $this->toastError($e->getMessage());
+        // The actual cleanup runs synchronous SSH (vhost teardown,
+        // placeholder index removal, testing-DNS delete) which can take
+        // 30–60s and would block the Livewire response, leaving the
+        // operator staring at a spinner that never resolves. Queue it
+        // instead and write a "restart queued" log line so the journey
+        // poll immediately reflects that something happened.
+        $siteProvisioner->appendLog(
+            $this->site,
+            'info',
+            'restart',
+            'Restart queued. Cleanup and re-provisioning will run in the background.',
+        );
+        $siteProvisioner->markQueued($this->site);
 
-            return;
-        }
+        \App\Jobs\RestartSiteProvisioningJob::dispatch((string) $this->site->id);
 
         $this->site->refresh();
-        $this->toastSuccess(__('Site wiped clean and provisioning restarted from scratch.'));
+        $this->toastSuccess(__('Restart queued — provisioning will run in the background.'));
     }
 
     public function openCancelProvisioningModal(): void
@@ -2520,11 +2528,17 @@ class Show extends Component
     {
         $this->authorize('update', $this->site);
 
+        $domain = SiteDomain::query()->where('site_id', $this->site->id)->find($domainId);
+        $hostname = $domain?->hostname ?? __('this domain');
+
         $this->openConfirmActionModal(
             'removeDomain',
             [(string) $domainId],
-            __('Remove domain'),
-            __('Remove this domain?'),
+            __('Remove :host', ['host' => $hostname]),
+            __('Remove “:host” from :site? Its web-server config and any SSL certificate covering only this hostname are removed, and the site stops responding on it. Visitors hit this hostname will no longer reach the site. DNS records at your provider are not changed — delete those separately if you no longer use the domain. This cannot be undone.', [
+                'host' => $hostname,
+                'site' => $this->site->name,
+            ]),
             __('Remove domain'),
             true,
         );

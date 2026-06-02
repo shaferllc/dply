@@ -8,6 +8,7 @@ use App\Models\Script;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
@@ -18,6 +19,14 @@ class Marketplace extends Component
     protected string $requiredFeature = 'surface.scripts';
 
     use DispatchesToastNotifications;
+
+    /**
+     * Optional webserver filter (nginx / caddy / apache). When set, only
+     * presets that reference that engine are shown — lets the webserver-config
+     * Runbook deep-link straight to the scripts relevant to this site's engine.
+     */
+    #[Url(as: 'webserver', except: '')]
+    public string $webserver = '';
 
     public function mount(): void
     {
@@ -60,7 +69,24 @@ class Marketplace extends Component
 
     public function render(): View
     {
-        $presets = collect(config('script_marketplace', []))
+        $all = collect(config('script_marketplace', []));
+
+        // Filter to presets relevant to the chosen webserver via their explicit
+        // `webservers` tag. A preset matches when it lists the engine, or is
+        // tagged '*' (generic web/TLS scripts that apply to every engine).
+        // Untagged presets are general-purpose system scripts and stay hidden
+        // while an engine filter is active.
+        $webserver = strtolower(trim($this->webserver));
+        if ($webserver !== '') {
+            $all = $all->filter(function (array $p) use ($webserver): bool {
+                $tags = $p['webservers'] ?? [];
+
+                return is_array($tags)
+                    && (in_array($webserver, $tags, true) || in_array('*', $tags, true));
+            });
+        }
+
+        $presets = $all
             ->map(fn (array $p, string $k) => [
                 'key' => $k,
                 'name' => $p['name'] ?? $k,
@@ -70,6 +96,8 @@ class Marketplace extends Component
 
         return view('livewire.scripts.marketplace', [
             'presets' => $presets,
+            'webserverFilter' => $webserver,
+            'totalPresetCount' => $all->count() === 0 && $webserver !== '' ? 0 : count(config('script_marketplace', [])),
         ]);
     }
 }

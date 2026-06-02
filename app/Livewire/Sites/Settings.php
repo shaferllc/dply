@@ -5,6 +5,7 @@ namespace App\Livewire\Sites;
 use App\Enums\SiteType;
 use App\Jobs\AssignSystemUserToSiteJob;
 use App\Jobs\ExecuteSiteCertificateJob;
+use App\Jobs\ProvisionTenantTestingHostnameJob;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Jobs\SiteResetPermissionsJob;
 use App\Jobs\SyncBasicAuthFromServerJob;
@@ -47,11 +48,13 @@ use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerPasswdUserLister;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Servers\ServerSystemUserService;
+use App\Services\Servers\WebserverCertsAggregator;
 use App\Services\Sites\LaravelConsoleExecutor;
 use App\Services\Sites\LaravelSiteSshSetupRunner;
 use App\Services\Sites\SiteAccessGateLoginLogReader;
 use App\Services\Sites\SiteAccessGateService;
 use App\Services\Sites\SiteDeploySyncGroupManager;
+use App\Services\Sites\SiteReachabilityChecker;
 use App\Services\Sites\SiteScopedCommandWrapper;
 use App\Services\Snapshots\LocalDiskDestination;
 use App\Services\Snapshots\SnapshotService;
@@ -65,6 +68,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Carbon\CarbonImmutable;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 
@@ -228,6 +232,30 @@ class Settings extends Show
     public ?string $quick_ssl_domain_hostname = null;
 
     public string $quick_ssl_provider_type = SiteCertificate::PROVIDER_LETSENCRYPT;
+
+    /** Last reachability result for the hostname in the quick-SSL modal (null = not checked). */
+    public ?array $quick_ssl_reachability = null;
+
+    /** Operator override to request SSL anyway when the domain isn't reachable yet (DNS propagating). */
+    public bool $quick_ssl_force = false;
+
+    /**
+     * Live Caddy-managed certificates read from the box. Caddy obtains and
+     * renews these itself (automatic HTTPS), so they never flow through
+     * certbot and have no SiteCertificate paths — we surface the real
+     * issuer/expiry by scanning Caddy's data dir over SSH.
+     *
+     * @var list<array<string, mixed>>
+     */
+    public array $caddy_managed_certs = [];
+
+    public bool $caddy_managed_certs_loaded = false;
+
+    public bool $caddy_managed_certs_unreadable = false;
+
+    public ?string $caddy_managed_certs_error = null;
+
+    public ?string $caddy_managed_certs_scanned_at_iso = null;
 
     public ?string $laravel_ssh_setup_pending_action = null;
 
@@ -2614,9 +2642,64 @@ class Settings extends Show
     {
         $this->authorize('update', $this->site);
 
-        $this->site->tenantDomains()->findOrFail($tenantDomainId)->delete();
+        $tenant = $this->site->tenantDomains()->findOrFail($tenantDomainId);
+
+        // If the tenant has a managed testing hostname, tear its DNS record down
+        // and delete the row from a queued job (DNS API + webserver re-apply both
+        // belong off the web request); otherwise delete inline as before.
+        if ($tenant->testingHostname() !== null) {
+            ProvisionTenantTestingHostnameJob::dispatch(
+                (string) $this->site->id,
+                (string) $tenant->id,
+                remove: true,
+                userId: (string) (auth()->id() ?? ''),
+                deleteTenantRow: true,
+            );
+            $this->toastSuccess(__('Removing tenant domain and its testing hostname…'));
+
+            return;
+        }
+
+        $tenant->delete();
         $this->site->load('tenantDomains');
         $this->finalizeRoutingMutation('Tenant domain removed.');
+    }
+
+    /**
+     * Provision a managed testing-domain hostname for this tenant so the app can
+     * be reached as the tenant on a dply testing zone before the customer's DNS
+     * is pointed. Queued: it makes a DNS API call then re-applies the vhost.
+     */
+    public function provisionTenantTestingHostname(string $tenantDomainId): void
+    {
+        $this->authorize('update', $this->site);
+
+        $tenant = $this->site->tenantDomains()->findOrFail($tenantDomainId);
+
+        ProvisionTenantTestingHostnameJob::dispatch(
+            (string) $this->site->id,
+            (string) $tenant->id,
+            remove: false,
+            userId: (string) (auth()->id() ?? ''),
+        );
+
+        $this->toastSuccess(__('Creating a testing URL for this tenant… DNS and the webserver update in the background.'));
+    }
+
+    public function removeTenantTestingHostname(string $tenantDomainId): void
+    {
+        $this->authorize('update', $this->site);
+
+        $tenant = $this->site->tenantDomains()->findOrFail($tenantDomainId);
+
+        ProvisionTenantTestingHostnameJob::dispatch(
+            (string) $this->site->id,
+            (string) $tenant->id,
+            remove: true,
+            userId: (string) (auth()->id() ?? ''),
+        );
+
+        $this->toastSuccess(__('Removing this tenant’s testing URL…'));
     }
 
     public function editTenantDomain(string $tenantDomainId): void
@@ -2740,9 +2823,31 @@ class Settings extends Show
         $this->finalizeRoutingMutation(__(':count tenant(s) imported.', ['count' => $imported]));
     }
 
+    /**
+     * The primary preview hostname is a dply-managed, auto-provisioned subdomain
+     * — there's a real DNS record + Let's Encrypt cert tied to that exact name on
+     * the testing domain. It can't be freely renamed from this form (doing so
+     * wouldn't re-provision DNS/SSL, it would just relabel a row and orphan the
+     * live record), so the hostname field is locked and only the label / auto-SSL
+     * / HTTPS-redirect options are editable.
+     */
+    public function previewHostnameLocked(): bool
+    {
+        $this->site->loadMissing('previewDomains');
+        $primary = $this->site->primaryPreviewDomain();
+
+        return $primary !== null && (bool) $primary->managed_by_dply;
+    }
+
     public function savePreviewSettings(): void
     {
         $this->authorize('update', $this->site);
+
+        // Pin a managed preview's hostname to its provisioned value before
+        // validating/saving — the form can only change the label and toggles.
+        if ($this->previewHostnameLocked()) {
+            $this->preview_primary_hostname = (string) $this->site->primaryPreviewDomain()->hostname;
+        }
 
         $validated = $this->validate([
             'preview_primary_hostname' => [
@@ -2829,11 +2934,27 @@ class Settings extends Show
 
         $this->quick_ssl_domain_hostname = $normalized;
         $this->quick_ssl_provider_type = SiteCertificate::PROVIDER_LETSENCRYPT;
+        $this->quick_ssl_force = false;
+        $this->quick_ssl_reachability = app(SiteReachabilityChecker::class)->checkHostname($this->site, $normalized);
         $this->dispatch('open-modal', 'quick-domain-ssl-modal');
+    }
+
+    public function recheckQuickDomainSslReachability(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $hostname = strtolower(trim((string) $this->quick_ssl_domain_hostname));
+        if ($hostname === '') {
+            return;
+        }
+
+        $this->quick_ssl_reachability = app(SiteReachabilityChecker::class)->checkHostname($this->site, $hostname);
     }
 
     public function closeQuickDomainSslModal(): void
     {
+        $this->quick_ssl_reachability = null;
+        $this->quick_ssl_force = false;
         $this->dispatch('close-modal', 'quick-domain-ssl-modal');
     }
 
@@ -2871,6 +2992,20 @@ class Settings extends Show
         if ($existing) {
             $this->toastError(__('SSL is already configured or in progress for :domain.', ['domain' => $hostname]));
             $this->closeQuickDomainSslModal();
+
+            return;
+        }
+
+        // An HTTP-01 challenge only succeeds if the domain already resolves to
+        // this server and answers on port 80 — otherwise the CA can't reach the
+        // challenge file. Gate the request on a live reachability check so we
+        // don't queue a cert that's guaranteed to fail. The operator can still
+        // override (e.g. DNS is mid-propagation) via the modal checkbox.
+        $reachability = app(SiteReachabilityChecker::class)->checkHostname($this->site, $hostname);
+        $this->quick_ssl_reachability = $reachability;
+        if (! $reachability['ok'] && ! $this->quick_ssl_force) {
+            $this->addError('quick_ssl_domain_hostname', $reachability['error']
+                ?? __('This domain is not reachable here yet — point it at this server before requesting SSL.'));
 
             return;
         }
@@ -3104,6 +3239,89 @@ class Settings extends Show
 
         $this->toastSuccess('Certificate removed.');
         $this->site->load('certificates');
+    }
+
+    /**
+     * Whether this site is fronted by Caddy terminating TLS with its built-in
+     * automatic HTTPS — i.e. Caddy owns the certificate, not certbot. Edge-proxy
+     * layouts (Envoy/HAProxy/Traefik in front of a Caddy backend) terminate TLS
+     * at the front, so they don't count.
+     */
+    public function siteUsesCaddyAutoHttps(): bool
+    {
+        return $this->site->webserver() === 'caddy' && ! $this->server->hasEdgeProxy();
+    }
+
+    /**
+     * Read the live Caddy-managed certificate(s) for this site's hostnames by
+     * scanning Caddy's data dir over SSH (reusing the cross-engine aggregator,
+     * cached 60s). This is a lazy Livewire action — never called from render() —
+     * so SSH stays out of the page-render request.
+     */
+    public function loadCaddyManagedCerts(bool $forceFresh = false): void
+    {
+        $this->authorize('view', $this->site);
+
+        if (! $this->siteUsesCaddyAutoHttps()) {
+            $this->caddy_managed_certs = [];
+            $this->caddy_managed_certs_loaded = true;
+
+            return;
+        }
+
+        if (! $this->server->isReady() || empty($this->server->ssh_private_key)) {
+            $this->caddy_managed_certs_error = __('Provisioning and SSH must be ready before reading Caddy certificates.');
+
+            return;
+        }
+
+        try {
+            $result = app(WebserverCertsAggregator::class)->aggregate($this->server, $forceFresh);
+
+            $hostnames = collect($this->site->webserverHostnames())
+                ->filter()
+                ->map(fn (string $host): string => strtolower(trim($host)))
+                ->filter()
+                ->values()
+                ->all();
+
+            $certs = array_values(array_filter($result['certs'], function (array $row) use ($hostnames): bool {
+                if (($row['engine_hint'] ?? null) !== 'caddy') {
+                    return false;
+                }
+
+                $haystack = strtolower(($row['path'] ?? '').' '.($row['subject'] ?? ''));
+                foreach ($hostnames as $host) {
+                    if (str_contains($haystack, $host)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }));
+
+            $this->caddy_managed_certs = array_map(function (array $row): array {
+                $row['expires_at'] = $row['expires_at'] instanceof CarbonImmutable
+                    ? $row['expires_at']->toIso8601String()
+                    : null;
+
+                return $row;
+            }, $certs);
+            $this->caddy_managed_certs_scanned_at_iso = $result['scanned_at'] instanceof CarbonImmutable
+                ? $result['scanned_at']->toIso8601String()
+                : null;
+            $this->caddy_managed_certs_unreadable = $result['unreadable'];
+            $this->caddy_managed_certs_loaded = true;
+            $this->caddy_managed_certs_error = null;
+        } catch (\Throwable $e) {
+            $this->caddy_managed_certs_error = __('Failed to read Caddy certificates: :msg', ['msg' => $e->getMessage()]);
+            $this->caddy_managed_certs_loaded = false;
+        }
+    }
+
+    public function refreshCaddyManagedCerts(): void
+    {
+        $this->loadCaddyManagedCerts(forceFresh: true);
     }
 
     public function retryCertificate(string $certificateId, CertificateRepairService $repairService): void

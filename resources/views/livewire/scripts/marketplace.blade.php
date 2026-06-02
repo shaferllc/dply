@@ -27,6 +27,25 @@
             <div class="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">{{ $message }}</div>
         @enderror
 
+        @if ($webserverFilter !== '')
+            <div class="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/25 px-4 py-3">
+                <p class="text-sm text-brand-moss">
+                    {!! __('Showing scripts for <span class="font-semibold text-brand-ink">:engine</span> — :count match.', ['engine' => e(ucfirst($webserverFilter)), 'count' => count($presets)]) !!}
+                </p>
+                <button type="button" wire:click="$set('webserver', '')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                    <x-heroicon-o-x-mark class="h-3.5 w-3.5" aria-hidden="true" />
+                    {{ __('Show all scripts') }}
+                </button>
+            </div>
+        @endif
+
+        @if (count($presets) === 0)
+            <div class="rounded-2xl border border-dashed border-brand-ink/15 bg-brand-sand/20 px-6 py-12 text-center">
+                <p class="text-sm font-medium text-brand-ink">{{ __('No presets match this filter.') }}</p>
+                <p class="mt-1 text-xs text-brand-moss">{{ __('Clear the filter to browse the full library of script presets.') }}</p>
+            </div>
+        @endif
+
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             @foreach ($presets as $preset)
                 <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm flex flex-col">

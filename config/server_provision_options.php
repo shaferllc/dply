@@ -98,9 +98,9 @@ return [
         [
             'id' => 'application',
             'label' => 'Web server',
-            'detail' => 'NGINX, Apache, Caddy, OpenLiteSpeed, or Traefik; database (selectable); Redis or Valkey; Memcached; Certbot; Composer; PHP; NPM; Supervisor; Fail2ban; UFW',
+            'detail' => 'NGINX, Apache, Caddy, OpenLiteSpeed, or Traefik; database (selectable); Redis or Valkey; Memcached; Certbot; Composer; PHP; NPM; Supervisor; Fail2ban; automatic security updates; UFW',
             'summary' => 'Best for hosting PHP apps with a full application stack on one server.',
-            'installs' => ['NGINX, Apache, Caddy, OpenLiteSpeed, or Traefik', 'PHP', 'Composer', 'NPM', 'Selectable database', 'Redis or Valkey', 'Memcached', 'Certbot', 'Supervisor', 'Fail2ban', 'UFW'],
+            'installs' => ['NGINX, Apache, Caddy, OpenLiteSpeed, or Traefik', 'PHP', 'Composer', 'NPM', 'Selectable database', 'Redis or Valkey', 'Memcached', 'Certbot', 'Supervisor', 'Fail2ban', 'Automatic security updates', 'UFW'],
             'best_for' => 'Laravel, WordPress, and other app servers that need web, cache, queue, and database services together.',
             'does_not_include' => 'Does not split web, database, and cache services across dedicated machines.',
         ],

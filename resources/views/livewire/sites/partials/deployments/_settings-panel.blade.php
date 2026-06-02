@@ -6,13 +6,17 @@
 @endphp
 
 <div class="space-y-6">
-    <section id="connection" class="scroll-mt-24">
+    {{-- Connection / Branches removed from Settings — they live under
+         Repository → Connection / Repository → Branches now. Settings only
+         holds deploy-time controls (Quick deploy webhook + Functions hooks). --}}
+
+    <section id="webhook" class="scroll-mt-24">
         <livewire:sites.repository
             :server="$server"
             :site="$site"
             :embedded="true"
-            lockedTab="connection"
-            wire:key="deployments-settings-connection-{{ $site->id }}"
+            lockedTab="webhook"
+            wire:key="deployments-settings-webhook-{{ $site->id }}"
         />
     </section>
 
@@ -26,14 +30,14 @@
     @endif
 </div>
 
-@if ($section !== '')
+@if ($settingsSection !== '')
     <script>
         document.addEventListener('livewire:navigated', () => {
-            const el = document.getElementById(@js($section));
+            const el = document.getElementById(@js($settingsSection));
             if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, { once: true });
         queueMicrotask(() => {
-            const el = document.getElementById(@js($section));
+            const el = document.getElementById(@js($settingsSection));
             if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
     </script>

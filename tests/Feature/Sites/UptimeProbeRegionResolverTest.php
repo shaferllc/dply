@@ -17,6 +17,16 @@ test('it maps digitalocean regions to the nearest probe', function () {
     expect($resolver->resolve('fra1'))->toBe('eu-frankfurt');
     expect($resolver->resolve('syd1'))->toBe('ap-sydney');
 });
+test('it maps hetzner regions to the nearest probe', function () {
+    $resolver = new UptimeProbeRegionResolver;
+
+    expect($resolver->resolve('fsn1'))->toBe('eu-falkenstein');
+    expect($resolver->resolve('nbg1'))->toBe('eu-falkenstein');
+    expect($resolver->resolve('hel1'))->toBe('eu-falkenstein');
+    expect($resolver->resolve('ash'))->toBe('us-east');
+    expect($resolver->resolve('hil'))->toBe('us-west');
+    expect($resolver->resolve('sin'))->toBe('ap-sydney');
+});
 test('an unknown or empty region falls back to the first configured', function () {
     $resolver = new UptimeProbeRegionResolver;
     $first = (string) array_key_first(config('site_uptime.probe_regions'));

@@ -315,18 +315,33 @@
 
                             <div class="flex flex-col-reverse gap-3 rounded-b-2xl border-t border-brand-ink/10 bg-brand-cream/60 px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
                                 <a href="{{ route('servers.sites', $server) }}" wire:navigate
+                                    wire:loading.class="pointer-events-none opacity-60" wire:target="run"
                                     class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
                                     {{ __('Cancel') }}
                                 </a>
-                                <x-primary-button>
-                                    @if ($selectedTile['kind'] === 'scaffold')
-                                        {{ __('Install :app', ['app' => $selectedTile['label']]) }}
-                                    @elseif ($selectedTile['kind'] === 'blank')
-                                        {{ __('Create blank site') }}
-                                    @else
-                                        {{ __('Create site') }}
-                                    @endif
-                                    <x-heroicon-o-arrow-right class="h-4 w-4" aria-hidden="true" />
+                                <x-primary-button
+                                    wire:loading.attr="disabled"
+                                    wire:target="run"
+                                    class="min-w-[10rem] disabled:cursor-progress disabled:opacity-80"
+                                >
+                                    <span wire:loading.remove wire:target="run" class="inline-flex items-center gap-2">
+                                        @if ($selectedTile['kind'] === 'scaffold')
+                                            {{ __('Install :app', ['app' => $selectedTile['label']]) }}
+                                        @elseif ($selectedTile['kind'] === 'blank')
+                                            {{ __('Create blank site') }}
+                                        @else
+                                            {{ __('Create site') }}
+                                        @endif
+                                        <x-heroicon-o-arrow-right class="h-4 w-4" aria-hidden="true" />
+                                    </span>
+                                    <span wire:loading wire:target="run" class="inline-flex items-center gap-2">
+                                        <x-spinner size="sm" variant="cream" />
+                                        @if ($selectedTile['kind'] === 'scaffold')
+                                            {{ __('Starting installer…') }}
+                                        @else
+                                            {{ __('Creating site…') }}
+                                        @endif
+                                    </span>
                                 </x-primary-button>
                             </div>
                         </div>

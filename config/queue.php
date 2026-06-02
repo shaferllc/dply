@@ -66,7 +66,11 @@ return [
 
         'redis' => [
             'driver' => 'redis',
-            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
+            // Dedicated `queue` Redis connection (config/database.php) with
+            // read_timeout=-1 so the long-running worker's blocking pop never
+            // throws "read error on connection". Same Redis DB as `default`, so
+            // switching off the web connection loses no in-flight jobs.
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'queue'),
             'queue' => env('REDIS_QUEUE', 'default'),
             // Must exceed the Horizon worker `timeout` (see config/horizon.php —
             // currently 720s). retry_after governs when Redis considers a
@@ -76,7 +80,11 @@ return [
             // 90s Laravel default is far too low for the SSH-driven jobs in
             // this app (webserver switch, insight-fix, etc).
             'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 900),
-            'block_for' => null,
+            // Blocking pop (BLPOP) keeps the connection warm instead of polling
+            // + idling, which is what got the socket reset by the remote box.
+            // MUST stay below read_timeout — the `queue` connection uses -1, so
+            // any positive value is safe; keep < retry_after (900s) too.
+            'block_for' => (int) env('REDIS_QUEUE_BLOCK_FOR', 5),
             'after_commit' => false,
         ],
 

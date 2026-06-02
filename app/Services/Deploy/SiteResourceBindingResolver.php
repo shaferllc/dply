@@ -40,6 +40,20 @@ final class SiteResourceBindingResolver
         $mode = $site->runtimeTargetMode();
         $serverId = $site->server_id;
 
+        // Role-aware suppression: queue-worker hosts already ARE the queue
+        // worker for some other app, and they don't host their own DB. So
+        // the "database binding pending" and "workers binding pending"
+        // preflight warnings are structurally wrong on these boxes — the
+        // DB lives on a separate server, and the supervisor programs are
+        // exactly what the worker host provides. Mark those bindings
+        // required=false here so DeploymentPreflightValidator drops them
+        // from the preflight summary while still leaving the binding rows
+        // visible for debugging.
+        $serverMeta = is_array($site->server?->meta) ? $site->server->meta : [];
+        $installProfile = (string) ($serverMeta['install_profile'] ?? '');
+        $serverRole = (string) ($serverMeta['server_role'] ?? '');
+        $isWorkerHost = $installProfile === 'queue_worker' || $serverRole === 'worker';
+
         $databaseCount = $serverId
             ? ServerDatabase::query()->where('server_id', $serverId)->count()
             : 0;
@@ -65,7 +79,9 @@ final class SiteResourceBindingResolver
         $bindings[] = new SiteResourceBinding(
             type: 'database',
             mode: $mode === 'vm' ? 'provision_new' : 'attach_existing',
-            required: in_array($mode, ['vm', 'docker', 'kubernetes'], true) && $site->type?->value !== 'static',
+            required: ! $isWorkerHost
+                && in_array($mode, ['vm', 'docker', 'kubernetes'], true)
+                && $site->type?->value !== 'static',
             status: $databaseCount > 0 ? 'configured' : 'pending',
             source: $databaseCount > 0 ? 'server_database' : 'inferred_requirement',
             name: $databaseCount > 0 ? 'server-database' : null,
@@ -85,7 +101,7 @@ final class SiteResourceBindingResolver
         $bindings[] = new SiteResourceBinding(
             type: 'workers',
             mode: $mode === 'vm' ? 'provision_new' : 'attach_existing',
-            required: $mode === 'vm',
+            required: $mode === 'vm' && ! $isWorkerHost,
             status: $workerCount > 0 ? 'configured' : 'pending',
             source: $workerCount > 0 ? 'supervisor_programs' : 'inferred_requirement',
             name: $workerCount > 0 ? 'supervisor' : null,

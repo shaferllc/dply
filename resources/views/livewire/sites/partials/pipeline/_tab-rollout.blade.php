@@ -1,6 +1,9 @@
 @php
     $functionsHost = $functionsHost ?? $server->hostCapabilities()->supportsFunctionDeploy();
     $card = 'dply-card overflow-hidden';
+    // The raw server-block snippet is Nginx-specific. Caddy (and other engines)
+    // don't take an Nginx `location` block, so only surface it on Nginx hosts.
+    $isNginx = $site->webserver() === 'nginx';
 @endphp
 
 @if (! $functionsHost)
@@ -145,7 +148,9 @@
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Rollout') }}</p>
                             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Rollout and web server') }}</h2>
                             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                {{ __('Release retention, deploy environment group, scheduler, Supervisor restarts, and optional Nginx snippets. Runtime ports and users are on Settings → Runtime.') }}
+                                {{ $isNginx
+                                    ? __('Release retention, deploy environment group, scheduler, Supervisor restarts, and optional Nginx snippets. Runtime ports and users are on Settings → Runtime.')
+                                    : __('Release retention, deploy environment group, scheduler, and Supervisor restarts. Runtime ports and users are on Settings → Runtime.') }}
                             </p>
                             @if ($zero_downtime_enabled)
                                 <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
@@ -196,6 +201,7 @@
                         </div>
                     </div>
 
+                    @if ($isNginx)
                     <div>
                         <x-input-label for="nginx_extra_raw" :value="__('Extra Nginx inside server block (advanced)')" />
                         <textarea
@@ -208,6 +214,7 @@
                         <p class="mt-2 text-sm text-brand-moss">{{ __('Injected into the site’s Nginx server block. Validate syntax before relying on it in production.') }}</p>
                         <x-input-error :messages="$errors->get('nginx_extra_raw')" class="mt-2" />
                     </div>
+                    @endif
                 </div>
 
             </section>

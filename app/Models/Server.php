@@ -150,6 +150,18 @@ class Server extends Model
             && ($meta['install_profile'] ?? null) === 'redis_server';
     }
 
+    /**
+     * A worker host is provisioned for background/queue-style workloads and
+     * always runs Caddy (it attaches testing URLs but isn't a public web
+     * front). Caching + CDN/edge tabs don't apply to these sites.
+     */
+    public function isWorkerHost(): bool
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+
+        return ($meta['server_role'] ?? null) === 'worker';
+    }
+
     public function providerCredential(): BelongsTo
     {
         return $this->belongsTo(ProviderCredential::class);

@@ -49,7 +49,10 @@ class WebserverConfig extends Component
     /** @var 'edit'|'preview'|'compare' */
     public string $content_tab = 'edit';
 
-    public function mount(Server $server, Site $site): mixed
+    /** Free-text filter for the "Insert snippet" picker. */
+    public string $snippetSearch = '';
+
+    public function mount(Server $server, Site $site): void
     {
         abort_unless($site->server_id === $server->id, 404);
         abort_unless($server->organization_id === auth()->user()->currentOrganization()?->id, 404);
@@ -65,7 +68,9 @@ class WebserverConfig extends Component
         if ($site->webserver() === 'none') {
             session()->flash('info', __('This site runs without a web server, so there’s no vhost to edit. The webserver-config page does not apply here.'));
 
-            return $this->redirect(route('sites.show', [$server, $site]), navigate: true);
+            $this->redirect(route('sites.show', [$server, $site]), navigate: true);
+
+            return;
         }
 
         $editor = app(SiteWebserverConfigEditorService::class);
@@ -88,6 +93,33 @@ class WebserverConfig extends Component
         }
 
         $this->active_layer = $this->mode === SiteWebserverConfigProfile::MODE_FULL_OVERRIDE ? 'full' : 'main';
+
+        // Only nginx has a real before/main/after snippet model. Every other
+        // engine (caddy, apache, traefik, openlitespeed) is whole-file: the
+        // managed vhost IS the script, so "Layered" maps to an empty snippet
+        // box. Force full-file editing for those and make sure the editor shows
+        // the actual config — falling back to the rendered managed config when
+        // the live read over SSH wasn't available (e.g. server not reachable).
+        if (! $this->supportsLayeredSnippets()) {
+            $this->mode = SiteWebserverConfigProfile::MODE_FULL_OVERRIDE;
+            $this->active_layer = 'full';
+
+            if (trim($this->full_override_body) === '') {
+                $this->full_override_body = $this->remote_live_config !== null && trim($this->remote_live_config) !== ''
+                    ? trim($this->remote_live_config)
+                    : trim($editor->effectivePreview($this->site));
+            }
+        }
+    }
+
+    /**
+     * Only nginx ships the before/main/after layered snippet model; all other
+     * engines edit a single managed file. Gates the Layered/Full-file toggle
+     * and the pipeline layer buttons in the view.
+     */
+    public function supportsLayeredSnippets(): bool
+    {
+        return $this->site->webserver() === 'nginx';
     }
 
     public function updatedMode(string $value): void
@@ -318,11 +350,54 @@ class WebserverConfig extends Component
             ->limit(25)
             ->get();
 
+        $engine = $this->site->webserver();
+        $needle = mb_strtolower(trim($this->snippetSearch));
+        $snippets = collect(config('webserver_snippets', []))
+            ->filter(function (array $s) use ($engine, $needle): bool {
+                $engines = is_array($s['webservers'] ?? null) ? $s['webservers'] : [];
+                if (! in_array($engine, $engines, true)) {
+                    return false;
+                }
+                if ($needle !== '') {
+                    return str_contains(mb_strtolower((string) ($s['name'] ?? '')), $needle)
+                        || str_contains(mb_strtolower((string) ($s['description'] ?? '')), $needle);
+                }
+
+                return true;
+            })
+            ->map(fn (array $s, string $k) => [
+                'key' => $k,
+                'name' => $s['name'] ?? $k,
+                'description' => $s['description'] ?? '',
+                'content' => (string) ($s['content'] ?? ''),
+            ])
+            ->values();
+
+        // Placeholder tokens the operator can drop into the config and fill in
+        // later. We insert the literal {{TOKEN}} (user's choice), but show this
+        // site's resolved value as a hint so they know what each maps to.
+        $phpVersion = (string) (data_get($this->site->server?->meta, 'php_version') ?: '8.x');
+        $primaryDomain = (string) ($this->site->domains->first()?->hostname
+            ?: (is_array($this->site->meta['testing_hostname'] ?? null)
+                ? (string) ($this->site->meta['testing_hostname']['hostname'] ?? '')
+                : '')
+            ?: $this->site->name);
+        $placeholders = [
+            ['token' => '{{DOMAIN}}', 'label' => __('Primary domain'), 'example' => $primaryDomain],
+            ['token' => '{{DOCROOT}}', 'label' => __('Document root'), 'example' => (string) $this->site->document_root],
+            ['token' => '{{PHP_FPM_SOCKET}}', 'label' => __('PHP-FPM socket'), 'example' => 'unix///run/php/php'.$phpVersion.'-fpm.sock'],
+            ['token' => '{{APP_HOST}}', 'label' => __('Upstream app host'), 'example' => '127.0.0.1'],
+            ['token' => '{{APP_PORT}}', 'label' => __('Upstream app port'), 'example' => (string) ($this->site->app_port ?: $this->site->internal_port ?: '3000')],
+            ['token' => '{{SERVER_IP}}', 'label' => __('Server IP'), 'example' => (string) ($this->site->server?->ip_address ?? '')],
+        ];
+
         return view('livewire.sites.webserver-config', [
             'revisions' => $revisions,
             'effective_config_preview' => $effectiveConfigPreview,
             'core_changed_warning' => $coreChangedWarning,
             'config_paths' => $this->configDisplayPaths(),
+            'webserverSnippets' => $snippets,
+            'configPlaceholders' => $placeholders,
         ]);
     }
 

@@ -67,7 +67,10 @@ class CleanupRemoteSiteArtifactsJob implements ShouldQueue
             $log .= $ssh->exec($supervisorProvisioner->supervisorRereadUpdateExecLine($server, 'DPLY_SV_CLEAN_EXIT'), 180);
         }
 
-        if ($basename !== '') {
+        // Worker / headless hosts provision with webserver=none and have no
+        // nginx/apache binary — skip vhost teardown entirely so we don't run
+        // `nginx -t` on a box where it doesn't exist (exit 127).
+        if ($basename !== '' && $webserver !== '' && $webserver !== 'none') {
             $log .= match ($webserver) {
                 'apache' => $ssh->exec(sprintf(
                     '(a2dissite %1$s >/dev/null 2>&1 || true; rm -f %2$s; apachectl configtest && (systemctl reload apache2 2>/dev/null || service apache2 reload 2>/dev/null)) 2>&1; printf "\nDPLY_WEBSERVER_CLEAN_EXIT:%%s" "$?"',
@@ -114,8 +117,11 @@ class CleanupRemoteSiteArtifactsJob implements ShouldQueue
 
         $siteId = (int) ($this->payload['site_id'] ?? 0);
         if ($siteId > 0) {
+            // The deploy key lives under root's home; the SSH connection runs
+            // as the (non-root) deploy user, so remove it via sudo — mirroring
+            // the systemd teardown below.
             $keyPath = '/root/.ssh/dply_site_'.$siteId.'_deploy';
-            $log .= $ssh->exec('rm -f '.escapeshellarg($keyPath).' 2>&1', 30);
+            $log .= $ssh->exec('sudo rm -f '.escapeshellarg($keyPath).' 2>&1', 30);
         }
 
         $host = trim((string) ($this->payload['primary_hostname'] ?? ''));

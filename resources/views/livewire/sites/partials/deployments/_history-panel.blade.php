@@ -17,7 +17,7 @@
     <div class="flex flex-wrap items-end gap-3 border-b border-brand-ink/10 bg-white px-6 py-4 sm:px-8">
         <div>
             <label for="status_filter" class="block text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Status') }}</label>
-            <select id="status_filter" wire:model.live="statusFilter" class="mt-1 rounded-lg border border-brand-ink/15 px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-2 focus:ring-brand-sage/30">
+            <select id="status_filter" wire:model.live="statusFilter" class="mt-1 rounded-lg border border-brand-ink/15 py-2 pl-3 pr-10 text-sm shadow-sm focus:border-brand-sage focus:ring-2 focus:ring-brand-sage/30">
                 <option value="">{{ __('Any') }}</option>
                 @foreach ($statuses as $s)
                     <option value="{{ $s }}">{{ $s }}</option>
@@ -26,7 +26,7 @@
         </div>
         <div>
             <label for="trigger_filter" class="block text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Trigger') }}</label>
-            <select id="trigger_filter" wire:model.live="triggerFilter" class="mt-1 rounded-lg border border-brand-ink/15 px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-2 focus:ring-brand-sage/30">
+            <select id="trigger_filter" wire:model.live="triggerFilter" class="mt-1 rounded-lg border border-brand-ink/15 py-2 pl-3 pr-10 text-sm shadow-sm focus:border-brand-sage focus:ring-2 focus:ring-brand-sage/30">
                 <option value="">{{ __('Any') }}</option>
                 @foreach ($triggers as $t)
                     <option value="{{ $t }}">{{ $t }}</option>

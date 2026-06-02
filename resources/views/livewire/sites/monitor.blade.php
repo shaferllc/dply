@@ -41,7 +41,7 @@
 
             <x-explainer tone="info">
                 <p>{{ __('Monitors live on the site and reflect their last check on this page and on any public status page that includes them. Adding a monitor immediately runs an initial check; "Check now" reruns it on demand.') }}</p>
-                <p>{{ __('The probe-region label describes where the check appears to come from on a status page. Today every check runs from dply infrastructure regardless of the label — the field is informational and reserved for future multi-region probes.') }}</p>
+                <p>{{ __('Each check runs from the selected dply worker location, so latency and reachability reflect that region. The worker also sets the region label shown on any public status page.') }}</p>
                 <p>{{ __('Output for the most recent check is shown in the banner below; "View output" expands the full transcript. Per-monitor rows summarise the last check with HTTP status and latency.') }}</p>
             </x-explainer>
 
@@ -137,7 +137,7 @@
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Uptime') }}</p>
                             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Add an uptime monitor') }}</h2>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                                {{ __('Pick a label, optional path, and a probe-region label. The first check runs immediately.') }}
+                                {{ __('Pick a label, optional path, and the worker location to check from. The first check runs immediately.') }}
                             </p>
                             <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
                                 <span class="inline-flex items-center gap-1">
@@ -187,7 +187,7 @@
                     <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Uptime monitor') }}</p>
                     <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Add an uptime monitor') }}</h2>
                     <p class="mt-2 text-sm leading-6 text-brand-moss">
-                        {{ __('The first check runs immediately after save. Region is a display label only.') }}
+                        {{ __('The first check runs immediately after save, from the selected worker location.') }}
                     </p>
                 </div>
 
@@ -215,21 +215,32 @@
                             <x-input-error :messages="$errors->get('newPath')" class="mt-1" />
                         </div>
 
-                        <div>
-                            <x-input-label for="uptime-region" :value="__('Probe-region label')" />
-                            <select
-                                id="uptime-region"
-                                wire:model="newProbeRegion"
-                                class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30"
-                                @disabled(! $canEdit || $probeRegions === [])
-                            >
-                                @foreach ($probeRegions as $key => $label)
-                                    <option value="{{ $key }}">{{ $label }}</option>
-                                @endforeach
-                            </select>
-                            <x-input-error :messages="$errors->get('newProbeRegion')" class="mt-1" />
-                            <p class="mt-1 text-xs text-brand-moss">{{ __('Display only — checks run from dply infrastructure today.') }}</p>
-                        </div>
+                        {{-- Adaptive: a dropdown once ≥2 workers exist, otherwise a static
+                             line — with a single worker there's nothing to choose. The value
+                             is still stored either way. --}}
+                        @if (count($probeWorkerOptions) > 1)
+                            <div>
+                                <x-input-label for="uptime-worker" :value="__('Check from')" />
+                                <select
+                                    id="uptime-worker"
+                                    wire:model="newProbeWorker"
+                                    class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30"
+                                    @disabled(! $canEdit)
+                                >
+                                    @foreach ($probeWorkerOptions as $key => $label)
+                                        <option value="{{ $key }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                                <x-input-error :messages="$errors->get('newProbeWorker')" class="mt-1" />
+                                <p class="mt-1 text-xs text-brand-moss">{{ __('The dply worker location the check runs from.') }}</p>
+                            </div>
+                        @elseif (count($probeWorkerOptions) === 1)
+                            <div>
+                                <x-input-label :value="__('Check from')" />
+                                <p class="mt-1 text-sm font-medium text-brand-ink">{{ reset($probeWorkerOptions) }}</p>
+                                <p class="mt-1 text-xs text-brand-moss">{{ __('The only dply worker location available today. More regions appear here as they come online.') }}</p>
+                            </div>
+                        @endif
                     </form>
                 </div>
 

@@ -3,12 +3,14 @@
         <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-10">
             <div class="max-w-sm">
                 <a href="{{ url('/') }}" class="inline-flex items-center gap-3">
+                    {{-- Dark-background mark (inverse of the light header lockup): gold
+                         square + ink "d". The "dply" wordmark is the text span beside it. --}}
                     <img
-                        src="{{ asset('images/dply-logo.svg') }}"
+                        src="{{ asset('images/dply-mark-dark.svg') }}"
                         alt=""
-                        class="h-9 w-auto opacity-95"
-                        width="50"
-                        height="58"
+                        class="h-9 w-9 shrink-0"
+                        width="36"
+                        height="36"
                     />
                     <span class="text-lg font-semibold tracking-tight text-brand-cream">{{ config('app.name') }}</span>
                 </a>

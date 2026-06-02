@@ -600,6 +600,22 @@ class StepWhat extends Component
                     $this->normalizeDedicatedCacheServerForm();
                 }
 
+                // Worker hosts always need a webserver — Dply attaches
+                // testing hostnames to the vhost and operators expect a
+                // reachable URL even on a queue-worker box. Force caddy
+                // back if the user dropped it to "none" in the overrides
+                // panel. (Other roles can still pick webserver=none for
+                // truly headless deployments.)
+                if ($field === 'form.webserver'
+                    && $this->form->server_role === 'worker'
+                    && $this->form->webserver === 'none'
+                ) {
+                    $this->form->webserver = 'caddy';
+                    if (method_exists($this, 'toastInfo')) {
+                        $this->toastInfo(__('Worker hosts always run Caddy so sites can attach testing URLs. The webserver was reset to Caddy.'));
+                    }
+                }
+
                 break;
             }
         }

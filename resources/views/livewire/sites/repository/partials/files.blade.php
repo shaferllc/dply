@@ -1,7 +1,28 @@
-<section class="space-y-4">
+<section class="space-y-6">
     <div class="dply-card overflow-hidden">
-        <div class="flex flex-wrap items-center justify-between gap-3 bg-brand-cream/40 px-6 py-4 sm:px-7">
-            <nav aria-label="{{ __('Repository path') }}" class="min-w-0 flex-1">
+        <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
+            <div class="flex min-w-0 items-start gap-3">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-folder class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Browse') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Files') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Browse the repository tree at the selected ref. Click a file to preview it inline.') }}</p>
+                </div>
+            </div>
+            <label class="flex shrink-0 items-center gap-2 text-xs text-brand-moss">
+                <span class="font-semibold uppercase tracking-[0.12em]">{{ __('Ref') }}</span>
+                <input
+                    type="text"
+                    wire:model.live.debounce.400ms="branchOverride"
+                    placeholder="{{ $currentBranch }}"
+                    class="w-32 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 font-mono text-xs shadow-sm focus:border-brand-ink focus:ring-1 focus:ring-brand-ink"
+                />
+            </label>
+        </div>
+        <div class="bg-brand-cream/40 px-6 py-3 sm:px-7">
+            <nav aria-label="{{ __('Repository path') }}" class="min-w-0">
                 <ol class="flex flex-wrap items-center gap-1 text-sm">
                     @foreach ($filesBreadcrumb as $crumb)
                         @if ($loop->last)
@@ -16,15 +37,6 @@
                     @endforeach
                 </ol>
             </nav>
-            <label class="flex items-center gap-2 text-xs text-brand-moss">
-                <span class="font-semibold uppercase tracking-[0.12em]">{{ __('Ref') }}</span>
-                <input
-                    type="text"
-                    wire:model.live.debounce.400ms="branchOverride"
-                    placeholder="{{ $currentBranch }}"
-                    class="w-32 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 font-mono text-xs shadow-sm focus:border-brand-ink focus:ring-1 focus:ring-brand-ink"
-                />
-            </label>
         </div>
     </div>
 

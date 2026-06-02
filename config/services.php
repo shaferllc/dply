@@ -45,6 +45,11 @@ return [
          */
         'token' => env('DIGITALOCEAN_TOKEN'),
         'auto_testing_hostname_enabled' => (bool) env('DPLY_AUTO_TESTING_HOSTNAME_ENABLED', false),
+        /*
+         * Universal testing-zone pool (DO). Legacy callers still read from
+         * here — the provider-routing logic in TestingHostnameProvisioner
+         * folds these into services.dply.testing_domains.digitalocean.
+         */
         'testing_domains' => array_values(array_filter(array_map(
             static fn (string $value): string => trim($value),
             explode(',', (string) env('DPLY_TESTING_DOMAINS', ''))
@@ -201,6 +206,40 @@ return [
         'client_secret' => env('GITLAB_CLIENT_SECRET'),
         'redirect' => env('GITLAB_REDIRECT_URI', env('APP_URL').'/auth/gitlab/callback'),
         'scopes' => array_values(array_filter(array_map('trim', explode(',', (string) env('GITLAB_SCOPES', 'read_user,api'))))),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Dply testing-hostname pools by DNS provider
+    |--------------------------------------------------------------------------
+    |
+    | Per-provider lists of Dply-owned zones used to mint testing URLs for
+    | newly provisioned sites. When an organization has a credential for one
+    | of these providers connected, TestingHostnameProvisioner will use that
+    | provider's pool + credential so the testing record lives where the
+    | operator's existing DNS already is. Falls back to the digitalocean
+    | pool (services.digitalocean.token or an org-level DO credential) when
+    | no provider-specific match is available.
+    |
+    | Each env var is a comma-separated list of zones Dply controls on the
+    | given provider, e.g. DPLY_TESTING_DOMAINS_HETZNER="dply.forum".
+    |
+    */
+    'dply' => [
+        'testing_domains' => [
+            'digitalocean' => array_values(array_unique(array_filter(array_merge(
+                array_map(static fn (string $v): string => strtolower(trim($v)), explode(',', (string) env('DPLY_TESTING_DOMAINS', ''))),
+                array_map(static fn (string $v): string => strtolower(trim($v)), explode(',', (string) env('DPLY_TESTING_DOMAINS_DIGITALOCEAN', ''))),
+            )))),
+            'hetzner' => array_values(array_filter(array_map(
+                static fn (string $v): string => strtolower(trim($v)),
+                explode(',', (string) env('DPLY_TESTING_DOMAINS_HETZNER', ''))
+            ))),
+            'cloudflare' => array_values(array_filter(array_map(
+                static fn (string $v): string => strtolower(trim($v)),
+                explode(',', (string) env('DPLY_TESTING_DOMAINS_CLOUDFLARE', ''))
+            ))),
+        ],
     ],
 
 ];

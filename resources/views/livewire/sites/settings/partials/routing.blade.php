@@ -289,6 +289,19 @@
         </div>
 
         <div class="px-6 py-6">
+            <div class="mb-5 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3 text-sm leading-6 text-brand-moss">
+                <p class="font-medium text-brand-ink">{{ __('What an alias does') }}</p>
+                <p class="mt-1">{{ __('An alias makes this site also answer on another hostname, serving the exact same content as your primary domain — dply adds it to the webserver’s server_name list. It does not redirect, and it does not become the primary customer domain.') }}</p>
+                <ul class="mt-2 list-disc space-y-1 pl-5">
+                    <li>{{ __('Point the hostname’s DNS at this server first (A or CNAME), same as any domain.') }}</li>
+                    <li>{{ __('Want www → apex (or any forwarding)? Use the Redirects tab instead — an alias serves content, it doesn’t forward.') }}</li>
+                </ul>
+                <p class="mt-3 font-medium text-brand-ink">{{ __('Examples') }}</p>
+                <ul class="mt-1 space-y-1">
+                    <li><code class="font-mono text-xs text-brand-ink">www.example.com</code> — {{ __('serve the site on www as well as the apex') }}</li>
+                    <li><code class="font-mono text-xs text-brand-ink">example.net</code> — {{ __('an alternate TLD showing the same site') }}</li>
+                </ul>
+            </div>
             <form wire:submit="addAlias" id="add-alias-form" class="space-y-4">
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
@@ -320,7 +333,7 @@
                     <div>
                         <x-input-label for="bulk_alias_input" :value="__('One per line: hostname or hostname,label')" />
                         <textarea id="bulk_alias_input" wire:model="bulk_alias_input" rows="6" class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-xs shadow-sm focus:border-brand-sage focus:ring-brand-sage/30" placeholder="alt.example.com&#10;marketing.example.com,Marketing site"></textarea>
-                        <p class="mt-1 text-xs text-brand-moss">{{ __('Existing hostnames are silently skipped.') }}</p>
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('Format: hostname or hostname,label — e.g. www.example.com or example.net,Alt TLD. Existing hostnames are silently skipped.') }}</p>
                         <x-input-error :messages="$errors->get('bulk_alias_input')" class="mt-1" />
                     </div>
                     <div class="flex justify-end">
@@ -750,7 +763,12 @@
             <div class="grid gap-4 sm:grid-cols-2">
                 <div>
                     <x-input-label for="preview_primary_hostname" :value="__('Primary preview hostname')" />
-                    <x-text-input id="preview_primary_hostname" wire:model="preview_primary_hostname" class="mt-1 block w-full font-mono text-sm" placeholder="preview.example.dply.cc" />
+                    @if ($this->previewHostnameLocked())
+                        <x-text-input id="preview_primary_hostname" :value="$preview_primary_hostname" readonly class="mt-1 block w-full cursor-not-allowed bg-brand-sand/20 font-mono text-sm text-brand-moss" />
+                        <p class="mt-1 text-[11px] text-brand-moss">{{ __('Auto-provisioned managed hostname — DNS and the certificate are tied to this exact name, so it can’t be renamed here.') }}</p>
+                    @else
+                        <x-text-input id="preview_primary_hostname" wire:model="preview_primary_hostname" class="mt-1 block w-full font-mono text-sm" placeholder="preview.example.dply.cc" />
+                    @endif
                     <x-input-error :messages="$errors->get('preview_primary_hostname')" class="mt-1" />
                 </div>
                 <div>
@@ -845,6 +863,20 @@
         </div>
 
         <div class="px-6 py-6">
+            <div class="mb-5 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3 text-sm leading-6 text-brand-moss">
+                <p class="font-medium text-brand-ink">{{ __('What a tenant domain does') }}</p>
+                <p class="mt-1">{{ __('Map many customer hostnames to this one app so a single deployment serves all of them (multi-tenant SaaS). dply adds each hostname to the webserver’s server_name so the site answers for it; your app then decides which tenant a request belongs to — usually from the incoming Host header.') }}</p>
+                <ul class="mt-2 list-disc space-y-1 pl-5">
+                    <li>{{ __('Hostname — the customer’s domain, pointed at this server by DNS (e.g. app.acme.com).') }}</li>
+                    <li>{{ __('Tenant key & Label — your own reference labels. dply stores them but does not inject them into requests, so resolve the tenant from the Host header in your app code.') }}</li>
+                    <li>{{ __('After adding a tenant, use “Create testing URL” on its row to get a managed *.on-dply.cc hostname pointed at this app — preview it as that tenant before the customer’s real DNS is live.') }}</li>
+                </ul>
+                <p class="mt-3 font-medium text-brand-ink">{{ __('Examples') }}</p>
+                <ul class="mt-1 space-y-1">
+                    <li><code class="font-mono text-xs text-brand-ink">app.acme.com</code> — {{ __('key “acme”, label “Acme Corp”') }}</li>
+                    <li><code class="font-mono text-xs text-brand-ink">portal.beta.io</code> — {{ __('key “beta” (label optional)') }}</li>
+                </ul>
+            </div>
             <form wire:submit="addTenantDomain" id="add-tenant-form" class="space-y-4">
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
@@ -881,7 +913,7 @@
                     <div>
                         <x-input-label for="bulk_tenant_input" :value="__('One per line: hostname,key,label')" />
                         <textarea id="bulk_tenant_input" wire:model="bulk_tenant_input" rows="6" class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-xs shadow-sm focus:border-brand-sage focus:ring-brand-sage/30" placeholder="acme.example.com,acme,Acme Corp&#10;beta.example.com,beta"></textarea>
-                        <p class="mt-1 text-xs text-brand-moss">{{ __('Existing hostnames are silently skipped. Key and label are optional.') }}</p>
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('Format: hostname,key,label — key & label optional. e.g. app.acme.com,acme,Acme Corp. Lines starting with # are ignored; hostnames already in use are skipped.') }}</p>
                         <x-input-error :messages="$errors->get('bulk_tenant_input')" class="mt-1" />
                     </div>
                     <div class="flex justify-end">
@@ -964,9 +996,33 @@
                                         @if ($tenantDomain->comment)
                                             <p class="mt-1 whitespace-pre-line text-[11px] italic text-brand-mist"># {{ $tenantDomain->comment }}</p>
                                         @endif
+                                        @if ($tenantDomain->testingHostname())
+                                            @php $tenantTestStatus = $tenantDomain->testingDnsStatus() ?? 'pending'; @endphp
+                                            <p class="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-brand-moss">
+                                                <x-heroicon-o-beaker class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
+                                                <a href="https://{{ $tenantDomain->testingHostname() }}" target="_blank" rel="noopener" class="font-mono text-brand-ink hover:underline">{{ $tenantDomain->testingHostname() }}</a>
+                                                <span @class([
+                                                    'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]',
+                                                    'bg-emerald-100 text-emerald-900' => $tenantTestStatus === 'ready',
+                                                    'bg-rose-100 text-rose-900' => $tenantTestStatus === 'failed',
+                                                    'bg-amber-100 text-amber-900' => ! in_array($tenantTestStatus, ['ready', 'failed'], true),
+                                                ])>{{ __('testing DNS: :s', ['s' => $tenantTestStatus]) }}</span>
+                                            </p>
+                                        @endif
                                     </div>
                                 </div>
                                 <div class="flex flex-wrap items-center gap-2">
+                                    @if ($tenantDomain->testingHostname())
+                                        <button type="button" wire:click="removeTenantTestingHostname('{{ $tenantDomain->id }}')" wire:loading.attr="disabled" wire:target="removeTenantTestingHostname('{{ $tenantDomain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-moss shadow-sm hover:bg-brand-sand/40" title="{{ __('Delete the managed testing hostname for this tenant') }}">
+                                            <x-heroicon-o-beaker class="h-3.5 w-3.5" />
+                                            {{ __('Remove testing URL') }}
+                                        </button>
+                                    @else
+                                        <button type="button" wire:click="provisionTenantTestingHostname('{{ $tenantDomain->id }}')" wire:loading.attr="disabled" wire:target="provisionTenantTestingHostname('{{ $tenantDomain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-forest/30 bg-brand-forest/5 px-2.5 py-1 text-[11px] font-semibold text-brand-forest shadow-sm hover:bg-brand-forest/10" title="{{ __('Provision a dply testing-domain hostname pointed at this app for this tenant') }}">
+                                            <x-heroicon-o-beaker class="h-3.5 w-3.5" />
+                                            {{ __('Create testing URL') }}
+                                        </button>
+                                    @endif
                                     <button type="button" wire:click="editTenantDomain('{{ $tenantDomain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                         <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
                                         {{ __('Edit') }}

@@ -12,6 +12,7 @@ use App\Models\SiteUptimeMonitor;
 use App\Services\Serverless\FunctionStatsRangeQuery;
 use App\Services\Sites\SiteUptimeCheckUrlResolver;
 use App\Services\Sites\UptimeProbeRegionResolver;
+use App\Services\Sites\UptimeProbeWorkerResolver;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
@@ -43,6 +44,9 @@ class Monitor extends Component
 
     public string $newProbeRegion = 'eu-amsterdam';
 
+    /** Selected probe worker key for a new monitor; null when none configured. */
+    public ?string $newProbeWorker = null;
+
     /** Function-activity chart window: 1h | 24h | 7d (serverless only). */
     #[Url]
     public string $statsRange = '24h';
@@ -57,8 +61,13 @@ class Monitor extends Component
         $this->server = $server;
         $this->site = $site->load('uptimeMonitors');
 
-        // Default the probe region to the one nearest the host, not EU.
-        $this->newProbeRegion = app(UptimeProbeRegionResolver::class)->forSite($this->site);
+        // Default the probe worker to the one nearest the host; the region
+        // label follows the worker (falling back to nearest region when no
+        // worker is configured).
+        $workerResolver = app(UptimeProbeWorkerResolver::class);
+        $this->newProbeWorker = $workerResolver->forSite($this->site);
+        $this->newProbeRegion = $workerResolver->regionFor($this->newProbeWorker)
+            ?? app(UptimeProbeRegionResolver::class)->forSite($this->site);
 
         if (! FunctionStatsRangeQuery::isValidRange($this->statsRange)) {
             $this->statsRange = FunctionStatsRangeQuery::defaultRange();
@@ -83,12 +92,17 @@ class Monitor extends Component
             return;
         }
 
+        $workerResolver = app(UptimeProbeWorkerResolver::class);
+        $worker = $workerResolver->forSite($this->site);
+
         $monitor = SiteUptimeMonitor::query()->firstOrCreate(
             ['site_id' => $this->site->id, 'sort_order' => 0],
             [
                 'label' => __('Homepage check'),
                 'path' => null,
-                'probe_region' => app(UptimeProbeRegionResolver::class)->forSite($this->site),
+                'probe_region' => $workerResolver->regionFor($worker)
+                    ?? app(UptimeProbeRegionResolver::class)->forSite($this->site),
+                'probe_worker' => $worker,
             ],
         );
 
@@ -113,13 +127,20 @@ class Monitor extends Component
     {
         Gate::authorize('update', $this->site);
 
-        $regions = array_keys(config('site_uptime.probe_regions', []));
+        $workerResolver = app(UptimeProbeWorkerResolver::class);
+        $workerOptions = $workerResolver->options();
 
-        $this->validate([
+        $rules = [
             'newLabel' => 'required|string|max:120',
             'newPath' => 'nullable|string|max:2048',
-            'newProbeRegion' => ['required', 'string', Rule::in($regions)],
-        ]);
+        ];
+        // Only require a worker when some are configured; with none the feature
+        // falls back to the central egress (null worker → default queue).
+        if ($workerOptions !== []) {
+            $rules['newProbeWorker'] = ['required', 'string', Rule::in(array_keys($workerOptions))];
+        }
+
+        $this->validate($rules);
 
         $path = $this->normalizePathInput($this->newPath);
         if ($resolver->resolveBaseUrl($this->site) === null) {
@@ -128,13 +149,18 @@ class Monitor extends Component
             return;
         }
 
+        $worker = $workerOptions !== [] ? $this->newProbeWorker : null;
+        $region = $workerResolver->regionFor($worker)
+            ?? app(UptimeProbeRegionResolver::class)->forSite($this->site);
+
         $maxOrder = (int) $this->site->uptimeMonitors()->max('sort_order');
 
         $created = SiteUptimeMonitor::query()->create([
             'site_id' => $this->site->id,
             'label' => $this->newLabel,
             'path' => $path,
-            'probe_region' => $this->newProbeRegion,
+            'probe_region' => $region,
+            'probe_worker' => $worker,
             'sort_order' => $maxOrder + 1,
         ]);
 
@@ -193,6 +219,7 @@ class Monitor extends Component
     public function render(SiteUptimeCheckUrlResolver $resolver): View
     {
         $probeRegions = config('site_uptime.probe_regions', []);
+        $probeWorkerOptions = app(UptimeProbeWorkerResolver::class)->options();
         $baseUrl = $resolver->resolveBaseUrl($this->site);
         $hostnameDisplay = $baseUrl !== null ? (parse_url($baseUrl, PHP_URL_HOST) ?: $baseUrl) : null;
 
@@ -213,6 +240,7 @@ class Monitor extends Component
 
         return view('livewire.sites.monitor', [
             'probeRegions' => is_array($probeRegions) ? $probeRegions : [],
+            'probeWorkerOptions' => $probeWorkerOptions,
             'resolvedBaseUrl' => $baseUrl,
             'hostnameDisplay' => $hostnameDisplay,
             'settingsSidebarItems' => $settingsSidebarItems,

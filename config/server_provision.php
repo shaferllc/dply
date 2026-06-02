@@ -128,6 +128,12 @@ return [
 
     'install_fail2ban' => true,
 
+    // Configure and enable OS-native automatic security updates
+    // (unattended-upgrades) at the end of provisioning. The base bootstrap
+    // preempts cloud-init's copy to avoid apt-lock contention during install;
+    // this re-enables it with a security-only, no-auto-reboot policy.
+    'install_unattended_upgrades' => (bool) env('DPLY_INSTALL_UNATTENDED_UPGRADES', true),
+
     /*
     |--------------------------------------------------------------------------
     | Local retest override

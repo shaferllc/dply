@@ -8,7 +8,7 @@
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Endpoints') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Invocation URLs') }}</h2>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    {{ __('Every public address this function answers on. The raw DigitalOcean URL skips dply\'s edge entirely (no redirects, no headers, no CORS handling); use it as a fallback only.') }}
+                    {{ __('Every public address this function answers on. The origin URL skips dply\'s edge entirely (no redirects, no headers, no CORS handling); use it as a fallback only.') }}
                 </p>
             </div>
         </div>
@@ -57,7 +57,7 @@
         <p class="font-medium text-brand-ink">{{ __('How requests flow') }}</p>
         <ul class="mt-2 list-disc space-y-1 pl-5">
             <li>{{ __('Edge requests pass through redirects → CORS preflight → upstream invocation → response decoration.') }}</li>
-            <li>{{ __('Raw DigitalOcean URL bypasses dply entirely — no redirects, no custom headers, no CORS handling. Useful for ops debugging.') }}</li>
+            <li>{{ __('The origin URL bypasses dply entirely — no redirects, no custom headers, no CORS handling. Useful for ops debugging.') }}</li>
             <li>{{ __('Custom domains appear here only after their DNS status flips to ready on the Custom domains tab.') }}</li>
         </ul>
     </section>

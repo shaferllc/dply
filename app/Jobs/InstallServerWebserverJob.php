@@ -111,6 +111,18 @@ class InstallServerWebserverJob implements ShouldQueue
 
         Log::info('InstallServerWebserverJob: caddy installed.', ['server_id' => $server->id]);
 
+        // Re-sync the provider cloud firewall (Hetzner) so 80/443 open at
+        // the edge — the on-box `ufw allow 80/443` from the install script
+        // is necessary but not sufficient; Hetzner Cloud Firewall sits in
+        // front of UFW and was provisioned with the server's original
+        // webserver=none rule set, so 80/443 are still blocked until we
+        // ask Hetzner to add them. HetznerCloudFirewallRules::forServer()
+        // already includes them whenever meta.webserver is non-"none", so
+        // a single setFirewallRules call against the existing firewall
+        // does it. Failures are logged but don't fail the install — the
+        // operator can re-run `dply:hetzner:ensure-firewall <id>` to retry.
+        $this->syncHetznerCloudFirewall($server->fresh());
+
         // Re-queue provisioning for headless sites on this server so they
         // get vhosts + testing hostnames now that caddy is up. Skip sites
         // that already failed or are mid-flight.
@@ -121,6 +133,55 @@ class InstallServerWebserverJob implements ShouldQueue
             $site->forceFill(['status' => Site::STATUS_PENDING])->save();
             $siteProvisioner->markQueued($site);
             ProvisionSiteJob::dispatch($site->id);
+        }
+    }
+
+    /**
+     * Push the new rule set (which now includes 80/443 because meta.webserver
+     * is no longer "none") to the server's existing Hetzner Cloud Firewall.
+     * Only acts on Hetzner-provisioned hosts that already have a managed
+     * firewall id stamped in meta — other providers rely on default-open
+     * cloud networking and only need the on-box UFW lines.
+     */
+    private function syncHetznerCloudFirewall(\App\Models\Server $server): void
+    {
+        if ($server->provider->value !== 'hetzner') {
+            return;
+        }
+
+        $firewallId = (int) data_get($server->meta, 'hetzner_firewall_id', 0);
+        if ($firewallId === 0) {
+            Log::info('InstallServerWebserverJob: no hetzner_firewall_id on server, skipping cloud-firewall sync.', [
+                'server_id' => $server->id,
+            ]);
+
+            return;
+        }
+
+        $credential = $server->providerCredential;
+        if ($credential === null) {
+            Log::warning('InstallServerWebserverJob: server has no provider credential, cannot sync cloud firewall.', [
+                'server_id' => $server->id,
+            ]);
+
+            return;
+        }
+
+        try {
+            $hetzner = new \App\Services\HetznerService($credential);
+            $rules = \App\Support\Servers\HetznerCloudFirewallRules::forServer($server);
+            $hetzner->setFirewallRules($firewallId, $rules);
+            Log::info('InstallServerWebserverJob: Hetzner cloud firewall re-synced.', [
+                'server_id' => $server->id,
+                'firewall_id' => $firewallId,
+                'rule_count' => count($rules),
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('InstallServerWebserverJob: Hetzner cloud firewall sync failed (run dply:hetzner:ensure-firewall to retry).', [
+                'server_id' => $server->id,
+                'firewall_id' => $firewallId,
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 }

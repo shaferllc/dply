@@ -1,14 +1,35 @@
 <section class="space-y-6">
+    {{-- Primary endpoint: the dply-managed edge hostname custom domains CNAME
+         to. Reuses the DnsPanel component (provision / verify / force-purge of
+         the auto-provisioned testing-domain subdomain) — formerly its own
+         "Hostname & DNS" tab, now the top of this merged Domains tab. --}}
     <div class="dply-card overflow-hidden">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
             </span>
             <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Primary endpoint') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Edge hostname & DNS') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                    {{ __('dply auto-provisions a subdomain on the testing domain pointing at this function. This is the hostname your custom domains should CNAME to.') }}
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <livewire:serverless.dns-panel :site="$site" :wire:key="'dns-panel-routing-'.$site->id" />
+
+    <div class="dply-card overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Domain') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Attach a custom domain') }}</h2>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    {{ __('Point your own hostname (e.g. api.acme.com) at this function. If dply\'s DigitalOcean token owns the apex zone, the CNAME is written automatically. Otherwise dply gives you the exact CNAME target to publish at your own DNS provider, then verifies it.') }}
+                    {{ __('Point your own hostname (e.g. api.acme.com) at this function. If dply manages DNS for the apex zone, the CNAME is written automatically. Otherwise dply gives you the exact CNAME target to publish at your own DNS provider, then verifies it.') }}
                 </p>
             </div>
         </div>
@@ -119,7 +140,7 @@
                                 <button
                                     type="button"
                                     wire:click="removeCustomDomain('{{ $domain['hostname'] }}')"
-                                    wire:confirm="{{ __('Detach :host? Auto-mode DNS records will be deleted from DigitalOcean.', ['host' => $domain['hostname']]) }}"
+                                    wire:confirm="{{ __('Detach :host? Auto-mode DNS records will be removed automatically.', ['host' => $domain['hostname']]) }}"
                                     class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-900 shadow-sm hover:bg-rose-50"
                                 >
                                     <x-heroicon-o-trash class="h-3.5 w-3.5" />

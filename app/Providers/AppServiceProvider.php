@@ -55,6 +55,7 @@ use App\Policies\StatusPagePolicy;
 use App\Policies\TeamPolicy;
 use App\Policies\UserSshKeyPolicy;
 use App\Policies\WorkspacePolicy;
+use App\Services\Certificates\CaddyAutomaticHttpsCertificateEngine;
 use App\Services\Certificates\CertificateEngineResolver;
 use App\Services\Certificates\CertificateRequestService;
 use App\Services\Certificates\CertificateSigningRequestGenerator;
@@ -107,6 +108,7 @@ use App\Services\Sites\SiteSystemdUnitBuilder;
 use App\Services\Sites\SiteTraefikProvisioner;
 use App\Services\Sites\SiteWebserverProvisionerRegistry;
 use App\Services\Sites\UptimeProbeRegionResolver;
+use App\Services\Sites\UptimeProbeWorkerResolver;
 use App\Services\Sites\WebserverConfig\ApacheWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\CaddyWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\NginxWebserverConfigEngine;
@@ -247,6 +249,9 @@ class AppServiceProvider extends ServiceProvider
         ], 'site.runtime.provisioners');
 
         $this->app->tag([
+            // Caddy fronts manage TLS themselves (automatic HTTPS) — intercept
+            // before the certbot engine so Caddy sites never shell out to certbot.
+            CaddyAutomaticHttpsCertificateEngine::class,
             LetsEncryptHttpCertificateEngine::class,
             LetsEncryptDnsCertificateEngine::class,
             ZeroSslHttpCertificateEngine::class,
@@ -405,13 +410,20 @@ class AppServiceProvider extends ServiceProvider
                         return;
                     }
 
+                    // Probe from the worker nearest the host; the cosmetic
+                    // region label is derived from that worker (falling back to
+                    // the host's nearest region when no worker is configured).
+                    $worker = app(UptimeProbeWorkerResolver::class)->forSite($site);
+                    $region = app(UptimeProbeWorkerResolver::class)->regionFor($worker)
+                        ?? app(UptimeProbeRegionResolver::class)->forSite($site);
+
                     SiteUptimeMonitor::query()->firstOrCreate(
                         ['site_id' => $site->id, 'sort_order' => 0],
                         [
                             'label' => __('Homepage check'),
                             'path' => null,
-                            // Probe from the region nearest the host, not a fixed default.
-                            'probe_region' => app(UptimeProbeRegionResolver::class)->forSite($site),
+                            'probe_region' => $region,
+                            'probe_worker' => $worker,
                         ],
                     );
                 },

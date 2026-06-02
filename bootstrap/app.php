@@ -98,8 +98,9 @@ return Application::configure(basePath: dirname(__DIR__))
                 return;
             }
             SiteUptimeMonitor::query()
-                ->pluck('id')
-                ->each(fn (string $id) => RunSiteUptimeMonitorCheckJob::dispatch($id));
+                ->get(['id', 'probe_worker'])
+                ->each(fn (SiteUptimeMonitor $monitor) => RunSiteUptimeMonitorCheckJob::dispatch($monitor->id)
+                    ->onQueue(RunSiteUptimeMonitorCheckJob::queueForMonitor($monitor)));
         })->everyFiveMinutes()->name('dispatch-site-uptime-checks');
 
         // SSH login notifications. Dispatches a per-server scan job only for

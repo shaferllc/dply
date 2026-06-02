@@ -39,6 +39,8 @@ class DeploymentsList extends Component
 
     public const TAB_OVERVIEW = 'overview';
 
+    public const TAB_REPOSITORY = 'repository';
+
     public const TAB_DEPLOY = 'deploy';
 
     public const TAB_COMMITS = 'commits';
@@ -57,17 +59,29 @@ class DeploymentsList extends Component
 
     public const TAB_SETTINGS = 'settings';
 
+    public const TAB_WEBHOOK = 'webhook';
+
+    public const TAB_HOOKS = 'hooks';
+
     public const TABS = [
         self::TAB_OVERVIEW,
+        self::TAB_REPOSITORY,
         self::TAB_DEPLOY,
-        self::TAB_COMMITS,
-        self::TAB_FILES,
-        self::TAB_BRANCHES,
+        self::TAB_WEBHOOK,
+        self::TAB_HOOKS,
+        // TAB_COMMITS / TAB_FILES / TAB_BRANCHES intentionally absent — they
+        // live as sub-tabs under Repository now. Any ?tab=commits / =files
+        // / =branches URL resets to TAB_DEPLOY via the in_array() guard in
+        // mount(); the constants stay defined so other code references keep
+        // compiling.
+        // TAB_SETTINGS intentionally absent — Webhook + Hooks moved up to
+        // top-level tabs; the Settings tab and its panel are no longer
+        // surfaced. Constant kept defined for compatibility with code that
+        // references it (e.g. mount/setTab fall-through guards).
         self::TAB_PIPELINE,
         self::TAB_ROLLOUT,
         self::TAB_RELEASES,
         self::TAB_HISTORY,
-        self::TAB_SETTINGS,
     ];
 
     public const SETTINGS_SECTIONS = ['pipeline', 'repository', 'hooks'];
@@ -75,8 +89,14 @@ class DeploymentsList extends Component
     #[Url(as: 'tab', except: self::TAB_DEPLOY)]
     public string $tab = self::TAB_DEPLOY;
 
+    /**
+     * Sub-section anchor within the Settings tab (e.g. ?section=pipeline). Stored under a
+     * non-`$section` name to avoid shadowing the sidebar's `$section` view variable, which
+     * the Livewire renderer would otherwise inject from this property and break sidebar
+     * highlighting for the Deployments item. The URL key stays `section` via the `as:`.
+     */
     #[Url(as: 'section', except: '')]
-    public string $section = '';
+    public string $settingsSection = '';
 
     #[Url(as: 'status', except: '')]
     public string $statusFilter = '';
@@ -111,9 +131,9 @@ class DeploymentsList extends Component
             $this->tab = self::TAB_DEPLOY;
         }
         if ($this->tab !== self::TAB_SETTINGS) {
-            $this->section = '';
-        } elseif (! in_array($this->section, self::SETTINGS_SECTIONS, true)) {
-            $this->section = '';
+            $this->settingsSection = '';
+        } elseif (! in_array($this->settingsSection, self::SETTINGS_SECTIONS, true)) {
+            $this->settingsSection = '';
         }
     }
 
@@ -127,7 +147,7 @@ class DeploymentsList extends Component
         }
         $this->tab = $tab;
         if ($tab !== self::TAB_SETTINGS) {
-            $this->section = '';
+            $this->settingsSection = '';
         }
     }
 
@@ -137,7 +157,7 @@ class DeploymentsList extends Component
             return;
         }
         $this->tab = self::TAB_SETTINGS;
-        $this->section = $section;
+        $this->settingsSection = $section;
     }
 
     public function updatedStatusFilter(): void
@@ -211,15 +231,21 @@ class DeploymentsList extends Component
 
         $tabsVisible = [
             self::TAB_OVERVIEW => true,
+            self::TAB_REPOSITORY => true,
             self::TAB_DEPLOY => true,
-            self::TAB_COMMITS => true,
-            self::TAB_FILES => true,
-            self::TAB_BRANCHES => true,
+            self::TAB_WEBHOOK => true,
+            // Hooks editor only applies to DigitalOcean Functions hosts.
+            self::TAB_HOOKS => (bool) $this->site->server?->isDigitalOceanFunctionsHost(),
+            // Commits / Files / Branches live under Repository now.
+            self::TAB_COMMITS => false,
+            self::TAB_FILES => false,
+            self::TAB_BRANCHES => false,
             self::TAB_PIPELINE => $isVmDeployHub,
             self::TAB_ROLLOUT => $isVmDeployHub,
             self::TAB_RELEASES => $atomicReleases,
             self::TAB_HISTORY => true,
-            self::TAB_SETTINGS => true,
+            // Settings consolidated up into Webhook + Hooks tabs.
+            self::TAB_SETTINGS => false,
         ];
 
         $overviewMetrics = $this->tab === self::TAB_OVERVIEW

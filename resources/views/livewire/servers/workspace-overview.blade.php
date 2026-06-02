@@ -63,7 +63,7 @@
         $provisionError = is_array($server->meta['provision_error'] ?? null) ? $server->meta['provision_error'] : null;
     @endphp
 
-    <div class="space-y-6">
+    <div class="space-y-4">
         {{-- Provisioning error banner --}}
         @if ($provisionError && $server->status === \App\Models\Server::STATUS_ERROR)
             <section data-testid="server-provision-error" class="dply-card overflow-hidden border-rose-200">
@@ -157,12 +157,11 @@
         @if ($server->workspace)
             @feature('surface.projects')
                 <section class="dply-card overflow-hidden">
-                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <div class="flex items-start gap-3 px-6 pt-5 pb-4 sm:px-7">
                         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                             <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Project') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $server->workspace->name }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                                 {{ __('This server is managed as part of the project. Use the project pages when you need access control, grouped activity, shared variables, coordinated deploys, or cross-resource health review.') }}
@@ -353,7 +352,7 @@
                     x-data="{ open: @js($onboardingDone === 0) }"
                     class="dply-card overflow-hidden"
                 >
-                    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <div class="px-6 pt-5 pb-4 sm:px-7">
                         <button
                             type="button"
                             x-on:click="open = ! open"
@@ -363,7 +362,6 @@
                                 <x-heroicon-o-rocket-launch class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Get started') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
                                     {{ trans_choice('{1} :n step left to make this server useful|[2,*] :n steps left to make this server useful', $onboardingTotal - $onboardingDone, ['n' => $onboardingTotal - $onboardingDone]) }}
                                 </h3>
@@ -409,96 +407,6 @@
                 </section>
             @endif
 
-            {{-- Live system metrics. --}}
-            @php
-                $metricPayload = is_object($latestMetricSnapshot) && is_array($latestMetricSnapshot->payload ?? null)
-                    ? $latestMetricSnapshot->payload
-                    : [];
-                $metricCpu = isset($metricPayload['cpu_pct']) && is_numeric($metricPayload['cpu_pct']) ? (float) $metricPayload['cpu_pct'] : null;
-                $metricMem = isset($metricPayload['mem_pct']) && is_numeric($metricPayload['mem_pct']) ? (float) $metricPayload['mem_pct'] : null;
-                $metricDisk = isset($metricPayload['disk_pct']) && is_numeric($metricPayload['disk_pct']) ? (float) $metricPayload['disk_pct'] : null;
-                $metricLoad1m = isset($metricPayload['load_1m']) && is_numeric($metricPayload['load_1m']) ? (float) $metricPayload['load_1m'] : null;
-                $metricLoadPerCpu = isset($metricPayload['load_per_cpu_1m']) && is_numeric($metricPayload['load_per_cpu_1m']) ? (float) $metricPayload['load_per_cpu_1m'] : null;
-                $metricHasAny = $metricCpu !== null || $metricMem !== null || $metricDisk !== null;
-                $metricCapturedAt = is_object($latestMetricSnapshot) ? $latestMetricSnapshot->captured_at : null;
-                $metricStale = $metricCapturedAt && $metricCapturedAt->lt(now()->subMinutes(10));
-                $metricBar = function (?float $pct): array {
-                    if ($pct === null) {
-                        return ['width' => 0, 'color' => 'bg-brand-mist/40'];
-                    }
-                    $clamped = max(0.0, min(100.0, $pct));
-                    if ($pct >= 95) {
-                        $color = 'bg-rose-500';
-                    } elseif ($pct >= 85) {
-                        $color = 'bg-amber-500';
-                    } else {
-                        $color = 'bg-emerald-500';
-                    }
-
-                    return ['width' => $clamped, 'color' => $color];
-                };
-                $metricRow = function (string $label, ?float $pct) use ($metricBar): string {
-                    $bar = $metricBar($pct);
-                    $val = $pct === null ? '—' : number_format($pct, 0).'%';
-
-                    return view('livewire.servers.partials._overview-metric-row', [
-                        'label' => $label,
-                        'value' => $val,
-                        'barColor' => $bar['color'],
-                        'barWidth' => $bar['width'],
-                    ])->render();
-                };
-            @endphp
-            <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
-                            <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Live load') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('System load right now') }}</h3>
-                            @if ($metricCapturedAt)
-                                <p class="mt-1 text-xs {{ $metricStale ? 'text-amber-700' : 'text-brand-mist' }}">
-                                    {{ __('Sampled :ago', ['ago' => $metricCapturedAt->diffForHumans()]) }}
-                                    @if ($metricStale)
-                                        · <span class="font-semibold uppercase tracking-wide">{{ __('stale') }}</span>
-                                    @endif
-                                </p>
-                            @endif
-                        </div>
-                        <a href="{{ route('servers.monitor', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                            <x-heroicon-m-chart-bar class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                            {{ __('Open Monitor') }}
-                        </a>
-                    </div>
-                </div>
-                <div class="p-6 sm:p-7">
-                    @if (! $metricHasAny)
-                        <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-cream/30 px-4 py-3 text-sm text-brand-moss">
-                            {{ __('No metric snapshots yet — install the monitor agent from the Monitor tab so this card lights up.') }}
-                        </div>
-                    @else
-                        <div class="grid gap-3 sm:grid-cols-3">
-                            {!! $metricRow(__('CPU'), $metricCpu) !!}
-                            {!! $metricRow(__('Memory'), $metricMem) !!}
-                            {!! $metricRow(__('Disk'), $metricDisk) !!}
-                        </div>
-                        @if ($metricLoad1m !== null)
-                            <p class="mt-3 text-xs text-brand-moss">
-                                {{ __('Load (1m)') }}:
-                                <span class="font-mono font-semibold text-brand-ink">{{ number_format($metricLoad1m, 2) }}</span>
-                                @if ($metricLoadPerCpu !== null)
-                                    <span class="text-brand-mist"> · </span>
-                                    {{ __('per CPU') }}:
-                                    <span class="font-mono font-semibold text-brand-ink">{{ number_format($metricLoadPerCpu, 2) }}</span>
-                                @endif
-                            </p>
-                        @endif
-                    @endif
-                </div>
-            </section>
-
             {{-- SSH key reminder --}}
             @if (! $serverHasPersonalProfileKey)
                 <section class="dply-card overflow-hidden border-amber-200">
@@ -543,14 +451,13 @@
                  (container hosts + VM app/worker hosts) — not dedicated cache/db boxes. --}}
             @if ($siteCount === 0 && ! $containerLaunch && ! $isDedicatedServiceRoleHost)
                 <section data-testid="add-first-site-cta" class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <div class="px-6 pt-5 pb-4 sm:px-7">
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div class="flex items-start gap-3">
                                 <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                                     <x-heroicon-o-cube-transparent class="h-5 w-5" aria-hidden="true" />
                                 </span>
                                 <div class="min-w-0">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Next step') }}</p>
                                     @if ($isContainerHost)
                                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Add your first container app') }}</h3>
                                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Point dply at a Git repo and we will inspect the Dockerfile, build the image, and deploy onto this host. You can add more apps any time.') }}</p>
@@ -594,13 +501,12 @@
             @endphp
             @if (! $isDedicatedServiceRoleHost)
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <div class="px-6 pt-5 pb-4 sm:px-7">
                     <div class="flex items-start gap-3">
                         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                             <x-heroicon-o-squares-2x2 class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('At a glance') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Workspace summary') }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Each tile drops you onto its full workspace page.') }}</p>
                         </div>
@@ -681,6 +587,97 @@
             </section>
             @endif
 
+            {{-- Live system metrics. Sits directly below the At-a-glance summary
+                 so load reads as part of the same "where does this server stand"
+                 story, rather than wedged between the setup nudges above. --}}
+            @php
+                $metricPayload = is_object($latestMetricSnapshot) && is_array($latestMetricSnapshot->payload ?? null)
+                    ? $latestMetricSnapshot->payload
+                    : [];
+                $metricCpu = isset($metricPayload['cpu_pct']) && is_numeric($metricPayload['cpu_pct']) ? (float) $metricPayload['cpu_pct'] : null;
+                $metricMem = isset($metricPayload['mem_pct']) && is_numeric($metricPayload['mem_pct']) ? (float) $metricPayload['mem_pct'] : null;
+                $metricDisk = isset($metricPayload['disk_pct']) && is_numeric($metricPayload['disk_pct']) ? (float) $metricPayload['disk_pct'] : null;
+                $metricLoad1m = isset($metricPayload['load_1m']) && is_numeric($metricPayload['load_1m']) ? (float) $metricPayload['load_1m'] : null;
+                $metricLoadPerCpu = isset($metricPayload['load_per_cpu_1m']) && is_numeric($metricPayload['load_per_cpu_1m']) ? (float) $metricPayload['load_per_cpu_1m'] : null;
+                $metricHasAny = $metricCpu !== null || $metricMem !== null || $metricDisk !== null;
+                $metricCapturedAt = is_object($latestMetricSnapshot) ? $latestMetricSnapshot->captured_at : null;
+                $metricStale = $metricCapturedAt && $metricCapturedAt->lt(now()->subMinutes(10));
+                $metricBar = function (?float $pct): array {
+                    if ($pct === null) {
+                        return ['width' => 0, 'color' => 'bg-brand-mist/40'];
+                    }
+                    $clamped = max(0.0, min(100.0, $pct));
+                    if ($pct >= 95) {
+                        $color = 'bg-rose-500';
+                    } elseif ($pct >= 85) {
+                        $color = 'bg-amber-500';
+                    } else {
+                        $color = 'bg-emerald-500';
+                    }
+
+                    return ['width' => $clamped, 'color' => $color];
+                };
+                $metricRow = function (string $label, ?float $pct) use ($metricBar): string {
+                    $bar = $metricBar($pct);
+                    $val = $pct === null ? '—' : number_format($pct, 0).'%';
+
+                    return view('livewire.servers.partials._overview-metric-row', [
+                        'label' => $label,
+                        'value' => $val,
+                        'barColor' => $bar['color'],
+                        'barWidth' => $bar['width'],
+                    ])->render();
+                };
+            @endphp
+            <section class="dply-card overflow-hidden">
+                <div class="px-6 pt-5 pb-4 sm:px-7">
+                    <div class="flex items-start gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0 flex-1">
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('System load right now') }}</h3>
+                            @if ($metricCapturedAt)
+                                <p class="mt-1 text-xs {{ $metricStale ? 'text-amber-700' : 'text-brand-mist' }}">
+                                    {{ __('Sampled :ago', ['ago' => $metricCapturedAt->diffForHumans()]) }}
+                                    @if ($metricStale)
+                                        · <span class="font-semibold uppercase tracking-wide">{{ __('stale') }}</span>
+                                    @endif
+                                </p>
+                            @endif
+                        </div>
+                        <a href="{{ route('servers.monitor', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                            <x-heroicon-m-chart-bar class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            {{ __('Open Monitor') }}
+                        </a>
+                    </div>
+                </div>
+                <div class="p-6 sm:p-7">
+                    @if (! $metricHasAny)
+                        <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-cream/30 px-4 py-3 text-sm text-brand-moss">
+                            {{ __('No metric snapshots yet — install the monitor agent from the Monitor tab so this card lights up.') }}
+                        </div>
+                    @else
+                        <div class="grid gap-3 sm:grid-cols-3">
+                            {!! $metricRow(__('CPU'), $metricCpu) !!}
+                            {!! $metricRow(__('Memory'), $metricMem) !!}
+                            {!! $metricRow(__('Disk'), $metricDisk) !!}
+                        </div>
+                        @if ($metricLoad1m !== null)
+                            <p class="mt-3 text-xs text-brand-moss">
+                                {{ __('Load (1m)') }}:
+                                <span class="font-mono font-semibold text-brand-ink">{{ number_format($metricLoad1m, 2) }}</span>
+                                @if ($metricLoadPerCpu !== null)
+                                    <span class="text-brand-mist"> · </span>
+                                    {{ __('per CPU') }}:
+                                    <span class="font-mono font-semibold text-brand-ink">{{ number_format($metricLoadPerCpu, 2) }}</span>
+                                @endif
+                            </p>
+                        @endif
+                    @endif
+                </div>
+            </section>
+
             {{-- Redis-native tile pack. server_role=redis/valkey hosts replace
                  the generic Sites/Databases/Latest-deploy/Background tiles with
                  INFO-derived values (memory, hit-rate, keys, persistence). Data
@@ -719,13 +716,12 @@
                     };
                 @endphp
                 <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <div class="px-6 pt-5 pb-4 sm:px-7">
                         <div class="flex items-start gap-3">
                             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                                 <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('At a glance') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine workspace', ['engine' => $engineLabel]) }}</h3>
                                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Live values pulled from INFO. Each tile drops you onto the full Caches workspace.') }}</p>
                             </div>
@@ -865,13 +861,12 @@
                         : __('Database backup cron on this host');
                 @endphp
                 <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <div class="px-6 pt-5 pb-4 sm:px-7">
                         <div class="flex items-start gap-3">
                             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                                 <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('At a glance') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine workspace', ['engine' => $engineLabel]) }}</h3>
                                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Engine status and databases on this host. Each tile drops you onto the full Database workspace.') }}</p>
                             </div>
@@ -912,13 +907,12 @@
             {{-- Sites preview. --}}
             @if (! $isDedicatedServiceRoleHost && $sitesPreview->isNotEmpty())
                 <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <div class="px-6 pt-5 pb-4 sm:px-7">
                         <div class="flex items-start gap-3">
                             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                                 <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Sites') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent activity') }}</h3>
                                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Top sites by last-touched, with each site\'s most recent deploy.') }}</p>
                             </div>
@@ -994,13 +988,12 @@
             {{-- Stack summary (app servers only — dedicated cache/db boxes use their tile packs). --}}
             @if (! $isDedicatedServiceRoleHost)
             <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <div class="px-6 pt-5 pb-4 sm:px-7">
                     <div class="flex items-start gap-3">
                         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                             <x-heroicon-o-cpu-chip class="h-5 w-5" aria-hidden="true" />
                         </span>
                         <div class="min-w-0 flex-1">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Stack') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Installed runtime') }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Database engine, language runtime, webserver, cache.') }}</p>
                         </div>
@@ -1053,6 +1046,11 @@
             </section>
             @endif
 
+            {{-- Secondary shortcuts (capacity, cost, patches, hygiene, radar,
+                 insights, alerts). A two-column grid keeps these compact
+                 "summary + open" cards as one tidy block instead of a tall
+                 stack of identical full-width stripes. --}}
+            <div class="grid gap-4 lg:grid-cols-2 lg:items-start">
             {{-- Health cockpit shortcut (VM + flag). --}}
             @feature('workspace.health')
             @if ($healthCockpitSummary)
@@ -1066,10 +1064,9 @@
                     'border-amber-200' => $healthWarning && ! $healthCritical,
                 ])>
                     <div @class([
-                        'border-b border-brand-ink/10 px-6 py-5 sm:px-7',
+                        'px-6 pt-5 pb-4 sm:px-7',
                         'bg-rose-50/60' => $healthCritical,
                         'bg-amber-50/60' => $healthWarning && ! $healthCritical,
-                        'bg-brand-sand/20' => ! $healthCritical && ! $healthWarning,
                     ])>
                         <div class="flex items-start gap-3">
                             <span @class([
@@ -1117,9 +1114,8 @@
                     'border-amber-200' => $costNudgeWarning,
                 ])>
                     <div @class([
-                        'border-b border-brand-ink/10 px-6 py-5 sm:px-7',
+                        'px-6 pt-5 pb-4 sm:px-7',
                         'bg-amber-50/60' => $costNudgeWarning,
-                        'bg-brand-sand/20' => ! $costNudgeWarning,
                     ])>
                         <div class="flex items-start gap-3">
                             <span @class([
@@ -1167,10 +1163,9 @@
                     'border-amber-200' => $patchWarning && ! $patchCritical,
                 ])>
                     <div @class([
-                        'border-b border-brand-ink/10 px-6 py-5 sm:px-7',
+                        'px-6 pt-5 pb-4 sm:px-7',
                         'bg-rose-50/60' => $patchCritical,
                         'bg-amber-50/60' => $patchWarning && ! $patchCritical,
-                        'bg-brand-sand/20' => ! $patchCritical && ! $patchWarning,
                     ])>
                         <div class="flex items-start gap-3">
                             <span @class([
@@ -1224,10 +1219,9 @@
                     'border-amber-200' => $hygieneWarning && ! $hygieneCritical,
                 ])>
                     <div @class([
-                        'border-b border-brand-ink/10 px-6 py-5 sm:px-7',
+                        'px-6 pt-5 pb-4 sm:px-7',
                         'bg-rose-50/60' => $hygieneCritical,
                         'bg-amber-50/60' => $hygieneWarning && ! $hygieneCritical,
-                        'bg-brand-sand/20' => ! $hygieneCritical && ! $hygieneWarning,
                     ])>
                         <div class="flex items-start gap-3">
                             <span @class([
@@ -1273,11 +1267,10 @@
                     'border-sky-200' => $sharedHostPreview,
                 ])>
                     <div @class([
-                        'border-b border-brand-ink/10 px-6 py-5 sm:px-7',
+                        'px-6 pt-5 pb-4 sm:px-7',
                         'bg-rose-50/60' => $sharedHostCritical,
                         'bg-amber-50/60' => $sharedHostWarning && ! $sharedHostCritical,
                         'bg-sky-50/60' => $sharedHostPreview,
-                        'bg-brand-sand/20' => ! $sharedHostCritical && ! $sharedHostWarning && ! $sharedHostPreview,
                     ])>
                         <div class="flex flex-wrap items-start justify-between gap-3">
                             <div class="flex items-start gap-3">
@@ -1348,13 +1341,12 @@
             {{-- Notifications --}}
             @if ($notificationSummary['manage_url'])
                 <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <div class="px-6 pt-5 pb-4 sm:px-7">
                         <div class="flex items-start gap-3">
                             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                                 <x-heroicon-o-bell-alert class="h-5 w-5" aria-hidden="true" />
                             </span>
                             <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Notifications') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
                                     @if ($notificationSummary['channel_count'] > 0)
                                         {{ trans_choice('{1} :count channel routing this server|[2,*] :count channels routing this server', $notificationSummary['channel_count'], ['count' => $notificationSummary['channel_count']]) }}
@@ -1378,6 +1370,7 @@
                     </div>
                 </section>
             @endif
+            </div>
         @endif
 
         {{-- Danger zone --}}
