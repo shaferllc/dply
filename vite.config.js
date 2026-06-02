@@ -40,7 +40,6 @@ export default defineConfig(({ mode }) => {
                     'resources/js/app.js',
                     'resources/js/dply-passkeys-lazy.js',
                     'resources/js/file-browser-editor-lazy.js',
-                    'resources/js/deploy-pipeline-dnd.js',
                     'resources/js/roadmap-admin-dnd.js',
                 ],
                 refresh: false,

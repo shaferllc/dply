@@ -17,7 +17,7 @@ class WorkspaceDaemonSlo extends Component
 {
     public function mount(Server $server): void
     {
-        $this->redirect(route('servers.daemons', $server), navigate: true);
+        $this->redirect(route('servers.workers', $server), navigate: true);
     }
 
     public function render(): View

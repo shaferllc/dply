@@ -1,11 +1,18 @@
 /**
  * Drag-and-drop for site deploy pipeline steps + hooks (Sortable.js).
  * Use this.$wire (not a reactive Alpine property) to avoid Vue __v_raw proxy errors.
+ *
+ * Registered from the main bundle (resources/js/app.js) so the component is
+ * defined before Alpine.start(). It must NOT self-register on `alpine:init`:
+ * this file used to be lazily @vite'd inside the pipeline partial, which loads
+ * after the main bundle has already fired `alpine:init`, so the listener never
+ * ran and `x-data="deployPipelineWorkspace()"` threw "not defined" (cascading
+ * into unrelated Alpine scopes on the same page).
  */
 import Sortable from 'sortablejs';
 
-document.addEventListener('alpine:init', () => {
-    window.Alpine.data('deployPipelineWorkspace', () => ({
+export function registerDeployPipelineWorkspace(Alpine) {
+    Alpine.data('deployPipelineWorkspace', () => ({
         buildSortable: null,
         releaseSortable: null,
         buildPaletteSortable: null,
@@ -296,4 +303,4 @@ document.addEventListener('alpine:init', () => {
             this.teardown();
         },
     }));
-});
+}

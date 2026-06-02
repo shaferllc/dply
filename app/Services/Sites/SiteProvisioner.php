@@ -121,6 +121,33 @@ class SiteProvisioner
             }
         }
 
+        // Headless sites (webserver=none, e.g. a worker host) run deployed code
+        // with no HTTP front — skip testing hostname, vhost config, and HTTP
+        // reachability. The site is "active" once the first deploy lands the
+        // code; it still uses the same deploy pipeline as any other site.
+        if ($site->isHeadless()) {
+            $this->appendLog($site, 'info', 'queued', 'Headless provisioning worker started — no web server to configure.', [
+                'server_id' => (string) $site->server_id,
+            ]);
+
+            $site->update(['status' => Site::activeStatusForWebserver('none')]);
+
+            $this->updateProvisioning($site, [
+                'state' => 'ready',
+                'webserver' => 'none',
+                'started_at' => now()->toIso8601String(),
+                'configured_at' => now()->toIso8601String(),
+                'checked_at' => now()->toIso8601String(),
+                'host_checks' => [],
+                'error' => null,
+            ]);
+
+            $this->appendLog($site, 'info', 'ready', 'Headless site is ready. Run a deploy to install the code.');
+            $this->revisionTracker->markApplied($site->fresh(), $this->contractBuilder->build($site->fresh())->revision(), 'runtime');
+
+            return;
+        }
+
         $this->appendLog($site, 'info', 'queued', 'Provisioning worker started.', [
             'webserver' => $site->webserver(),
             'server_id' => (string) $site->server_id,

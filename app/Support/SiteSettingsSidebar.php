@@ -60,12 +60,10 @@ final class SiteSettingsSidebar
                 ['id' => 'general', 'label' => __('Overview'), 'icon' => 'heroicon-o-home', 'group' => 'general'],
                 ['id' => 'settings', 'label' => __('Settings'), 'icon' => 'heroicon-o-cog-6-tooth', 'group' => 'general'],
                 ['id' => 'routing', 'label' => __('Routing'), 'icon' => 'heroicon-o-share', 'group' => 'networking', 'route' => 'sites.routing'],
-                // Deployments is the history list — recipe (URL/branch/pipeline/hooks/etc.) lives on Repository (section=repository), per Q3.
+                // Deployments owns the deploy tab strip (Overview / Deploy /
+                // Releases / History / Settings). Pipeline + Repository live
+                // under Settings; the old standalone routes redirect there.
                 ['id' => 'deploy', 'label' => __('Deployments'), 'icon' => 'heroicon-o-code-bracket-square', 'group' => 'deploy', 'route' => 'sites.deployments.index'],
-                // Serverless Repository is a dedicated Livewire page (browse
-                // files / branches / switch repo) — distinct from the VM
-                // section-router partial that just shows the config form.
-                ['id' => 'repository', 'label' => __('Repository'), 'icon' => 'heroicon-o-folder-open', 'group' => 'deploy', 'route' => 'sites.repository'],
                 ['id' => 'runtime', 'label' => __('Runtime'), 'icon' => 'heroicon-o-cube-transparent', 'group' => 'runtime'],
                 ['id' => 'environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line', 'group' => 'runtime'],
                 ['id' => 'resources', 'label' => __('Resources'), 'icon' => 'heroicon-o-puzzle-piece', 'group' => 'runtime', 'route' => 'sites.resources'],
@@ -83,8 +81,6 @@ final class SiteSettingsSidebar
                 ['id' => 'routing', 'label' => __('Routing'), 'icon' => 'heroicon-o-share', 'group' => 'networking'],
                 ['id' => 'certificates', 'label' => __('Certificates'), 'icon' => 'heroicon-o-shield-check', 'group' => 'networking'],
                 ['id' => 'deploy', 'label' => __('Deployments'), 'icon' => 'heroicon-o-code-bracket-square', 'group' => 'deploy', 'route' => 'sites.deployments.index'],
-                ['id' => 'repository', 'label' => __('Repository'), 'icon' => 'heroicon-o-folder-open', 'group' => 'deploy'],
-                ['id' => 'pipeline', 'label' => __('Pipeline'), 'icon' => 'heroicon-o-adjustments-horizontal', 'group' => 'deploy', 'route' => 'sites.pipeline'],
                 ['id' => 'runtime', 'label' => __('Runtime'), 'icon' => 'heroicon-o-cube-transparent', 'group' => 'runtime'],
                 ['id' => 'system-user', 'label' => __('System user'), 'icon' => 'heroicon-o-user', 'group' => 'runtime'],
                 ['id' => 'laravel-stack', 'label' => __('Laravel'), 'icon' => 'heroicon-o-bolt', 'group' => 'runtime'],
@@ -263,12 +259,10 @@ final class SiteSettingsSidebar
         $items = [
             ['id' => 'general', 'label' => __('Overview'), 'icon' => 'heroicon-o-home', 'group' => 'general'],
             ['id' => 'settings', 'label' => __('Settings'), 'icon' => 'heroicon-o-cog-6-tooth', 'group' => 'general'],
+            // Deployments hosts the Repository + Pipeline editors under its
+            // Settings tab — see SiteSettingsSidebar comment in the base map.
             ['id' => 'deploy', 'label' => __('Deployments'), 'icon' => 'heroicon-o-code-bracket-square', 'group' => 'deploy'],
         ];
-
-        if ($site->isCustomGitMode()) {
-            $items[] = ['id' => 'repository', 'label' => __('Repository'), 'icon' => 'heroicon-o-folder-open', 'group' => 'deploy'];
-        }
 
         $items = [...$items,
             ['id' => 'environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line', 'group' => 'runtime'],

@@ -957,11 +957,15 @@ class Create extends Component
         $dockerHost = $this->server->isDockerHost();
         $kubernetesHost = $this->server->isKubernetesCluster();
         $containerHost = $dockerHost || $kubernetesHost;
+        // Headless host (webserver=none): no domain, no web root — the site
+        // just runs deployed code via the standard pipeline + processes.
+        $headlessHost = (($this->server->meta['webserver'] ?? 'nginx') === 'none')
+            && ! $functionsHost && ! $containerHost;
 
         $rules = [
             'name' => 'required|string|max:120',
             'type' => 'required|in:php,static,node',
-            'document_root' => 'required|string|max:500',
+            'document_root' => $headlessHost ? 'nullable|string|max:500' : 'required|string|max:500',
             'repository_path' => 'nullable|string|max:500',
             'php_version' => 'nullable|string|max:10',
             'app_port' => 'nullable|integer|min:1|max:65535',
@@ -976,12 +980,15 @@ class Create extends Component
             'functions_build_command' => 'nullable|string|max:4000',
             'functions_artifact_output_path' => 'nullable|string|max:255',
             'primary_hostname' => [
-                'required',
+                'nullable',
                 'string',
                 'max:255',
                 'unique:site_domains,hostname',
                 function (string $attribute, mixed $value, \Closure $fail): void {
-                    if (! is_string($value) || ! HostnameValidator::isValid($value)) {
+                    if (! is_string($value) || trim($value) === '') {
+                        return;
+                    }
+                    if (! HostnameValidator::isValid($value)) {
                         $fail('Enter a valid domain name like app.example.com.');
                     }
                 },
@@ -1227,12 +1234,17 @@ class Create extends Component
             $effectiveFramework !== '' ? $effectiveFramework : null,
         );
 
-        SiteDomain::query()->create([
-            'site_id' => $site->id,
-            'hostname' => strtolower(trim($this->form->primary_hostname)),
-            'is_primary' => true,
-            'www_redirect' => false,
-        ]);
+        // Primary domain is optional at create time — Dply provisions a testing
+        // hostname automatically. Only create the SiteDomain row when the user
+        // supplied a real customer-facing hostname.
+        if (trim((string) $this->form->primary_hostname) !== '') {
+            SiteDomain::query()->create([
+                'site_id' => $site->id,
+                'hostname' => strtolower(trim($this->form->primary_hostname)),
+                'is_primary' => true,
+                'www_redirect' => false,
+            ]);
+        }
 
         $site->loadMissing(['server', 'domains']);
         $siteProvisioner->markQueued($site);
@@ -1294,12 +1306,15 @@ class Create extends Component
         $this->form->validate([
             'name' => ['required', 'string', 'max:120'],
             'primary_hostname' => [
-                'required',
+                'nullable',
                 'string',
                 'max:255',
                 'unique:site_domains,hostname',
                 function (string $attribute, mixed $value, \Closure $fail): void {
-                    if (! is_string($value) || ! HostnameValidator::isValid($value)) {
+                    if (! is_string($value) || trim($value) === '') {
+                        return;
+                    }
+                    if (! HostnameValidator::isValid($value)) {
                         $fail(__('Enter a valid domain name like app.example.com.'));
                     }
                 },
@@ -1349,12 +1364,14 @@ class Create extends Component
             ],
         ]);
 
-        SiteDomain::query()->create([
-            'site_id' => $site->id,
-            'hostname' => $hostname,
-            'is_primary' => true,
-            'www_redirect' => false,
-        ]);
+        if ($hostname !== '') {
+            SiteDomain::query()->create([
+                'site_id' => $site->id,
+                'hostname' => $hostname,
+                'is_primary' => true,
+                'www_redirect' => false,
+            ]);
+        }
 
         if ($this->server->organization) {
             audit_log(

@@ -1,3 +1,13 @@
+@php
+    // When embedded inside another page (e.g. the Deployments page's Settings /
+    // Commits tabs), suppress the breadcrumb + sidebar + page header chrome so
+    // the host page provides the framing. When $lockedTab is also set, suppress
+    // the internal tablist too and render only the matching tab partial.
+    $isEmbedded = $embedded ?? false;
+    $isLocked = ($lockedTab ?? '') !== '';
+@endphp
+
+@if (! $isEmbedded)
 <div class="max-w-7xl mx-auto px-4 pt-8 pb-16 sm:px-6 lg:px-8">
     @include('livewire.sites.partials.workspace-breadcrumb-bar', [
         'server' => $server,
@@ -17,8 +27,12 @@
                 flush
                 compact
             />
+@else
+<div class="space-y-6">
+@endif
 
             @if ($currentRepositoryUrl === '')
+                @if (! $isEmbedded)
                 <section class="dply-card overflow-hidden border-amber-200">
                     <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
                         <div class="flex items-start gap-3">
@@ -48,9 +62,8 @@
                         </div>
                     </div>
                 </section>
-            @endif
+                @endif
 
-            @if ($currentRepositoryUrl === '')
                 @include('livewire.sites.repository.partials.connection')
             @else
                 @php
@@ -63,16 +76,18 @@
                     ];
                 @endphp
 
-                <x-server-workspace-tablist :aria-label="__('Repository sections')">
-                    @foreach ($tabs as $entry)
-                        <x-server-workspace-tab
-                            id="repository-tab-{{ $entry['id'] }}"
-                            :active="$tab === $entry['id']"
-                            :icon="$entry['icon']"
-                            wire:click="$set('tab', '{{ $entry['id'] }}')"
-                        >{{ $entry['label'] }}</x-server-workspace-tab>
-                    @endforeach
-                </x-server-workspace-tablist>
+                @unless ($isLocked)
+                    <x-server-workspace-tablist :aria-label="__('Repository sections')">
+                        @foreach ($tabs as $entry)
+                            <x-server-workspace-tab
+                                id="repository-tab-{{ $entry['id'] }}"
+                                :active="$tab === $entry['id']"
+                                :icon="$entry['icon']"
+                                wire:click="$set('tab', '{{ $entry['id'] }}')"
+                            >{{ $entry['label'] }}</x-server-workspace-tab>
+                        @endforeach
+                    </x-server-workspace-tablist>
+                @endunless
 
                 <div wire:key="repository-tab-{{ $tab }}-{{ $branchInUse }}-{{ $filesPath }}">
                     @includeWhen($tab === 'overview',   'livewire.sites.repository.partials.overview')
@@ -82,6 +97,11 @@
                     @includeWhen($tab === 'connection', 'livewire.sites.repository.partials.connection')
                 </div>
             @endif
+
+@if (! $isEmbedded)
         </main>
     </div>
 </div>
+@else
+</div>
+@endif

@@ -135,7 +135,7 @@ final class ServerDaemonSloPanel
                 'in_snapshot' => $parsed->has($programId),
                 'href' => $row['site_id'] !== null
                     ? route('sites.show', ['server' => $server->id, 'site' => $row['site_id'], 'section' => 'workers'])
-                    : route('servers.daemons', $server),
+                    : route('servers.workers', $server),
             ]);
         }
 
@@ -173,7 +173,7 @@ final class ServerDaemonSloPanel
             'severity' => 'warning',
             'title' => __('Supervisor is not installed'),
             'message' => __('Install supervisor from the Daemons workspace before queue workers can run.'),
-            'href' => route('servers.daemons', $server),
+            'href' => route('servers.workers', $server),
             'link_label' => __('Install supervisor'),
         ]];
     }
@@ -209,7 +209,7 @@ final class ServerDaemonSloPanel
                 'severity' => 'critical',
                 'title' => __('Supervisor programs need attention'),
                 'message' => $health['summary'] ?? __('One or more managed programs are not RUNNING.'),
-                'href' => route('servers.daemons', $server),
+                'href' => route('servers.workers', $server),
                 'link_label' => __('Go to programs'),
             ];
         }
@@ -219,7 +219,7 @@ final class ServerDaemonSloPanel
                 'severity' => 'warning',
                 'title' => __('Supervisor config drift'),
                 'message' => __('On-disk supervisor files differ from Dply — sync from the Sync tab below.'),
-                'href' => route('servers.daemons', $server),
+                'href' => route('servers.workers', $server),
                 'link_label' => __('Go to sync'),
             ];
         }
@@ -251,7 +251,7 @@ final class ServerDaemonSloPanel
                 ['count' => (int) $programs['unhealthy']],
             ),
             'message' => $badStates !== '' ? $badStates : __('Inspect supervisor status on the Programs tab.'),
-            'href' => route('servers.daemons', $server),
+            'href' => route('servers.workers', $server),
             'link_label' => __('Go to programs'),
         ]];
     }

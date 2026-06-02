@@ -1,3 +1,5 @@
+@php($isEmbedded = $embedded ?? false)
+@if (! $isEmbedded)
 <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
     <div class="lg:grid lg:grid-cols-12 lg:gap-10">
         @include('livewire.sites.settings.partials.sidebar')
@@ -45,11 +47,15 @@
             </x-page-header>
 
             <main class="min-w-0 space-y-6 mt-8">
+@else
+<div class="space-y-6">
+@endif
                 @if ($watchedConsoleRunId)
                     <div wire:poll.3s="resolveWatchedConsoleAction" class="hidden" aria-hidden="true"></div>
                 @endif
 
                 @include('livewire.sites.partials.pipeline._workspace-content')
+@if (! $isEmbedded)
             </main>
         </div>
     </div>
@@ -67,3 +73,6 @@
 
     @include('livewire.partials.confirm-action-modal')
 </div>
+@else
+</div>
+@endif

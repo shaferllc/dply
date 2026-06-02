@@ -21,7 +21,8 @@
     $isCacheRoleHost = in_array((string) ($server->meta['server_role'] ?? ''), ['redis', 'valkey'], true);
     $isDatabaseRoleHost = (string) ($server->meta['server_role'] ?? '') === 'database';
     $isWorkerRoleHost = (string) ($server->meta['server_role'] ?? '') === 'worker';
-    // Worker keeps site/deploy cards — it runs queue workers from the deployed code.
+    // Worker keeps site/deploy cards — it deploys sites through the same caddy
+    // pipeline as application hosts and also runs queue workers from the code.
     $isDedicatedServiceRoleHost = $isCacheRoleHost || $isDatabaseRoleHost;
     $setupIncomplete = $server->isVmHost() && (
         $server->status !== \App\Models\Server::STATUS_READY
@@ -313,40 +314,34 @@
                         $heroIp = $server->ip_address ?? '—';
                         $heroSize = $server->size ?? '—';
                     @endphp
-                    <dl class="grid grid-cols-2 gap-2 lg:col-span-5 lg:grid-cols-4">
-                        <x-tooltip :label="__('Provider').': '.$heroProvider" class="w-full">
-                            <div class="w-full rounded-2xl border border-brand-ink/10 bg-white px-3 py-2.5 shadow-sm">
-                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Provider') }}</dt>
-                                <dd class="mt-0.5 truncate text-xs font-semibold text-brand-ink">{{ $heroProvider }}</dd>
-                            </div>
-                        </x-tooltip>
-                        <x-tooltip :label="__('Region').': '.$heroRegion" class="w-full">
-                            <div class="w-full rounded-2xl border border-brand-ink/10 bg-white px-3 py-2.5 shadow-sm">
-                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Region') }}</dt>
-                                <dd class="mt-0.5 truncate text-xs font-semibold text-brand-ink">{{ $heroRegion }}</dd>
-                            </div>
-                        </x-tooltip>
-                        <x-tooltip :label="__('IP').': '.$heroIp" class="w-full">
-                            <div class="w-full rounded-2xl border border-brand-ink/10 bg-white px-3 py-2.5 shadow-sm">
-                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('IP') }}</dt>
-                                <dd class="mt-0.5 truncate font-mono text-xs font-semibold text-brand-ink">{{ $heroIp }}</dd>
-                            </div>
-                        </x-tooltip>
-                        @if ($server->private_ip_address)
-                            <x-tooltip :label="__('Private IP').': '.$server->private_ip_address" class="w-full">
-                                <div class="w-full rounded-2xl border border-brand-ink/10 bg-white px-3 py-2.5 shadow-sm">
-                                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Private IP') }}</dt>
-                                    <dd class="mt-0.5 truncate font-mono text-xs font-semibold text-brand-ink">{{ $server->private_ip_address }}</dd>
+                    <div class="lg:col-span-5">
+                        <dl class="divide-y divide-brand-ink/10 overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
+                            <div class="grid grid-cols-3 divide-x divide-brand-ink/10">
+                                <div class="min-w-0 px-3 py-2.5 sm:px-4">
+                                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Provider') }}</dt>
+                                    <dd class="mt-1 truncate text-sm font-semibold text-brand-ink" title="{{ $heroProvider }}">{{ $heroProvider }}</dd>
                                 </div>
-                            </x-tooltip>
-                        @endif
-                        <x-tooltip :label="__('Size').': '.$heroSize" class="w-full">
-                            <div class="w-full rounded-2xl border border-brand-ink/10 bg-white px-3 py-2.5 shadow-sm">
-                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Size') }}</dt>
-                                <dd class="mt-0.5 truncate font-mono text-xs font-semibold text-brand-ink">{{ $heroSize }}</dd>
+                                <div class="min-w-0 px-3 py-2.5 sm:px-4">
+                                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Region') }}</dt>
+                                    <dd class="mt-1 truncate text-sm font-semibold text-brand-ink" title="{{ $heroRegion }}">{{ $heroRegion }}</dd>
+                                </div>
+                                <div class="min-w-0 px-3 py-2.5 sm:px-4">
+                                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Size') }}</dt>
+                                    <dd class="mt-1 truncate font-mono text-sm font-semibold text-brand-ink" title="{{ $heroSize }}">{{ $heroSize }}</dd>
+                                </div>
                             </div>
-                        </x-tooltip>
-                    </dl>
+                            <div class="flex items-baseline justify-between gap-4 px-3 py-2.5 sm:px-4">
+                                <dt class="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('IP') }}</dt>
+                                <dd class="select-all break-all text-right font-mono text-sm font-semibold text-brand-ink">{{ $heroIp }}</dd>
+                            </div>
+                            @if ($server->private_ip_address)
+                                <div class="flex items-baseline justify-between gap-4 px-3 py-2.5 sm:px-4">
+                                    <dt class="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Private IP') }}</dt>
+                                    <dd class="select-all break-all text-right font-mono text-sm font-semibold text-brand-ink">{{ $server->private_ip_address }}</dd>
+                                </div>
+                            @endif
+                        </dl>
+                    </div>
                 </div>
             </section>
 
@@ -559,9 +554,6 @@
                                     @if ($isContainerHost)
                                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Add your first container app') }}</h3>
                                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Point dply at a Git repo and we will inspect the Dockerfile, build the image, and deploy onto this host. You can add more apps any time.') }}</p>
-                                    @elseif ($isWorkerRoleHost)
-                                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deploy your app code') }}</h3>
-                                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('A worker runs your queue workers and scheduled jobs from the deployed code. Connect a Git repo to install it, then start a worker from the Workers tab.') }}</p>
                                     @else
                                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Add your first site') }}</h3>
                                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Connect a Git repo, configure the web root, and deploy. You can add more sites any time.') }}</p>
@@ -635,6 +627,7 @@
                         </p>
                     </a>
 
+                    @if (! $isWorkerRoleHost)
                     <a href="{{ route('servers.databases', $server) }}" wire:navigate class="group block rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm transition hover:border-brand-sage/30 hover:shadow-md">
                         <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Databases') }}</p>
                         <p class="mt-1 font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $databaseSummary['count'] }}</p>
@@ -650,6 +643,7 @@
                             <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0" aria-hidden="true" />
                         </p>
                     </a>
+                    @endif
 
                     <a href="{{ route('servers.deploys', $server) }}" wire:navigate class="group block rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm transition hover:border-brand-sage/30 hover:shadow-md">
                         <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Latest deploy') }}</p>
@@ -661,7 +655,7 @@
                         </p>
                     </a>
 
-                    <a href="{{ route('servers.backups', $server) }}" wire:navigate class="group block rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm transition hover:border-brand-sage/30 hover:shadow-md">
+                    <a href="{{ route($isWorkerRoleHost ? 'servers.workers' : 'servers.backups', $server) }}" wire:navigate class="group block rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm transition hover:border-brand-sage/30 hover:shadow-md">
                         <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Background') }}</p>
                         <p class="mt-1 flex items-baseline gap-1.5">
                             <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $backgroundSummary['active_workers'] }}</span>
@@ -679,7 +673,7 @@
                             @endif
                         </p>
                         <p class="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold text-brand-sage opacity-0 transition group-hover:opacity-100">
-                            {{ __('Open Backups') }}
+                            {{ $isWorkerRoleHost ? __('Open Workers') : __('Open Backups') }}
                             <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0" aria-hidden="true" />
                         </p>
                     </a>

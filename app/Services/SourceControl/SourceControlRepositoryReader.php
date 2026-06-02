@@ -103,16 +103,16 @@ final class SourceControlRepositoryReader
         }
 
         return match ($remote['provider']) {
-            'github' => $this->githubBranches($remote, $user),
-            'gitlab' => $this->gitlabBranches($remote, $user),
-            'bitbucket' => $this->bitbucketBranches($remote, $user),
+            'github' => $this->githubBranches($remote, $site, $user),
+            'gitlab' => $this->gitlabBranches($remote, $site, $user),
+            'bitbucket' => $this->bitbucketBranches($remote, $site, $user),
             default => ['ok' => false, 'branches' => [], 'error' => __('Unsupported Git host.'), 'provider' => $remote['provider']],
         };
     }
 
-    private function githubBranches(array $remote, User $user): array
+    private function githubBranches(array $remote, Site $site, User $user): array
     {
-        $identity = $this->resolver->forUserProvider($user, 'github');
+        $identity = $this->resolver->forSite($site, $user,'github');
         if ($identity === null) {
             return ['ok' => false, 'branches' => [], 'error' => __('Link a GitHub account or add a personal access token to browse this repo.'), 'provider' => 'github'];
         }
@@ -151,9 +151,9 @@ final class SourceControlRepositoryReader
         return ['ok' => true, 'branches' => $branches, 'error' => null, 'provider' => 'github'];
     }
 
-    private function gitlabBranches(array $remote, User $user): array
+    private function gitlabBranches(array $remote, Site $site, User $user): array
     {
-        $identity = $this->resolver->forUserProvider($user, 'gitlab');
+        $identity = $this->resolver->forSite($site, $user,'gitlab');
         if ($identity === null) {
             return ['ok' => false, 'branches' => [], 'error' => __('Link a GitLab account or add a personal access token to browse this repo.'), 'provider' => 'gitlab'];
         }
@@ -191,9 +191,9 @@ final class SourceControlRepositoryReader
         return ['ok' => true, 'branches' => $branches, 'error' => null, 'provider' => 'gitlab'];
     }
 
-    private function bitbucketBranches(array $remote, User $user): array
+    private function bitbucketBranches(array $remote, Site $site, User $user): array
     {
-        $identity = $this->resolver->forUserProvider($user, 'bitbucket');
+        $identity = $this->resolver->forSite($site, $user,'bitbucket');
         if ($identity === null) {
             return ['ok' => false, 'branches' => [], 'error' => __('Link a Bitbucket account or add a personal access token to browse this repo.'), 'provider' => 'bitbucket'];
         }
@@ -237,16 +237,16 @@ final class SourceControlRepositoryReader
         }
 
         return match ($remote['provider']) {
-            'github' => $this->githubTags($remote, $user),
-            'gitlab' => $this->gitlabTags($remote, $user),
-            'bitbucket' => $this->bitbucketTags($remote, $user),
+            'github' => $this->githubTags($remote, $site, $user),
+            'gitlab' => $this->gitlabTags($remote, $site, $user),
+            'bitbucket' => $this->bitbucketTags($remote, $site, $user),
             default => ['ok' => false, 'tags' => [], 'error' => __('Unsupported Git host.'), 'provider' => $remote['provider']],
         };
     }
 
-    private function githubTags(array $remote, User $user): array
+    private function githubTags(array $remote, Site $site, User $user): array
     {
-        $identity = $this->resolver->forUserProvider($user, 'github');
+        $identity = $this->resolver->forSite($site, $user,'github');
         if ($identity === null) {
             return ['ok' => false, 'tags' => [], 'error' => __('Link a GitHub account or add a personal access token to browse this repo.'), 'provider' => 'github'];
         }
@@ -279,9 +279,9 @@ final class SourceControlRepositoryReader
         return ['ok' => true, 'tags' => $tags, 'error' => null, 'provider' => 'github'];
     }
 
-    private function gitlabTags(array $remote, User $user): array
+    private function gitlabTags(array $remote, Site $site, User $user): array
     {
-        $identity = $this->resolver->forUserProvider($user, 'gitlab');
+        $identity = $this->resolver->forSite($site, $user,'gitlab');
         if ($identity === null) {
             return ['ok' => false, 'tags' => [], 'error' => __('Link a GitLab account or add a personal access token to browse this repo.'), 'provider' => 'gitlab'];
         }
@@ -313,9 +313,9 @@ final class SourceControlRepositoryReader
         return ['ok' => true, 'tags' => $tags, 'error' => null, 'provider' => 'gitlab'];
     }
 
-    private function bitbucketTags(array $remote, User $user): array
+    private function bitbucketTags(array $remote, Site $site, User $user): array
     {
-        $identity = $this->resolver->forUserProvider($user, 'bitbucket');
+        $identity = $this->resolver->forSite($site, $user,'bitbucket');
         if ($identity === null) {
             return ['ok' => false, 'tags' => [], 'error' => __('Link a Bitbucket account or add a personal access token to browse this repo.'), 'provider' => 'bitbucket'];
         }
@@ -357,18 +357,18 @@ final class SourceControlRepositoryReader
         }
 
         $result = match ($remote['provider']) {
-            'github' => $this->githubTree($remote, $user, $branch, $path),
-            'gitlab' => $this->gitlabTree($remote, $user, $branch, $path),
-            'bitbucket' => $this->bitbucketTree($remote, $user, $branch, $path),
+            'github' => $this->githubTree($remote, $site, $user, $branch, $path),
+            'gitlab' => $this->gitlabTree($remote, $site, $user, $branch, $path),
+            'bitbucket' => $this->bitbucketTree($remote, $site, $user, $branch, $path),
             default => ['ok' => false, 'entries' => [], 'error' => __('Unsupported Git host.'), 'provider' => $remote['provider']],
         };
 
         return $result + ['path' => $path, 'branch' => $branch];
     }
 
-    private function githubTree(array $remote, User $user, string $branch, string $path): array
+    private function githubTree(array $remote, Site $site, User $user, string $branch, string $path): array
     {
-        $identity = $this->resolver->forUserProvider($user, 'github');
+        $identity = $this->resolver->forSite($site, $user,'github');
         if ($identity === null) {
             return ['ok' => false, 'entries' => [], 'error' => __('Link a GitHub account or add a personal access token.'), 'provider' => 'github'];
         }
@@ -401,9 +401,9 @@ final class SourceControlRepositoryReader
         return ['ok' => true, 'entries' => $this->sortEntries($entries), 'error' => null, 'provider' => 'github'];
     }
 
-    private function gitlabTree(array $remote, User $user, string $branch, string $path): array
+    private function gitlabTree(array $remote, Site $site, User $user, string $branch, string $path): array
     {
-        $identity = $this->resolver->forUserProvider($user, 'gitlab');
+        $identity = $this->resolver->forSite($site, $user,'gitlab');
         if ($identity === null) {
             return ['ok' => false, 'entries' => [], 'error' => __('Link a GitLab account or add a personal access token.'), 'provider' => 'gitlab'];
         }
@@ -438,9 +438,9 @@ final class SourceControlRepositoryReader
         return ['ok' => true, 'entries' => $this->sortEntries($entries), 'error' => null, 'provider' => 'gitlab'];
     }
 
-    private function bitbucketTree(array $remote, User $user, string $branch, string $path): array
+    private function bitbucketTree(array $remote, Site $site, User $user, string $branch, string $path): array
     {
-        $identity = $this->resolver->forUserProvider($user, 'bitbucket');
+        $identity = $this->resolver->forSite($site, $user,'bitbucket');
         if ($identity === null) {
             return ['ok' => false, 'entries' => [], 'error' => __('Link a Bitbucket account or add a personal access token.'), 'provider' => 'bitbucket'];
         }
@@ -490,18 +490,18 @@ final class SourceControlRepositoryReader
         }
 
         $result = match ($remote['provider']) {
-            'github' => $this->githubFile($remote, $user, $branch, $path),
-            'gitlab' => $this->gitlabFile($remote, $user, $branch, $path),
-            'bitbucket' => $this->bitbucketFile($remote, $user, $branch, $path),
+            'github' => $this->githubFile($remote, $site, $user, $branch, $path),
+            'gitlab' => $this->gitlabFile($remote, $site, $user, $branch, $path),
+            'bitbucket' => $this->bitbucketFile($remote, $site, $user, $branch, $path),
             default => ['ok' => false, 'content' => '', 'size' => 0, 'too_large' => false, 'binary' => false, 'html_url' => null, 'error' => __('Unsupported Git host.'), 'provider' => $remote['provider']],
         };
 
         return $result + ['path' => $path, 'branch' => $branch];
     }
 
-    private function githubFile(array $remote, User $user, string $branch, string $path): array
+    private function githubFile(array $remote, Site $site, User $user, string $branch, string $path): array
     {
-        $identity = $this->resolver->forUserProvider($user, 'github');
+        $identity = $this->resolver->forSite($site, $user,'github');
         if ($identity === null) {
             return ['ok' => false, 'content' => '', 'size' => 0, 'too_large' => false, 'binary' => false, 'html_url' => null, 'error' => __('Link a GitHub account or add a personal access token.'), 'provider' => 'github'];
         }
@@ -529,9 +529,9 @@ final class SourceControlRepositoryReader
         return $this->buildFileResult($raw, $size, $htmlUrl, 'github');
     }
 
-    private function gitlabFile(array $remote, User $user, string $branch, string $path): array
+    private function gitlabFile(array $remote, Site $site, User $user, string $branch, string $path): array
     {
-        $identity = $this->resolver->forUserProvider($user, 'gitlab');
+        $identity = $this->resolver->forSite($site, $user,'gitlab');
         if ($identity === null) {
             return ['ok' => false, 'content' => '', 'size' => 0, 'too_large' => false, 'binary' => false, 'html_url' => null, 'error' => __('Link a GitLab account or add a personal access token.'), 'provider' => 'gitlab'];
         }
@@ -561,9 +561,9 @@ final class SourceControlRepositoryReader
         return $this->buildFileResult($raw, $size, $htmlUrl, 'gitlab');
     }
 
-    private function bitbucketFile(array $remote, User $user, string $branch, string $path): array
+    private function bitbucketFile(array $remote, Site $site, User $user, string $branch, string $path): array
     {
-        $identity = $this->resolver->forUserProvider($user, 'bitbucket');
+        $identity = $this->resolver->forSite($site, $user,'bitbucket');
         if ($identity === null) {
             return ['ok' => false, 'content' => '', 'size' => 0, 'too_large' => false, 'binary' => false, 'html_url' => null, 'error' => __('Link a Bitbucket account or add a personal access token.'), 'provider' => 'bitbucket'];
         }
@@ -612,18 +612,18 @@ final class SourceControlRepositoryReader
         }
 
         $result = match ($remote['provider']) {
-            'github' => $this->githubReadme($remote, $user, $branch),
-            'gitlab' => $this->probeReadmeViaFile($remote, $user, $branch, 'gitlab'),
-            'bitbucket' => $this->probeReadmeViaFile($remote, $user, $branch, 'bitbucket'),
+            'github' => $this->githubReadme($remote, $site, $user, $branch),
+            'gitlab' => $this->probeReadmeViaFile($remote, $site, $user, $branch, 'gitlab'),
+            'bitbucket' => $this->probeReadmeViaFile($remote, $site, $user, $branch, 'bitbucket'),
             default => ['ok' => false, 'name' => null, 'content_html' => '', 'content_raw' => '', 'error' => __('Unsupported Git host.'), 'provider' => $remote['provider']],
         };
 
         return $result + ['branch' => $branch];
     }
 
-    private function githubReadme(array $remote, User $user, string $branch): array
+    private function githubReadme(array $remote, Site $site, User $user, string $branch): array
     {
-        $identity = $this->resolver->forUserProvider($user, 'github');
+        $identity = $this->resolver->forSite($site, $user,'github');
         if ($identity === null) {
             return ['ok' => false, 'name' => null, 'content_html' => '', 'content_raw' => '', 'error' => __('Link a GitHub account or add a personal access token.'), 'provider' => 'github'];
         }
@@ -652,12 +652,12 @@ final class SourceControlRepositoryReader
         ];
     }
 
-    private function probeReadmeViaFile(array $remote, User $user, string $branch, string $provider): array
+    private function probeReadmeViaFile(array $remote, Site $site, User $user, string $branch, string $provider): array
     {
         foreach (['README.md', 'readme.md', 'Readme.md', 'README', 'README.rst', 'README.txt'] as $candidate) {
             $file = match ($provider) {
-                'gitlab' => $this->gitlabFile($remote, $user, $branch, $candidate),
-                'bitbucket' => $this->bitbucketFile($remote, $user, $branch, $candidate),
+                'gitlab' => $this->gitlabFile($remote, $site, $user, $branch, $candidate),
+                'bitbucket' => $this->bitbucketFile($remote, $site, $user, $branch, $candidate),
                 default => null,
             };
             if (! is_array($file) || ! ($file['ok'] ?? false) || ($file['too_large'] ?? false) || ($file['binary'] ?? false)) {

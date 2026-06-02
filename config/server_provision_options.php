@@ -48,7 +48,7 @@ return [
             'summary' => 'Background worker host focused on queues and scheduled jobs.',
             'server_role' => 'worker',
             'cache_service' => 'none',
-            'webserver' => 'none',
+            'webserver' => 'caddy',
             'php_version' => '8.3',
             'database' => 'none',
         ],
@@ -144,11 +144,11 @@ return [
         [
             'id' => 'worker',
             'label' => 'Worker server',
-            'detail' => 'PHP, Supervisor',
-            'summary' => 'Runs background jobs and queue workers without hosting the public web app.',
-            'installs' => ['PHP', 'Supervisor'],
+            'detail' => 'PHP, Supervisor, Caddy (private placeholder)',
+            'summary' => 'Runs background jobs and queue workers; Caddy is installed only to host the standard deploy pipeline (no public traffic).',
+            'installs' => ['PHP', 'Supervisor', 'Caddy (placeholder vhost)'],
             'best_for' => 'Queues, scheduled jobs, Horizon-style workloads, and offloading background processing from the main app server.',
-            'does_not_include' => 'Does not install a public web server, SSL tooling, or a database engine.',
+            'does_not_include' => 'Does not expose public web traffic, install SSL tooling, or install a database engine.',
         ],
         [
             'id' => 'docker',
@@ -202,7 +202,7 @@ return [
             'summary' => 'Simplest option when you want automatic HTTPS and easy config.',
             'pros' => ['Automatic HTTPS by default', 'Clean configuration format', 'Great for simpler setups'],
             'cons' => ['Smaller ops ecosystem than NGINX', 'Less common in established PHP teams'],
-            'exclude_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain', 'worker'],
+            'exclude_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain'],
         ],
         [
             'id' => 'openlitespeed',
@@ -220,7 +220,7 @@ return [
             'cons' => ['Less typical for a single PHP app host', 'Adds complexity if you just need a standard app server'],
             'exclude_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain', 'worker'],
         ],
-        ['id' => 'none', 'label' => 'Not applicable', 'only_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain', 'worker']],
+        ['id' => 'none', 'label' => 'Not applicable', 'only_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain']],
     ],
     'php_versions' => [
         ['id' => '8.6', 'label' => 'PHP 8.6 (not yet released)', 'exclude_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain']],

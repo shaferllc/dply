@@ -54,6 +54,7 @@ class DigitalOceanFunctionsArtifactBuilder
             isset($resolvedConfig['source_control_account_id']) && is_string($resolvedConfig['source_control_account_id'])
                 ? $resolvedConfig['source_control_account_id']
                 : null,
+            $site->gitRefKind(),
         );
         $this->progress->done($site, 'checkout', 'Cloned repository');
 

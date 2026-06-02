@@ -160,6 +160,36 @@ class Server extends Model
         return $this->hasMany(Site::class);
     }
 
+    /** Memoized request-lifetime cache for {@see cachedSitesCount()}. */
+    private ?int $cachedSitesCount = null;
+
+    /**
+     * Request-level cache for sites().count() — both the sidebar nav helper
+     * and the shared-host report widget call this on the same Server
+     * instance during a page render, so eat the query once and reuse it.
+     * Cleared when caller knows the count changed via {@see flushCachedSitesCount()}.
+     */
+    public function cachedSitesCount(): int
+    {
+        if ($this->cachedSitesCount !== null) {
+            return $this->cachedSitesCount;
+        }
+
+        // Reuse a withCount-loaded value if a controller pre-warmed it
+        // (sites_count is the Laravel convention).
+        $preloaded = $this->getAttributeValue('sites_count');
+        if (is_int($preloaded) || (is_string($preloaded) && ctype_digit($preloaded))) {
+            return $this->cachedSitesCount = (int) $preloaded;
+        }
+
+        return $this->cachedSitesCount = $this->sites()->count();
+    }
+
+    public function flushCachedSitesCount(): void
+    {
+        $this->cachedSitesCount = null;
+    }
+
     public function serverDatabases(): HasMany
     {
         return $this->hasMany(ServerDatabase::class);

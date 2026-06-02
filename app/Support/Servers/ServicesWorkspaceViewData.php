@@ -310,7 +310,7 @@ final class ServicesWorkspaceViewData
                 'key' => 'workers',
                 'label' => __('Workers'),
                 'icon' => 'heroicon-o-server-stack',
-                'href' => route('servers.daemons', $server),
+                'href' => route('servers.workers', $server),
                 'detail' => __('Supervisor-managed processes'),
                 'shown' => array_key_exists('supervisor', $installedTags),
             ],

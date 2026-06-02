@@ -931,7 +931,7 @@ test('servers create step what install profile updates stack defaults', function
         ->test(ServerCreateStepWhat::class)
         ->set('form.install_profile', 'queue_worker')
         ->assertSet('form.server_role', 'worker')
-        ->assertSet('form.webserver', 'none')
+        ->assertSet('form.webserver', 'caddy')
         ->assertSet('form.database', 'none');
 });
 

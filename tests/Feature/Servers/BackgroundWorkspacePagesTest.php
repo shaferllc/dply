@@ -1632,5 +1632,5 @@ test('legacy server queue workers route redirects to daemons', function () {
 
     $this->actingAs($user)
         ->get(route('servers.queue-workers', $server))
-        ->assertRedirect(route('servers.daemons', $server));
+        ->assertRedirect(route('servers.workers', $server));
 });

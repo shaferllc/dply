@@ -40,15 +40,15 @@ test('daemon slo route redirects to daemons workspace', function (): void {
     [$user, $server] = vmRoadmapUserWithServer();
 
     $this->actingAs($user)
-        ->get(route('servers.daemon-slo', $server))
-        ->assertRedirect(route('servers.daemons', $server));
+        ->get(route('servers.worker-slo', $server))
+        ->assertRedirect(route('servers.workers', $server));
 });
 
 test('daemons workspace shows worker health when daemon slo feature is on', function (): void {
     [$user, $server] = vmRoadmapUserWithServer();
 
     $this->actingAs($user)
-        ->get(route('servers.daemons', $server))
+        ->get(route('servers.workers', $server))
         ->assertOk()
         ->assertSee(__('Worker health'))
         ->assertSee(__('Refresh status'));
@@ -61,7 +61,7 @@ test('daemons workspace hides worker health when daemon slo feature is off', fun
     [$user, $server] = vmRoadmapUserWithServer();
 
     $this->actingAs($user)
-        ->get(route('servers.daemons', $server))
+        ->get(route('servers.workers', $server))
         ->assertOk()
         ->assertDontSee(__('Worker health'))
         ->assertSee(__('Programs at a glance'));

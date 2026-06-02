@@ -68,6 +68,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Show extends Component
 {
+    use \App\Livewire\Sites\Concerns\HandlesSiteRemovalFlow;
     use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
     use ManagesEdgeRedeploy;
@@ -2563,12 +2564,41 @@ class Show extends Component
         $this->finalizeRoutingMutation('Domain removed.');
     }
 
-    public function deleteSite(): void
+    /**
+     * Retrofit Caddy onto the server when the install profile left it
+     * webserver=none (e.g. legacy queue_worker provisions). Dispatches
+     * {@see \App\Jobs\InstallServerWebserverJob}, which SSHes in, installs
+     * Caddy, updates server meta, and re-queues provisioning for sites
+     * stuck on the headless path.
+     */
+    public function installServerWebserver(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ((string) ($this->server->meta['webserver'] ?? '') !== 'none') {
+            $this->toastError(__('Caddy is already installed on this server.'));
+
+            return;
+        }
+
+        // Stamp a "pending" flag so a refresh / second click shows the
+        // button as in-flight rather than re-queuing the install.
+        $meta = is_array($this->server->meta) ? $this->server->meta : [];
+        $meta['webserver_install_pending'] = true;
+        $this->server->forceFill(['meta' => $meta])->save();
+
+        \App\Jobs\InstallServerWebserverJob::dispatch($this->server->id, 'caddy');
+
+        $this->toastSuccess(__('Caddy install queued. The page will refresh once the server reports back.'));
+    }
+
+    public function deleteSite(): mixed
     {
         $this->authorize('delete', $this->site);
         $organization = $this->site->server?->organization;
+        $siteName = $this->site->name;
         $snapshot = [
-            'name' => $this->site->name,
+            'name' => $siteName,
             'slug' => $this->site->slug,
             'server_id' => (string) $this->site->server_id,
             'type' => $this->site->type instanceof \BackedEnum ? $this->site->type->value : (string) $this->site->type,
@@ -2588,7 +2618,13 @@ class Show extends Component
             );
         }
 
-        $this->redirect(route('servers.show', $this->server), navigate: true);
+        // Hard redirect (no navigate: true) — Livewire's SPA-style soft
+        // navigation re-hydrates the current component before the redirect
+        // URL takes over, and the re-hydration tries to look up the just-
+        // deleted Site → 404. A plain HTTP redirect avoids that round trip.
+        session()->flash('success', __('Site :name was removed.', ['name' => $siteName]));
+
+        return redirect()->route('servers.index');
     }
 
     public function confirmSuspendSite(): void

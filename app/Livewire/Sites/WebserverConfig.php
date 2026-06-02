@@ -49,7 +49,7 @@ class WebserverConfig extends Component
     /** @var 'edit'|'preview'|'compare' */
     public string $content_tab = 'edit';
 
-    public function mount(Server $server, Site $site): void
+    public function mount(Server $server, Site $site): mixed
     {
         abort_unless($site->server_id === $server->id, 404);
         abort_unless($server->organization_id === auth()->user()->currentOrganization()?->id, 404);
@@ -58,6 +58,15 @@ class WebserverConfig extends Component
 
         $this->server = $server;
         $this->site = $site;
+
+        // Headless sites (webserver=none) have no vhost/server block to edit.
+        // The editor service throws on this case; redirect with a flash so
+        // the user isn't dropped into an exception page.
+        if ($site->webserver() === 'none') {
+            session()->flash('info', __('This site runs without a web server, so there’s no vhost to edit. The webserver-config page does not apply here.'));
+
+            return $this->redirect(route('sites.show', [$server, $site]), navigate: true);
+        }
 
         $editor = app(SiteWebserverConfigEditorService::class);
         $profile = $editor->getOrCreateProfile($site);

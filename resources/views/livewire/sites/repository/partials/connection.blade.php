@@ -40,15 +40,36 @@
                         class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-mono shadow-sm focus:border-brand-ink focus:ring-1 focus:ring-brand-ink"
                     />
                 </label>
-                <label class="block text-sm">
-                    <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Deploy branch') }}</span>
-                    <input
-                        type="text"
-                        wire:model="connectionBranch"
-                        placeholder="main"
-                        class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-mono shadow-sm focus:border-brand-ink focus:ring-1 focus:ring-brand-ink"
-                    />
-                </label>
+                <div class="block text-sm">
+                    <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Deploy ref') }}</span>
+                    <div class="mt-1 flex flex-wrap items-center gap-2">
+                        <span @class([
+                            'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-mono text-sm',
+                            'border-violet-200 bg-violet-50 text-violet-900' => ($connectionRefKind ?? 'branch') === 'branch',
+                            'border-amber-200 bg-amber-50 text-amber-900' => $connectionRefKind === 'tag',
+                            'border-sky-200 bg-sky-50 text-sky-900' => $connectionRefKind === 'commit',
+                        ])>
+                            <span class="text-[10px] font-semibold uppercase tracking-wide">{{ match ($connectionRefKind ?? 'branch') {
+                                'tag' => __('Tag'),
+                                'commit' => __('Commit'),
+                                default => __('Branch'),
+                            } }}</span>
+                            <span>{{ $connectionRefKind === 'commit'
+                                ? \Illuminate\Support\Str::limit($connectionBranch ?: 'main', 12, '')
+                                : ($connectionBranch ?: 'main') }}</span>
+                        </span>
+                        <button type="button" wire:click="openConnectionRefPicker"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                            <x-heroicon-o-arrows-right-left class="h-3.5 w-3.5" aria-hidden="true" />
+                            {{ __('Change…') }}
+                        </button>
+                    </div>
+                    <p class="mt-1 text-xs text-brand-moss">{{ __('Pick a branch, tag, or specific commit. Saved when you click “Save connection”.') }}</p>
+
+                    @if ($repo_ref_picker_open)
+                        @include('livewire.sites.partials._repository-ref-picker')
+                    @endif
+                </div>
             </div>
         </form>
 

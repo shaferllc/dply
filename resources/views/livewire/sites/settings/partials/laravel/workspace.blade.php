@@ -10,7 +10,7 @@
     $cronUrl = route('sites.cron', ['server' => $server, 'site' => $site]);
     $daemonsUrl = route('sites.daemons', ['server' => $server, 'site' => $site]);
     $cronAllServerUrl = route('servers.cron', $server);
-    $daemonsAllServerUrl = route('servers.daemons', $server);
+    $daemonsAllServerUrl = route('servers.workers', $server);
     $envUrl = route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'environment']);
     $laravelLogKey = 'site_'.$site->getKey().'_laravel';
 @endphp

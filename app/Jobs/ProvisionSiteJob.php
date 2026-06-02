@@ -43,6 +43,14 @@ class ProvisionSiteJob implements ShouldQueue
             if ($this->probeAttempt === 0) {
                 $siteProvisioner->begin($site);
                 $site->refresh();
+
+                // Headless sites (webserver=none) finish inside begin() —
+                // no vhost, no testing hostname, nothing to probe. Bail
+                // before checkReadiness schedules an HTTP reachability loop
+                // against a hostname that nobody ever provisioned.
+                if ($site->provisioningState() === 'ready') {
+                    return;
+                }
             }
 
             $result = $siteProvisioner->checkReadiness($site);

@@ -1,3 +1,44 @@
+            @php
+                $serverWebserver = (string) ($server->meta['webserver'] ?? '');
+                $headlessHostNoCaddy = $serverWebserver === 'none' && ! $site->usesEdgeRuntime();
+                $caddyInstallPending = (bool) ($server->meta['webserver_install_pending'] ?? false);
+            @endphp
+
+            @if ($headlessHostNoCaddy)
+                <section class="mb-4 rounded-2xl border border-amber-300 bg-amber-50/80 p-5 shadow-sm">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800 ring-1 ring-amber-200">
+                                <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <h3 class="text-sm font-semibold text-amber-900">{{ __('No web server on this host') }}</h3>
+                                <p class="mt-1 text-sm leading-relaxed text-amber-900/90">
+                                    {{ __('This server was provisioned without a web server, so there\'s no testing URL and no vhost. Install Caddy now and Dply will re-provision the sites on this server to attach testing hostnames.') }}
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            wire:click="installServerWebserver"
+                            wire:loading.attr="disabled"
+                            wire:target="installServerWebserver"
+                            @disabled($caddyInstallPending)
+                            class="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-xl bg-amber-700 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-amber-800 disabled:cursor-progress disabled:opacity-60"
+                        >
+                            <span wire:loading.remove wire:target="installServerWebserver" class="inline-flex items-center gap-2">
+                                <x-heroicon-o-bolt class="h-4 w-4" aria-hidden="true" />
+                                {{ $caddyInstallPending ? __('Installing Caddy…') : __('Install Caddy') }}
+                            </span>
+                            <span wire:loading wire:target="installServerWebserver" class="inline-flex items-center gap-2">
+                                <x-spinner size="sm" variant="white" />
+                                {{ __('Queuing…') }}
+                            </span>
+                        </button>
+                    </div>
+                </section>
+            @endif
+
             <x-explainer class="mb-2">
                 <p>{{ __('Site dashboard — health at a glance, the most-recent endpoints, and the deploy controls.') }}</p>
                 <p>{{ __('Routing, certificates, environment, redirects, deploy hooks, and destructive actions live in') }}

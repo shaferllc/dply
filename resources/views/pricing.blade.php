@@ -7,7 +7,9 @@
 
     @include('partials.theme-head')
 
-    <title>Pricing – {{ config('app.name') }}</title>
+    <x-seo-meta
+        title="Pricing"
+        description="Flat, per-organization pricing that covers every server and site you run—no per-app surprises. Start with a free trial on infrastructure you already control." />
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700&display=swap" rel="stylesheet" />
     @vite(['resources/css/app.css', 'resources/js/app.js'])

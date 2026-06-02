@@ -114,7 +114,7 @@
 
         @if ($showLaravelSchedulerEnable)
             <div class="border-t border-brand-ink/10 px-6 py-3 text-xs text-brand-moss sm:px-7">
-                <p>{{ __('Prefer a long-running daemon? ') }}<a href="{{ route('servers.daemons', $server) }}?preset=laravel-schedule{{ $enableTargetSite ? '&site='.$enableTargetSite->id : '' }}" wire:navigate class="font-semibold text-brand-ink underline">{{ __('Add a schedule:work supervisor program') }}</a>{{ __(' instead.') }}</p>
+                <p>{{ __('Prefer a long-running daemon? ') }}<a href="{{ route('servers.workers', $server) }}?preset=laravel-schedule{{ $enableTargetSite ? '&site='.$enableTargetSite->id : '' }}" wire:navigate class="font-semibold text-brand-ink underline">{{ __('Add a schedule:work supervisor program') }}</a>{{ __(' instead.') }}</p>
             </div>
         @endif
     </section>

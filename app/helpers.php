@@ -113,7 +113,7 @@ if (! function_exists('server_workspace_nav_for_server')) {
         $siteCountKey = '';
         if ($needsSiteCount) {
             if (! array_key_exists($serverId, $siteCounts)) {
-                $siteCounts[$serverId] = $server->sites()->count();
+                $siteCounts[$serverId] = $server->cachedSitesCount();
             }
             $siteCountKey = (string) $siteCounts[$serverId];
         }
@@ -226,7 +226,7 @@ if (! function_exists('server_workspace_nav_for_server')) {
 
             $minSites = (int) ($item['requires_min_sites'] ?? 0);
             if ($minSites > 1) {
-                $count = $siteCounts[$serverId] ?? $server->sites()->count();
+                $count = $siteCounts[$serverId] ?? $server->cachedSitesCount();
                 $siteCounts[$serverId] = $count;
                 if ($count < $minSites) {
                     continue;

@@ -52,6 +52,7 @@
             </div>
         @endif
         <div class="grid gap-5">
+                @unless ($site->isHeadless())
                 <div>
                     <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ $primaryHostnameLabel }}</p>
                     <div class="mt-2 flex flex-wrap items-center gap-2">
@@ -62,6 +63,7 @@
                         </a>
                     </div>
                 </div>
+                @endunless
 
                 <div>
                     <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ $documentRootLabel }}</p>

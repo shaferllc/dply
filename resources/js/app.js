@@ -5,6 +5,7 @@ import {
     registerDplyLazyAssetListeners,
 } from './lazy-load.js';
 import { registerDplyThemeListeners } from './theme.js';
+import { registerDeployPipelineWorkspace } from './deploy-pipeline-dnd.js';
 
 window.dplyEnsureDocsProseStyles = dplyEnsureDocsProseStyles;
 
@@ -58,6 +59,8 @@ document.addEventListener('alpine:init', () => {
             },
         };
     });
+
+    registerDeployPipelineWorkspace(window.Alpine);
 });
 
 const plotlyCdnUrl = 'https://cdn.jsdelivr.net/npm/plotly.js-dist-min@3.4.0/plotly.min.js';

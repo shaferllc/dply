@@ -575,8 +575,8 @@ final class ServerHealthCockpit
                 (int) $daemons['inactive_count'],
                 ['count' => (int) $daemons['inactive_count']],
             ),
-            'href' => route('servers.daemons', $server),
-            'link_label' => __('Open daemons'),
+            'href' => route('servers.workers', $server),
+            'link_label' => __('Open workers'),
         ]];
     }
 

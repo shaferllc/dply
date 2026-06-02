@@ -38,14 +38,31 @@ final class PipelineAnchorScriptRunner
         $repoEsc = escapeshellarg($repoUrl);
         $branchEsc = escapeshellarg($branch);
         $releaseEsc = escapeshellarg($releaseDir);
+        $refKind = $site->gitRefKind();
+        $isCommit = $refKind === 'commit';
 
         if ($atomic) {
             $baseEsc = escapeshellarg(rtrim($site->effectiveRepositoryPath(), '/'));
             $log = "\n--- git clone (atomic) ---\n";
-            $log .= $ssh->exec(
-                $gitSshPrefix.sprintf('git clone --depth 1 --branch %s %s %s 2>&1', $branchEsc, $repoEsc, $releaseEsc),
-                600
-            );
+            if ($isCommit) {
+                // Arbitrary SHAs need full history; --depth 1 --branch <sha>
+                // is not supported by hosts that don't allow reachable-SHA
+                // fetches. Clone the default ref, then checkout the SHA.
+                $log .= $ssh->exec(
+                    $gitSshPrefix.sprintf('git clone %s %s 2>&1', $repoEsc, $releaseEsc),
+                    600
+                );
+                $log .= "\n--- git checkout ---\n";
+                $log .= $ssh->exec(
+                    sprintf('cd %s && %s git checkout %s 2>&1', $releaseEsc, $gitSshPrefix, $branchEsc),
+                    120
+                );
+            } else {
+                $log .= $ssh->exec(
+                    $gitSshPrefix.sprintf('git clone --depth 1 --branch %s %s %s 2>&1', $branchEsc, $repoEsc, $releaseEsc),
+                    600
+                );
+            }
             $hasGit = trim($ssh->exec(sprintf('test -d %s/.git && echo ok', $releaseEsc), 30));
             if ($hasGit !== 'ok') {
                 throw new \RuntimeException('Git clone failed. See deployment log.');
@@ -65,6 +82,11 @@ final class PipelineAnchorScriptRunner
                 sprintf('cd %s && %s git checkout %s 2>&1', $releaseEsc, $gitSshPrefix, $branchEsc),
                 120
             );
+            // SHAs have no upstream to pull; `git pull` would fail with a
+            // detached HEAD. Only fast-forward branches.
+            if ($isCommit || $refKind === 'tag') {
+                return $log;
+            }
             $log .= "\n--- git pull ---\n";
 
             return $log.$ssh->exec(
@@ -74,6 +96,19 @@ final class PipelineAnchorScriptRunner
         }
 
         $log = "\n--- git clone ---\n";
+
+        if ($isCommit) {
+            $log .= $ssh->exec(
+                $gitSshPrefix.sprintf('git clone %s %s 2>&1', $repoEsc, $releaseEsc),
+                600
+            );
+            $log .= "\n--- git checkout ---\n";
+
+            return $log.$ssh->exec(
+                sprintf('cd %s && %s git checkout %s 2>&1', $releaseEsc, $gitSshPrefix, $branchEsc),
+                120
+            );
+        }
 
         return $log.$ssh->exec(
             $gitSshPrefix.sprintf('git clone --branch %s %s %s 2>&1', $branchEsc, $repoEsc, $releaseEsc),

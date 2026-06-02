@@ -14,7 +14,6 @@ use App\Models\SiteDeployment;
 use App\Services\Deploy\DeploymentContractBuilder;
 use App\Services\Deploy\DeploymentPreflightValidator;
 use App\Support\Sites\SiteSettingsViewData;
-use App\Support\Sites\SiteShowViewData;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Url;
@@ -37,6 +36,47 @@ class DeploymentsList extends Component
     public Server $server;
 
     public Site $site;
+
+    public const TAB_OVERVIEW = 'overview';
+
+    public const TAB_DEPLOY = 'deploy';
+
+    public const TAB_COMMITS = 'commits';
+
+    public const TAB_FILES = 'files';
+
+    public const TAB_BRANCHES = 'branches';
+
+    public const TAB_PIPELINE = 'pipeline';
+
+    public const TAB_ROLLOUT = 'rollout';
+
+    public const TAB_RELEASES = 'releases';
+
+    public const TAB_HISTORY = 'history';
+
+    public const TAB_SETTINGS = 'settings';
+
+    public const TABS = [
+        self::TAB_OVERVIEW,
+        self::TAB_DEPLOY,
+        self::TAB_COMMITS,
+        self::TAB_FILES,
+        self::TAB_BRANCHES,
+        self::TAB_PIPELINE,
+        self::TAB_ROLLOUT,
+        self::TAB_RELEASES,
+        self::TAB_HISTORY,
+        self::TAB_SETTINGS,
+    ];
+
+    public const SETTINGS_SECTIONS = ['pipeline', 'repository', 'hooks'];
+
+    #[Url(as: 'tab', except: self::TAB_DEPLOY)]
+    public string $tab = self::TAB_DEPLOY;
+
+    #[Url(as: 'section', except: '')]
+    public string $section = '';
 
     #[Url(as: 'status', except: '')]
     public string $statusFilter = '';
@@ -63,6 +103,41 @@ class DeploymentsList extends Component
 
         $this->server = $server;
         $this->site = $site;
+
+        if (! in_array($this->tab, self::TABS, true)) {
+            $this->tab = self::TAB_DEPLOY;
+        }
+        if ($this->tab === self::TAB_RELEASES && $site->deploy_strategy !== 'atomic') {
+            $this->tab = self::TAB_DEPLOY;
+        }
+        if ($this->tab !== self::TAB_SETTINGS) {
+            $this->section = '';
+        } elseif (! in_array($this->section, self::SETTINGS_SECTIONS, true)) {
+            $this->section = '';
+        }
+    }
+
+    public function setTab(string $tab): void
+    {
+        if (! in_array($tab, self::TABS, true)) {
+            return;
+        }
+        if ($tab === self::TAB_RELEASES && $this->site->deploy_strategy !== 'atomic') {
+            return;
+        }
+        $this->tab = $tab;
+        if ($tab !== self::TAB_SETTINGS) {
+            $this->section = '';
+        }
+    }
+
+    public function setSection(string $section): void
+    {
+        if (! in_array($section, self::SETTINGS_SECTIONS, true)) {
+            return;
+        }
+        $this->tab = self::TAB_SETTINGS;
+        $this->section = $section;
     }
 
     public function updatedStatusFilter(): void
@@ -123,19 +198,33 @@ class DeploymentsList extends Component
             && ! $this->site->usesFunctionsRuntime()
             && ! $this->site->usesEdgeRuntime();
 
-        $deploymentConsoles = collect();
-        $atomicReleases = false;
+        $atomicReleases = $isVmDeployHub && $this->site->deploy_strategy === 'atomic';
+        $latestDeployment = null;
 
         if ($isVmDeployHub) {
             $this->site->load([
                 'releases' => fn ($q) => $q->orderByDesc('id')->limit(30),
                 'deployments' => fn ($q) => $q->orderByDesc('started_at')->limit(5),
             ]);
-            $atomicReleases = $this->site->deploy_strategy === 'atomic';
-            if ($this->site->relationLoaded('deployments')) {
-                $deploymentConsoles = SiteShowViewData::deploymentConsolesFor($this->site->deployments);
-            }
+            $latestDeployment = $this->site->deployments->first();
         }
+
+        $tabsVisible = [
+            self::TAB_OVERVIEW => true,
+            self::TAB_DEPLOY => true,
+            self::TAB_COMMITS => true,
+            self::TAB_FILES => true,
+            self::TAB_BRANCHES => true,
+            self::TAB_PIPELINE => $isVmDeployHub,
+            self::TAB_ROLLOUT => $isVmDeployHub,
+            self::TAB_RELEASES => $atomicReleases,
+            self::TAB_HISTORY => true,
+            self::TAB_SETTINGS => true,
+        ];
+
+        $overviewMetrics = $this->tab === self::TAB_OVERVIEW
+            ? $this->computeOverviewMetrics()
+            : null;
 
         return view('livewire.sites.deployments-list', array_merge(
             SiteSettingsViewData::for(
@@ -151,12 +240,103 @@ class DeploymentsList extends Component
                 'triggers' => $triggers,
                 'statuses' => self::ALLOWED_STATUSES,
                 'isVmDeployHub' => $isVmDeployHub,
-                'deploymentConsoles' => $deploymentConsoles,
                 'atomicReleases' => $atomicReleases,
+                'latestDeployment' => $latestDeployment,
+                'tabsVisible' => $tabsVisible,
+                'overviewMetrics' => $overviewMetrics,
                 'section' => 'deploy',
                 'routingTab' => 'domains',
                 'laravel_tab' => 'commands',
             ],
         ))->layout('layouts.app');
+    }
+
+    /**
+     * Summarise the last 30 days of deploys for the Overview panel.
+     *
+     * @return array{
+     *   window_days:int,
+     *   total:int,
+     *   success_count:int,
+     *   failed_count:int,
+     *   success_rate:?float,
+     *   median_duration_ms:?int,
+     *   daily:array<int, array{date:string, total:int, success:int, failed:int}>,
+     *   top_failure_phase:?string,
+     * }
+     */
+    private function computeOverviewMetrics(): array
+    {
+        $windowDays = 30;
+        $since = now()->subDays($windowDays);
+
+        $rows = SiteDeployment::query()
+            ->where('site_id', $this->site->id)
+            ->where('created_at', '>=', $since)
+            ->orderBy('created_at')
+            ->get(['status', 'started_at', 'finished_at', 'phase_results', 'created_at']);
+
+        $total = $rows->count();
+        $successCount = $rows->where('status', SiteDeployment::STATUS_SUCCESS)->count();
+        $failedCount = $rows->where('status', SiteDeployment::STATUS_FAILED)->count();
+        $rated = $successCount + $failedCount;
+        $successRate = $rated > 0 ? round(($successCount / $rated) * 100, 1) : null;
+
+        $durations = $rows
+            ->map(fn (SiteDeployment $d): int => $d->phaseTotalDurationMs())
+            ->filter(fn (int $ms): bool => $ms > 0)
+            ->values();
+        $medianDurationMs = null;
+        if ($durations->isNotEmpty()) {
+            $sorted = $durations->sort()->values();
+            $count = $sorted->count();
+            $medianDurationMs = (int) ($count % 2
+                ? $sorted[(int) (($count - 1) / 2)]
+                : (int) (($sorted[$count / 2 - 1] + $sorted[$count / 2]) / 2));
+        }
+
+        $daily = [];
+        for ($i = $windowDays - 1; $i >= 0; $i--) {
+            $day = now()->subDays($i)->toDateString();
+            $daily[$day] = ['date' => $day, 'total' => 0, 'success' => 0, 'failed' => 0];
+        }
+        foreach ($rows as $row) {
+            $day = $row->created_at?->toDateString();
+            if ($day === null || ! isset($daily[$day])) {
+                continue;
+            }
+            $daily[$day]['total']++;
+            if ($row->status === SiteDeployment::STATUS_SUCCESS) {
+                $daily[$day]['success']++;
+            } elseif ($row->status === SiteDeployment::STATUS_FAILED) {
+                $daily[$day]['failed']++;
+            }
+        }
+
+        $failurePhases = [];
+        foreach ($rows->where('status', SiteDeployment::STATUS_FAILED) as $row) {
+            foreach (['build', 'swap', 'release', 'restart'] as $phase) {
+                if ($row->hasPhase($phase) && ! $row->phaseOk($phase)) {
+                    $failurePhases[$phase] = ($failurePhases[$phase] ?? 0) + 1;
+                    break;
+                }
+            }
+        }
+        $topFailurePhase = null;
+        if ($failurePhases !== []) {
+            arsort($failurePhases);
+            $topFailurePhase = (string) array_key_first($failurePhases);
+        }
+
+        return [
+            'window_days' => $windowDays,
+            'total' => $total,
+            'success_count' => $successCount,
+            'failed_count' => $failedCount,
+            'success_rate' => $successRate,
+            'median_duration_ms' => $medianDurationMs,
+            'daily' => array_values($daily),
+            'top_failure_phase' => $topFailurePhase,
+        ];
     }
 }

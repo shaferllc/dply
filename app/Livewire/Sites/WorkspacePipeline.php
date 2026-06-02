@@ -31,7 +31,18 @@ class WorkspacePipeline extends Show
 {
     use InteractsWithUnsavedChangesBar;
 
-    #[Url(as: 'tab', except: 'overview')]
+    /** Suppress the page wrapper (breadcrumb / sidebar / header) when rendered
+     * inside another page (Deployments → Settings tab). */
+    public bool $embedded = false;
+
+    /** When set, pin the pipeline to a single sub-tab (steps / rollout / etc.)
+     * and hide the internal tablist. Used by Deployments' top-level Pipeline
+     * and Rollout tabs. */
+    public string $lockedTab = '';
+
+    // Aliased to `pipeline_tab` so this component plays nicely when embedded
+    // inside the Deployments page (its own ?tab= owns the outer tab strip).
+    #[Url(as: 'pipeline_tab', except: 'overview')]
     public string $pipelineTab = 'overview';
 
     public function mount(Server $server, Site $site): void
@@ -50,6 +61,10 @@ class WorkspacePipeline extends Show
         $allowed = array_keys(config('site_deploy_pipeline.tabs', []));
         if (is_string($tab) && in_array($tab, $allowed, true)) {
             $this->pipelineTab = $tab;
+        }
+
+        if ($this->lockedTab !== '' && in_array($this->lockedTab, $allowed, true)) {
+            $this->pipelineTab = $this->lockedTab;
         }
     }
 

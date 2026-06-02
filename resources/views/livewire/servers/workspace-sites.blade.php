@@ -10,6 +10,7 @@
     ];
 
     $isContainerHost = in_array($server->hostKind(), [\App\Models\Server::HOST_KIND_DOCKER, \App\Models\Server::HOST_KIND_KUBERNETES], true);
+
     $newCardEyebrow = $isContainerHost ? __('Container apps') : __('Sites');
     $newCardHeading = $isContainerHost ? __('New container app') : __('New site');
     $newCardDescription = $isContainerHost

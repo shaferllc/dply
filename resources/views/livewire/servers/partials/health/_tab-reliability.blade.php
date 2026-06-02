@@ -88,7 +88,7 @@
             @endforeach
         </ul>
         <div class="border-t border-brand-ink/10 px-6 py-3 sm:px-7">
-            <a href="{{ route('servers.daemons', $server) }}" wire:navigate class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Open workers') }}</a>
+            <a href="{{ route('servers.workers', $server) }}" wire:navigate class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Open workers') }}</a>
         </div>
     @endif
 </section>

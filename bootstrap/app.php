@@ -12,6 +12,7 @@ use App\Console\Commands\FlushDeployDigestCommand;
 use App\Console\Commands\FlushServerSystemdNotificationDigestCommand;
 use App\Console\Commands\ProcessInsightDigestQueueCommand;
 use App\Console\Commands\ProcessScheduledServerDeletionsCommand;
+use App\Console\Commands\ProcessScheduledSiteDeletionsCommand;
 use App\Console\Commands\ProcessSshKeyRotationRemindersCommand;
 use App\Console\Commands\PruneAuditLogsCommand;
 use App\Console\Commands\PruneFunctionInvocationsCommand;
@@ -120,6 +121,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ->when(fn (): bool => (bool) config('features.workspace.shared_host', true));
 
         $schedule->command(ProcessScheduledServerDeletionsCommand::class)->everyMinute();
+        $schedule->command(ProcessScheduledSiteDeletionsCommand::class)->everyMinute();
 
         // Sweep edge sites for backend status updates. Runs every
         // minute so an active deploy reaches "active" within ~60s

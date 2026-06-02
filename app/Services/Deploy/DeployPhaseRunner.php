@@ -149,6 +149,11 @@ class DeployPhaseRunner
         }
 
         $shell = $this->resolveShell($site, $shellFactory);
+        $stepEnv = [
+            'DEPLOY_PATH' => $cwd,
+            'SITE_NAME' => (string) $site->name,
+            'RELEASE_REF' => (string) ($site->git_branch ?? ''),
+        ];
         $results = [];
         foreach ($steps as $step) {
             $cmd = $step->commandFor();
@@ -166,7 +171,7 @@ class DeployPhaseRunner
                 continue;
             }
 
-            $result = $this->execAt($shell, $cwd, $cmd, (int) ($step->timeout_seconds ?? 900));
+            $result = $this->execAt($shell, $cwd, $cmd, (int) ($step->timeout_seconds ?? 900), $stepEnv);
             $result['step_id'] = (string) $step->id;
             $result['step_type'] = $step->step_type;
             $result['command'] = $cmd;
@@ -205,9 +210,17 @@ class DeployPhaseRunner
     /**
      * @return array{ok: bool, output: string, duration_ms: int}
      */
-    private function execAt(RemoteShell $shell, string $cwd, string $command, int $timeout): array
+    private function execAt(RemoteShell $shell, string $cwd, string $command, int $timeout, array $env = []): array
     {
-        $wrapped = sprintf('cd %s && %s', escapeshellarg($cwd), $command);
+        // Export the documented deploy-step env (DEPLOY_PATH, SITE_NAME,
+        // RELEASE_REF, …) before running the command so custom scripts that
+        // reference them — and run under `set -u` — don't fail with
+        // "unbound variable".
+        $exports = '';
+        foreach ($env as $key => $value) {
+            $exports .= sprintf('export %s=%s; ', $key, escapeshellarg((string) $value));
+        }
+        $wrapped = sprintf('cd %s && %s%s', escapeshellarg($cwd), $exports, $command);
         $start = Carbon::now();
         try {
             $output = $shell->exec($wrapped, $timeout);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Sites;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\Sites\PicksRepositoryRef;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
@@ -40,36 +41,54 @@ use Livewire\Component;
 class Repository extends Component
 {
     use DispatchesToastNotifications;
+    use PicksRepositoryRef;
 
     public Server $server;
 
     public Site $site;
 
-    #[Url(as: 'tab', except: 'overview')]
+    /** When true, suppress the page wrapper (breadcrumb / sidebar / header) so the
+     * component renders cleanly inside another page (e.g. the Deployments Settings tab). */
+    public bool $embedded = false;
+
+    /** When set to a tab id, pin the component to that tab and hide the tablist. Used by
+     * the Deployments page's "Commits" surface to render commits-only without the rest of
+     * Repository's chrome. */
+    public string $lockedTab = '';
+
+    // Aliased to `repo_*` so this component plays nicely when embedded inside
+    // the Deployments page (its own ?tab= owns the outer tab strip).
+    #[Url(as: 'repo_tab', except: 'overview')]
     public string $tab = 'overview';
 
     /** Path being browsed under the Files tab. Empty string = repo root. */
-    #[Url(as: 'path', except: '')]
+    #[Url(as: 'repo_path', except: '')]
     public string $filesPath = '';
 
     /** File the operator clicked into in the Files tab. */
     public string $filesOpenFile = '';
 
     /** Override which ref the Files/Overview tabs read from — defaults to `Site::$git_branch`. */
-    #[Url(as: 'ref', except: '')]
+    #[Url(as: 'repo_ref', except: '')]
     public string $branchOverride = '';
 
     /** Search box on the Branches tab. */
     public string $branchSearch = '';
 
     /** Filter box on the Commits tab (matches message / author / sha). */
-    #[Url(as: 'q', except: '')]
+    #[Url(as: 'repo_q', except: '')]
     public string $commitFilter = '';
 
     /** Connection-tab form mirrors of the equivalent fields on the Site. */
     public string $connectionRepositoryUrl = '';
 
     public string $connectionBranch = '';
+
+    /**
+     * Ref kind for $connectionBranch: 'branch', 'tag', or 'commit'. Driven
+     * by the ref picker; falls back to 'branch' on save when unset.
+     */
+    public ?string $connectionRefKind = null;
 
     public string $connectionAccountId = '';
 
@@ -83,9 +102,51 @@ class Repository extends Component
         $this->server = $server;
         $this->site = $site;
 
+        if ($this->lockedTab !== '') {
+            $this->tab = $this->lockedTab;
+        }
+
         $this->connectionRepositoryUrl = (string) ($site->git_repository_url ?? '');
         $this->connectionBranch = (string) ($site->git_branch ?? '');
         $this->connectionAccountId = (string) ($site->repositoryMeta()['git_source_control_account_id'] ?? '');
+
+        $storedKind = is_array($site->meta ?? null) ? (string) ($site->meta['git_ref_kind'] ?? '') : '';
+        $this->connectionRefKind = in_array($storedKind, ['branch', 'tag', 'commit'], true) ? $storedKind : null;
+    }
+
+    /**
+     * If the user edits the URL on the connection form and then clicks
+     * "Change ref", sync the in-progress URL to the site so the picker's
+     * reader can resolve refs against the correct remote. We intentionally
+     * mutate $site->git_repository_url only — the branch field stays whatever
+     * was last persisted until the user saves the form.
+     */
+    public function openConnectionRefPicker(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $url = trim($this->connectionRepositoryUrl);
+        if ($url === '') {
+            $this->toastError(__('Enter a repository URL first.'));
+
+            return;
+        }
+        if ((string) $this->site->git_repository_url !== $url) {
+            $this->site->forceFill(['git_repository_url' => $url])->save();
+            app(SourceControlRepositoryReader::class)->invalidate($this->site);
+        }
+
+        $this->openRepoRefPicker();
+    }
+
+    public function onRepoRefSelected(): void
+    {
+        $label = (string) ($this->repo_ref_selected_label ?? '');
+        if ($label === '') {
+            return;
+        }
+        $this->connectionBranch = $label;
+        $this->connectionRefKind = $this->repo_ref_selected_kind;
     }
 
     #[On('source-control-linked')]
@@ -125,9 +186,15 @@ class Repository extends Component
             return;
         }
 
-        $this->site->forceFill(['git_branch' => $branch])->save();
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta['git_ref_kind'] = 'branch';
+        $this->site->forceFill([
+            'git_branch' => $branch,
+            'meta' => $meta,
+        ])->save();
         $reader->invalidate($this->site);
         $this->connectionBranch = $branch;
+        $this->connectionRefKind = 'branch';
         $this->branchOverride = '';
         $this->toastSuccess(__('Deploy branch set to :branch.', ['branch' => $branch]));
     }
@@ -150,17 +217,22 @@ class Repository extends Component
             $branch = 'main';
         }
 
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta['git_ref_kind'] = 'branch';
         $this->site->forceFill([
             'git_repository_url' => $url,
             'git_branch' => $branch,
+            'meta' => $meta,
         ])->save();
         $reader->invalidate($this->site);
 
         $this->connectionRepositoryUrl = $url;
         $this->connectionBranch = $branch;
+        $this->connectionRefKind = 'branch';
         $this->filesPath = '';
         $this->filesOpenFile = '';
         $this->branchOverride = '';
+        $this->clearRepoRefSelection();
 
         $this->toastSuccess(__('Repository switched to :url.', ['url' => $url]));
     }
@@ -179,15 +251,21 @@ class Repository extends Component
 
         $url = trim($this->connectionRepositoryUrl);
         $branch = trim($this->connectionBranch) !== '' ? trim($this->connectionBranch) : 'main';
+        $refKind = in_array($this->connectionRefKind, ['branch', 'tag', 'commit'], true)
+            ? $this->connectionRefKind
+            : 'branch';
 
         $this->site->mergeRepositoryMeta([
             'git_source_control_account_id' => $this->connectionAccountId !== '' ? $this->connectionAccountId : null,
             'git_provider_kind' => $this->detectProviderKind($url),
         ]);
 
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta['git_ref_kind'] = $refKind;
         $this->site->fill([
             'git_repository_url' => $url,
             'git_branch' => $branch,
+            'meta' => $meta,
         ])->save();
         $reader->invalidate($this->site);
 

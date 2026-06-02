@@ -3,8 +3,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Features – {{ config('app.name') }}</title>
-    <meta name="description" content="BYO cloud servers with nginx, TLS, PHP, firewall—alongside classic panels like ServerPilot. Plus Git deploys, org vault, CD, IaC-friendly ops, Forge-style transparency, AI-builder complement.">
+    <x-seo-meta
+        title="Features"
+        description="One control plane for the servers you own: provision or bring your own, deploy from git, manage TLS, databases, cron, firewall, backups, and teams—with an API and CLI behind every action." />
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     @include('partials.theme-head')
@@ -18,745 +19,445 @@
 <body class="font-sans antialiased bg-brand-cream text-brand-ink" style="font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;">
     <div class="fixed inset-0 -z-20 bg-brand-cream"></div>
     <div class="fixed inset-0 -z-10 bg-mesh-brand"></div>
+    <div class="fixed inset-0 -z-10 bg-[radial-gradient(ellipse_100%_80%_at_50%_-30%,rgba(205,169,66,0.08),transparent_55%)]"></div>
 
     <x-site-header active="features" />
 
     <main>
         {{-- Hero --}}
-        <section class="pt-16 pb-12 sm:pt-20 sm:pb-16 px-4 sm:px-6 lg:px-8 border-b border-brand-ink/10">
-            <div class="max-w-4xl mx-auto text-center">
-                <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">Platform tour</p>
-                <h1 class="mt-4 text-4xl font-bold tracking-tight text-brand-ink sm:text-5xl">Everything in one operating model</h1>
-                <p class="mt-5 text-lg text-brand-moss max-w-2xl mx-auto leading-relaxed">
-                    {{ config('app.name') }} connects <strong class="text-brand-ink font-semibold">who</strong> is allowed to work (organizations),
-                    <strong class="text-brand-ink font-semibold">what</strong> they can touch (credentials and servers),
-                    and <strong class="text-brand-ink font-semibold">how</strong> apps go live (sites, SSL, git deploys, and hooks)—without scattering secrets or SSH config across laptops.
+        <section class="relative pt-16 pb-14 sm:pt-24 sm:pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
+            <div class="mx-auto max-w-3xl text-center">
+                <p class="inline-flex items-center gap-2 rounded-full border border-brand-sage/25 bg-white/60 px-4 py-1.5 text-xs font-semibold tracking-wide text-brand-forest uppercase">
+                    <span class="h-1.5 w-1.5 rounded-full bg-brand-gold" aria-hidden="true"></span>
+                    The platform tour
                 </p>
-                <p class="mt-4 text-base text-brand-moss/90 max-w-2xl mx-auto leading-relaxed">
-                    The same <strong class="text-brand-forest font-medium">developer-first</strong> idea as Git-centric platforms (e.g.
-                    <a href="https://bohr.io" class="font-semibold text-brand-forest underline decoration-brand-sage/40 underline-offset-2 hover:decoration-brand-forest">bohr.io</a>):
-                    spend energy on product code, not on re-creating deploy plumbing—while <strong class="text-brand-forest font-medium">you keep the servers</strong>.
+                <h1 class="mt-8 text-4xl font-bold tracking-tight text-brand-ink sm:text-5xl lg:leading-[1.08]">
+                    One control plane for the
+                    <span class="relative whitespace-nowrap">
+                        <span class="relative z-10 text-brand-forest">servers you own</span>
+                        <span class="absolute bottom-1 left-0 right-0 h-3 bg-brand-gold/35 -rotate-1 rounded-sm -z-0" aria-hidden="true"></span>
+                    </span>
+                </h1>
+                <p class="mt-6 text-lg text-brand-moss leading-relaxed">
+                    Provision from your cloud or bring any box over SSH. Deploy from git, manage TLS, databases, cron, firewall, and backups—and give the whole team one audited place to work, without scattering secrets across laptops.
                 </p>
-                <p class="mt-3 text-sm text-brand-moss/85 max-w-2xl mx-auto leading-relaxed">
-                    If you define cloud resources with <strong class="text-brand-forest font-medium">infrastructure as code</strong> (e.g.
-                    <a href="https://www.pulumi.com" class="font-semibold text-brand-forest underline decoration-brand-sage/40 underline-offset-2 hover:decoration-brand-forest">Pulumi</a>
-                    in TypeScript, Python, or Go), {{ config('app.name') }} sits <strong class="text-brand-forest font-medium">next to that workflow</strong>—see the section on platform ops below.
-                </p>
-                <nav class="mt-10 flex flex-wrap justify-center gap-2 text-sm" aria-label="On this page">
-                    <a href="#how-it-fits" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">How it fits</a>
-                    <a href="#git-native" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Git-first</a>
-                    <a href="#ai-builders" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">AI builders</a>
-                    <a href="#platform-ops" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">IaC &amp; ops</a>
-                    <a href="#cd-releases" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">CD &amp; releases</a>
-                    <a href="#organizations" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Organizations</a>
-                    <a href="#credentials" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Credentials</a>
-                    <a href="#servers" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Servers</a>
-                    <a href="#sites" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Sites &amp; deploy</a>
-                    <a href="#recovery" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Recovery</a>
-                    <a href="#project-ops" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Project ops</a>
-                    <a href="#forge-style" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Forge-style</a>
-                    <a href="#serverpilot" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">ServerPilot</a>
-                    <a href="#coverage" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Coverage</a>
-                    <a href="#plans-and-account" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Plans &amp; account</a>
-                    <a href="#api-cli" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">API &amp; CLI</a>
-                    <a href="#security" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">Security</a>
+                <div class="mt-9 flex flex-col sm:flex-row items-center justify-center gap-4">
+                    @auth
+                        <a href="{{ route('dashboard') }}" class="w-full sm:w-auto inline-flex justify-center items-center px-7 py-3.5 rounded-xl bg-brand-gold text-brand-ink text-sm font-semibold shadow-lg shadow-brand-gold/25 hover:bg-[#d4b24d] transition-colors">Open dashboard</a>
+                    @else
+                        <a href="{{ route('register') }}" class="w-full sm:w-auto inline-flex justify-center items-center px-7 py-3.5 rounded-xl bg-brand-gold text-brand-ink text-sm font-semibold shadow-lg shadow-brand-gold/25 hover:bg-[#d4b24d] transition-colors">Start free trial</a>
+                    @endauth
+                    <a href="{{ route('pricing') }}" class="w-full sm:w-auto inline-flex justify-center items-center px-7 py-3.5 rounded-xl border-2 border-brand-ink/15 bg-white/70 text-brand-ink text-sm font-semibold hover:border-brand-sage/40 hover:bg-white transition-colors">View pricing</a>
+                </div>
+
+                <nav class="mt-12 flex flex-wrap justify-center gap-2 text-sm" aria-label="On this page">
+                    @php
+                        $jump = [
+                            '#model' => 'How it fits',
+                            '#deploy' => 'Deploy &amp; releases',
+                            '#servers' => 'Servers',
+                            '#sites' => 'Sites &amp; TLS',
+                            '#recovery' => 'Backups &amp; recovery',
+                            '#teams' => 'Teams &amp; projects',
+                            '#api' => 'API &amp; CLI',
+                            '#coverage' => 'Full coverage',
+                            '#security' => 'Security',
+                        ];
+                    @endphp
+                    @foreach ($jump as $href => $label)
+                        <a href="{{ $href }}" class="rounded-full border border-brand-ink/15 bg-white/80 px-4 py-2 font-medium text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink transition-colors">{!! $label !!}</a>
+                    @endforeach
                 </nav>
             </div>
         </section>
 
-        {{-- How it fits together --}}
-        <section id="how-it-fits" class="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 scroll-mt-24">
+        {{-- Operating model --}}
+        <section id="model" class="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 scroll-mt-24">
             <div class="mx-auto max-w-7xl">
-                <h2 class="text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl text-center">How it works together</h2>
-                <p class="mt-4 text-center text-brand-moss max-w-2xl mx-auto">Data and permissions flow through a single hierarchy—so onboarding a teammate never means forwarding API tokens.</p>
+                <div class="max-w-2xl">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">One hierarchy, one trust boundary</p>
+                    <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">How everything fits together</h2>
+                    <p class="mt-4 text-brand-moss leading-relaxed">Access and data flow through a single chain—so onboarding a teammate never means forwarding API tokens, and every action traces back to a member who already belongs to the org.</p>
+                </div>
 
-                <ol class="mt-16 grid gap-8 lg:grid-cols-5 lg:gap-4 relative">
+                <ol class="mt-14 grid gap-5 lg:grid-cols-4">
                     @php
                         $steps = [
-                            ['n' => '1', 'title' => 'Organization', 'body' => 'Every resource belongs to an org. Switch context, invite people, and align billing to the team that owns the infrastructure—one subscription covers every server and every site in that org.'],
-                            ['n' => '2', 'title' => 'Credentials', 'body' => 'Cloud API tokens live in the vault, scoped to the org. Members run workflows without copying secrets into local env files.'],
-                            ['n' => '3', 'title' => 'Servers', 'body' => 'Provision from supported clouds, or register any box over SSH. One inventory for commands, health checks, databases, cron, processes, and firewall rules.'],
-                            ['n' => '4', 'title' => 'Sites', 'body' => 'Map domains to runtimes (PHP, Node, or static). Nginx, TLS, git remotes, env files, and deploy automation stay attached to the server they run on.'],
-                            ['n' => '5', 'title' => 'Ship & operate', 'body' => 'Trigger deploys from git hooks or your CI. Run ad-hoc commands, review deployment output, and adjust worker and firewall config from the same console.'],
+                            ['icon' => 'user-group', 'n' => '01', 'title' => 'Organization', 'body' => 'Every server, site, and credential belongs to an org. Invite people, switch context, and bill the whole team on one plan.'],
+                            ['icon' => 'key', 'n' => '02', 'title' => 'Credentials', 'body' => 'Cloud tokens and keys live encrypted in the org vault. Members run real workflows without copying secrets locally.'],
+                            ['icon' => 'server-stack', 'n' => '03', 'title' => 'Servers', 'body' => 'Provision from supported clouds or register any box over SSH. One inventory for commands, health, and config.'],
+                            ['icon' => 'globe-alt', 'n' => '04', 'title' => 'Sites & ship', 'body' => 'Map domains to runtimes, wire git, and deploy from the UI, a webhook, or your CI—every release tracked.'],
                         ];
                     @endphp
-                    @foreach ($steps as $step)
-                        <li class="rounded-2xl border border-brand-ink/10 bg-white/80 p-6 shadow-sm lg:flex lg:flex-col">
-                            <span class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-brand-ink text-brand-cream text-sm font-bold">{{ $step['n'] }}</span>
-                            <h3 class="mt-4 text-lg font-semibold text-brand-ink">{{ $step['title'] }}</h3>
-                            <p class="mt-2 text-sm text-brand-moss leading-relaxed flex-1">{{ $step['body'] }}</p>
+                    @foreach ($steps as $i => $step)
+                        <li class="relative rounded-2xl border border-brand-ink/10 bg-white/80 p-6 shadow-sm">
+                            <div class="flex items-center justify-between">
+                                <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-forest/10 text-brand-forest">
+                                    <x-dynamic-component :component="'heroicon-o-' . $step['icon']" class="h-5 w-5" aria-hidden="true" />
+                                </span>
+                                <span class="text-xs font-bold tracking-widest text-brand-mist">{{ $step['n'] }}</span>
+                            </div>
+                            <h3 class="mt-5 text-lg font-semibold text-brand-ink">{{ $step['title'] }}</h3>
+                            <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ $step['body'] }}</p>
+                            @unless ($loop->last)
+                                <span class="hidden lg:block absolute top-1/2 -right-[11px] -translate-y-1/2 text-brand-sage/50" aria-hidden="true">
+                                    <x-heroicon-m-chevron-right class="h-5 w-5" />
+                                </span>
+                            @endunless
                         </li>
                     @endforeach
                 </ol>
 
-                <div class="mt-12 rounded-2xl border border-brand-ink/10 bg-brand-ink text-brand-cream px-6 py-8 sm:px-10">
+                <div class="mt-10 rounded-2xl border border-brand-ink/10 bg-brand-ink text-brand-cream px-6 py-7 sm:px-10">
                     <p class="text-sm font-medium text-brand-sand/90 leading-relaxed max-w-3xl">
-                        <span class="text-brand-gold font-semibold">Mental model:</span> the organization is the trust boundary. Credentials never leave it; servers and sites inherit it; every action is tied to a member who is already authenticated into that org.
+                        <span class="text-brand-gold font-semibold">The mental model:</span> the organization is the trust boundary. Credentials never leave it, servers and sites inherit it, and the audit log records who did what—across every surface.
                     </p>
                 </div>
             </div>
         </section>
 
-        {{-- Git-native developer workflow (similar positioning to bohr.io: integrate with Git, automate deploys) --}}
-        <section id="git-native" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-gradient-to-b from-white/60 to-brand-sand/20 scroll-mt-24">
+        {{-- Deploy & releases (bento) --}}
+        <section id="deploy" class="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-gradient-to-b from-white/60 to-brand-sand/20 scroll-mt-24">
             <div class="mx-auto max-w-7xl">
-                <div class="max-w-3xl">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">Code more, manage less—on your metal</p>
-                    <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Git-first workflows, not a black-box host</h2>
-                    <p class="mt-4 text-brand-moss leading-relaxed">
-                        Platforms like <a href="https://bohr.io" class="font-semibold text-brand-forest underline decoration-brand-sage/40 underline-offset-2 hover:decoration-brand-forest">bohr.io</a>
-                        emphasize GitHub-integrated deploys and a smooth path from repo to production.
-                        {{ config('app.name') }} brings that <strong class="text-brand-forest font-medium">same mental model</strong>—OAuth to <strong class="text-brand-forest font-medium">GitHub, GitLab, and Bitbucket</strong> for source control, signed <strong class="text-brand-forest font-medium">deploy webhooks</strong>, and per-environment configuration—while your workloads run on <strong class="text-brand-forest font-medium">servers and credentials you own</strong> (BYO or cloud-provisioned).
-                    </p>
+                <div class="max-w-2xl">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">Git in, releases out</p>
+                    <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Deploys you can trigger, track, and roll back</h2>
+                    <p class="mt-4 text-brand-moss leading-relaxed">Connect a repo, wire a branch, and ship from the dashboard, a signed webhook after a push, or your pipeline—every path runs the same code over SSH and lands in the same deployment history.</p>
                 </div>
 
-                <ul class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                    <li class="rounded-2xl border border-brand-ink/10 bg-white/90 p-6 shadow-sm">
-                        <h3 class="font-semibold text-brand-ink">Same deploys from UI, git, or CI</h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Trigger deploys from the dashboard, from a <strong class="text-brand-forest font-medium">signed webhook</strong> after a push, or from your pipeline using <strong class="text-brand-forest font-medium">organization-scoped API tokens</strong>—granular abilities, same operations the app uses.</p>
-                    </li>
-                    <li class="rounded-2xl border border-brand-ink/10 bg-white/90 p-6 shadow-sm">
-                        <h3 class="font-semibold text-brand-ink">Frontend and backend in one org</h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Run <strong class="text-brand-forest font-medium">static</strong> and <strong class="text-brand-forest font-medium">Node</strong> sites next to <strong class="text-brand-forest font-medium">PHP</strong> apps (Laravel and others) on the same inventory—domains, TLS, and env stay next to each site.</p>
-                    </li>
-                    <li class="rounded-2xl border border-brand-ink/10 bg-white/90 p-6 shadow-sm">
-                        <h3 class="font-semibold text-brand-ink">Secrets that stay in the platform</h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Deploy keys, webhook secrets, and env payloads are <strong class="text-brand-forest font-medium">encrypted at rest</strong>; teammates collaborate through the org instead of passing keys in chat. When you need the box, <strong class="text-brand-forest font-medium">SSH</strong> and remote commands are still there.</p>
-                    </li>
-                </ul>
-            </div>
-        </section>
-
-        {{-- AI vibe-coding / no-code builders (e.g. YouWare) vs production ops on owned infra --}}
-        <section id="ai-builders" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-white/60 scroll-mt-24">
-            <div class="mx-auto max-w-7xl">
-                <div class="max-w-3xl">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">Vibe coding · then production</p>
-                    <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Not an AI website generator—operations for code you own</h2>
-                    <p class="mt-4 text-brand-moss leading-relaxed">
-                        <a href="https://www.youware.com/" class="font-semibold text-brand-forest underline decoration-brand-sage/40 underline-offset-2 hover:decoration-brand-forest">YouWare</a>
-                        and similar products focus on <strong class="text-brand-forest font-medium">“vibe coding”</strong>: chat with AI to spin up landing pages, dashboards, prototypes, internal tools, Figma-to-site flows, and more—often with hosting, credits, and built-in AI APIs so creators can ship fast without touching servers.
-                    </p>
-                    <p class="mt-4 text-brand-moss leading-relaxed">
-                        {{ config('app.name') }} does <strong class="text-brand-forest font-medium">not</strong> replace that experience. We do not generate sites from a prompt or run a no-code app builder.
-                        We are the <strong class="text-brand-forest font-medium">ops layer</strong> when you are ready to run <strong class="text-brand-forest font-medium">real repositories</strong> on <strong class="text-brand-forest font-medium">infrastructure you control</strong>: git deploys, TLS, org-scoped secrets, teams, backups, and the same server inventory your engineers SSH into.
-                    </p>
-                    <p class="mt-4 text-brand-moss leading-relaxed">
-                        Many teams use <strong class="text-brand-forest font-medium">both kinds of tool</strong>—a fast AI builder for experiments or marketing surfaces, and {{ config('app.name') }} for the product that needs <strong class="text-brand-forest font-medium">predictable deploys, audit trails, and BYO compliance boundaries</strong>.
-                    </p>
-                </div>
-
-                <ul class="mt-12 grid gap-6 lg:grid-cols-3">
-                    <li class="rounded-2xl border border-brand-ink/10 bg-brand-cream/90 p-6 shadow-sm">
-                        <h3 class="font-semibold text-brand-ink">YouWare-style: ideate fast</h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Describe a page or app in chat, get responsive UI, prototypes, or Figma-driven output—great for velocity before you commit to a repo and runtime.</p>
-                    </li>
-                    <li class="rounded-2xl border border-brand-ink/10 bg-brand-cream/90 p-6 shadow-sm">
-                        <h3 class="font-semibold text-brand-ink">{{ config('app.name') }}: operate for real</h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Wire <strong class="text-brand-forest font-medium">git</strong>, <strong class="text-brand-forest font-medium">webhooks</strong>, and <strong class="text-brand-forest font-medium">APIs</strong> to servers you pay for; keep <strong class="text-brand-forest font-medium">env and keys</strong> in the org vault; roll out with <strong class="text-brand-forest font-medium">releases and rollback</strong>.</p>
-                    </li>
-                    <li class="rounded-2xl border border-brand-ink/10 bg-brand-cream/90 p-6 shadow-sm">
-                        <h3 class="font-semibold text-brand-ink">Same company, two speeds</h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Landing pages or demos from an AI builder; customer-facing APIs and apps on {{ config('app.name') }}—without pretending one product is the other.</p>
-                    </li>
-                </ul>
-            </div>
-        </section>
-
-        {{-- Complement to IaC / platform engineering tools (e.g. Pulumi: define infra in code; dply: operate servers & apps) --}}
-        <section id="platform-ops" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-white/50 scroll-mt-24">
-            <div class="mx-auto max-w-7xl">
-                <div class="max-w-3xl">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">Infrastructure as code · then what?</p>
-                    <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Complements IaC platforms like Pulumi</h2>
-                    <p class="mt-4 text-brand-moss leading-relaxed">
-                        <a href="https://www.pulumi.com" class="font-semibold text-brand-forest underline decoration-brand-sage/40 underline-offset-2 hover:decoration-brand-forest">Pulumi</a>
-                        is a <strong class="text-brand-forest font-medium">modern infrastructure-as-code platform</strong>: real languages (TypeScript, Python, Go, .NET, Java, YAML), provider registry, centralized
-                        <strong class="text-brand-forest font-medium">secrets and configuration</strong> (e.g. Pulumi ESC), governance and insights, and patterns for
-                        <strong class="text-brand-forest font-medium">internal developer platforms</strong>—so teams can define and provision cloud resources as software.
-                    </p>
-                    <p class="mt-4 text-brand-moss leading-relaxed">
-                        {{ config('app.name') }} is <strong class="text-brand-forest font-medium">not</strong> a drop-in replacement for Pulumi or Terraform: we do not compile arbitrary multi-cloud infrastructure graphs from your repo.
-                        We are the <strong class="text-brand-forest font-medium">operations control plane</strong> for the servers and sites your team actually runs—whether those VMs or networks were created with Pulumi, by hand, or through our built-in provider integrations.
-                    </p>
-                </div>
-
-                <ul class="mt-12 grid gap-6 lg:grid-cols-3">
-                    <li class="rounded-2xl border border-brand-ink/10 bg-brand-cream/80 p-6 shadow-sm">
-                        <h3 class="font-semibold text-brand-ink">Same automation ethos</h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Granular <strong class="text-brand-forest font-medium">HTTP APIs</strong> and org-scoped tokens mirror the “scriptable platform” expectation—CI and services can trigger the <strong class="text-brand-forest font-medium">same deploys and server actions</strong> as the dashboard.</p>
-                    </li>
-                    <li class="rounded-2xl border border-brand-ink/10 bg-brand-cream/80 p-6 shadow-sm">
-                        <h3 class="font-semibold text-brand-ink">Secrets &amp; governance</h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Provider credentials and app secrets live <strong class="text-brand-forest font-medium">encrypted</strong> in the org vault; <strong class="text-brand-forest font-medium">audit trails</strong> record infrastructure actions—aligned with platform engineering discipline, scoped to application delivery.</p>
-                    </li>
-                    <li class="rounded-2xl border border-brand-ink/10 bg-brand-cream/80 p-6 shadow-sm">
-                        <h3 class="font-semibold text-brand-ink">Typical split of responsibilities</h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Use <strong class="text-brand-forest font-medium">Pulumi</strong> (or similar) for durable cloud definitions; use <strong class="text-brand-forest font-medium">{{ config('app.name') }}</strong> for SSH-backed <strong class="text-brand-forest font-medium">sites, TLS, git deploys, databases, cron, firewall</strong>, and team workflows on those machines.</p>
-                    </li>
-                </ul>
-            </div>
-        </section>
-
-        {{-- CI vs CD: overlap with Octopus-style release orchestration (narrower scope in dply) --}}
-        <section id="cd-releases" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-gradient-to-b from-white/70 to-brand-sand/20 scroll-mt-24">
-            <div class="mx-auto max-w-7xl">
-                <div class="max-w-3xl">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">CI is not CD</p>
-                    <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Deploy &amp; releases — alongside tools like Octopus</h2>
-                    <p class="mt-4 text-brand-moss leading-relaxed">
-                        <a href="https://octopus.com" class="font-semibold text-brand-forest underline decoration-brand-sage/40 underline-offset-2 hover:decoration-brand-forest">Octopus Deploy</a>
-                        is built for <strong class="text-brand-forest font-medium">continuous delivery at scale</strong>: take over after your CI server, orchestrate releases across environments, model runbooks and tenants, target Kubernetes and multi-cloud hosts, and enforce RBAC and compliance—addressing the gap that
-                        <strong class="text-brand-forest font-medium">“CI is not CD”</strong> (build pipelines alone are not full delivery).
-                    </p>
-                    <p class="mt-4 text-brand-moss leading-relaxed">
-                        {{ config('app.name') }} covers the <strong class="text-brand-forest font-medium">application deploy side</strong> for <strong class="text-brand-forest font-medium">servers and sites you own</strong>:
-                        <strong class="text-brand-forest font-medium">signed webhooks</strong> and <strong class="text-brand-forest font-medium">org-scoped APIs</strong> to trigger deploys,
-                        <strong class="text-brand-forest font-medium">deployment history</strong>, <strong class="text-brand-forest font-medium">atomic releases</strong> with <strong class="text-brand-forest font-medium">rollback</strong>,
-                        and per-site <strong class="text-brand-forest font-medium">environments</strong> and encrypted env—so your CI (GitHub Actions, Jenkins, GitLab CI, etc.) can build and test while we push to the runtime over SSH.
-                    </p>
-                    <p class="mt-4 text-brand-moss leading-relaxed">
-                        We are <strong class="text-brand-forest font-medium">not</strong> a drop-in replacement for Octopus: there is no <strong class="text-brand-forest font-medium">tenant-per-customer</strong> deployment model, no <strong class="text-brand-forest font-medium">first-class Kubernetes control plane</strong>, and no <strong class="text-brand-forest font-medium">runbook</strong> product as rich as theirs.
-                        If you need enterprise-grade release orchestration across many clusters and teams, Octopus remains in that category; if you need a <strong class="text-brand-forest font-medium">focused BYO-server path</strong> from git to production with a clear audit trail in the org, that is {{ config('app.name') }}.
-                    </p>
-                </div>
-
-                <ul class="mt-12 grid gap-6 lg:grid-cols-3">
-                    <li class="rounded-2xl border border-brand-ink/10 bg-white/95 p-6 shadow-sm">
-                        <h3 class="font-semibold text-brand-ink">CI builds, {{ config('app.name') }} deploys</h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Keep CI where it belongs—compile, test, static analysis—then trigger a deploy with the same <strong class="text-brand-forest font-medium">webhook or API</strong> your pipeline would call manually.</p>
-                    </li>
-                    <li class="rounded-2xl border border-brand-ink/10 bg-white/95 p-6 shadow-sm">
-                        <h3 class="font-semibold text-brand-ink">Releases you can roll back</h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Track <strong class="text-brand-forest font-medium">deployments</strong> and flip the <strong class="text-brand-forest font-medium">current</strong> symlink to a prior release when something goes wrong—without inventing glue scripts per app.</p>
-                    </li>
-                    <li class="rounded-2xl border border-brand-ink/10 bg-white/95 p-6 shadow-sm">
-                        <h3 class="font-semibold text-brand-ink">Octopus-scale CD</h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">For <strong class="text-brand-forest font-medium">multi-team, multi-cluster, compliance-heavy</strong> promotion pipelines, products like <a href="https://octopus.com" class="font-semibold text-brand-forest underline decoration-brand-sage/40 underline-offset-2 hover:decoration-brand-forest">Octopus</a> are purpose-built; {{ config('app.name') }} stays focused on <strong class="text-brand-forest font-medium">your org’s servers and sites</strong> in one control plane.</p>
-                    </li>
-                </ul>
-            </div>
-        </section>
-
-        {{-- Organizations --}}
-        <section id="organizations" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-white/40 scroll-mt-24">
-            <div class="mx-auto max-w-7xl lg:grid lg:grid-cols-12 lg:gap-12 lg:items-start">
-                <div class="lg:col-span-4">
-                    <h2 class="text-3xl font-bold tracking-tight text-brand-ink">Organizations &amp; people</h2>
-                    <p class="mt-3 text-brand-moss">Multi-tenant by design—your production org stays separate from personal experiments.</p>
-                </div>
-                <ul class="mt-10 lg:mt-0 lg:col-span-8 space-y-6">
-                    <li class="flex gap-4">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-sage font-semibold text-sm">A</span>
-                        <div>
-                            <h3 class="font-semibold text-brand-ink">Org-scoped data</h3>
-                            <p class="mt-1 text-sm text-brand-moss leading-relaxed">Servers, sites, credentials, and billing roll up under the active organization. Switch orgs from the app when you belong to more than one.</p>
+                <div class="mt-14 grid gap-5 lg:grid-cols-3">
+                    {{-- Wide dark card: deploy from anywhere --}}
+                    <article class="lg:col-span-2 rounded-2xl border border-brand-ink/10 bg-brand-ink text-brand-cream p-8 sm:p-10 shadow-lg">
+                        <div class="flex flex-col sm:flex-row sm:items-center gap-8">
+                            <div class="flex-1">
+                                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-white/10 text-brand-gold">
+                                    <x-heroicon-o-bolt class="h-6 w-6" aria-hidden="true" />
+                                </div>
+                                <h3 class="mt-6 text-xl font-semibold text-brand-cream">Same deploy from UI, git, or CI</h3>
+                                <p class="mt-3 text-brand-sand/85 leading-relaxed">A push, a button, or an org-scoped API call all hit the same flow. Keep CI for build and test; let {{ config('app.name') }} push to the runtime.</p>
+                            </div>
+                            <div class="shrink-0 rounded-xl border border-white/15 bg-black/30 px-4 py-3 font-mono text-xs text-brand-sand/90 w-full sm:w-auto sm:min-w-[230px]">
+                                <div><span class="text-brand-gold">$</span> git push origin main</div>
+                                <div class="mt-2 text-brand-mist"># signed webhook fires</div>
+                                <div class="mt-3 text-brand-sage">→ release 184 · live · audited</div>
+                            </div>
                         </div>
-                    </li>
-                    <li class="flex gap-4">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-sage font-semibold text-sm">B</span>
-                        <div>
-                            <h3 class="font-semibold text-brand-ink">Invitations</h3>
-                            <p class="mt-1 text-sm text-brand-moss leading-relaxed">Bring teammates in through secure invite links so access is granted in-app—not over Slack with raw tokens.</p>
-                        </div>
-                    </li>
-                    <li class="flex gap-4">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-sage font-semibold text-sm">C</span>
-                        <div>
-                            <h3 class="font-semibold text-brand-ink">Billing per organization</h3>
-                            <p class="mt-1 text-sm text-brand-moss leading-relaxed">Trials and subscriptions attach to the org. Usage limits apply <strong class="text-brand-forest font-medium">organization-wide</strong>—every server and <strong class="text-brand-forest font-medium">every site</strong> under that org shares the same plan. There is no separate per-site product line on your invoice.</p>
-                        </div>
-                    </li>
-                    <li class="flex gap-4">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-sage font-semibold text-sm">D</span>
-                        <div>
-                            <h3 class="font-semibold text-brand-ink">Activity visibility</h3>
-                            <p class="mt-1 text-sm text-brand-moss leading-relaxed">Review recent organization audit entries—who did what—so changes to infrastructure are easier to trace.</p>
-                        </div>
-                    </li>
-                    <li class="flex gap-4">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-sage font-semibold text-sm">E</span>
-                        <div>
-                            <h3 class="font-semibold text-brand-ink">Your account follows you</h3>
-                            <p class="mt-1 text-sm text-brand-moss leading-relaxed">Profile, password, verified email, <strong class="text-brand-forest font-medium">two-factor authentication</strong>, and <strong class="text-brand-forest font-medium">OAuth</strong> sign-in (e.g. GitHub, GitLab, Bitbucket when enabled) live on <strong class="text-brand-forest font-medium">your user</strong>—not on each organization or site. The same settings apply everywhere you have access.</p>
-                        </div>
-                    </li>
-                </ul>
+                    </article>
 
-                {{-- Must span full grid width: without col-span-12 this sat in column 1 only (narrow strip). --}}
-                <div id="plans-and-account" class="mt-12 w-full min-w-0 lg:col-span-12 scroll-mt-24 rounded-2xl border border-brand-gold/35 bg-gradient-to-br from-brand-gold/10 to-brand-sand/20 px-6 py-8 sm:px-10">
-                    <h3 class="text-lg font-semibold text-brand-ink">Trials and plans cover the whole organization</h3>
-                    <p class="mt-2 text-sm text-brand-moss leading-relaxed max-w-3xl">Usage limits we enforce during trial and on lower tiers, such as how many <strong class="text-brand-forest font-medium">servers</strong> you can connect and how many <strong class="text-brand-forest font-medium">sites</strong> the org may create before moving to Pro, are counted for the <strong class="text-brand-forest font-medium">entire org</strong>. Billing is not split per application or hostname.</p>
-                    <h3 class="mt-8 text-lg font-semibold text-brand-ink">Profile, 2FA, and OAuth are personal</h3>
-                    <p class="mt-2 text-sm text-brand-moss leading-relaxed max-w-3xl">You sign in as a person. Hardening your account with 2FA, linking an OAuth provider, or updating your profile applies to <strong class="text-brand-forest font-medium">all organizations</strong> you belong to and <strong class="text-brand-forest font-medium">every site</strong> you can reach through those memberships—without reconfiguring security per team.</p>
-                </div>
-            </div>
-        </section>
+                    <article class="rounded-2xl border border-brand-ink/10 bg-white/85 p-8 shadow-sm">
+                        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-sage">
+                            <x-heroicon-o-rectangle-stack class="h-6 w-6" aria-hidden="true" />
+                        </div>
+                        <h3 class="mt-6 text-lg font-semibold text-brand-ink">Atomic releases</h3>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Each deploy is a fresh release directory with the <code class="text-xs bg-brand-sand/50 px-1 rounded">current</code> symlink flipped on success—no half-deployed states.</p>
+                    </article>
 
-        {{-- Credentials --}}
-        <section id="credentials" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 scroll-mt-24">
-            <div class="mx-auto max-w-7xl">
-                <h2 class="text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Credentials &amp; clouds</h2>
-                <p class="mt-4 text-brand-moss max-w-3xl">Connect the APIs that create and manage infrastructure. Tokens are validated when possible, then stored encrypted—your team uses them through {{ config('app.name') }}, not from plaintext notes.</p>
+                    <article class="rounded-2xl border border-brand-ink/10 bg-white/85 p-8 shadow-sm">
+                        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-gold/25 text-brand-rust">
+                            <x-heroicon-o-arrow-uturn-left class="h-6 w-6" aria-hidden="true" />
+                        </div>
+                        <h3 class="mt-6 text-lg font-semibold text-brand-ink">Rollback without heroics</h3>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">When a release misbehaves, flip back to a prior one from history—no SSH-around-until-it-works.</p>
+                    </article>
 
-                <div class="mt-12 grid gap-8 lg:grid-cols-2">
-                    <div class="rounded-2xl border border-brand-ink/10 bg-white/80 p-8 shadow-sm">
-                        <h3 class="text-lg font-semibold text-brand-ink flex items-center gap-2">
-                            <span class="h-2 w-2 rounded-full bg-brand-gold" aria-hidden="true"></span>
-                            Full provisioning support
-                        </h3>
-                        <p class="mt-3 text-sm text-brand-moss leading-relaxed">Create and tear down compute from the panel (where the integration is complete), including:</p>
-                        <ul class="mt-4 space-y-2 text-sm text-brand-moss">
-                            <li class="flex gap-2"><span class="text-brand-sage font-bold">·</span> DigitalOcean, Hetzner, Linode, Vultr, UpCloud, Scaleway</li>
-                            <li class="flex gap-2"><span class="text-brand-sage font-bold">·</span> Equinix Metal, Akamai (Linode), Fly.io, AWS EC2</li>
-                        </ul>
-                    </div>
-                    <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 p-8">
-                        <h3 class="text-lg font-semibold text-brand-ink">Custom &amp; roadmap providers</h3>
-                        <p class="mt-3 text-sm text-brand-moss leading-relaxed">Attach <strong class="text-brand-forest font-medium">any server with SSH</strong> when you already have hardware or a provider we have not wired for provisioning yet.</p>
-                        <p class="mt-4 text-sm text-brand-moss leading-relaxed">Additional provider accounts (e.g. Render, Railway, GCP, Azure) can be stored as credentials for future workflows as integrations expand—your labels and vaulting model stay the same.</p>
-                    </div>
+                    <article class="rounded-2xl border border-brand-ink/10 bg-white/85 p-8 shadow-sm">
+                        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-forest/10 text-brand-forest">
+                            <x-heroicon-o-variable class="h-6 w-6" aria-hidden="true" />
+                        </div>
+                        <h3 class="mt-6 text-lg font-semibold text-brand-ink">Env &amp; secrets per site</h3>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Per-environment <code class="text-xs bg-brand-sand/50 px-1 rounded">.env</code> content and deploy keys are encrypted at rest and applied during the deploy.</p>
+                    </article>
+
+                    <article class="rounded-2xl border border-brand-ink/10 bg-gradient-to-b from-brand-sand/40 to-white/80 p-8 shadow-sm">
+                        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-white/70 text-brand-forest">
+                            <x-heroicon-o-rocket-launch class="h-6 w-6" aria-hidden="true" />
+                        </div>
+                        <h3 class="mt-6 text-lg font-semibold text-brand-ink">Laravel-friendly</h3>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Octane ports, scheduler toggles, post-deploy commands, and release retention—configured next to the site, not in a playbook.</p>
+                    </article>
                 </div>
             </div>
         </section>
 
         {{-- Servers --}}
-        <section id="servers" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-white/40 scroll-mt-24">
+        <section id="servers" class="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 scroll-mt-24">
             <div class="mx-auto max-w-7xl">
-                <h2 class="text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Servers &amp; day-two operations</h2>
-                <p class="mt-4 text-brand-moss max-w-3xl">After a machine exists—cloud or custom—the server record becomes your control plane: run commands, declare dependencies, and keep access tidy.</p>
+                <div class="max-w-2xl">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">Day-two operations</p>
+                    <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">The server record is your control plane</h2>
+                    <p class="mt-4 text-brand-moss leading-relaxed">Provision from DigitalOcean, Hetzner, Linode, Vultr, UpCloud, Scaleway, Equinix Metal, Fly.io, AWS EC2, and more—or attach any machine over SSH. Then operate it without leaving the console.</p>
+                </div>
 
-                <div class="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                    <article class="rounded-2xl border border-brand-ink/10 bg-white/90 p-6">
-                        <h3 class="font-semibold text-brand-ink">Remote execution</h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Run shell commands from the dashboard over SSH—ideal for quick fixes without distributing keys to every laptop.</p>
-                    </article>
-                    <article class="rounded-2xl border border-brand-ink/10 bg-white/90 p-6">
-                        <h3 class="font-semibold text-brand-ink">Health checks</h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Point at an HTTP endpoint and let the platform track whether your service answers—so status lives next to the server, not in a separate monitor.</p>
-                    </article>
-                    <article class="rounded-2xl border border-brand-ink/10 bg-white/90 p-6">
-                        <h3 class="font-semibold text-brand-ink">Databases</h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Record database connections your apps rely on (engines like MySQL), kept alongside the server that hosts them.</p>
-                    </article>
-                    <article class="rounded-2xl border border-brand-ink/10 bg-white/90 p-6">
-                        <h3 class="font-semibold text-brand-ink">Cron &amp; workers</h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Model scheduled jobs and Supervisor programs (queues, workers) so long-running processes are documented and reproducible.</p>
-                    </article>
-                    <article class="rounded-2xl border border-brand-ink/10 bg-white/90 p-6">
-                        <h3 class="font-semibold text-brand-ink">Firewall rules</h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Manage basic UFW rules for the same server your team already uses for deploys: the ports you open, the sources you trust, and the rule history you can review.</p>
-                    </article>
-                    <article class="rounded-2xl border border-brand-ink/10 bg-white/90 p-6">
-                        <h3 class="font-semibold text-brand-ink">SSH keys &amp; recipes</h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Manage authorized keys centrally and run setup scripts (“recipes”) when you need a repeatable bootstrap beyond the default image.</p>
-                    </article>
+                <div class="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                    @php
+                        $ops = [
+                            ['icon' => 'command-line', 'title' => 'Remote execution', 'body' => 'Run shell commands over SSH from the dashboard for quick fixes—no keys handed out to every laptop.'],
+                            ['icon' => 'signal', 'title' => 'Health checks', 'body' => 'Point at an HTTP endpoint and track whether the service answers, with status next to the server.'],
+                            ['icon' => 'circle-stack', 'title' => 'Databases', 'body' => 'Create databases and users on the box (MySQL, MariaDB, PostgreSQL) over SSH, kept with the server.'],
+                            ['icon' => 'clock', 'title' => 'Cron &amp; workers', 'body' => 'Managed crontab blocks and Supervisor programs so scheduled jobs and queues are documented and reproducible.'],
+                            ['icon' => 'shield-exclamation', 'title' => 'Firewall', 'body' => 'Declarative UFW rules with presets and templates—open the ports you mean to, with a history you can review.'],
+                            ['icon' => 'cpu-chip', 'title' => 'Metrics', 'body' => 'CPU, memory, disk, and load with historical charts and deployment correlation in the same place.'],
+                        ];
+                    @endphp
+                    @foreach ($ops as $op)
+                        <article class="rounded-2xl border border-brand-ink/10 bg-white/85 p-6 shadow-sm hover:shadow-md transition-shadow">
+                            <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-sage">
+                                <x-dynamic-component :component="'heroicon-o-' . $op['icon']" class="h-5 w-5" aria-hidden="true" />
+                            </div>
+                            <h3 class="mt-5 font-semibold text-brand-ink">{!! $op['title'] !!}</h3>
+                            <p class="mt-2 text-sm text-brand-moss leading-relaxed">{!! $op['body'] !!}</p>
+                        </article>
+                    @endforeach
                 </div>
             </div>
         </section>
 
-        {{-- Sites --}}
-        <section id="sites" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 scroll-mt-24">
+        {{-- Sites & TLS --}}
+        <section id="sites" class="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-white/40 scroll-mt-24">
             <div class="mx-auto max-w-7xl lg:grid lg:grid-cols-12 lg:gap-12">
                 <div class="lg:col-span-5">
-                    <h2 class="text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Sites, TLS &amp; deploys</h2>
-                    <p class="mt-4 text-brand-moss leading-relaxed">A <strong class="text-brand-forest font-medium">site</strong> is how traffic reaches your code: hostname, runtime, document root, and deployment settings—all bound to a parent server.</p>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">From hostname to HTTPS</p>
+                    <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Sites, TLS &amp; runtimes</h2>
+                    <p class="mt-4 text-brand-moss leading-relaxed">A <strong class="text-brand-forest font-medium">site</strong> is how traffic reaches your code—hostname, runtime, document root, and deploy settings, all bound to the server it runs on.</p>
+                    <ul class="mt-8 space-y-3 text-sm text-brand-moss">
+                        <li class="flex gap-3"><x-heroicon-m-check class="mt-0.5 h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" /> PHP-FPM, Node behind a reverse proxy, or static/HTML</li>
+                        <li class="flex gap-3"><x-heroicon-m-check class="mt-0.5 h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" /> Certbot / Let's Encrypt with certificate status</li>
+                        <li class="flex gap-3"><x-heroicon-m-check class="mt-0.5 h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" /> GitHub, GitLab &amp; Bitbucket via OAuth</li>
+                    </ul>
                 </div>
-                <div class="mt-10 lg:mt-0 lg:col-span-7 space-y-6">
-                    <div class="rounded-2xl border border-brand-ink/10 bg-white/80 p-6 shadow-sm">
+                <div class="mt-10 lg:mt-0 lg:col-span-7 grid gap-5 sm:grid-cols-2">
+                    <div class="rounded-2xl border border-brand-ink/10 bg-white/85 p-6 shadow-sm">
                         <h3 class="font-semibold text-brand-ink">Runtimes</h3>
-                        <p class="mt-2 text-sm text-brand-moss">PHP (PHP-FPM), Node behind a reverse proxy, or static/HTML—pick the stack that matches the app.</p>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Pick PHP, Node, or static per site—frontend and backend live on the same inventory, with domains and env attached to each.</p>
                     </div>
-                    <div class="rounded-2xl border border-brand-ink/10 bg-white/80 p-6 shadow-sm">
+                    <div class="rounded-2xl border border-brand-ink/10 bg-white/85 p-6 shadow-sm">
                         <h3 class="font-semibold text-brand-ink">Nginx &amp; SSL</h3>
-                        <p class="mt-2 text-sm text-brand-moss">Provision vhosts and track certificate status so HTTPS is part of the site lifecycle, not a weekend chore.</p>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Provision vhosts, add custom snippets, and keep HTTPS part of the site lifecycle—not a weekend chore.</p>
                     </div>
-                    <div class="rounded-2xl border border-brand-ink/10 bg-white/80 p-6 shadow-sm">
+                    <div class="rounded-2xl border border-brand-ink/10 bg-white/85 p-6 shadow-sm">
                         <h3 class="font-semibold text-brand-ink">Git &amp; webhooks</h3>
-                        <p class="mt-2 text-sm text-brand-moss">Wire a repository and branch, keep deploy keys in the vault, and trigger builds from git push via a signed webhook—CI can call the same hook when you are ready.</p>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Wire a repository and branch, vault the deploy key, and build on push via a signed webhook your CI can call too.</p>
                     </div>
                     <div class="rounded-2xl border border-brand-ink/10 bg-brand-forest/5 p-6">
-                        <h3 class="font-semibold text-brand-ink">Laravel-friendly options</h3>
-                        <p class="mt-2 text-sm text-brand-moss">When the app needs it: Octane ports, scheduler toggles, per-environment <code class="text-xs bg-brand-sand/50 px-1 rounded">.env</code> content, post-deploy commands, release retention, and extra Nginx snippets—configured next to the site, not scattered across playbooks.</p>
+                        <h3 class="font-semibold text-brand-ink">Per-environment config</h3>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Encrypted <code class="text-xs bg-brand-sand/50 px-1 rounded">.env</code>, post-deploy commands, and extra Nginx config sit beside the site they belong to.</p>
                     </div>
                 </div>
             </div>
         </section>
 
-        <section id="recovery" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-white/45 scroll-mt-24">
+        {{-- Backups & recovery --}}
+        <section id="recovery" class="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 scroll-mt-24">
             <div class="mx-auto max-w-7xl">
-                <div class="max-w-3xl">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">Recovery and confidence</p>
-                    <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Backups, rollback, and migration work as one story</h2>
-                    <p class="mt-4 text-brand-moss leading-relaxed">
-                        Production teams do not buy hosting control planes only for deploy buttons. They buy confidence that they can
-                        <strong class="text-brand-forest font-medium">restore data</strong>, <strong class="text-brand-forest font-medium">roll back code</strong>, and
-                        <strong class="text-brand-forest font-medium">plan workload moves safely</strong> when a server, release, or provider decision changes.
-                    </p>
-                    <p class="mt-4 text-brand-moss leading-relaxed">
-                        {{ config('app.name') }} keeps that workflow close to the app itself: <strong class="text-brand-forest font-medium">storage destinations and backup planning</strong>,
-                        <strong class="text-brand-forest font-medium">atomic releases with rollback</strong>, and <strong class="text-brand-forest font-medium">project runbooks</strong> that capture recovery steps beside the resources they affect.
-                    </p>
+                <div class="max-w-2xl">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">Confidence, not just deploy buttons</p>
+                    <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Backups, rollback &amp; recovery as one story</h2>
+                    <p class="mt-4 text-brand-moss leading-relaxed">Production teams buy the confidence that they can restore data, roll back code, and move workloads safely—so {{ config('app.name') }} keeps that close to the app instead of scattered across docs.</p>
                 </div>
 
-                <div class="mt-12 grid gap-6 lg:grid-cols-3">
-                    <article class="rounded-2xl border border-brand-ink/10 bg-white/90 p-6 shadow-sm">
-                        <h3 class="font-semibold text-brand-ink">Backups with ownership</h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Use the Backups area to define what should be captured for databases and files, where archives land, and what restore path the team is expected to follow.</p>
+                <div class="mt-14 grid gap-5 lg:grid-cols-3">
+                    <article class="rounded-2xl border border-brand-ink/10 bg-white/85 p-8 shadow-sm">
+                        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-sage">
+                            <x-heroicon-o-archive-box class="h-6 w-6" aria-hidden="true" />
+                        </div>
+                        <h3 class="mt-6 text-lg font-semibold text-brand-ink">Backups with ownership</h3>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Define what to capture for databases and files, where archives land, and what restore path the team follows.</p>
                     </article>
-                    <article class="rounded-2xl border border-brand-ink/10 bg-white/90 p-6 shadow-sm">
-                        <h3 class="font-semibold text-brand-ink">Rollback without heroics</h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Atomic releases and deployment history keep code rollback obvious when a release misbehaves, so recovery is not “SSH around until it works.”</p>
+                    <article class="rounded-2xl border border-brand-ink/10 bg-white/85 p-8 shadow-sm">
+                        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-gold/25 text-brand-rust">
+                            <x-heroicon-o-arrow-path class="h-6 w-6" aria-hidden="true" />
+                        </div>
+                        <h3 class="mt-6 text-lg font-semibold text-brand-ink">Deployment history</h3>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Every release is recorded with its output, so rollback is obvious and the timeline is easy to trace.</p>
                     </article>
-                    <article class="rounded-2xl border border-brand-ink/10 bg-white/90 p-6 shadow-sm">
-                        <h3 class="font-semibold text-brand-ink">Migration as a guided operation</h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">When teams move a site or rebuild a server, they already have one home for deploy settings, backup expectations, health checks, and project notes instead of scattered docs and ad-hoc checklists.</p>
+                    <article class="rounded-2xl border border-brand-ink/10 bg-white/85 p-8 shadow-sm">
+                        <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-forest/10 text-brand-forest">
+                            <x-heroicon-o-map class="h-6 w-6" aria-hidden="true" />
+                        </div>
+                        <h3 class="mt-6 text-lg font-semibold text-brand-ink">Migration as a guided op</h3>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Move a site or rebuild a server with deploy settings, backups, health checks, and runbooks already in one home.</p>
                     </article>
                 </div>
             </div>
         </section>
 
-        <section id="project-ops" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-gradient-to-b from-brand-sand/20 to-white/70 scroll-mt-24">
-            <div class="mx-auto max-w-7xl">
-                <div class="max-w-3xl">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">A better operating surface</p>
-                    <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Projects turn servers into a team control plane</h2>
-                    <p class="mt-4 text-brand-moss leading-relaxed">
-                        Many panels stop at server CRUD. {{ config('app.name') }} adds a <strong class="text-brand-forest font-medium">project layer</strong> for grouped health,
-                        shared variables, notification routing, deploy batches, runbooks, and activity feeds, so one customer stack or product area can be operated from one place.
-                    </p>
+        {{-- Teams & projects --}}
+        <section id="teams" class="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-gradient-to-b from-brand-sand/20 to-white/70 scroll-mt-24">
+            <div class="mx-auto max-w-7xl lg:grid lg:grid-cols-12 lg:gap-12 lg:items-start">
+                <div class="lg:col-span-5">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">People &amp; coordination</p>
+                    <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Teams, billing &amp; projects</h2>
+                    <p class="mt-4 text-brand-moss leading-relaxed">Multi-tenant by design: your production org stays separate from personal experiments, billing rolls up per organization, and projects group a product stack into one operating surface.</p>
+                    <div class="mt-8 rounded-2xl border border-brand-gold/35 bg-gradient-to-br from-brand-gold/10 to-brand-sand/20 px-6 py-6">
+                        <p class="text-sm text-brand-moss leading-relaxed"><span class="font-semibold text-brand-ink">One plan, whole org.</span> Trials and limits—how many servers and sites you can run—are counted for the entire organization. There's no per-site line on your invoice. Your profile, 2FA, and OAuth stay personal and follow you across every org.</p>
+                    </div>
                 </div>
-
-                <div class="mt-12 grid gap-6 lg:grid-cols-3">
-                    <article class="rounded-2xl border border-brand-ink/10 bg-white/90 p-6 shadow-sm">
-                        <h3 class="font-semibold text-brand-ink">Grouped health</h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Review server readiness, SSL status, recent failures, and project issues before drilling into a single machine.</p>
-                    </article>
-                    <article class="rounded-2xl border border-brand-ink/10 bg-white/90 p-6 shadow-sm">
-                        <h3 class="font-semibold text-brand-ink">Runbooks and routing</h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Keep incident notes, escalation URLs, notification channels, and delivery context with the same project that owns the production change.</p>
-                    </article>
-                    <article class="rounded-2xl border border-brand-ink/10 bg-white/90 p-6 shadow-sm">
-                        <h3 class="font-semibold text-brand-ink">Coordinated delivery</h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Queue releases across multiple sites, keep shared variables together, and treat a product stack as one operating unit instead of many unrelated screens.</p>
-                    </article>
-                </div>
-            </div>
-        </section>
-
-        {{-- Positioning vs Laravel Forge–style panels; reference Serversinc comparison narrative --}}
-        <section id="forge-style" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-gradient-to-b from-brand-sand/25 to-white/80 scroll-mt-24">
-            <div class="mx-auto max-w-7xl">
-                <h2 class="text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Transparency vs Forge-style panels</h2>
-                <p class="mt-4 text-brand-moss max-w-3xl leading-relaxed">
-                    <strong class="text-brand-forest font-medium">Laravel Forge</strong>-style products make Laravel deploys easy but are sometimes criticized for feeling like a
-                    <strong class="text-brand-forest font-medium">black box</strong> when you need non-standard stacks or deeper access.
-                    Alternatives such as
-                    <a href="https://serversinc.io/compare/laravel-forge/" class="font-semibold text-brand-forest underline decoration-brand-sage/40 underline-offset-2 hover:decoration-brand-forest">Serversinc (vs Forge)</a>
-                    emphasize <strong class="text-brand-forest font-medium">Docker per app</strong>, <strong class="text-brand-forest font-medium">flat platform pricing</strong>, and
-                    <strong class="text-brand-forest font-medium">your own VPS</strong>—trading Forge’s opinions for containers and control.
-                </p>
-                <p class="mt-4 text-brand-moss max-w-3xl leading-relaxed">
-                    {{ config('app.name') }} goes after the <strong class="text-brand-forest font-medium">same goals</strong>—<strong class="text-brand-forest font-medium">full control</strong>,
-                    <strong class="text-brand-forest font-medium">predictable org billing</strong> for the product, and <strong class="text-brand-forest font-medium">infrastructure you pay providers for directly</strong>—with a
-                    <strong class="text-brand-forest font-medium">VM-first</strong> model: <strong class="text-brand-forest font-medium">Nginx, PHP-FPM, Node, and static</strong> sites on the server over SSH, plus git deploys, env management, and optional extra config.
-                    We do <strong class="text-brand-forest font-medium">not</strong> require every app to be packaged as a Docker image; if you standardize on Compose or other tooling on the box, you can still drive it through
-                    <strong class="text-brand-forest font-medium">SSH and automation</strong>—first-class flows are <strong class="text-brand-forest font-medium">traditional stack + releases</strong>, not orchestration inside the panel.
-                </p>
-
-                <div class="mt-10 overflow-x-auto rounded-2xl border border-brand-ink/10 bg-white/95 shadow-sm">
-                    <table class="min-w-full text-left text-sm">
-                        <thead>
-                            <tr class="border-b border-brand-ink/10 bg-brand-sand/30 text-xs font-semibold uppercase tracking-wide text-brand-moss">
-                                <th scope="col" class="px-4 py-3 sm:px-6">What teams ask for</th>
-                                <th scope="col" class="px-4 py-3 sm:px-6">In {{ config('app.name') }}</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-brand-ink/10 text-brand-ink">
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">Escape the black box</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><strong class="text-brand-forest font-medium">SSH</strong>, server <strong class="text-brand-forest font-medium">recipes</strong>, <strong class="text-brand-forest font-medium">Nginx snippets</strong>, and explicit paths—so tuning is visible, not hidden.</td>
-                            </tr>
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">Predictable platform cost</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed">Subscription is <strong class="text-brand-forest font-medium">per organization</strong> and covers <strong class="text-brand-forest font-medium">every server and site</strong> in that org under plan limits; you pay clouds or VPS vendors separately—similar “platform + your infra” clarity to flat-fee comparisons like <a href="https://serversinc.io/compare/laravel-forge/" class="font-semibold text-brand-forest underline decoration-brand-sage/40 underline-offset-2 hover:decoration-brand-forest">Serversinc’s Forge page</a>.</td>
-                            </tr>
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">Not only Laravel</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><strong class="text-brand-forest font-medium">PHP</strong>, <strong class="text-brand-forest font-medium">Node</strong>, and <strong class="text-brand-forest font-medium">static</strong> site types; Laravel-first conveniences (scheduler, Octane, env) without locking the whole org to one framework.</td>
-                            </tr>
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">Docker-first (e.g. Serversinc)</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><strong class="text-brand-forest font-medium">Optional</strong> on your server—{{ config('app.name') }} does not mandate a container image per app. Prefer Docker everywhere? Run it on the VM and use the panel for <strong class="text-brand-forest font-medium">coordination, secrets, and deploy triggers</strong>, or pair with a container-centric host.</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <div class="mt-10 lg:mt-0 lg:col-span-7 grid gap-5 sm:grid-cols-2">
+                    @php
+                        $teamCards = [
+                            ['icon' => 'user-plus', 'title' => 'In-app invitations', 'body' => 'Bring teammates in through secure invite links—access granted in the app, not over Slack with raw tokens.'],
+                            ['icon' => 'clipboard-document-list', 'title' => 'Activity &amp; audit', 'body' => 'Review who changed what across infrastructure so production changes are easy to trace.'],
+                            ['icon' => 'squares-2x2', 'title' => 'Project control plane', 'body' => 'Grouped health, shared variables, notification routing, and runbooks for a whole product area.'],
+                            ['icon' => 'bell-alert', 'title' => 'Alerts &amp; routing', 'body' => 'Notification channels, event routing, quiet hours, and webhook-friendly delivery to the right operators.'],
+                        ];
+                    @endphp
+                    @foreach ($teamCards as $card)
+                        <div class="rounded-2xl border border-brand-ink/10 bg-white/85 p-6 shadow-sm">
+                            <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-sage">
+                                <x-dynamic-component :component="'heroicon-o-' . $card['icon']" class="h-5 w-5" aria-hidden="true" />
+                            </div>
+                            <h3 class="mt-5 font-semibold text-brand-ink">{!! $card['title'] !!}</h3>
+                            <p class="mt-2 text-sm text-brand-moss leading-relaxed">{!! $card['body'] !!}</p>
+                        </div>
+                    @endforeach
                 </div>
             </div>
         </section>
 
-        {{-- Classic BYO control panels: ServerPilot-style any-provider hosting --}}
-        <section id="serverpilot" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-white/70 scroll-mt-24">
-            <div class="mx-auto max-w-7xl">
-                <h2 class="text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Same lane as ServerPilot: your cloud, your root</h2>
-                <p class="mt-4 text-brand-moss max-w-3xl leading-relaxed">
-                    <a href="https://serverpilot.io" class="font-semibold text-brand-forest underline decoration-brand-sage/40 underline-offset-2 hover:decoration-brand-forest">ServerPilot</a>
-                    popularized <strong class="text-brand-forest font-medium">bring-your-own-server</strong> management: connect VPS from any provider, keep
-                    <strong class="text-brand-forest font-medium">root access</strong>, run <strong class="text-brand-forest font-medium">apps</strong> with
-                    <strong class="text-brand-forest font-medium">Let’s Encrypt SSL</strong>, multiple <strong class="text-brand-forest font-medium">PHP</strong> versions,
-                    <strong class="text-brand-forest font-medium">Nginx</strong> (and Apache where offered), <strong class="text-brand-forest font-medium">firewall</strong> defaults,
-                    <strong class="text-brand-forest font-medium">monitoring dashboards</strong>, and <strong class="text-brand-forest font-medium">migrations</strong> between servers—plus a dashboard/API so you are not stuck in a single vendor’s “managed” cage.
-                </p>
-                <p class="mt-4 text-brand-moss max-w-3xl leading-relaxed">
-                    {{ config('app.name') }} shares that <strong class="text-brand-forest font-medium">core promise</strong>: <strong class="text-brand-forest font-medium">your servers</strong>, <strong class="text-brand-forest font-medium">your providers</strong>, and a control plane for
-                    <strong class="text-brand-forest font-medium">sites, TLS, PHP-FPM, Node, static assets, databases, cron, and firewall rules</strong>.
-                    We drive configuration over <strong class="text-brand-forest font-medium">SSH</strong> (and cloud APIs when you provision through us)—we do not claim the same
-                    <strong class="text-brand-forest font-medium">agent architecture</strong> or <strong class="text-brand-forest font-medium">Apache+.htaccess</strong> stack ServerPilot markets; advanced
-                    <strong class="text-brand-forest font-medium">host metrics dashboards</strong> and <strong class="text-brand-forest font-medium">cross-server migrations</strong> are handled here through
-                    <strong class="text-brand-forest font-medium">metrics, backup planning, deploy history, and project runbooks</strong> rather than a single opaque wizard.
-                </p>
-                <p class="mt-4 text-brand-moss max-w-3xl leading-relaxed">
-                    Where we often go <strong class="text-brand-forest font-medium">further</strong> for product teams: <strong class="text-brand-forest font-medium">git-native deploys</strong>, <strong class="text-brand-forest font-medium">atomic releases</strong>,
-                    <strong class="text-brand-forest font-medium">organization RBAC</strong>, <strong class="text-brand-forest font-medium">audit logs</strong>, and <strong class="text-brand-forest font-medium">granular HTTP APIs</strong>—closer to a platform engineering surface than a PHP-only panel.
-                </p>
-
-                <div class="mt-10 overflow-x-auto rounded-2xl border border-brand-ink/10 bg-brand-cream/50 shadow-sm">
-                    <table class="min-w-full text-left text-sm">
-                        <thead>
-                            <tr class="border-b border-brand-ink/10 bg-brand-sand/30 text-xs font-semibold uppercase tracking-wide text-brand-moss">
-                                <th scope="col" class="px-4 py-3 sm:px-6">ServerPilot-style theme</th>
-                                <th scope="col" class="px-4 py-3 sm:px-6">In {{ config('app.name') }}</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-brand-ink/10 text-brand-ink">
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">Any provider · root</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-emerald-800 font-semibold">Supported</span> — cloud provisioning integrations plus <strong class="text-brand-forest font-medium">Custom</strong> servers with SSH; you retain provider access and keys in the org vault.</td>
-                            </tr>
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">Apps · SSL · PHP</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-emerald-800 font-semibold">Supported</span> — sites, Certbot/Let’s Encrypt, per-site PHP and paths; <strong class="text-brand-forest font-medium">Node</strong> and <strong class="text-brand-forest font-medium">static</strong> in addition to PHP.</td>
-                            </tr>
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">Nginx · performance stack</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-emerald-800 font-semibold">Supported</span> — Nginx vhosts and optional snippets; no bundled <strong class="text-brand-forest font-medium">Apache front door</strong> for <code class="text-xs bg-brand-sand/60 px-1 rounded">.htaccess</code>—tune via Nginx or server recipes if you need Apache semantics.</td>
-                            </tr>
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">Firewall · hardening narrative</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-emerald-800 font-semibold">Partial</span> — declarative <strong class="text-brand-forest font-medium">UFW</strong> rules from the panel; OS auto-updates and “no exposed management ports” are <strong class="text-brand-forest font-medium">your image/provider</strong> unless you encode them in bootstrap scripts.</td>
-                            </tr>
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">Metrics dashboards</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-emerald-800 font-semibold">Supported</span> — server metrics, recent history, deployment correlation, callback diagnostics, and project shortcuts for grouped troubleshooting.</td>
-                            </tr>
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">Migrations between servers</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-brand-ink font-semibold">Operational</span> — use <strong class="text-brand-forest font-medium">backup planning, deploys, restore notes, and project runbooks</strong> to move safely without losing the surrounding context.</td>
-                            </tr>
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">WordPress one-click</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-amber-800 font-semibold">Partial</span> — run WordPress as a <strong class="text-brand-forest font-medium">PHP site</strong>; no WP-specific installer in the panel today.</td>
-                            </tr>
-                        </tbody>
-                    </table>
+        {{-- API & CLI (dark band) --}}
+        <section id="api" class="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-brand-ink text-brand-cream scroll-mt-24">
+            <div class="mx-auto max-w-7xl lg:grid lg:grid-cols-12 lg:gap-12 lg:items-center">
+                <div class="lg:col-span-5">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-gold">Scriptable platform</p>
+                    <h2 class="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">An API and a CLI behind every action</h2>
+                    <p class="mt-4 text-brand-sand/85 leading-relaxed">A public REST API with an <a href="{{ url('/openapi/edge.json') }}" class="font-semibold text-brand-gold underline decoration-brand-gold/40 underline-offset-2 hover:decoration-brand-gold">OpenAPI&nbsp;3 spec</a> and a zero-dependency Node CLI mean CI pipelines, agents, and scripts run the same operations as the dashboard—against the same org and audit trail.</p>
+                    <ul class="mt-8 space-y-4 text-sm">
+                        <li class="flex gap-3">
+                            <x-heroicon-o-code-bracket class="h-5 w-5 shrink-0 text-brand-gold" aria-hidden="true" />
+                            <span class="text-brand-sand/90"><span class="font-semibold text-brand-cream">OpenAPI 3 spec.</span> Sites, deployments, previews, domains, cache purge, usage, and logs in one file—generate clients, mock for tests, drop into Postman or Bruno.</span>
+                        </li>
+                        <li class="flex gap-3">
+                            <x-heroicon-o-key class="h-5 w-5 shrink-0 text-brand-gold" aria-hidden="true" />
+                            <span class="text-brand-sand/90"><span class="font-semibold text-brand-cream">Org-scoped tokens.</span> Granular abilities (<code class="text-xs bg-white/10 px-1 rounded">edge.read</code>, <code class="text-xs bg-white/10 px-1 rounded">edge.deploy</code>, <code class="text-xs bg-white/10 px-1 rounded">edge.write</code>), minted in Settings and revocable anytime. The CLI stores them in your OS keyring.</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="mt-10 lg:mt-0 lg:col-span-7">
+                    <div class="rounded-2xl border border-white/10 bg-black/40 shadow-xl overflow-hidden">
+                        <div class="flex items-center gap-1.5 border-b border-white/10 px-4 py-3">
+                            <span class="h-3 w-3 rounded-full bg-white/20"></span>
+                            <span class="h-3 w-3 rounded-full bg-white/20"></span>
+                            <span class="h-3 w-3 rounded-full bg-white/20"></span>
+                            <span class="ml-3 text-xs font-mono text-brand-mist">dply — terminal</span>
+                        </div>
+                        <div class="px-5 py-5 font-mono text-xs sm:text-sm leading-relaxed text-brand-sand/90 space-y-1">
+                            <div><span class="text-brand-mist"># install &amp; sign in via OAuth device flow</span></div>
+                            <div><span class="text-brand-gold">$</span> curl -fsSL {{ route('cli.install') }} | bash -s -- --login</div>
+                            <div class="text-brand-sage">✓ authenticated · token stored in keyring</div>
+                            <div class="pt-3"><span class="text-brand-gold">$</span> dply edge deploy</div>
+                            <div class="text-brand-sage">→ release 184 deploying… done in 12s</div>
+                            <div class="pt-3"><span class="text-brand-gold">$</span> dply server system-users</div>
+                            <div class="text-brand-mist">deploy  web-1  active</div>
+                        </div>
+                    </div>
+                    <p class="mt-4 text-xs text-brand-mist">The CLI is hosted by your {{ config('app.name') }} instance, not npm. Node 18+. Same code path as a GitHub webhook—no dashboard-only features to give up.</p>
                 </div>
             </div>
         </section>
 
-        {{-- Coverage vs common server panels (categories aligned with e.g. SiteKit features) --}}
-        <section id="coverage" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-brand-sand/15 scroll-mt-24">
+        {{-- Coverage table --}}
+        <section id="coverage" class="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-brand-sand/15 scroll-mt-24">
             <div class="mx-auto max-w-7xl">
-                <h2 class="text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Coverage vs panels like SiteKit</h2>
-                <p class="mt-4 text-brand-moss max-w-3xl leading-relaxed">
-                    {{ config('app.name') }} is a control plane that drives your servers over SSH and provider APIs—similar in scope to panels that advertise a full LEMP/LAMP stack, Git deploys, and security tooling.
-                    The categories below mirror what you see on open-source server panels such as
-                    <a href="https://sitekit.dev/features" class="font-semibold text-brand-forest underline decoration-brand-sage/50 underline-offset-2 hover:decoration-brand-forest">SiteKit</a>,
-                    so you can compare feature-for-feature. We do not ship a resident agent or a single-line OS bootstrap; instead we integrate with clouds you already use or any box you can SSH into.
-                </p>
+                <div class="max-w-2xl">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">No marketing asterisks</p>
+                    <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">What's included today</h2>
+                    <p class="mt-4 text-brand-moss leading-relaxed">A control plane that drives your servers over SSH and provider APIs. Here's the honest state of each area—what's fully supported, what works a bit differently, and what you'd reach for a recipe to do.</p>
+                </div>
 
-                <p class="mt-6 flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-wide text-brand-moss">
+                <p class="mt-8 flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-wide text-brand-moss">
                     <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-1 text-emerald-900"><span class="h-1.5 w-1.5 rounded-full bg-emerald-600" aria-hidden="true"></span> Supported</span>
                     <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-amber-950"><span class="h-1.5 w-1.5 rounded-full bg-amber-600" aria-hidden="true"></span> Partial / different model</span>
                     <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-mist/20 px-2.5 py-1 text-brand-ink"><span class="h-1.5 w-1.5 rounded-full bg-brand-mist" aria-hidden="true"></span> Roadmap / use recipes</span>
                 </p>
 
-                <div class="mt-10 overflow-x-auto rounded-2xl border border-brand-ink/10 bg-white/90 shadow-sm">
+                <div class="mt-8 overflow-x-auto rounded-2xl border border-brand-ink/10 bg-white/90 shadow-sm">
                     <table class="min-w-full text-left text-sm">
                         <thead>
                             <tr class="border-b border-brand-ink/10 bg-brand-sand/30 text-xs font-semibold uppercase tracking-wide text-brand-moss">
-                                <th scope="col" class="px-4 py-3 sm:px-6">Area</th>
+                                <th scope="col" class="px-4 py-3 sm:px-6 w-56">Area</th>
                                 <th scope="col" class="px-4 py-3 sm:px-6">In {{ config('app.name') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-brand-ink/10 text-brand-ink">
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">Server provisioning</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-emerald-700 font-semibold">Supported</span> — create or destroy servers via DigitalOcean, Hetzner, Linode, Vultr, UpCloud, Scaleway, Equinix Metal, Fly.io, AWS EC2, and more; attach <strong class="text-brand-forest font-medium">Custom</strong> servers with SSH. <span class="text-amber-800 font-semibold">Different</span> — we do not install a lightweight agent or run a curl&nbsp;|&nbsp;bash full-stack bootstrap; the OS and packages are yours or your cloud image.</td>
-                            </tr>
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">Git deployments &amp; rollbacks</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-emerald-700 font-semibold">Supported</span> — git remotes, signed webhooks, deploy hooks, atomic deploys with <code class="text-xs bg-brand-sand/60 px-1 rounded">releases/</code> and rollback to a prior release.</td>
-                            </tr>
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">PHP / Laravel / Node / static</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-emerald-700 font-semibold">Supported</span> — site types for PHP-FPM, Node reverse proxy, and static; Laravel-oriented options (scheduler, Octane, env, caches in deploy scripts).</td>
-                            </tr>
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">WordPress</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-amber-800 font-semibold">Partial</span> — deploy PHP apps and custom scripts; there is no dedicated WordPress provisioning wizard or WP-CLI panel in BYO today. Treat WordPress like any PHP site or automate with deploy scripts.</td>
-                            </tr>
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">Databases (MySQL, MariaDB, PostgreSQL)</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-emerald-700 font-semibold">Supported</span> — create databases and users on the server over SSH (MySQL/MariaDB and PostgreSQL paths in provisioning).</td>
-                            </tr>
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">Redis</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-brand-ink/80 font-semibold">Roadmap / ops</span> — install and configure Redis on the server outside the dedicated DB wizard, or encode it in server recipes.</td>
-                            </tr>
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">SSL (Let’s Encrypt)</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-emerald-700 font-semibold">Supported</span> — Certbot over SSH for site domains; renewal follows your server’s certbot setup.</td>
-                            </tr>
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">Firewall (UFW)</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-emerald-700 font-semibold">Supported</span> — basic per-server UFW rules with presets, templates, apply, status, and recent history.</td>
-                            </tr>
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">Cron &amp; Supervisor (workers)</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-emerald-700 font-semibold">Supported</span> — managed crontab blocks and Supervisor programs tied to servers and sites.</td>
-                            </tr>
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">Environment variables</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-emerald-700 font-semibold">Supported</span> — per-site environment rows stored in the app (encrypted at rest) and applied in deploy flows.</td>
-                            </tr>
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">Monitoring (CPU / RAM / disk)</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-emerald-700 font-semibold">Supported</span> — server CPU, memory, disk, load, historical charts, deployment correlation, diagnostics, and project-aware drilldowns in the same control plane.</td>
-                            </tr>
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">Fail2Ban, unattended upgrades, hardening</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-amber-800 font-semibold">Partial</span> — TLS and Nginx configuration from the panel; OS-level hardening (Fail2Ban, unattended-upgrades) is left to your image or run via remote commands/recipes.</td>
-                            </tr>
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">SSH keys</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-emerald-700 font-semibold">Supported</span> — account SSH keys with optional deploy to <code class="text-xs bg-brand-sand/60 px-1 rounded">authorized_keys</code>, plus per-server key records.</td>
-                            </tr>
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">Backups</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-emerald-700 font-semibold">Supported</span> — dedicated database and file backup planning surfaces, storage destinations, retention expectations, and restore-oriented operator guidance in the app.</td>
-                            </tr>
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">Teams &amp; audit</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-emerald-700 font-semibold">Supported</span> — organizations, teams, invitations, roles, and audit log entries for infrastructure actions.</td>
-                            </tr>
-                            <tr>
-                                <td class="px-4 py-4 sm:px-6 font-medium align-top">Alerts (email, Slack, webhooks)</td>
-                                <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed"><span class="text-emerald-700 font-semibold">Supported</span> — notification channels, event routing, quiet hours, project notifications, and webhook-friendly delivery paths let teams send the right events to the right operators.</td>
-                            </tr>
+                            @php
+                                $coverage = [
+                                    ['Server provisioning', 'ok', 'Create or destroy servers via DigitalOcean, Hetzner, Linode, Vultr, UpCloud, Scaleway, Equinix Metal, Fly.io, AWS EC2, and more; attach Custom servers over SSH. The OS and base image stay yours—no resident agent.'],
+                                    ['Git deploys &amp; rollbacks', 'ok', 'Git remotes, signed webhooks, deploy hooks, atomic deploys with a <code class="text-xs bg-brand-sand/60 px-1 rounded">releases/</code> directory, and rollback to a prior release.'],
+                                    ['PHP / Laravel / Node / static', 'ok', 'Site types for PHP-FPM, Node reverse proxy, and static; Laravel options like scheduler, Octane, and env in the deploy flow.'],
+                                    ['Databases (MySQL, MariaDB, PostgreSQL)', 'ok', 'Create databases and users on the server over SSH through the provisioning paths.'],
+                                    ['SSL (Let\'s Encrypt)', 'ok', 'Certbot over SSH for site domains; renewal follows the server\'s certbot setup.'],
+                                    ['Firewall (UFW)', 'ok', 'Per-server UFW rules with presets, templates, apply, status, and recent history.'],
+                                    ['Cron &amp; Supervisor', 'ok', 'Managed crontab blocks and Supervisor programs tied to servers and sites.'],
+                                    ['Monitoring (CPU / RAM / disk)', 'ok', 'Server metrics, historical charts, deployment correlation, diagnostics, and project-aware drilldowns.'],
+                                    ['Backups', 'ok', 'Database and file backup planning, storage destinations, retention, and restore-oriented guidance.'],
+                                    ['Teams &amp; audit', 'ok', 'Organizations, invitations, roles, and audit-log entries for infrastructure actions.'],
+                                    ['WordPress', 'partial', 'Run WordPress as a PHP site; there is no dedicated WP installer or WP-CLI panel today.'],
+                                    ['OS hardening (Fail2Ban, auto-updates)', 'partial', 'TLS and Nginx come from the panel; OS-level hardening is your image or run via remote commands and recipes.'],
+                                    ['Redis &amp; extra services', 'roadmap', 'Install and configure on the server outside the dedicated DB wizard, or encode it in server recipes.'],
+                                ];
+                                $badge = [
+                                    'ok' => ['Supported', 'text-emerald-700'],
+                                    'partial' => ['Partial', 'text-amber-800'],
+                                    'roadmap' => ['Recipes', 'text-brand-ink/70'],
+                                ];
+                            @endphp
+                            @foreach ($coverage as $row)
+                                <tr>
+                                    <td class="px-4 py-4 sm:px-6 font-medium align-top">{!! $row[0] !!}</td>
+                                    <td class="px-4 py-4 sm:px-6 text-brand-moss leading-relaxed align-top">
+                                        <span class="{{ $badge[$row[1]][1] }} font-semibold">{{ $badge[$row[1]][0] }}</span> — {!! $row[2] !!}
+                                    </td>
+                                </tr>
+                            @endforeach
                         </tbody>
                     </table>
                 </div>
             </div>
         </section>
 
-        {{-- API + CLI: Edge OpenAPI + dply CLI; "everything the dashboard does is scriptable" --}}
-        <section id="api-cli" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-gradient-to-b from-white/70 to-brand-sand/20 scroll-mt-24">
-            <div class="mx-auto max-w-7xl">
-                <div class="max-w-3xl">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">Scriptable platform</p>
-                    <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">An API and a CLI — everything the dashboard does</h2>
-                    <p class="mt-4 text-brand-moss leading-relaxed">
-                        {{ config('app.name') }} ships a <strong class="text-brand-forest font-medium">public REST API</strong> with an
-                        <a href="{{ url('/openapi/edge.json') }}" class="font-semibold text-brand-forest underline decoration-brand-sage/40 underline-offset-2 hover:decoration-brand-forest">OpenAPI 3 spec</a>
-                        and a <strong class="text-brand-forest font-medium">zero-dependency Node CLI</strong> — <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">@dply/cli</code> — so CI pipelines, AI agents, and scripts can do the same operations the panel does, against the same org and the same audit trail.
-                    </p>
-                </div>
-
-                <ul class="mt-12 grid gap-6 lg:grid-cols-3">
-                    <li class="rounded-2xl border border-brand-ink/10 bg-white/95 p-6 shadow-sm">
-                        <h3 class="font-semibold text-brand-ink flex items-center gap-2">
-                            <x-heroicon-o-code-bracket class="h-5 w-5 text-brand-sage" aria-hidden="true" />
-                            OpenAPI 3 spec
-                        </h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Wave A Edge endpoints — sites, deployments, previews, domains, aliases, cache purge, usage, logs, lint — described in a single <a href="{{ url('/openapi/edge.json') }}" class="font-semibold text-brand-forest underline decoration-brand-sage/40 underline-offset-2 hover:decoration-brand-forest">spec file</a>. Generate clients in any language, mock for tests, drop into Postman or Bruno.</p>
-                    </li>
-                    <li class="rounded-2xl border border-brand-ink/10 bg-white/95 p-6 shadow-sm">
-                        <h3 class="font-semibold text-brand-ink flex items-center gap-2">
-                            <x-heroicon-o-command-line class="h-5 w-5 text-brand-sage" aria-hidden="true" />
-                            <code class="text-sm">dply</code> CLI
-                        </h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Install with <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">curl -fsSL {{ route('cli.install') }} | bash -s -- --login</code>. The CLI is hosted by your dply instance (not npm). <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">dply login</code> uses OAuth device flow. Then <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">dply edge deploy</code>, <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">dply server system-users</code>, and more. Node 18+.</p>
-                    </li>
-                    <li class="rounded-2xl border border-brand-ink/10 bg-white/95 p-6 shadow-sm">
-                        <h3 class="font-semibold text-brand-ink flex items-center gap-2">
-                            <x-heroicon-o-key class="h-5 w-5 text-brand-sage" aria-hidden="true" />
-                            Org-scoped tokens
-                        </h3>
-                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">API tokens are issued per organization with <strong class="text-brand-forest font-medium">granular abilities</strong> (<code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">edge.read</code>, <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">edge.deploy</code>, <code class="text-xs bg-brand-sand/60 px-1.5 py-0.5 rounded">edge.write</code>). Mint from <strong class="text-brand-forest font-medium">Settings → API tokens</strong>; revoke any time. The CLI stores tokens in your OS keyring, never in plaintext config.</p>
-                    </li>
-                </ul>
-
-                <div class="mt-10 rounded-2xl border border-brand-ink/10 bg-brand-ink text-brand-cream px-6 py-6 sm:px-10">
-                    <p class="text-sm font-medium text-brand-sand/90 leading-relaxed max-w-3xl">
-                        <span class="text-brand-gold font-semibold">Same operations, three surfaces:</span> the dashboard calls the same API the CLI calls. A signed webhook from GitHub triggers the same code path as <code class="text-xs bg-white/10 px-1.5 py-0.5 rounded">dply deploy</code>. There is no "dashboard-only" feature you have to give up if you script your way through the platform.
-                    </p>
-                </div>
-            </div>
-        </section>
-
         {{-- Security --}}
-        <section id="security" class="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-brand-ink text-brand-cream scroll-mt-24">
+        <section id="security" class="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 scroll-mt-24">
             <div class="mx-auto max-w-7xl">
-                <h2 class="text-3xl font-bold tracking-tight sm:text-4xl">Security &amp; account hygiene</h2>
-                <p class="mt-4 text-brand-sand/85 max-w-3xl">Enterprise-style products need more than a password—here is how {{ config('app.name') }} keeps keys and sessions under control.</p>
-                <ul class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-2">
-                    <li class="rounded-xl border border-white/10 bg-white/5 p-6">
-                        <h3 class="font-semibold text-brand-cream">Encrypted secrets</h3>
-                        <p class="mt-2 text-sm text-brand-mist leading-relaxed">Sensitive fields (deploy keys, webhook secrets, env payloads) are encrypted at rest so the database alone is never enough to impersonate your infrastructure.</p>
-                    </li>
-                    <li class="rounded-xl border border-white/10 bg-white/5 p-6">
-                        <h3 class="font-semibold text-brand-cream">Two-factor authentication</h3>
-                        <p class="mt-2 text-sm text-brand-mist leading-relaxed">Turn on 2FA once in your profile—it protects your login across <strong class="text-brand-cream font-medium">every organization and site</strong> you can access, not just one workspace.</p>
-                    </li>
-                    <li class="rounded-xl border border-white/10 bg-white/5 p-6">
-                        <h3 class="font-semibold text-brand-cream">OAuth sign-in</h3>
-                        <p class="mt-2 text-sm text-brand-mist leading-relaxed">Link GitHub, GitLab, or Bitbucket (when your app enables them) to your user account. The same identity signs you in everywhere; <strong class="text-brand-cream font-medium">org roles</strong> still decide what you are allowed to change.</p>
-                    </li>
-                    <li class="rounded-xl border border-white/10 bg-white/5 p-6">
-                        <h3 class="font-semibold text-brand-cream">Verified email &amp; profile</h3>
-                        <p class="mt-2 text-sm text-brand-mist leading-relaxed">A verified address is required for dashboard access. Name and profile settings live on your user—they do not reset when you switch org context.</p>
-                    </li>
-                </ul>
+                <div class="max-w-2xl">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">More than a password</p>
+                    <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Security &amp; account hygiene</h2>
+                    <p class="mt-4 text-brand-moss leading-relaxed">Keys and sessions stay under control so the database alone is never enough to impersonate your infrastructure.</p>
+                </div>
 
-                <div class="mt-10 grid gap-6 lg:grid-cols-3">
-                    <div class="rounded-xl border border-white/10 bg-white/5 p-6">
-                        <h3 class="font-semibold text-brand-cream">Governed API access</h3>
-                        <p class="mt-2 text-sm text-brand-mist leading-relaxed">Organization-scoped tokens and granular abilities keep automation inside clearer boundaries instead of long-lived root credentials on laptops.</p>
-                    </div>
-                    <div class="rounded-xl border border-white/10 bg-white/5 p-6">
-                        <h3 class="font-semibold text-brand-cream">Approval-friendly operations</h3>
-                        <p class="mt-2 text-sm text-brand-mist leading-relaxed">Teams can pair firewall approvals, audit visibility, and project routing so production changes are easier to review before and after they ship.</p>
-                    </div>
-                    <div class="rounded-xl border border-white/10 bg-white/5 p-6">
-                        <h3 class="font-semibold text-brand-cream">Recovery lives in-product</h3>
-                        <p class="mt-2 text-sm text-brand-mist leading-relaxed">Backups, deployment history, and project runbooks keep recovery guidance attached to the same resources you operate every day.</p>
-                    </div>
+                <div class="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                    @php
+                        $security = [
+                            ['icon' => 'lock-closed', 'title' => 'Encrypted secrets', 'body' => 'Deploy keys, webhook secrets, and env payloads are encrypted at rest.'],
+                            ['icon' => 'finger-print', 'title' => 'Two-factor auth', 'body' => 'Turn on 2FA once—it protects login across every org and site you can reach.'],
+                            ['icon' => 'shield-check', 'title' => 'Governed API access', 'body' => 'Org-scoped tokens and granular abilities replace long-lived root creds on laptops.'],
+                            ['icon' => 'check-badge', 'title' => 'Verified identity', 'body' => 'OAuth sign-in and a verified email; org roles still decide what you can change.'],
+                        ];
+                    @endphp
+                    @foreach ($security as $item)
+                        <div class="rounded-2xl border border-brand-ink/10 bg-white/85 p-6 shadow-sm">
+                            <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-forest/10 text-brand-forest">
+                                <x-dynamic-component :component="'heroicon-o-' . $item['icon']" class="h-5 w-5" aria-hidden="true" />
+                            </div>
+                            <h3 class="mt-5 font-semibold text-brand-ink">{{ $item['title'] }}</h3>
+                            <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ $item['body'] }}</p>
+                        </div>
+                    @endforeach
                 </div>
             </div>
         </section>
 
-        {{-- Docs CTA --}}
+        {{-- CTA --}}
         <section class="py-20 px-4 sm:px-6 lg:px-8">
-            <div class="max-w-3xl mx-auto text-center rounded-3xl border border-brand-ink/10 bg-gradient-to-br from-white via-brand-cream to-brand-sand/30 px-8 py-14 shadow-lg shadow-brand-forest/5">
-                <h2 class="text-2xl font-bold tracking-tight text-brand-ink sm:text-3xl">See it in your account</h2>
-                <p class="mt-3 text-brand-moss">Guided docs walk through connecting a provider and creating your first server. The same flows power everything above.</p>
-                <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <div class="max-w-4xl mx-auto rounded-3xl border border-brand-ink/10 bg-gradient-to-br from-white via-brand-cream to-brand-sand/30 px-8 py-16 sm:px-14 sm:py-20 text-center shadow-lg shadow-brand-forest/5">
+                <h2 class="text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">See it in your account</h2>
+                <p class="mt-4 text-lg text-brand-moss max-w-xl mx-auto">Connect a provider, create your first server, and ship a real deploy—on infrastructure you already control. The same flows power everything above.</p>
+                <div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
                     @auth
-                        <a href="{{ route('docs.index') }}" class="inline-flex items-center px-6 py-3 rounded-xl bg-brand-ink text-brand-cream text-sm font-semibold hover:bg-brand-forest transition-colors shadow-md">Open docs</a>
-                        <a href="{{ route('dashboard') }}" class="inline-flex items-center px-6 py-3 rounded-xl border-2 border-brand-ink/15 bg-white text-brand-ink text-sm font-semibold hover:border-brand-sage/40 transition-colors">Dashboard</a>
+                        <a href="{{ route('docs.index') }}" class="w-full sm:w-auto inline-flex justify-center items-center px-7 py-3.5 rounded-xl bg-brand-ink text-brand-cream text-sm font-semibold hover:bg-brand-forest transition-colors shadow-md">Open docs</a>
+                        <a href="{{ route('dashboard') }}" class="w-full sm:w-auto inline-flex justify-center items-center px-7 py-3.5 rounded-xl border-2 border-brand-ink/15 bg-white text-brand-ink text-sm font-semibold hover:border-brand-sage/40 transition-colors">Go to dashboard</a>
                     @else
-                        <a href="{{ route('register') }}" class="inline-flex items-center px-6 py-3 rounded-xl bg-brand-gold text-brand-ink text-sm font-semibold shadow-lg shadow-brand-gold/20 hover:bg-[#d4b24d] transition-colors">Start trial</a>
-                        <a href="{{ route('pricing') }}" class="inline-flex items-center px-6 py-3 rounded-xl border-2 border-brand-ink/15 bg-white text-brand-ink text-sm font-semibold hover:border-brand-sage/40 transition-colors">Compare plans</a>
+                        <a href="{{ route('register') }}" class="w-full sm:w-auto inline-flex justify-center items-center px-7 py-3.5 rounded-xl bg-brand-gold text-brand-ink text-sm font-semibold shadow-lg shadow-brand-gold/20 hover:bg-[#d4b24d] transition-colors">Start free trial</a>
+                        <a href="{{ route('pricing') }}" class="w-full sm:w-auto inline-flex justify-center items-center px-7 py-3.5 rounded-xl border-2 border-brand-ink/15 bg-white text-brand-ink text-sm font-semibold hover:border-brand-sage/40 transition-colors">Compare plans</a>
                     @endauth
                 </div>
             </div>

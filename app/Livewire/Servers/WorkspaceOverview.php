@@ -417,7 +417,7 @@ class WorkspaceOverview extends Component
                 'help' => __('Run your queue workers and scheduled jobs from the Workers tab.'),
                 'done' => ($backgroundSummary['active_workers'] ?? 0) > 0,
                 'cta_label' => __('Open Workers'),
-                'cta_route' => route('servers.daemons', $this->server),
+                'cta_route' => route('servers.workers', $this->server),
             ];
         }
         if (! $isContainerHostForChecklist) {

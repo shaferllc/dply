@@ -6,6 +6,7 @@ namespace App\Services\SourceControl;
 
 use App\Contracts\SourceControl\GitIdentity;
 use App\Models\GitProviderToken;
+use App\Models\Site;
 use App\Models\SocialAccount;
 use App\Models\User;
 
@@ -49,6 +50,29 @@ class GitIdentityResolver
         }
 
         return null;
+    }
+
+    /**
+     * Identity to use for a given Site's read traffic. Prefers the specific
+     * account the operator picked when wiring the repo
+     * (`meta.repository.git_source_control_account_id`); falls back to
+     * "best available" for the provider when nothing was recorded. This is
+     * what keeps reads (branch/tag/commit listing) from drifting onto a
+     * different identity than the one used to enumerate repos in the first
+     * place — important when the user has multiple PATs/OAuth identities
+     * for the same provider and only one of them is valid for this repo.
+     */
+    public function forSite(Site $site, User $user, string $provider): ?GitIdentity
+    {
+        $accountId = (string) ($site->repositoryMeta()['git_source_control_account_id'] ?? '');
+        if ($accountId !== '') {
+            $identity = $this->forId($user, $accountId);
+            if ($identity instanceof GitIdentity && $identity->accessToken() !== '' && $identity->provider() === $provider) {
+                return $identity;
+            }
+        }
+
+        return $this->forUserProvider($user, $provider);
     }
 
     /**

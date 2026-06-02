@@ -71,7 +71,7 @@ final class SharedHostReport
             return null;
         }
 
-        if ($server->sites()->count() < 2) {
+        if ($server->cachedSitesCount() < 2) {
             return null;
         }
 

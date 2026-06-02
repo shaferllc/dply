@@ -145,6 +145,7 @@ class Site extends Model
         'last_deploy_at',
         'suspended_at',
         'suspended_reason',
+        'scheduled_deletion_at',
         'git_repository_url',
         'git_branch',
         'git_deploy_key_private',
@@ -197,6 +198,7 @@ class Site extends Model
             'ssl_installed_at' => 'datetime',
             'last_deploy_at' => 'datetime',
             'suspended_at' => 'datetime',
+            'scheduled_deletion_at' => 'datetime',
         ];
     }
 
@@ -734,6 +736,22 @@ class Site extends Model
         $this->primaryDomainResolved = false;
     }
 
+    /**
+     * What the value of {@see $git_branch} represents — a branch name, a
+     * tag name, or a commit SHA. Deployers branch on this to pick clone
+     * flags: branch/tag use `--branch`, commit needs a full clone + checkout.
+     * Defaults to 'branch' for legacy sites with no meta value.
+     *
+     * @return 'branch'|'tag'|'commit'
+     */
+    public function gitRefKind(): string
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $value = $meta['git_ref_kind'] ?? null;
+
+        return in_array($value, ['branch', 'tag', 'commit'], true) ? $value : 'branch';
+    }
+
     public function testingHostname(): string
     {
         $previewDomain = $this->primaryPreviewDomain();
@@ -809,6 +827,17 @@ class Site extends Model
         $webserver = $serverMeta['webserver'] ?? 'nginx';
 
         return is_string($webserver) && $webserver !== '' ? $webserver : 'nginx';
+    }
+
+    /**
+     * A headless site runs deployed code with no HTTP front (no webserver,
+     * no domain, no SSL) — e.g. a queue-worker host where webserver=none.
+     * It still uses the full standard deploy pipeline (git, build, releases),
+     * just skips the vhost / testing-hostname / reachability steps.
+     */
+    public function isHeadless(): bool
+    {
+        return $this->webserver() === 'none';
     }
 
     public function provisioningMeta(): array
@@ -999,6 +1028,10 @@ class Site extends Model
             'docker' => self::STATUS_DOCKER_ACTIVE,
             'kubernetes' => self::STATUS_KUBERNETES_ACTIVE,
             'digitalocean_functions' => self::STATUS_FUNCTIONS_ACTIVE,
+            // Headless (no webserver) sites are "active" once code is deployed —
+            // reuse the custom-active status, which the active-status lists and
+            // labels already recognise.
+            'none' => self::STATUS_CUSTOM_ACTIVE,
             default => self::STATUS_NGINX_ACTIVE,
         };
     }

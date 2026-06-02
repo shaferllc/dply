@@ -56,7 +56,7 @@ final class PreflightIssueFixResolver
                 : self::link(__('Open cron jobs'), route('sites.cron', ['server' => $server, 'site' => $site])),
             'queue', 'workers' => $site->usesFunctionsRuntime()
                 ? self::link(__('Open workers'), route('sites.workers', ['server' => $server, 'site' => $site]))
-                : self::link(__('Open daemons'), route('sites.daemons', ['server' => $server, 'site' => $site])),
+                : self::link(__('Open workers'), route('sites.daemons', ['server' => $server, 'site' => $site])),
             'runtime_revision' => self::link(
                 __('Open deploy settings'),
                 route('sites.pipeline', ['server' => $server, 'site' => $site]),
@@ -97,7 +97,7 @@ final class PreflightIssueFixResolver
                 : self::link(__('Open cron jobs'), route('sites.cron', ['server' => $server, 'site' => $site])),
             'queue', 'workers' => $site->usesFunctionsRuntime()
                 ? self::link(__('Open workers'), route('sites.workers', ['server' => $server, 'site' => $site]))
-                : self::link(__('Open daemons'), route('sites.daemons', ['server' => $server, 'site' => $site])),
+                : self::link(__('Open workers'), route('sites.daemons', ['server' => $server, 'site' => $site])),
             default => self::link(
                 __('Open runtime'),
                 route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'runtime']),

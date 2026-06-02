@@ -1,5 +1,7 @@
 <div>
-    @php($selectedTile = collect($tiles)->firstWhere('key', $selected))
+    @php
+        $selectedTile = collect($tiles)->firstWhere('key', $selected);
+    @endphp
 
     <div class="py-10">
         <div class="dply-page-shell">
@@ -25,8 +27,10 @@
                 <div class="mx-auto mt-10 max-w-5xl">
                     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                         @foreach ($tiles as $tile)
-                            @php($isSelected = $selected === $tile['key'])
-                            @php($isInstaller = ($tile['kind'] ?? '') === 'scaffold')
+                            @php
+                                $isSelected = $selected === $tile['key'];
+                                $isInstaller = ($tile['kind'] ?? '') === 'scaffold';
+                            @endphp
                             <button
                                 type="button"
                                 wire:click="selectTile('{{ $tile['key'] }}')"
@@ -66,8 +70,8 @@
                 {{-- Config + submit --}}
                 @if ($selectedTile)
                     <form wire:submit="run" class="mx-auto mt-6 max-w-5xl">
-                        <div class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-md shadow-brand-ink/5">
-                            <div class="flex items-center gap-3 border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-4">
+                        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-md shadow-brand-ink/5">
+                            <div class="flex items-center gap-3 rounded-t-2xl border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-4">
                                 <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                                     <x-dynamic-component :component="$selectedTile['icon']" class="h-5 w-5" aria-hidden="true" />
                                 </span>
@@ -119,34 +123,49 @@
                                         <span>{{ __('An empty PHP site is provisioned and serves a default page. Return to this picker any time to install a real application.') }}</span>
                                     </p>
                                 @else
-                                    @if (count($linkedSourceControlAccounts) > 0)
-                                        {{-- Source toggle: connected provider vs pasted URL --}}
-                                        <div class="inline-flex rounded-xl border border-brand-ink/10 bg-brand-cream/60 p-1">
-                                            <button type="button" wire:click="$set('repo_source', 'provider')"
-                                                @class([
-                                                    'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
-                                                    'bg-white text-brand-ink shadow-sm' => $repo_source === 'provider',
-                                                    'text-brand-moss hover:text-brand-ink' => $repo_source !== 'provider',
-                                                ])>
-                                                <x-heroicon-o-link class="h-3.5 w-3.5" aria-hidden="true" />
-                                                {{ __('Connected provider') }}
-                                            </button>
-                                            <button type="button" wire:click="$set('repo_source', 'manual')"
-                                                @class([
-                                                    'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
-                                                    'bg-white text-brand-ink shadow-sm' => $repo_source === 'manual',
-                                                    'text-brand-moss hover:text-brand-ink' => $repo_source !== 'manual',
-                                                ])>
-                                                <x-heroicon-o-pencil-square class="h-3.5 w-3.5" aria-hidden="true" />
-                                                {{ __('Paste a URL') }}
-                                            </button>
-                                        </div>
-                                    @endif
+                                    <div class="flex flex-wrap items-center justify-between gap-3">
+                                        @if (count($linkedSourceControlAccounts) > 0)
+                                            {{-- Source toggle: connected provider vs pasted URL --}}
+                                            <div class="inline-flex rounded-xl border border-brand-ink/10 bg-brand-cream/60 p-1">
+                                                <button type="button" wire:click="$set('repo_source', 'provider')"
+                                                    @class([
+                                                        'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
+                                                        'bg-white text-brand-ink shadow-sm' => $repo_source === 'provider',
+                                                        'text-brand-moss hover:text-brand-ink' => $repo_source !== 'provider',
+                                                    ])>
+                                                    <x-heroicon-o-link class="h-3.5 w-3.5" aria-hidden="true" />
+                                                    {{ __('Connected provider') }}
+                                                </button>
+                                                <button type="button" wire:click="$set('repo_source', 'manual')"
+                                                    @class([
+                                                        'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',
+                                                        'bg-white text-brand-ink shadow-sm' => $repo_source === 'manual',
+                                                        'text-brand-moss hover:text-brand-ink' => $repo_source !== 'manual',
+                                                    ])>
+                                                    <x-heroicon-o-pencil-square class="h-3.5 w-3.5" aria-hidden="true" />
+                                                    {{ __('Paste a URL') }}
+                                                </button>
+                                            </div>
+                                        @else
+                                            <span></span>
+                                        @endif
+                                        <x-connect-provider-link>{{ count($linkedSourceControlAccounts) > 0
+                                            ? __('Connect another account')
+                                            : __('Connect a provider') }} &rarr;</x-connect-provider-link>
+                                    </div>
 
                                     @if ($repo_source === 'provider' && count($linkedSourceControlAccounts) > 0)
                                         <div>
-                                            <x-input-label for="sc-account" :value="__('Account')" required />
-                                            <select id="sc-account" wire:model.live="source_control_account_id" class="dply-input mt-1.5">
+                                            <div class="flex items-center gap-2">
+                                                <x-input-label for="sc-account" :value="__('Account')" required />
+                                                <span wire:loading wire:target="source_control_account_id" class="inline-flex items-center gap-1 text-[11px] font-medium text-brand-moss">
+                                                    <x-spinner size="sm" />
+                                                    {{ __('Loading repositories…') }}
+                                                </span>
+                                            </div>
+                                            <select id="sc-account" wire:model.live="source_control_account_id"
+                                                wire:loading.attr="disabled" wire:target="source_control_account_id"
+                                                class="dply-input mt-1.5 disabled:cursor-progress disabled:opacity-60">
                                                 @foreach ($linkedSourceControlAccounts as $account)
                                                     <option value="{{ $account['id'] }}">{{ $account['label'] }}</option>
                                                 @endforeach
@@ -156,11 +175,74 @@
                                         <div>
                                             <x-input-label for="sc-repo" :value="__('Repository')" required />
                                             @if (count($availableRepositories) > 0)
-                                                <select id="sc-repo" wire:model.live="repository_selection" class="dply-input mt-1.5">
-                                                    @foreach ($availableRepositories as $repository)
-                                                        <option value="{{ $repository['url'] }}">{{ $repository['label'] }}</option>
-                                                    @endforeach
-                                                </select>
+                                                @php
+                                                    $selectedRepository = collect($availableRepositories)->firstWhere('url', $repository_selection);
+                                                @endphp
+                                                <div x-data="{ open: false, search: '' }" class="relative mt-1.5"
+                                                    wire:loading.class="opacity-60 pointer-events-none" wire:target="source_control_account_id">
+                                                    <button
+                                                        id="sc-repo"
+                                                        type="button"
+                                                        x-on:click="open = !open; $nextTick(() => open && $refs.repoSearch && $refs.repoSearch.focus())"
+                                                        x-on:keydown.escape.window="open = false"
+                                                        x-bind:aria-expanded="open.toString()"
+                                                        aria-haspopup="listbox"
+                                                        wire:loading.attr="disabled" wire:target="source_control_account_id"
+                                                        class="flex w-full items-center justify-between gap-3 rounded-xl border border-brand-ink/15 bg-white px-3.5 py-2.5 text-left text-sm shadow-sm transition focus:border-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-ink"
+                                                    >
+                                                        <span class="min-w-0 flex-1 truncate font-mono text-sm text-brand-ink">
+                                                            <span wire:loading.remove wire:target="source_control_account_id">{{ $selectedRepository['label'] ?? __('Select repository') }}</span>
+                                                            <span wire:loading wire:target="source_control_account_id" class="inline-flex items-center gap-1.5 text-brand-moss">
+                                                                <x-spinner size="sm" />
+                                                                {{ __('Loading repositories…') }}
+                                                            </span>
+                                                        </span>
+                                                        <x-heroicon-m-chevron-down class="h-4 w-4 shrink-0 text-brand-moss transition-transform" x-bind:class="{ 'rotate-180': open }" aria-hidden="true" />
+                                                    </button>
+
+                                                    <div
+                                                        x-cloak
+                                                        x-show="open"
+                                                        x-transition.origin.top
+                                                        x-on:click.outside="open = false"
+                                                        role="listbox"
+                                                        class="absolute z-20 mt-2 w-full rounded-2xl border border-brand-ink/10 bg-white p-2 shadow-xl shadow-brand-ink/10"
+                                                    >
+                                                        <div class="relative">
+                                                            <x-heroicon-o-magnifying-glass class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-moss" aria-hidden="true" />
+                                                            <input
+                                                                x-ref="repoSearch"
+                                                                x-model="search"
+                                                                type="text"
+                                                                placeholder="{{ __('Filter repositories…') }}"
+                                                                class="block w-full rounded-xl border border-brand-ink/15 bg-white py-2 pl-9 pr-3 text-sm text-brand-ink placeholder:text-brand-mist focus:border-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-ink"
+                                                            />
+                                                        </div>
+
+                                                        <div class="mt-2 max-h-64 space-y-1 overflow-y-auto overscroll-contain pr-1">
+                                                            @foreach ($availableRepositories as $repository)
+                                                                @php
+                                                                    $repoUrl = (string) ($repository['url'] ?? '');
+                                                                    $repoLabel = (string) ($repository['label'] ?? '');
+                                                                    $repoLabelLower = Str::lower($repoLabel);
+                                                                    $repoUrlLower = Str::lower($repoUrl);
+                                                                    $isSelectedRepo = $repository_selection === $repoUrl;
+                                                                @endphp
+                                                                <button
+                                                                    type="button"
+                                                                    role="option"
+                                                                    wire:click="$set('repository_selection', '{{ $repoUrl }}')"
+                                                                    x-on:click="open = false; search = ''"
+                                                                    x-show="'{{ $repoLabelLower }}'.includes(search.toLowerCase()) || '{{ $repoUrlLower }}'.includes(search.toLowerCase())"
+                                                                    aria-selected="{{ $isSelectedRepo ? 'true' : 'false' }}"
+                                                                    class="block w-full rounded-lg px-3 py-2 text-left font-mono text-sm transition {{ $isSelectedRepo ? 'bg-brand-sand/40 text-brand-ink ring-1 ring-brand-ink/15' : 'text-brand-ink hover:bg-brand-sand/30' }}"
+                                                                >
+                                                                    {{ $repoLabel }}
+                                                                </button>
+                                                            @endforeach
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             @else
                                                 <p class="mt-1.5 flex items-start gap-1.5 rounded-xl border border-brand-ink/10 bg-brand-cream/70 px-3 py-2.5 text-xs text-brand-moss">
                                                     <x-heroicon-o-information-circle class="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
@@ -185,15 +267,42 @@
                                     @endif
 
                                     <div>
-                                        <x-input-label for="git-branch" :value="__('Branch')" required />
-                                        <x-text-input
-                                            id="git-branch"
-                                            type="text"
-                                            wire:model="git_branch"
-                                            autocomplete="off"
-                                            class="mt-1.5 font-mono"
-                                        />
+                                        <x-input-label :value="__('Ref to deploy')" required />
+                                        <div class="mt-1.5 flex flex-wrap items-center gap-2">
+                                            <span @class([
+                                                'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-mono text-sm',
+                                                'border-violet-200 bg-violet-50 text-violet-900' => ($git_ref_kind ?? 'branch') === 'branch',
+                                                'border-amber-200 bg-amber-50 text-amber-900' => $git_ref_kind === 'tag',
+                                                'border-sky-200 bg-sky-50 text-sky-900' => $git_ref_kind === 'commit',
+                                            ])>
+                                                <span class="text-[10px] font-semibold uppercase tracking-wide">{{ match ($git_ref_kind ?? 'branch') {
+                                                    'tag' => __('Tag'),
+                                                    'commit' => __('Commit'),
+                                                    default => __('Branch'),
+                                                } }}</span>
+                                                <span>{{ $git_ref_kind === 'commit'
+                                                    ? \Illuminate\Support\Str::limit($git_branch, 12, '')
+                                                    : $git_branch }}</span>
+                                            </span>
+                                            <button type="button" wire:click="openRefPicker"
+                                                wire:loading.attr="disabled" wire:target="openRefPicker,setRepoRefTab,updatedRepoRefSearch"
+                                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-progress disabled:opacity-60">
+                                                <span wire:loading.remove wire:target="openRefPicker" class="inline-flex items-center gap-1.5">
+                                                    <x-heroicon-o-arrows-right-left class="h-3.5 w-3.5" aria-hidden="true" />
+                                                    {{ __('Change…') }}
+                                                </span>
+                                                <span wire:loading wire:target="openRefPicker" class="inline-flex items-center gap-1.5">
+                                                    <x-spinner size="sm" />
+                                                    {{ __('Loading…') }}
+                                                </span>
+                                            </button>
+                                        </div>
+                                        <p class="mt-1.5 text-xs text-brand-moss">{{ __('Choose a branch, tag, or specific commit from the connected repository.') }}</p>
                                         <x-input-error :messages="$errors->get('git_branch')" class="mt-2" />
+
+                                        @if ($repo_ref_picker_open)
+                                            @include('livewire.sites.partials._repository-ref-picker')
+                                        @endif
                                     </div>
                                     @if (($selectedTile['kind'] ?? '') === 'preset' && ($selectedTile['framework'] ?? '') !== '')
                                         <p class="flex items-start gap-1.5 text-xs text-brand-moss">
@@ -204,7 +313,7 @@
                                 @endif
                             </div>
 
-                            <div class="flex flex-col-reverse gap-3 border-t border-brand-ink/10 bg-brand-cream/60 px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
+                            <div class="flex flex-col-reverse gap-3 rounded-b-2xl border-t border-brand-ink/10 bg-brand-cream/60 px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
                                 <a href="{{ route('servers.sites', $server) }}" wire:navigate
                                     class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
                                     {{ __('Cancel') }}

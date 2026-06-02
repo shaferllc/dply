@@ -3,8 +3,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Migrate to {{ config('app.name') }} – in an afternoon</title>
-    <meta name="description" content="Move from Laravel Forge, Ploi, or Vercel to dply in an afternoon. Import wizards bring servers, sites, env, and deploy hooks across — then you get a continuous parity view, not a one-shot handoff.">
+    <x-seo-meta
+        full-title="Migrate to {{ config('app.name') }} – in an afternoon"
+        description="Move from Laravel Forge, Ploi, or Vercel to dply in an afternoon. Import wizards bring servers, sites, env, and deploy hooks across — then you get a continuous parity view, not a one-shot handoff." />
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     @include('partials.theme-head')

@@ -96,7 +96,7 @@ final class ServerProvisionCommandBuilder
         $lines = array_merge($lines, match ($role) {
             'application' => $this->roleApplication($web, $php, $database, $cache, $layout),
             'docker' => $this->roleDocker($web, $php, $database, $cache, $layout),
-            'worker' => $this->roleWorker($php, $database, $layout),
+            'worker' => $this->roleWorker($web, $php, $database, $layout),
             'database' => $this->roleDatabase($database, $layout),
             'redis' => $this->roleCacheHost($cache),
             'valkey' => $this->roleCacheHost('valkey'),
@@ -718,15 +718,20 @@ final class ServerProvisionCommandBuilder
     /**
      * @return list<string>
      */
-    private function roleWorker(string $php, string $database, array $layout): array
+    private function roleWorker(string $web, string $php, string $database, array $layout): array
     {
+        // Worker hosts install Caddy so sites deploy through the same
+        // vhost-and-FPM pipeline as application hosts. The server-default
+        // Caddyfile is a placeholder catch-all — per-site vhosts under
+        // /etc/caddy/sites-enabled/ take over for real hostnames.
         $lines = [];
         $lines = array_merge($lines, $this->ufwSsh());
-        $lines = array_merge($lines, $this->installPhpIfNeeded('none', $php, $database));
+        $lines = array_merge($lines, $this->installWebserver($web));
+        $lines = array_merge($lines, $this->installPhpIfNeeded($web, $php, $database));
         $lines = array_merge($lines, $this->installDatabaseIfNeeded($database));
         $lines = array_merge($lines, $this->maybeInstallSupervisor());
         $lines = array_merge($lines, $this->maybeInstallMise());
-        $lines = array_merge($lines, $this->writeRenderedConfigs('worker', 'none', $php, $layout));
+        $lines = array_merge($lines, $this->writeRenderedConfigs('worker', $web, $php, $layout));
 
         return $lines;
     }

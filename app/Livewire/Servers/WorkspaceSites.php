@@ -108,6 +108,15 @@ class WorkspaceSites extends Component
             return;
         }
 
+        // Headless hosts (webserver=none, e.g. workers) have no domain, so the
+        // hostname-based quick-add doesn't apply — send them to the full create
+        // flow, which renders its headless (no-domain) variant.
+        if (($this->server->meta['webserver'] ?? 'nginx') === 'none') {
+            $this->redirect(route('sites.create', $this->server), navigate: true);
+
+            return;
+        }
+
         if (! $this->supportsQuickAdd) {
             $this->redirect(route('sites.create', $this->server), navigate: true);
 
@@ -370,7 +379,13 @@ class WorkspaceSites extends Component
 
     public function render(): View
     {
-        $this->server->refresh();
+        // No $this->server->refresh() here — Livewire re-resolves the bound
+        // model from the database on every request (route binding on first
+        // load, the Eloquent synthesizer on later updates), so the row is
+        // already current at render time. Action handlers that mutate
+        // $this->server (server-removal flow, etc.) refresh it themselves,
+        // so refreshing again here only doubled the `select * from servers`
+        // per render — same rationale as WorkspaceManage::render().
         $this->server->load(['sites.domains']);
 
         return view('livewire.servers.workspace-sites', [

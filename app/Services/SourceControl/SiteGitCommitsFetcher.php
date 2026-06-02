@@ -63,9 +63,9 @@ final class SiteGitCommitsFetcher
         $limit = max(1, min(self::MAX_COMMITS, $limit));
 
         return match ($remote['provider']) {
-            'github' => $this->fetchGithub($remote, $user, $branch, $limit),
-            'gitlab' => $this->fetchGitlab($remote, $user, $branch, $limit),
-            'bitbucket' => $this->fetchBitbucket($remote, $user, $branch, $limit),
+            'github' => $this->fetchGithub($remote, $site, $user, $branch, $limit),
+            'gitlab' => $this->fetchGitlab($remote, $site, $user, $branch, $limit),
+            'bitbucket' => $this->fetchBitbucket($remote, $site, $user, $branch, $limit),
             default => [
                 'ok' => false,
                 'commits' => [],
@@ -156,9 +156,9 @@ final class SiteGitCommitsFetcher
         return null;
     }
 
-    private function fetchGithub(array $remote, User $user, string $branch, int $limit): array
+    private function fetchGithub(array $remote, Site $site, User $user, string $branch, int $limit): array
     {
-        $identity = $this->resolver->forUserProvider($user, 'github');
+        $identity = $this->resolver->forSite($site, $user,'github');
         if ($identity === null) {
             return [
                 'ok' => false,
@@ -239,9 +239,9 @@ final class SiteGitCommitsFetcher
         ];
     }
 
-    private function fetchGitlab(array $remote, User $user, string $branch, int $limit): array
+    private function fetchGitlab(array $remote, Site $site, User $user, string $branch, int $limit): array
     {
-        $identity = $this->resolver->forUserProvider($user, 'gitlab');
+        $identity = $this->resolver->forSite($site, $user,'gitlab');
         if ($identity === null) {
             return [
                 'ok' => false,
@@ -320,9 +320,9 @@ final class SiteGitCommitsFetcher
         ];
     }
 
-    private function fetchBitbucket(array $remote, User $user, string $branch, int $limit): array
+    private function fetchBitbucket(array $remote, Site $site, User $user, string $branch, int $limit): array
     {
-        $identity = $this->resolver->forUserProvider($user, 'bitbucket');
+        $identity = $this->resolver->forSite($site, $user,'bitbucket');
         if ($identity === null) {
             return [
                 'ok' => false,

@@ -68,7 +68,7 @@ return [
         ['key' => 'configuration', 'route' => 'servers.configuration', 'icon' => 'document-text', 'label' => 'Configuration', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'cron', 'route' => 'servers.cron', 'icon' => 'clock', 'label' => 'Cron jobs', 'group' => 'background', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'schedule', 'route' => 'servers.schedule', 'icon' => 'calendar-days', 'label' => 'Schedule', 'group' => 'background', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.schedule'],
-        ['key' => 'daemons', 'route' => 'servers.daemons', 'icon' => 'server-stack', 'label' => 'Daemons', 'group' => 'background', 'except_host_kinds' => ['kubernetes']],
+        ['key' => 'daemons', 'route' => 'servers.workers', 'icon' => 'server-stack', 'label' => 'Workers', 'group' => 'background', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'backups', 'route' => 'servers.backups', 'preview_route' => 'servers.backups', 'icon' => 'archive-box', 'label' => 'Backups', 'group' => 'background', 'requires_any_tags' => ['mysql', 'postgres'], 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.backups', 'preview_feature' => 'workspace.backups_preview'],
         ['key' => 'redis-snapshots', 'route' => 'servers.redis-snapshots', 'icon' => 'archive-box', 'label' => 'Snapshots', 'group' => 'background', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'firewall', 'route' => 'servers.firewall', 'icon' => 'shield-check', 'label' => 'Firewall', 'group' => 'access', 'except_host_kinds' => ['kubernetes']],
@@ -144,11 +144,12 @@ return [
             ],
         ],
         'worker' => [
-            // A worker host runs queue workers + scheduled jobs (PHP installed,
-            // no webserver/cache/database). Surface daemons (the workers) next to
-            // Overview; hide the stack tabs that don't apply (databases, caches,
+            // A worker host runs queue workers + scheduled jobs from deployed
+            // code (PHP installed, no webserver/cache/database). Surface Sites
+            // (the deployed code) and daemons (the workers) next to Overview;
+            // hide the stack tabs that don't apply (databases, caches,
             // webserver, backups, snapshots, load balancers).
-            'keys' => ['overview', 'daemons', 'schedule', 'cron', 'console', 'php', 'health', 'monitor', 'activity', 'logs', 'firewall', 'networking', 'ssh', 'files', 'manage', 'settings'],
+            'keys' => ['overview', 'sites', 'daemons', 'schedule', 'cron', 'console', 'php', 'health', 'monitor', 'activity', 'logs', 'firewall', 'networking', 'ssh', 'files', 'manage', 'settings'],
             'overrides' => [
                 'daemons' => ['label' => 'Workers', 'group' => 'overview'],
                 'schedule' => ['group' => 'background'],
@@ -180,7 +181,7 @@ return [
     | (engine tabs + switch picker) and cannot be switched to until removed.
     | Tests override with config(['server_workspace.webserver_coming_soon' => []]).
     */
-    'webserver_coming_soon' => ['caddy', 'apache', 'openlitespeed'],
+    'webserver_coming_soon' => ['apache', 'openlitespeed'],
 
     /*
     | Edge proxy engines listed here show "Coming soon" in the overview picker

@@ -649,7 +649,13 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::get('servers/{server}/sites/{site}/deploy', function (Server $server, Site $site) {
         return redirect()->route('sites.deployments.index', ['server' => $server, 'site' => $site] + request()->query());
     });
-    Route::livewire('servers/{server}/sites/{site}/pipeline', WorkspacePipeline::class)->name('sites.pipeline');
+    Route::get('servers/{server}/sites/{site}/pipeline', function (Server $server, Site $site) {
+        return redirect()->route('sites.deployments.index', [
+            'server' => $server,
+            'site' => $site,
+            'tab' => 'pipeline',
+        ] + request()->query());
+    })->name('sites.pipeline');
     Route::livewire('servers/{server}/sites/{site}/deployments', SitesDeploymentsList::class)->name('sites.deployments.index');
     Route::livewire('servers/{server}/sites/{site}/deployments/{deployment}', SitesDeploymentDetail::class)->name('sites.deployments.show');
     Route::livewire('servers/{server}/sites/{site}/edge/deployments/{deployment}', EdgeDeploymentDetail::class)->name('sites.edge.deployments.show');
@@ -665,7 +671,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     })->name('sites.commits');
     Route::livewire('servers/{server}/sites/{site}/cron', WorkspaceCron::class)->name('sites.cron');
     Route::livewire('servers/{server}/sites/{site}/preview-comments', EdgePreviewComments::class)->name('sites.preview-comments');
-    Route::livewire('servers/{server}/sites/{site}/workers', WorkspaceDaemons::class)->name('sites.daemons');
+    Route::livewire('servers/{server}/sites/{site}/daemons', WorkspaceDaemons::class)->name('sites.daemons');
     Route::livewire('servers/{server}/sites/{site}/services', WorkspaceSystemd::class)->name('sites.services');
     Route::get('servers/{server}/sites/{site}/queue-workers', function (Server $server, Site $site) {
         return redirect()->route('sites.daemons', ['server' => $server, 'site' => $site] + request()->query());
@@ -681,12 +687,26 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // proxy (hostname/DNS, custom domains, redirects, headers + CORS,
     // invocation URLs). Distinct from VM `routing` which edits nginx.
     Route::livewire('servers/{server}/sites/{site}/routing', ServerlessRouting::class)->name('sites.routing');
-    // DEPLOY group for serverless workspaces — Repository page that
-    // browses the connected repo: overview (commits + README), file
-    // tree, branches, and the connection config (account / repo /
-    // deploy key / webhook). VM sites keep the legacy section partial
-    // at `?section=repository`.
-    Route::livewire('servers/{server}/sites/{site}/source', Repository::class)->name('sites.repository');
+    // Repository now lives as the "Settings → Repository" section inside
+    // the Deployments page. The /source URL redirects there so existing
+    // bookmarks keep working. Any incoming `?tab=` query (e.g. ?tab=commits
+    // from the commits redirect above) is forwarded as `?repo_tab=` so the
+    // embedded Repository component can pick it up without colliding with
+    // the deployments page's own ?tab= param.
+    Route::get('servers/{server}/sites/{site}/source', function (Server $server, Site $site) {
+        $query = request()->query();
+        if (isset($query['tab'])) {
+            $query['repo_tab'] = $query['tab'];
+            unset($query['tab']);
+        }
+
+        return redirect()->route('sites.deployments.index', [
+            'server' => $server,
+            'site' => $site,
+            'tab' => 'settings',
+            'section' => 'repository',
+        ] + $query);
+    })->name('sites.repository');
     Route::livewire('servers/{server}/sites/{site}/caching', Caching::class)->name('sites.caching');
     Route::livewire('servers/{server}/sites/{site}/cdn', Cdn::class)->name('sites.cdn');
     Route::livewire('servers/{server}/sites/{site}/files', Files::class)->name('sites.files');
@@ -706,7 +726,11 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         } elseif ($targetSection === 'deploy') {
             return redirect()->route('sites.deployments.index', ['server' => $server, 'site' => $site] + $query);
         } elseif ($targetSection === 'pipeline') {
-            return redirect()->route('sites.pipeline', ['server' => $server, 'site' => $site] + $query);
+            return redirect()->route('sites.deployments.index', [
+                'server' => $server,
+                'site' => $site,
+                'tab' => 'pipeline',
+            ] + $query);
         } elseif ($targetSection === 'dns') {
             $query['tab'] = 'dns';
             $targetSection = 'routing';

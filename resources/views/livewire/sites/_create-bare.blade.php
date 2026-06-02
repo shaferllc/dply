@@ -61,7 +61,7 @@
                     </div>
 
                     <div>
-                        <x-input-label for="bare-hostname" :value="__('Primary domain')" required />
+                        <x-input-label for="bare-hostname" :value="__('Primary domain (optional)')" />
                         <x-text-input
                             id="bare-hostname"
                             type="text"
@@ -72,7 +72,7 @@
                         />
                         <p class="mt-1.5 flex items-start gap-1.5 text-xs text-brand-moss">
                             <x-heroicon-o-information-circle class="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
-                            <span>{{ __('Dply wires a temporary testing hostname during provisioning, so you can verify before switching customer DNS.') }}</span>
+                            <span>{{ __('Optional. Dply wires a temporary testing hostname so you can deploy and verify without a customer domain. Add your real domain whenever you’re ready.') }}</span>
                         </p>
                         <x-input-error :messages="$errors->get('form.primary_hostname')" class="mt-2" />
                     </div>

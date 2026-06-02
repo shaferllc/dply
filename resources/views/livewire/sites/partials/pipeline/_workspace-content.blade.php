@@ -4,8 +4,10 @@
     $stepCount = $pipelineOverviewStepCount ?? $editingDeployPipeline?->steps?->count() ?? $site->deploySteps->count();
     $hookCount = $pipelineOverviewHookCount ?? $editingDeployPipeline?->hooks?->count() ?? $site->deployHooks->count();
     $strategyLabel = $site->deploy_strategy === 'atomic' ? __('Zero downtime (atomic)') : __('Simple (in-place)');
+    $isLocked = ($lockedTab ?? '') !== '';
 @endphp
 
+@unless ($isLocked)
 <section class="{{ $card }}">
     <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
         <div class="flex min-w-0 items-start gap-3">
@@ -53,8 +55,9 @@
         >{{ __($tabLabel) }}</x-server-workspace-tab>
     @endforeach
 </x-server-workspace-tablist>
+@endunless
 
-<div class="mt-6 space-y-6" wire:key="pipeline-panel-{{ $pipelineTab }}">
+<div @class(['space-y-6', 'mt-6' => ! $isLocked]) wire:key="pipeline-panel-{{ $pipelineTab }}">
     @if ($pipelineTab === 'overview')
         @include('livewire.sites.partials.pipeline._tab-overview')
     @elseif ($pipelineTab === 'steps')

@@ -1,5 +1,10 @@
 <div>
     @php($functionsHost = $server->hostCapabilities()->supportsFunctionDeploy())
+    {{-- Headless host (webserver=none, e.g. a worker): no domain / web root / SSL —
+         deploys code through the standard pipeline only. --}}
+    @php($isHeadlessHost = ! $functionsHost
+        && $server->hostKind() === \App\Models\Server::HOST_KIND_VM
+        && ($server->meta['webserver'] ?? 'nginx') === 'none')
     @if ($siteCreateBlockedReason !== '')
         <div class="border-b border-slate-200 bg-white">
             <div class="dply-page-shell py-8">
@@ -64,7 +69,7 @@
             @endif
             @if (config('dply.scaffold_v1_enabled'))
                 @include('livewire.sites._create-mode-toggle')
-            @elseif ($server->hostKind() === \App\Models\Server::HOST_KIND_VM)
+            @elseif ($server->hostKind() === \App\Models\Server::HOST_KIND_VM && ! $isHeadlessHost)
                 <div class="rounded-2xl border border-dashed border-brand-ink/15 bg-brand-sand/20 p-4 text-sm text-brand-moss">
                     <div class="flex items-start gap-3">
                         <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-brand-forest shadow-sm">
@@ -141,16 +146,22 @@
                             <x-input-error :messages="$errors->get('form.name')" class="mt-1" />
                         </div>
 
+                        @unless ($isHeadlessHost)
                         <div>
-                            <x-input-label for="primary_hostname" :value="__('Primary domain')" />
-                            <x-text-input id="primary_hostname" wire:model.live.debounce.300ms="form.primary_hostname" placeholder="app.example.com" class="mt-1 block w-full font-mono text-sm" required autocomplete="off" />
+                            <x-input-label for="primary_hostname" :value="__('Primary domain (optional)')" />
+                            <x-text-input id="primary_hostname" wire:model.live.debounce.300ms="form.primary_hostname" placeholder="app.example.com" class="mt-1 block w-full font-mono text-sm" autocomplete="off" />
                             <p class="mt-2 text-sm text-slate-600">
                                 {{ $functionsHost
-                                    ? __('Use the real customer-facing domain here. Dply tracks the domain, repository, and runtime metadata for the first publish.')
-                                    : __('Use the real customer-facing domain here. Dply can still provision a temporary testing hostname on one of your owned zones while you finish setup.') }}
+                                    ? __('Optional. Add the real customer-facing domain when you have one — Dply tracks the domain, repository, and runtime metadata for the first publish.')
+                                    : __('Optional. Dply provisions a testing hostname automatically so you can deploy without a customer domain. Add your real domain here whenever you’re ready.') }}
                             </p>
                             <x-input-error :messages="$errors->get('form.primary_hostname')" class="mt-1" />
                         </div>
+                        @else
+                        <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-4 py-3 text-sm text-brand-moss">
+                            {{ __('This is a headless host (no web server) — no domain or SSL needed. Connect a repository below and deploy; your workers run from the deployed code.') }}
+                        </div>
+                        @endunless
 
                         @if (! $functionsHost && ! $isContainerMode && $server->dockerEnginePresent())
                             <div>

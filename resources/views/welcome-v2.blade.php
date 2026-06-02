@@ -3,8 +3,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ config('app.name') }} – Infrastructure operations, in motion</title>
-    <meta name="description" content="Provision, secure, and run servers across any cloud—organization-scoped, audit-ready, and fast. Watch a deploy happen.">
+    <x-seo-meta
+        full-title="{{ config('app.name') }} – Infrastructure operations, in motion"
+        description="Provision, secure, and run servers across any cloud—organization-scoped, audit-ready, and fast. Watch a deploy happen." />
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     @include('partials.theme-head')

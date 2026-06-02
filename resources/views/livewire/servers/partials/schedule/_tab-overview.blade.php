@@ -123,7 +123,7 @@
                 <p class="font-semibold text-brand-ink">{{ __('Workers') }}</p>
                 <p class="mt-0.5 text-xs text-brand-moss">{{ __('Supervisor programs including schedule:work daemons.') }}</p>
             </div>
-            <a href="{{ route('servers.daemons', $server) }}" wire:navigate class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Open workers') }}</a>
+            <a href="{{ route('servers.workers', $server) }}" wire:navigate class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Open workers') }}</a>
         </li>
         <li class="flex flex-wrap items-center justify-between gap-3 px-6 py-4 sm:px-7">
             <div>

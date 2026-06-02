@@ -55,7 +55,8 @@
 @endphp
 
 @if (! $functionsHost && $editingPipeline)
-    @vite(['resources/css/deploy-pipeline.css', 'resources/js/deploy-pipeline-dnd.js'])
+    {{-- deployPipelineWorkspace() is registered from the main app.js bundle (before Alpine.start). --}}
+    @vite(['resources/css/deploy-pipeline.css'])
 
     <section
         class="dply-card overflow-hidden"

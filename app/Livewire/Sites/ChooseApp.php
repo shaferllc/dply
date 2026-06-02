@@ -7,6 +7,7 @@ namespace App\Livewire\Sites;
 use App\Enums\SiteType;
 use App\Jobs\ProvisionSiteJob;
 use App\Jobs\RunComposerScaffoldJob;
+use App\Livewire\Concerns\Sites\PicksRepositoryRef;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Deploy\SiteDeployPipelineManager;
@@ -18,6 +19,7 @@ use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
@@ -34,6 +36,8 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class ChooseApp extends Component
 {
+    use PicksRepositoryRef;
+
     public Server $server;
 
     public Site $site;
@@ -46,6 +50,7 @@ class ChooseApp extends Component
     public array $tiles = [];
 
     /** Currently selected tile key (empty until the user picks one). */
+    #[Url(as: 'app', except: '')]
     public string $selected = '';
 
     /** Server-default PHP version, applied to PHP-shaped tiles. */
@@ -68,6 +73,12 @@ class ChooseApp extends Component
     public string $git_repository_url = '';
 
     public string $git_branch = 'main';
+
+    /**
+     * Ref kind tracked for the chosen $git_branch: 'branch', 'tag', or
+     * 'commit'. Null means we treat it as a branch (legacy default).
+     */
+    public ?string $git_ref_kind = null;
 
     public string $scaffold_admin_email = '';
 
@@ -108,6 +119,12 @@ class ChooseApp extends Component
 
         $this->scaffold_admin_email = (string) (auth()->user()?->email ?? '');
 
+        // Drop bogus values supplied by the URL — they would leave the picker
+        // in a "tile selected but config invisible" state.
+        if ($this->selected !== '' && $this->tileFor($this->selected) === null) {
+            $this->selected = '';
+        }
+
         // Pre-load connected git accounts so the repository tile can offer a
         // dropdown instead of forcing a pasted URL. Default to provider mode
         // when the user has at least one linked account.
@@ -143,7 +160,9 @@ class ChooseApp extends Component
     {
         $this->source_control_account_id = $value;
         $this->repository_selection = '';
+        $this->clearRepoRefSelection();
         $this->refreshRepositories(app(SourceControlRepositoryBrowser::class));
+        $this->syncRepoUrlToSite();
     }
 
     public function updatedRepositorySelection(string $value): void
@@ -154,9 +173,81 @@ class ChooseApp extends Component
             }
             $this->git_repository_url = (string) $repository['url'];
             $this->git_branch = (string) ($repository['branch'] ?: 'main');
+            $this->git_ref_kind = 'branch';
+            $this->clearRepoRefSelection();
+            $this->syncRepoUrlToSite();
 
             return;
         }
+    }
+
+    public function updatedGitRepositoryUrl(): void
+    {
+        $this->clearRepoRefSelection();
+        $this->git_ref_kind = null;
+        $this->syncRepoUrlToSite();
+    }
+
+    /**
+     * Persist the in-progress repository URL onto $site so the ref-picker's
+     * SourceControlRepositoryReader can resolve branches/tags/commits before
+     * the site is fully provisioned. Safe because the site is in
+     * STATUS_AWAITING_APP and nothing has been deployed yet.
+     */
+    private function syncRepoUrlToSite(): void
+    {
+        $url = $this->repo_source === 'provider'
+            ? trim($this->repository_selection)
+            : trim($this->git_repository_url);
+        if ($url === '') {
+            return;
+        }
+
+        $accountId = $this->repo_source === 'provider' && $this->source_control_account_id !== ''
+            ? $this->source_control_account_id
+            : null;
+
+        $storedAccountId = (string) ($this->site->repositoryMeta()['git_source_control_account_id'] ?? '');
+        $urlChanged = (string) $this->site->git_repository_url !== $url;
+        $accountChanged = $storedAccountId !== (string) $accountId;
+        if (! $urlChanged && ! $accountChanged) {
+            return;
+        }
+
+        $this->site->git_repository_url = $url;
+        $this->site->mergeRepositoryMeta(['git_source_control_account_id' => $accountId]);
+        $this->site->save();
+    }
+
+    /**
+     * Trait hook: copy the chosen ref into the form fields so the existing
+     * save path (runProvisioned) doesn't need to know about the picker.
+     */
+    public function onRepoRefSelected(): void
+    {
+        $label = (string) ($this->repo_ref_selected_label ?? '');
+        if ($label === '') {
+            return;
+        }
+        $this->git_branch = $label;
+        $this->git_ref_kind = $this->repo_ref_selected_kind;
+    }
+
+    /**
+     * Wrapper for the blade button: ensure the repo URL is on the site, then
+     * delegate to the trait's picker-open action.
+     */
+    public function openRefPicker(): void
+    {
+        $this->syncRepoUrlToSite();
+        if (trim((string) $this->site->git_repository_url) === '') {
+            if (method_exists($this, 'toastError')) {
+                $this->toastError(__('Choose a repository first.'));
+            }
+
+            return;
+        }
+        $this->openRepoRefPicker();
     }
 
     private function refreshRepositories(SourceControlRepositoryBrowser $repositoryBrowser): void
@@ -177,6 +268,9 @@ class ChooseApp extends Component
             $this->repository_selection = (string) $first['url'];
             $this->git_repository_url = (string) $first['url'];
             $this->git_branch = (string) ($first['branch'] ?: 'main');
+            $this->git_ref_kind = 'branch';
+            $this->clearRepoRefSelection();
+            $this->syncRepoUrlToSite();
         }
     }
 
@@ -310,6 +404,15 @@ class ChooseApp extends Component
             $repoUrl = trim($this->git_repository_url);
         }
 
+        $refKind = in_array($this->git_ref_kind, ['branch', 'tag', 'commit'], true)
+            ? $this->git_ref_kind
+            : 'branch';
+
+        $accountId = $this->repo_source === 'provider' && $this->source_control_account_id !== ''
+            ? $this->source_control_account_id
+            : null;
+        $existingRepoMeta = $this->site->repositoryMeta();
+
         $this->site->forceFill([
             'type' => $type,
             'runtime' => $runtime,
@@ -319,15 +422,17 @@ class ChooseApp extends Component
             'git_branch' => trim($this->git_branch) !== '' ? trim($this->git_branch) : 'main',
             'status' => Site::STATUS_PENDING,
             'meta' => $this->mergedMeta([
+                'git_ref_kind' => $refKind,
+                'repository' => array_merge($existingRepoMeta, [
+                    'git_source_control_account_id' => $accountId,
+                ]),
                 'choose_app' => array_merge($this->chooseAppMeta(), [
                     'chosen_kind' => (string) $tile['kind'],
                     'chosen_key' => (string) $tile['key'],
                     'chosen_at' => now()->toISOString(),
                     'skipped' => false,
                     'repo_source' => $this->repo_source,
-                    'source_control_account_id' => $this->repo_source === 'provider'
-                        ? ($this->source_control_account_id ?: null)
-                        : null,
+                    'source_control_account_id' => $accountId,
                 ]),
             ]),
         ])->save();
@@ -380,6 +485,33 @@ class ChooseApp extends Component
 
         $this->site->loadMissing(['server', 'domains']);
         $siteProvisioner->markQueued($this->site);
+
+        // If the server was provisioned without a webserver (legacy
+        // queue_worker hosts), site provisioning would take the headless
+        // fast-path and flip straight to "ready" with no testing hostname —
+        // the operator would land on an empty dashboard. Install caddy
+        // first; that job re-queues ProvisionSiteJob for this site once the
+        // webserver is up, so the site stays in STATUS_PENDING and the
+        // provisioning journey shows real progress.
+        $serverWebserver = (string) ($this->server->meta['webserver'] ?? '');
+        if ($serverWebserver === 'none') {
+            $meta = is_array($this->server->meta) ? $this->server->meta : [];
+            if (! ($meta['webserver_install_pending'] ?? false)) {
+                $meta['webserver_install_pending'] = true;
+                $this->server->forceFill(['meta' => $meta])->save();
+            }
+            $siteProvisioner->appendLog(
+                $this->site,
+                'info',
+                'queued',
+                __('Installing Caddy on the server before this site can be provisioned…'),
+                ['server_id' => (string) $this->server->id],
+            );
+            \App\Jobs\InstallServerWebserverJob::dispatch((string) $this->server->id, 'caddy');
+
+            return;
+        }
+
         ProvisionSiteJob::dispatch($this->site->id);
     }
 

@@ -77,7 +77,7 @@ class CheckSupervisorHealthCommand extends Command
                                         subject: $server,
                                         title: '['.config('app.name').'] Supervisor programs need attention',
                                         body: $issueSummary,
-                                        url: route('servers.daemons', $server, absolute: true),
+                                        url: route('servers.workers', $server, absolute: true),
                                         recipientUsers: $users->pluck('id')->all(),
                                         metadata: [
                                             'server_id' => $server->id,
