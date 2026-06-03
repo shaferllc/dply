@@ -35,6 +35,7 @@ use App\Console\Commands\PruneServerCreateDraftsCommand;
 use App\Console\Commands\PruneServerCronJobRunsCommand;
 use App\Console\Commands\PruneTestingHostnameRecordsCommand;
 use App\Console\Commands\RevokeExpiredServerSshSessionsCommand;
+use App\Console\Commands\RunDueDeploymentSchedulesCommand;
 use App\Console\Commands\RollupEdgeAnalyticsEngineCommand;
 use App\Console\Commands\ServerlessTickCommand;
 use App\Console\Commands\SnapshotOrganizationBillingCommand;
@@ -75,6 +76,11 @@ final class DplySchedule
         $schedule->command(ProcessScheduledSiteDeletionsCommand::class)->everyMinute();
 
         $schedule->command(CloudPollStatusCommand::class)->everyMinute();
+
+        $schedule->command(RunDueDeploymentSchedulesCommand::class)
+            ->everyMinute()
+            ->withoutOverlapping()
+            ->name('run-due-deployment-schedules');
 
         $schedule->command(ServerlessTickCommand::class)
             ->everyMinute()

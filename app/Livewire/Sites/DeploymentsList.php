@@ -12,6 +12,7 @@ use App\Livewire\Concerns\ManagesSiteBindings;
 use App\Livewire\Concerns\OptimizesPipeline;
 use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
 use App\Livewire\Sites\Concerns\ManagesSiteDeployExecution;
+use App\Livewire\Sites\Concerns\ManagesSiteDeploymentSchedules;
 use App\Livewire\Sites\Concerns\ManagesSiteEnvironment;
 use App\Models\Server;
 use App\Models\Site;
@@ -39,6 +40,7 @@ class DeploymentsList extends Component
     use DispatchesToastNotifications;
     use ManagesSiteBindings;
     use ManagesSiteDeployExecution;
+    use ManagesSiteDeploymentSchedules;
     use ManagesSiteEnvironment;
     use OptimizesPipeline;
     use WatchesConsoleActionOutcomes;

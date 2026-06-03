@@ -167,6 +167,7 @@ use App\Livewire\Servers\WorkspaceSshAccessGraphPreview;
 use App\Livewire\Servers\WorkspaceSshKeys;
 use App\Livewire\Servers\WorkspaceSystemUsers;
 use App\Livewire\Servers\WorkspaceWebserver;
+use App\Livewire\Servers\WorkspaceWorkerPool;
 use App\Livewire\Settings\ApiKeys as SettingsApiKeys;
 use App\Livewire\Settings\BackupConfigurations as SettingsBackupConfigurations;
 use App\Livewire\Settings\BulkNotificationAssignments;
@@ -869,6 +870,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/docker-preview', WorkspaceDockerPreview::class)->name('servers.docker-preview');
     Route::livewire('servers/{server}/cron', WorkspaceCron::class)->name('servers.cron');
     Route::livewire('servers/{server}/workers', WorkspaceDaemons::class)->name('servers.workers');
+    Route::livewire('servers/{server}/worker-pool', WorkspaceWorkerPool::class)->name('servers.worker-pool');
     Route::get('servers/{server}/queue-workers', function (Server $server) {
         return redirect()->route('servers.workers', array_merge(['server' => $server], request()->query()));
     })->name('servers.queue-workers');

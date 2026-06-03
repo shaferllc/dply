@@ -335,6 +335,8 @@
             </div>
         </dl>
 
+        @include('livewire.sites.partials.deployments._schedule-panel')
+
         <div class="px-6 py-6 sm:px-8">
             {{-- While a deploy request is in flight, clear the previous run's
                  timeline right away and show a starting placeholder. The deploy

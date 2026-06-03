@@ -655,6 +655,11 @@ class Site extends Model
         return $this->hasMany(SiteDeployPipeline::class)->orderBy('sort_order')->orderBy('name');
     }
 
+    public function deploymentSchedules(): HasMany
+    {
+        return $this->hasMany(SiteDeploymentSchedule::class)->orderBy('created_at');
+    }
+
     public function activeDeployPipeline(): BelongsTo
     {
         return $this->belongsTo(SiteDeployPipeline::class, 'active_deploy_pipeline_id');

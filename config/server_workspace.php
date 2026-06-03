@@ -69,6 +69,7 @@ return [
         ['key' => 'cron', 'route' => 'servers.cron', 'icon' => 'clock', 'label' => 'Cron jobs', 'group' => 'background', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'schedule', 'route' => 'servers.schedule', 'icon' => 'calendar-days', 'label' => 'Schedule', 'group' => 'background', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.schedule'],
         ['key' => 'daemons', 'route' => 'servers.workers', 'icon' => 'server-stack', 'label' => 'Workers', 'group' => 'background', 'except_host_kinds' => ['kubernetes']],
+        ['key' => 'worker-pool', 'route' => 'servers.worker-pool', 'icon' => 'square-3-stack-3d', 'label' => 'Worker Pool', 'group' => 'background', 'except_host_kinds' => ['kubernetes'], 'only_server_roles' => ['worker']],
         ['key' => 'backups', 'route' => 'servers.backups', 'preview_route' => 'servers.backups', 'icon' => 'archive-box', 'label' => 'Backups', 'group' => 'background', 'requires_any_tags' => ['mysql', 'postgres'], 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.backups', 'preview_feature' => 'workspace.backups_preview'],
         ['key' => 'redis-snapshots', 'route' => 'servers.redis-snapshots', 'icon' => 'archive-box', 'label' => 'Snapshots', 'group' => 'background', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'firewall', 'route' => 'servers.firewall', 'icon' => 'shield-check', 'label' => 'Firewall', 'group' => 'access', 'except_host_kinds' => ['kubernetes']],
@@ -149,9 +150,10 @@ return [
             // (the deployed code) and daemons (the workers) next to Overview;
             // hide the stack tabs that don't apply (databases, caches,
             // webserver, backups, snapshots, load balancers).
-            'keys' => ['overview', 'sites', 'daemons', 'schedule', 'cron', 'console', 'php', 'health', 'monitor', 'activity', 'logs', 'firewall', 'networking', 'ssh', 'files', 'manage', 'settings'],
+            'keys' => ['overview', 'sites', 'worker-pool', 'daemons', 'schedule', 'cron', 'console', 'php', 'health', 'monitor', 'activity', 'logs', 'firewall', 'networking', 'ssh', 'files', 'manage', 'settings'],
             'overrides' => [
                 'daemons' => ['label' => 'Workers', 'group' => 'overview'],
+                'worker-pool' => ['group' => 'overview'],
                 'schedule' => ['group' => 'background'],
                 'cron' => ['group' => 'background'],
                 'logs' => ['group' => 'monitor'],

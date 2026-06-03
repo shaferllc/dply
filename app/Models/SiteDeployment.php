@@ -21,6 +21,8 @@ class SiteDeployment extends Model
 
     public const TRIGGER_SYNC_PEER = 'sync_peer';
 
+    public const TRIGGER_SCHEDULE = 'schedule';
+
     public const STATUS_RUNNING = 'running';
 
     public const STATUS_SUCCESS = 'success';

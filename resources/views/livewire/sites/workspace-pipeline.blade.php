@@ -75,6 +75,7 @@
             discardAction="discardPipelineWorkspaceUnsaved"
             :targets="$pipelineUnsavedTargets ?? null"
             form-pending-wire="pipeline_form_edits_pending"
+            :client-dirty="true"
             :saveLabel="__('Save pipeline')"
         />
     @endunless

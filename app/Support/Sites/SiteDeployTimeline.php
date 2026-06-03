@@ -55,7 +55,11 @@ final class SiteDeployTimeline
         // running and a phase hasn't recorded yet, so the whole pipeline shows.
         $previewing = $latest === null || ! $finished;
 
-        $configuredByPhase = $site->deploySteps()->get()->groupBy(static fn ($s): string => (string) $s->phase);
+        // Use the cached relation property (not ->get()) so repeated reads in the
+        // same request — e.g. this timeline plus SitePipelineAdvisor on the same
+        // $site instance — share one query instead of each hitting the DB.
+        $site->loadMissing('deploySteps');
+        $configuredByPhase = $site->deploySteps->groupBy(static fn ($s): string => (string) $s->phase);
         $hooksByPhase = self::hooksByPhase($site);
 
         // Show EVERY canonical phase with its status — clone → build → activate
@@ -141,7 +145,8 @@ final class SiteDeployTimeline
         $map = collect(array_fill_keys(array_keys(self::PHASES), null))
             ->map(static fn () => collect());
 
-        foreach ($site->deployHooks()->with('anchorStep')->get() as $hook) {
+        $site->loadMissing('deployHooks.anchorStep');
+        foreach ($site->deployHooks as $hook) {
             $phase = match ($hook->anchor) {
                 SiteDeployHook::ANCHOR_BEFORE_CLONE, SiteDeployHook::ANCHOR_AFTER_CLONE => 'clone',
                 SiteDeployHook::ANCHOR_BEFORE_ACTIVATE, SiteDeployHook::ANCHOR_AFTER_ACTIVATE => 'activate',

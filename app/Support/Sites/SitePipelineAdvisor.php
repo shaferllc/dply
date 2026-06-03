@@ -37,7 +37,10 @@ final class SitePipelineAdvisor
             return [];
         }
 
-        $steps = $site->deploySteps()->get();
+        // Cached relation property so this shares the steps query with the deploy
+        // timeline when both run against the same $site instance in one request.
+        $site->loadMissing('deploySteps');
+        $steps = $site->deploySteps;
         $types = $steps->pluck('step_type')->map(static fn ($t): string => (string) $t)->all();
         $customCommands = $steps
             ->where('step_type', SiteDeployStep::TYPE_CUSTOM)

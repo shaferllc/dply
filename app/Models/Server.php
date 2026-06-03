@@ -78,6 +78,8 @@ class Server extends Model
         'organization_id',
         'workspace_id',
         'team_id',
+        'worker_pool_id',
+        'pool_role',
         'provider_credential_id',
         'name',
         'provider',
@@ -161,6 +163,29 @@ class Server extends Model
         $meta = is_array($this->meta) ? $this->meta : [];
 
         return ($meta['server_role'] ?? null) === 'worker';
+    }
+
+    /**
+     * The worker pool this server belongs to (clones + their source), if any.
+     * See {@see \App\Models\WorkerPool}.
+     */
+    public function workerPool(): BelongsTo
+    {
+        return $this->belongsTo(WorkerPool::class);
+    }
+
+    /** True when this server is the pool's single primary (scheduler owner). */
+    public function isPoolPrimary(): bool
+    {
+        return $this->pool_role === WorkerPool::ROLE_PRIMARY;
+    }
+
+    /** Per-member reconciler sub-state (servers.meta['pool']['state']). */
+    public function poolMemberState(): ?string
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+
+        return $meta['pool']['state'] ?? null;
     }
 
     public function providerCredential(): BelongsTo

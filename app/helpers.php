@@ -172,6 +172,15 @@ if (! function_exists('server_workspace_nav_for_server')) {
                 continue;
             }
 
+            // Role allow-list at the item level: a row tagged `only_server_roles`
+            // appears solely on servers whose server_role matches (e.g. the
+            // Worker Pool page only on worker hosts). Generic app servers (no
+            // role_nav_keys entry) still honour this and hide the row.
+            $onlyServerRoles = $item['only_server_roles'] ?? null;
+            if (is_array($onlyServerRoles) && $onlyServerRoles !== [] && ! in_array($serverRole, $onlyServerRoles, true)) {
+                continue;
+            }
+
             $feature = $item['feature'] ?? null;
             $previewFeature = $item['preview_feature'] ?? null;
             $featureActive = is_string($feature) && $feature !== '' && Feature::active($feature);
