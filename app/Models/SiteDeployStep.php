@@ -205,7 +205,19 @@ class SiteDeployStep extends Model
             self::TYPE_ARTISAN_STORAGE_LINK => 'php artisan storage:link',
             self::TYPE_ARTISAN_EVENT_CACHE => 'php artisan event:cache',
             self::TYPE_ARTISAN_QUEUE_RESTART => 'php artisan queue:restart',
-            self::TYPE_ARTISAN_HORIZON_TERMINATE => 'php artisan horizon:terminate',
+            // Terminate gracefully, then VERIFY the process supervisor brought
+            // Horizon back. `horizon:terminate` exits 0 (a clean exit), so a unit
+            // with Restart=on-failure would silently leave Horizon dead after the
+            // deploy. We only check when Horizon was running beforehand (skips a
+            // false alarm on first deploy) and only WARN — never fail the deploy.
+            self::TYPE_ARTISAN_HORIZON_TERMINATE => 'BEFORE=$(pgrep -fc "artisan horizon" 2>/dev/null || echo 0); '
+                .'php artisan horizon:terminate; '
+                .'if [ "$BEFORE" -gt 0 ] 2>/dev/null; then '
+                .'for _i in 1 2 3 4 5 6 7 8; do sleep 1; pgrep -f "artisan horizon" >/dev/null 2>&1 && break; done; '
+                .'pgrep -f "artisan horizon" >/dev/null 2>&1 '
+                .'&& echo "[dply] Horizon is running after terminate." '
+                .'|| echo "[dply] WARNING: Horizon did not restart after horizon:terminate — verify its systemd unit is enabled with Restart=always."; '
+                .'else echo "[dply] Horizon was not running before terminate; skipping restart check."; fi',
             self::TYPE_ARTISAN_DB_SEED => 'php artisan db:seed --force',
             self::TYPE_ARTISAN_CACHE_CLEAR => 'php artisan cache:clear',
             self::TYPE_CUSTOM => trim((string) $this->custom_command) !== ''

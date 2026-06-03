@@ -510,6 +510,8 @@
         @php
             $hz = is_array($pool->meta['horizon'] ?? null) ? $pool->meta['horizon'] : [];
             $hzAt = ! empty($hz['collected_at']) ? \Illuminate\Support\Carbon::parse($hz['collected_at']) : null;
+            $hzAttemptAt = ! empty($hz['last_attempt_at']) ? \Illuminate\Support\Carbon::parse($hz['last_attempt_at']) : null;
+            $hzError = $hz['error'] ?? null;
             $hzStatus = $hz['status'] ?? null;
         @endphp
         <div wire:poll.8s class="mt-6 space-y-6">
@@ -532,6 +534,14 @@
                     </div>
                     <div class="flex flex-col items-end gap-2 text-right text-xs text-brand-moss">
                         <span>{{ $hzAt ? __('collected :ago', ['ago' => $hzAt->diffForHumans()]) : __('no data yet') }}</span>
+                        @if ($hzError)
+                            <span class="inline-flex max-w-xs items-center gap-1 text-right font-medium text-rose-600" title="{{ $hzError }}">
+                                <x-heroicon-o-exclamation-triangle class="h-3.5 w-3.5 shrink-0" />
+                                {{ __('last refresh failed :ago', ['ago' => $hzAttemptAt?->diffForHumans() ?? __('just now')]) }}
+                            </span>
+                        @elseif ($hzAttemptAt && (! $hzAt || $hzAttemptAt->gt($hzAt)))
+                            <span class="text-amber-700">{{ __('refresh ran :ago — no change', ['ago' => $hzAttemptAt->diffForHumans()]) }}</span>
+                        @endif
                         <div class="flex flex-wrap items-center justify-end gap-2">
                             <div class="inline-flex overflow-hidden rounded-lg border border-brand-ink/15" title="{{ __('Control Horizon on every member.') }}">
                                 <button type="button" wire:click="controlPoolHorizon('horizon:pause')" class="px-2.5 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Pause') }}</button>
@@ -593,15 +603,38 @@
                                 <th class="px-3 py-2">{{ __('Length') }}</th>
                                 <th class="px-3 py-2">{{ __('Wait') }}</th>
                                 <th class="px-3 py-2">{{ __('Processes') }}</th>
+                                <th class="px-3 py-2">{{ __('Throughput (jobs/min)') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-brand-ink/5">
                             @foreach ($hz['workload'] as $w)
+                                @php
+                                    $series = $hz['queue_throughput'][$w['name'] ?? ''] ?? [];
+                                    $series = collect($series)->filter(fn ($v) => is_numeric($v))->map(fn ($v) => (float) $v)->values()->all();
+                                    $spMax = $series ? max(max($series), 0.0001) : 0;
+                                    $spN = count($series);
+                                    $spPoints = $spN > 1
+                                        ? collect($series)->map(fn ($v, $i) => round($i / ($spN - 1) * 100, 1).','.round(18 - ($v / $spMax) * 16, 1))->implode(' ')
+                                        : '';
+                                    $spLast = $spN ? $series[$spN - 1] : null;
+                                @endphp
                                 <tr>
                                     <td class="px-6 py-2 font-mono text-brand-ink sm:px-7">{{ $w['name'] ?? '?' }}</td>
                                     <td class="px-3 py-2 text-brand-moss">{{ $w['length'] ?? '—' }}</td>
                                     <td class="px-3 py-2 text-brand-moss">{{ isset($w['wait']) ? $w['wait'].'s' : '—' }}</td>
                                     <td class="px-3 py-2 text-brand-moss">{{ $w['processes'] ?? '—' }}</td>
+                                    <td class="px-3 py-2">
+                                        @if ($spPoints !== '')
+                                            <span class="inline-flex items-center gap-2">
+                                                <svg viewBox="0 0 100 20" preserveAspectRatio="none" class="h-5 w-24 text-brand-forest">
+                                                    <polyline points="{{ $spPoints }}" fill="none" stroke="currentColor" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+                                                </svg>
+                                                <span class="font-mono text-xs text-brand-moss">{{ $spLast !== null ? rtrim(rtrim(number_format((float) $spLast, 1), '0'), '.') : '' }}</span>
+                                            </span>
+                                        @else
+                                            <span class="text-brand-mist">—</span>
+                                        @endif
+                                    </td>
                                 </tr>
                             @endforeach
                         </tbody>

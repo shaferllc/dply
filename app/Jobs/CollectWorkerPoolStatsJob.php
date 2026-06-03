@@ -76,43 +76,52 @@ class CollectWorkerPoolStatsJob implements ShouldQueue
      */
     private function probe(ExecuteRemoteTaskOnServer $exec, Server $member, string $siteDir): array
     {
-        // KEY=VALUE lines, every value failure-tolerant. Redis/queue are read
-        // from the APP's own .env (the backend is usually a REMOTE redis), not
-        // localhost. Uses if/then/fi rather than `[ ] && cmd` so a missing file
-        // never trips `set -e` and aborts the whole probe.
-        $probe = <<<'BASH'
-echo "LOAD=$(cut -d' ' -f1-3 /proc/loadavg 2>/dev/null || true)"
-echo "CPUS=$(nproc 2>/dev/null || true)"
-echo "MEM=$(free -m 2>/dev/null | awk '/^Mem:/{print $3"/"$2}' || true)"
-echo "DISK=$(df -h / 2>/dev/null | awk 'NR==2{print $3"/"$2" "$5}' || true)"
-echo "UPTIME=$(uptime -p 2>/dev/null | sed 's/^up //' || true)"
-echo "HORIZON_PROCS=$(pgrep -fc 'artisan horizon' 2>/dev/null || echo 0)"
-echo "QUEUE_PROCS=$(pgrep -fc 'artisan queue:work' 2>/dev/null || echo 0)"
-echo "SYSTEMD_WORKERS=$(systemctl list-units 'dply-site-*.service' --no-legend --state=running 2>/dev/null | wc -l | tr -d ' ' || echo 0)"
-echo "SV_RUNNING=$( (sudo -n supervisorctl status 2>/dev/null || supervisorctl status 2>/dev/null || true) | grep -c RUNNING || true)"
-RH=127.0.0.1; RP=6379; RA=""
-if [ -n "$DIR" ] && [ -d "$DIR" ]; then
-  cd "$DIR" 2>/dev/null || true
-  echo "QUEUE_SIZE=$(php artisan queue:size 2>/dev/null | grep -oE '[0-9]+' | tail -n1 || true)"
+        // Host metrics + worker-process detection come from bash. Redis + queue
+        // come from the APP ITSELF (Redis::connection()->info() / Queue::size())
+        // — not redis-cli — so the exact host/port/password/TLS the app uses is
+        // honoured. redis-cli is often absent (the app uses phpredis) or can't
+        // reach/auth a private/TLS redis, which is why it showed "down".
+        $redisPhp = <<<'PHP'
+$T = function ($cb, $d = '') { try { return $cb(); } catch (\Throwable $e) { return $d; } };
+$r = $T(fn () => \Illuminate\Support\Facades\Redis::connection(), null);
+echo "\nREDIS_PING=".$T(function () use ($r) { if (! $r) { return 'down'; } $r->ping(); return 'PONG'; }, 'down');
+$info = $T(fn () => $r ? $r->info() : [], []);
+$flat = [];
+if (is_array($info)) { array_walk_recursive($info, function ($v, $k) use (&$flat) { $flat[$k] = $v; }); }
+echo "\nREDIS_MEM=".($flat['used_memory_human'] ?? '');
+echo "\nREDIS_PEAK=".($flat['used_memory_peak_human'] ?? '');
+echo "\nREDIS_CLIENTS=".($flat['connected_clients'] ?? '');
+echo "\nREDIS_OPS=".($flat['instantaneous_ops_per_sec'] ?? '');
+echo "\nREDIS_TOTAL_CMDS=".($flat['total_commands_processed'] ?? '');
+echo "\nREDIS_UPTIME=".($flat['uptime_in_seconds'] ?? '');
+echo "\nREDIS_KEYS=".$T(fn () => (string) ($r ? $r->dbSize() : ''), '');
+echo "\nQUEUE_SIZE=".$T(fn () => (string) \Illuminate\Support\Facades\Queue::size(), '');
+echo "\n";
+PHP;
+        $redisB64 = base64_encode($redisPhp);
+
+        $probe = <<<BASH
+echo "LOAD=\$(cut -d' ' -f1-3 /proc/loadavg 2>/dev/null || true)"
+echo "CPUS=\$(nproc 2>/dev/null || true)"
+echo "MEM=\$(free -m 2>/dev/null | awk '/^Mem:/{print \$3"/"\$2}' || true)"
+echo "DISK=\$(df -h / 2>/dev/null | awk 'NR==2{print \$3"/"\$2" "\$5}' || true)"
+echo "UPTIME=\$(uptime -p 2>/dev/null | sed 's/^up //' || true)"
+echo "HORIZON_PROCS=\$(pgrep -fc 'artisan horizon' 2>/dev/null || echo 0)"
+echo "QUEUE_PROCS=\$(pgrep -fc 'artisan queue:work' 2>/dev/null || echo 0)"
+echo "SYSTEMD_WORKERS=\$(systemctl list-units 'dply-site-*.service' --no-legend --state=running 2>/dev/null | wc -l | tr -d ' ' || echo 0)"
+echo "SV_RUNNING=\$( (sudo -n supervisorctl status 2>/dev/null || supervisorctl status 2>/dev/null || true) | grep -c RUNNING || true)"
+RH=127.0.0.1; RP=6379
+if [ -n "\$DIR" ] && [ -d "\$DIR" ]; then
+  cd "\$DIR" 2>/dev/null || true
   if [ -f .env ]; then
-    RH=$(sed -n 's/^REDIS_HOST=//p' .env | head -n1 | tr -d "\"' \r")
-    RP=$(sed -n 's/^REDIS_PORT=//p' .env | head -n1 | tr -d "\"' \r")
-    RA=$(sed -n 's/^REDIS_PASSWORD=//p' .env | head -n1 | tr -d "\"' \r")
+    RH=\$(sed -n 's/^REDIS_HOST=//p' .env | head -n1 | tr -d "\\"' \\r")
+    RP=\$(sed -n 's/^REDIS_PORT=//p' .env | head -n1 | tr -d "\\"' \\r")
   fi
-  if [ -z "$RH" ]; then RH=127.0.0.1; fi
-  if [ -z "$RP" ]; then RP=6379; fi
+  echo "REDIS_HOST=\${RH:-127.0.0.1}:\${RP:-6379}"
+  printf '%s' {$redisB64} | base64 -d | php artisan tinker 2>/dev/null || echo "REDIS_PING=down"
+else
+  echo "REDIS_HOST=:"
 fi
-RC="redis-cli -h $RH -p $RP"
-if [ -n "$RA" ]; then RC="$RC -a $RA"; fi
-echo "REDIS_HOST=$RH:$RP"
-echo "REDIS_PING=$($RC ping 2>/dev/null || echo down)"
-echo "REDIS_MEM=$($RC info memory 2>/dev/null | awk -F: '/used_memory_human/{print $2}' | tr -d '\r' || true)"
-echo "REDIS_PEAK=$($RC info memory 2>/dev/null | awk -F: '/used_memory_peak_human/{print $2}' | tr -d '\r' || true)"
-echo "REDIS_CLIENTS=$($RC info clients 2>/dev/null | awk -F: '/connected_clients/{print $2}' | tr -d '\r' || true)"
-echo "REDIS_OPS=$($RC info stats 2>/dev/null | awk -F: '/instantaneous_ops_per_sec/{print $2}' | tr -d '\r' || true)"
-echo "REDIS_TOTAL_CMDS=$($RC info stats 2>/dev/null | awk -F: '/total_commands_processed/{print $2}' | tr -d '\r' || true)"
-echo "REDIS_KEYS=$($RC info keyspace 2>/dev/null | awk -F'[:,=]' '/^db/{s+=$3} END{print s+0}' || true)"
-echo "REDIS_UPTIME=$($RC info server 2>/dev/null | awk -F: '/uptime_in_seconds/{print $2}' | tr -d '\r' || true)"
 BASH;
 
         $bash = 'DIR='.escapeshellarg($siteDir)."\n".$probe;

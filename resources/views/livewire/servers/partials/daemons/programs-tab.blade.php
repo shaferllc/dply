@@ -12,6 +12,33 @@
     $programsFiltered = $filteredSupervisorPrograms->count();
 @endphp
 
+{{-- systemd-managed workers live elsewhere (SiteProcess → dply-site-*.service)
+     and never appear in the Supervisor list — surface them so "where's my
+     Horizon worker?" answers itself and nobody double-creates one here. --}}
+@if (isset($systemdWorkers) && $systemdWorkers->isNotEmpty())
+    <section class="dply-card mb-5 overflow-hidden border border-sky-200">
+        <div class="flex flex-wrap items-start justify-between gap-3 border-b border-sky-200 bg-sky-50 px-6 py-4 sm:px-7">
+            <div class="min-w-0">
+                <h3 class="text-sm font-semibold text-sky-900">{{ __(':n worker(s) run via systemd — not Supervisor', ['n' => $systemdWorkers->count()]) }}</h3>
+                <p class="mt-1 max-w-3xl text-sm text-sky-800">{{ __('These run as systemd units (dply’s native worker mechanism), so they don’t show in the Supervisor program list below. Manage them where they were created — adding a Supervisor program here would create a SECOND, parallel worker.') }}</p>
+            </div>
+            @if (! empty($serverIsWorkerHost))
+                <a href="{{ route('servers.worker-pool', $server) }}" wire:navigate class="shrink-0 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-sky-700">{{ __('Open Worker Pool') }}</a>
+            @endif
+        </div>
+        <div class="divide-y divide-sky-100">
+            @foreach ($systemdWorkers as $w)
+                <div class="flex flex-wrap items-center gap-2 px-6 py-2.5 text-sm sm:px-7">
+                    <span class="font-semibold text-brand-ink">{{ $w['name'] }}</span>
+                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-[11px] uppercase tracking-wide text-brand-moss">{{ $w['type'] }}</span>
+                    <span class="text-xs text-brand-moss">{{ $w['site_name'] }}</span>
+                    <code class="ml-auto truncate font-mono text-[11px] text-brand-moss" title="{{ $w['command'] }}">{{ $w['command'] }}</code>
+                </div>
+            @endforeach
+        </div>
+    </section>
+@endif
+
 {{-- Programs list card. Header carries the primary actions (Sync, Restart all,
      Add program) and a count chip; rows below. --}}
 <section class="dply-card overflow-hidden">

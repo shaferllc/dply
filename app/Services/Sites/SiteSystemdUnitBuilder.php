@@ -137,7 +137,12 @@ Wants=network-online.target
 Type=simple
 {$userLine}WorkingDirectory={$workingDirectory}
 {$portLine}ExecStart={$execStart}
-Restart=on-failure
+# `always`, not `on-failure`: these are long-running daemons (Horizon, queue
+# workers, web server). A deploy runs `horizon:terminate`, which exits 0 — a
+# clean exit that `on-failure` would NOT restart, leaving the daemon dead after
+# every deploy. `always` brings it back; an explicit `systemctl stop` still
+# stops it (stop is not a restart trigger). RestartSec throttles crash loops.
+Restart=always
 RestartSec=5s
 KillMode=mixed
 TimeoutStopSec=20

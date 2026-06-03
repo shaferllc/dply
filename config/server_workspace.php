@@ -149,8 +149,10 @@ return [
             // code (PHP installed, no webserver/cache/database). Surface Sites
             // (the deployed code) and daemons (the workers) next to Overview;
             // hide the stack tabs that don't apply (databases, caches,
-            // webserver, backups, snapshots, load balancers).
-            'keys' => ['overview', 'sites', 'worker-pool', 'daemons', 'schedule', 'cron', 'console', 'php', 'health', 'monitor', 'activity', 'logs', 'firewall', 'networking', 'ssh', 'files', 'manage', 'settings'],
+            // webserver, backups, snapshots, load balancers). `services` is
+            // included so the systemd inventory (incl. the per-site Horizon
+            // unit + queue workers) is reachable on worker hosts.
+            'keys' => ['overview', 'sites', 'worker-pool', 'daemons', 'services', 'schedule', 'cron', 'console', 'php', 'health', 'monitor', 'activity', 'logs', 'firewall', 'networking', 'ssh', 'files', 'manage', 'settings'],
             'overrides' => [
                 'daemons' => ['label' => 'Workers', 'group' => 'overview'],
                 'worker-pool' => ['group' => 'overview'],

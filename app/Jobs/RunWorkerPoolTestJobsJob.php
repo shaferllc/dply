@@ -118,6 +118,13 @@ class RunWorkerPoolTestJobsJob implements ShouldQueue
     private function script(string $dir, string $marker, int $n): string
     {
         $dirArg = escapeshellarg($dir);
+        // Each processed closure appends a line to this file, so success is
+        // confirmed by counting lines — NOT by grepping the app log. The app's
+        // log channel may be `stack`/external with nothing in storage/logs, in
+        // which case a log grep is a guaranteed false negative even when every
+        // job ran. storage/app is always present and writable by the deploy user.
+        $doneFile = rtrim($dir, '/').'/storage/app/dply-test-'.$marker.'.done';
+        $doneArg = escapeshellarg($doneFile);
 
         // Dispatch the closures from a REAL bootstrapped PHP file (not tinker).
         // A closure defined in eval'd/tinker code has no source file, so
@@ -128,20 +135,26 @@ class RunWorkerPoolTestJobsJob implements ShouldQueue
 require __DIR__.'/vendor/autoload.php';
 $app = require __DIR__.'/bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$doneFile = '__DONEFILE__';
 for ($i = 1; $i <= __N__; $i++) {
-    dispatch(function () use ($i) { \Illuminate\Support\Facades\Log::info('__MARKER__ #'.$i); });
+    dispatch(function () use ($i, $doneFile) {
+        @file_put_contents($doneFile, $i.PHP_EOL, FILE_APPEND | LOCK_EX);
+        \Illuminate\Support\Facades\Log::info('__MARKER__ #'.$i);
+    });
 }
 fwrite(STDOUT, "dispatched __N__\n");
 PHP;
-        $php = str_replace(['__N__', '__MARKER__'], [(string) $n, $marker], $phpTemplate);
+        $php = str_replace(['__N__', '__MARKER__', '__DONEFILE__'], [(string) $n, $marker, $doneFile], $phpTemplate);
         $b64Arg = escapeshellarg(base64_encode($php));
 
         return <<<BASH
 DIR={$dirArg}
 MARKER={$marker}
 N={$n}
+DONEFILE={$doneArg}
 cd "\$DIR" 2>/dev/null || { echo "no app dir: \$DIR"; exit 0; }
 TESTFILE="dply-test-\$MARKER.php"
+rm -f "\$DONEFILE"
 BEFORE=\$(php artisan queue:size 2>/dev/null | grep -oE '[0-9]+' | tail -n1 || echo "?")
 echo "queue size before: \$BEFORE"
 printf '%s' {$b64Arg} | base64 -d > "\$TESTFILE"
@@ -149,11 +162,13 @@ php "\$TESTFILE" 2>&1 | tail -n5 || echo "dispatch step reported an error"
 rm -f "\$TESTFILE"
 echo "dispatched \$N closure job(s) — marker \$MARKER"
 echo "waiting for workers to process…"
-sleep 7
-RAN=\$(grep -c "\$MARKER" storage/logs/laravel.log 2>/dev/null || echo 0)
+sleep 8
+RAN=\$(wc -l < "\$DONEFILE" 2>/dev/null | tr -d ' ')
+RAN=\${RAN:-0}
+rm -f "\$DONEFILE"
 AFTER=\$(php artisan queue:size 2>/dev/null | grep -oE '[0-9]+' | tail -n1 || echo "?")
 echo "queue size after: \$AFTER"
-echo "processed (log markers found): \$RAN / \$N"
+echo "processed (confirmed by workers): \$RAN / \$N"
 if [ "\$RAN" -ge "\$N" ] 2>/dev/null; then echo "RESULT: OK — workers processed the test jobs"; else echo "RESULT: not all jobs processed yet — worker down/slow, or a different worker grabbed them (see note on shared queue)"; fi
 BASH;
     }

@@ -47,30 +47,59 @@ class CollectWorkerPoolHorizonSnapshotJob implements ShouldQueue
         }
         $primary = $pool->primaryServer ?? $pool->sourceServer;
         if (! $primary instanceof Server) {
+            $this->recordError($pool, 'No primary/source server on the pool to pull Horizon from.');
+
             return;
         }
         $site = $this->appSite($primary);
         if (! $site instanceof Site) {
+            $this->recordError($pool, 'No app site on '.($primary->name ?? 'the primary').' to read Horizon from.');
+
             return;
         }
         $dir = rtrim($site->effectiveEnvDirectory(), '/');
 
         try {
             $out = $exec->runInlineBash($primary, 'worker-pool:horizon-snapshot', $this->script($dir), timeoutSeconds: 60, asRoot: false);
-            $snapshot = $this->extract((string) $out->buffer);
+            $buffer = (string) $out->buffer;
+            $snapshot = $this->extract($buffer);
         } catch (\Throwable $e) {
             Log::info('worker-pool: horizon snapshot failed', ['pool_id' => $pool->id, 'error' => $e->getMessage()]);
+            $this->recordError($pool, 'SSH/exec failed: '.$e->getMessage());
 
             return;
         }
 
         if ($snapshot === null) {
+            // Surface a trimmed tail of the box output so a broken tinker run or
+            // wrong app dir is debuggable from the UI instead of failing blank.
+            $tail = trim(mb_substr($buffer, -300));
+            $this->recordError($pool, 'No snapshot returned from the box (tinker/app-dir issue). Output tail: '.($tail !== '' ? $tail : '(empty)'));
+
             return;
         }
 
-        $snapshot['collected_at'] = now()->toIso8601String();
+        $now = now()->toIso8601String();
+        $snapshot['collected_at'] = $now;
+        $snapshot['last_attempt_at'] = $now;
         $meta = is_array($pool->meta) ? $pool->meta : [];
         $meta['horizon'] = $snapshot;
+        $pool->forceFill(['meta' => $meta])->save();
+    }
+
+    /**
+     * Record a failed snapshot attempt onto the pool meta WITHOUT clobbering the
+     * last good snapshot, so the UI can show "last refresh failed: <why>" and the
+     * attempt timestamp advances even when the pull fails — making a frozen
+     * `collected_at` distinguishable from a refresh that simply errored.
+     */
+    private function recordError(WorkerPool $pool, string $message): void
+    {
+        $meta = is_array($pool->meta) ? $pool->meta : [];
+        $hz = is_array($meta['horizon'] ?? null) ? $meta['horizon'] : [];
+        $hz['last_attempt_at'] = now()->toIso8601String();
+        $hz['error'] = mb_substr($message, 0, 600);
+        $meta['horizon'] = $hz;
         $pool->forceFill(['meta' => $meta])->save();
     }
 
@@ -122,6 +151,8 @@ $out['jobs_per_minute'] = $T(fn () => $mr->jobsProcessedPerMinute(), null);
 // null (every queue name → '?', every metric → '—').
 $g = fn ($o, $k, $d = null) => is_array($o) ? ($o[$k] ?? $d) : ($o->$k ?? $d);
 $out['workload'] = $T(fn () => collect($wr->get())->map(fn ($w) => ['name' => $g($w, 'name', '?'), 'length' => $g($w, 'length'), 'wait' => $g($w, 'wait'), 'processes' => $g($w, 'processes')])->values()->all(), []);
+// Per-queue throughput time series (Horizon MetricsRepository) for sparklines.
+$out['queue_throughput'] = $T(fn () => collect($mr->measuredQueues())->mapWithKeys(fn ($q) => [(string) $q => collect($mr->snapshotsForQueue($q))->map(fn ($s) => round((float) $g($s, 'throughput', 0), 2))->values()->all()])->all(), []);
 $jobRow = fn ($j) => ['name' => $g($j, 'name') ?: 'job', 'queue' => $g($j, 'queue', '?'), 'status' => $g($j, 'status', '?'), 'at' => $g($j, 'reserved_at', $g($j, 'completed_at'))];
 $out['pending_jobs'] = $T(fn () => collect($jr->getPending())->take(25)->map($jobRow)->values()->all(), []);
 $out['recent_jobs'] = $T(fn () => collect($jr->getRecent())->take(25)->map($jobRow)->values()->all(), []);

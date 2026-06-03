@@ -883,9 +883,29 @@ class WorkspaceDaemons extends Component
             'total_processes' => (int) $filteredSupervisorPrograms->where('is_active', true)->sum('numprocs'),
         ];
 
+        // Workers managed by systemd (SiteProcess → dply-site-*.service), NOT by
+        // Supervisor — these never show in the program list above, which is the
+        // #1 "where's my Horizon worker?" confusion. Surface them read-only so
+        // operators know they exist and where to manage them.
+        $systemdWorkers = Site::query()
+            ->where('server_id', $this->server->id)
+            ->with(['processes' => fn ($q) => $q->where('is_active', true)->where('type', '!=', \App\Models\SiteProcess::TYPE_WEB)])
+            ->orderBy('name')
+            ->get(['id', 'name', 'slug', 'server_id'])
+            ->flatMap(fn (Site $site) => $site->processes->map(fn ($p) => [
+                'site_id' => (string) $site->id,
+                'site_name' => $site->name,
+                'name' => $p->name,
+                'type' => $p->type,
+                'command' => (string) $p->command,
+            ]))
+            ->values();
+
         return view('livewire.servers.workspace-daemons', array_merge(
             DaemonWorkspaceViewData::for($this->server, $this),
             [
+                'systemdWorkers' => $systemdWorkers,
+                'serverIsWorkerHost' => $this->server->isWorkerHost(),
                 'deletionSummary' => $this->showRemoveServerModal
                     ? ServerRemovalAdvisor::summary($this->server)
                     : null,
