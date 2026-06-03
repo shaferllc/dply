@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\EdgeEnvController;
 use App\Http\Controllers\Api\ImportMigrationController;
 use App\Http\Controllers\Api\InsightsController;
 use App\Http\Controllers\Api\MetricsController;
+use App\Http\Controllers\Api\OperatorReadmeController;
 use App\Http\Controllers\Api\OperatorSummaryController;
 use App\Http\Controllers\Api\ProjectApiController;
 use App\Http\Controllers\Api\ServerController;

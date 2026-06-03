@@ -161,11 +161,29 @@
                                             </span>
                                             @if ($durTxt)<span class="font-mono text-[11px] text-brand-mist">{{ $durTxt }}</span>@endif
                                         </div>
-                                        @foreach ($phase['steps'] as $step)
-                                            @if (! $step['ok'] && ! $step['skipped'] && ($step['output'] ?? '') !== '')
-                                                <pre class="mt-1.5 max-h-40 overflow-auto rounded-lg bg-brand-ink p-2.5 font-mono text-[11px] leading-relaxed text-rose-100/95">{{ $step['output'] }}</pre>
-                                            @endif
-                                        @endforeach
+                                        @if ($phase['steps'] !== [])
+                                            <ul class="mt-2 space-y-1 pl-6">
+                                                @foreach ($phase['steps'] as $step)
+                                                    @php $stepFailed = ! ($step['ok'] ?? false) && ! ($step['skipped'] ?? false) && ! ($step['pending'] ?? false); @endphp
+                                                    <li>
+                                                        <div class="flex items-center gap-2 text-xs">
+                                                            <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold {{ $step['glyph_classes'] }}">{{ $step['glyph'] }}</span>
+                                                            <span class="min-w-0 truncate {{ $stepFailed ? 'font-medium text-rose-800' : (($step['pending'] ?? false) ? 'text-brand-mist' : 'text-brand-ink') }}">{{ $step['label'] }}</span>
+                                                            @if ($step['pending'] ?? false)
+                                                                <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-brand-moss">{{ __('queued') }}</span>
+                                                            @elseif ($step['skipped'])
+                                                                <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-amber-900">{{ __('skipped') }}</span>
+                                                            @elseif (($step['duration_ms'] ?? 0) > 0)
+                                                                <span class="font-mono text-brand-mist">{{ $step['duration_ms'] >= 1000 ? number_format($step['duration_ms'] / 1000, 1).'s' : $step['duration_ms'].'ms' }}</span>
+                                                            @endif
+                                                        </div>
+                                                        @if ($stepFailed && ($step['output'] ?? '') !== '')
+                                                            <pre class="mt-1 max-h-40 overflow-auto rounded-lg bg-brand-ink p-2.5 font-mono text-[11px] leading-relaxed text-rose-100/95">{{ $step['output'] }}</pre>
+                                                        @endif
+                                                    </li>
+                                                @endforeach
+                                            </ul>
+                                        @endif
                                     </li>
                                 @endforeach
                             </ol>
