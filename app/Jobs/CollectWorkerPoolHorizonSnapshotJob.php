@@ -105,16 +105,24 @@ $jr = $T(fn () => app(\Laravel\Horizon\Contracts\JobRepository::class));
 $mr = $T(fn () => app(\Laravel\Horizon\Contracts\MetricsRepository::class));
 $wr = $T(fn () => app(\Laravel\Horizon\Contracts\WorkloadRepository::class));
 $msr = $T(fn () => app(\Laravel\Horizon\Contracts\MasterSupervisorRepository::class));
+$sr = $T(fn () => app(\Laravel\Horizon\Contracts\SupervisorRepository::class));
 $out = [];
 $out['status'] = $T(fn () => collect($msr->all())->first()->status ?? 'inactive', 'unknown');
-$out['processes'] = $T(fn () => collect($msr->all())->sum(fn ($m) => collect($m->supervisors ?? [])->sum(fn ($s) => (int) collect($s->processes ?? [])->sum())), null);
+// Process counts live on the SUPERVISOR records (each ->processes is a
+// queue => count map). The master record's ->supervisors is only a list of
+// supervisor name strings, so summing through it always yields 0.
+$out['processes'] = $T(fn () => (int) collect($sr->all())->sum(fn ($s) => collect((array) ($s->processes ?? []))->sum()), null);
 $out['recent'] = $T(fn () => (int) $jr->countRecent(), null);
 $out['completed'] = $T(fn () => (int) $jr->countCompleted(), null);
 $out['pending'] = $T(fn () => (int) $jr->countPending(), null);
 $out['failed_recent'] = $T(fn () => (int) $jr->countRecentlyFailed(), null);
 $out['jobs_per_minute'] = $T(fn () => $mr->jobsProcessedPerMinute(), null);
-$out['workload'] = $T(fn () => collect($wr->get())->map(fn ($w) => ['name' => $w->name ?? '?', 'length' => $w->length ?? null, 'wait' => $w->wait ?? null, 'processes' => $w->processes ?? null])->values()->all(), []);
-$jobRow = function ($j) { return ['name' => $j->name ?? ($j->payload['displayName'] ?? 'job'), 'queue' => $j->queue ?? '?', 'status' => $j->status ?? '?', 'at' => $j->reserved_at ?? ($j->completed_at ?? null)]; };
+// Horizon returns workload rows as ARRAYS and job records as OBJECTS, so read
+// both shapes through one accessor — object access on an array silently yields
+// null (every queue name → '?', every metric → '—').
+$g = fn ($o, $k, $d = null) => is_array($o) ? ($o[$k] ?? $d) : ($o->$k ?? $d);
+$out['workload'] = $T(fn () => collect($wr->get())->map(fn ($w) => ['name' => $g($w, 'name', '?'), 'length' => $g($w, 'length'), 'wait' => $g($w, 'wait'), 'processes' => $g($w, 'processes')])->values()->all(), []);
+$jobRow = fn ($j) => ['name' => $g($j, 'name') ?: 'job', 'queue' => $g($j, 'queue', '?'), 'status' => $g($j, 'status', '?'), 'at' => $g($j, 'reserved_at', $g($j, 'completed_at'))];
 $out['pending_jobs'] = $T(fn () => collect($jr->getPending())->take(25)->map($jobRow)->values()->all(), []);
 $out['recent_jobs'] = $T(fn () => collect($jr->getRecent())->take(25)->map($jobRow)->values()->all(), []);
 $out['failed_total'] = $T(fn () => (int) \Illuminate\Support\Facades\DB::table('failed_jobs')->count(), null);

@@ -412,6 +412,31 @@ class WorkspaceWorkerPool extends Component
     }
 
     /**
+     * Dispatch test jobs from the Horizon tab and auto-pull a fresh snapshot a
+     * few seconds later, so the recent/pending lists below show whether Horizon
+     * actually picked the jobs up. Stays on the Horizon tab (unlike runTestJobs,
+     * which streams to the Traffic tab's console).
+     */
+    public function runHorizonTestJobs(): void
+    {
+        Gate::authorize('update', $this->server);
+
+        $pool = $this->pool();
+        if (! $pool) {
+            $this->toastError(__('No pool.'));
+
+            return;
+        }
+
+        $this->tab = 'horizon';
+        RunWorkerPoolTestJobsJob::dispatch((string) $pool->id, 5, (string) (auth()->id() ?? '') ?: null);
+        // Re-snapshot after the workers have had time to process the closures so
+        // the recent jobs list reflects them (the test probe waits ~7s on-box).
+        CollectWorkerPoolHorizonSnapshotJob::dispatch((string) $pool->id)->delay(now()->addSeconds(14));
+        $this->toastSuccess(__('Dispatching 5 test jobs — the dashboard refreshes in ~15s once the workers pick them up.'));
+    }
+
+    /**
      * Dispatch a handful of throwaway queued closures onto the app's queue and
      * verify the workers process them — streamed to the test console below.
      */

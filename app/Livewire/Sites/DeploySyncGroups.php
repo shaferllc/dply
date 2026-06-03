@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
 use App\Models\SiteDeployment;
@@ -24,6 +25,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class DeploySyncGroups extends Component
 {
+    use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
 
     public string $new_group_name = '';

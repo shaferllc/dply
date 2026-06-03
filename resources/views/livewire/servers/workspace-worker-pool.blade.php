@@ -539,6 +539,13 @@
                                 <button type="button" wire:click="controlPoolHorizon('horizon:terminate')" class="border-l border-brand-ink/15 px-2.5 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Restart') }}</button>
                                 <button type="button" wire:click="controlPoolHorizon('horizon:snapshot')" class="border-l border-brand-ink/15 px-2.5 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Snapshot') }}</button>
                             </div>
+                            <button type="button" wire:click="runHorizonTestJobs" wire:loading.attr="disabled" wire:target="runHorizonTestJobs"
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 disabled:opacity-60"
+                                title="{{ __('Dispatch 5 throwaway test jobs onto the queue, then re-pull the snapshot to confirm Horizon picked them up.') }}">
+                                <x-heroicon-o-beaker class="h-3.5 w-3.5" wire:loading.remove wire:target="runHorizonTestJobs" />
+                                <span wire:loading wire:target="runHorizonTestJobs" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner size="sm" /></span>
+                                {{ __('Test jobs') }}
+                            </button>
                             <button type="button" wire:click="refreshHorizon" wire:loading.attr="disabled" wire:target="refreshHorizon"
                                 class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:opacity-60">
                                 <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="refreshHorizon" />

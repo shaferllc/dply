@@ -51,8 +51,8 @@
                             <option value="parallel" @selected(($group->rollout_mode ?? 'parallel') === 'parallel')>{{ __('Parallel') }}</option>
                             <option value="sequential" @selected(($group->rollout_mode ?? 'parallel') === 'sequential')>{{ __('Sequential') }}</option>
                         </select>
-                        <button type="button" wire:click="deployGroup('{{ $group->id }}')" wire:confirm="{{ __('Queue a deploy for all :n site(s) in this group?', ['n' => $group->sites->count()]) }}" class="rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">{{ __('Deploy group') }}</button>
-                        <button type="button" wire:click="deleteGroup('{{ $group->id }}')" wire:confirm="{{ __('Delete this sync group? The sites themselves are not affected.') }}" class="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50">{{ __('Delete') }}</button>
+                        <button type="button" wire:click="openConfirmActionModal('deployGroup', @js([$group->id]), @js(__('Deploy group')), @js(__('Queue a deploy for all :n site(s) in “:name”? :mode', ['n' => $group->sites->count(), 'name' => $group->name, 'mode' => ($group->rollout_mode ?? 'parallel') === 'sequential' ? __('They deploy in order and stop on the first failure.') : __('They deploy in parallel.')])), @js(__('Deploy group')), false)" class="rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">{{ __('Deploy group') }}</button>
+                        <button type="button" wire:click="openConfirmActionModal('deleteGroup', @js([$group->id]), @js(__('Delete sync group')), @js(__('Delete “:name”? The sites themselves are not affected.', ['name' => $group->name])), @js(__('Delete')), true)" class="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50">{{ __('Delete') }}</button>
                     </div>
                 @endif
             </div>
@@ -99,4 +99,6 @@
             @if ($canManage) {{ __('Create one above to deploy multiple sites together.') }} @endif
         </div>
     @endforelse
+
+    @include('livewire.partials.confirm-action-modal')
 </div>
