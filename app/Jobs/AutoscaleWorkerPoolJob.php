@@ -28,7 +28,10 @@ class AutoscaleWorkerPoolJob implements ShouldQueue
 
     public int $tries = 1;
 
-    public function __construct(public string $poolId) {}
+    public function __construct(public string $poolId)
+    {
+        $this->onQueue('dply-control');
+    }
 
     public function handle(ExecuteRemoteTaskOnServer $executor, WorkerPoolManager $manager): void
     {

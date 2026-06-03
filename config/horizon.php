@@ -31,7 +31,11 @@ $probeWorkerQueue = env('DPLY_PROBE_WORKER_QUEUE');
 if (is_string($probeWorkerQueue) && $probeWorkerQueue !== '') {
     $horizonWorkerQueues = [$probeWorkerQueue];
 } else {
-    $horizonWorkerQueues = array_values(array_unique(array_merge(['default'], $horizonExtraQueues, $probeQueues)));
+    // `dply-control` carries worker-pool orchestration jobs (reconcile, stats,
+    // ensure/restart workers, test jobs). It's a dedicated queue ONLY dply's
+    // Horizon drains, so a managed worker app that happens to share this Redis
+    // never grabs (and fails on) dply's own job classes.
+    $horizonWorkerQueues = array_values(array_unique(array_merge(['default', 'dply-control'], $horizonExtraQueues, $probeQueues)));
 }
 
 return [

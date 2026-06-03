@@ -301,6 +301,10 @@
                         {{ __('Deploy linked sites') }}
                     </button>
                 @endif
+                <a href="{{ route('deploy-sync.index') }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-brand-moss transition-colors hover:text-brand-ink" title="{{ __('Manage which sites deploy together.') }}">
+                    <x-heroicon-o-arrows-right-left class="h-3.5 w-3.5" />
+                    {{ __('Sync groups') }}
+                </a>
             </div>
         </div>
 

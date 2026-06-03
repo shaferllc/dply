@@ -6,6 +6,7 @@ use App\Jobs\RunSiteDeploymentJob;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\SiteDeploySyncGroup;
+use Illuminate\Support\Facades\Bus;
 
 class SiteDeploySyncCoordinator
 {
@@ -39,12 +40,8 @@ class SiteDeploySyncCoordinator
         }
 
         $group->loadMissing('sites');
-        foreach ($group->sites as $peer) {
-            if ((string) $peer->id === (string) $triggeredSite->id) {
-                continue;
-            }
-            RunSiteDeploymentJob::dispatch($peer->fresh(), SiteDeployment::TRIGGER_SYNC_PEER);
-        }
+        $peers = $group->sites->reject(fn (Site $p): bool => (string) $p->id === (string) $triggeredSite->id);
+        $this->rollOut($group, $peers, SiteDeployment::TRIGGER_SYNC_PEER);
     }
 
     /**
@@ -60,13 +57,52 @@ class SiteDeploySyncCoordinator
         }
 
         $group->loadMissing('sites');
-        foreach ($group->sites as $member) {
-            RunSiteDeploymentJob::dispatch($member->fresh(), SiteDeployment::TRIGGER_MANUAL);
-        }
+        $this->rollOut($group, $group->sites, SiteDeployment::TRIGGER_MANUAL);
     }
 
     public function dispatchManualSingle(Site $site): void
     {
         RunSiteDeploymentJob::dispatch($site->fresh(), SiteDeployment::TRIGGER_MANUAL);
+    }
+
+    /**
+     * Deploy a whole group now, honouring its rollout mode (parallel/sequential).
+     * Returns the number of members queued.
+     */
+    public function dispatchGroup(SiteDeploySyncGroup $group, string $trigger = SiteDeployment::TRIGGER_MANUAL): int
+    {
+        $group->loadMissing('sites');
+        $this->rollOut($group, $group->sites, $trigger);
+
+        return $group->sites->count();
+    }
+
+    /**
+     * Fan out a deploy to a set of group members per the group's rollout mode:
+     *  - parallel:   dispatch all at once (independent).
+     *  - sequential: a Bus chain in the group's site order — each member deploys
+     *    only after the previous succeeds; a failed deploy (RunSiteDeploymentJob
+     *    throws) halts the chain, so it's ordered + stop-on-failure.
+     *
+     * @param  \Illuminate\Support\Collection<int, Site>  $members
+     */
+    private function rollOut(SiteDeploySyncGroup $group, $members, string $trigger): void
+    {
+        $members = $members->values();
+        if ($members->isEmpty()) {
+            return;
+        }
+
+        if ($group->isSequential()) {
+            Bus::chain(
+                $members->map(fn (Site $s) => new RunSiteDeploymentJob($s->fresh(), $trigger))->all()
+            )->dispatch();
+
+            return;
+        }
+
+        foreach ($members as $member) {
+            RunSiteDeploymentJob::dispatch($member->fresh(), $trigger);
+        }
     }
 }

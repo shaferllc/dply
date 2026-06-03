@@ -272,6 +272,12 @@
                                             {{ __('Projects') }}
                                         </x-dropdown-link>
                                     @endfeature
+                                    <x-dropdown-link :href="route('deploy-sync.index')">
+                                        <x-slot name="icon">
+                                            <x-heroicon-o-arrows-right-left class="{{ $hi }}" />
+                                        </x-slot>
+                                        {{ __('Deploy sync') }}
+                                    </x-dropdown-link>
                                     <div class="mx-3 my-2 flex items-center gap-2" role="presentation">
                                         <div class="h-px flex-1 bg-brand-ink/10"></div>
                                         <span class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Org') }}</span>

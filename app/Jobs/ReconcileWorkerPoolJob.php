@@ -50,7 +50,11 @@ class ReconcileWorkerPoolJob implements ShouldQueue
         public string $poolId,
         public int $attempt = 0,
         public ?string $runId = null,
-    ) {}
+    ) {
+        // Dedicated control queue — only dply's Horizon drains it, so a managed
+        // worker app sharing this Redis never grabs dply's own job classes.
+        $this->onQueue('dply-control');
+    }
 
     public function handle(WorkerPoolManager $manager, WorkerWorkloadReplayer $replayer): void
     {

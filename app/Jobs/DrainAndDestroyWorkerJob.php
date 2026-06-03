@@ -34,7 +34,9 @@ class DrainAndDestroyWorkerJob implements ShouldQueue
     public function __construct(
         public string $serverId,
         public ?string $actorId = null,
-    ) {}
+    ) {
+        $this->onQueue('dply-control');
+    }
 
     public function handle(DeleteServerAction $deleteServer, WorkerPoolExposureApplier $exposure): void
     {

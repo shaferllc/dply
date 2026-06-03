@@ -26,7 +26,9 @@ class ApplyWorkerPoolExposureJob implements ShouldQueue
     public function __construct(
         public string $poolId,
         public ?string $actorId = null,
-    ) {}
+    ) {
+        $this->onQueue('dply-control');
+    }
 
     public function handle(WorkerPoolExposureApplier $applier): void
     {

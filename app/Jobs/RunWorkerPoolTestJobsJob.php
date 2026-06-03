@@ -39,7 +39,9 @@ class RunWorkerPoolTestJobsJob implements ShouldQueue
         public string $poolId,
         public int $count = 5,
         public ?string $userId = null,
-    ) {}
+    ) {
+        $this->onQueue('dply-control');
+    }
 
     protected function consoleSubject(): Model
     {

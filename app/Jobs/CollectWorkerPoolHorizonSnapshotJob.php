@@ -34,7 +34,10 @@ class CollectWorkerPoolHorizonSnapshotJob implements ShouldQueue
 
     public int $timeout = 90;
 
-    public function __construct(public string $poolId) {}
+    public function __construct(public string $poolId)
+    {
+        $this->onQueue('dply-control');
+    }
 
     public function handle(ExecuteRemoteTaskOnServer $exec): void
     {
@@ -111,6 +114,9 @@ $out['pending'] = $T(fn () => (int) $jr->countPending(), null);
 $out['failed_recent'] = $T(fn () => (int) $jr->countRecentlyFailed(), null);
 $out['jobs_per_minute'] = $T(fn () => $mr->jobsProcessedPerMinute(), null);
 $out['workload'] = $T(fn () => collect($wr->get())->map(fn ($w) => ['name' => $w->name ?? '?', 'length' => $w->length ?? null, 'wait' => $w->wait ?? null, 'processes' => $w->processes ?? null])->values()->all(), []);
+$jobRow = function ($j) { return ['name' => $j->name ?? ($j->payload['displayName'] ?? 'job'), 'queue' => $j->queue ?? '?', 'status' => $j->status ?? '?', 'at' => $j->reserved_at ?? ($j->completed_at ?? null)]; };
+$out['pending_jobs'] = $T(fn () => collect($jr->getPending())->take(25)->map($jobRow)->values()->all(), []);
+$out['recent_jobs'] = $T(fn () => collect($jr->getRecent())->take(25)->map($jobRow)->values()->all(), []);
 $out['failed_total'] = $T(fn () => (int) \Illuminate\Support\Facades\DB::table('failed_jobs')->count(), null);
 $out['failed_jobs'] = $T(fn () => \Illuminate\Support\Facades\DB::table('failed_jobs')->orderByDesc('failed_at')->limit(25)->get()->map(function ($j) {
     $p = json_decode($j->payload, true) ?: [];

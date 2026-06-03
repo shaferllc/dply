@@ -43,7 +43,9 @@ class ControlWorkerDaemonJob implements ShouldQueue
         public string $action = 'ensure',
         public ?string $userId = null,
         public ?string $arg = null,
-    ) {}
+    ) {
+        $this->onQueue('dply-control');
+    }
 
     protected function consoleSubject(): Model
     {

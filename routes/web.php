@@ -472,6 +472,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('/settings/profile', SettingsHub::class)->name('settings.profile');
     Route::livewire('/settings/servers', SettingsHub::class)->name('settings.servers');
     Route::livewire('/notifications', NotificationsIndex::class)->name('notifications.index');
+    Route::livewire('/deploy-sync', \App\Livewire\Sites\DeploySyncGroups::class)->name('deploy-sync.index');
 
     Route::livewire('/profile/referrals', ProfileReferrals::class)->name('profile.referrals');
     Route::livewire('/profile/security', SettingsSecurity::class)->name('profile.security');

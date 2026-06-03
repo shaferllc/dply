@@ -602,6 +602,44 @@
                 </section>
             @endif
 
+            {{-- Pending + Recent jobs --}}
+            @php
+                $jobLists = [
+                    ['key' => 'pending_jobs', 'title' => __('Pending jobs'), 'empty' => __('Nothing waiting in the queue.')],
+                    ['key' => 'recent_jobs', 'title' => __('Recent jobs'), 'empty' => __('No recent jobs recorded.')],
+                ];
+                $statusTone = fn (string $s) => match (strtolower($s)) {
+                    'completed' => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+                    'failed' => 'bg-rose-50 text-rose-700 ring-rose-200',
+                    'reserved', 'running' => 'bg-sky-50 text-sky-700 ring-sky-200',
+                    'pending' => 'bg-amber-50 text-amber-700 ring-amber-200',
+                    default => 'bg-brand-sand/60 text-brand-moss ring-brand-ink/15',
+                };
+            @endphp
+            @foreach ($jobLists as $list)
+                <section class="dply-card overflow-hidden">
+                    <div class="flex items-center justify-between border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
+                        <h3 class="text-sm font-semibold text-brand-ink">{{ $list['title'] }}</h3>
+                        <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-xs font-semibold text-brand-moss">{{ count($hz[$list['key']] ?? []) }}</span>
+                    </div>
+                    @if (empty($hz[$list['key']]))
+                        <div class="px-6 py-5 text-sm text-brand-moss sm:px-7">{{ $list['empty'] }}</div>
+                    @else
+                        <div class="divide-y divide-brand-ink/5">
+                            @foreach ($hz[$list['key']] as $j)
+                                <div class="flex flex-wrap items-center gap-2 px-6 py-2.5 sm:px-7">
+                                    <span class="text-sm font-medium text-brand-ink">{{ $j['name'] ?? 'job' }}</span>
+                                    <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-[11px] text-brand-moss">{{ $j['queue'] ?? '?' }}</span>
+                                    @if (! empty($j['status']))
+                                        <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 {{ $statusTone($j['status']) }}">{{ $j['status'] }}</span>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </section>
+            @endforeach
+
             {{-- Recent failed jobs --}}
             <section class="dply-card overflow-hidden">
                 <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
@@ -614,7 +652,7 @@
                     @if (! empty($hz['failed_jobs']))
                         <div class="flex items-center gap-2">
                             <button type="button" wire:click="retryAllFailed" class="rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">{{ __('Retry all') }}</button>
-                            <button type="button" wire:click="flushFailed" wire:confirm="{{ __('Permanently delete all failed jobs?') }}" class="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50">{{ __('Flush all') }}</button>
+                            <button type="button" wire:click="openConfirmActionModal('flushFailed', [], @js(__('Flush failed jobs')), @js(__('Permanently delete ALL failed jobs? This cannot be undone.')), @js(__('Flush all')), true)" class="rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50">{{ __('Flush all') }}</button>
                         </div>
                     @endif
                 </div>
@@ -634,7 +672,7 @@
                                     @if (! empty($fj['uuid']))
                                         <span class="inline-flex overflow-hidden rounded-md border border-brand-ink/15">
                                             <button type="button" wire:click="retryFailedJob('{{ $fj['uuid'] }}')" class="px-2 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Retry') }}</button>
-                                            <button type="button" wire:click="forgetFailedJob('{{ $fj['uuid'] }}')" class="border-l border-brand-ink/15 px-2 py-1 text-[11px] font-medium text-rose-700 hover:bg-rose-50">{{ __('Delete') }}</button>
+                                            <button type="button" wire:click="openConfirmActionModal('forgetFailedJob', @js([$fj['uuid']]), @js(__('Delete failed job')), @js(__('Permanently delete this failed job?')), @js(__('Delete')), true)" class="border-l border-brand-ink/15 px-2 py-1 text-[11px] font-medium text-rose-700 hover:bg-rose-50">{{ __('Delete') }}</button>
                                         </span>
                                     @endif
                                 </div>
