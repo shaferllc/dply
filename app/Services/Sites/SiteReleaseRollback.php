@@ -23,8 +23,15 @@ class SiteReleaseRollback
         $target = $base.'/releases/'.$release->folder;
         $ssh = new SshConnection($server);
 
+        // Drop a non-symlink `current` (e.g. a root-owned provisioning
+        // placeholder dir) first — `ln -sfn` would nest the link inside a real
+        // directory rather than replace it. Its contents can be root-owned
+        // while we run as the deploy user, so sudo the removal (fall back to a
+        // plain rm). See PipelineAnchorScriptRunner::runActivate().
         $out = $ssh->exec(sprintf(
-            'if [ -d %1$s ]; then ln -sfn %1$s %2$s/current && echo DPLY_ROLLBACK_OK; else echo DPLY_ROLLBACK_MISSING; fi',
+            'if [ -d %1$s ]; then '
+            .'if [ -L %2$s/current ]; then :; elif [ -e %2$s/current ]; then sudo -n rm -rf %2$s/current 2>&1 || rm -rf %2$s/current; fi; '
+            .'ln -sfn %1$s %2$s/current && echo DPLY_ROLLBACK_OK; else echo DPLY_ROLLBACK_MISSING; fi',
             escapeshellarg($target),
             escapeshellarg($base)
         ), 60);

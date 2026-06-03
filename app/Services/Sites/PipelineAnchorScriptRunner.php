@@ -153,7 +153,26 @@ final class PipelineAnchorScriptRunner
         $releaseEsc = escapeshellarg($releaseDir);
         $log = "\n--- activate release ---\n";
 
-        return $log.$ssh->exec(sprintf('ln -sfn %s %s/current', $releaseEsc, $baseEsc), 60);
+        // The webserver provisioner writes the "awaiting first deploy"
+        // placeholder into the atomic doc root (…/current/public), which
+        // `mkdir -p`s `current` as a REAL directory — as ROOT. `ln -sfn` only
+        // replaces a symlink at the destination; against a real directory it
+        // silently nests the link *inside* it (…/current/<release>), leaving
+        // the placeholder in place so release steps `cd …/current` into a tree
+        // with no `artisan`. So a non-symlink `current` must be removed first —
+        // but its contents (e.g. a root-owned .env from an earlier push) can be
+        // root-owned while deploys run as the unprivileged deploy user, so a
+        // plain `rm -rf` dies with "Permission denied". Use sudo for that one
+        // removal (deploys already rely on passwordless sudo for the .env
+        // push), falling back to a plain rm where sudo isn't available. A real
+        // symlink is left untouched for `ln -sfn` to overwrite directly.
+        return $log.$ssh->exec(sprintf(
+            'if [ -L %2$s/current ]; then :; '
+            .'elif [ -e %2$s/current ]; then sudo -n rm -rf %2$s/current 2>&1 || rm -rf %2$s/current; fi; '
+            .'ln -sfn %1$s %2$s/current',
+            $releaseEsc,
+            $baseEsc
+        ), 60);
     }
 
     public function defaultCloneScriptHint(Site $site): string

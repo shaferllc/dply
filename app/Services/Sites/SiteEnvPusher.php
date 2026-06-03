@@ -28,7 +28,14 @@ class SiteEnvPusher
      * will silently break the app on the server — they get a per-line
      * error message they can fix in the UI.
      */
-    public function push(Site $site): string
+    /**
+     * @param  string|null  $overridePath  Absolute path to write the .env to,
+     *   instead of {@see Site::effectiveEnvFilePath()}. Used by the atomic
+     *   deployer to seed a fresh release directory's `.env` (the git checkout
+     *   has none) BEFORE build/release steps run — otherwise artisan reads
+     *   Laravel's defaults (pgsql 127.0.0.1:5432) and migrations fail.
+     */
+    public function push(Site $site, ?string $overridePath = null): string
     {
         $server = $site->server;
         if (! $server->hostCapabilities()->supportsEnvPushToHost()) {
@@ -56,13 +63,13 @@ class SiteEnvPusher
             }
         }
 
-        $path = $site->effectiveEnvFilePath();
+        $path = $overridePath ?? $site->effectiveEnvFilePath();
         $parent = dirname($path);
         $ssh = new SshConnection($server);
         $tmp = '/tmp/dply-env-'.Str::lower(Str::random(20));
 
         try {
-            return $this->writeViaTmp($ssh, $site, $content, $tmp, $path, $parent);
+            return $this->writeViaTmp($ssh, $site, $content, $tmp, $path, $parent, $overridePath === null);
         } finally {
             // Defence-in-depth: the success path rm's $tmp inside the sudo
             // script below, but any throw before that point would otherwise
@@ -89,6 +96,7 @@ class SiteEnvPusher
         string $tmp,
         string $path,
         string $parent,
+        bool $updateCacheOrigin = true,
     ): string {
         $ssh->putFile($tmp, $content);
         // Stage the tmp file world-readable so root's `cp` (below) can read
@@ -139,8 +147,11 @@ class SiteEnvPusher
         // After a successful push, the cache reflects "what's on disk per
         // the most recent push" — but the bits came from the operator's
         // edits, not from a server read. The "edited :time" pill is the
-        // accurate label for this state.
-        $site->forceFill(['env_cache_origin' => 'local-edit'])->save();
+        // accurate label for this state. Skip when seeding a release dir
+        // during deploy (override path) — that's not an operator edit.
+        if ($updateCacheOrigin) {
+            $site->forceFill(['env_cache_origin' => 'local-edit'])->save();
+        }
 
         return $path;
     }

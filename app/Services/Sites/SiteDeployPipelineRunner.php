@@ -73,6 +73,21 @@ class SiteDeployPipelineRunner
             ->sortBy('sort_order')
             ->values();
 
+        // Verbose preamble: show the working directory this phase runs in and
+        // exactly what's on disk there (does `artisan` exist? is it a symlink?)
+        // so a "Could not open input file: artisan" failure is self-explaining
+        // from the log instead of guesswork.
+        $log .= sprintf("\n[dply] phase '%s' → working dir: %s\n", $phase, $workingDirectory);
+        $log .= sprintf("[dply] %d step(s) queued: %s\n", $ordered->count(), $ordered->pluck('step_type')->implode(', ') ?: '(none)');
+        $probe = $ssh->exec(sprintf(
+            'echo "[dply] pwd=$(cd %1$s 2>/dev/null && pwd || echo UNREADABLE)"; '
+            .'echo "[dply] is-symlink=$([ -L %1$s ] && echo yes || echo no)"; '
+            .'echo "[dply] artisan=$([ -f %1$s/artisan ] && echo present || echo MISSING)"; '
+            .'echo "[dply] ls:"; ls -la %1$s 2>&1 | head -n 30',
+            $cwd
+        ), 30);
+        $log .= $probe."\n";
+
         foreach ($ordered as $step) {
             /** @var SiteDeployStep $step */
             $cmd = $this->resolveShellCommand($step);
@@ -104,6 +119,9 @@ class SiteDeployPipelineRunner
             // The recorded `command` stays clean; only the executed command is
             // prefixed with any tooling guard (e.g. ensure Composer is present).
             $runCmd = $this->ensureToolingPrefix($step, $cmd).$cmd;
+            // Echo the fully-resolved shell line (incl. the `cd`) so the log
+            // shows precisely what ran and where — invaluable when a step fails.
+            $log .= sprintf("[dply] exec (timeout %ds): cd %s && %s\n", $timeout, $workingDirectory, $runCmd);
             $start = microtime(true);
             $stepOut = $ssh->exec(
                 sprintf('cd %s && (%s) 2>&1; printf "\nDPLY_STEP_EXIT:%%s" "$?"', $cwd, $runCmd),

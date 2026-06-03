@@ -51,12 +51,35 @@ class AtomicSiteDeployer
         $folder = gmdate('YmdHis');
         $releasesDir = $base.'/releases';
         $newRelease = $releasesDir.'/'.$folder;
+        $currentPath = $base.'/current';
 
         $baseEsc = escapeshellarg($base);
         $newEsc = escapeshellarg($newRelease);
 
+        // ── PLAN ── dump every resolved path up front so the deployment log
+        // shows exactly where each phase will run. Zero-downtime (atomic)
+        // deploys clone+build+release into the timestamped release directory,
+        // then flip the `current` symlink to it — so artisan/migrate always run
+        // against the real checked-out code, never the `current` symlink.
+        $log .= "\n=== dply deploy plan (atomic / zero-downtime) ===\n";
+        $log .= sprintf("[dply] site:            #%s %s\n", $site->id, $site->name);
+        $log .= sprintf("[dply] server:          #%s %s\n", $server->id, $server->name);
+        $log .= sprintf("[dply] repository:      %s\n", $repo);
+        $log .= sprintf("[dply] branch/ref:      %s (%s)\n", $branch, $site->gitRefKind());
+        $log .= sprintf("[dply] base dir:        %s\n", $base);
+        $log .= sprintf("[dply] releases dir:    %s\n", $releasesDir);
+        $log .= sprintf("[dply] new release:     %s\n", $newRelease);
+        $log .= sprintf("[dply] current symlink: %s -> (flips to new release)\n", $currentPath);
+        $log .= sprintf("[dply] build runs in:   %s\n", $newRelease);
+        $log .= sprintf("[dply] release runs in: %s  (the release dir, NOT the symlink)\n", $newRelease);
+        $log .= sprintf("[dply] env dir:         %s\n", $site->effectiveEnvDirectory());
+        $log .= sprintf("[dply] nginx docroot:   %s\n", $site->effectiveDocumentRootForNginx());
+        $log .= sprintf("[dply] worker site:     %s\n", $site->isWorkerSite() ? 'yes' : 'no');
+        $log .= "===============================================\n";
+
         // ── CLONE ── make releases dir, checkout into the new release folder.
         $cloneStart = microtime(true);
+        $log .= sprintf("\n[dply] CLONE → mkdir -p %s/releases, then clone %s\n", $base, $newRelease);
         $cloneLog = $ssh->exec("mkdir -p {$baseEsc}/releases", 60);
 
         $previousActiveRelease = SiteRelease::query()
@@ -87,9 +110,45 @@ class AtomicSiteDeployer
             'skipped' => false,
         ]]);
 
+        $log .= sprintf("[dply] CLONE done in %dms → %s\n", (int) round((microtime(true) - $cloneStart) * 1000), $newRelease);
+
         app(VmSiteComposerDetectionPersister::class)->persistFromReleasePath($site, $ssh, $newRelease);
 
+        // ── ENV ── seed the fresh release's .env. A release is a clean git
+        // checkout and .env is gitignored, so without this every build/release
+        // step (and the live app) reads Laravel's defaults — e.g. migrate hits
+        // pgsql 127.0.0.1:5432 and fails "Connection refused". Done BEFORE build
+        // so asset/compile steps that read env work too. Runs only on hosts
+        // that expose a server .env (the VM/BYO path this deployer serves).
+        if ($server->hostCapabilities()->supportsEnvPushToHost()) {
+            $releaseEnv = $newRelease.'/.env';
+            $envOverride = trim((string) ($site->env_file_path ?? ''));
+            if ($envOverride !== '') {
+                // Custom env_file_path: the operator deliberately relocated .env
+                // outside the docroot so the webserver can't serve it. Keep ONE
+                // canonical file there (the source of truth) and symlink each
+                // release's project-root .env at it — Laravel reads
+                // <release>/.env, which resolves to the unservable external
+                // file. Never copy the secret into the docroot.
+                $log .= sprintf("\n[dply] ENV → external env_file_path; writing %s and symlinking %s → it\n", $envOverride, $releaseEnv);
+                app(SiteEnvPusher::class)->push($site, $envOverride);
+                $ssh->exec(sprintf('ln -sfn %s %s', escapeshellarg($envOverride), escapeshellarg($releaseEnv)), 30);
+                $resolved = trim($ssh->exec(sprintf('readlink -f %s 2>/dev/null || echo "(unresolved)"', escapeshellarg($releaseEnv)), 30));
+                $log .= sprintf("[dply] ENV → %s/.env → %s\n", basename($newRelease), $resolved);
+            } else {
+                // Default: .env lives in the project root. Write it straight
+                // into the release dir (which `current` flips to), so this
+                // release is self-contained.
+                $log .= sprintf("\n[dply] ENV → writing composed .env to %s\n", $releaseEnv);
+                app(SiteEnvPusher::class)->push($site, $releaseEnv);
+                $log .= "[dply] ENV → .env written\n";
+            }
+        } else {
+            $log .= "\n[dply] ENV → host does not expose a server .env; skipping\n";
+        }
+
         // ── BUILD ── install deps / compile assets in the new release.
+        $log .= sprintf("\n[dply] BUILD → running build-phase steps in %s\n", $newRelease);
         $build = $this->pipelineRunner->runBuild($ssh, $site, $newRelease);
         $log .= $build['log'];
         $deployment?->recordPhaseResults('build', $build['steps']);
@@ -97,12 +156,18 @@ class AtomicSiteDeployer
             throw new \RuntimeException('Deploy failed during the build phase. See the deployment log for details.');
         }
 
+        $log .= sprintf("[dply] BUILD done → %d step(s), ok=%s\n", count($build['steps']), $build['ok'] ? 'true' : 'false');
+
         // ── ACTIVATE ── before-activate hooks + the atomic symlink flip.
         $activateStart = microtime(true);
+        $log .= sprintf("\n[dply] ACTIVATE → before-activate hooks + flip %s -> %s\n", $currentPath, $newRelease);
         $activateLog = $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::ANCHOR_BEFORE_ACTIVATE, $newRelease);
         $this->hookRunner->assertHooksSucceeded($activateLog, 'before_activate');
         $activateOut = $this->anchorRunner->runActivate($ssh, $site, $newRelease, $gitSsh, $repo, $branch);
         $activateLog .= $activateOut;
+        // Confirm the flip actually landed: show what `current` resolves to now.
+        $resolved = trim($ssh->exec(sprintf('readlink -f %s/current 2>/dev/null || echo "(missing)"', $baseEsc), 30));
+        $activateLog .= sprintf("\n[dply] current now resolves to: %s\n", $resolved !== '' ? $resolved : '(empty)');
         $this->hookRunner->assertHooksSucceeded($activateLog, 'activate');
         $log .= $activateLog;
         $deployment?->recordPhaseResults('activate', [[
@@ -115,23 +180,30 @@ class AtomicSiteDeployer
             'skipped' => trim($activateOut) === '',
         ]]);
 
-        // ── RELEASE ── release steps on the live path, after-activate hooks,
-        // then the post-deploy command (recorded as a final release step).
-        $currentPath = $base.'/current';
-        $release = $this->pipelineRunner->runRelease($ssh, $site, $currentPath);
+        // ── RELEASE ── run release steps in the freshly-built RELEASE dir, not
+        // the `current` symlink. The flip above already points `current` at
+        // this release, so this is equivalent for a healthy deploy — but it
+        // does NOT depend on the symlink resolving. Running migrations/caches
+        // against the real checked-out code means `php artisan …` always finds
+        // `artisan`, instead of dying with "Could not open input file: artisan"
+        // when `current` is a stale/placeholder directory (the failure mode for
+        // first deploys and worker-host sites).
+        $log .= sprintf("\n[dply] RELEASE → running release-phase steps in %s\n", $newRelease);
+        $release = $this->pipelineRunner->runRelease($ssh, $site, $newRelease);
         $releaseLog = $release['log'];
         $releaseSteps = $release['steps'];
         $releaseOk = $release['ok'];
+        $releaseLog .= sprintf("[dply] RELEASE steps done → %d step(s), ok=%s\n", count($release['steps']), $releaseOk ? 'true' : 'false');
 
-        $afterActivateLog = $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_ACTIVATE, $currentPath);
+        $afterActivateLog = $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_ACTIVATE, $newRelease);
         $releaseLog .= $afterActivateLog;
 
         $post = trim((string) $site->post_deploy_command);
         if ($post !== '') {
             $postStart = microtime(true);
-            $releaseLog .= "\n--- post deploy ---\n";
+            $releaseLog .= sprintf("\n--- post deploy (in %s) ---\n", $newRelease);
             $postOut = $ssh->exec(
-                sprintf('cd %s && (%s) 2>&1; printf "\nDPLY_STEP_EXIT:%%s" "$?"', escapeshellarg($currentPath), $post),
+                sprintf('cd %s && (%s) 2>&1; printf "\nDPLY_STEP_EXIT:%%s" "$?"', $newEsc, $post),
                 900
             );
             $releaseLog .= $postOut;
