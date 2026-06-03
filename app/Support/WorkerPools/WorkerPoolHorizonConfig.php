@@ -57,6 +57,11 @@ final class WorkerPoolHorizonConfig
 
         return [
             'HORIZON_QUEUES' => implode(',', $c['queues']),
+            // The member app runs against a Redis it may SHARE with dply's
+            // control plane (which now defaults its queue to 'dply'). Pin the
+            // member's dispatch queue to its own first queue (normally 'default')
+            // so the member's jobs and dply's jobs never land on the same list.
+            'REDIS_QUEUE' => $c['queues'][0] ?? 'default',
             'HORIZON_BALANCE' => $c['balance'],
             'HORIZON_MIN_PROCESSES' => (string) $c['min_processes'],
             'HORIZON_MAX_PROCESSES' => (string) $c['max_processes'],

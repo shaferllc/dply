@@ -156,6 +156,7 @@ $out['queue_throughput'] = $T(fn () => collect($mr->measuredQueues())->mapWithKe
 $jobRow = fn ($j) => ['name' => $g($j, 'name') ?: 'job', 'queue' => $g($j, 'queue', '?'), 'status' => $g($j, 'status', '?'), 'at' => $g($j, 'reserved_at', $g($j, 'completed_at'))];
 $out['pending_jobs'] = $T(fn () => collect($jr->getPending())->take(25)->map($jobRow)->values()->all(), []);
 $out['recent_jobs'] = $T(fn () => collect($jr->getRecent())->take(25)->map($jobRow)->values()->all(), []);
+$out['completed_jobs'] = $T(fn () => collect($jr->getCompleted())->take(25)->map($jobRow)->values()->all(), []);
 $out['failed_total'] = $T(fn () => (int) \Illuminate\Support\Facades\DB::table('failed_jobs')->count(), null);
 $out['failed_jobs'] = $T(fn () => \Illuminate\Support\Facades\DB::table('failed_jobs')->orderByDesc('failed_at')->limit(25)->get()->map(function ($j) {
     $p = json_decode($j->payload, true) ?: [];

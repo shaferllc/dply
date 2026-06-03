@@ -71,7 +71,14 @@ return [
             // throws "read error on connection". Same Redis DB as `default`, so
             // switching off the web connection loses no in-flight jobs.
             'connection' => env('REDIS_QUEUE_CONNECTION', 'queue'),
-            'queue' => env('REDIS_QUEUE', 'default'),
+            // dply's control plane dispatches to its OWN queue namespace ('dply')
+            // by default, NOT bare 'default'. A managed worker app can run dply's
+            // codebase against the SAME Redis (worker pools), so sharing 'default'
+            // makes the two instances steal each other's jobs (e.g. worker-1's
+            // Horizon failing on dply's NotificationEvent). Pool members are
+            // pushed REDIS_QUEUE=default (see WorkerPoolHorizonConfig) so they
+            // keep using 'default' — disjoint from the control plane.
+            'queue' => env('REDIS_QUEUE', 'dply'),
             // Must exceed the Horizon worker `timeout` (see config/horizon.php —
             // currently 720s). retry_after governs when Redis considers a
             // reserved job "lost" and re-dispatches it; if it fires before the

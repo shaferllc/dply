@@ -38,11 +38,13 @@ if (is_string($horizonQueuesOverride) && trim($horizonQueuesOverride) !== '') {
 } elseif (is_string($probeWorkerQueue) && $probeWorkerQueue !== '') {
     $horizonWorkerQueues = [$probeWorkerQueue];
 } else {
-    // `dply-control` carries worker-pool orchestration jobs (reconcile, stats,
-    // ensure/restart workers, test jobs). It's a dedicated queue ONLY dply's
-    // Horizon drains, so a managed worker app that happens to share this Redis
-    // never grabs (and fails on) dply's own job classes.
-    $horizonWorkerQueues = array_values(array_unique(array_merge(['default', 'dply-control'], $horizonExtraQueues, $probeQueues)));
+    // dply's control plane drains its OWN namespace — 'dply' (the default queue,
+    // see config/queue.php) + 'dply-control' (worker-pool orchestration) — NOT
+    // bare 'default'. A managed worker app can run dply's codebase against the
+    // same Redis (worker pools); if both consumed 'default' they'd steal each
+    // other's jobs. Pool members are pushed HORIZON_QUEUES=default + REDIS_QUEUE
+    // =default, so they own 'default' and the control plane owns 'dply'.
+    $horizonWorkerQueues = array_values(array_unique(array_merge(['dply', 'dply-control'], $horizonExtraQueues, $probeQueues)));
 }
 
 // dply-managed Horizon worker knobs — all env-driven so the pool UI can tune

@@ -5,6 +5,7 @@ namespace App\Livewire\Servers;
 use App\Actions\Servers\ResolveServerCreateCatalog;
 use App\Jobs\ApplyWorkerPoolExposureJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\ConsoleAction;
 use App\Models\ProviderCredential;
@@ -32,6 +33,7 @@ use Livewire\Component;
 class WorkspaceWorkerPool extends Component
 {
     use ConfirmsActionWithModal;
+    use DismissesServerConsoleActionRun;
     use InteractsWithServerWorkspace;
 
     #[Url(as: 'tab')]

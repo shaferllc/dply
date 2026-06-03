@@ -239,6 +239,9 @@
         </div>
 
         @if ($tab === 'overview')
+        {{-- Poll the whole component every 15s so pool status, capacity and
+             member health stay fresh without a manual reload. --}}
+        <div wire:poll.15s></div>
         {{-- Scale control --}}
         <section class="dply-card mt-6 overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
@@ -440,6 +443,7 @@
         @endif {{-- /overview --}}
 
         @if ($tab === 'members')
+        <div wire:poll.15s></div>
         {{-- Members --}}
         <section class="dply-card overflow-hidden mt-6">
             <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
@@ -531,6 +535,14 @@
                             @endif
                         </div>
                         <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Live job metrics pulled from the app’s Horizon over SSH — processed, failed, pending, throughput and recent failures across the pool.') }}</p>
+                        @php $watchedQueues = \App\Support\WorkerPools\WorkerPoolHorizonConfig::for($pool)['queues'] ?? ['default']; @endphp
+                        <p class="mt-1.5 text-xs text-brand-moss">
+                            <span class="font-medium text-brand-ink">{{ __('Queues watched:') }}</span>
+                            @foreach ($watchedQueues as $q)
+                                <code class="ml-1 rounded bg-brand-sand/60 px-1.5 py-0.5 font-mono text-[11px]">{{ $q }}</code>
+                            @endforeach
+                            <span class="ml-1 text-brand-mist">{{ __('· isolated from dply’s own queues (dply / dply-control)') }}</span>
+                        </p>
                     </div>
                     <div class="flex flex-col items-end gap-2 text-right text-xs text-brand-moss">
                         <span>{{ $hzAt ? __('collected :ago', ['ago' => $hzAt->diffForHumans()]) : __('no data yet') }}</span>
@@ -706,11 +718,12 @@
                 </section>
             @endif
 
-            {{-- Pending + Recent jobs --}}
+            {{-- Pending + Recent + Completed jobs --}}
             @php
                 $jobLists = [
                     ['key' => 'pending_jobs', 'title' => __('Pending jobs'), 'empty' => __('Nothing waiting in the queue.')],
                     ['key' => 'recent_jobs', 'title' => __('Recent jobs'), 'empty' => __('No recent jobs recorded.')],
+                    ['key' => 'completed_jobs', 'title' => __('Completed jobs'), 'empty' => __('No completed jobs recorded.')],
                 ];
                 $statusTone = fn (string $s) => match (strtolower($s)) {
                     'completed' => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
