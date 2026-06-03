@@ -107,6 +107,14 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
             return;
         }
 
+        // Worker sites never serve their doc root — Caddy serves the dedicated
+        // worker page ({@see ensureWorkerPage()}) for every request. Writing the
+        // "awaiting first deploy" placeholder here would be misleading (it would
+        // never be replaced) and pointless (it would never be served).
+        if ($site->isWorkerSite()) {
+            return;
+        }
+
         $root = rtrim($site->effectiveDocumentRoot(), '/');
         if ($root === '') {
             return;
@@ -172,6 +180,26 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
 
         $emit?->step($this->emitterSource(), 'ensuring suspended page');
         $builder = new SiteSuspendedPageBuilder;
+        $this->writeSystemFile($ssh, $dir.'/index.html', $builder->render($site));
+    }
+
+    /**
+     * Writes {@see SiteWorkerPageBuilder} HTML under {@see Site::workerStaticRoot()}.
+     * No-op unless the site is a worker site; emits a `step` only when work happens.
+     */
+    protected function ensureWorkerPage(Site $site, SshConnection $ssh, ?ConsoleEmitter $emit = null): void
+    {
+        if (! $site->isWorkerSite()) {
+            return;
+        }
+
+        $dir = rtrim($site->workerStaticRoot(), '/');
+        if ($dir === '') {
+            return;
+        }
+
+        $emit?->step($this->emitterSource(), 'ensuring worker page');
+        $builder = new SiteWorkerPageBuilder;
         $this->writeSystemFile($ssh, $dir.'/index.html', $builder->render($site));
     }
 

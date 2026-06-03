@@ -842,6 +842,20 @@ class Site extends Model
         return $this->webserver() === 'none';
     }
 
+    /**
+     * A worker site lives on a worker host (server_role=worker). Unlike a
+     * headless site it still runs Caddy (so it can attach a testing URL), but
+     * it only runs queue workers from the deployed code and never serves a web
+     * app. The webserver therefore locks the URL down to a static "this runs
+     * workers" page instead of exposing the deployed code — see
+     * {@see \App\Services\Sites\CaddySiteConfigBuilder} and
+     * {@see \App\Services\Sites\SiteWorkerPageBuilder}.
+     */
+    public function isWorkerSite(): bool
+    {
+        return $this->server?->isWorkerHost() === true;
+    }
+
     public function provisioningMeta(): array
     {
         $meta = is_array($this->meta) ? $this->meta : [];
@@ -2998,6 +3012,16 @@ class Site extends Model
     public function suspendedStaticRoot(): string
     {
         return rtrim($this->effectiveEnvDirectory(), '/').'/.dply/suspended';
+    }
+
+    /**
+     * Static web root for the worker-host "no web interface" page (outside
+     * public/). Served by Caddy for every request on a worker site so the
+     * deployed code is never browsable. See {@see Site::isWorkerSite()}.
+     */
+    public function workerStaticRoot(): string
+    {
+        return rtrim($this->effectiveEnvDirectory(), '/').'/.dply/worker';
     }
 
     /**

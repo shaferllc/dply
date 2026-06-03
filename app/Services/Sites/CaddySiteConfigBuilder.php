@@ -22,7 +22,7 @@ class CaddySiteConfigBuilder
             return '';
         }
 
-        $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers', 'accessGate']);
+        $site->loadMissing(['server', 'domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers', 'accessGate']);
 
         $hostnames = collect($site->webserverHostnames())
             ->filter()
@@ -50,6 +50,13 @@ class CaddySiteConfigBuilder
 
         if ($site->isSuspended()) {
             return $this->suspendedSiteBlock($hosts, $basename, $site);
+        }
+
+        // Worker hosts run Caddy only to attach a testing URL — they never serve
+        // a web app, so the deployed code must not be browsable. Serve the static
+        // "this runs workers" page for every request instead of the doc root.
+        if ($site->isWorkerSite()) {
+            return $this->workerSiteBlock($hosts, $basename, $site);
         }
 
         $root = $site->effectiveDocumentRoot();
@@ -219,6 +226,28 @@ CADDY;
         return str_starts_with($hash, '$2y$')
             || str_starts_with($hash, '$2a$')
             || str_starts_with($hash, '$2b$');
+    }
+
+    /**
+     * Locked-down block for a worker host: rewrite every request to the single
+     * worker page and serve it statically. No php_fastcgi, no doc-root file
+     * serving — the deployed code stays unreachable over HTTP.
+     */
+    private function workerSiteBlock(string $hosts, string $basename, Site $site): string
+    {
+        $root = $site->workerStaticRoot();
+
+        return <<<CADDY
+{$hosts} {
+    root * {$root}
+    rewrite * /index.html
+    encode zstd gzip
+    log {
+        output file /var/log/caddy/{$basename}-access.log
+    }
+    file_server
+}
+CADDY;
     }
 
     private function suspendedSiteBlock(string $hosts, string $basename, Site $site): string
