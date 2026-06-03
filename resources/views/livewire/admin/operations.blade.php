@@ -88,10 +88,25 @@
             </div>
         </div>
         <div class="{{ $card }}">
-            <h2 class="mb-3 text-base font-semibold text-brand-ink">{{ __('Cache maintenance') }}</h2>
+            <h2 class="mb-3 text-base font-semibold text-brand-ink">{{ __('Cache & queue maintenance') }}</h2>
             <div class="flex flex-wrap gap-2">
                 <button type="button" wire:click="clearApplicationCache" wire:loading.attr="disabled" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-950 hover:bg-amber-100">{{ __('Clear application cache') }}</button>
                 <button type="button" wire:click="clearOptimizedCaches" wire:loading.attr="disabled" class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-brand-sand/40">{{ __('Optimize clear') }}</button>
+                <button type="button" wire:click="retryFailedJobs" wire:loading.attr="disabled" class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-brand-sand/40">
+                    {{ __('Retry failed jobs') }}@if ($failedJobsCount > 0) <span class="ml-1 rounded-full bg-rose-100 px-1.5 py-0.5 text-xs font-semibold text-rose-700">{{ $failedJobsCount }}</span>@endif
+                </button>
+                <button type="button" wire:click="flushFailedJobs" wire:loading.attr="disabled" wire:confirm="{{ __('Permanently delete all :n failed job(s)?', ['n' => $failedJobsCount]) }}" class="rounded-lg border border-rose-200 bg-white px-4 py-2.5 text-sm font-medium text-rose-700 shadow-sm hover:bg-rose-50">{{ __('Flush failed jobs') }}</button>
+            </div>
+
+            {{-- Console — captured output of the maintenance commands run above. --}}
+            <div class="mt-4">
+                <div class="mb-1.5 flex items-center justify-between">
+                    <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Console') }}</p>
+                    @if ($consoleOutput !== '')
+                        <button type="button" wire:click="clearConsole" class="text-xs font-medium text-brand-moss hover:text-brand-ink">{{ __('Clear') }}</button>
+                    @endif
+                </div>
+                <pre class="max-h-80 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-brand-ink/95 p-3 font-mono text-xs leading-relaxed text-emerald-100">{{ $consoleOutput !== '' ? $consoleOutput : __('Run a maintenance action above — its output appears here.') }}</pre>
             </div>
         </div>
     </div>

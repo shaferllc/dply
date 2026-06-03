@@ -2,9 +2,12 @@
 
 namespace App\Services\WorkerPools;
 
+use App\Jobs\ControlWorkerDaemonJob;
 use App\Jobs\DrainAndDestroyWorkerJob;
 use App\Jobs\ReconcileWorkerPoolJob;
 use App\Models\Server;
+use App\Models\Site;
+use App\Models\SiteProcess;
 use App\Models\User;
 use App\Models\WorkerPool;
 use Illuminate\Support\Facades\DB;
@@ -67,10 +70,19 @@ class WorkerPoolManager
             throw new RuntimeException(__('Desired count exceeds the pool max size (:max).', ['max' => $pool->max_size]));
         }
 
+        $from = (int) $pool->desired_count;
+
         $pool->forceFill([
             'desired_count' => $desired,
             'status' => WorkerPool::STATUS_SCALING,
         ])->save();
+
+        // Notify (in-app + email + webhooks) that a scale was requested. Only
+        // when the target actually changed — re-applying the same count is a
+        // no-op the operator shouldn't be paged about.
+        if ($desired !== $from) {
+            app(WorkerPoolNotifier::class)->scaleStarted($pool, $from, $desired);
+        }
 
         ReconcileWorkerPoolJob::dispatch((string) $pool->id);
     }
@@ -171,5 +183,152 @@ class WorkerPoolManager
         ReconcileWorkerPoolJob::dispatch((string) $pool->id);
 
         return $member;
+    }
+
+    /**
+     * Tear the whole pool down: drain + destroy every replica, detach the
+     * primary back into a standalone worker server, and delete the pool row.
+     * The primary server itself is KEPT (this is its own workspace) — only the
+     * pool construct and its replica boxes go away. Idempotent enough to re-run.
+     *
+     * servers.worker_pool_id has no DB foreign key (nullable, unconstrained), so
+     * a replica still draining keeps a harmless dangling id until its job
+     * destroys the row — safe to delete the pool immediately.
+     *
+     * @return int Number of replicas queued for drain + destroy.
+     */
+    public function dissolvePool(WorkerPool $pool, ?User $actor = null): int
+    {
+        $pool->load('servers');
+        $primary = $pool->primaryServer ?? $pool->sourceServer;
+
+        $drained = 0;
+        foreach ($pool->servers as $member) {
+            if ($member->isPoolPrimary()) {
+                continue;
+            }
+            $meta = is_array($member->meta) ? $member->meta : [];
+            $meta['pool'] = array_merge($meta['pool'] ?? [], ['state' => WorkerPool::MEMBER_DRAINING]);
+            $member->forceFill(['meta' => $meta])->save();
+            DrainAndDestroyWorkerJob::dispatch((string) $member->id, $actor?->id);
+            $drained++;
+        }
+
+        if ($primary instanceof Server) {
+            $meta = is_array($primary->meta) ? $primary->meta : [];
+            unset($meta['pool']);
+            $primary->forceFill([
+                'worker_pool_id' => null,
+                'pool_role' => null,
+                'meta' => $meta,
+            ])->save();
+        }
+
+        $pool->delete();
+
+        return $drained;
+    }
+
+    /**
+     * Ensure the queue daemon (Horizon when the app ships laravel/horizon, else
+     * a plain `queue:work`) is defined and running on EVERY member of the pool.
+     *
+     * On VMs a worker runs as a {@see SiteProcess} that
+     * {@see \App\Services\Sites\SiteSystemdProvisioner} materialises into a
+     * systemd unit — NOT a SupervisorProgram. So we (1) make sure each member's
+     * app site has an active worker SiteProcess with the right command, then
+     * (2) dispatch {@see ProvisionSiteSystemdUnitsJob} for that site, which
+     * writes the unit and `systemctl enable --now`s it (streamed to the site's
+     * console banner). Idempotent: a member that already runs the daemon is
+     * just re-provisioned.
+     *
+     * @return array{daemon: string, command: string, members: int}
+     */
+    public function ensureWorkersAcrossPool(WorkerPool $pool, ?User $actor = null): array
+    {
+        $pool->load('servers');
+        $primaryApp = $this->appSiteForMember($pool->primaryServer ?? $pool->sourceServer);
+        $useHorizon = $primaryApp !== null && ! empty(($primaryApp->resolvedRuntimeAppDetection() ?? [])['laravel_horizon']);
+
+        $command = $useHorizon ? 'php artisan horizon' : 'php artisan queue:work';
+        $name = $useHorizon ? 'horizon' : 'worker';
+        $needle = $useHorizon ? 'horizon' : 'queue:work';
+
+        $count = 0;
+        foreach ($pool->servers as $member) {
+            $site = $this->appSiteForMember($member);
+            if (! $site instanceof Site) {
+                continue;
+            }
+
+            $covered = $site->processes()
+                ->where('is_active', true)
+                ->get(['type', 'command'])
+                ->contains(fn (SiteProcess $p): bool => str_contains(strtolower((string) $p->command), $needle));
+
+            if (! $covered) {
+                $site->processes()->create([
+                    'type' => SiteProcess::TYPE_WORKER,
+                    'name' => $name,
+                    'command' => $command,
+                    'scale' => 1,
+                    'is_active' => true,
+                ]);
+            }
+
+            // Write + enable --now the worker unit(s) on this member's box.
+            ControlWorkerDaemonJob::dispatch((string) $site->id, 'ensure', $actor?->id !== null ? (string) $actor->id : null);
+            $count++;
+        }
+
+        return ['daemon' => $useHorizon ? 'horizon' : 'queue', 'command' => $command, 'members' => $count];
+    }
+
+    /**
+     * Control the worker daemon (systemd) on a single member box.
+     * $action ∈ ensure | start | stop | restart. Returns false when the member
+     * has no resolvable app site to run workers from.
+     */
+    public function controlMemberWorkers(Server $member, string $action, ?User $actor = null, ?string $arg = null): bool
+    {
+        $site = $this->appSiteForMember($member);
+        if (! $site instanceof Site) {
+            return false;
+        }
+
+        ControlWorkerDaemonJob::dispatch((string) $site->id, $action, $actor?->id !== null ? (string) $actor->id : null, $arg);
+
+        return true;
+    }
+
+    /**
+     * Run a failed-job queue command (queue:retry / queue:forget / queue:flush)
+     * against the pool's primary app over SSH — failed jobs live in the app's
+     * shared backend, so the primary is the canonical place to manage them.
+     */
+    public function controlPrimaryQueue(WorkerPool $pool, string $action, ?string $arg = null, ?User $actor = null): bool
+    {
+        $primary = $pool->primaryServer ?? $pool->sourceServer;
+        if (! $primary instanceof Server) {
+            return false;
+        }
+
+        return $this->controlMemberWorkers($primary, $action, $actor, $arg);
+    }
+
+    /**
+     * The Laravel application site hosted on a pool member (the box hosting the
+     * replicated worker app). Prefers a framework-detected Laravel site, falling
+     * back to the member's first site.
+     */
+    private function appSiteForMember(?Server $member): ?Site
+    {
+        if (! $member instanceof Server) {
+            return null;
+        }
+
+        $sites = $member->sites()->get();
+
+        return $sites->first(fn (Site $s): bool => $s->isLaravelFrameworkDetected()) ?? $sites->first();
     }
 }

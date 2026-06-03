@@ -210,6 +210,26 @@ return [
             'failed' => 'Database engine uninstall failed.',
             'stale' => 'Database engine uninstall did not finish.',
         ],
+        // Worker pool scaling — the reconciler streams each tick's work
+        // (provision / replay / deploy / drain) into one run that spans the
+        // whole converge loop, so the operator watches scaling live on the
+        // pool's primary server page. Long-running (minutes), so the staleness
+        // window matters less; the run only goes terminal when the pool settles.
+        'worker_pool_scale' => [
+            'running' => 'Scaling the worker pool on :host …',
+            'completed' => 'Worker pool scaled.',
+            'failed' => 'Worker pool scaling failed.',
+            'stale' => 'Worker pool scaling did not finish.',
+        ],
+        // Dispatches throwaway queued closures onto the app's queue and watches
+        // the workers process them — a live "are the workers actually working?"
+        // probe streamed to the pool page.
+        'worker_pool_test' => [
+            'running' => 'Running test jobs on :host …',
+            'completed' => 'Test jobs processed by the workers.',
+            'failed' => 'Test jobs did not all process.',
+            'stale' => 'Test job run did not finish.',
+        ],
     ],
 
     /*

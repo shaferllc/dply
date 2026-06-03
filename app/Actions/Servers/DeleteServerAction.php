@@ -47,6 +47,21 @@ final class DeleteServerAction
             audit_log($org, $actor, 'server.deleted', $server, ['name' => $server->name], $auditExtras !== [] ? $auditExtras : null);
         }
 
+        // If this server is a worker-pool MEMBER and it's being deleted
+        // out-of-band (from the server page, billing teardown, etc. — NOT the
+        // pool's own scale-down path, which already lowered the target), drop
+        // the pool's desired_count by one. Otherwise the reconciler would treat
+        // the now-missing box as a deficit and immediately re-provision a
+        // replacement, leaving the pool stuck "below desired". Pool-managed
+        // removals carry reason `worker_pool_scale_down` and are skipped here.
+        $reason = is_string($auditExtras['reason'] ?? null) ? $auditExtras['reason'] : null;
+        if (! empty($server->worker_pool_id) && $reason !== 'worker_pool_scale_down' && ! $server->isPoolPrimary()) {
+            $pool = \App\Models\WorkerPool::query()->find($server->worker_pool_id);
+            if ($pool !== null) {
+                $pool->forceFill(['desired_count' => max(1, $pool->desired_count - 1)])->save();
+            }
+        }
+
         $this->destroyCloudResources($server);
 
         $server->delete();

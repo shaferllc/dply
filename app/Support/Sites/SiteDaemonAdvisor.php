@@ -7,6 +7,7 @@ namespace App\Support\Sites;
 use App\Models\Server;
 use App\Models\ServerCronJob;
 use App\Models\Site;
+use App\Models\SiteProcess;
 use App\Models\SupervisorProgram;
 
 /**
@@ -51,14 +52,31 @@ final class SiteDaemonAdvisor
             ->where(fn ($q) => $q->whereNull('site_id')->orWhere('site_id', $site->id))
             ->get(['program_type', 'command']);
 
-        $covers = static function (string $type, string $needle) use ($programs): bool {
-            return $programs->contains(function (SupervisorProgram $p) use ($type, $needle): bool {
+        // The VM-native way to run a worker is a SiteProcess (materialised into a
+        // systemd unit by SiteSystemdProvisioner) — NOT a SupervisorProgram. So
+        // a Horizon/queue/Reverb worker can be fully running via systemd and
+        // leave the supervisor table empty. Consider active SiteProcesses too,
+        // or we'd wrongly tell an operator their Horizon "isn't running".
+        $processes = $site->processes()
+            ->where('is_active', true)
+            ->get(['type', 'command']);
+
+        $covers = static function (string $type, string $needle) use ($programs, $processes): bool {
+            $inSupervisor = $programs->contains(function (SupervisorProgram $p) use ($type, $needle): bool {
                 if ((string) $p->program_type === $type) {
                     return true;
                 }
 
                 return str_contains(strtolower((string) $p->command), $needle);
             });
+            if ($inSupervisor) {
+                return true;
+            }
+
+            // A SiteProcess worker/custom whose command runs this daemon.
+            return $processes->contains(
+                fn (SiteProcess $p): bool => str_contains(strtolower((string) $p->command), $needle)
+            );
         };
 
         $out = [];
@@ -109,7 +127,7 @@ final class SiteDaemonAdvisor
         // ---- Scheduler --------------------------------------------------
         // Covered by either a schedule:work Supervisor program or a
         // schedule:run cron entry (the two ways to run Laravel's scheduler).
-        if (! self::schedulerCovered($site, $server, $programs)) {
+        if (! self::schedulerCovered($site, $server, $programs, $processes)) {
             $out[] = self::make(
                 'scheduler',
                 __('Run the scheduler'),
@@ -126,8 +144,9 @@ final class SiteDaemonAdvisor
 
     /**
      * @param  \Illuminate\Support\Collection<int, SupervisorProgram>  $programs
+     * @param  \Illuminate\Support\Collection<int, SiteProcess>  $processes
      */
-    private static function schedulerCovered(Site $site, Server $server, $programs): bool
+    private static function schedulerCovered(Site $site, Server $server, $programs, $processes): bool
     {
         // schedule:work / schedule:run as a long-running Supervisor program.
         $byProgram = $programs->contains(
@@ -135,6 +154,17 @@ final class SiteDaemonAdvisor
                 || str_contains(strtolower((string) $p->command), 'schedule:run')
         );
         if ($byProgram) {
+            return true;
+        }
+
+        // …or as a SiteProcess (scheduler type, or a command running the scheduler),
+        // which is how the VM systemd path runs it.
+        $byProcess = $processes->contains(
+            fn (SiteProcess $p): bool => $p->type === SiteProcess::TYPE_SCHEDULER
+                || str_contains(strtolower((string) $p->command), 'schedule:work')
+                || str_contains(strtolower((string) $p->command), 'schedule:run')
+        );
+        if ($byProcess) {
             return true;
         }
 

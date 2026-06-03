@@ -41,6 +41,13 @@
     $backupsContextSite = $contextSite ?? null;
 @endphp
 
+{{-- Single stable root: a Livewire component must morph against ONE consistent
+     root element. This page renders two structurally different layouts (site
+     context vs server context) plus a sibling modal include; without a shared
+     wrapper the root element changes shape and Livewire's morph / wire:navigate
+     cycle leaves an orphaned, snapshot-less root ("Snapshot missing on Livewire
+     component"). `display:contents` keeps the wrapper layout-neutral. --}}
+<div class="contents">
 @if ($backupsContextSite)
     @php
         $site = $backupsContextSite;
@@ -93,3 +100,4 @@
 @endif
 
 @include('livewire.partials.confirm-action-modal')
+</div>

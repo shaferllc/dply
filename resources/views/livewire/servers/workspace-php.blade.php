@@ -12,6 +12,12 @@
     ];
 @endphp
 
+{{-- Single stable root: the layout below plus the trailing modal include are two
+     top-level siblings. A Livewire component must morph against ONE consistent
+     root element — without this wrapper the morph / wire:navigate cycle can
+     leave an orphaned, snapshot-less root ("Snapshot missing on Livewire
+     component"). `display:contents` keeps the wrapper layout-neutral. --}}
+<div class="contents">
 <x-server-workspace-layout
     :server="$server"
     active="php"
@@ -765,3 +771,4 @@
 </x-server-workspace-layout>
 
 @include('livewire.partials.confirm-action-modal')
+</div>{{-- /single root --}}

@@ -51,6 +51,15 @@ class NginxSiteConfigBuilder
             return $this->suspendedBlock($site, $basename, $names);
         }
 
+        // Worker-host sites never serve the deployed app — the code must not be
+        // browsable. Serve the static "this runs workers" splash for every
+        // request (rooted at workerStaticRoot, NOT the app docroot) on both HTTP
+        // and HTTPS. Without this, nginx roots at the empty/absent app docroot
+        // and returns 403. (Caddy already special-cases this; Nginx now matches.)
+        if ($site->isWorkerSite()) {
+            return $this->appendTlsServerBlocks($site, $this->workerBlock($site, $basename, $names));
+        }
+
         $root = $site->effectiveDocumentRootForNginx();
         $phpSock = str_replace(
             '{version}',
@@ -200,6 +209,38 @@ class NginxSiteConfigBuilder
     /**
      * Static-only vhost serving {@see Site::suspendedStaticRoot()} (no PHP, proxy, or redirects).
      */
+    /**
+     * Static "this server runs workers" splash for a worker-host site, served
+     * for every path (mirrors Caddy's worker block). Rooted at workerStaticRoot
+     * so the deployed code is never browsable. TLS is layered on by
+     * {@see appendTlsServerBlocks()} when the cert is ready.
+     */
+    protected function workerBlock(Site $site, string $basename, string $serverNames): string
+    {
+        $root = $site->workerStaticRoot();
+
+        return <<<NGINX
+# Managed by Dply — {$basename} (worker host — no web app)
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {$serverNames};
+    root {$root};
+    index index.html;
+    access_log /var/log/nginx/{$basename}-access.log;
+    error_log /var/log/nginx/{$basename}-error.log;
+
+    location / {
+        try_files \$uri \$uri/ /index.html;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}
+NGINX;
+    }
+
     protected function suspendedBlock(Site $site, string $basename, string $serverNames): string
     {
         $root = $site->suspendedStaticRoot();

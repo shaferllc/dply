@@ -2,14 +2,17 @@
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\WorkerPool;
 use App\Services\WorkerPools\WorkerPoolManager;
+use App\Services\WorkerPools\WorkerPoolNotifier;
 use App\Services\WorkerPools\WorkerWorkloadReplayer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -26,17 +29,27 @@ use Illuminate\Support\Facades\Log;
  *
  * Best-effort: a member that fails to provision is left for retry/inspection
  * and never causes healthy members to be torn down.
+ *
+ * Every tick streams its work into ONE {@see \App\Models\ConsoleAction} run
+ * (kind `worker_pool_scale`) that spans the whole converge loop — the run id is
+ * threaded through each self-redispatch — so the operator watches scaling live
+ * on the pool primary's workspace. The run only goes terminal (completed /
+ * failed) when the pool settles or the attempt budget is exhausted, and the
+ * matching scaled / scale_failed notification fires there too.
  */
 class ReconcileWorkerPoolJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, WritesConsoleAction;
 
     /** Stop re-dispatching after this many ticks (~20 min at 30s) as a backstop. */
     private const MAX_ATTEMPTS = 40;
 
+    private ?Server $resolvedSubject = null;
+
     public function __construct(
         public string $poolId,
         public int $attempt = 0,
+        public ?string $runId = null,
     ) {}
 
     public function handle(WorkerPoolManager $manager, WorkerWorkloadReplayer $replayer): void
@@ -51,21 +64,59 @@ class ReconcileWorkerPoolJob implements ShouldQueue
         if (! $source instanceof Server) {
             return;
         }
+        $this->resolvedSubject = $source;
+
+        // Bind (or seed) the console run that spans every tick of this scale,
+        // then stream this tick's work into it. (The working run id lives on the
+        // WritesConsoleAction trait; $this->runId is the serialized carrier
+        // threaded across re-dispatches — they must stay separate properties.)
+        $this->bindConsoleRunId($this->runId);
+        $emit = $this->beginConsoleAction();
+        $this->runId = $this->currentConsoleRunId();
+
+        try {
+            $this->converge($pool, $manager, $replayer, $emit);
+        } catch (\Throwable $e) {
+            $emit->error('Reconcile tick crashed: '.$e->getMessage());
+            $this->failConsoleAction($e->getMessage());
+            $pool->forceFill(['status' => WorkerPool::STATUS_DEGRADED])->save();
+            app(WorkerPoolNotifier::class)->scaleFailed($pool->fresh() ?? $pool, $e->getMessage());
+
+            throw $e;
+        }
+    }
+
+    private function converge(
+        WorkerPool $pool,
+        WorkerPoolManager $manager,
+        WorkerWorkloadReplayer $replayer,
+        \App\Services\ConsoleActions\ConsoleEmitter $emit,
+    ): void {
+        $source = $this->resolvedSubject;
 
         // 1) Converge member count to desired.
         $active = $pool->activeMemberCount();
         $deficit = $pool->desired_count - $active;
+        $emit->step('reconcile', sprintf(
+            'tick #%d — desired %d, active %d (%s)',
+            $this->attempt + 1,
+            $pool->desired_count,
+            $active,
+            $deficit > 0 ? 'scaling up '.$deficit : ($deficit < 0 ? 'scaling down '.(-$deficit) : 'balanced'),
+        ));
 
         if ($deficit > 0) {
             // Scale up: provision replicas until active members reach desired.
             for ($i = 0; $i < $deficit; $i++) {
                 try {
-                    $manager->addReplica($pool->fresh('servers'));
+                    $replica = $manager->addReplica($pool->fresh('servers'));
+                    $emit->success(sprintf('provisioning replica %s (%s)', $replica->name, $replica->region ?: 'same region'), 'provision');
                 } catch (\Throwable $e) {
                     Log::warning('worker-pool: failed to provision replica', [
                         'pool_id' => $pool->id,
                         'error' => $e->getMessage(),
                     ]);
+                    $emit->error('failed to provision a replica: '.$e->getMessage(), 'provision');
                     $pool->forceFill(['status' => WorkerPool::STATUS_DEGRADED])->save();
                     break;
                 }
@@ -82,12 +133,14 @@ class ReconcileWorkerPoolJob implements ShouldQueue
             foreach ($victims as $victim) {
                 try {
                     $manager->removeMember($pool, $victim);
+                    $emit->info(sprintf('draining %s, then destroying it', $victim->name), 'drain');
                 } catch (\Throwable $e) {
                     Log::warning('worker-pool: failed to drain replica', [
                         'pool_id' => $pool->id,
                         'member_id' => $victim->id,
                         'error' => $e->getMessage(),
                     ]);
+                    $emit->warn(sprintf('could not drain %s: %s', $victim->name, $e->getMessage()), 'drain');
                 }
             }
         }
@@ -106,28 +159,33 @@ class ReconcileWorkerPoolJob implements ShouldQueue
             if ($state === WorkerPool::MEMBER_PROVISIONING) {
                 if ($member->isReady()) {
                     $this->markState($member, WorkerPool::MEMBER_REPLAYING);
+                    $emit->step('replay', sprintf('%s is ready — replaying workload', $member->name));
                     try {
                         $replayer->replicate($source, $member, asReplica: true);
                         // Replay recorded pending_deploys on the member; move to
                         // DEPLOYING so the deploy step below picks it up once each
                         // site finishes provisioning.
                         $this->markState($member, WorkerPool::MEMBER_DEPLOYING);
+                        $emit->info(sprintf('%s replay done — deploying sites', $member->name), 'replay');
                         $inFlight = true;
                     } catch (\Throwable $e) {
                         Log::warning('worker-pool: replay failed', [
                             'member_id' => $member->id,
                             'error' => $e->getMessage(),
                         ]);
+                        $emit->warn(sprintf('%s replay failed (will retry): %s', $member->name, $e->getMessage()), 'replay');
                         // Leave in provisioning state for a later retry tick.
                         $this->markState($member, WorkerPool::MEMBER_PROVISIONING);
                         $inFlight = true;
                     }
                 } else {
+                    $emit->info(sprintf('%s still provisioning at the provider…', $member->name), 'provision');
                     $inFlight = true; // still provisioning at the provider
                 }
             } elseif ($state === WorkerPool::MEMBER_DEPLOYING) {
-                if ($this->dispatchReadyDeploys($member)) {
+                if ($this->dispatchReadyDeploys($member, $emit)) {
                     $this->markState($member, WorkerPool::MEMBER_ACTIVE);
+                    $emit->success(sprintf('%s is active', $member->name), 'deploy');
                     // A cross-region member needs its backends opened to its IP.
                     // Auto-apply (the operator already confirmed by adding it).
                     if ((bool) ($member->meta['cross_region'] ?? false)) {
@@ -143,15 +201,28 @@ class ReconcileWorkerPoolJob implements ShouldQueue
         $pool->refresh();
         $stillScaling = $inFlight || $pool->activeMemberCount() < $pool->desired_count;
 
-        if ($stillScaling && $this->attempt < self::MAX_ATTEMPTS) {
-            self::dispatch($this->poolId, $this->attempt + 1)->delay(now()->addSeconds(30));
+        if (! $stillScaling) {
+            $pool->forceFill(['status' => WorkerPool::STATUS_STEADY])->save();
+            $emit->success(sprintf('pool settled — %d active worker(s)', $pool->activeMemberCount()), 'reconcile');
+            $this->completeConsoleAction();
+            app(WorkerPoolNotifier::class)->scaled($pool, $pool->activeMemberCount());
 
             return;
         }
 
-        if (! $stillScaling) {
-            $pool->forceFill(['status' => WorkerPool::STATUS_STEADY])->save();
+        if ($this->attempt < self::MAX_ATTEMPTS) {
+            $emit->info('still converging — re-checking in 30s', 'reconcile');
+            self::dispatch($this->poolId, $this->attempt + 1, $this->currentConsoleRunId())
+                ->delay(now()->addSeconds(30));
+
+            return;
         }
+
+        // Attempt budget exhausted while still scaling — give up and surface it.
+        $pool->forceFill(['status' => WorkerPool::STATUS_DEGRADED])->save();
+        $emit->error('scaling did not converge after the maximum number of attempts', 'reconcile');
+        $this->failConsoleAction('Scaling did not converge before the attempt limit (~20 min).');
+        app(WorkerPoolNotifier::class)->scaleFailed($pool, 'Scaling did not converge before the attempt limit.');
     }
 
     /**
@@ -160,7 +231,7 @@ class ReconcileWorkerPoolJob implements ShouldQueue
      * sites remain pending (all deploys dispatched), false while some are still
      * provisioning. Idempotent: dispatched sites are removed from the list.
      */
-    private function dispatchReadyDeploys(Server $member): bool
+    private function dispatchReadyDeploys(Server $member, \App\Services\ConsoleActions\ConsoleEmitter $emit): bool
     {
         $meta = is_array($member->meta) ? $member->meta : [];
         $pending = $meta['pool']['pending_deploys'] ?? [];
@@ -174,10 +245,20 @@ class ReconcileWorkerPoolJob implements ShouldQueue
             if (! $site instanceof Site) {
                 continue; // site gone — drop it
             }
-            if (($site->meta['provisioning']['state'] ?? null) === 'ready') {
+            $provState = $site->meta['provisioning']['state'] ?? null;
+            if ($provState === 'ready') {
                 RunSiteDeploymentJob::dispatch($site, SiteDeployment::TRIGGER_MANUAL);
+                $emit->info(sprintf('%s: dispatching deploy for %s', $member->name, $site->name), 'deploy');
             } else {
                 $remaining[] = $siteId;
+                // Surface WHY the member is stuck in DEPLOYING: it's waiting on
+                // this site to finish provisioning before its deploy can run.
+                $emit->warn(sprintf(
+                    '%s: waiting on site %s to finish provisioning (state: %s) before deploying',
+                    $member->name,
+                    $site->name,
+                    $provState ?? 'unknown',
+                ), 'deploy');
             }
         }
 
@@ -192,5 +273,22 @@ class ReconcileWorkerPoolJob implements ShouldQueue
         $meta = is_array($member->meta) ? $member->meta : [];
         $meta['pool'] = array_merge($meta['pool'] ?? [], ['state' => $state]);
         $member->forceFill(['meta' => $meta])->save();
+    }
+
+    protected function consoleSubject(): Model
+    {
+        if ($this->resolvedSubject instanceof Server) {
+            return $this->resolvedSubject;
+        }
+
+        $pool = WorkerPool::query()->with('servers')->find($this->poolId);
+        $server = $pool?->primaryServer ?? $pool?->sourceServer;
+
+        return $this->resolvedSubject = ($server instanceof Server ? $server : new Server);
+    }
+
+    protected function consoleKind(): string
+    {
+        return 'worker_pool_scale';
     }
 }

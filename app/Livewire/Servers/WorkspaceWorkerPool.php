@@ -4,15 +4,21 @@ namespace App\Livewire\Servers;
 
 use App\Actions\Servers\ResolveServerCreateCatalog;
 use App\Jobs\ApplyWorkerPoolExposureJob;
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Models\ConsoleAction;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\WorkerPool;
 use App\Services\WorkerPools\WorkerCloneProvisioner;
 use App\Services\WorkerPools\WorkerPoolManager;
 use Illuminate\Contracts\View\View;
+use App\Jobs\CollectWorkerPoolHorizonSnapshotJob;
+use App\Jobs\CollectWorkerPoolStatsJob;
+use App\Jobs\RunWorkerPoolTestJobsJob;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
@@ -25,7 +31,11 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class WorkspaceWorkerPool extends Component
 {
+    use ConfirmsActionWithModal;
     use InteractsWithServerWorkspace;
+
+    #[Url(as: 'tab')]
+    public string $tab = 'overview';
 
     public string $pool_name = '';
 
@@ -207,6 +217,285 @@ class WorkspaceWorkerPool extends Component
         $this->toastSuccess(__('Scaling to :n worker(s). Provisioning runs in the background.', ['n' => (int) $this->desired_count]));
     }
 
+    /**
+     * Refresh per-member host + worker + Redis stats over SSH (queued, never
+     * inline) so the Traffic tab shows live numbers. Switches to the Traffic
+     * tab so the operator sees the result land.
+     */
+    public function collectStats(): void
+    {
+        Gate::authorize('update', $this->server);
+
+        $pool = $this->pool();
+        if (! $pool) {
+            $this->toastError(__('No pool.'));
+
+            return;
+        }
+
+        $this->tab = 'traffic';
+        CollectWorkerPoolStatsJob::dispatch((string) $pool->id);
+        $this->toastSuccess(__('Refreshing worker stats over SSH — numbers update in a few seconds.'));
+    }
+
+    /**
+     * Ensure the queue daemon (Horizon when the app has laravel/horizon, else
+     * queue:work) is defined and running on every member — creating the worker
+     * SiteProcess where missing and (re)writing/starting its systemd unit. The
+     * per-member progress streams to each member's own systemd console banner.
+     */
+    public function ensureWorkers(WorkerPoolManager $manager): void
+    {
+        Gate::authorize('update', $this->server);
+
+        $pool = $this->pool();
+        if (! $pool) {
+            $this->toastError(__('No pool.'));
+
+            return;
+        }
+
+        $result = $manager->ensureWorkersAcrossPool($pool, auth()->user());
+        $this->toastSuccess(__('Ensuring :daemon on :n member(s) — units are being written and started in the background.', [
+            'daemon' => $result['daemon'] === 'horizon' ? 'Horizon' : __('queue workers'),
+            'n' => $result['members'],
+        ]));
+    }
+
+    /**
+     * Start / stop / restart the worker daemon (systemd) on one member box.
+     * $action ∈ ensure | start | stop | restart.
+     */
+    public function controlMemberWorkers(string $serverId, string $action, WorkerPoolManager $manager): void
+    {
+        Gate::authorize('update', $this->server);
+
+        $allowed = ['ensure', 'start', 'stop', 'restart', 'horizon:pause', 'horizon:continue', 'horizon:terminate', 'horizon:snapshot', 'horizon:status'];
+        $action = in_array($action, $allowed, true) ? $action : 'restart';
+
+        $pool = $this->pool();
+        $member = $pool?->servers->firstWhere('id', $serverId);
+        if (! $pool || ! $member) {
+            $this->toastError(__('Member not found.'));
+
+            return;
+        }
+
+        if (! $manager->controlMemberWorkers($member, $action, auth()->user())) {
+            $this->toastError(__('No app site on :name to run workers from.', ['name' => $member->name]));
+
+            return;
+        }
+
+        $verb = [
+            'ensure' => __('Ensuring workers'),
+            'start' => __('Starting workers'),
+            'stop' => __('Stopping workers'),
+            'restart' => __('Restarting workers'),
+            'horizon:pause' => __('Pausing Horizon'),
+            'horizon:continue' => __('Resuming Horizon'),
+            'horizon:terminate' => __('Restarting Horizon'),
+            'horizon:snapshot' => __('Snapshotting Horizon metrics'),
+            'horizon:status' => __('Checking Horizon status'),
+        ][$action] ?? __('Updating workers');
+        $this->toastSuccess(__(':verb on :name — watch its systemd console for output.', ['verb' => $verb, 'name' => $member->name]));
+    }
+
+    /**
+     * Pool-wide Horizon control: pause / continue / terminate (restart) /
+     * snapshot, applied to every member's Horizon over SSH.
+     */
+    public function controlPoolHorizon(string $action, WorkerPoolManager $manager): void
+    {
+        Gate::authorize('update', $this->server);
+
+        $action = in_array($action, ['horizon:pause', 'horizon:continue', 'horizon:terminate', 'horizon:snapshot'], true)
+            ? $action
+            : 'horizon:snapshot';
+
+        $pool = $this->pool();
+        if (! $pool) {
+            $this->toastError(__('No pool.'));
+
+            return;
+        }
+
+        $n = 0;
+        foreach ($pool->servers as $member) {
+            if ($manager->controlMemberWorkers($member, $action, auth()->user())) {
+                $n++;
+            }
+        }
+
+        $verb = [
+            'horizon:pause' => __('Pausing Horizon'),
+            'horizon:continue' => __('Resuming Horizon'),
+            'horizon:terminate' => __('Restarting Horizon'),
+            'horizon:snapshot' => __('Snapshotting Horizon metrics'),
+        ][$action];
+        $this->toastSuccess(__(':verb on :n member(s).', ['verb' => $verb, 'n' => $n]));
+    }
+
+    /**
+     * Retry / delete failed jobs on the pool's app over SSH. $uuid is a single
+     * failed-job UUID, or null/'all' to act on every failed job.
+     */
+    public function retryFailedJob(?string $uuid = null, ?WorkerPoolManager $manager = null): void
+    {
+        $this->queueFailedAction('queue:retry', $uuid, $manager);
+    }
+
+    public function forgetFailedJob(string $uuid, ?WorkerPoolManager $manager = null): void
+    {
+        $this->queueFailedAction('queue:forget', $uuid, $manager);
+    }
+
+    public function retryAllFailed(?WorkerPoolManager $manager = null): void
+    {
+        $this->queueFailedAction('queue:retry', 'all', $manager);
+    }
+
+    public function flushFailed(?WorkerPoolManager $manager = null): void
+    {
+        $this->queueFailedAction('queue:flush', null, $manager);
+    }
+
+    private function queueFailedAction(string $action, ?string $arg, ?WorkerPoolManager $manager): void
+    {
+        Gate::authorize('update', $this->server);
+        $manager ??= app(WorkerPoolManager::class);
+
+        $pool = $this->pool();
+        if (! $pool) {
+            $this->toastError(__('No pool.'));
+
+            return;
+        }
+
+        if (! $manager->controlPrimaryQueue($pool, $action, $arg, auth()->user())) {
+            $this->toastError(__('No app site to manage failed jobs on.'));
+
+            return;
+        }
+
+        $this->tab = 'horizon';
+        $label = match ($action) {
+            'queue:retry' => $arg && $arg !== 'all' ? __('Retrying failed job') : __('Retrying all failed jobs'),
+            'queue:forget' => __('Deleting failed job'),
+            'queue:flush' => __('Flushing all failed jobs'),
+            default => __('Updating failed jobs'),
+        };
+        // Re-pull the snapshot shortly so the list reflects the change.
+        CollectWorkerPoolHorizonSnapshotJob::dispatch((string) $pool->id);
+        $this->toastSuccess($label.' — '.__('the Horizon tab will refresh.'));
+    }
+
+    /**
+     * Pull a Horizon-style metrics snapshot (failed/completed/pending, jobs per
+     * minute, per-queue workload, recent failed jobs) from the app's Horizon
+     * over SSH into the pool's Horizon tab.
+     */
+    public function refreshHorizon(): void
+    {
+        Gate::authorize('update', $this->server);
+
+        $pool = $this->pool();
+        if (! $pool) {
+            $this->toastError(__('No pool.'));
+
+            return;
+        }
+
+        $this->tab = 'horizon';
+        CollectWorkerPoolHorizonSnapshotJob::dispatch((string) $pool->id);
+        $this->toastSuccess(__('Pulling Horizon metrics over SSH — the dashboard updates in a few seconds.'));
+    }
+
+    /**
+     * Dispatch a handful of throwaway queued closures onto the app's queue and
+     * verify the workers process them — streamed to the test console below.
+     */
+    public function runTestJobs(): void
+    {
+        Gate::authorize('update', $this->server);
+
+        $pool = $this->pool();
+        if (! $pool) {
+            $this->toastError(__('No pool.'));
+
+            return;
+        }
+
+        $this->tab = 'traffic';
+        RunWorkerPoolTestJobsJob::dispatch((string) $pool->id, 5, (string) (auth()->id() ?? '') ?: null);
+        $this->toastSuccess(__('Dispatching 5 test jobs — watch the test console for whether the workers process them.'));
+    }
+
+    /**
+     * Latest non-dismissed test-jobs console run (server subject), for the
+     * Traffic tab's test console banner.
+     */
+    public function testRun(): ?ConsoleAction
+    {
+        return ConsoleAction::query()
+            ->where('subject_type', $this->server->getMorphClass())
+            ->where('subject_id', $this->server->getKey())
+            ->where('kind', 'worker_pool_test')
+            ->whereNull('dismissed_at')
+            ->orderByDesc('created_at')
+            ->first();
+    }
+
+    /**
+     * Re-kick the reconciler for a pool that stopped converging — e.g. a member
+     * stuck in DEPLOYING after the ~20-min attempt budget ran out, or one whose
+     * site provisioning has since finished. Sets status back to scaling so the
+     * console run re-seeds and streams a fresh pass.
+     */
+    public function reconcileNow(): void
+    {
+        Gate::authorize('update', $this->server);
+
+        $pool = $this->pool();
+        if (! $pool) {
+            $this->toastError(__('No pool to reconcile.'));
+
+            return;
+        }
+
+        $pool->forceFill(['status' => WorkerPool::STATUS_SCALING])->save();
+        \App\Jobs\ReconcileWorkerPoolJob::dispatch((string) $pool->id);
+        $this->toastSuccess(__('Re-checking the pool — watch the console below for what each member is waiting on.'));
+    }
+
+    /**
+     * Tear the whole pool down: drain + destroy all replicas and dissolve the
+     * pool, leaving this server as a standalone worker. Destructive — the blade
+     * gates it behind a typed confirmation.
+     */
+    public function tearDownPool(WorkerPoolManager $manager): void
+    {
+        Gate::authorize('update', $this->server);
+
+        $pool = $this->pool();
+        if (! $pool) {
+            $this->toastError(__('No pool to tear down.'));
+
+            return;
+        }
+
+        try {
+            $count = $manager->dissolvePool($pool, auth()->user());
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        }
+
+        $this->server->refresh();
+        $this->toastSuccess(__('Tearing down the pool — :n replica(s) draining and destroying. This server is now a standalone worker.', ['n' => $count]));
+    }
+
     public function promote(string $serverId, WorkerPoolManager $manager): void
     {
         Gate::authorize('update', $this->server);
@@ -251,7 +540,17 @@ class WorkspaceWorkerPool extends Component
             return;
         }
 
-        $this->toastSuccess(__('Draining :name, then it will be destroyed.', ['name' => $member->name]));
+        // Operator-initiated removal is a scale-DOWN: lower the target so the
+        // reconciler doesn't immediately provision a replacement to "fill" the
+        // now-missing slot. (The reconciler's own scale-down path leaves
+        // desired_count alone — it's already the target there.) Then settle the
+        // status so the pool doesn't sit stuck on "scaling".
+        $newDesired = max(1, $pool->desired_count - 1);
+        $pool->forceFill(['desired_count' => $newDesired, 'status' => WorkerPool::STATUS_SCALING])->save();
+        $this->desired_count = $newDesired;
+        \App\Jobs\ReconcileWorkerPoolJob::dispatch((string) $pool->id);
+
+        $this->toastSuccess(__('Draining :name, then it will be destroyed. Desired count is now :n.', ['name' => $member->name, 'n' => $newDesired]));
     }
 
     public function applyExposure(): void
@@ -333,12 +632,42 @@ class WorkspaceWorkerPool extends Component
         return $plan;
     }
 
+    /**
+     * Latest non-dismissed scaling console run for this server, fed to the
+     * console-action-banner-static partial so the operator watches the
+     * reconciler stream its work live. The partial's wire:poll re-renders this
+     * component every few seconds while the run is in-flight.
+     */
+    public function scaleRun(): ?ConsoleAction
+    {
+        return ConsoleAction::query()
+            ->where('subject_type', $this->server->getMorphClass())
+            ->where('subject_id', $this->server->getKey())
+            ->where('kind', 'worker_pool_scale')
+            ->whereNull('dismissed_at')
+            ->orderByDesc('created_at')
+            ->first();
+    }
+
     public function render(): View
     {
         $pool = $this->pool();
         $members = $pool
             ? $pool->servers()->orderByRaw("CASE WHEN pool_role = 'primary' THEN 0 ELSE 1 END")->orderBy('created_at')->get()
             : collect();
+
+        // Self-heal a stale "scaling" status: the reconciler only flips the
+        // column to steady when it fully converges, so a stopped/exhausted
+        // reconcile can leave it stuck on "scaling" forever. If the pool is
+        // actually settled (nothing converging or draining and active is at or
+        // above desired), correct it here so the rest of the app agrees.
+        if ($pool && $pool->status !== WorkerPool::STATUS_STEADY) {
+            $converging = $members->filter(fn ($m) => ! $m->isPoolPrimary() && in_array($m->poolMemberState(), [WorkerPool::MEMBER_PROVISIONING, WorkerPool::MEMBER_REPLAYING, WorkerPool::MEMBER_DEPLOYING], true))->count();
+            $draining = $members->filter(fn ($m) => $m->poolMemberState() === WorkerPool::MEMBER_DRAINING)->count();
+            if ($converging === 0 && $draining === 0 && $pool->activeMemberCount() >= $pool->desired_count) {
+                $pool->forceFill(['status' => WorkerPool::STATUS_STEADY])->save();
+            }
+        }
 
         // Cross-provider selectors: providers we can clone onto that the org has
         // a credential for, plus the source provider (same-provider region change).
@@ -367,6 +696,8 @@ class WorkspaceWorkerPool extends Component
             'providerOptions' => $providerOptions,
             'credentialOptions' => $credentialOptions,
             'perWorkerCents' => $perWorkerCents,
+            'scaleRun' => $this->scaleRun(),
+            'testRun' => $this->testRun(),
         ]);
     }
 }

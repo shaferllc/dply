@@ -175,10 +175,28 @@ class WorkerCloneProvisioner
 
     private function nextName(WorkerPool $pool): string
     {
-        $base = Str::of($pool->name)->slug()->value() ?: 'worker';
-        // Find the highest numeric suffix already used in the pool.
+        // Name replicas off the PRIMARY server, not the pool name — so a pool
+        // led by "worker-1" yields "worker-2", "worker-3", … rather than
+        // "worker-1-pool-2". Strip any trailing "-<number>" from the primary's
+        // name to get the stem, then take the next free integer suffix across
+        // all current member names (so it never collides and continues the
+        // primary's numbering, e.g. worker-1 → worker-2).
+        $primary = $pool->primaryServer ?? $pool->sourceServer;
+        $primaryName = trim((string) ($primary?->name ?? ''));
+        $base = $primaryName !== ''
+            ? (string) preg_replace('/-\d+$/', '', $primaryName)
+            : (Str::of($pool->name)->slug()->value() ?: 'worker');
+        $base = $base !== '' ? $base : 'worker';
+
         $existing = Server::query()->where('worker_pool_id', $pool->id)->pluck('name');
-        $n = $existing->count() + 1;
+
+        // Start after the primary's own number when it has one (worker-1 → 2),
+        // otherwise after the current member count.
+        $primarySuffix = ($primaryName !== '' && preg_match('/-(\d+)$/', $primaryName, $m))
+            ? (int) $m[1]
+            : $existing->count();
+        $n = max($primarySuffix + 1, 2);
+
         $name = $base.'-'.$n;
         while ($existing->contains($name)) {
             $n++;

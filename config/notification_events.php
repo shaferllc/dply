@@ -58,6 +58,14 @@ return [
                 'project.activity' => 'Project activity summaries',
             ],
         ],
+        'worker_pool' => [
+            'label' => 'Worker pool notifications',
+            'events' => [
+                'worker_pool.scale_started' => 'Worker pool scaling started',
+                'worker_pool.scaled' => 'Worker pool scaled',
+                'worker_pool.scale_failed' => 'Worker pool scaling failed (action required)',
+            ],
+        ],
         'import' => [
             'label' => 'Import & migration notifications',
             'events' => [

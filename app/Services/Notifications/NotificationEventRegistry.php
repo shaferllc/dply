@@ -86,6 +86,7 @@ class NotificationEventRegistry
             || str_ends_with($eventKey, 'paused_nudge')
             || str_ends_with($eventKey, 'container_launch.failed')
             || str_ends_with($eventKey, 'provision_failed')
+            || str_ends_with($eventKey, 'scale_failed')
         ) {
             return 'warning';
         }
