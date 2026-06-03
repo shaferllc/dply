@@ -541,13 +541,17 @@ class WorkspaceDatabases extends Component
         $allowedFrom = $enable ? trim($this->remote_access_allowed_from) : '';
 
         if ($enable) {
+            // Require an explicit trusted source — never silently open the engine
+            // port to the whole internet on a blank field.
             if ($allowedFrom === '') {
-                $allowedFrom = '0.0.0.0/0';
+                $this->addError('remote_access_allowed_from', __('Enter the CIDR allowed to connect (e.g. 10.0.0.0/8 or your app server IP/32). Leave remote access off to keep the port closed.'));
+
+                return;
             }
 
-            // Basic CIDR sanity — must look like x.x.x.x/n or x::/n or 0.0.0.0/0.
+            // Basic CIDR sanity — must look like x.x.x.x/n or x::/n.
             if (! $this->isValidRemoteCidr($allowedFrom)) {
-                $this->addError('remote_access_allowed_from', __('Enter a valid CIDR (e.g. 0.0.0.0/0, 10.0.0.0/8).'));
+                $this->addError('remote_access_allowed_from', __('Enter a valid CIDR (e.g. 10.0.0.0/8, 203.0.113.5/32).'));
 
                 return;
             }
@@ -603,14 +607,18 @@ class WorkspaceDatabases extends Component
             return;
         }
 
-        $allowedFrom = $enable ? trim($this->db_networking_allowed_from[$databaseId] ?? '0.0.0.0/0') : '';
+        $allowedFrom = $enable ? trim($this->db_networking_allowed_from[$databaseId] ?? '') : '';
 
         if ($enable) {
+            // Require an explicit trusted source — never silently open the port
+            // to the whole internet on a blank field.
             if ($allowedFrom === '') {
-                $allowedFrom = '0.0.0.0/0';
+                $this->addError('db_networking_allowed_from.'.$databaseId, __('Enter the CIDR allowed to connect (e.g. 10.0.0.0/8 or your app server IP/32). Leave remote access off to keep the port closed.'));
+
+                return;
             }
             if (! $this->isValidRemoteCidr($allowedFrom)) {
-                $this->addError('db_networking_allowed_from.'.$databaseId, __('Enter a valid CIDR (e.g. 0.0.0.0/0, 10.0.0.0/8).'));
+                $this->addError('db_networking_allowed_from.'.$databaseId, __('Enter a valid CIDR (e.g. 10.0.0.0/8, 203.0.113.5/32).'));
 
                 return;
             }

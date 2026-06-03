@@ -1,4 +1,12 @@
 @php($isEmbedded = $embedded ?? false)
+{{-- Single unconditional root element. This component is rendered embedded
+     (nested) inside DeploymentsList, and Livewire requires a nested component's
+     root to be ONE unconditional element. Choosing the root inside an
+     @if/@else wraps it in <!--[if BLOCK]--> markers, which breaks Livewire's
+     root detection — it re-assigns the component to a child element with a fresh
+     id every render, so morph can't match and throws "Snapshot missing",
+     destroying the component on every action. --}}
+<div>
 @if (! $isEmbedded)
 <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
     <div class="lg:grid lg:grid-cols-12 lg:gap-10">
@@ -76,3 +84,4 @@
 @else
 </div>
 @endif
+</div>

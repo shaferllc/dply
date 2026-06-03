@@ -94,10 +94,15 @@ Slim Laravel app = `dply-engine` + thin persistence + UI.
 
 > **Naming note:** `dply-node` was already taken — it's the existing TypeScript **dply Node SDK** (API client) at `~/Projects/Apps/dply-node`. The PHP server engine is therefore named **`dply-engine`** to avoid collision.
 
-### Phase 1 — node core: SSH + firewall + provision (≈2–3 wk)
-- [ ] Lift `TaskRunner/` (strip Livewire/Http/Broadcasting sub-trees → those belong to CE/Cloud, not the lib).
-- [ ] Port `SshConnection` against `RemoteShell`; `ProvisionCommandBuilder`; firewall services.
-- [ ] CLI: `dply-engine provision`, `dply-engine firewall`. **Shippable, star-worthy on its own.**
+### Phase 1 — node core: SSH + firewall + provision (≈2–3 wk) — IN PROGRESS
+- [x] **SSH transport** — `Ssh\SshRemoteShell` (phpseclib3, DTO + `NodeContext` driven). **Decision:** did NOT lift `TaskRunner/` wholesale — it's heavily Laravel-coupled (Livewire/Http/Jobs/Broadcasting) and its real value is streaming/job orchestration, which is a CE/Cloud concern. Built `SshRemoteShell` directly on phpseclib instead — cleaner and contract-honoring (it throws `RemoteCommandFailed` on non-zero exit, fixing the silent-success bug).
+- [x] **Firewall services** — `Firewall\UfwRuleCompiler` (faithful UFW grammar), `FirewallApplyPlanner` (ordered plan + always-on SSH safety guard), `FirewallApplier` (runs via `RemoteShell` w/ transcript), `UfwShowAddedParser` (host import). `Testing\FakeRemoteShell` + `Support\NullNodeContext` shipped for downstream tests.
+- [x] CLI: `dply-engine firewall:plan` prints a real UFW apply plan. 19 tests / phpstan L8 / import-ban green.
+- [x] **Port `ServerProvisionCommandBuilder` — application role.** `Provision\ProvisionScriptBuilder` (step-timing protocol, idempotent lock-aware apt primitive, ondrej/sury repo dance, webserver[caddy/nginx/apache]/PHP-FPM/cache[redis/valkey/memcached]/Supervisor/Composer + fail2ban/unattended-upgrades finalize), `ProvisionPreamble` (self-contained shell helpers — emitted script needs no control-plane injection), `ProvisionOptions` (baked allowlists + coalesce), `ProvisionConfig` (toggles). `Server` DTO gained `databaseEngine`/`cacheEngine`. CLI `dply-engine provision`. **Generated 206-line script passes `bash -n`.** 27 tests / phpstan L8 / import-ban green.
+- [x] **Database engines + memory probe + installed-stack snapshot.** `installDatabaseIfNeeded` → MySQL (policy-rc.d shim sequence), PostgreSQL (pgdg repo, per-version), MariaDB, SQLite; `DPLY_LOW_MEM` probe drives MySQL/Postgres→SQLite fallback on <1GB hosts; `emitInstalledStack` tagged JSON with live-probed DB version. `bash -n` passes for mysql84/postgres17/mariadb114/sqlite3/none. 33 tests green.
+  - **STILL STAGED:** swap provisioning, cloud-init pre-emption, rendered webserver vhosts, dpkg self-heal + ERR rollback trap, openlitespeed/traefik, non-application roles (worker/database/docker/etc.).
+- [x] **`firewall:apply` over SSH.** `FirewallManager` (one-call plan+apply through any `RemoteShell`) + CLI `firewall:apply <config.json>` (dry-run default, `--run` executes via `SshRemoteShell`). Non-zero ufw exit aborts (no silent success). 36 tests green.
+- [ ] Remaining provision: non-application roles, rendered vhosts, dpkg-repair/rollback subsystem, swap.
 
 ### Phase 2 — deploy layer (≈3–4 wk)
 - [ ] Port `DeployPhaseRunner` + `ByoServerDeployEngine` + `DockerDeployEngine` behind data interfaces.

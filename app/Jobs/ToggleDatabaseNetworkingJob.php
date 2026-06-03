@@ -10,6 +10,7 @@ use App\Models\ServerFirewallRule;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerFirewallProvisioner;
 use App\Support\Servers\DatabaseEngineInstallScripts;
+use App\Support\Servers\DedicatedCacheServerProvisionConfig;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -122,35 +123,55 @@ class ToggleDatabaseNetworkingJob implements ShouldQueue
         // Hetzner cloud firewall is synced inside ServerFirewallProvisioner::applyRule.
     }
 
+    /**
+     * Reconcile the engine's UFW rules so the database port is opened ONLY to the
+     * trusted networks listed in each remote-access database's `allowed_from` —
+     * one rule per distinct CIDR, never source=any. The port being world-open is
+     * what abuse scanners flag (pg_hba.conf only gates auth, not the open port),
+     * so legacy source=any rules are torn down here too.
+     */
     private function syncEngineFirewallRule(ServerDatabase $db, ServerFirewallProvisioner $firewall): void
     {
         $server = $db->server;
         $tag = 'dply-db-network-'.$db->engine;
 
+        /** @var \Illuminate\Support\Collection<int, ServerFirewallRule> $existing */
         $existing = ServerFirewallRule::query()
             ->where('server_id', $server->id)
             ->whereJsonContains('tags', $tag)
-            ->first();
+            ->get();
 
-        $anyRemote = ServerDatabase::query()
+        // Union of every remote-access database's allowed_from CIDRs on this
+        // engine. Each becomes its own scoped UFW rule.
+        $desiredSources = ServerDatabase::query()
             ->where('server_id', $server->id)
             ->where('engine', $db->engine)
             ->where('remote_access', true)
-            ->exists();
+            ->get()
+            ->flatMap(fn (ServerDatabase $d): array => DedicatedCacheServerProvisionConfig::splitAllowedFrom((string) $d->allowed_from))
+            ->map(fn (string $cidr): string => trim($cidr))
+            ->filter(fn (string $cidr): bool => $cidr !== '')
+            ->unique()
+            ->values();
 
-        if (! $anyRemote) {
-            if ($existing) {
-                try {
-                    $firewall->removeFromHost($server, $existing);
-                } catch (\Throwable) {
-                }
-                $existing->delete();
+        // Drop any host rule whose source is no longer wanted — including legacy
+        // source=any rules that exposed the port to the whole internet.
+        $keptSources = [];
+        foreach ($existing as $rule) {
+            if ($desiredSources->contains((string) $rule->source)) {
+                $keptSources[] = (string) $rule->source;
+
+                continue;
             }
 
-            return;
+            try {
+                $firewall->removeFromHost($server, $rule);
+            } catch (\Throwable) {
+            }
+            $rule->delete();
         }
 
-        if ($existing) {
+        if ($desiredSources->isEmpty()) {
             return;
         }
 
@@ -159,21 +180,27 @@ class ToggleDatabaseNetworkingJob implements ShouldQueue
             ->where('engine', $db->engine)
             ->value('port') ?? ServerDatabaseEngine::defaultPortFor($db->engine);
 
-        $rule = ServerFirewallRule::query()->create([
-            'server_id' => $server->id,
-            'name' => sprintf('Database · %s network', ucfirst($db->engine)),
-            'port' => (int) $port,
-            'protocol' => 'tcp',
-            'source' => 'any',
-            'action' => 'allow',
-            'enabled' => true,
-            'sort_order' => (int) (ServerFirewallRule::query()->where('server_id', $server->id)->max('sort_order') ?? 0) + 1,
-            'tags' => ['dply-database', $tag],
-        ]);
+        foreach ($desiredSources as $source) {
+            if (in_array($source, $keptSources, true)) {
+                continue;
+            }
 
-        try {
-            $firewall->applyRule($server, $rule);
-        } catch (\Throwable) {
+            $rule = ServerFirewallRule::query()->create([
+                'server_id' => $server->id,
+                'name' => sprintf('Database · %s network', ucfirst($db->engine)),
+                'port' => (int) $port,
+                'protocol' => 'tcp',
+                'source' => $source,
+                'action' => 'allow',
+                'enabled' => true,
+                'sort_order' => (int) (ServerFirewallRule::query()->where('server_id', $server->id)->max('sort_order') ?? 0) + 1,
+                'tags' => ['dply-database', $tag],
+            ]);
+
+            try {
+                $firewall->applyRule($server, $rule);
+            } catch (\Throwable) {
+            }
         }
     }
 }
