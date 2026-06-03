@@ -19,6 +19,7 @@ use App\Jobs\CollectWorkerPoolStatsJob;
 use App\Jobs\RunWorkerPoolTestJobsJob;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -82,6 +83,14 @@ class WorkspaceWorkerPool extends Component
     public int $hz_timeout = 720;
 
     public int $hz_tries = 1;
+
+    /**
+     * Live per-job feed, newest first, pushed over Reverb from the worker boxes
+     * (see WorkerPoolJobEvent). Capped; this is a rolling window, not history.
+     *
+     * @var array<int, array<string, mixed>>
+     */
+    public array $liveJobs = [];
 
     public function mount(Server $server): void
     {
@@ -543,6 +552,28 @@ class WorkspaceWorkerPool extends Component
      * Latest non-dismissed test-jobs console run (server subject), for the
      * Traffic tab's test console banner.
      */
+    /**
+     * Real-time per-job event pushed from a worker box (via Reverb → Echo →
+     * Livewire). Prepend to the live feed if it's for this pool; cap the window.
+     *
+     * @param  array<string, mixed>  $job
+     */
+    #[On('worker-pool-job')]
+    public function onWorkerPoolJob(string $poolId, array $job): void
+    {
+        if ($poolId !== (string) ($this->server->worker_pool_id ?? '')) {
+            return;
+        }
+
+        array_unshift($this->liveJobs, [
+            'name' => (string) ($job['name'] ?? 'job'),
+            'queue' => (string) ($job['queue'] ?? '?'),
+            'status' => (string) ($job['status'] ?? 'processing'),
+            'at' => (float) ($job['at'] ?? 0),
+        ]);
+        $this->liveJobs = array_slice($this->liveJobs, 0, 30);
+    }
+
     public function testRun(): ?ConsoleAction
     {
         return ConsoleAction::query()

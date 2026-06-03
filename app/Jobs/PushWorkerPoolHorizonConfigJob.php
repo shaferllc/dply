@@ -54,7 +54,10 @@ class PushWorkerPoolHorizonConfigJob implements ShouldQueue
             return;
         }
 
-        $envVars = WorkerPoolHorizonConfig::envVarsFor($pool);
+        $envVars = array_merge(
+            WorkerPoolHorizonConfig::envVarsFor($pool),
+            $this->eventIngestEnvVars($pool),
+        );
 
         foreach ($pool->servers as $member) {
             if (! $member instanceof Server || ! $member->isReady()) {
@@ -98,6 +101,34 @@ class PushWorkerPoolHorizonConfigJob implements ShouldQueue
             $variables[$key] = (string) $value;
         }
         $site->forceFill(['env_file_content' => $writer->render($variables, $parsed['comments'])])->save();
+    }
+
+    /**
+     * Env that turns on the box-side real-time agent
+     * ({@see \App\Listeners\ForwardWorkerPoolJobEvent}): the ingest URL it POSTs
+     * each Horizon job event to, and the per-pool bearer token. The token is
+     * minted once and stored on the pool meta. The base URL defaults to the app
+     * URL but is overridable (DPLY_POOL_EVENT_INGEST_BASE) for when the boxes
+     * must reach dply on a different public host (e.g. a dev tunnel).
+     *
+     * @return array<string, string>
+     */
+    private function eventIngestEnvVars(WorkerPool $pool): array
+    {
+        $meta = is_array($pool->meta) ? $pool->meta : [];
+        $token = (string) ($meta['event_token'] ?? '');
+        if ($token === '') {
+            $token = bin2hex(random_bytes(24));
+            $meta['event_token'] = $token;
+            $pool->forceFill(['meta' => $meta])->save();
+        }
+
+        $base = rtrim((string) (env('DPLY_POOL_EVENT_INGEST_BASE') ?: config('app.url')), '/');
+
+        return [
+            'DPLY_POOL_EVENT_URL' => $base.'/api/worker-pools/'.$pool->id.'/job-events',
+            'DPLY_POOL_EVENT_TOKEN' => $token,
+        ];
     }
 
     private function appSite(Server $member): ?Site

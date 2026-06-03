@@ -8,6 +8,7 @@ use App\Jobs\CleanupRemoteSiteArtifactsJob;
 use App\Jobs\ProvisionDefaultUserSshKeysToServerJob;
 use App\Listeners\ProcessReferralInvoicePayment;
 use App\Listeners\RecordLivewireDispatchedJob;
+use App\Listeners\ForwardWorkerPoolJobEvent;
 use App\Listeners\RecordServerRemoteAccessContext;
 use App\Listeners\Servers\DispatchServerAuthorizedKeysSyncedWebhook;
 use App\Listeners\SyncBillingOnSubscriptionWebhook;
@@ -311,6 +312,12 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(JobProcessing::class, [RecordServerRemoteAccessContext::class, 'handleProcessing']);
         Event::listen(JobProcessed::class, [RecordServerRemoteAccessContext::class, 'handleProcessed']);
         Event::listen(JobFailed::class, [RecordServerRemoteAccessContext::class, 'handleFailed']);
+
+        // Box-side worker-pool agent: forward per-job events to dply for the live
+        // dashboard. No-op unless DPLY_POOL_EVENT_URL/_TOKEN are set on the box.
+        Event::listen(JobProcessing::class, [ForwardWorkerPoolJobEvent::class, 'handleProcessing']);
+        Event::listen(JobProcessed::class, [ForwardWorkerPoolJobEvent::class, 'handleProcessed']);
+        Event::listen(JobFailed::class, [ForwardWorkerPoolJobEvent::class, 'handleFailed']);
 
         Gate::policy(Organization::class, OrganizationPolicy::class);
         Gate::policy(Server::class, ServerPolicy::class);

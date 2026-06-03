@@ -37,12 +37,22 @@ function bindDplyOrganizationServerChannel() {
 
     window.__dplyOrgEchoSub = orgId;
 
-    window.Echo.private(`organization.${orgId}`).listen('.server.state.updated', (payload) => {
+    const orgChannel = window.Echo.private(`organization.${orgId}`);
+
+    orgChannel.listen('.server.state.updated', (payload) => {
         window.Livewire.dispatch('server-state-updated', {
             organizationId: payload.organization_id,
             action: payload.action,
             serverId: payload.server_id,
             server: payload.server,
+        });
+    });
+
+    // Per-job worker-pool events — true real-time Horizon dashboard (no polling).
+    orgChannel.listen('.worker-pool.job', (payload) => {
+        window.Livewire.dispatch('worker-pool-job', {
+            poolId: payload.pool_id,
+            job: payload.job,
         });
     });
 }

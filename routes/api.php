@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\ServerFirewallController;
 use App\Http\Controllers\Api\ServerSharedHostController;
 use App\Http\Controllers\Api\ServerSystemUserApiController;
 use App\Http\Controllers\Api\SiteController;
+use App\Http\Controllers\Api\WorkerPoolJobEventController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -39,6 +40,12 @@ use Illuminate\Support\Facades\Route;
 */
 Route::post('/metrics', [MetricsController::class, 'store'])
     ->middleware(['throttle:metrics-guest-push', 'throttle:metrics-ingest']);
+
+// Per-job Horizon events forwarded from worker pool boxes (Bearer = pool
+// event_token), re-broadcast over Reverb to the org channel for the live
+// worker-pool dashboard. High-frequency but tiny; throttled generously.
+Route::post('/worker-pools/{pool}/job-events', [WorkerPoolJobEventController::class, 'store'])
+    ->middleware('throttle:600,1');
 
 Route::prefix('v1')->group(function (): void {
     // OAuth-style device-flow login for the dply CLI. The CLI calls

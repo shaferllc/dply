@@ -518,7 +518,9 @@
             $hzError = $hz['error'] ?? null;
             $hzStatus = $hz['status'] ?? null;
         @endphp
-        <div wire:poll.8s class="mt-6 space-y-6">
+        {{-- No wire:poll here: the Live jobs feed is pushed over Reverb in real
+             time. Aggregate tiles/lists refresh on Refresh Horizon / Snapshot. --}}
+        <div class="mt-6 space-y-6">
             <section class="dply-card overflow-hidden">
                 <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <div class="min-w-0">
@@ -599,6 +601,41 @@
                             </div>
                         @endforeach
                     </dl>
+                @endif
+            </section>
+
+            {{-- Live jobs — real-time per-job feed pushed from the worker boxes
+                 over Reverb (no polling); newest first. Populated by the
+                 #[On('worker-pool-job')] handler as Echo delivers events. --}}
+            <section class="dply-card overflow-hidden">
+                <div class="flex items-center justify-between border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
+                    <div class="flex items-center gap-2">
+                        <span class="relative flex h-2 w-2" title="{{ __('Live') }}">
+                            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                            <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+                        </span>
+                        <h3 class="text-sm font-semibold text-brand-ink">{{ __('Live jobs') }}</h3>
+                    </div>
+                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-xs font-semibold text-brand-moss">{{ count($liveJobs) }}</span>
+                </div>
+                @if (empty($liveJobs))
+                    <div class="px-6 py-5 text-sm text-brand-moss sm:px-7">{{ __('Waiting for job activity… events stream in here the instant workers process them.') }}</div>
+                @else
+                    <div class="divide-y divide-brand-ink/5">
+                        @foreach ($liveJobs as $i => $j)
+                            <div class="flex flex-wrap items-center gap-2 px-6 py-2.5 sm:px-7" wire:key="livejob-{{ $i }}-{{ $j['at'] }}">
+                                <span class="text-sm font-medium text-brand-ink">{{ $j['name'] }}</span>
+                                <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-[11px] text-brand-moss">{{ $j['queue'] }}</span>
+                                <span @class([
+                                    'inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1',
+                                    'bg-sky-50 text-sky-700 ring-sky-200' => $j['status'] === 'processing',
+                                    'bg-emerald-50 text-emerald-700 ring-emerald-200' => $j['status'] === 'completed',
+                                    'bg-rose-50 text-rose-700 ring-rose-200' => $j['status'] === 'failed',
+                                    'bg-brand-sand/60 text-brand-moss ring-brand-ink/15' => ! in_array($j['status'], ['processing', 'completed', 'failed'], true),
+                                ])>{{ $j['status'] }}</span>
+                            </div>
+                        @endforeach
+                    </div>
                 @endif
             </section>
 
