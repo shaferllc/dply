@@ -714,6 +714,17 @@ class Organization extends Model
     }
 
     /**
+     * True when the dply platform fee is waived this cycle: an active beta org
+     * that has NOT subscribed early. Opting into a paid plan turns the waiver
+     * off (the org wanted to pay) — but the free CX22 stays comped regardless,
+     * via the comped_until column. Drives the $0 plan price in billing.
+     */
+    public function betaFeeWaived(): bool
+    {
+        return $this->isBeta() && ! $this->onAnyPaidPlan();
+    }
+
+    /**
      * BYO server ceiling for a beta org — generous enough to feel unlimited for
      * a solo dev / small team, bounded so a leaked invite can't provision
      * hundreds of boxes on a stolen cloud key via dply.
