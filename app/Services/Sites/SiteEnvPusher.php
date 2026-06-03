@@ -10,13 +10,18 @@ class SiteEnvPusher
 {
     public function __construct(
         protected DotEnvFileParser $parser,
+        protected DotEnvFileWriter $writer,
     ) {}
 
     /**
-     * Writes the site's encrypted env cache to the server's `.env` file
-     * verbatim. The cache IS the desired contents — we don't compose
-     * project-level vars in here anymore (Laravel reads project defaults
-     * separately; the deployment contract is what merges them).
+     * Writes the site's `.env` to the server, composed from the editable env
+     * cache PLUS the connection variables of any attached resource bindings
+     * (database, redis, …). The bindings inject under the cache: a real .env
+     * key the operator set still wins (that's the per-key override), but keys a
+     * binding owns and the cache doesn't carry (because "adopt" moved them out
+     * of the editable list) are written here so the deployed app actually
+     * receives DB_HOST/REDIS_HOST/… — otherwise the binding would only ever
+     * live in the deploy contract and never reach a VM's on-disk .env.
      *
      * Validates the blob via DotEnvFileParser before SSHing. Rejecting
      * malformed input here keeps the operator from pushing a file that
@@ -38,6 +43,17 @@ class SiteEnvPusher
         $parsed = $this->parser->parse($content);
         if ($parsed['errors'] !== []) {
             throw new \RuntimeException('.env has parse errors — fix and retry: '.implode('; ', $parsed['errors']));
+        }
+
+        // Compose attached-resource bindings under the cache (cache/override
+        // wins). When a binding contributes keys the cache lacks, re-render the
+        // file so they're physically written to the server's .env.
+        $bindingEnv = $this->bindingEnv($site);
+        if ($bindingEnv !== []) {
+            $merged = array_merge($bindingEnv, $parsed['variables']);
+            if ($merged !== $parsed['variables']) {
+                $content = $this->writer->render($merged, $parsed['comments']);
+            }
         }
 
         $path = $site->effectiveEnvFilePath();
@@ -127,6 +143,26 @@ class SiteEnvPusher
         $site->forceFill(['env_cache_origin' => 'local-edit'])->save();
 
         return $path;
+    }
+
+    /**
+     * Flattened connection variables from every attached resource binding,
+     * later keys winning ties between bindings (rare). Returns [] when the site
+     * has no bindings — leaving the cache content untouched.
+     *
+     * @return array<string, string>
+     */
+    private function bindingEnv(Site $site): array
+    {
+        $env = [];
+        $site->loadMissing('bindings');
+        foreach ($site->bindings as $binding) {
+            foreach ($binding->connectionEnv() as $key => $value) {
+                $env[(string) $key] = (string) $value;
+            }
+        }
+
+        return $env;
     }
 
     /**

@@ -43,74 +43,78 @@
          inline rather than letting the build succeed and the app 500. --}}
     @if ($blockedEnv !== [])
         <div class="rounded-2xl border border-rose-200 bg-rose-50 p-4">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-                <div class="flex min-w-0 items-start gap-3">
-                    <x-heroicon-o-exclamation-triangle class="mt-0.5 h-5 w-5 shrink-0 text-rose-700" aria-hidden="true" />
-                    <div class="min-w-0">
-                        <p class="text-sm font-semibold text-rose-900">
-                            {{ trans_choice('{1} Deploy needs :count environment variable|[2,*] Deploy needs :count environment variables', count($blockedEnv), ['count' => count($blockedEnv)]) }}
-                        </p>
-                        <p class="mt-1 text-sm text-rose-800">{{ __('The last deploy stopped because the app requires these and they aren\'t set. Add them, then deploy again.') }}</p>
-                        <div class="mt-2 flex flex-wrap gap-1.5">
-                            @foreach (array_slice($blockedEnv, 0, 24) as $entry)
-                                <span class="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 font-mono text-[11px] font-semibold text-rose-800 ring-1 ring-inset ring-rose-200">
-                                    {{ $entry['key'] }}
-                                    <button type="button" wire:click="confirmIgnoreEnvKey('{{ $entry['key'] }}')" class="-mr-0.5 text-rose-400 hover:text-rose-700" title="{{ __('Ignore :key', ['key' => $entry['key']]) }}" aria-label="{{ __('Ignore :key', ['key' => $entry['key']]) }}">
-                                        <x-heroicon-o-x-mark class="h-3 w-3" />
-                                    </button>
-                                </span>
-                            @endforeach
-                            @if (count($blockedEnv) > 24)
-                                <span class="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-800">{{ __('+:count more', ['count' => count($blockedEnv) - 24]) }}</span>
-                            @endif
-                        </div>
+            <div class="flex items-start gap-3">
+                <x-heroicon-o-exclamation-triangle class="mt-0.5 h-5 w-5 shrink-0 text-rose-700" aria-hidden="true" />
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-semibold text-rose-900">
+                        {{ trans_choice('{1} Deploy needs :count environment variable|[2,*] Deploy needs :count environment variables', count($blockedEnv), ['count' => count($blockedEnv)]) }}
+                    </p>
+                    <p class="mt-1 text-sm leading-relaxed text-rose-800">{{ __('The last deploy stopped because the app requires these and they aren\'t set. Add them, then deploy again.') }}</p>
+                    <div class="mt-2.5 flex flex-wrap gap-1.5">
+                        @foreach (array_slice($blockedEnv, 0, 24) as $entry)
+                            <span class="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 font-mono text-[11px] font-semibold text-rose-800 ring-1 ring-inset ring-rose-200">
+                                {{ $entry['key'] }}
+                                <button type="button" wire:click="confirmIgnoreEnvKey('{{ $entry['key'] }}')" class="-mr-0.5 text-rose-400 hover:text-rose-700" title="{{ __('Ignore :key', ['key' => $entry['key']]) }}" aria-label="{{ __('Ignore :key', ['key' => $entry['key']]) }}">
+                                    <x-heroicon-o-x-mark class="h-3 w-3" />
+                                </button>
+                            </span>
+                        @endforeach
+                        @if (count($blockedEnv) > 24)
+                            <span class="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-800">{{ __('+:count more', ['count' => count($blockedEnv) - 24]) }}</span>
+                        @endif
                     </div>
                 </div>
-                <div class="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
+            </div>
+
+            {{-- Single action bar: fix-it actions on the left, sync / bypass on
+                 the right. Wraps cleanly instead of a floating centered column. --}}
+            <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-rose-200/70 pt-3">
+                <button
+                    type="button"
+                    wire:click="openBlockedEnvModal"
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-rose-800"
+                >
+                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                    {{ __('Add variables') }}
+                </button>
+                <button
+                    type="button"
+                    wire:click="setTab('environment')"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-900 shadow-sm transition-colors hover:bg-rose-100"
+                >
+                    <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                    {{ __('Edit all variables') }}
+                </button>
+
+                <div class="flex flex-wrap items-center gap-2 sm:ml-auto">
                     <button
                         type="button"
-                        wire:click="openBlockedEnvModal"
-                        class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-rose-800"
+                        wire:click="openConfirmActionModal('syncEnvFromServer', [], @js(__('Sync from server?')), @js(__('This replaces the cached variables with the live .env on the server. Any local edits not yet pushed will be overwritten and lost.')), @js(__('Overwrite with server copy')), true)"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-800 shadow-sm transition-colors hover:bg-rose-100 disabled:opacity-60"
+                        title="{{ __('Re-read the live .env from the server (in case you set them out-of-band).') }}"
                     >
-                        <x-heroicon-o-plus class="h-3.5 w-3.5" />
-                        {{ __('Add variables') }}
+                        <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5" wire:loading.remove wire:target="syncEnvFromServer" />
+                        <span wire:loading wire:target="syncEnvFromServer" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
+                        {{ __('Sync from server') }}
                     </button>
-                    <button type="button" wire:click="setTab('environment')" class="inline-flex items-center justify-center gap-1 text-[11px] font-semibold text-rose-700 hover:underline">
-                        <x-heroicon-o-pencil-square class="h-3 w-3" />
-                        {{ __('Edit all variables') }}
+                    <button
+                        type="button"
+                        wire:click="confirmDeployIgnoringEnvGate"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-800 shadow-sm transition-colors hover:bg-rose-100"
+                        title="{{ __('Ignore the required-env check and deploy anyway.') }}"
+                    >
+                        <x-heroicon-o-rocket-launch class="h-3.5 w-3.5" />
+                        {{ __('Deploy anyway') }}
                     </button>
-                    <div class="flex flex-wrap gap-2">
-                        <button
-                            type="button"
-                            wire:click="syncEnvFromServer"
-                            wire:loading.attr="disabled"
-                            wire:target="syncEnvFromServer"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-900 shadow-sm hover:bg-rose-100 disabled:opacity-60"
-                            title="{{ __('Re-read the live .env from the server (in case you set them out-of-band).') }}"
-                        >
-                            <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5" wire:loading.remove wire:target="syncEnvFromServer" />
-                            <span wire:loading wire:target="syncEnvFromServer" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
-                            {{ __('Sync from server') }}
-                        </button>
-                        <button
-                            type="button"
-                            wire:click="confirmDeployIgnoringEnvGate"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-900 shadow-sm hover:bg-rose-100"
-                            title="{{ __('Ignore the required-env check and deploy anyway.') }}"
-                        >
-                            <x-heroicon-o-rocket-launch class="h-3.5 w-3.5" />
-                            {{ __('Deploy anyway') }}
-                        </button>
-                        <button
-                            type="button"
-                            wire:click="confirmIgnoreMissingEnv"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-900 shadow-sm hover:bg-rose-100"
-                            title="{{ __('Stop blocking deploys on missing required variables.') }}"
-                        >
-                            <x-heroicon-o-no-symbol class="h-3.5 w-3.5" />
-                            {{ __('Ignore all') }}
-                        </button>
-                    </div>
+                    <button
+                        type="button"
+                        wire:click="confirmIgnoreMissingEnv"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-800 shadow-sm transition-colors hover:bg-rose-100"
+                        title="{{ __('Stop blocking deploys on missing required variables.') }}"
+                    >
+                        <x-heroicon-o-no-symbol class="h-3.5 w-3.5" />
+                        {{ __('Ignore all') }}
+                    </button>
                 </div>
             </div>
         </div>

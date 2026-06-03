@@ -8,6 +8,7 @@ use App\Jobs\PushSiteEnvJob;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\ManagesSiteBindings;
 use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
 use App\Livewire\Sites\Concerns\ManagesSiteDeployExecution;
 use App\Livewire\Sites\Concerns\ManagesSiteEnvironment;
@@ -35,6 +36,7 @@ class DeploymentsList extends Component
 {
     use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
+    use ManagesSiteBindings;
     use ManagesSiteDeployExecution;
     use ManagesSiteEnvironment;
     use WatchesConsoleActionOutcomes;

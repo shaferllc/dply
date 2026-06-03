@@ -183,8 +183,14 @@
             </ol>
         </nav>
 
-        @if ($showDocs || isset($trailing))
+        @php $breadcrumbSite = request()->route('site'); @endphp
+        @if ($showDocs || isset($trailing) || $breadcrumbSite instanceof \App\Models\Site)
             <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                {{-- Deploy from anywhere: a persistent Deploy button + live
+                     console for the site in scope, next to Documentation. --}}
+                @if ($breadcrumbSite instanceof \App\Models\Site)
+                    <livewire:sites.deploy-control :key="'deploy-control-'.$breadcrumbSite->id" />
+                @endif
                 @if ($docContextual)
                     <x-docs-link :slug="$resolvedContextualDocSlug">
                         <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />

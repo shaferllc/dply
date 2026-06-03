@@ -48,6 +48,24 @@ return [
             'failed' => 'Environment scan failed.',
             'stale' => 'Environment scan did not finish.',
         ],
+        'binding_validate' => [
+            'running' => 'Validating the connection from :host …',
+            'completed' => 'Connection validated — the server can reach the resource.',
+            'failed' => 'Connection check failed — the server could not reach the resource.',
+            'stale' => 'Connection check did not finish.',
+        ],
+        'site_test' => [
+            'running' => 'Testing whether the site loads …',
+            'completed' => 'The site loaded successfully.',
+            'failed' => 'The site did not load — see the error output.',
+            'stale' => 'Site test did not finish.',
+        ],
+        'site_remediate' => [
+            'running' => 'Running the fix on :host …',
+            'completed' => 'Fix completed.',
+            'failed' => 'The fix did not complete — see the output.',
+            'stale' => 'Fix did not finish.',
+        ],
         'ssl' => [
             'running' => 'Issuing SSL certificate on :host …',
             'completed' => 'SSL certificate issued.',

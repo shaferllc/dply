@@ -5,11 +5,18 @@ declare(strict_types=1);
 namespace App\Livewire\Sites\Concerns;
 
 use App\Jobs\PushSiteEnvJob;
+use App\Jobs\RunSiteFixerJob;
 use App\Jobs\ScanSiteEnvRequirementsJob;
 use App\Jobs\SyncEnvFromServerJob;
+use App\Jobs\TestSiteHealthJob;
+use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
+use App\Livewire\Sites\Show;
 use App\Models\ConsoleAction;
+use App\Models\Server;
+use App\Models\Site;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
+use App\Support\Sites\SiteFixers;
 use Livewire\Component;
 
 /**
@@ -17,16 +24,16 @@ use Livewire\Component;
  * from / pushing it to the server's live .env, the detected-requirement
  * "missing variables" prompt, and the file-path relocation controls.
  *
- * Lifted out of {@see \App\Livewire\Sites\Show} so the same editor can be
+ * Lifted out of {@see Show} so the same editor can be
  * embedded as the Deploy hub's Environment tab. The host component must also
  * use {@see ConfirmsActionWithModal}, {@see DispatchesToastNotifications} and
- * {@see \App\Livewire\Concerns\WatchesConsoleActionOutcomes}, and expose
+ * {@see WatchesConsoleActionOutcomes}, and expose
  * `$this->site` and `$this->server`.
  *
  * @phpstan-require-extends Component
  *
- * @property \App\Models\Server $server
- * @property \App\Models\Site $site
+ * @property Server $server
+ * @property Site $site
  */
 trait ManagesSiteEnvironment
 {
@@ -44,6 +51,11 @@ trait ManagesSiteEnvironment
 
     public string $editing_env_comment = '';
 
+    /** Key currently open in the single-variable "Fix" modal ('' = closed). */
+    public ?string $fixing_env_key = null;
+
+    public string $fixing_env_value = '';
+
     /** @var list<string> */
     public array $revealed_env_keys = [];
 
@@ -54,6 +66,19 @@ trait ManagesSiteEnvironment
 
     /** Selected prefix group to filter the variables list ('' = all). */
     public string $env_group = '';
+
+    /** 1-based page for the (in-memory) variables list. */
+    public int $env_page = 1;
+
+    public function updatedEnvSearch(): void
+    {
+        $this->env_page = 1;
+    }
+
+    public function updatedEnvGroup(): void
+    {
+        $this->env_page = 1;
+    }
 
     /** Editable buffer for the "Edit all" modal (the full .env as text). */
     public string $edit_all_env = '';
@@ -354,6 +379,32 @@ trait ManagesSiteEnvironment
         $this->editing_env_comment = '';
     }
 
+    /**
+     * Open the inline editor for a connection variable currently provided by a
+     * resource binding (e.g. DB_HOST from a database binding). The key isn't in
+     * the site .env yet, so seed the buffer from the binding's value; saving
+     * writes a real .env key, which the deploy layering lets beat the binding —
+     * i.e. a manual override the operator owns from here on.
+     */
+    public function overrideManagedEnvVar(string $key): void
+    {
+        $this->authorize('update', $this->site);
+
+        $value = '';
+        $this->site->loadMissing('bindings');
+        foreach ($this->site->bindings as $binding) {
+            $env = $binding->connectionEnv();
+            if (array_key_exists($key, $env)) {
+                $value = (string) $env[$key];
+                break;
+            }
+        }
+
+        $this->editing_env_key = $key;
+        $this->editing_env_value = $value;
+        $this->editing_env_comment = '';
+    }
+
     public function saveEditedEnvVar(DotEnvFileParser $parser, DotEnvFileWriter $writer): void
     {
         $this->authorize('update', $this->site);
@@ -388,6 +439,108 @@ trait ManagesSiteEnvironment
 
         $this->cancelEditEnvVar();
         $this->autoPushAfterCacheMutation(__('Variable updated.'));
+    }
+
+    /**
+     * Open the single-variable "Fix" modal for a key flagged by the config
+     * check. Pre-fills the input with the current value (creating the row if
+     * it doesn't exist yet) so the operator can correct it in place — works
+     * for ANY key, not just the ones with a known suggested fix.
+     */
+    public function openFixEnvVar(string $key, DotEnvFileParser $parser): void
+    {
+        $this->authorize('update', $this->site);
+
+        $parsed = $parser->parse((string) ($this->site->env_file_content ?? ''));
+
+        $this->fixing_env_key = $key;
+        $this->fixing_env_value = (string) ($parsed['variables'][$key] ?? '');
+        $this->resetErrorBag('fixing_env_value');
+
+        $this->dispatch('open-modal', 'fix-env-var-modal');
+    }
+
+    public function cancelFixEnvVar(): void
+    {
+        $this->fixing_env_key = null;
+        $this->fixing_env_value = '';
+    }
+
+    /**
+     * Drop the suggested fix into the input (the modal's "Use suggested"
+     * button). For APP_KEY this mints a fresh key; for the boolean/enum keys
+     * it's the safe-in-production value.
+     */
+    public function applySuggestedEnvFix(): void
+    {
+        $key = strtoupper(trim((string) $this->fixing_env_key));
+        $this->fixing_env_value = match ($key) {
+            'APP_DEBUG' => 'false',
+            'APP_ENV' => 'production',
+            'SESSION_SECURE_COOKIE' => 'true',
+            'APP_KEY' => $this->freshAppKey(),
+            'APP_URL' => str_starts_with(strtolower($this->fixing_env_value), 'http://')
+                ? 'https://'.substr($this->fixing_env_value, 7)
+                : $this->fixing_env_value,
+            default => $this->fixing_env_value,
+        };
+    }
+
+    /**
+     * Human-readable label for the "Use suggested" button, or null when we
+     * have no opinion on the right value (e.g. DB_PASSWORD — only the operator
+     * knows it). Deterministic so it's safe to call on every render.
+     */
+    public function envFixSuggestionLabel(string $key, string $current): ?string
+    {
+        return match (strtoupper(trim($key))) {
+            'APP_DEBUG' => 'false',
+            'APP_ENV' => 'production',
+            'SESSION_SECURE_COOKIE' => 'true',
+            'APP_KEY' => __('Generate a fresh key'),
+            'APP_URL' => str_starts_with(strtolower($current), 'http://')
+                ? 'https://'.substr($current, 7)
+                : null,
+            default => null,
+        };
+    }
+
+    /**
+     * Write the single fixed key back into the cache and auto-push. Mirrors
+     * {@see saveEditedEnvVar()} but scoped to the modal's one key.
+     */
+    public function saveFixedEnvVar(DotEnvFileParser $parser, DotEnvFileWriter $writer): void
+    {
+        $this->authorize('update', $this->site);
+
+        $key = trim((string) $this->fixing_env_key);
+        if ($key === '' || ! preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $key)) {
+            return;
+        }
+
+        $this->validate([
+            'fixing_env_value' => 'nullable|string|max:20000',
+        ]);
+
+        $parsed = $parser->parse((string) ($this->site->env_file_content ?? ''));
+        $map = $parsed['variables'];
+        $map[$key] = (string) $this->fixing_env_value;
+
+        $this->site->forceFill([
+            'env_file_content' => $writer->render($map, $parsed['comments']),
+            'env_cache_origin' => 'local-edit',
+        ])->save();
+
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.env.var_updated', $this->site, null, [
+                'key' => $key,
+            ]);
+        }
+
+        $this->cancelFixEnvVar();
+        $this->dispatch('close-modal', 'fix-env-var-modal');
+        $this->autoPushAfterCacheMutation(__(':key updated.', ['key' => $key]));
     }
 
     /**
@@ -466,6 +619,57 @@ trait ManagesSiteEnvironment
             return;
         }
         $this->revealed_env_keys[] = $key;
+    }
+
+    /**
+     * "Test site" — end-to-end check that the app actually loads with the
+     * current environment (HTTP request + server-log tail on failure). Per-key
+     * checks can pass while the app still 500s, so this exercises the real URL.
+     */
+    public function testSiteLoads(): void
+    {
+        $this->authorize('view', $this->site);
+
+        $run = $this->seedQueuedConsoleAction('site_test', __('Testing the site'));
+
+        TestSiteHealthJob::dispatch(
+            (string) $run->id,
+            (string) $this->site->id,
+        );
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            __('The site loaded successfully.'),
+            __('The site did not load — see the error below.'),
+        );
+        $this->toastConsoleActionQueued();
+    }
+
+    /**
+     * Run a whitelisted artisan remediation (Run migrations, Clear config
+     * cache, …) on the server — surfaced as one-click buttons when "Test site"
+     * recognises a known failure (e.g. a missing table → migrate).
+     */
+    public function runRemediation(string $key): void
+    {
+        $this->authorize('update', $this->site);
+
+        $spec = SiteFixers::spec($key);
+        if ($spec === null) {
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('site_remediate', (string) $spec['label']);
+        RunSiteFixerJob::dispatch((string) $run->id, (string) $this->site->id, $key);
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            $spec['label'].' completed.',
+            $spec['label'].' did not finish — see the output.',
+        );
+        $this->toastConsoleActionQueued();
     }
 
     /**
@@ -561,7 +765,7 @@ trait ManagesSiteEnvironment
     /**
      * Pre-seed a `queued` console_actions row for the current site so the
      * progress banner appears the moment a job is dispatched. Mirrors the
-     * helper on {@see \App\Livewire\Sites\Show} — kept here too so this trait
+     * helper on {@see Show} — kept here too so this trait
      * is self-contained for components (e.g. DeploymentsList) that don't carry
      * Show's inline copy. Auto-dismisses stale rows so one run shows at a time.
      */

@@ -43,6 +43,27 @@ class SiteWorkspaceController
             ]);
         }
 
+        // Environment now lives exclusively on the Deploy hub's Environment
+        // tab — the same component that owns the variables editor and the
+        // resource bindings. The old Settings → Environment section is gone for
+        // VM sites; funnel every deep-link (preflight fixes, env-diff "back",
+        // legacy /settings/environment) straight there. Mirrors the `deploy`
+        // redirect's host guard so container/serverless/edge sites, which keep
+        // their own environment surface, are left untouched.
+        if (
+            $section === 'environment'
+            && $server->isVmHost()
+            && ! $site->usesFunctionsRuntime()
+            && ! $site->usesEdgeRuntime()
+        ) {
+            return redirect()->route('sites.deployments.index', [
+                'server' => $server,
+                'site' => $site,
+                'tab' => 'environment',
+                ...request()->query(),
+            ]);
+        }
+
         if ($section === 'pipeline') {
             return redirect()->route('sites.pipeline', [
                 'server' => $server,

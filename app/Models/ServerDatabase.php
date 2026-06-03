@@ -72,8 +72,12 @@ class ServerDatabase extends Model
 
     /**
      * Application connection URL (credentials are decrypted; use only in trusted UI).
+     *
+     * Pass $hostOverride to target the database over a different address than
+     * the stored host — e.g. a peer server's private IP when the consuming
+     * site lives on a different box in the same private network.
      */
-    public function connectionUrl(): string
+    public function connectionUrl(?string $hostOverride = null): string
     {
         if ($this->engine === 'sqlite') {
             // For SQLite, `host` stores the absolute file path on the
@@ -84,7 +88,7 @@ class ServerDatabase extends Model
 
         $user = rawurlencode((string) $this->username);
         $pass = rawurlencode((string) $this->password);
-        $host = $this->host ?: '127.0.0.1';
+        $host = $hostOverride ?: ($this->host ?: '127.0.0.1');
         $port = $this->defaultPort();
         $name = $this->name;
 

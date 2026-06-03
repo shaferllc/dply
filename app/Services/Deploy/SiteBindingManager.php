@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace App\Services\Deploy;
 
+use App\Models\PrivateNetwork;
+use App\Models\Server;
+use App\Models\ServerCacheService;
 use App\Models\ServerDatabase;
 use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Services\Servers\ServerDatabaseProvisioner;
+use App\Services\Sites\DotEnvFileParser;
+use App\Services\Sites\DotEnvFileWriter;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use RuntimeException;
@@ -36,17 +41,80 @@ class SiteBindingManager
     public function attachableTargets(Site $site, string $type): array
     {
         return match ($type) {
-            'database' => ServerDatabase::query()
-                ->where('server_id', $site->server_id)
-                ->orderBy('name')
-                ->get()
-                ->map(fn (ServerDatabase $db) => [
-                    'id' => (string) $db->id,
-                    'label' => $db->name.' ('.$db->engine.')',
-                ])
-                ->all(),
+            'database' => $this->attachableDatabases($site),
+            'redis' => $this->attachableCacheServices($site),
             default => [],
         };
+    }
+
+    /**
+     * Redis-family cache services the site can reach: those on its own server
+     * (loopback) plus those on private-network peers (private IP). Mirrors
+     * {@see attachableDatabases}.
+     *
+     * @return list<array{id: string, label: string}>
+     */
+    private function attachableCacheServices(Site $site): array
+    {
+        $server = $site->server;
+        if ($server === null) {
+            return [];
+        }
+
+        return ServerCacheService::query()
+            ->whereIn('server_id', $this->reachableServerIds($server))
+            ->whereIn('engine', ServerCacheService::FAMILY_REDIS_ENGINES)
+            ->with('server:id,name,organization_id,private_ip_address,private_network_id')
+            ->orderBy('engine')
+            ->get()
+            ->map(function (ServerCacheService $svc) use ($server): array {
+                $sameBox = (string) $svc->server_id === (string) $server->id;
+                $where = $sameBox ? __('this server') : ($svc->server?->name ?: __('network peer'));
+                $state = $svc->status === ServerCacheService::STATUS_RUNNING ? '' : ' — '.$svc->status;
+
+                return [
+                    'id' => (string) $svc->id,
+                    'label' => ucfirst((string) $svc->engine).' · '.$where.$state,
+                ];
+            })
+            ->all();
+    }
+
+    /**
+     * Databases the site can actually reach: those on its own server (over
+     * loopback) plus those on peer servers sharing the same private network
+     * (over the peer's private IP). Each label notes where the DB lives and
+     * flags peers whose remote access isn't open yet.
+     *
+     * @return list<array{id: string, label: string}>
+     */
+    private function attachableDatabases(Site $site): array
+    {
+        $server = $site->server;
+        if ($server === null) {
+            return [];
+        }
+
+        return ServerDatabase::query()
+            ->whereIn('server_id', $this->reachableServerIds($server))
+            ->with('server:id,name,organization_id,private_ip_address,private_network_id')
+            ->orderBy('name')
+            ->get()
+            ->map(function (ServerDatabase $db) use ($server): array {
+                $sameBox = (string) $db->server_id === (string) $server->id;
+                if ($sameBox) {
+                    $where = __('this server');
+                } else {
+                    $where = ($db->server?->name ?: __('network peer'))
+                        .($db->remote_access ? '' : ' — '.__('remote access off'));
+                }
+
+                return [
+                    'id' => (string) $db->id,
+                    'label' => $db->name.' ('.$db->engine.') · '.$where,
+                ];
+            })
+            ->all();
     }
 
     /**
@@ -58,14 +126,18 @@ class SiteBindingManager
     {
         $this->assertType($type);
 
-        return match ($type) {
+        $binding = match ($type) {
             'database' => $this->attachDatabase($site, $params),
-            'redis' => $this->attachRedis($site),
+            'redis' => $this->attachRedis($site, $params),
             'queue' => $this->attachQueue($site, $params),
             'storage' => $this->attachStorage($site, $params),
             'scheduler', 'workers' => $this->attachMarker($site, $type),
             default => throw new InvalidArgumentException(__('This binding type cannot be attached yet.')),
         };
+
+        $this->adoptInjectedEnv($site, $binding);
+
+        return $binding;
     }
 
     /**
@@ -77,13 +149,60 @@ class SiteBindingManager
     {
         $this->assertType($type);
 
-        return match ($type) {
+        $binding = match ($type) {
             'database' => $this->provisionDatabase($site, $params),
             // Redis/queue/storage/scheduler/workers have no separate resource to
             // spin up beyond what attach already wires, so provision falls back
-            // to the attach path for v1.
+            // to the attach path for v1 (which already adopts).
             default => $this->attachExisting($site, $type, $params),
         };
+
+        $this->adoptInjectedEnv($site, $binding);
+
+        return $binding;
+    }
+
+    /**
+     * "Adopt" a freshly-connected resource's connection variables: drop any
+     * matching keys from the site .env cache so the binding's values win
+     * instead of a stale manual .env value overriding them. This is what makes
+     * "choose a resource" actually take over DB_HOST/DB_PASSWORD/… rather than
+     * sitting underneath whatever the operator typed before. The keys then
+     * render as managed rows; the operator can still re-Override per key.
+     *
+     * @return list<string> the keys that were removed from the .env cache
+     */
+    private function adoptInjectedEnv(Site $site, SiteBinding $binding): array
+    {
+        if ($binding->status !== SiteBinding::STATUS_CONFIGURED) {
+            return [];
+        }
+
+        $injected = $binding->connectionEnv();
+        if ($injected === []) {
+            return [];
+        }
+
+        $parser = app(DotEnvFileParser::class);
+        $parsed = $parser->parse((string) ($site->env_file_content ?? ''));
+
+        $removed = [];
+        foreach (array_keys($injected) as $key) {
+            $key = (string) $key;
+            if (array_key_exists($key, $parsed['variables'])) {
+                unset($parsed['variables'][$key], $parsed['comments'][$key]);
+                $removed[] = $key;
+            }
+        }
+
+        if ($removed !== []) {
+            $site->forceFill([
+                'env_file_content' => app(DotEnvFileWriter::class)->render($parsed['variables'], $parsed['comments']),
+                'env_cache_origin' => 'local-edit',
+            ])->save();
+        }
+
+        return $removed;
     }
 
     public function detach(SiteBinding $binding): void
@@ -103,14 +222,21 @@ class SiteBindingManager
             throw new InvalidArgumentException(__('Choose a database to attach.'));
         }
 
+        $server = $site->server;
+        if ($server === null) {
+            throw new RuntimeException(__('This site has no server.'));
+        }
+
         $db = ServerDatabase::query()
-            ->where('server_id', $site->server_id)
+            ->whereIn('server_id', $this->reachableServerIds($server))
             ->whereKey($databaseId)
             ->first();
 
         if (! $db instanceof ServerDatabase) {
-            throw new InvalidArgumentException(__('That database is not on this site\'s server.'));
+            throw new InvalidArgumentException(__('That database is not reachable from this site\'s server.'));
         }
+
+        $crossServer = (string) $db->server_id !== (string) $server->id;
 
         return $this->persist($site, 'database', [
             'mode' => 'attach_existing',
@@ -118,8 +244,14 @@ class SiteBindingManager
             'name' => $db->name,
             'target_type' => 'server_database',
             'target_id' => (string) $db->id,
-            'injected_env' => $this->databaseEnv($db),
-            'config' => ['engine' => $db->engine],
+            'injected_env' => $this->databaseEnv($db, $site),
+            'config' => array_filter([
+                'engine' => $db->engine,
+                // Cross-server attachments carry the source so the UI can show
+                // a "network peer" badge and warn when remote access is off.
+                'source_server_id' => $crossServer ? (string) $db->server_id : null,
+                'needs_remote_access' => ($crossServer && ! $db->remote_access) ? true : null,
+            ]),
         ]);
     }
 
@@ -178,7 +310,7 @@ class SiteBindingManager
                 'name' => $db->name,
                 'target_type' => 'server_database',
                 'target_id' => (string) $db->id,
-                'injected_env' => $this->databaseEnv($db),
+                'injected_env' => $this->databaseEnv($db, $site),
                 'config' => ['engine' => $db->engine],
                 'last_error' => Str::limit($e->getMessage(), 1000),
             ]);
@@ -192,16 +324,21 @@ class SiteBindingManager
             'name' => $db->name,
             'target_type' => 'server_database',
             'target_id' => (string) $db->id,
-            'injected_env' => $this->databaseEnv($db),
+            'injected_env' => $this->databaseEnv($db, $site),
             'config' => ['engine' => $db->engine],
             'last_error' => null,
         ]);
     }
 
     /**
+     * Connection variables for a database as seen by $site. The host is
+     * resolved relative to where the site runs: loopback when the DB is on the
+     * site's own box, the source server's private IP when it's a peer in the
+     * same private network.
+     *
      * @return array<string, string>
      */
-    private function databaseEnv(ServerDatabase $db): array
+    private function databaseEnv(ServerDatabase $db, Site $site): array
     {
         if ($db->engine === 'sqlite') {
             return [
@@ -211,40 +348,211 @@ class SiteBindingManager
             ];
         }
 
+        $host = $this->effectiveDatabaseHost($db, $site);
+
         return [
             'DB_CONNECTION' => $db->engine === 'postgres' ? 'pgsql' : 'mysql',
-            'DB_HOST' => (string) ($db->host ?: '127.0.0.1'),
+            'DB_HOST' => $host,
             'DB_PORT' => (string) $db->defaultPort(),
             'DB_DATABASE' => (string) $db->name,
             'DB_USERNAME' => (string) $db->username,
             'DB_PASSWORD' => (string) $db->password,
-            'DATABASE_URL' => $db->connectionUrl(),
+            'DATABASE_URL' => $db->connectionUrl($host),
         ];
+    }
+
+    /**
+     * The address $site should dial to reach $db:
+     *  - same server  → loopback (127.0.0.1), or the stored host if customised
+     *  - network peer → the peer server's private IP
+     *  - otherwise    → the stored host (a public IP/hostname set deliberately)
+     */
+    private function effectiveDatabaseHost(ServerDatabase $db, Site $site): string
+    {
+        $siteServer = $site->server;
+        $dbServer = $db->server;
+
+        if ($siteServer !== null && $dbServer !== null && (string) $dbServer->id !== (string) $siteServer->id) {
+            if ($this->sharePrivateNetwork($siteServer, $dbServer) && filled($dbServer->private_ip_address)) {
+                return (string) $dbServer->private_ip_address;
+            }
+        }
+
+        return (string) ($db->host ?: '127.0.0.1');
+    }
+
+    /**
+     * Server IDs whose databases $server can reach: itself, plus every same-org
+     * peer that shares a private network with it (see {@see sharePrivateNetwork}).
+     * Membership is derived from the actual private IPs, not just the
+     * private_network_id column — servers often have a private IP on the subnet
+     * without that link being recorded.
+     *
+     * @return list<string>
+     */
+    private function reachableServerIds(Server $server): array
+    {
+        $ids = [(string) $server->id];
+
+        if (blank($server->private_ip_address)) {
+            return $ids; // No private interface → only its own (loopback) DBs.
+        }
+
+        $peers = Server::query()
+            ->where('organization_id', $server->organization_id)
+            ->whereKeyNot($server->id)
+            ->whereNotNull('private_ip_address')
+            ->get()
+            ->filter(fn (Server $peer): bool => $this->sharePrivateNetwork($server, $peer))
+            ->map(fn (Server $peer): string => (string) $peer->id)
+            ->all();
+
+        return array_values(array_unique([...$ids, ...$peers]));
+    }
+
+    /**
+     * Whether two servers sit on the same private network and can reach each
+     * other over their private IPs. True when they're linked to the same
+     * PrivateNetwork row, OR a PrivateNetwork in the org has a CIDR covering
+     * both private IPs, OR (no network row links them) the IPs share a /24.
+     */
+    private function sharePrivateNetwork(Server $a, Server $b): bool
+    {
+        if ((string) $a->organization_id !== (string) $b->organization_id) {
+            return false;
+        }
+
+        $aIp = trim((string) $a->private_ip_address);
+        $bIp = trim((string) $b->private_ip_address);
+        if ($aIp === '' || $bIp === '') {
+            return false;
+        }
+
+        if ($a->private_network_id !== null && (string) $a->private_network_id === (string) $b->private_network_id) {
+            return true;
+        }
+
+        foreach (PrivateNetwork::query()->where('organization_id', $a->organization_id)->get() as $net) {
+            $cidr = (string) $net->ip_range;
+            if ($cidr !== '' && $this->ipInCidr($aIp, $cidr) && $this->ipInCidr($bIp, $cidr)) {
+                return true;
+            }
+        }
+
+        return $this->sameSubnet24($aIp, $bIp);
+    }
+
+    /** IPv4 CIDR-membership test. Non-IPv4 / unparseable inputs return false. */
+    private function ipInCidr(string $ip, string $cidr): bool
+    {
+        if (! str_contains($cidr, '/')) {
+            return false;
+        }
+
+        [$subnet, $bits] = explode('/', $cidr, 2);
+        $ipLong = ip2long($ip);
+        $subnetLong = ip2long($subnet);
+        if ($ipLong === false || $subnetLong === false) {
+            return false;
+        }
+
+        $bits = (int) $bits;
+        if ($bits < 0 || $bits > 32) {
+            return false;
+        }
+
+        $mask = $bits === 0 ? 0 : ((~0 << (32 - $bits)) & 0xFFFFFFFF);
+
+        return ($ipLong & $mask) === ($subnetLong & $mask);
+    }
+
+    /** Whether two IPv4 addresses share the same /24 subnet. */
+    private function sameSubnet24(string $a, string $b): bool
+    {
+        $al = ip2long($a);
+        $bl = ip2long($b);
+        if ($al === false || $bl === false) {
+            return false;
+        }
+
+        $mask = (~0 << 8) & 0xFFFFFFFF;
+
+        return ($al & $mask) === ($bl & $mask);
     }
 
     // ---- redis ------------------------------------------------------------
 
-    private function attachRedis(Site $site): SiteBinding
+    /**
+     * @param  array<string, mixed>  $params
+     */
+    private function attachRedis(Site $site, array $params): SiteBinding
     {
         $server = $site->server;
-        $cacheService = is_array($server?->meta) ? ($server->meta['cache_service'] ?? null) : null;
-        if ($cacheService !== 'redis') {
-            throw new RuntimeException(__('This server does not have Redis installed. Install it from the server Caches workspace first.'));
+        if ($server === null) {
+            throw new RuntimeException(__('This site has no server.'));
         }
+
+        $reachable = $this->reachableServerIds($server);
+        $query = ServerCacheService::query()
+            ->whereIn('server_id', $reachable)
+            ->whereIn('engine', ServerCacheService::FAMILY_REDIS_ENGINES)
+            ->with('server:id,name,organization_id,private_ip_address,private_network_id');
+
+        $targetId = (string) ($params['target_id'] ?? '');
+        $svc = $targetId !== ''
+            ? (clone $query)->whereKey($targetId)->first()
+            // No explicit pick (e.g. legacy callers): prefer the local service.
+            : (clone $query)->get()->sortBy(fn (ServerCacheService $s) => (string) $s->server_id === (string) $server->id ? 0 : 1)->first();
+
+        if (! $svc instanceof ServerCacheService) {
+            throw new RuntimeException(__('No Redis-compatible service is reachable. Install Redis/Valkey from the server Caches workspace, or add one to this private network.'));
+        }
+
+        $svcServer = $svc->server ?? $server;
+        $crossServer = (string) $svc->server_id !== (string) $server->id;
+        $host = $this->effectiveServiceHost($svcServer, $site);
+        $port = (string) ($svc->port ?: ServerCacheService::defaultPortFor((string) $svc->engine));
+
+        $env = array_filter([
+            'REDIS_CLIENT' => 'phpredis',
+            'REDIS_HOST' => $host,
+            'REDIS_PORT' => $port,
+            'REDIS_PASSWORD' => filled($svc->auth_password) ? (string) $svc->auth_password : null,
+            'REDIS_PREFIX' => filled($svc->cache_prefix) ? (string) $svc->cache_prefix : null,
+        ], fn ($v) => $v !== null);
 
         return $this->persist($site, 'redis', [
             'mode' => 'attach_existing',
             'status' => SiteBinding::STATUS_CONFIGURED,
-            'name' => 'server-redis',
+            'name' => (string) $svc->engine.($crossServer ? ' · '.($svcServer->name ?? '') : ''),
             'target_type' => 'server_cache_service',
-            'target_id' => (string) $server->id,
-            'injected_env' => [
-                'REDIS_CLIENT' => 'phpredis',
-                'REDIS_HOST' => '127.0.0.1',
-                'REDIS_PORT' => '6379',
-            ],
-            'config' => [],
+            'target_id' => (string) $svc->id,
+            'injected_env' => $env,
+            'config' => array_filter([
+                'engine' => (string) $svc->engine,
+                'source_server_id' => $crossServer ? (string) $svc->server_id : null,
+            ]),
         ]);
+    }
+
+    /**
+     * Address $site should dial to reach a service on $serviceServer: loopback
+     * when it's the site's own box, the server's private IP when it's a peer on
+     * the same private network. Used for cache/redis hosts (databases have their
+     * own variant that also honours a stored host).
+     */
+    private function effectiveServiceHost(Server $serviceServer, Site $site): string
+    {
+        $siteServer = $site->server;
+
+        if ($siteServer !== null
+            && (string) $serviceServer->id !== (string) $siteServer->id
+            && $this->sharePrivateNetwork($siteServer, $serviceServer)
+            && filled($serviceServer->private_ip_address)) {
+            return (string) $serviceServer->private_ip_address;
+        }
+
+        return '127.0.0.1';
     }
 
     // ---- queue ------------------------------------------------------------
