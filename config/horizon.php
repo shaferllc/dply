@@ -28,7 +28,14 @@ foreach (($siteUptimeConfig['probe_workers'] ?? []) as $worker) {
 }
 
 $probeWorkerQueue = env('DPLY_PROBE_WORKER_QUEUE');
-if (is_string($probeWorkerQueue) && $probeWorkerQueue !== '') {
+// dply manages a worker pool's Horizon entirely through env vars it writes to
+// the box (see WorkerPoolManager / PushWorkerPoolHorizonConfigJob). HORIZON_QUEUES
+// is the explicit, dply-controlled queue list — when present it wins over the
+// auto-derived set so the pool's "Queues watched" UI is the source of truth.
+$horizonQueuesOverride = env('HORIZON_QUEUES');
+if (is_string($horizonQueuesOverride) && trim($horizonQueuesOverride) !== '') {
+    $horizonWorkerQueues = array_values(array_filter(array_map('trim', explode(',', $horizonQueuesOverride)), fn ($q) => $q !== ''));
+} elseif (is_string($probeWorkerQueue) && $probeWorkerQueue !== '') {
     $horizonWorkerQueues = [$probeWorkerQueue];
 } else {
     // `dply-control` carries worker-pool orchestration jobs (reconcile, stats,
@@ -37,6 +44,13 @@ if (is_string($probeWorkerQueue) && $probeWorkerQueue !== '') {
     // never grabs (and fails on) dply's own job classes.
     $horizonWorkerQueues = array_values(array_unique(array_merge(['default', 'dply-control'], $horizonExtraQueues, $probeQueues)));
 }
+
+// dply-managed Horizon worker knobs — all env-driven so the pool UI can tune
+// them without editing this file. Sensible fallbacks keep stock behaviour.
+$horizonBalance = (string) (env('HORIZON_BALANCE') ?: 'auto');
+$horizonMinProcesses = max(1, (int) env('HORIZON_MIN_PROCESSES', 1));
+$horizonWorkerMemory = max(32, (int) env('HORIZON_WORKER_MEMORY', 128));
+$horizonWorkerTries = max(1, (int) env('HORIZON_TRIES', 1));
 
 return [
 
@@ -268,10 +282,14 @@ return [
             'supervisor-1' => [
                 'connection' => 'redis',
                 'queue' => $horizonWorkerQueues,
-                'maxProcesses' => max(1, (int) env('HORIZON_MAX_PROCESSES', 10)),
+                'balance' => $horizonBalance,
+                'minProcesses' => $horizonMinProcesses,
+                'maxProcesses' => max($horizonMinProcesses, (int) env('HORIZON_MAX_PROCESSES', 10)),
+                'memory' => $horizonWorkerMemory,
+                'tries' => $horizonWorkerTries,
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
-                'timeout' => (int) env('HORIZON_PROD_JOB_TIMEOUT', 720),
+                'timeout' => (int) env('HORIZON_PROD_JOB_TIMEOUT', env('HORIZON_JOB_TIMEOUT', 720)),
             ],
         ],
 
@@ -279,11 +297,12 @@ return [
             'supervisor-1' => [
                 'connection' => 'redis',
                 'queue' => $horizonWorkerQueues,
-                'balance' => 'simple',
+                'balance' => (string) (env('HORIZON_BALANCE') ?: 'simple'),
+                'minProcesses' => $horizonMinProcesses,
                 // Concurrent workers for local dev (Redis default maxclients is usually plenty).
-                'maxProcesses' => max(1, (int) env('HORIZON_LOCAL_MAX_PROCESSES', 8)),
-                'memory' => (int) env('HORIZON_LOCAL_WORKER_MEMORY', 128),
-                'tries' => 1,
+                'maxProcesses' => max($horizonMinProcesses, (int) env('HORIZON_LOCAL_MAX_PROCESSES', 8)),
+                'memory' => max(32, (int) env('HORIZON_LOCAL_WORKER_MEMORY', $horizonWorkerMemory)),
+                'tries' => $horizonWorkerTries,
                 'timeout' => (int) env('HORIZON_LOCAL_JOB_TIMEOUT', 720),
                 'nice' => 0,
             ],

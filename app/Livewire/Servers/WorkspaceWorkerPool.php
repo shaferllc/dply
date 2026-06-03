@@ -66,6 +66,21 @@ class WorkspaceWorkerPool extends Component
 
     public int $as_backlog = 100;
 
+    // Horizon config (env-var driven; see WorkerPoolHorizonConfig).
+    public string $hz_queues = 'default';
+
+    public int $hz_min_processes = 1;
+
+    public int $hz_max_processes = 4;
+
+    public string $hz_balance = 'auto';
+
+    public int $hz_memory = 128;
+
+    public int $hz_timeout = 720;
+
+    public int $hz_tries = 1;
+
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
@@ -79,6 +94,15 @@ class WorkspaceWorkerPool extends Component
             $this->as_min = (int) ($as['min'] ?? 1);
             $this->as_max = (int) ($as['max'] ?? min(5, $pool->max_size));
             $this->as_backlog = (int) ($as['per_worker_backlog'] ?? 100);
+
+            $hz = \App\Support\WorkerPools\WorkerPoolHorizonConfig::for($pool);
+            $this->hz_queues = implode(', ', $hz['queues']);
+            $this->hz_min_processes = $hz['min_processes'];
+            $this->hz_max_processes = $hz['max_processes'];
+            $this->hz_balance = $hz['balance'];
+            $this->hz_memory = $hz['memory'];
+            $this->hz_timeout = $hz['timeout'];
+            $this->hz_tries = $hz['tries'];
         } else {
             $this->pool_name = $server->name.' pool';
         }
@@ -163,6 +187,48 @@ class WorkspaceWorkerPool extends Component
         $this->toastSuccess($this->as_enabled
             ? __('Autoscaling enabled (:min–:max workers).', ['min' => $min, 'max' => $max])
             : __('Autoscaling disabled.'));
+    }
+
+    /**
+     * Persist the pool's Horizon config to meta, then project it onto every
+     * member box as HORIZON_* env vars and restart their workers.
+     */
+    public function saveHorizonConfig(): void
+    {
+        Gate::authorize('update', $this->server);
+
+        $pool = $this->pool();
+        if (! $pool) {
+            $this->toastError(__('No pool.'));
+
+            return;
+        }
+
+        $meta = is_array($pool->meta) ? $pool->meta : [];
+        $meta['horizon_config'] = [
+            'queues' => $this->hz_queues,
+            'min_processes' => $this->hz_min_processes,
+            'max_processes' => $this->hz_max_processes,
+            'balance' => $this->hz_balance,
+            'memory' => $this->hz_memory,
+            'timeout' => $this->hz_timeout,
+            'tries' => $this->hz_tries,
+        ];
+        $pool->forceFill(['meta' => $meta])->save();
+
+        // Re-read through the normaliser so the form reflects the clamped/cleaned
+        // values that were actually stored (and will be pushed to the boxes).
+        $normalised = \App\Support\WorkerPools\WorkerPoolHorizonConfig::for($pool->refresh());
+        $this->hz_queues = implode(', ', $normalised['queues']);
+        $this->hz_min_processes = $normalised['min_processes'];
+        $this->hz_max_processes = $normalised['max_processes'];
+        $this->hz_balance = $normalised['balance'];
+        $this->hz_memory = $normalised['memory'];
+        $this->hz_timeout = $normalised['timeout'];
+        $this->hz_tries = $normalised['tries'];
+
+        \App\Jobs\PushWorkerPoolHorizonConfigJob::dispatch((string) $pool->id);
+        $this->toastSuccess(__('Horizon config saved — applying to workers over SSH (they restart in a few seconds).'));
     }
 
     public function pool(): ?WorkerPool
