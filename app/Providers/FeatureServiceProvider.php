@@ -27,6 +27,12 @@ class FeatureServiceProvider extends ServiceProvider
         Feature::resolveScopeUsing(fn () => auth()->user()?->currentOrganization());
 
         foreach (config('features', []) as $namespace => $flags) {
+            // `beta_bundle` is a reserved list (the beta-invite override set),
+            // not a flag namespace — see config/features.php.
+            if ($namespace === 'beta_bundle') {
+                continue;
+            }
+
             foreach (array_keys($flags) as $leaf) {
                 $name = "$namespace.$leaf";
 

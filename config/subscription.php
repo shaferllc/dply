@@ -108,6 +108,23 @@ return [
         ],
         // Metered managed-server cost is billed in 1-cent Stripe units (quantity = cents).
         'managed_server_usage_unit_cents' => 1,
+        // Closed-beta envelope. An org with organizations.beta_joined_at set is a
+        // beta participant: the platform fee is waived, trial/soft-pause is
+        // suppressed, and these caps replace the plan ceilings until the global
+        // cutover. `byo_servers` is generous-but-bounded (a leaked invite can't
+        // provision hundreds of boxes on a stolen cloud key via dply);
+        // `managed_servers` is the single free CX22 grant; `sites` is roomy.
+        // `cutover_at` is the global beta end date (Y-m-d or full datetime, null
+        // = no end set yet). At cutover beta orgs fall to the normal trial and
+        // the free CX22's comped_until expires. `managed_size` pins the free box.
+        'beta' => [
+            'byo_servers' => (int) env('SUBSCRIPTION_BETA_BYO_SERVERS', 5),
+            'managed_servers' => (int) env('SUBSCRIPTION_BETA_MANAGED_SERVERS', 1),
+            'sites' => (int) env('SUBSCRIPTION_BETA_SITES', 25),
+            'managed_size' => env('SUBSCRIPTION_BETA_MANAGED_SIZE', 'cx22'),
+            'cutover_at' => env('SUBSCRIPTION_BETA_CUTOVER_AT'),
+            'invite_expiry_days' => (int) env('SUBSCRIPTION_BETA_INVITE_EXPIRY_DAYS', 30),
+        ],
         // dply Cloud **platform fee** per live app — covers builds, deploys,
         // scaling, TLS, dashboards, and orchestration. This is NOT the whole
         // bill: Cloud apps run on dply-owned DigitalOcean infra (containers,

@@ -22,6 +22,45 @@
 
             <x-livewire-validation-errors class="m-6 sm:m-8 mb-0" />
 
+            @if ($isBeta)
+                <div class="m-6 sm:m-8 mb-0 rounded-xl border border-brand-gold/30 bg-brand-gold/10 px-4 py-3">
+                    <p class="flex items-center gap-2 text-sm font-semibold text-brand-ink">
+                        <x-heroicon-o-sparkles class="h-4 w-4 shrink-0 text-brand-gold" aria-hidden="true" />
+                        {{ __('Included free with your beta') }}
+                    </p>
+                    <p class="mt-1 text-sm text-brand-moss">
+                        {{ __('Your beta includes one dply-managed server on us — pinned to CX22 and free until the beta ends. Just pick a region and stack.') }}
+                    </p>
+                </div>
+            @endif
+
+            @if ($betaGrantUsed)
+                <div class="p-6 sm:p-8">
+                    <div class="rounded-xl border border-brand-ink/15 bg-brand-sand/20 px-5 py-6 text-center">
+                        <p class="text-sm font-semibold text-brand-ink">{{ __('You’ve used your free managed server') }}</p>
+                        <p class="mx-auto mt-1 max-w-md text-sm text-brand-moss">
+                            {{ __('Your beta includes one free dply-managed server. Delete the existing one to create another, or subscribe to add more.') }}
+                        </p>
+                        <a href="{{ route('servers.index') }}" wire:navigate
+                           class="mt-4 inline-flex items-center gap-2 rounded-lg bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream hover:bg-brand-forest">
+                            {{ __('Back to servers') }}
+                        </a>
+                    </div>
+                </div>
+            @elseif ($isBeta && ! $emailVerified)
+                <div class="p-6 sm:p-8">
+                    <div class="rounded-xl border border-amber-300/60 bg-amber-50 px-5 py-6 text-center">
+                        <p class="text-sm font-semibold text-brand-ink">{{ __('Verify your email first') }}</p>
+                        <p class="mx-auto mt-1 max-w-md text-sm text-brand-moss">
+                            {{ __('Confirm your email address to provision your free managed server.') }}
+                        </p>
+                        <a href="{{ route('verification.notice') }}" wire:navigate
+                           class="mt-4 inline-flex items-center gap-2 rounded-lg bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream hover:bg-brand-forest">
+                            {{ __('Verify email') }}
+                        </a>
+                    </div>
+                </div>
+            @else
             <form wire:submit="create" class="p-6 sm:p-8 space-y-6">
                 <div>
                     <label for="name" class="block text-sm font-semibold text-brand-ink">{{ __('Server name') }}</label>
@@ -42,6 +81,20 @@
 
                 <div>
                     <span class="block text-sm font-semibold text-brand-ink">{{ __('Size') }}</span>
+                    @if ($isBeta)
+                        @php($pinned = collect($sizes)->firstWhere('slug', $size))
+                        <div class="mt-2 rounded-xl border-2 border-brand-gold bg-brand-gold/10 px-4 py-3 flex items-center justify-between gap-3">
+                            <span class="min-w-0">
+                                <span class="block text-sm font-semibold text-brand-ink">{{ $pinned['label'] ?? strtoupper($size) }}</span>
+                                @if ($pinned)
+                                    <span class="mt-0.5 block text-xs leading-relaxed text-brand-moss">
+                                        {{ $pinned['vcpu'] }} {{ __('vCPU') }} · {{ $pinned['ram_gb'] }} {{ __('GB RAM') }} · {{ $pinned['disk_gb'] }} {{ __('GB disk') }}
+                                    </span>
+                                @endif
+                            </span>
+                            <span class="shrink-0 rounded-full bg-brand-forest/10 px-2.5 py-1 text-[11px] font-semibold text-brand-forest">{{ __('Free in beta') }}</span>
+                        </div>
+                    @else
                     <div class="mt-2 grid gap-3 sm:grid-cols-2">
                         @foreach ($sizes as $option)
                             <label class="flex cursor-pointer items-start justify-between gap-3 rounded-xl border-2 px-4 py-3 transition
@@ -60,6 +113,7 @@
                             </label>
                         @endforeach
                     </div>
+                    @endif
                 </div>
 
                 <div>
@@ -75,12 +129,21 @@
 
                 <div class="rounded-xl border border-brand-sage/30 bg-brand-sage/10 px-4 py-3 flex items-center justify-between gap-3">
                     <div>
-                        <p class="text-sm font-semibold text-brand-ink">{{ __('All-in price') }}</p>
-                        <p class="text-xs text-brand-moss mt-0.5">{{ __('One monthly fee — hosting included. Replaces the per-server plan fee. Billed monthly while the server exists.') }}</p>
+                        <p class="text-sm font-semibold text-brand-ink">{{ $isBeta ? __('Your price during beta') : __('All-in price') }}</p>
+                        <p class="text-xs text-brand-moss mt-0.5">
+                            {{ $isBeta
+                                ? __('On us until the beta ends. After the beta, keep it by subscribing or it’ll be scheduled for removal — we’ll email you first.')
+                                : __('One monthly fee — hosting included. Replaces the per-server plan fee. Billed monthly while the server exists.') }}
+                        </p>
                     </div>
                     <div class="text-right shrink-0">
-                        <p class="text-lg font-bold text-brand-ink">${{ number_format($selectedMonthlyCents / 100, 2) }}</p>
-                        <p class="text-[11px] text-brand-moss">{{ __('/mo') }}</p>
+                        @if ($isBeta)
+                            <p class="text-lg font-bold text-brand-forest">{{ __('Free') }}</p>
+                            <p class="text-[11px] text-brand-moss line-through">${{ number_format($selectedMonthlyCents / 100, 2) }}{{ __('/mo') }}</p>
+                        @else
+                            <p class="text-lg font-bold text-brand-ink">${{ number_format($selectedMonthlyCents / 100, 2) }}</p>
+                            <p class="text-[11px] text-brand-moss">{{ __('/mo') }}</p>
+                        @endif
                     </div>
                 </div>
 
@@ -94,6 +157,7 @@
                     </button>
                 </div>
             </form>
+            @endif
         </div>
     </div>
 </div>

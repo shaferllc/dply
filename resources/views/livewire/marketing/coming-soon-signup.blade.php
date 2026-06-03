@@ -5,6 +5,16 @@
 
     <x-site-header :show-guest-signup="false" />
 
+    @if (session('status'))
+        <div class="px-4 pt-6 sm:px-6 lg:px-8">
+            <div class="mx-auto max-w-7xl">
+                <div class="rounded-xl border border-brand-gold/30 bg-white/80 px-4 py-3 text-sm font-medium text-brand-forest">
+                    {{ session('status') }}
+                </div>
+            </div>
+        </div>
+    @endif
+
     <main class="px-4 py-14 sm:px-6 sm:py-20 lg:px-8 lg:py-24">
         <section class="mx-auto max-w-7xl">
             <div class="grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)] lg:items-center">

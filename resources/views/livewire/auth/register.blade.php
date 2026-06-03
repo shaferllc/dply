@@ -1,6 +1,19 @@
 <div>
     <x-livewire-validation-errors />
-    @if (!empty($oauthProviders))
+
+    @if ($emailLocked)
+        <div class="mb-6 rounded-xl border border-brand-sage/30 bg-brand-sand/20 p-4">
+            <p class="flex items-center gap-2 text-sm font-semibold text-brand-ink">
+                <x-heroicon-o-sparkles class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                {{ __('You’re invited to the dply beta') }}
+            </p>
+            <p class="mt-1 text-sm text-brand-moss">
+                {{ __('Connect your own cloud servers free during the beta, plus one dply-managed server on us. Finish creating your account below.') }}
+            </p>
+        </div>
+    @endif
+
+    @if (!empty($oauthProviders) && ! $emailLocked)
         <div class="mb-6">
             <p class="mb-3 flex items-center gap-2 text-sm font-medium text-brand-moss">
                 <x-heroicon-o-link class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
@@ -30,7 +43,10 @@
         </div>
         <div>
             <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" wire:model="form.email" class="block w-full mt-1" type="email" required autocomplete="username" />
+            <x-text-input id="email" wire:model="form.email" class="block w-full mt-1 @if ($emailLocked) bg-brand-sand/30 text-brand-moss @endif" type="email" required autocomplete="username" :readonly="$emailLocked" />
+            @if ($emailLocked)
+                <p class="mt-1 text-xs text-brand-moss">{{ __('Your invite is tied to this address.') }}</p>
+            @endif
             <x-input-error :messages="$errors->get('form.email')" class="mt-2" />
         </div>
         <div>

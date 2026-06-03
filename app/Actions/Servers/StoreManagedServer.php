@@ -10,6 +10,7 @@ use App\Jobs\ProvisionHetznerServerJob;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
+use App\Support\Beta\BetaProgram;
 use App\Support\Servers\ServerHostingPlatformContext;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -32,11 +33,31 @@ final class StoreManagedServer
      */
     public function handle(User $user, Organization $org, array $input): Server
     {
-        $platform = ServerHostingPlatformContext::fromConfig();
+        $platform = ServerHostingPlatformContext::forOrg($org);
         if (! $platform->configured()) {
             throw ValidationException::withMessages([
                 'form.size' => __('dply-managed servers are not available yet.'),
             ]);
+        }
+
+        // Verified email gates provisioning — the cheap anti-abuse signal that
+        // sits before any real Hetzner spend (no card-on-file during beta).
+        if (! $user->hasVerifiedEmail()) {
+            throw ValidationException::withMessages([
+                'form.size' => __('Please verify your email address before creating a managed server.'),
+            ]);
+        }
+
+        // Enforce the single free-CX22 grant for beta orgs.
+        if (! $org->canCreateManagedServer()) {
+            throw ValidationException::withMessages([
+                'form.size' => __('Your beta includes one free managed server. Delete the existing one to create another, or subscribe for more.'),
+            ]);
+        }
+
+        // Beta's free box is pinned to CX22 — no comp-the-difference math.
+        if ($org->isBeta()) {
+            $input['size'] = (string) config('subscription.standard.beta.managed_size', 'cx22');
         }
 
         $regions = array_keys((array) config('managed_servers.regions', []));
@@ -74,6 +95,11 @@ final class StoreManagedServer
             'size' => $data['size'],
             'meta' => $meta,
             'status' => Server::STATUS_PENDING,
+            // Beta's free box is comped until the global cutover (null = until
+            // cutover when no date is set yet — see Server::isComped()). This
+            // localizes the "is it free?" decision to one column the billing
+            // calc already reads, so subscribe-early and cutover fall out cleanly.
+            'comped_until' => $org->isBeta() ? BetaProgram::compedUntil() : null,
         ]);
 
         ProvisionHetznerServerJob::dispatch($server);

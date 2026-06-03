@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\TrialState;
 use App\Services\Billing\OrganizationBillingStateComputer;
+use App\Support\Beta\BetaProgram;
 use App\Services\Billing\SubscriptionPlanResolver;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -53,6 +54,7 @@ class Organization extends Model
     {
         return [
             'trial_ends_at' => 'datetime',
+            'beta_joined_at' => 'datetime',
             'deploy_email_notifications_enabled' => 'boolean',
             'email_server_credentials_enabled' => 'boolean',
             'email_database_credentials_enabled' => 'boolean',
@@ -108,6 +110,15 @@ class Organization extends Model
         // until ends_at, so a just-canceled org keeps full access.
         if ($this->onAnyPaidPlan()) {
             return TrialState::Subscribed;
+        }
+
+        // Closed-beta participants pay $0 with full access and are never paused:
+        // the trial/pause ladder only protects dply from cost on orgs that
+        // should be paying. Subscribed (early-subscribe) wins above; at the
+        // global cutover isBeta() flips false and the org rejoins this ladder
+        // (BetaGraduateCommand reseeds a fresh trial). NoTrial = free indefinitely.
+        if ($this->isBeta()) {
+            return TrialState::NoTrial;
         }
 
         $reference = $this->pauseLadderReference();
@@ -291,6 +302,11 @@ class Organization extends Model
      */
     public function planSiteLimit(): ?int
     {
+        // Beta orgs use the roomy beta site ceiling instead of the plan tier.
+        if ($this->isBeta()) {
+            return max(1, (int) config('subscription.standard.beta.sites', 25));
+        }
+
         return $this->currentSubscriptionPlan()['max_sites'];
     }
 
@@ -687,13 +703,82 @@ class Organization extends Model
     }
 
     /**
-     * Maximum number of servers allowed. Always unlimited under the Standard
-     * model — trial-state gating (see canDeploy / acceptsMetrics) handles the
-     * cash-burning abuse case, so there's no need for an arbitrary server cap.
+     * True while this org is an active closed-beta participant: it redeemed an
+     * invite (`beta_joined_at` set) AND the global beta program is still open.
+     * After the cutover this flips false and the org rejoins the normal
+     * plan/trial lifecycle.
+     */
+    public function isBeta(): bool
+    {
+        return $this->beta_joined_at !== null && BetaProgram::isOpen();
+    }
+
+    /**
+     * BYO server ceiling for a beta org — generous enough to feel unlimited for
+     * a solo dev / small team, bounded so a leaked invite can't provision
+     * hundreds of boxes on a stolen cloud key via dply.
+     */
+    public function betaByoServerLimit(): int
+    {
+        return max(1, (int) config('subscription.standard.beta.byo_servers', 5));
+    }
+
+    /**
+     * Free dply-managed server ceiling for a beta org — the single free CX22.
+     */
+    public function betaManagedServerLimit(): int
+    {
+        return max(0, (int) config('subscription.standard.beta.managed_servers', 1));
+    }
+
+    /**
+     * BYO VMs that count against the beta BYO ceiling (excludes the free managed
+     * box and managed-product logical hosts).
+     */
+    public function byoServerCount(): int
+    {
+        return $this->servers()
+            ->where('hosting_backend', Server::HOSTING_BACKEND_BYO)
+            ->get()
+            ->reject(fn (Server $server) => $server->isManagedProductHost())
+            ->count();
+    }
+
+    /**
+     * dply-managed VMs the org currently holds (the free-CX22 grant counter).
+     */
+    public function managedServerCount(): int
+    {
+        return $this->servers()
+            ->where('hosting_backend', Server::HOSTING_BACKEND_DPLY)
+            ->get()
+            ->filter(fn (Server $server) => $server->isManagedVm())
+            ->count();
+    }
+
+    /**
+     * Whether the org can provision another free dply-managed server. During
+     * beta this enforces the single-CX22 grant; outside beta managed servers
+     * aren't capped here (availability is gated by the surface flag + platform
+     * config at the create flow).
+     */
+    public function canCreateManagedServer(): bool
+    {
+        if (! $this->isBeta()) {
+            return true;
+        }
+
+        return $this->managedServerCount() < $this->betaManagedServerLimit();
+    }
+
+    /**
+     * Maximum number of BYO servers allowed. Unlimited under the Standard model
+     * — trial-state gating handles the cash-burning abuse case — but bounded for
+     * beta orgs by the beta envelope.
      */
     public function maxServers(): int
     {
-        return PHP_INT_MAX;
+        return $this->isBeta() ? $this->betaByoServerLimit() : PHP_INT_MAX;
     }
 
     /**
@@ -710,6 +795,12 @@ class Organization extends Model
      */
     public function canCreateServer(): bool
     {
+        // Beta orgs are bounded by the BYO envelope (the free managed box is
+        // counted separately via canCreateManagedServer); otherwise unlimited.
+        if ($this->isBeta()) {
+            return $this->byoServerCount() < $this->maxServers();
+        }
+
         return $this->servers()->count() < $this->maxServers();
     }
 

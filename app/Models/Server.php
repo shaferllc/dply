@@ -114,6 +114,7 @@ class Server extends Model
             'meta' => 'array',
             'last_health_check_at' => 'datetime',
             'scheduled_deletion_at' => 'datetime',
+            'comped_until' => 'datetime',
         ];
     }
 
@@ -515,6 +516,33 @@ class Server extends Model
     public function usesManagedHosting(): bool
     {
         return $this->hosting_backend === self::HOSTING_BACKEND_DPLY;
+    }
+
+    /**
+     * A real dply-managed VM (the free-CX22 grant counter), as opposed to a
+     * managed-product logical host (Cloud/Edge/serverless).
+     */
+    public function isManagedVm(): bool
+    {
+        return $this->usesManagedHosting() && $this->isVmHost();
+    }
+
+    /**
+     * True when this server is currently comped (free) and must be excluded from
+     * the managed-server bill. Two cases: an explicit future `comped_until`
+     * stamp (the localized comp primitive — reusable for support credits), or a
+     * managed box on a still-open beta org with no stamp yet (reads as
+     * comped-until-cutover; a backfill stamps the real date once it's known).
+     */
+    public function isComped(): bool
+    {
+        if ($this->comped_until !== null) {
+            return $this->comped_until->isFuture();
+        }
+
+        return $this->isManagedVm()
+            && $this->organization !== null
+            && $this->organization->isBeta();
     }
 
     public function hostingBackendLabel(): string

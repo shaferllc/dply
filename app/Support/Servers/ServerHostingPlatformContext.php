@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Servers;
 
+use App\Models\Organization;
 use App\Services\HetznerService;
 use RuntimeException;
 
@@ -30,6 +31,30 @@ final readonly class ServerHostingPlatformContext
             apiToken: trim((string) config('managed_servers.hetzner.api_token', '')),
             defaultRegion: trim((string) config('managed_servers.hetzner.default_region', 'fsn1')) ?: 'fsn1',
             defaultImage: trim((string) config('managed_servers.hetzner.default_image', 'ubuntu-24.04')) ?: 'ubuntu-24.04',
+        );
+    }
+
+    /**
+     * Platform context for a given org. Beta orgs provision their free CX22 in a
+     * SEPARATE, isolated Hetzner project (`beta_hetzner`) so one abuser can't get
+     * the production-managed/Edge project suspended. Falls back to the primary
+     * project when no beta token is configured (local / fake-cloud dev).
+     */
+    public static function forOrg(Organization $org): self
+    {
+        if (! $org->isBeta()) {
+            return self::fromConfig();
+        }
+
+        $betaToken = trim((string) config('managed_servers.beta_hetzner.api_token', ''));
+        if ($betaToken === '') {
+            return self::fromConfig();
+        }
+
+        return new self(
+            apiToken: $betaToken,
+            defaultRegion: trim((string) config('managed_servers.beta_hetzner.default_region', 'fsn1')) ?: 'fsn1',
+            defaultImage: trim((string) config('managed_servers.beta_hetzner.default_image', 'ubuntu-24.04')) ?: 'ubuntu-24.04',
         );
     }
 
