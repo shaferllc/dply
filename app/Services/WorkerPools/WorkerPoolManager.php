@@ -4,7 +4,9 @@ namespace App\Services\WorkerPools;
 
 use App\Jobs\ControlWorkerDaemonJob;
 use App\Jobs\DrainAndDestroyWorkerJob;
+use App\Jobs\PushWorkerPoolHorizonConfigJob;
 use App\Jobs\ReconcileWorkerPoolJob;
+use App\Support\WorkerPools\WorkerPoolHorizonConfig;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteProcess;
@@ -48,6 +50,9 @@ class WorkerPoolManager
                 'desired_count' => 1,
                 'max_size' => 10,
                 'status' => WorkerPool::STATUS_STEADY,
+                // Seed explicit Horizon defaults so the config panel + env-var
+                // push have concrete values from the moment the pool exists.
+                'meta' => ['horizon_config' => WorkerPoolHorizonConfig::defaults(new WorkerPool)],
             ]);
 
             $source->forceFill([
@@ -279,6 +284,14 @@ class WorkerPoolManager
             // Write + enable --now the worker unit(s) on this member's box.
             ControlWorkerDaemonJob::dispatch((string) $site->id, 'ensure', $actor?->id !== null ? (string) $actor->id : null);
             $count++;
+        }
+
+        // Auto-apply the pool's Horizon config (defaults when the user hasn't
+        // tuned anything) as HORIZON_* env vars on every box, so a fresh pool's
+        // workers come up configured without any manual step. Delayed so it lands
+        // after the units above are written/started, then restarts to pick it up.
+        if ($useHorizon && $count > 0) {
+            PushWorkerPoolHorizonConfigJob::dispatch((string) $pool->id)->delay(now()->addSeconds(20));
         }
 
         return ['daemon' => $useHorizon ? 'horizon' : 'queue', 'command' => $command, 'members' => $count];

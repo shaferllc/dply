@@ -590,6 +590,70 @@
                 @endif
             </section>
 
+            {{-- Test-jobs console — streams the workers processing the throwaway
+                 jobs dispatched by the “Test jobs” button above. Same run as the
+                 Traffic tab; shown here so dispatch + result sit together. --}}
+            @include('livewire.partials.console-action-banner-static', [
+                'run' => $testRun,
+                'kindLabels' => (array) config('console_actions.kinds', []),
+            ])
+
+            {{-- Horizon configuration — env-var driven; dply writes HORIZON_* to
+                 each member's .env and restarts the workers. Auto-defaulted. --}}
+            <section class="dply-card overflow-hidden" x-data="{ open: false }">
+                <button type="button" x-on:click="open = !open" class="flex w-full items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 text-left sm:px-7">
+                    <div>
+                        <h3 class="text-sm font-semibold text-brand-ink">{{ __('Configuration') }}</h3>
+                        <p class="mt-0.5 text-xs text-brand-moss">{{ __('Queues, processes, balance, memory, timeout and tries — applied to every worker over SSH.') }}</p>
+                    </div>
+                    <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform" x-bind:class="open ? 'rotate-90' : ''" />
+                </button>
+                <form wire:submit="saveHorizonConfig" x-show="open" x-cloak class="space-y-5 px-6 py-6 sm:px-7">
+                    <div>
+                        <x-input-label for="hz_queues" :value="__('Queues watched')" />
+                        <x-text-input id="hz_queues" wire:model="hz_queues" class="mt-2 block w-full font-mono text-sm" placeholder="default, emails, notifications" />
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('Comma-separated. Workers process these queues in priority order.') }}</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                        <div>
+                            <x-input-label for="hz_min_processes" :value="__('Min processes')" />
+                            <x-text-input id="hz_min_processes" type="number" min="1" max="256" wire:model="hz_min_processes" class="mt-2 block w-full text-sm" />
+                        </div>
+                        <div>
+                            <x-input-label for="hz_max_processes" :value="__('Max processes')" />
+                            <x-text-input id="hz_max_processes" type="number" min="1" max="256" wire:model="hz_max_processes" class="mt-2 block w-full text-sm" />
+                        </div>
+                        <div>
+                            <x-input-label for="hz_balance" :value="__('Balance')" />
+                            <select id="hz_balance" wire:model="hz_balance" class="mt-2 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm focus:border-brand-forest focus:ring-brand-forest">
+                                <option value="auto">{{ __('auto') }}</option>
+                                <option value="simple">{{ __('simple') }}</option>
+                                <option value="false">{{ __('false (off)') }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <x-input-label for="hz_memory" :value="__('Memory (MB)')" />
+                            <x-text-input id="hz_memory" type="number" min="32" max="4096" wire:model="hz_memory" class="mt-2 block w-full text-sm" />
+                        </div>
+                        <div>
+                            <x-input-label for="hz_timeout" :value="__('Job timeout (s)')" />
+                            <x-text-input id="hz_timeout" type="number" min="5" max="3600" wire:model="hz_timeout" class="mt-2 block w-full text-sm" />
+                        </div>
+                        <div>
+                            <x-input-label for="hz_tries" :value="__('Tries')" />
+                            <x-text-input id="hz_tries" type="number" min="1" max="25" wire:model="hz_tries" class="mt-2 block w-full text-sm" />
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between gap-3">
+                        <p class="text-xs text-brand-moss">{{ __('Saving restarts each worker’s Horizon to pick up the new settings.') }}</p>
+                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveHorizonConfig">
+                            <span wire:loading.remove wire:target="saveHorizonConfig">{{ __('Save & apply') }}</span>
+                            <span wire:loading wire:target="saveHorizonConfig">{{ __('Applying…') }}</span>
+                        </x-primary-button>
+                    </div>
+                </form>
+            </section>
+
             {{-- Per-queue workload --}}
             @if (! empty($hz['workload']))
                 <section class="dply-card overflow-hidden">
