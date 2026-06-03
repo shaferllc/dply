@@ -14,8 +14,8 @@ use Illuminate\Support\Collection;
 final class DeployPipelineIssueFixResolver
 {
     /**
-     * @param  Collection<int, array{key?: string, level?: string, message?: string}>  $checks
-     * @return Collection<int, array{key: string, level: string, message: string, fix: ?array{label: string, url: string}}>
+     * @param  Collection<int, array{key?: string, level?: string, message?: string, meta?: array<string, mixed>}>  $checks
+     * @return Collection<int, array{key: string, level: string, message: string, fix: ?array{label: string, url?: string, action?: string}}>
      */
     public static function actionableChecks(Site $site, Server $server, Collection $checks): Collection
     {
@@ -23,27 +23,46 @@ final class DeployPipelineIssueFixResolver
             ->filter(fn (array $check): bool => in_array((string) ($check['level'] ?? ''), ['warning', 'error'], true))
             ->map(function (array $check) use ($site, $server): array {
                 $key = (string) ($check['key'] ?? 'check');
+                $meta = is_array($check['meta'] ?? null) ? $check['meta'] : [];
 
                 return [
                     'key' => $key,
                     'level' => (string) ($check['level'] ?? 'warning'),
                     'message' => (string) ($check['message'] ?? ''),
-                    'fix' => self::fixFor($site, $server, $key),
+                    'fix' => self::fixFor($site, $server, $key, $meta),
                 ];
             })
             ->values();
     }
 
     /**
-     * @return array{label: string, url: string}|null
+     * @param  array<string, mixed>  $meta
+     * @return array{label: string, url?: string, action?: string}|null
      */
-    public static function fixFor(Site $site, Server $server, string $key): ?array
+    public static function fixFor(Site $site, Server $server, string $key, array $meta = []): ?array
     {
-        if ($key === 'simple_deploy_migrations') {
+        if (str_starts_with($key, 'duplicate_step_')) {
+            $stepType = (string) ($meta['step_type'] ?? '');
+            $phase = (string) ($meta['phase'] ?? '');
+
+            if ($stepType !== '' && $phase !== '') {
+                return [
+                    'label' => __('Remove duplicate'),
+                    'action' => sprintf("removeDuplicateDeployStep('%s', '%s')", $stepType, $phase),
+                ];
+            }
+
             return self::link(
-                __('Enable zero downtime'),
-                self::pipelineTab($site, $server, 'rollout'),
+                __('Remove duplicate'),
+                self::pipelineTab($site, $server, 'steps'),
             );
+        }
+
+        if ($key === 'simple_deploy_migrations') {
+            return [
+                'label' => __('Enable zero downtime'),
+                'action' => 'enableZeroDowntimeDeploys',
+            ];
         }
 
         if ($key === 'migrate_without_backup') {
@@ -82,17 +101,11 @@ final class DeployPipelineIssueFixResolver
         }
 
         if (str_starts_with($key, 'release_step_in_build_')) {
-            return self::link(
-                __('Move to release'),
-                self::pipelineTab($site, $server, 'steps'),
-            );
+            return self::phaseMoveFix($site, $server, __('Move to release'), $meta);
         }
 
         if (str_starts_with($key, 'build_step_in_release_')) {
-            return self::link(
-                __('Move to build'),
-                self::pipelineTab($site, $server, 'steps'),
-            );
+            return self::phaseMoveFix($site, $server, __('Move to build'), $meta);
         }
 
         if (in_array($key, [
@@ -124,17 +137,33 @@ final class DeployPipelineIssueFixResolver
             );
         }
 
-        if (str_starts_with($key, 'duplicate_step_')) {
-            return self::link(
-                __('Remove duplicate'),
-                self::pipelineTab($site, $server, 'steps'),
-            );
-        }
-
         return self::link(
             __('Edit pipeline'),
             self::pipelineTab($site, $server, 'steps'),
         );
+    }
+
+    /**
+     * In-place "move this step to the other phase" fix, falling back to the
+     * steps tab when the originating check didn't carry phase metadata.
+     *
+     * @param  array<string, mixed>  $meta
+     * @return array{label: string, url?: string, action?: string}
+     */
+    private static function phaseMoveFix(Site $site, Server $server, string $label, array $meta): array
+    {
+        $stepType = (string) ($meta['step_type'] ?? '');
+        $fromPhase = (string) ($meta['from_phase'] ?? '');
+        $toPhase = (string) ($meta['to_phase'] ?? '');
+
+        if ($stepType !== '' && $fromPhase !== '' && $toPhase !== '') {
+            return [
+                'label' => $label,
+                'action' => sprintf("moveDeployStepsToPhase('%s', '%s', '%s')", $stepType, $fromPhase, $toPhase),
+            ];
+        }
+
+        return self::link($label, self::pipelineTab($site, $server, 'steps'));
     }
 
     private static function pipelineTab(Site $site, Server $server, string $tab): string

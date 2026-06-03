@@ -98,8 +98,8 @@ final class DeployPipelineAdvisor
             $checks[] = $this->check('empty_step_command', 'error', $message);
         }
 
-        $this->checkDuplicateStepTypes($buildSteps, __('Build'), $warnings, $checks);
-        $this->checkDuplicateStepTypes($releaseSteps, __('Release'), $warnings, $checks);
+        $this->checkDuplicateStepTypes($buildSteps, SiteDeployStep::PHASE_BUILD, __('Build'), $warnings, $checks);
+        $this->checkDuplicateStepTypes($releaseSteps, SiteDeployStep::PHASE_RELEASE, __('Release'), $warnings, $checks);
         $this->checkMultipleNodeInstallers($buildSteps, $warnings, $checks);
         $this->checkPhaseMisplacement($buildSteps, $releaseSteps, $warnings, $checks);
         $this->checkReleaseOrdering($releaseSteps, $warnings, $checks);
@@ -134,7 +134,7 @@ final class DeployPipelineAdvisor
      * @param  list<string>  $warnings
      * @param  list<array{key: string, level: string, message: string}>  $checks
      */
-    private function checkDuplicateStepTypes(Collection $steps, string $phaseLabel, array &$warnings, array &$checks): void
+    private function checkDuplicateStepTypes(Collection $steps, string $phase, string $phaseLabel, array &$warnings, array &$checks): void
     {
         $counts = $steps->groupBy('step_type')->map->count()->filter(fn (int $c) => $c > 1);
 
@@ -146,7 +146,9 @@ final class DeployPipelineAdvisor
                 'label' => $label,
             ]);
             $warnings[] = $message;
-            $checks[] = $this->check('duplicate_step_'.$type.'_'.$phaseLabel, 'warning', $message);
+            $check = $this->check('duplicate_step_'.$type.'_'.$phaseLabel, 'warning', $message);
+            $check['meta'] = ['step_type' => (string) $type, 'phase' => $phase];
+            $checks[] = $check;
         }
     }
 
@@ -197,7 +199,13 @@ final class DeployPipelineAdvisor
                 ]),
             };
             $warnings[] = $message;
-            $checks[] = $this->check('release_step_in_build_'.$step->step_type, 'warning', $message);
+            $check = $this->check('release_step_in_build_'.$step->step_type, 'warning', $message);
+            $check['meta'] = [
+                'step_type' => (string) $step->step_type,
+                'from_phase' => SiteDeployStep::PHASE_BUILD,
+                'to_phase' => SiteDeployStep::PHASE_RELEASE,
+            ];
+            $checks[] = $check;
         }
 
         foreach ($releaseSteps as $step) {
@@ -209,7 +217,13 @@ final class DeployPipelineAdvisor
                 'label' => $step->pillLabel(),
             ]);
             $warnings[] = $message;
-            $checks[] = $this->check('build_step_in_release_'.$step->step_type, 'warning', $message);
+            $check = $this->check('build_step_in_release_'.$step->step_type, 'warning', $message);
+            $check['meta'] = [
+                'step_type' => (string) $step->step_type,
+                'from_phase' => SiteDeployStep::PHASE_RELEASE,
+                'to_phase' => SiteDeployStep::PHASE_BUILD,
+            ];
+            $checks[] = $check;
         }
     }
 

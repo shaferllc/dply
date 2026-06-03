@@ -8,10 +8,12 @@ use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Jobs\AttachCloudDomainJob;
 use App\Jobs\DetachCloudDomainJob;
 use App\Jobs\ExecuteSiteCertificateJob;
+use App\Jobs\InstallServerWebserverJob;
 use App\Jobs\IssueSiteSslJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Jobs\PushSiteEnvJob;
 use App\Jobs\RemoveSiteRepositoryJob;
+use App\Jobs\RestartSiteProvisioningJob;
 use App\Jobs\ScanSiteEnvRequirementsJob;
 use App\Jobs\SyncEnvFromServerJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
@@ -19,8 +21,10 @@ use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\Edge\ManagesEdgeRedeploy;
 use App\Livewire\Concerns\ManagesServerlessRuntime;
 use App\Livewire\Concerns\MountsSiteWorkspace;
+use App\Livewire\Concerns\OptimizesPipeline;
 use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
 use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
+use App\Livewire\Sites\Concerns\HandlesSiteRemovalFlow;
 use App\Livewire\Sites\Concerns\ManagesSiteDeployExecution;
 use App\Livewire\Sites\Concerns\ManagesSiteDeployHooks;
 use App\Livewire\Sites\Concerns\ManagesSiteDeploySteps;
@@ -50,7 +54,6 @@ use App\Services\Sites\PrimaryHostnameRenamePlanner;
 use App\Services\Sites\RepositoryWebhookProvisioner;
 use App\Services\Sites\SiteProvisioner;
 use App\Services\Sites\SiteProvisioningCanceller;
-use App\Services\Sites\SiteProvisioningRestarter;
 use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use App\Support\HostnameValidator;
@@ -69,15 +72,16 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Show extends Component
 {
-    use \App\Livewire\Sites\Concerns\HandlesSiteRemovalFlow;
     use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
+    use HandlesSiteRemovalFlow;
     use ManagesEdgeRedeploy;
     use ManagesServerlessRuntime;
     use ManagesSiteDeployExecution;
     use ManagesSiteDeployHooks;
     use ManagesSiteDeploySteps;
     use MountsSiteWorkspace;
+    use OptimizesPipeline;
     use RefreshesLinkedSourceControlAccounts;
     use WatchesConsoleActionOutcomes;
 
@@ -775,7 +779,7 @@ class Show extends Component
         );
         $siteProvisioner->markQueued($this->site);
 
-        \App\Jobs\RestartSiteProvisioningJob::dispatch((string) $this->site->id);
+        RestartSiteProvisioningJob::dispatch((string) $this->site->id);
 
         $this->site->refresh();
         $this->toastSuccess(__('Restart queued — provisioning will run in the background.'));
@@ -2716,7 +2720,7 @@ class Show extends Component
     /**
      * Retrofit Caddy onto the server when the install profile left it
      * webserver=none (e.g. legacy queue_worker provisions). Dispatches
-     * {@see \App\Jobs\InstallServerWebserverJob}, which SSHes in, installs
+     * {@see InstallServerWebserverJob}, which SSHes in, installs
      * Caddy, updates server meta, and re-queues provisioning for sites
      * stuck on the headless path.
      */
@@ -2736,7 +2740,7 @@ class Show extends Component
         $meta['webserver_install_pending'] = true;
         $this->server->forceFill(['meta' => $meta])->save();
 
-        \App\Jobs\InstallServerWebserverJob::dispatch($this->server->id, 'caddy');
+        InstallServerWebserverJob::dispatch($this->server->id, 'caddy');
 
         $this->toastSuccess(__('Caddy install queued. The page will refresh once the server reports back.'));
     }

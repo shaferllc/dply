@@ -75,6 +75,23 @@
                 </p>
                 </div>
             </div>
+            @if (method_exists($this, 'optimizePipeline'))
+                <div class="flex shrink-0 items-center gap-2">
+                    <button
+                        type="button"
+                        wire:click="optimizePipeline"
+                        wire:loading.attr="disabled"
+                        wire:target="optimizePipeline"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 shadow-sm transition-colors hover:bg-indigo-100 disabled:opacity-60"
+                        title="{{ __('Read package.json / composer.json on the server and add every deploy step the repo needs.') }}"
+                    >
+                        <x-heroicon-o-sparkles class="h-3.5 w-3.5" wire:loading.remove wire:target="optimizePipeline" />
+                        <span wire:loading wire:target="optimizePipeline" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
+                        <span wire:loading.remove wire:target="optimizePipeline">{{ __('Optimize pipeline') }}</span>
+                        <span wire:loading wire:target="optimizePipeline">{{ __('Scanning…') }}</span>
+                    </button>
+                </div>
+            @endif
         </div>
 
         @if (($pipelineActionableChecks ?? collect())->isNotEmpty())

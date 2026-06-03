@@ -452,6 +452,85 @@ trait ManagesSiteDeploySteps
         $this->toastSuccess(__('Pipeline step removed.'));
     }
 
+    /**
+     * Remove the extra copies of a duplicated step (same type + phase), keeping
+     * the first occurrence. Wired from the Pipeline review "Remove duplicate"
+     * fix so it resolves the warning in place without a page navigation.
+     */
+    public function removeDuplicateDeployStep(string $stepType, string $phase): void
+    {
+        $this->authorize('update', $this->site);
+
+        $pipeline = $this->editingDeployPipeline();
+        $duplicates = $pipeline->steps()
+            ->where('step_type', $stepType)
+            ->where('phase', $phase)
+            ->orderBy('sort_order')
+            ->get();
+
+        if ($duplicates->count() < 2) {
+            return;
+        }
+
+        $removeIds = $duplicates->skip(1)->pluck('id')->all();
+        if ($this->editing_deploy_step_id !== null && in_array((string) $this->editing_deploy_step_id, array_map('strval', $removeIds), true)) {
+            $this->closePipelineStepForm();
+        }
+
+        SiteDeployStep::query()
+            ->where('pipeline_id', $pipeline->id)
+            ->whereIn('id', $removeIds)
+            ->delete();
+
+        $this->syncEditingPipelineSnapshot();
+        $this->toastSuccess(trans_choice('{1} Removed 1 duplicate step.|[2,*] Removed :count duplicate steps.', count($removeIds), ['count' => count($removeIds)]));
+    }
+
+    /**
+     * Move every step of a given type from one phase to the other, keeping
+     * relative order. Wired from the Pipeline review "Move to release" /
+     * "Move to build" fixes so phase-misplacement warnings resolve in place.
+     */
+    public function moveDeployStepsToPhase(string $stepType, string $fromPhase, string $toPhase): void
+    {
+        $this->authorize('update', $this->site);
+
+        $phases = SiteDeployStep::userPhases();
+        if (! in_array($fromPhase, $phases, true) || ! in_array($toPhase, $phases, true) || $fromPhase === $toPhase) {
+            return;
+        }
+
+        $pipeline = $this->editingDeployPipeline();
+        $steps = $pipeline->steps()
+            ->where('step_type', $stepType)
+            ->where('phase', $fromPhase)
+            ->orderBy('sort_order')
+            ->get();
+
+        if ($steps->isEmpty()) {
+            return;
+        }
+
+        $manager = app(SiteDeployPipelineManager::class);
+        foreach ($steps as $step) {
+            $manager->updateStep(
+                $pipeline,
+                $step,
+                (string) $step->step_type,
+                $step->custom_command,
+                (int) ($step->timeout_seconds ?? 900),
+                $toPhase,
+            );
+        }
+
+        $this->syncEditingPipelineSnapshot();
+        $this->toastSuccess(trans_choice(
+            '{1} Moved 1 step.|[2,*] Moved :count steps.',
+            $steps->count(),
+            ['count' => $steps->count()],
+        ));
+    }
+
     public function moveDeployStepUp(string $id): void
     {
         $this->authorize('update', $this->site);
