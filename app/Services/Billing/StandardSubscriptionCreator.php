@@ -78,6 +78,13 @@ class StandardSubscriptionCreator
             }
         }
 
+        if ($desired->realtimeCount > 0) {
+            $realtimePriceId = $this->managedProductPriceIdForInterval('realtime', $interval);
+            if ($realtimePriceId !== '') {
+                $items[] = ['price' => $realtimePriceId, 'quantity' => $desired->realtimeCount];
+            }
+        }
+
         if ($interval === self::INTERVAL_MONTH && $desired->cloudResourceSubtotalCents > 0) {
             $cloudUsagePriceId = $this->cloudUsagePriceId();
             if ($cloudUsagePriceId !== '') {
@@ -122,6 +129,11 @@ class StandardSubscriptionCreator
     public function edgePriceIdForInterval(string $interval): string
     {
         return $this->managedProductPriceIdForInterval('edge', $interval);
+    }
+
+    public function realtimePriceIdForInterval(string $interval): string
+    {
+        return $this->managedProductPriceIdForInterval('realtime', $interval);
     }
 
     public function edgeUsagePriceId(): string

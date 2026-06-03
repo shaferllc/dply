@@ -140,6 +140,12 @@ return [
         'edge_cents' => 200,
         // Edge delivery usage is billed in 1-cent Stripe units (quantity = cents).
         'edge_usage_unit_cents' => 1,
+        // Flat per-app fee for the managed Realtime (Pusher/Reverb-compatible)
+        // resource. Runs on dply's Cloudflare account (Workers + Durable Objects,
+        // hibernation keeps idle connections ~free), so the marginal cost of
+        // another app is low and a flat fee holds margin. v1 is flat-only; peak
+        // concurrency is captured for future connection-based tiers.
+        'realtime_cents' => (int) env('SUBSCRIPTION_REALTIME_CENTS', 900),
 
         /*
         |----------------------------------------------------------------------
@@ -232,6 +238,9 @@ return [
             'edge' => env('STRIPE_PRICE_STANDARD_EDGE', ''),
             'edge_yearly' => env('STRIPE_PRICE_STANDARD_EDGE_YEARLY', ''),
             'edge_usage' => env('STRIPE_PRICE_STANDARD_EDGE_USAGE', ''),
+            // Managed Realtime — flat per-app, monthly + yearly. No metered line.
+            'realtime' => env('STRIPE_PRICE_STANDARD_REALTIME', ''),
+            'realtime_yearly' => env('STRIPE_PRICE_STANDARD_REALTIME_YEARLY', ''),
             // --- Legacy size-tier Stripe prices (retired with the migration) ---
             'base_monthly' => env('STRIPE_PRICE_STANDARD_BASE_MONTHLY', ''),
             'base_yearly' => env('STRIPE_PRICE_STANDARD_BASE_YEARLY', ''),

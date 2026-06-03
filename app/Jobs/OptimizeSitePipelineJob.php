@@ -66,19 +66,25 @@ class OptimizeSitePipelineJob implements ShouldQueue
 
             $needed = $this->plan($pkg, $composer, $locks, $emit);
             if ($needed === []) {
+                $this->storePreview($site, []);
                 $emit->success('scan', 'No pipeline changes needed — your pipeline already covers what the repo requires.');
                 $this->complete(failed: false);
 
                 return;
             }
 
+            // Preview only: figure out which steps are genuinely NEW (the
+            // pipeline doesn't have them yet) and stash them for the operator
+            // to review + apply. We never mutate the pipeline here — the
+            // "Optimize pipeline" action now always confirms before changing
+            // anything, so the operator sees exactly what it will add.
             $pipeline = $pipelines->ensureDefaultPipeline($site);
             $existing = $pipeline->steps()->get();
             $existingTypes = $existing->pluck('step_type')->map(static fn ($t): string => (string) $t)->all();
             $existingCustom = $existing->where('step_type', SiteDeployStep::TYPE_CUSTOM)
                 ->map(static fn ($s): string => strtolower((string) $s->custom_command));
 
-            $added = 0;
+            $proposed = [];
             foreach ($needed as $step) {
                 $isCustom = $step['type'] === SiteDeployStep::TYPE_CUSTOM;
                 $already = $isCustom
@@ -89,17 +95,14 @@ class OptimizeSitePipelineJob implements ShouldQueue
                     continue;
                 }
 
-                $pipelines->addStep($pipeline, $step['type'], $step['command'] ?? null, 900, null, $step['phase']);
-                $existingTypes[] = $step['type'];
-                if ($isCustom) {
-                    $existingCustom->push(strtolower((string) $step['command']));
-                }
-                $emit->success('add', 'Added: '.$step['label']);
-                $added++;
+                $proposed[] = $step;
+                $emit->success('plan', 'Will add: '.$step['label']);
             }
 
-            $emit->step('scan', $added > 0
-                ? $added.' step(s) added — review them on the Pipeline tab, then deploy.'
+            $this->storePreview($site, $proposed);
+
+            $emit->step('scan', $proposed !== []
+                ? count($proposed).' proposed step(s) — review and apply them from the confirm dialog.'
                 : 'Everything the repo needs is already in the pipeline.');
             $this->complete(failed: false);
         } catch (\Throwable $e) {
@@ -221,6 +224,29 @@ class OptimizeSitePipelineJob implements ShouldQueue
         $out = $conn->exec($cmd, 15);
 
         return array_values(array_filter(array_map('trim', preg_split('/\r?\n/', $out) ?: [])));
+    }
+
+    /**
+     * Persist (or clear) the proposed-steps preview on the site so the
+     * confirm dialog can render the diff and {@see OptimizesPipeline::applyPipelineOptimization()}
+     * can apply it.
+     *
+     * @param  list<array{type: string, phase: string, command: ?string, label: string}>  $proposed
+     */
+    private function storePreview(Site $site, array $proposed): void
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+
+        if ($proposed === []) {
+            unset($meta['pipeline_optimize_preview']);
+        } else {
+            $meta['pipeline_optimize_preview'] = [
+                'at' => now()->toIso8601String(),
+                'steps' => $proposed,
+            ];
+        }
+
+        $site->forceFill(['meta' => $meta])->save();
     }
 
     private function complete(bool $failed, ?string $error = null): void

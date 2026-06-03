@@ -79,6 +79,22 @@ class Repository extends Component
     #[Url(as: 'repo_q', except: '')]
     public string $commitFilter = '';
 
+    /** 1-based page for the Commits tab — pages through the full history. */
+    #[Url(as: 'commits_page', except: 1)]
+    public int $commitsPage = 1;
+
+    /** Reset to the first page whenever the filter changes. */
+    public function updatedCommitFilter(): void
+    {
+        $this->commitsPage = 1;
+    }
+
+    /** Step the Commits tab one page in either direction (never below 1). */
+    public function changeCommitsPage(int $delta): void
+    {
+        $this->commitsPage = max(1, $this->commitsPage + $delta);
+    }
+
     /** Connection-tab form mirrors of the equivalent fields on the Site. */
     public string $connectionRepositoryUrl = '';
 
@@ -315,18 +331,42 @@ class Repository extends Component
     {
         Gate::authorize('update', $this->site);
 
-        if ($this->connectionAccountId === '') {
-            $this->toastError(__('Select a linked source-control account before enabling the provider hook.'));
+        // We already know the provider from the repository URL, so the operator
+        // shouldn't have to re-pick an account just to register the push hook.
+        // Resolve the identity exactly the way reads do: honour an explicitly
+        // wired account, otherwise fall back to the connection this repo already
+        // uses for that provider (forSite → best-available identity).
+        $provider = $this->detectProviderKind((string) ($this->site->git_repository_url ?? ''));
+        if (! in_array($provider, ['github', 'gitlab', 'bitbucket'], true)) {
+            $this->toastError(__('Quick deploy needs a GitHub, GitLab, or Bitbucket repository.'));
 
             return;
         }
 
-        $account = app(GitIdentityResolver::class)->forId(auth()->user(), $this->connectionAccountId);
+        $resolver = app(GitIdentityResolver::class);
+        $account = $this->connectionAccountId !== ''
+            ? $resolver->forId(auth()->user(), $this->connectionAccountId)
+            : null;
+        $account ??= $resolver->forSite($this->site, auth()->user(), $provider);
+
         if ($account === null) {
-            $this->toastError(__('That source-control account is no longer linked.'));
+            $this->toastError(__('Link a :provider account before enabling quick deploy.', ['provider' => ucfirst($provider)]));
 
             return;
         }
+
+        // The provisioner reads the provider kind + backing account from stored
+        // meta, not the live URL. Sites created outside the connection form (e.g.
+        // serverless workers) can carry a stale 'custom' kind, so sync what we
+        // just resolved into meta and persist it before the provisioner reloads
+        // the site via ->fresh() — otherwise the patch is dropped.
+        $patch = ['git_provider_kind' => $provider];
+        if ((string) ($this->site->repositoryMeta()['git_source_control_account_id'] ?? '') === '') {
+            $patch['git_source_control_account_id'] = $account->id();
+            $this->connectionAccountId = (string) $account->id();
+        }
+        $this->site->mergeRepositoryMeta($patch);
+        $this->site->save();
 
         $result = $provisioner->enable($this->site->fresh(), $account);
         if (! ($result['ok'] ?? false)) {
@@ -444,7 +484,7 @@ class Repository extends Component
      */
     private function renderCommitsPayload(SiteGitCommitsFetcher $fetcher, $user, string $branch): array
     {
-        $result = $fetcher->fetch($this->site, $user, 40, $branch);
+        $result = $fetcher->fetch($this->site, $user, 40, $branch, $this->commitsPage);
 
         $commits = $result['commits'];
         $filter = trim($this->commitFilter);
@@ -577,7 +617,7 @@ class Repository extends Component
      */
     private function buildBreadcrumb(string $path): array
     {
-        $crumbs = [['name' => __('root'), 'path' => '']];
+        $crumbs = [['name' => __('Repository root'), 'path' => '']];
         $accum = '';
         foreach (array_filter(explode('/', $path)) as $segment) {
             $accum = $accum === '' ? $segment : $accum.'/'.$segment;

@@ -874,7 +874,7 @@
                             </button>
                         @endif
                         @if ($supportsEnvPush)
-                            <button type="button" wire:click="openConfirmActionModal('syncEnvFromServer', [], @js(__('Sync from server?')), @js(__('This replaces the cached variables with the live .env on the server. Any local edits here that haven\'t been pushed will be overwritten and lost.')), @js(__('Overwrite with server copy')), true)" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
+                            <button type="button" wire:click="openConfirmActionModal('syncEnvFromServer', [], @js(__('Sync from server?')), @js(__('This replaces the cached variables with the live .env on the server. Any local edits here that haven\'t been pushed — and connection variables injected by attached resources (managed databases, caches) — will be overwritten with the server copy.')), @js(__('Overwrite with server copy')), true)" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
                                 <x-heroicon-o-arrow-down-tray class="h-4 w-4 text-brand-moss" /> {{ __('Sync from server') }}
                             </button>
                         @endif

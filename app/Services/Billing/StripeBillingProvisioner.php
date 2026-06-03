@@ -65,6 +65,12 @@ class StripeBillingProvisioner
 
     public const ROLE_EDGE_USAGE_MONTHLY = 'standard_edge_usage';
 
+    public const ROLE_REALTIME_PRODUCT = 'standard_realtime_product';
+
+    public const ROLE_REALTIME_MONTHLY = 'standard_realtime';
+
+    public const ROLE_REALTIME_YEARLY = 'standard_realtime_yearly';
+
     public const ROLE_ENTERPRISE_PRODUCT = 'enterprise_product';
 
     public function __construct(private StripeClient $stripe) {}
@@ -282,6 +288,32 @@ class StripeBillingProvisioner
             )->id;
         }
 
+        $realtimeCents = (int) ($standardConfig['realtime_cents'] ?? 900);
+        if ($realtimeCents > 0) {
+            $realtimeProduct = $this->upsertProduct(
+                name: 'dply Realtime app',
+                description: 'Per-app fee for dply Realtime — a managed Pusher/Reverb-compatible channel app on dply-owned edge infrastructure. Covers WebSocket connections, presence, and publishing. Billed per active app.',
+                role: self::ROLE_REALTIME_PRODUCT,
+            );
+            $result[self::ROLE_REALTIME_PRODUCT] = $realtimeProduct->id;
+
+            $result[self::ROLE_REALTIME_MONTHLY] = $this->upsertRecurringPrice(
+                productId: $realtimeProduct->id,
+                amount: $realtimeCents,
+                interval: 'month',
+                nickname: 'Realtime app — Monthly',
+                role: self::ROLE_REALTIME_MONTHLY,
+            )->id;
+
+            $result[self::ROLE_REALTIME_YEARLY] = $this->upsertRecurringPrice(
+                productId: $realtimeProduct->id,
+                amount: $this->annualAmount($realtimeCents, $annualPct),
+                interval: 'year',
+                nickname: 'Realtime app — Yearly',
+                role: self::ROLE_REALTIME_YEARLY,
+            )->id;
+        }
+
         $enterpriseProduct = $this->upsertProduct(
             name: 'dply Enterprise',
             description: 'dply for larger fleets and procurement-led rollouts. Includes everything in Standard, plus volume pricing on per-server fees, SSO, audit log access, a custom MSA, dedicated support, and rollout planning. Pricing is negotiated per deal.',
@@ -311,6 +343,8 @@ class StripeBillingProvisioner
             self::ROLE_EDGE_MONTHLY => 'STRIPE_PRICE_STANDARD_EDGE',
             self::ROLE_EDGE_YEARLY => 'STRIPE_PRICE_STANDARD_EDGE_YEARLY',
             self::ROLE_EDGE_USAGE_MONTHLY => 'STRIPE_PRICE_STANDARD_EDGE_USAGE',
+            self::ROLE_REALTIME_MONTHLY => 'STRIPE_PRICE_STANDARD_REALTIME',
+            self::ROLE_REALTIME_YEARLY => 'STRIPE_PRICE_STANDARD_REALTIME_YEARLY',
         ];
 
         $lines = [];

@@ -534,6 +534,11 @@ class Organization extends Model
         return $this->hasMany(Site::class);
     }
 
+    public function realtimeApps(): HasMany
+    {
+        return $this->hasMany(RealtimeApp::class);
+    }
+
     public function billingSnapshots(): HasMany
     {
         return $this->hasMany(OrganizationBillingSnapshot::class);

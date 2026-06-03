@@ -168,10 +168,13 @@ final class DeployPipelineIssueFixResolver
 
     private static function pipelineTab(Site $site, Server $server, string $tab): string
     {
+        // Use the query key the WorkspacePipeline component binds to
+        // (#[Url(as: 'pipeline_tab')]). Emitting ?tab= lands on the page but
+        // leaves the default Overview tab active under wire:navigate.
         return route('sites.pipeline', [
             'server' => $server,
             'site' => $site,
-            'tab' => $tab,
+            'pipeline_tab' => $tab,
         ]);
     }
 

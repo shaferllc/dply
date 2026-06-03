@@ -49,6 +49,8 @@ class DesiredBillingState
         public readonly int $edgeSubtotalCents,
         public readonly int $edgeUsageSubtotalCents,
         public readonly array $edgeUsageEstimate,
+        public readonly int $realtimeCount,
+        public readonly int $realtimeSubtotalCents,
         public readonly int $monthlyTotalCents,
         // --- Back-compat shims for consumers not yet migrated off the old
         // size-tier shape (billing dashboard, analytics, forecast, snapshot).
@@ -81,6 +83,8 @@ class DesiredBillingState
         int $edgeUnitCents = 0,
         int $edgeUsageSubtotalCents = 0,
         array $edgeUsageEstimate = [],
+        int $realtimeCount = 0,
+        int $realtimeUnitCents = 0,
     ): self {
         $normalized = [];
         foreach (ServerTier::ordered() as $tier) {
@@ -105,6 +109,9 @@ class DesiredBillingState
 
         $edgeUsageSubtotalCents = max(0, $edgeUsageSubtotalCents);
 
+        $realtimeCount = max(0, $realtimeCount);
+        $realtimeSubtotal = $realtimeCount * max(0, $realtimeUnitCents);
+
         $monthly = $planPriceCents
             + $serverlessSubtotal
             + $serverlessUsageSubtotalCents
@@ -112,7 +119,8 @@ class DesiredBillingState
             + $cloudSubtotal
             + $cloudResourceSubtotalCents
             + $edgeSubtotal
-            + $edgeUsageSubtotalCents;
+            + $edgeUsageSubtotalCents
+            + $realtimeSubtotal;
 
         return new self(
             planKey: (string) ($plan['key'] ?? 'free'),
@@ -131,6 +139,8 @@ class DesiredBillingState
             edgeSubtotalCents: $edgeSubtotal,
             edgeUsageSubtotalCents: $edgeUsageSubtotalCents,
             edgeUsageEstimate: $edgeUsageEstimate,
+            realtimeCount: $realtimeCount,
+            realtimeSubtotalCents: $realtimeSubtotal,
             monthlyTotalCents: $monthly,
             baseCents: 0,
             serverSubtotalCents: $planPriceCents,
@@ -161,7 +171,8 @@ class DesiredBillingState
             + $this->managedServerSubtotalCents
             + $this->cloudSubtotalCents
             + $this->cloudResourceSubtotalCents
-            + $this->edgeSubtotalCents;
+            + $this->edgeSubtotalCents
+            + $this->realtimeSubtotalCents;
     }
 
     /**
@@ -197,6 +208,8 @@ class DesiredBillingState
             'edge_subtotal_cents' => $this->edgeSubtotalCents,
             'edge_usage_subtotal_cents' => $this->edgeUsageSubtotalCents,
             'edge_usage_estimate' => $this->edgeUsageEstimate,
+            'realtime_count' => $this->realtimeCount,
+            'realtime_subtotal_cents' => $this->realtimeSubtotalCents,
             'monthly_total_cents' => $this->monthlyTotalCents,
             // Back-compat keys (snapshots/forecast read these today).
             'base_cents' => $this->baseCents,

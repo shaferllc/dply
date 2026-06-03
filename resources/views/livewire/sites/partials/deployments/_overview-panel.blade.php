@@ -86,7 +86,7 @@
                         $heightPct = $maxDaily > 0 ? round(($day['total'] / $maxDaily) * 100) : 0;
                         $failedRatio = $day['total'] > 0 ? ($day['failed'] / $day['total']) : 0;
                     @endphp
-                    <div class="group relative flex flex-1 flex-col justify-end" title="{{ $day['date'] }} · {{ $day['total'] }} deploys ({{ $day['success'] }} ok, {{ $day['failed'] }} failed)">
+                    <div class="group relative flex h-full flex-1 flex-col justify-end" title="{{ $day['date'] }} · {{ $day['total'] }} deploys ({{ $day['success'] }} ok, {{ $day['failed'] }} failed)">
                         <div @class([
                             'w-full rounded-sm transition-colors',
                             'bg-emerald-500/70 group-hover:bg-emerald-600' => $day['total'] > 0 && $failedRatio < 0.5,

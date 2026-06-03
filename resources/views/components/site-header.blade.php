@@ -10,6 +10,7 @@
         \Laravel\Pennant\Feature::loadMissing([
             'surface.cloud',
             'surface.edge',
+            'surface.realtime',
             'surface.serverless',
             'surface.fleet',
             'surface.projects',
@@ -26,7 +27,7 @@
     $homeActive = $active === 'home' || (request()->is('/') && ! request()->routeIs('dashboard'));
     $hi = 'h-5 w-5 shrink-0';
     $hiGuest = 'h-4 w-4 shrink-0 opacity-90';
-    $browseActive = request()->routeIs('infrastructure.*', 'servers.*', 'cloud.*', 'serverless.*', 'edge.*', 'sites.*', 'projects.*', 'organizations.*', 'fleet.*');
+    $browseActive = request()->routeIs('infrastructure.*', 'servers.*', 'cloud.*', 'serverless.*', 'edge.*', 'realtime.*', 'sites.*', 'projects.*', 'organizations.*', 'fleet.*');
     $moreMenuActive = request()->routeIs('status-pages.*')
         || request()->routeIs('marketplace.index')
         || request()->routeIs('backups.*')
@@ -235,6 +236,21 @@
                                                 <x-heroicon-o-globe-alt class="{{ $hi }}" />
                                             </x-slot>
                                             {{ __('Edge') }}
+                                        </x-coming-soon-dropdown-link>
+                                    @endfeature
+                                    @feature('surface.realtime')
+                                        <x-dropdown-link :href="route('realtime.index')">
+                                            <x-slot name="icon">
+                                                <x-heroicon-o-signal class="{{ $hi }}" />
+                                            </x-slot>
+                                            {{ __('Realtime') }}
+                                        </x-dropdown-link>
+                                    @else
+                                        <x-coming-soon-dropdown-link>
+                                            <x-slot name="icon">
+                                                <x-heroicon-o-signal class="{{ $hi }}" />
+                                            </x-slot>
+                                            {{ __('Realtime') }}
                                         </x-coming-soon-dropdown-link>
                                     @endfeature
                                     <div class="mx-3 my-2 flex items-center gap-2" role="presentation">

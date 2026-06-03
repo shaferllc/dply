@@ -95,13 +95,27 @@
                 <div class="flex flex-wrap items-center gap-2 sm:ml-auto">
                     <button
                         type="button"
-                        wire:click="openConfirmActionModal('syncEnvFromServer', [], @js(__('Sync from server?')), @js(__('This replaces the cached variables with the live .env on the server. Any local edits not yet pushed will be overwritten and lost.')), @js(__('Overwrite with server copy')), true)"
+                        wire:click="recheckBlockedEnv"
+                        wire:loading.attr="disabled"
+                        wire:target="recheckBlockedEnv"
                         class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-800 shadow-sm transition-colors hover:bg-rose-100 disabled:opacity-60"
-                        title="{{ __('Re-read the live .env from the server (in case you set them out-of-band).') }}"
+                        title="{{ __('Re-read the server .env and clear this if the variables are actually set — no deploy needed.') }}"
                     >
-                        <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5" wire:loading.remove wire:target="syncEnvFromServer" />
-                        <span wire:loading wire:target="syncEnvFromServer" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
-                        {{ __('Sync from server') }}
+                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="recheckBlockedEnv" />
+                        <span wire:loading wire:target="recheckBlockedEnv" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
+                        {{ __('Re-check') }}
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="viewServerEnv"
+                        wire:loading.attr="disabled"
+                        wire:target="viewServerEnv"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-800 shadow-sm transition-colors hover:bg-rose-100 disabled:opacity-60"
+                        title="{{ __('See which variables are set on the server right now — read-only, nothing is overwritten.') }}"
+                    >
+                        <x-heroicon-o-eye class="h-3.5 w-3.5" wire:loading.remove wire:target="viewServerEnv" />
+                        <span wire:loading wire:target="viewServerEnv" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
+                        {{ __('View server .env') }}
                     </button>
                     <button
                         type="button"
@@ -277,14 +291,16 @@
                     @else
                         <x-heroicon-o-rocket-launch class="h-3.5 w-3.5" wire:loading.remove wire:target="deployNow" />
                         <span wire:loading wire:target="deployNow"><x-spinner variant="white" size="sm" /></span>
-                        <span wire:loading.remove wire:target="deployNow">{{ __('Deploy now') }}</span>
+                        <span wire:loading.remove wire:target="deployNow">{{ __('Deploy') }}</span>
                         <span wire:loading wire:target="deployNow">{{ __('Deploying…') }}</span>
                     @endif
                 </button>
-                <button type="button" wire:click="queueDeploy" wire:loading.attr="disabled" wire:target="queueDeploy" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 disabled:opacity-50">
-                    <x-heroicon-o-queue-list class="h-3.5 w-3.5" />
-                    {{ __('Queue deploy') }}
-                </button>
+                @if ($this->deploySyncPeerCount > 0)
+                    <button type="button" wire:click="queueDeploy" wire:loading.attr="disabled" wire:target="queueDeploy" title="{{ __('Also deploys :count linked site(s) in this deploy sync group.', ['count' => $this->deploySyncPeerCount]) }}" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 disabled:opacity-50">
+                        <x-heroicon-o-queue-list class="h-3.5 w-3.5" />
+                        {{ __('Deploy linked sites') }}
+                    </button>
+                @endif
                 @if (method_exists($this, 'optimizePipeline'))
                     <button type="button" wire:click="optimizePipeline" wire:loading.attr="disabled" wire:target="optimizePipeline" class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-2 text-xs font-semibold text-indigo-700 shadow-sm transition-colors hover:bg-indigo-100 disabled:opacity-60" title="{{ __('Read package.json / composer.json on the server and add every deploy step the repo needs.') }}">
                         <x-heroicon-o-sparkles class="h-3.5 w-3.5" wire:loading.remove wire:target="optimizePipeline" />
@@ -483,10 +499,26 @@
                 </ol>
 
                 @if ($latest->exit_code !== null && $latest->exit_code !== 0)
-                    <p class="mt-4 font-mono text-xs text-rose-700">{{ __('exit :code', ['code' => $latest->exit_code]) }}</p>
+                    <div class="mt-4 space-y-2">
+                        <p class="font-mono text-xs text-rose-700">{{ __('exit :code', ['code' => $latest->exit_code]) }}</p>
+                        {{-- A deploy can fail BETWEEN recorded phases (e.g. a thrown
+                             exception that never becomes a pipeline step), leaving the
+                             timeline with nothing to expand. Surface the captured
+                             failure reason from the log so the operator isn't left with
+                             a bare exit code. --}}
+                        @php($failLog = trim((string) $latest->log_output))
+                        @if ($failLog !== '')
+                            @php($failTail = mb_strlen($failLog) > 4000 ? '…'.mb_substr($failLog, -4000) : $failLog)
+                            <pre class="max-h-60 overflow-auto rounded-lg bg-brand-ink p-3 font-mono text-[11px] leading-relaxed text-rose-100/95">{{ $failTail }}</pre>
+                        @endif
+                    </div>
                 @endif
             @endif
             </div>
         </div>
     </section>
+
+    @if (method_exists($this, 'applyPipelineOptimization'))
+        @include('livewire.sites.partials.pipeline._optimize-preview-modal')
+    @endif
 </div>

@@ -14,8 +14,7 @@ use App\Services\Deploy\EphemeralDeployCredentialManager;
 use App\Services\Notifications\DeployDigestBuffer;
 use App\Services\Notifications\NotificationPublisher;
 use App\Services\Servers\ServerDeployPolicyGuard;
-use App\Services\Sites\DotEnvFileParser;
-use App\Services\Sites\SiteEnvReader;
+use App\Services\Sites\RequiredEnvEvaluator;
 use App\Support\DeployLogRedactor;
 use App\Support\ProductLine\ProductLineKillSwitches;
 use Illuminate\Bus\Queueable;
@@ -292,63 +291,14 @@ class RunSiteDeploymentJob implements ShouldQueue
      */
     private function assertRequiredEnvPresent(Site $site): void
     {
-        $server = $site->server;
-        if ($server === null || ! $server->hostCapabilities()->supportsEnvPushToHost()) {
+        // Evaluate (and record on meta.deploy_blocked_env) via the shared gate
+        // so the Deploy panel banner and the on-demand re-check stay identical.
+        // null = gate doesn't apply; [] = satisfied; non-empty = block.
+        $missing = app(RequiredEnvEvaluator::class)->evaluateAndRecord($site);
+
+        if (empty($missing)) {
             return;
         }
-
-        // Operator opted out of the required-env gate for this site — deploys
-        // proceed even with missing vars, and it's on them if the app errors.
-        if (($site->meta['skip_env_gate'] ?? false) === true) {
-            return;
-        }
-
-        if (($site->envRequirements()['keys'] ?? []) === []) {
-            return;
-        }
-
-        try {
-            $envRaw = app(SiteEnvReader::class)->read($site);
-        } catch (\Throwable) {
-            return;
-        }
-
-        $parsed = app(DotEnvFileParser::class)->parse($envRaw);
-        $present = [];
-        foreach ($parsed['variables'] as $key => $value) {
-            if (trim((string) $value) !== '') {
-                $present[] = (string) $key;
-            }
-        }
-        $inherited = $site->workspace?->variables->pluck('env_key')->map(fn ($k) => (string) $k)->all() ?? [];
-
-        // Strict gate: only no-default env() references (source 'code'). Keys
-        // that only appear in .env.example or carry a config default are
-        // advisory and never block a deploy.
-        $missing = array_values(array_filter(
-            $site->missingRequiredEnvKeys($present, $inherited),
-            static fn (array $entry): bool => in_array('code', $entry['sources'], true),
-        ));
-
-        $meta = is_array($site->meta) ? $site->meta : [];
-
-        if ($missing === []) {
-            if (array_key_exists('deploy_blocked_env', $meta)) {
-                unset($meta['deploy_blocked_env']);
-                $site->forceFill(['meta' => $meta])->save();
-            }
-
-            return;
-        }
-
-        $meta['deploy_blocked_env'] = [
-            'at' => now()->toIso8601String(),
-            'keys' => array_map(
-                static fn (array $entry): array => ['key' => $entry['key'], 'example' => $entry['example']],
-                $missing,
-            ),
-        ];
-        $site->forceFill(['meta' => $meta])->save();
 
         $names = array_map(static fn (array $entry): string => $entry['key'], $missing);
         $shown = implode(', ', array_slice($names, 0, 12));

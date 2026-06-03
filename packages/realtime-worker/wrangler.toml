@@ -1,0 +1,38 @@
+name = "dply-realtime"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+# Keep the *.workers.dev URL alongside the custom domain (useful fallback while
+# the custom domain cert provisions, and for quick probes).
+workers_dev = true
+
+# Placeholder — replace with your Cloudflare account values before deploy.
+# Deploy once to your platform account; dply provisions apps into it by
+# writing credentials into the APPS KV namespace (it never re-deploys the
+# Worker). See README.md.
+# Serve on the branded host. custom_domain provisions the hostname + TLS on the
+# on-dply.site zone (already in the account from Edge) at deploy time. Must stay
+# at the top level — a key under [vars] becomes an env var, not a route.
+routes = [
+  { pattern = "realtime.on-dply.site", custom_domain = true },
+]
+
+[vars]
+ENVIRONMENT = "production"
+
+# Per-app credentials, written by dply at provision time:
+#   key:{appKey}  -> { id, key, secret, enabled, maxConnections, ... }
+#   id:{appId}    -> { id, key, secret, enabled, maxConnections, ... }
+[[kv_namespaces]]
+binding = "APPS"
+id = "3048de6f485943fd98affd21d91c33aa"
+
+# One Durable Object instance per app id. Holds all live WebSocket
+# connections for that app and fans out channel/presence messages.
+[[durable_objects.bindings]]
+name = "APP_HUB"
+class_name = "AppHub"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["AppHub"]

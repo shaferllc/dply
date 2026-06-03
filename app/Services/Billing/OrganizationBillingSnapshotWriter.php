@@ -32,6 +32,7 @@ final class OrganizationBillingSnapshotWriter
                     'serverless' => $state->serverlessCount,
                     'cloud' => $state->cloudCount,
                     'edge' => $state->edgeCount,
+                    'realtime' => $state->realtimeCount,
                 ],
                 'edge_usage_cents' => $state->edgeUsageSubtotalCents,
                 'subscription_interval' => $this->subscriptionInterval($organization),
@@ -53,6 +54,7 @@ final class OrganizationBillingSnapshotWriter
             'cloud_resource_cents' => $state->cloudResourceSubtotalCents,
             'edge_cents' => $state->edgeSubtotalCents,
             'edge_usage_cents' => $state->edgeUsageSubtotalCents,
+            'realtime_cents' => $state->realtimeSubtotalCents,
         ];
     }
 
@@ -71,6 +73,7 @@ final class OrganizationBillingSnapshotWriter
                 (string) (config('subscription.standard.stripe.serverless_yearly') ?? ''),
                 (string) (config('subscription.standard.stripe.cloud_yearly') ?? ''),
                 (string) (config('subscription.standard.stripe.edge_yearly') ?? ''),
+                (string) (config('subscription.standard.stripe.realtime_yearly') ?? ''),
             ],
         );
 

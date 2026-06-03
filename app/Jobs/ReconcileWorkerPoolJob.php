@@ -52,19 +52,43 @@ class ReconcileWorkerPoolJob implements ShouldQueue
             return;
         }
 
-        // 1) Scale up: provision replicas until active members reach desired.
+        // 1) Converge member count to desired.
         $active = $pool->activeMemberCount();
         $deficit = $pool->desired_count - $active;
-        for ($i = 0; $i < $deficit; $i++) {
-            try {
-                $manager->addReplica($pool->fresh('servers'));
-            } catch (\Throwable $e) {
-                Log::warning('worker-pool: failed to provision replica', [
-                    'pool_id' => $pool->id,
-                    'error' => $e->getMessage(),
-                ]);
-                $pool->forceFill(['status' => WorkerPool::STATUS_DEGRADED])->save();
-                break;
+
+        if ($deficit > 0) {
+            // Scale up: provision replicas until active members reach desired.
+            for ($i = 0; $i < $deficit; $i++) {
+                try {
+                    $manager->addReplica($pool->fresh('servers'));
+                } catch (\Throwable $e) {
+                    Log::warning('worker-pool: failed to provision replica', [
+                        'pool_id' => $pool->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                    $pool->forceFill(['status' => WorkerPool::STATUS_DEGRADED])->save();
+                    break;
+                }
+            }
+        } elseif ($deficit < 0) {
+            // Scale down: drain+destroy the newest non-primary members (LIFO),
+            // never the primary. removeMember marks them draining + dispatches
+            // DrainAndDestroyWorkerJob, so they drop out of activeMemberCount.
+            $surplus = -$deficit;
+            $victims = $pool->servers
+                ->filter(fn (Server $s): bool => ! $s->isPoolPrimary() && $s->poolMemberState() !== WorkerPool::MEMBER_DRAINING)
+                ->sortByDesc(fn (Server $s) => $s->created_at?->getTimestamp() ?? 0)
+                ->take($surplus);
+            foreach ($victims as $victim) {
+                try {
+                    $manager->removeMember($pool, $victim);
+                } catch (\Throwable $e) {
+                    Log::warning('worker-pool: failed to drain replica', [
+                        'pool_id' => $pool->id,
+                        'member_id' => $victim->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
             }
         }
 

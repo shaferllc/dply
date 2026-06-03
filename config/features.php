@@ -254,6 +254,9 @@ return [
         'status_pages' => env('FEATURE_SURFACE_STATUS_PAGES', false),
         // exit: ship when Edge build → R2 → CF Worker loop is green in staging
         'edge' => env('FEATURE_SURFACE_EDGE', false),
+        // exit: ship the managed realtime (Reverb/Pusher-compatible) resource
+        // once the realtime Worker + KV provisioning + billing are validated.
+        'realtime' => env('FEATURE_SURFACE_REALTIME', false),
         // exit: ship once OpenWhisk multi-language adapters + billing are GA
         'serverless' => env('FEATURE_SURFACE_SERVERLESS', false),
         // exit: offer the dply-managed serverless option (dply runs the function

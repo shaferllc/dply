@@ -6,6 +6,8 @@ namespace App\Livewire\Concerns;
 
 use App\Jobs\OptimizeSitePipelineJob;
 use App\Livewire\Sites\Concerns\ManagesSiteDeploySteps;
+use App\Models\SiteDeployStep;
+use App\Services\Deploy\SiteDeployPipelineManager;
 use Livewire\Component;
 
 /**
@@ -38,12 +40,93 @@ trait OptimizesPipeline
         if (method_exists($this, 'watchConsoleAction')) {
             $this->watchConsoleAction(
                 $run,
-                __('Pipeline optimized — review the new steps on the Pipeline tab.'),
+                __('Scan complete — review the proposed changes before applying.'),
                 __('Pipeline optimize did not finish — see the output.'),
             );
         }
         if (method_exists($this, 'toastConsoleActionQueued')) {
             $this->toastConsoleActionQueued();
         }
+    }
+
+    /**
+     * Apply the steps the scan proposed (stored on meta.pipeline_optimize_preview).
+     * Adding steps is DB-only, so it runs inline. Idempotent: skips anything
+     * the pipeline already has, then clears the preview.
+     */
+    public function applyPipelineOptimization(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $preview = $this->site->meta['pipeline_optimize_preview']['steps'] ?? null;
+        if (! is_array($preview) || $preview === []) {
+            $this->discardPipelineOptimization();
+
+            return;
+        }
+
+        $pipelines = app(SiteDeployPipelineManager::class);
+        $pipeline = $pipelines->ensureDefaultPipeline($this->site);
+        $existing = $pipeline->steps()->get();
+        $existingTypes = $existing->pluck('step_type')->map(static fn ($t): string => (string) $t)->all();
+        $existingCustom = $existing->where('step_type', SiteDeployStep::TYPE_CUSTOM)
+            ->map(static fn ($s): string => strtolower((string) $s->custom_command));
+
+        $added = 0;
+        foreach ($preview as $step) {
+            $type = (string) ($step['type'] ?? '');
+            if ($type === '') {
+                continue;
+            }
+            $isCustom = $type === SiteDeployStep::TYPE_CUSTOM;
+            $command = $step['command'] ?? null;
+            $already = $isCustom
+                ? $existingCustom->contains(static fn (string $c): bool => $c === strtolower((string) $command))
+                : in_array($type, $existingTypes, true);
+
+            if ($already) {
+                continue;
+            }
+
+            $pipelines->addStep($pipeline, $type, $command, 900, null, (string) ($step['phase'] ?? SiteDeployStep::PHASE_BUILD));
+            $existingTypes[] = $type;
+            if ($isCustom) {
+                $existingCustom->push(strtolower((string) $command));
+            }
+            $added++;
+        }
+
+        $this->clearPipelineOptimizePreview();
+        $this->dispatch('close-modal', 'pipeline-optimize-preview');
+
+        if (method_exists($this, 'syncEditingPipelineBranches')) {
+            // Pipeline editor: refresh so the new steps render immediately.
+            $this->site->refresh();
+        }
+
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess(trans_choice(
+                '{0} No new steps to add.|{1} Added :count step to the pipeline.|[2,*] Added :count steps to the pipeline.',
+                $added,
+                ['count' => $added],
+            ));
+        }
+    }
+
+    /**
+     * Dismiss the proposed changes without applying them.
+     */
+    public function discardPipelineOptimization(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->clearPipelineOptimizePreview();
+        $this->dispatch('close-modal', 'pipeline-optimize-preview');
+    }
+
+    private function clearPipelineOptimizePreview(): void
+    {
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        unset($meta['pipeline_optimize_preview']);
+        $this->site->forceFill(['meta' => $meta])->save();
     }
 }

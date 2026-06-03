@@ -50,97 +50,108 @@
             @endif
         </div>
     @else
-        <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
-                <thead class="bg-brand-sand/10 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
-                    <tr>
-                        <th class="px-6 py-3 sm:px-8">{{ __('Status') }}</th>
-                        <th class="px-4 py-3">{{ __('Started') }}</th>
-                        <th class="px-4 py-3">{{ __('Finished') }}</th>
-                        <th class="px-4 py-3">{{ __('Duration') }}</th>
-                        <th class="px-4 py-3">{{ __('Trigger') }}</th>
-                        <th class="px-4 py-3">{{ __('Commit') }}</th>
-                        <th class="px-4 py-3">{{ __('Phases') }}</th>
-                        <th class="px-6 py-3 sm:px-8">{{ __('Deploy ID') }}</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-brand-ink/10">
-                    @foreach ($deployments as $deployment)
-                        <tr class="transition-colors hover:bg-brand-sand/20">
-                            <td class="px-6 py-3 sm:px-8">
+        {{-- Vertical timeline: one card per deploy. The whole card navigates to
+             the deploy detail via a stretched link; inner links (Explain
+             failure, copy deploy id) sit above it with relative z-index. --}}
+        <ol class="divide-y divide-brand-ink/10">
+            @foreach ($deployments as $deployment)
+                @php
+                    $isSuccess = $deployment->status === 'success';
+                    $isFailed = $deployment->status === 'failed';
+                    $isRunning = $deployment->status === 'running';
+                    $duration = $deployment->phaseTotalDurationMs() > 0
+                        ? number_format($deployment->phaseTotalDurationMs() / 1000, 1).'s'
+                        : (($deployment->started_at && $deployment->finished_at)
+                            ? $deployment->started_at->diffInSeconds($deployment->finished_at).'s'
+                            : null);
+                @endphp
+                <li class="group relative transition-colors hover:bg-brand-sand/15">
+                    <a
+                        href="{{ route('sites.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $deployment]) }}"
+                        wire:navigate
+                        class="absolute inset-0 z-0"
+                        aria-label="{{ __('View deployment :id', ['id' => $deployment->id]) }}"
+                    ></a>
+
+                    <div class="flex items-start gap-3 px-6 py-4 sm:gap-4 sm:px-8">
+                        {{-- Status dot on the rail --}}
+                        <span @class([
+                            'mt-1 flex h-2.5 w-2.5 shrink-0 rounded-full ring-4',
+                            'bg-emerald-500 ring-emerald-100' => $isSuccess,
+                            'bg-rose-500 ring-rose-100' => $isFailed,
+                            'bg-amber-500 ring-amber-100 animate-pulse' => $isRunning,
+                            'bg-brand-mist ring-brand-sand/50' => ! $isSuccess && ! $isFailed && ! $isRunning,
+                        ])></span>
+
+                        <div class="min-w-0 flex-1">
+                            {{-- Headline: status + when + duration --}}
+                            <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
                                 <span @class([
                                     'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset',
-                                    'bg-emerald-50 text-emerald-800 ring-emerald-200' => $deployment->status === 'success',
-                                    'bg-rose-50 text-rose-800 ring-rose-200' => $deployment->status === 'failed',
-                                    'bg-amber-50 text-amber-900 ring-amber-200' => $deployment->status === 'running',
-                                    'bg-brand-sand/60 text-brand-ink ring-brand-ink/10' => ! in_array($deployment->status, ['success', 'failed', 'running']),
+                                    'bg-emerald-50 text-emerald-800 ring-emerald-200' => $isSuccess,
+                                    'bg-rose-50 text-rose-800 ring-rose-200' => $isFailed,
+                                    'bg-amber-50 text-amber-900 ring-amber-200' => $isRunning,
+                                    'bg-brand-sand/60 text-brand-ink ring-brand-ink/10' => ! $isSuccess && ! $isFailed && ! $isRunning,
                                 ])>{{ $deployment->status }}</span>
-                                @if ($deployment->exit_code !== null && $deployment->exit_code !== 0)
-                                    <span class="mt-1 block font-mono text-[10px] text-rose-700">{{ __('exit :code', ['code' => $deployment->exit_code]) }}</span>
+
+                                @if ($deployment->started_at)
+                                    <span class="text-xs text-brand-moss" title="{{ $deployment->started_at->toIso8601String() }}">{{ $deployment->started_at->diffForHumans() }}</span>
                                 @endif
-                                @if ($deployment->status === 'failed' && ops_copilot_active())
+                                @if ($deployment->exit_code !== null && $deployment->exit_code !== 0)
+                                    <span class="font-mono text-[10px] text-rose-700">{{ __('exit :code', ['code' => $deployment->exit_code]) }}</span>
+                                @endif
+
+                                @if ($duration !== null)
+                                    <span class="ml-auto inline-flex items-center gap-1 whitespace-nowrap font-mono text-xs text-brand-moss">
+                                        <x-heroicon-m-clock class="h-3.5 w-3.5 text-brand-mist" aria-hidden="true" />
+                                        {{ $duration }}
+                                    </span>
+                                @endif
+                            </div>
+
+                            {{-- Meta row: trigger + commit + phases --}}
+                            <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                                <span class="inline-flex items-center rounded-full bg-brand-sand/50 px-2 py-0.5 text-[11px] font-medium text-brand-ink ring-1 ring-inset ring-brand-ink/10">{{ $deployment->trigger ?: '—' }}</span>
+
+                                @if ($deployment->git_sha)
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/50 px-2 py-0.5 font-mono text-[11px] font-semibold text-brand-sage ring-1 ring-inset ring-brand-ink/10" title="{{ $deployment->git_sha }}">
+                                        <x-heroicon-m-code-bracket class="h-3 w-3" aria-hidden="true" />
+                                        {{ \Illuminate\Support\Str::limit($deployment->git_sha, 7, '') }}
+                                    </span>
+                                @endif
+
+                                @foreach (['clone', 'build', 'swap', 'activate', 'release', 'restart', 'serverless'] as $phase)
+                                    @if ($deployment->hasPhase($phase) && $deployment->phaseSteps($phase) !== [])
+                                        <span @class([
+                                            'inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] ring-1 ring-inset',
+                                            'bg-emerald-50 text-emerald-800 ring-emerald-200' => $deployment->phaseOk($phase),
+                                            'bg-rose-50 text-rose-800 ring-rose-200' => ! $deployment->phaseOk($phase),
+                                        ])>{{ $phase }}</span>
+                                    @endif
+                                @endforeach
+                            </div>
+
+                            {{-- Footer: deploy id + failure helper --}}
+                            <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                                <span class="font-mono text-[10px] text-brand-mist">{{ $deployment->id }}</span>
+                                @if ($isFailed && ops_copilot_active())
                                     <a
                                         href="{{ route('fleet.copilot', ['site' => $site->id]) }}"
                                         wire:navigate
-                                        class="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-brand-forest hover:text-brand-sage"
+                                        class="relative z-10 inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-semibold text-brand-forest hover:text-brand-sage"
                                     >
                                         {{ __('Explain failure') }}
                                         <x-heroicon-m-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
                                     </a>
                                 @endif
-                            </td>
-                            <td class="px-4 py-3 text-brand-moss">
-                                @if ($deployment->started_at)
-                                    <span title="{{ $deployment->started_at->toIso8601String() }}">{{ $deployment->started_at->diffForHumans() }}</span>
-                                @else
-                                    <span class="text-brand-mist">—</span>
-                                @endif
-                            </td>
-                            <td class="px-4 py-3 text-brand-moss">
-                                @if ($deployment->finished_at)
-                                    <span title="{{ $deployment->finished_at->toIso8601String() }}">{{ $deployment->finished_at->diffForHumans() }}</span>
-                                @else
-                                    <span class="text-brand-mist">—</span>
-                                @endif
-                            </td>
-                            <td class="px-4 py-3 font-mono text-xs text-brand-moss">
-                                @if ($deployment->phaseTotalDurationMs() > 0)
-                                    {{ number_format($deployment->phaseTotalDurationMs() / 1000, 1) }}s
-                                @elseif ($deployment->started_at && $deployment->finished_at)
-                                    {{ $deployment->started_at->diffInSeconds($deployment->finished_at) }}s
-                                @else
-                                    <span class="font-sans text-brand-mist">—</span>
-                                @endif
-                            </td>
-                            <td class="px-4 py-3 text-brand-ink">{{ $deployment->trigger ?: '—' }}</td>
-                            <td class="px-4 py-3 font-mono text-xs">
-                                @if ($deployment->git_sha)
-                                    <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 font-semibold text-brand-sage" title="{{ $deployment->git_sha }}">{{ \Illuminate\Support\Str::limit($deployment->git_sha, 7, '') }}</span>
-                                @else
-                                    <span class="font-sans text-brand-mist">—</span>
-                                @endif
-                            </td>
-                            <td class="px-4 py-3">
-                                <div class="flex flex-wrap gap-1">
-                                    @foreach (['clone', 'build', 'swap', 'activate', 'release', 'restart', 'serverless'] as $phase)
-                                        @if ($deployment->hasPhase($phase) && $deployment->phaseSteps($phase) !== [])
-                                            <span @class([
-                                                'inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] ring-1 ring-inset',
-                                                'bg-emerald-50 text-emerald-800 ring-emerald-200' => $deployment->phaseOk($phase),
-                                                'bg-rose-50 text-rose-800 ring-rose-200' => ! $deployment->phaseOk($phase),
-                                            ])>{{ $phase }}</span>
-                                        @endif
-                                    @endforeach
-                                </div>
-                            </td>
-                            <td class="px-6 py-3 sm:px-8">
-                                <a href="{{ route('sites.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $deployment]) }}" wire:navigate class="select-all rounded bg-brand-sand/60 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-brand-sage transition-colors hover:bg-brand-sage/15 hover:text-brand-forest">{{ $deployment->id }}</a>
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
+                            </div>
+                        </div>
+
+                        <x-heroicon-m-chevron-right class="mt-1 h-4 w-4 shrink-0 text-brand-mist transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+                    </div>
+                </li>
+            @endforeach
+        </ol>
 
         @if ($deployments->hasPages())
             <div class="border-t border-brand-ink/10 bg-white px-6 py-4 sm:px-8">

@@ -5,6 +5,7 @@ namespace App\Services\Billing;
 use App\Enums\ServerTier;
 use App\Models\FunctionAction;
 use App\Models\Organization;
+use App\Models\RealtimeApp;
 use App\Models\Server;
 use App\Models\Site;
 use Illuminate\Support\Collection;
@@ -132,6 +133,12 @@ class OrganizationBillingStateComputer
 
         $cloudResourceSubtotalCents = $this->cloudResourceCalculator->subtotalCents($billableCloudSites);
 
+        // Managed Realtime apps — flat per active app. No metered usage in v1.
+        $realtimeCount = $organization->realtimeApps()
+            ->where('status', RealtimeApp::STATUS_ACTIVE)
+            ->where('created_at', '<=', $ageCutoff)
+            ->count();
+
         [$usagePeriodStart, $usagePeriodEnd] = $this->usageReader->currentMonthWindow();
         $usageTotals = $this->usageReader->totalsForOrganization($organization, $usagePeriodStart, $usagePeriodEnd);
         $edgeUsageEstimate = $this->usageCostCalculator->estimate($usageTotals, $edgeCount);
@@ -181,6 +188,8 @@ class OrganizationBillingStateComputer
             edgeUnitCents: (int) config('subscription.standard.edge_cents', 200),
             edgeUsageSubtotalCents: $edgeUsageSubtotalCents,
             edgeUsageEstimate: $edgeUsageEstimate,
+            realtimeCount: $realtimeCount,
+            realtimeUnitCents: (int) config('subscription.standard.realtime_cents', 900),
         );
     }
 }

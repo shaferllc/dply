@@ -54,6 +54,8 @@ class StripeSubscriptionSyncer
         // dply Cloud + Edge — flat per live site.
         $this->reconcileManagedProductLine($subscription, $desired, $changes, 'cloud', $desired->cloudCount);
         $this->reconcileManagedProductLine($subscription, $desired, $changes, 'edge', $desired->edgeCount);
+        // Managed Realtime — flat per active app.
+        $this->reconcileManagedProductLine($subscription, $desired, $changes, 'realtime', $desired->realtimeCount);
         $this->reconcileCloudResourceLine($subscription, $desired, $changes);
         $this->reconcileServerlessUsageLine($subscription, $desired, $changes);
         $this->reconcileManagedServerLine($subscription, $desired, $changes);
@@ -344,6 +346,7 @@ class StripeSubscriptionSyncer
                 (string) (config('subscription.standard.stripe.serverless_yearly') ?? ''),
                 (string) (config('subscription.standard.stripe.cloud_yearly') ?? ''),
                 (string) (config('subscription.standard.stripe.edge_yearly') ?? ''),
+                (string) (config('subscription.standard.stripe.realtime_yearly') ?? ''),
             ],
         );
 

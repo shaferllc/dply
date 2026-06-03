@@ -103,7 +103,23 @@
             </div>
         </div>
 
-        {{-- Pipeline review lives on the Overview subtab — not duplicated here. --}}
+        @if (method_exists($this, 'applyPipelineOptimization'))
+            @include('livewire.sites.partials.pipeline._optimize-preview-modal')
+        @endif
+
+        {{-- Pipeline review also shown here (mirrors the Overview subtab) so
+             warnings are visible while editing steps, not just on Overview. --}}
+        @if (($pipelineActionableChecks ?? collect())->isNotEmpty())
+            <div class="border-b border-brand-ink/10 px-6 py-5 sm:px-8">
+                <x-site-preflight-issues-panel
+                    :checks="$pipelineActionableChecks"
+                    compact
+                    section-id="pipeline-advisor-steps"
+                    :title="__('Pipeline review')"
+                    :description="__('Adjust the flagged steps and hooks below.')"
+                />
+            </div>
+        @endif
 
         <div class="space-y-6 border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-4 sm:px-8">
             <div class="flex flex-wrap items-center gap-2">

@@ -43,7 +43,7 @@ final class SiteGitCommitsFetcher
      *     remote_label: string|null,
      * }
      */
-    public function fetch(Site $site, User $user, int $limit = 30, ?string $branchOverride = null): array
+    public function fetch(Site $site, User $user, int $limit = 30, ?string $branchOverride = null, int $page = 1): array
     {
         $branch = $branchOverride !== null && $branchOverride !== ''
             ? $branchOverride
@@ -57,15 +57,18 @@ final class SiteGitCommitsFetcher
                 'provider' => null,
                 'branch' => $branch,
                 'remote_label' => null,
+                'page' => 1,
+                'has_more' => false,
             ];
         }
 
         $limit = max(1, min(self::MAX_COMMITS, $limit));
+        $page = max(1, $page);
 
         return match ($remote['provider']) {
-            'github' => $this->fetchGithub($remote, $site, $user, $branch, $limit),
-            'gitlab' => $this->fetchGitlab($remote, $site, $user, $branch, $limit),
-            'bitbucket' => $this->fetchBitbucket($remote, $site, $user, $branch, $limit),
+            'github' => $this->fetchGithub($remote, $site, $user, $branch, $limit, $page),
+            'gitlab' => $this->fetchGitlab($remote, $site, $user, $branch, $limit, $page),
+            'bitbucket' => $this->fetchBitbucket($remote, $site, $user, $branch, $limit, $page),
             default => [
                 'ok' => false,
                 'commits' => [],
@@ -73,6 +76,8 @@ final class SiteGitCommitsFetcher
                 'provider' => $remote['provider'],
                 'branch' => $branch,
                 'remote_label' => $remote['label'] ?? null,
+                'page' => 1,
+                'has_more' => false,
             ],
         };
     }
@@ -156,7 +161,7 @@ final class SiteGitCommitsFetcher
         return null;
     }
 
-    private function fetchGithub(array $remote, Site $site, User $user, string $branch, int $limit): array
+    private function fetchGithub(array $remote, Site $site, User $user, string $branch, int $limit, int $page = 1): array
     {
         $identity = $this->resolver->forSite($site, $user,'github');
         if ($identity === null) {
@@ -179,6 +184,7 @@ final class SiteGitCommitsFetcher
             ->get($identity->apiBaseUrl().'/repos/'.$remote['owner'].'/'.$remote['repo'].'/commits', [
                 'sha' => $branch,
                 'per_page' => $limit,
+                'page' => $page,
             ]);
 
         if (! $response->successful()) {
@@ -236,10 +242,12 @@ final class SiteGitCommitsFetcher
             'provider' => 'github',
             'branch' => $branch,
             'remote_label' => $remote['label'],
+            'page' => $page,
+            'has_more' => count($commits) >= $limit,
         ];
     }
 
-    private function fetchGitlab(array $remote, Site $site, User $user, string $branch, int $limit): array
+    private function fetchGitlab(array $remote, Site $site, User $user, string $branch, int $limit, int $page = 1): array
     {
         $identity = $this->resolver->forSite($site, $user,'gitlab');
         if ($identity === null) {
@@ -262,6 +270,7 @@ final class SiteGitCommitsFetcher
             ->get($url, [
                 'ref_name' => $branch,
                 'per_page' => $limit,
+                'page' => $page,
             ]);
 
         if (! $response->successful()) {
@@ -317,10 +326,12 @@ final class SiteGitCommitsFetcher
             'provider' => 'gitlab',
             'branch' => $branch,
             'remote_label' => $remote['label'],
+            'page' => $page,
+            'has_more' => count($commits) >= $limit,
         ];
     }
 
-    private function fetchBitbucket(array $remote, Site $site, User $user, string $branch, int $limit): array
+    private function fetchBitbucket(array $remote, Site $site, User $user, string $branch, int $limit, int $page = 1): array
     {
         $identity = $this->resolver->forSite($site, $user,'bitbucket');
         if ($identity === null) {
@@ -338,7 +349,7 @@ final class SiteGitCommitsFetcher
 
         $response = Http::withToken($identity->accessToken())
             ->acceptJson()
-            ->get($url, ['pagelen' => $limit]);
+            ->get($url, ['pagelen' => $limit, 'page' => $page]);
 
         if (! $response->successful()) {
             return [
@@ -353,6 +364,8 @@ final class SiteGitCommitsFetcher
 
         $payload = $response->json();
         $rows = is_array($payload['values'] ?? null) ? $payload['values'] : [];
+        // Bitbucket returns a `next` URL when more pages exist — authoritative.
+        $hasMore = isset($payload['next']) && (string) $payload['next'] !== '';
 
         $commits = [];
         foreach ($rows as $row) {
@@ -388,6 +401,8 @@ final class SiteGitCommitsFetcher
             'provider' => 'bitbucket',
             'branch' => $branch,
             'remote_label' => $remote['label'],
+            'page' => $page,
+            'has_more' => $hasMore,
         ];
     }
 

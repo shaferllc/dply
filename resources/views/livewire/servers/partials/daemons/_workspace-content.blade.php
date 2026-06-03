@@ -6,6 +6,19 @@
     <p>{{ __('State (running / stopped / fatal) is read live via supervisorctl status. The worker health block above rolls up the scheduled health snapshot — refresh it before restarting workers or syncing config when drift is detected.') }}</p>
 </x-explainer>
 
+@if ($contextSiteModel ?? null)
+    @php $daemonSuggestions = \App\Support\Sites\SiteDaemonAdvisor::suggestions($contextSiteModel); @endphp
+    @if ($daemonSuggestions !== [])
+        <div class="mt-4">
+            <x-site-daemon-suggestions
+                :suggestions="$daemonSuggestions"
+                mode="interactive"
+                :schedule-url="route('sites.cron', ['server' => $server, 'site' => $contextSiteModel])"
+            />
+        </div>
+    @endif
+@endif
+
 @if ($daemonSloReport ?? null)
     @include('livewire.servers.partials.daemons._slo-overview')
 @else

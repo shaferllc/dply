@@ -9,6 +9,7 @@ use App\Console\Commands\CheckEdgeRumAlertsCommand;
 use App\Console\Commands\CheckSupervisorHealthCommand;
 use App\Console\Commands\CloudPollStatusCommand;
 use App\Console\Commands\CollectEdgeUsageCommand;
+use App\Console\Commands\CollectRealtimeUsageCommand;
 use App\Console\Commands\CollectServerlessUsageCommand;
 use App\Console\Commands\DeployIntelligenceScanCommand;
 use App\Console\Commands\DispatchGuestMetricsScriptUpgradesCommand;
@@ -108,6 +109,11 @@ final class DplySchedule
         $schedule->command(CollectServerlessUsageCommand::class)
             ->hourly()
             ->name('serverless-usage-today');
+
+        $schedule->command(CollectRealtimeUsageCommand::class)
+            ->hourly()
+            ->name('realtime-usage-today')
+            ->withoutOverlapping();
 
         $schedule->command(RollupEdgeAnalyticsEngineCommand::class)->hourlyAt(5);
 

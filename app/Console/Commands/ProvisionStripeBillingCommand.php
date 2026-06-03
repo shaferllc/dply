@@ -139,6 +139,15 @@ class ProvisionStripeBillingCommand extends Command
                 number_format($edgeUsageUnit / 100, 2),
             ));
         }
+        $realtime = (int) ($standard['realtime_cents'] ?? 0);
+        if ($realtime > 0) {
+            $this->line('  Product: dply Realtime app');
+            $this->line(sprintf(
+                '    Per app $%s/mo   $%s/yr',
+                number_format($realtime / 100, 2),
+                number_format($yearlyOf($realtime) / 100, 2),
+            ));
+        }
         $this->line('  Product: dply Enterprise (no prices — sales-led)');
         $this->newLine();
         $this->info('Re-run without --dry-run to actually create these in Stripe.');

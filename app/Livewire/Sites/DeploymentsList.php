@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Livewire\Sites;
 
 use App\Jobs\PushSiteEnvJob;
+use App\Jobs\RecheckRequiredEnvJob;
 use App\Jobs\RunSiteDeploymentJob;
+use App\Jobs\ViewServerEnvJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\ManagesSiteBindings;
@@ -369,6 +371,62 @@ class DeploymentsList extends Component
         unset($meta['deploy_blocked_env']);
         $this->site->forceFill(['meta' => $meta])->save();
         $this->toastSuccess(__('Ignoring missing required variables for this site — deploys won\'t be blocked by them.'));
+    }
+
+    /**
+     * Re-evaluate the required-env gate against the live server .env right now,
+     * without deploying. Clears the "Deploy needs N variables" banner if the
+     * vars are actually set — the non-destructive fix for a stale block. The
+     * .env read is over SSH, so it runs in a queued job (never inline).
+     */
+    public function recheckBlockedEnv(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        if (! $this->server->hostCapabilities()->supportsEnvPushToHost()) {
+            $this->toastError(__('This host runtime does not expose a server .env file to re-check.'));
+
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('env_recheck');
+        RecheckRequiredEnvJob::dispatch(
+            $this->site->id,
+            (string) (auth()->id() ?? ''),
+            (string) $run->id,
+        );
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction($run, __('Re-checked environment variables.'), __('Re-check did not finish.'));
+        $this->toastConsoleActionQueued();
+    }
+
+    /**
+     * Read-only view of the live server .env — a key inventory streamed to the
+     * console drawer (values masked). Non-destructive: unlike Sync, it never
+     * overwrites dply's cache, so an operator can just see which vars are set
+     * on the box. SSH read runs in a queued job.
+     */
+    public function viewServerEnv(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        if (! $this->server->hostCapabilities()->supportsEnvPushToHost()) {
+            $this->toastError(__('This host runtime does not expose a server .env file to view.'));
+
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('env_view');
+        ViewServerEnvJob::dispatch(
+            $this->site->id,
+            (string) (auth()->id() ?? ''),
+            (string) $run->id,
+        );
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction($run, __('Read the server .env.'), __('Could not read the server .env.'));
+        $this->toastConsoleActionQueued();
     }
 
     /**

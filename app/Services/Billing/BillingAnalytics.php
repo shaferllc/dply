@@ -84,6 +84,7 @@ final class BillingAnalytics
             'serverless_count' => $state->serverlessCount,
             'cloud_count' => $state->cloudCount,
             'edge_count' => $state->edgeCount,
+            'realtime_count' => $state->realtimeCount,
         ];
     }
 
@@ -155,6 +156,15 @@ final class BillingAnalytics
                 'label' => __('Edge').' × '.$state->edgeCount,
                 'cents' => $state->edgeSubtotalCents,
                 'color' => 'bg-emerald-500/70',
+            ];
+        }
+
+        if ($state->realtimeSubtotalCents > 0) {
+            $segments[] = [
+                'key' => 'realtime',
+                'label' => __('Realtime').' × '.$state->realtimeCount,
+                'cents' => $state->realtimeSubtotalCents,
+                'color' => 'bg-violet-500/70',
             ];
         }
 
@@ -259,6 +269,16 @@ final class BillingAnalytics
                 'unit_cents' => $state->edgeUsageSubtotalCents,
                 'line_cents' => $state->edgeUsageSubtotalCents,
                 'detail' => $this->formatEdgeUsageDetail($state->edgeUsageEstimate),
+            ];
+        }
+
+        if ($state->realtimeCount > 0) {
+            $items[] = [
+                'label' => __('dply Realtime app'),
+                'quantity' => $state->realtimeCount,
+                'unit_cents' => (int) config('subscription.standard.realtime_cents', 900),
+                'line_cents' => $state->realtimeSubtotalCents,
+                'detail' => null,
             ];
         }
 
@@ -605,6 +625,7 @@ final class BillingAnalytics
                 (string) (config('subscription.standard.stripe.serverless_yearly') ?? ''),
                 (string) (config('subscription.standard.stripe.cloud_yearly') ?? ''),
                 (string) (config('subscription.standard.stripe.edge_yearly') ?? ''),
+                (string) (config('subscription.standard.stripe.realtime_yearly') ?? ''),
             ],
         );
 
@@ -678,6 +699,7 @@ final class BillingAnalytics
                 'managed_servers' => $state->managedServerCount,
                 'cloud' => $state->cloudCount,
                 'edge' => $state->edgeCount,
+                'realtime' => $state->realtimeCount,
             ],
             'subscription' => $this->subscriptionSnapshot($organization),
         ];

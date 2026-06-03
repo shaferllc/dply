@@ -57,6 +57,11 @@ class ManagedProductCostEstimator
         return ((int) config('subscription.standard.edge_cents', 0)) / 100;
     }
 
+    public function realtimeFee(): float
+    {
+        return ((int) config('subscription.standard.realtime_cents', 0)) / 100;
+    }
+
     /**
      * Customer-facing unit rates for Edge delivery usage (monthly).
      *

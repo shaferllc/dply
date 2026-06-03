@@ -72,10 +72,9 @@ class WorkspaceWorkerPool extends Component
         } else {
             $this->pool_name = $server->name.' pool';
         }
-
-        if ($pool) {
-            $this->loadCrCatalog();
-        }
+        // Catalog (region/size dropdowns) is loaded lazily when the operator picks
+        // a provider/credential — not on mount, to avoid a provider API call on
+        // every page view. Until then the cross-region form uses text inputs.
     }
 
     public function updatedCrProvider(): void

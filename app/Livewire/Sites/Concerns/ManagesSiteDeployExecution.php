@@ -57,6 +57,28 @@ trait ManagesSiteDeployExecution
     }
 
     /**
+     * Number of *other* sites a manual "deploy group" would fan out to. Zero when
+     * the site is solo or peer fan-out is disabled — in that case "Queue deploy"
+     * does exactly what "Deploy now" does, so the second button is hidden.
+     */
+    public function getDeploySyncPeerCountProperty(): int
+    {
+        $coordinator = app(SiteDeploySyncCoordinator::class);
+
+        if (! $coordinator->shouldIncludePeersOnManual($this->site)) {
+            return 0;
+        }
+
+        $group = $coordinator->findGroupForSite($this->site);
+
+        if ($group === null) {
+            return 0;
+        }
+
+        return max(0, $group->sites()->count() - 1);
+    }
+
+    /**
      * @return array{deployment_id?: string}|null
      */
     public function getDeployLockInfoProperty(): ?array

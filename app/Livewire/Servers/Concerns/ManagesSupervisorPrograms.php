@@ -685,6 +685,23 @@ trait ManagesSupervisorPrograms
         $this->openCreateSupervisorProgramModal();
     }
 
+    /**
+     * Open the create-daemon modal pre-filled from a preset — the one-click
+     * target for {@see \App\Support\Sites\SiteDaemonAdvisor} suggestions. We
+     * pin new_sv_site_id to the page's context site first so the preset is
+     * allowed (allowedSupervisorPresetKeys() is site-derived) and the command
+     * picks up the site's directory/user.
+     */
+    public function suggestDaemonPreset(string $preset): void
+    {
+        $this->authorize('update', $this->server);
+        $this->openCreateSupervisorProgramModal();
+        if (($this->context_site_id ?? '') !== '') {
+            $this->new_sv_site_id = (string) $this->context_site_id;
+        }
+        $this->applySupervisorPreset($preset);
+    }
+
     public function closeCreateDaemonModal(): void
     {
         $this->closeCreateSupervisorProgramModal();

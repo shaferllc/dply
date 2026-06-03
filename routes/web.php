@@ -58,6 +58,9 @@ use App\Livewire\Edge\Import;
 use App\Livewire\Edge\Index as EdgeIndex;
 use App\Livewire\Edge\Templates;
 use App\Livewire\Edge\Usage;
+use App\Livewire\Realtime\Create as RealtimeCreate;
+use App\Livewire\Realtime\Index as RealtimeIndex;
+use App\Livewire\Realtime\Show as RealtimeShow;
 use App\Livewire\Fleet\BlastRadius as FleetBlastRadius;
 use App\Livewire\Fleet\DeployContracts as FleetDeployContracts;
 use App\Livewire\Fleet\Deploys as FleetDeploys;
@@ -524,6 +527,11 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         Route::livewire('edge/import', Import::class)->name('edge.import');
         Route::livewire('edge/templates', Templates::class)->name('edge.templates');
         Route::livewire('edge/usage', Usage::class)->name('edge.usage');
+    });
+    Route::middleware('feature:surface.realtime')->group(function (): void {
+        Route::livewire('realtime', RealtimeIndex::class)->name('realtime.index');
+        Route::livewire('realtime/create', RealtimeCreate::class)->name('realtime.create');
+        Route::livewire('realtime/{realtimeApp}', RealtimeShow::class)->name('realtime.show');
     });
     Route::middleware('feature:surface.serverless')->group(function (): void {
         Route::livewire('serverless', ServerlessIndex::class)->name('serverless.index');

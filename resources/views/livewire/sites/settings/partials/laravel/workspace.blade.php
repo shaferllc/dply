@@ -14,9 +14,19 @@
     // Environment now lives in the Deployments hub (Deploy → Environment tab).
     $envUrl = route('sites.deployments.index', ['server' => $server, 'site' => $site, 'tab' => 'environment']);
     $laravelLogKey = 'site_'.$site->getKey().'_laravel';
+    $daemonSuggestions = \App\Support\Sites\SiteDaemonAdvisor::suggestions($site);
 @endphp
 
 <div class="space-y-6">
+    @if ($daemonSuggestions !== [])
+        <x-site-daemon-suggestions
+            :suggestions="$daemonSuggestions"
+            mode="links"
+            :daemons-url="$daemonsUrl"
+            :schedule-url="$cronUrl"
+        />
+    @endif
+
     <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
             <h2 class="text-base font-semibold text-brand-ink">{{ __('Laravel') }}</h2>

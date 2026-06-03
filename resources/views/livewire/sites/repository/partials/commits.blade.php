@@ -71,6 +71,34 @@
                             </li>
                         @endforeach
                     </ul>
+
+                    @php($commitsPageNum = (int) ($commitsResult['page'] ?? $commitsPage ?? 1))
+                    @php($commitsHasMore = (bool) ($commitsResult['has_more'] ?? false))
+                    @if ($commitsHasMore || $commitsPageNum > 1)
+                        <div class="flex items-center justify-between gap-3 border-t border-brand-ink/10 px-4 py-3 sm:px-6">
+                            <button
+                                type="button"
+                                wire:click="changeCommitsPage(-1)"
+                                wire:loading.attr="disabled"
+                                @disabled($commitsPageNum <= 1)
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <x-heroicon-m-chevron-left class="h-3.5 w-3.5" aria-hidden="true" />
+                                {{ __('Newer') }}
+                            </button>
+                            <span class="text-xs text-brand-moss">{{ __('Page :n', ['n' => $commitsPageNum]) }}</span>
+                            <button
+                                type="button"
+                                wire:click="changeCommitsPage(1)"
+                                wire:loading.attr="disabled"
+                                @disabled(! $commitsHasMore)
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {{ __('Older') }}
+                                <x-heroicon-m-chevron-right class="h-3.5 w-3.5" aria-hidden="true" />
+                            </button>
+                        </div>
+                    @endif
                 @endif
             </div>
         </div>
