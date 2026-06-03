@@ -243,7 +243,7 @@
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('This server') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Per-database remote access') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                            {{ __('Open individual databases to a CIDR — use a VPC subnet like 10.0.0.0/8 to allow only your own servers, or 0.0.0.0/0 for public access. Dply writes the pg_hba rule and opens the UFW port.') }}
+                            {{ __('Open individual databases to a specific CIDR — e.g. a VPC subnet like 10.0.0.0/8 or your app server IP like 203.0.113.5/32. A trusted source is required; leave remote access off to keep the port closed. Dply writes the pg_hba rule and opens the UFW port only to that source.') }}
                         </p>
                     </div>
                 </div>
