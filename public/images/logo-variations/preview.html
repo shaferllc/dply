@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>dply — logo variations (not used in app)</title>
+  <style>
+    :root { --ink:#171a0e; --gold:#cda942; --cream:#fdfcf9; --line:rgba(23,26,14,.1); }
+    * { box-sizing: border-box; }
+    body { margin:0; padding:40px; background:#f4f2ec; color:var(--ink);
+           font:15px/1.5 'Instrument Sans','Helvetica Neue',Arial,sans-serif; }
+    h1 { font-size:22px; margin:0 0 4px; }
+    p.note { color:#5d6259; margin:0 0 32px; }
+    h2 { font-size:13px; text-transform:uppercase; letter-spacing:.12em; color:#8a8a7d;
+         margin:36px 0 14px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:18px; }
+    .card { border:1px solid var(--line); border-radius:18px; overflow:hidden; background:#fff;
+            display:flex; flex-direction:column; }
+    .stage { display:flex; align-items:center; justify-content:center; padding:34px 20px; min-height:120px; }
+    .stage.dark { background:var(--ink); }
+    .stage img { height:56px; width:auto; }
+    .stage img.tall { height:104px; }
+    .label { border-top:1px solid var(--line); padding:9px 14px; font-size:12px;
+             color:#5d6259; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+  </style>
+</head>
+<body>
+  <h1>dply — logo variations</h1>
+  <p class="note">Scratch set for review only. None of these are referenced by the app.</p>
+
+  <h2>Lockups · light backgrounds</h2>
+  <div class="grid">
+    <div class="card"><div class="stage"><img src="01-horizontal-primary.svg" alt=""></div><div class="label">01-horizontal-primary.svg</div></div>
+    <div class="card"><div class="stage"><img src="03-gold-badge.svg" alt=""></div><div class="label">03-gold-badge.svg</div></div>
+    <div class="card"><div class="stage"><img src="09-gradient-badge.svg" alt=""></div><div class="label">09-gradient-badge.svg</div></div>
+    <div class="card"><div class="stage"><img src="10-mono-ink-knockout.svg" alt=""></div><div class="label">10-mono-ink-knockout.svg</div></div>
+    <div class="card"><div class="stage"><img src="18-stroke-badge.svg" alt=""></div><div class="label">18-stroke-badge.svg</div></div>
+    <div class="card"><div class="stage"><img src="19-corner-accent-badge.svg" alt=""></div><div class="label">19-corner-accent-badge.svg</div></div>
+    <div class="card"><div class="stage"><img src="20-forest-badge.svg" alt=""></div><div class="label">20-forest-badge.svg</div></div>
+    <div class="card"><div class="stage"><img src="12-pill-lockup.svg" alt=""></div><div class="label">12-pill-lockup.svg</div></div>
+    <div class="card"><div class="stage"><img class="tall" src="08-stacked.svg" alt=""></div><div class="label">08-stacked.svg</div></div>
+  </div>
+
+  <h2>Lockups · dark backgrounds</h2>
+  <div class="grid">
+    <div class="card"><div class="stage dark"><img src="02-horizontal-inverse.svg" alt=""></div><div class="label">02-horizontal-inverse.svg</div></div>
+    <div class="card"><div class="stage dark"><img src="04-gold-badge-inverse.svg" alt=""></div><div class="label">04-gold-badge-inverse.svg</div></div>
+    <div class="card"><div class="stage dark"><img src="11-mono-cream-knockout.svg" alt=""></div><div class="label">11-mono-cream-knockout.svg</div></div>
+    <div class="card"><div class="stage dark"><img class="tall" src="25-stacked-inverse.svg" alt=""></div><div class="label">25-stacked-inverse.svg</div></div>
+  </div>
+
+  <h2>Wordmark · CLI / dev-tool flavors</h2>
+  <div class="grid">
+    <div class="card"><div class="stage"><img src="05-wordmark-gold-d.svg" alt=""></div><div class="label">05-wordmark-gold-d.svg</div></div>
+    <div class="card"><div class="stage"><img src="06-wordmark-mono-ink.svg" alt=""></div><div class="label">06-wordmark-mono-ink.svg</div></div>
+    <div class="card"><div class="stage"><img src="14-wordmark-underline.svg" alt=""></div><div class="label">14-wordmark-underline.svg</div></div>
+    <div class="card"><div class="stage"><img src="15-prompt-lockup.svg" alt=""></div><div class="label">15-prompt-lockup.svg</div></div>
+    <div class="card"><div class="stage"><img src="16-cursor-wordmark.svg" alt=""></div><div class="label">16-cursor-wordmark.svg</div></div>
+    <div class="card"><div class="stage"><img src="17-status-dot.svg" alt=""></div><div class="label">17-status-dot.svg</div></div>
+    <div class="card"><div class="stage"><img src="22-bracket-wordmark.svg" alt=""></div><div class="label">22-bracket-wordmark.svg</div></div>
+    <div class="card"><div class="stage"><img src="23-mono-code.svg" alt=""></div><div class="label">23-mono-code.svg</div></div>
+    <div class="card"><div class="stage dark"><img src="07-wordmark-mono-cream.svg" alt=""></div><div class="label">07-wordmark-mono-cream.svg</div></div>
+  </div>
+
+  <h2>Mark only · icons</h2>
+  <div class="grid">
+    <div class="card"><div class="stage"><img src="13-mark-circle.svg" alt=""></div><div class="label">13-mark-circle.svg</div></div>
+    <div class="card"><div class="stage"><img src="21-hex-mark.svg" alt=""></div><div class="label">21-hex-mark.svg</div></div>
+    <div class="card"><div class="stage"><img src="24-tag-mark.svg" alt=""></div><div class="label">24-tag-mark.svg</div></div>
+  </div>
+
+  <h2>Animated (SMIL — plays in-browser)</h2>
+  <div class="grid">
+    <div class="card"><div class="stage"><img src="26-animated-cursor.svg" alt=""></div><div class="label">26-animated-cursor.svg</div></div>
+    <div class="card"><div class="stage"><img src="27-animated-pulse-dot.svg" alt=""></div><div class="label">27-animated-pulse-dot.svg</div></div>
+    <div class="card"><div class="stage"><img src="28-animated-deploy-bar.svg" alt=""></div><div class="label">28-animated-deploy-bar.svg</div></div>
+  </div>
+
+  <h2>Monogram · d only</h2>
+  <div class="grid">
+    <div class="card"><div class="stage"><img src="29-monogram-square.svg" alt=""></div><div class="label">29-monogram-square.svg</div></div>
+    <div class="card"><div class="stage"><img src="30-monogram-circle.svg" alt=""></div><div class="label">30-monogram-circle.svg</div></div>
+    <div class="card"><div class="stage"><img src="31-monogram-gold.svg" alt=""></div><div class="label">31-monogram-gold.svg</div></div>
+    <div class="card"><div class="stage"><img src="32-monogram-outline.svg" alt=""></div><div class="label">32-monogram-outline.svg</div></div>
+    <div class="card"><div class="stage"><img src="33-monogram-knockout.svg" alt=""></div><div class="label">33-monogram-knockout.svg</div></div>
+    <div class="card"><div class="stage"><img src="34-monogram-geometric.svg" alt=""></div><div class="label">34-monogram-geometric.svg</div></div>
+  </div>
+
+  <h2>Font-independent · geometric (no &lt;text&gt;, no font dependency)</h2>
+  <div class="grid">
+    <div class="card"><div class="stage"><img src="35-geometric-wordmark.svg" alt=""></div><div class="label">35-geometric-wordmark.svg</div></div>
+    <div class="card"><div class="stage"><img src="36-geometric-lockup.svg" alt=""></div><div class="label">36-geometric-lockup.svg</div></div>
+  </div>
+</body>
+</html>

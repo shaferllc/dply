@@ -1,0 +1,5 @@
+<svg width="96" height="96" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="'Instrument Sans','Helvetica Neue',Arial,sans-serif">
+  <!-- Icon only, hexagon badge (node/infra vibe): ink hex, gold d -->
+  <polygon points="4,48 26,9.9 70,9.9 92,48 70,86.1 26,86.1" fill="#171a0e"/>
+  <text x="48" y="64" font-size="44" font-weight="700" fill="#cda942" text-anchor="middle">d</text>
+</svg>

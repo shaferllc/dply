@@ -1,0 +1,6 @@
+<svg width="120" height="140" viewBox="0 0 120 140" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="'Instrument Sans','Helvetica Neue',Arial,sans-serif">
+  <!-- Stacked lockup for dark backgrounds: ink badge / gold d, cream wordmark. Transparent bg. -->
+  <rect x="28" y="10" width="64" height="64" rx="16" fill="#171a0e"/>
+  <text x="60" y="59" font-size="46" font-weight="700" fill="#cda942" text-anchor="middle">d</text>
+  <text x="60" y="120" font-size="40" font-weight="700" letter-spacing="-1.2" fill="#fdfcf9" text-anchor="middle">dply</text>
+</svg>

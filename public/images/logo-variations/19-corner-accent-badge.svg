@@ -1,0 +1,10 @@
+<svg width="148" height="96" viewBox="0 0 148 96" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="'Instrument Sans','Helvetica Neue',Arial,sans-serif">
+  <!-- Ink badge with a gold corner wedge accent, cream d -->
+  <defs><clipPath id="cab"><rect x="4" y="16" width="64" height="64" rx="16"/></clipPath></defs>
+  <g clip-path="url(#cab)">
+    <rect x="4" y="16" width="64" height="64" fill="#171a0e"/>
+    <polygon points="68,48 68,80 36,80" fill="#cda942"/>
+  </g>
+  <text x="37" y="65" font-size="46" font-weight="700" fill="#fdfcf9" text-anchor="middle">d</text>
+  <text x="76" y="64" font-size="50" font-weight="700" letter-spacing="-1.5" fill="#171a0e">ply</text>
+</svg>

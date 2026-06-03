@@ -86,7 +86,10 @@ final class SiteSettingsSidebar
                 ['id' => 'laravel-stack', 'label' => __('Laravel'), 'icon' => 'heroicon-o-bolt', 'group' => 'runtime'],
                 ['id' => 'rails-stack', 'label' => __('Rails'), 'icon' => 'heroicon-o-bolt', 'group' => 'runtime'],
                 ['id' => 'wordpress', 'label' => __('WordPress'), 'icon' => 'heroicon-o-globe-alt', 'group' => 'runtime'],
-                ['id' => 'environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line', 'group' => 'runtime'],
+                // Environment moved to the Deployments hub (Deploy → Environment
+                // tab) for VM sites — it lives next to the deploy controls and
+                // the missing-env deploy gate. Container/serverless sidebars keep
+                // their own entry since their deploy view has no tab strip.
                 // SSH file browser, locked to the site's directory root. Has its
                 // own dedicated route; gated below so it's hidden on hosts without
                 // SSH (where the browser can't read anything).

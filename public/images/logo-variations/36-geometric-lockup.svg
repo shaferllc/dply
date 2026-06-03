@@ -1,0 +1,18 @@
+<svg width="180" height="96" viewBox="0 0 180 96" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- FONT-INDEPENDENT lockup: ink badge + geometric gold d, geometric ink "ply". No <text>. -->
+  <rect x="4" y="16" width="64" height="64" rx="16" fill="#171a0e"/>
+  <g stroke="#cda942" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="30" cy="54" r="12"/>
+    <path d="M48 24 V70"/>
+  </g>
+  <g stroke="#171a0e" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    <!-- p -->
+    <path d="M88 28 V86"/>
+    <circle cx="102" cy="46" r="13"/>
+    <!-- l -->
+    <path d="M130 8 V64"/>
+    <!-- y -->
+    <path d="M140 28 L154 52"/>
+    <path d="M168 28 L142 86"/>
+  </g>
+</svg>

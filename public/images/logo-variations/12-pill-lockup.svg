@@ -1,0 +1,7 @@
+<svg width="172" height="80" viewBox="0 0 172 80" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="'Instrument Sans','Helvetica Neue',Arial,sans-serif">
+  <!-- Lockup enclosed in a bordered pill (good for buttons / avatars / favicons-in-context) -->
+  <rect x="2" y="2" width="168" height="76" rx="38" fill="#fdfcf9" stroke="#171a0e" stroke-opacity="0.12" stroke-width="2"/>
+  <rect x="16" y="14" width="52" height="52" rx="14" fill="#171a0e"/>
+  <text x="42" y="54" font-size="38" font-weight="700" fill="#cda942" text-anchor="middle">d</text>
+  <text x="78" y="53" font-size="40" font-weight="700" letter-spacing="-1.2" fill="#171a0e">ply</text>
+</svg>

@@ -63,7 +63,7 @@
                 </div>
                 <button
                     type="button"
-                    wire:click="openMissingEnvModal"
+                    wire:click="openBlockedEnvModal"
                     class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-rose-800"
                 >
                     <x-heroicon-o-plus class="h-3.5 w-3.5" />
@@ -89,13 +89,13 @@
                 </button>
             </div>
             <div class="max-h-[60vh] overflow-y-auto px-6 py-6">
-                <form wire:submit="addMissingEnvVars" id="deploy-missing-env-form" class="space-y-3">
+                <form wire:submit="addBlockedEnvVars" id="deploy-missing-env-form" class="space-y-3">
                     @foreach ($blockedEnv as $entry)
                         <div wire:key="blocked-env-{{ md5($entry['key']) }}">
                             <label class="block font-mono text-xs font-semibold text-brand-ink" for="blocked_env_{{ md5($entry['key']) }}">{{ $entry['key'] }}</label>
                             <input
                                 id="blocked_env_{{ md5($entry['key']) }}"
-                                wire:model="missing_env_values.{{ $entry['key'] }}"
+                                wire:model="blocked_env_values.{{ $entry['key'] }}"
                                 autocomplete="off"
                                 spellcheck="false"
                                 class="mt-1 block w-full rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-sm text-brand-ink"
@@ -108,9 +108,9 @@
             <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 px-6 py-4">
                 <p class="mr-auto text-xs text-brand-moss">{{ __('Saved and pushed to the server.') }}</p>
                 <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
-                <x-primary-button type="submit" form="deploy-missing-env-form" wire:loading.attr="disabled" wire:target="addMissingEnvVars">
-                    <span wire:loading.remove wire:target="addMissingEnvVars">{{ __('Add variables') }}</span>
-                    <span wire:loading wire:target="addMissingEnvVars">{{ __('Adding…') }}</span>
+                <x-primary-button type="submit" form="deploy-missing-env-form" wire:loading.attr="disabled" wire:target="addBlockedEnvVars">
+                    <span wire:loading.remove wire:target="addBlockedEnvVars">{{ __('Add variables') }}</span>
+                    <span wire:loading wire:target="addBlockedEnvVars">{{ __('Adding…') }}</span>
                 </x-primary-button>
             </div>
         </x-modal>

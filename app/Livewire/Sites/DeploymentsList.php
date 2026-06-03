@@ -8,7 +8,9 @@ use App\Jobs\PushSiteEnvJob;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
 use App\Livewire\Sites\Concerns\ManagesSiteDeployExecution;
+use App\Livewire\Sites\Concerns\ManagesSiteEnvironment;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
@@ -34,6 +36,8 @@ class DeploymentsList extends Component
     use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
     use ManagesSiteDeployExecution;
+    use ManagesSiteEnvironment;
+    use WatchesConsoleActionOutcomes;
     use WithPagination;
 
     public Server $server;
@@ -41,19 +45,22 @@ class DeploymentsList extends Component
     public Site $site;
 
     /**
-     * Modal inputs for the "Add missing variables" prompt, keyed by the env
-     * KEY the last deploy was blocked on. Seeded from the recorded block with
-     * the .env.example sample value; only non-empty entries are written.
+     * Modal inputs for the deploy-panel "Add variables" prompt (the gate that
+     * blocked the last deploy), keyed by env KEY. Distinct from the
+     * Environment tab's $missing_env_values (provided by ManagesSiteEnvironment)
+     * because this one is seeded from the recorded deploy block, not the cache.
      *
      * @var array<string, string>
      */
-    public array $missing_env_values = [];
+    public array $blocked_env_values = [];
 
     public const TAB_OVERVIEW = 'overview';
 
     public const TAB_REPOSITORY = 'repository';
 
     public const TAB_DEPLOY = 'deploy';
+
+    public const TAB_ENVIRONMENT = 'environment';
 
     public const TAB_COMMITS = 'commits';
 
@@ -79,6 +86,7 @@ class DeploymentsList extends Component
         self::TAB_OVERVIEW,
         self::TAB_REPOSITORY,
         self::TAB_DEPLOY,
+        self::TAB_ENVIRONMENT,
         self::TAB_WEBHOOK,
         self::TAB_HOOKS,
         // TAB_COMMITS / TAB_FILES / TAB_BRANCHES intentionally absent — they
@@ -229,10 +237,11 @@ class DeploymentsList extends Component
     }
 
     /**
-     * Open the inline fill-in modal, seeding each input with the .env.example
-     * sample value so the operator can confirm or edit.
+     * Open the deploy-panel fill-in modal (the gate prompt), seeding each
+     * input with the .env.example sample value so the operator can confirm or
+     * edit.
      */
-    public function openMissingEnvModal(): void
+    public function openBlockedEnvModal(): void
     {
         Gate::authorize('update', $this->site);
 
@@ -240,7 +249,7 @@ class DeploymentsList extends Component
         foreach ($this->deployBlockedEnvKeys() as $entry) {
             $seed[$entry['key']] = (string) ($entry['example'] ?? '');
         }
-        $this->missing_env_values = $seed;
+        $this->blocked_env_values = $seed;
 
         $this->dispatch('open-modal', 'deploy-missing-env-modal');
     }
@@ -251,12 +260,12 @@ class DeploymentsList extends Component
      * Blank inputs are skipped. Mirrors the Environment tab's writer; the push
      * here is a plain queued job (no console banner on this component).
      */
-    public function addMissingEnvVars(DotEnvFileParser $parser, DotEnvFileWriter $writer): void
+    public function addBlockedEnvVars(DotEnvFileParser $parser, DotEnvFileWriter $writer): void
     {
         Gate::authorize('update', $this->site);
 
         $additions = [];
-        foreach ($this->missing_env_values as $key => $value) {
+        foreach ($this->blocked_env_values as $key => $value) {
             $key = trim((string) $key);
             $value = (string) $value;
             if ($key === '' || ! preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $key) || trim($value) === '') {
@@ -295,7 +304,7 @@ class DeploymentsList extends Component
             $this->site->forceFill(['meta' => $meta])->save();
         }
 
-        $this->missing_env_values = [];
+        $this->blocked_env_values = [];
 
         if ($this->server->hostCapabilities()->supportsEnvPushToHost()) {
             PushSiteEnvJob::dispatch($this->site->id, (string) (auth()->id() ?? ''));

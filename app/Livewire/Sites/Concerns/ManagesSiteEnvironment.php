@@ -1,0 +1,523 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Livewire\Sites\Concerns;
+
+use App\Jobs\PushSiteEnvJob;
+use App\Jobs\ScanSiteEnvRequirementsJob;
+use App\Jobs\SyncEnvFromServerJob;
+use App\Models\ConsoleAction;
+use App\Services\Sites\DotEnvFileParser;
+use App\Services\Sites\DotEnvFileWriter;
+use Livewire\Component;
+
+/**
+ * The site .env editor: viewing/editing the encrypted env cache, syncing it
+ * from / pushing it to the server's live .env, the detected-requirement
+ * "missing variables" prompt, and the file-path relocation controls.
+ *
+ * Lifted out of {@see \App\Livewire\Sites\Show} so the same editor can be
+ * embedded as the Deploy hub's Environment tab. The host component must also
+ * use {@see ConfirmsActionWithModal}, {@see DispatchesToastNotifications} and
+ * {@see \App\Livewire\Concerns\WatchesConsoleActionOutcomes}, and expose
+ * `$this->site` and `$this->server`.
+ *
+ * @phpstan-require-extends Component
+ *
+ * @property \App\Models\Server $server
+ * @property \App\Models\Site $site
+ */
+trait ManagesSiteEnvironment
+{
+    public string $new_env_key = '';
+
+    public string $new_env_value = '';
+
+    public string $new_env_comment = '';
+
+    public string $bulk_env_input = '';
+
+    public ?string $editing_env_key = null;
+
+    public string $editing_env_value = '';
+
+    public string $editing_env_comment = '';
+
+    /** @var list<string> */
+    public array $revealed_env_keys = [];
+
+    public string $env_file_path_override = '';
+
+    /** @var array<string, string> */
+    public array $missing_env_values = [];
+
+    /**
+     * Manual push of the cache to the server's .env (console banner).
+     */
+    public function pushEnvToServer(): void
+    {
+        $this->authorize('update', $this->site);
+        if (! $this->server->hostCapabilities()->supportsEnvPushToHost()) {
+            $this->toastError(__('This host runtime does not support pushing a .env file over SSH.'));
+
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('env_push');
+
+        PushSiteEnvJob::dispatch(
+            $this->site->id,
+            (string) (auth()->id() ?? ''),
+            (string) $run->id,
+        );
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction($run, __('Environment file pushed to server.'), __('Environment push did not finish.'));
+        $this->toastConsoleActionQueued();
+    }
+
+    /**
+     * Lazy first-visit sync (wire:init): fires the env-sync job only when the
+     * cache has never been touched. Read uses 'view' priv.
+     */
+    public function autoSyncIfFirstVisit(): void
+    {
+        $this->authorize('view', $this->site);
+
+        if (! $this->server->hostCapabilities()->supportsEnvPushToHost()) {
+            return;
+        }
+        if (filled($this->site->env_file_content) || $this->site->env_cache_origin !== null) {
+            return;
+        }
+
+        $inFlight = ConsoleAction::query()
+            ->forSubject($this->site)
+            ->ofKind('env_sync')
+            ->notDismissed()
+            ->inFlight()
+            ->exists();
+        if ($inFlight) {
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('env_sync');
+        SyncEnvFromServerJob::dispatch(
+            $this->site->id,
+            (string) (auth()->id() ?? ''),
+            (string) $run->id,
+        );
+        $this->watchConsoleAction($run, __('Environment synced from server.'), __('Environment sync did not finish.'));
+    }
+
+    /**
+     * Manual "re-read the live .env from the server and replace the cache".
+     */
+    public function syncEnvFromServer(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->server->hostCapabilities()->supportsEnvPushToHost()) {
+            $this->toastError(__('This host runtime does not expose a server .env file.'));
+
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('env_sync');
+
+        SyncEnvFromServerJob::dispatch(
+            $this->site->id,
+            (string) (auth()->id() ?? ''),
+            (string) $run->id,
+        );
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction($run, __('Environment synced from server.'), __('Environment sync did not finish.'));
+        $this->toastConsoleActionQueued();
+    }
+
+    /**
+     * One-click "move .env outside docroot" → /etc/dply/<slug>.env + push.
+     */
+    public function relocateEnvOutsideDocroot(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->server->hostCapabilities()->supportsEnvPushToHost()) {
+            $this->toastError(__('This host runtime does not have a server .env to relocate.'));
+
+            return;
+        }
+
+        $newPath = '/etc/dply/'.$this->site->slug.'.env';
+        $this->site->forceFill(['env_file_path' => $newPath])->save();
+        $this->env_file_path_override = $newPath;
+
+        $run = $this->seedQueuedConsoleAction('env_push');
+        PushSiteEnvJob::dispatch(
+            $this->site->id,
+            (string) (auth()->id() ?? ''),
+            (string) $run->id,
+        );
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            __('Relocated .env to :path.', ['path' => $newPath]),
+            __('Relocating .env to :path did not finish.', ['path' => $newPath]),
+        );
+        $this->toastConsoleActionQueued();
+    }
+
+    /**
+     * Save a custom absolute .env path on the Site row (empty = default).
+     */
+    public function saveEnvFilePath(): void
+    {
+        $this->authorize('update', $this->site);
+        $value = trim($this->env_file_path_override);
+
+        if ($value === '') {
+            $this->site->forceFill(['env_file_path' => null])->save();
+            $this->autoPushAfterCacheMutation(__('Default .env path restored.'));
+
+            return;
+        }
+
+        $this->validate([
+            'env_file_path_override' => ['required', 'string', 'max:1024', 'regex:/^\/[^\\\\\\0]+$/'],
+        ], [
+            'env_file_path_override.regex' => __('Path must be absolute (start with /) and not contain backslashes or null bytes.'),
+        ]);
+
+        $this->site->forceFill(['env_file_path' => $value])->save();
+        $this->autoPushAfterCacheMutation(__('Custom .env path saved.'));
+    }
+
+    /**
+     * Single-row add: writes one key into the encrypted env cache, then
+     * auto-pushes to the server's .env file.
+     */
+    public function addEnvVar(DotEnvFileParser $parser, DotEnvFileWriter $writer): void
+    {
+        $this->authorize('update', $this->site);
+        $this->validate([
+            'new_env_key' => 'required|string|max:128|regex:/^[A-Za-z_][A-Za-z0-9_]*$/',
+            'new_env_value' => 'nullable|string|max:20000',
+            'new_env_comment' => 'nullable|string|max:1000',
+        ]);
+
+        $parsed = $parser->parse((string) ($this->site->env_file_content ?? ''));
+        $map = $parsed['variables'];
+        $comments = $parsed['comments'];
+        $map[$this->new_env_key] = (string) $this->new_env_value;
+        $trimmedComment = trim($this->new_env_comment);
+        if ($trimmedComment !== '') {
+            $comments[$this->new_env_key] = $trimmedComment;
+        } else {
+            unset($comments[$this->new_env_key]);
+        }
+        $this->site->forceFill([
+            'env_file_content' => $writer->render($map, $comments),
+            'env_cache_origin' => 'local-edit',
+        ])->save();
+
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.env.var_added', $this->site, null, [
+                'key' => $this->new_env_key,
+            ]);
+        }
+
+        $this->new_env_key = '';
+        $this->new_env_value = '';
+        $this->new_env_comment = '';
+        $this->autoPushAfterCacheMutation(__('Variable saved.'));
+    }
+
+    /**
+     * Bulk paste — additive merge of a multi-line .env block.
+     */
+    public function bulkImportEnvVars(DotEnvFileParser $parser, DotEnvFileWriter $writer): void
+    {
+        $this->authorize('update', $this->site);
+        $this->validate(['bulk_env_input' => 'required|string|max:65535']);
+
+        $incoming = $parser->parse($this->bulk_env_input);
+        if ($incoming['errors'] !== []) {
+            foreach ($incoming['errors'] as $err) {
+                $this->addError('bulk_env_input', $err);
+            }
+
+            return;
+        }
+
+        $existing = $parser->parse((string) ($this->site->env_file_content ?? ''));
+        $mergedVars = array_merge($existing['variables'], $incoming['variables']);
+        $mergedComments = array_merge($existing['comments'], $incoming['comments']);
+
+        $this->site->forceFill([
+            'env_file_content' => $writer->render($mergedVars, $mergedComments),
+            'env_cache_origin' => 'local-edit',
+        ])->save();
+
+        $count = count($incoming['variables']);
+
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.env.bulk_imported', $this->site, null, [
+                'imported_count' => $count,
+                'imported_keys' => array_keys($incoming['variables']),
+            ]);
+        }
+
+        $this->bulk_env_input = '';
+        $this->autoPushAfterCacheMutation(__(':count variable(s) imported.', ['count' => $count]));
+    }
+
+    /**
+     * Open the inline editor for a single key.
+     */
+    public function editEnvVar(DotEnvFileParser $parser, string $key): void
+    {
+        $this->authorize('update', $this->site);
+        $parsed = $parser->parse((string) ($this->site->env_file_content ?? ''));
+        if (! array_key_exists($key, $parsed['variables'])) {
+            return;
+        }
+        $this->editing_env_key = $key;
+        $this->editing_env_value = $parsed['variables'][$key];
+        $this->editing_env_comment = (string) ($parsed['comments'][$key] ?? '');
+    }
+
+    public function cancelEditEnvVar(): void
+    {
+        $this->editing_env_key = null;
+        $this->editing_env_value = '';
+        $this->editing_env_comment = '';
+    }
+
+    public function saveEditedEnvVar(DotEnvFileParser $parser, DotEnvFileWriter $writer): void
+    {
+        $this->authorize('update', $this->site);
+        $this->validate([
+            'editing_env_key' => 'required|string|max:128|regex:/^[A-Za-z_][A-Za-z0-9_]*$/',
+            'editing_env_value' => 'nullable|string|max:20000',
+            'editing_env_comment' => 'nullable|string|max:1000',
+        ]);
+
+        $parsed = $parser->parse((string) ($this->site->env_file_content ?? ''));
+        $map = $parsed['variables'];
+        $comments = $parsed['comments'];
+        $key = (string) $this->editing_env_key;
+        $map[$key] = (string) $this->editing_env_value;
+        $trimmedComment = trim($this->editing_env_comment);
+        if ($trimmedComment !== '') {
+            $comments[$key] = $trimmedComment;
+        } else {
+            unset($comments[$key]);
+        }
+        $this->site->forceFill([
+            'env_file_content' => $writer->render($map, $comments),
+            'env_cache_origin' => 'local-edit',
+        ])->save();
+
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.env.var_updated', $this->site, null, [
+                'key' => $key,
+            ]);
+        }
+
+        $this->cancelEditEnvVar();
+        $this->autoPushAfterCacheMutation(__('Variable updated.'));
+    }
+
+    /**
+     * Trash button → opens the shared confirm-action modal pointing at
+     * {@see removeEnvVar()}.
+     */
+    public function confirmRemoveEnvVar(string $key): void
+    {
+        $this->authorize('update', $this->site);
+        $this->openConfirmActionModal(
+            method: 'removeEnvVar',
+            arguments: [$key],
+            title: __('Remove :key?', ['key' => $key]),
+            message: __('This deletes :key from the cache and auto-pushes the change to the server. The variable will be gone from the live .env immediately.', ['key' => $key]),
+            confirmLabel: __('Remove'),
+            destructive: true,
+        );
+    }
+
+    public function removeEnvVar(string $key, DotEnvFileParser $parser, DotEnvFileWriter $writer): void
+    {
+        $this->authorize('update', $this->site);
+        $parsed = $parser->parse((string) ($this->site->env_file_content ?? ''));
+        if (! array_key_exists($key, $parsed['variables'])) {
+            return;
+        }
+        unset($parsed['variables'][$key], $parsed['comments'][$key]);
+        $this->site->forceFill([
+            'env_file_content' => $writer->render($parsed['variables'], $parsed['comments']),
+            'env_cache_origin' => 'local-edit',
+        ])->save();
+
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.env.var_removed', $this->site, ['key' => $key], null);
+        }
+
+        $this->revealed_env_keys = array_values(array_diff($this->revealed_env_keys, [$key]));
+        $this->autoPushAfterCacheMutation(__('Variable removed.'));
+    }
+
+    /**
+     * Dispatch the push job after a successful cache mutation. No-op on hosts
+     * without a server-side .env (Docker/K8s/Serverless inject at deploy time).
+     */
+    protected function autoPushAfterCacheMutation(string $savedMessage): void
+    {
+        if (! $this->server->hostCapabilities()->supportsEnvPushToHost()) {
+            $this->toastSuccess($savedMessage.' '.__('Saved.'));
+
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('env_push');
+
+        PushSiteEnvJob::dispatch(
+            $this->site->id,
+            (string) (auth()->id() ?? ''),
+            (string) $run->id,
+        );
+
+        $this->watchConsoleAction(
+            $run,
+            $savedMessage.' '.__('Pushed to server.'),
+            __('Push to server did not finish.'),
+        );
+        $this->toastSuccess($savedMessage.' '.__('Pushing to server — the console banner will confirm when it finishes.'));
+    }
+
+    public function toggleRevealEnvVar(string $key): void
+    {
+        $this->authorize('update', $this->site);
+        if (in_array($key, $this->revealed_env_keys, true)) {
+            $this->revealed_env_keys = array_values(array_diff($this->revealed_env_keys, [$key]));
+
+            return;
+        }
+        $this->revealed_env_keys[] = $key;
+    }
+
+    /**
+     * Re-scan the deployed code for required env vars (backgrounded).
+     */
+    public function rescanEnvRequirements(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->server->hostCapabilities()->supportsEnvPushToHost()) {
+            $this->toastError(__('This host runtime has no on-disk code to scan.'));
+
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('env_scan');
+
+        ScanSiteEnvRequirementsJob::dispatch(
+            $this->site->id,
+            (string) (auth()->id() ?? ''),
+            (string) $run->id,
+        );
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction($run, __('Environment requirements re-scanned.'), __('Environment scan did not finish.'));
+        $this->toastConsoleActionQueued();
+    }
+
+    /**
+     * Open the "Add missing variables" modal, seeding each input with the
+     * .env.example sample value.
+     */
+    public function openMissingEnvModal(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $present = $this->presentNonEmptyEnvKeys();
+        $inherited = $this->site->workspace?->variables->pluck('env_key')->map(fn ($k) => (string) $k)->all() ?? [];
+
+        $seed = [];
+        foreach ($this->site->missingRequiredEnvKeys($present, $inherited) as $entry) {
+            $seed[$entry['key']] = (string) ($entry['example'] ?? '');
+        }
+        $this->missing_env_values = $seed;
+
+        $this->dispatch('open-modal', 'add-missing-env-modal');
+    }
+
+    /**
+     * Bulk-add the filled-in missing required keys. Blank inputs skipped.
+     */
+    public function addMissingEnvVars(DotEnvFileParser $parser, DotEnvFileWriter $writer): void
+    {
+        $this->authorize('update', $this->site);
+
+        $additions = [];
+        foreach ($this->missing_env_values as $key => $value) {
+            $key = trim((string) $key);
+            $value = (string) $value;
+            if ($key === '' || ! preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $key) || trim($value) === '') {
+                continue;
+            }
+            $additions[$key] = $value;
+        }
+
+        if ($additions === []) {
+            $this->toastError(__('Enter a value for at least one variable.'));
+
+            return;
+        }
+
+        $parsed = $parser->parse((string) ($this->site->env_file_content ?? ''));
+        $map = array_merge($parsed['variables'], $additions);
+
+        $this->site->forceFill([
+            'env_file_content' => $writer->render($map, $parsed['comments']),
+            'env_cache_origin' => 'local-edit',
+        ])->save();
+
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.env.bulk_imported', $this->site, null, [
+                'imported_count' => count($additions),
+                'imported_keys' => array_keys($additions),
+            ]);
+        }
+
+        $this->missing_env_values = [];
+        $this->dispatch('close-modal', 'add-missing-env-modal');
+        $this->autoPushAfterCacheMutation(__(':count variable(s) added.', ['count' => count($additions)]));
+    }
+
+    /**
+     * Keys already set with a non-empty value in the env cache.
+     *
+     * @return list<string>
+     */
+    private function presentNonEmptyEnvKeys(): array
+    {
+        $parsed = app(DotEnvFileParser::class)->parse((string) ($this->site->env_file_content ?? ''));
+
+        $keys = [];
+        foreach ($parsed['variables'] as $key => $value) {
+            if (trim((string) $value) !== '') {
+                $keys[] = (string) $key;
+            }
+        }
+
+        return $keys;
+    }
+}

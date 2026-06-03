@@ -1,0 +1,6 @@
+<svg width="100" height="96" viewBox="0 0 100 96" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="'Instrument Sans','Helvetica Neue',Arial,sans-serif">
+  <!-- Icon only, ship/deploy tag silhouette with eyelet ring, gold d -->
+  <path d="M30 10 H86 Q92 10 92 16 V80 Q92 86 86 86 H30 L6 48 Z" fill="#171a0e"/>
+  <circle cx="24" cy="48" r="5" fill="none" stroke="#cda942" stroke-width="2.5"/>
+  <text x="60" y="62" font-size="38" font-weight="700" fill="#cda942" text-anchor="middle">d</text>
+</svg>

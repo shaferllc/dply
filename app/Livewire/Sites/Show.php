@@ -1785,6 +1785,7 @@ class Show extends Component
         }
 
         $this->bulk_env_input = '';
+        $this->dispatch('close-modal', 'paste-env-modal');
         $this->autoPushAfterCacheMutation(__(':count variable(s) imported.', ['count' => $count]));
     }
 

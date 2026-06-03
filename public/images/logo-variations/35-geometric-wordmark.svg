@@ -1,0 +1,14 @@
+<svg width="150" height="96" viewBox="0 0 150 96" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="#171a0e" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+  <!-- FONT-INDEPENDENT "dply": monoline letterforms from circles + paths, no <text> -->
+  <!-- d -->
+  <circle cx="22" cy="46" r="13"/>
+  <path d="M40 8 V64"/>
+  <!-- p -->
+  <path d="M58 28 V86"/>
+  <circle cx="72" cy="46" r="13"/>
+  <!-- l -->
+  <path d="M100 8 V64"/>
+  <!-- y -->
+  <path d="M110 28 L124 52"/>
+  <path d="M138 28 L112 86"/>
+</svg>
