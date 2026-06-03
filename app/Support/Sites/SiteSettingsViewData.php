@@ -543,6 +543,11 @@ final class SiteSettingsViewData
             'icon' => 'server-stack',
         ];
         $items[] = [
+            'label' => __('Sites'),
+            'href' => route('servers.sites', $server),
+            'icon' => 'rectangle-stack',
+        ];
+        $items[] = [
             'label' => $site->name,
             'href' => $section === 'general' ? null : route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']),
             'icon' => 'globe-alt',

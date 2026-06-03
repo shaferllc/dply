@@ -38,8 +38,11 @@
         wire:dirty.class="dply-unsaved-bar-visible"
     @endif
     @if (filled($formPendingWire))
+        {{-- Alpine drives its OWN show class (…-pending) so its object binding
+             never clobbers the wire:dirty.class (…-visible) that field/checkbox
+             edits set — both classes independently un-hide the bar. --}}
         x-data
-        x-bind:class="{ 'dply-unsaved-bar-visible': $wire.{{ $formPendingWire }} }"
+        x-bind:class="{ 'dply-unsaved-bar-pending': $wire.{{ $formPendingWire }} }"
     @endif
     role="region"
     aria-label="{{ __('Unsaved changes') }}"

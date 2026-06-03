@@ -853,7 +853,27 @@ class Site extends Model
      */
     public function isWorkerSite(): bool
     {
+        $meta = is_array($this->meta) ? $this->meta : [];
+
+        // Explicit per-site override wins when set (the user toggle). Absent an
+        // override, worker mode defaults ON for sites on a worker host and OFF
+        // everywhere else.
+        if (array_key_exists('worker_mode', $meta) && $meta['worker_mode'] !== null) {
+            return (bool) $meta['worker_mode'];
+        }
+
         return $this->server?->isWorkerHost() === true;
+    }
+
+    /**
+     * Whether worker mode is an explicit user choice (meta override) rather than
+     * the host-role default. Lets the UI show the toggle in its real state.
+     */
+    public function workerModeIsExplicit(): bool
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+
+        return array_key_exists('worker_mode', $meta) && $meta['worker_mode'] !== null;
     }
 
     public function provisioningMeta(): array

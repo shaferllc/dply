@@ -17,6 +17,14 @@ class SiteWorkerPageBuilder
 {
     public function render(Site $site): string
     {
+        // A site can supply its own page (Settings → Serving mode). When set we
+        // serve it verbatim, after substituting a small set of {{tokens}} so the
+        // user can still surface dynamic values. Empty → built-in page below.
+        $custom = $this->customHtml($site);
+        if ($custom !== null) {
+            return $custom;
+        }
+
         $siteName = $this->escape($site->name !== '' ? $site->name : 'Worker');
         $serverName = $this->escape($site->server?->name ?? '—');
         $runtimeKey = $site->runtimeKey() ?: $site->type->value;
@@ -253,6 +261,30 @@ class SiteWorkerPageBuilder
 </body>
 </html>
 HTML;
+    }
+
+    /**
+     * The site's user-supplied worker page, or null when none is set. Tokens
+     * ({{site_name}}, {{server_name}}, {{runtime}}, {{hostname}}) are replaced
+     * with the site's HTML-escaped values so the custom page can stay dynamic.
+     */
+    private function customHtml(Site $site): ?string
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $html = trim((string) ($meta['worker_page_html'] ?? ''));
+        if ($html === '') {
+            return null;
+        }
+
+        $runtimeKey = $site->runtimeKey() ?: $site->type->value;
+        $runtimeVersion = (string) ($site->runtimeVersion() ?? '');
+
+        return strtr($html, [
+            '{{site_name}}' => $this->escape($site->name !== '' ? $site->name : 'Worker'),
+            '{{server_name}}' => $this->escape($site->server?->name ?? ''),
+            '{{runtime}}' => $this->escape(strtoupper($runtimeKey).($runtimeVersion !== '' ? ' '.$runtimeVersion : '')),
+            '{{hostname}}' => $this->escape((string) $site->testingHostname()),
+        ]);
     }
 
     private function backgroundProcessCount(Site $site): int

@@ -121,7 +121,7 @@ trait ManagesSiteDeployHooks
         $this->dispatch('open-modal', $this->pipelineHookModalName());
     }
 
-    public function openAddPipelineHookForm(?string $kind = null, ?string $anchor = null, bool $lockAnchor = false): void
+    public function openAddPipelineHookForm(?string $kind = null, ?string $anchor = null, bool $lockAnchor = false, ?string $anchorStepId = null): void
     {
         $this->authorize('update', $this->site);
         $this->closePipelineStepForm();
@@ -136,6 +136,12 @@ trait ManagesSiteDeployHooks
             $this->new_hook_anchor = $anchor;
         } elseif (! $lockAnchor) {
             $this->new_hook_anchor = SiteDeployHook::ANCHOR_AFTER_CLONE;
+        }
+        // Clicking the dashed "after a build step" slot pre-selects that step so
+        // the chooser opens already pointed at the right place (kind still open).
+        if ($anchorStepId !== null && $anchorStepId !== ''
+            && $this->editingDeployPipeline()->steps()->whereKey($anchorStepId)->exists()) {
+            $this->new_hook_anchor_step_id = $anchorStepId;
         }
         $this->resetErrorBag();
         $this->dispatch('open-modal', $this->pipelineHookModalName());

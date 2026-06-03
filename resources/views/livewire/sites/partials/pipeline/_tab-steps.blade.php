@@ -354,6 +354,34 @@
                     :description="__('Flip traffic to the new release (symlink for zero-downtime). Hooks can run just before the swap.')"
                     tone="activate"
                 >
+                    {{-- Strategy toggle right where it matters: switch between an
+                         atomic symlink swap and a simple in-place deploy. Bound
+                         to the same zero_downtime_enabled property as the Rollout
+                         tab, so the floating Save bar picks up the change. --}}
+                    <div
+                        x-data="{ zd: @js((bool) ($zero_downtime_enabled ?? false)) }"
+                        class="mb-3 flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-brand-ink/10 bg-white/70 px-3 py-2"
+                        data-pipeline-no-drag
+                    >
+                        <label class="inline-flex cursor-pointer items-center gap-2">
+                            <input
+                                type="checkbox"
+                                wire:model="zero_downtime_enabled"
+                                x-model="zd"
+                                class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest"
+                            >
+                            <span class="text-xs font-semibold text-brand-ink">{{ __('Zero-downtime (atomic) release') }}</span>
+                        </label>
+                        <span class="text-[11px] text-brand-moss" x-text="zd
+                            ? @js(__('Symlink swap into a fresh release directory — no downtime.'))
+                            : @js(__('Simple in-place deploy — the live checkout updates directly.'))"></span>
+                        <button
+                            type="button"
+                            wire:click="setPipelineTab('rollout')"
+                            class="ml-auto text-[11px] font-semibold text-brand-forest hover:underline"
+                            data-pipeline-no-drag
+                        >{{ __('Rollout settings') }}</button>
+                    </div>
                     @include('livewire.sites.partials.pipeline._timeline-hook-drop-zone', [
                         'anchor' => 'before_activate',
                         'items' => $hooksBeforeActivate,

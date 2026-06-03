@@ -653,7 +653,7 @@ class Show extends Component
             'kind' => $kind,
             'status' => ConsoleAction::STATUS_QUEUED,
             'label' => $label,
-            'user_id' => request()->user()?->id ?? 0,
+            'user_id' => request()->user()?->id,
             'output' => ['v' => (int) config('console_actions.current_version', 1), 'lines' => []],
         ]);
     }

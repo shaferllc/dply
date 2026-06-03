@@ -151,7 +151,7 @@ class DeployControl extends Component
             'kind' => 'site_remediate',
             'status' => ConsoleAction::STATUS_QUEUED,
             'label' => (string) $spec['label'],
-            'user_id' => auth()->id() ?? 0,
+            'user_id' => auth()->id(),
             'output' => ['v' => (int) config('console_actions.current_version', 1), 'lines' => []],
         ]);
 

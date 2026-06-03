@@ -46,6 +46,11 @@ final class SiteWorkspaceBreadcrumbs
             'icon' => 'server-stack',
         ];
         $items[] = [
+            'label' => __('Sites'),
+            'href' => route('servers.sites', $server),
+            'icon' => 'rectangle-stack',
+        ];
+        $items[] = [
             'label' => $site->name,
             'href' => route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']),
             'icon' => 'globe-alt',

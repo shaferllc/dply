@@ -224,17 +224,31 @@ class RunSiteDeploymentJob implements ShouldQueue
                 // build, migrations, …). Run the health check + smart-fix
                 // detection so a degraded deploy surfaces its cause and
                 // one-click fixes automatically.
+                // Best-effort: the deploy has already succeeded and the status
+                // is persisted, so kicking off verification must never be able
+                // to flip it back to FAILED. Swallow + log any error here.
                 if ($this->site->server?->isVmHost()) {
-                    $verifyRun = ConsoleAction::query()->create([
-                        'subject_type' => $this->site->getMorphClass(),
-                        'subject_id' => $this->site->id,
-                        'kind' => 'site_test',
-                        'status' => ConsoleAction::STATUS_QUEUED,
-                        'label' => 'Verifying deploy',
-                        'user_id' => 0,
-                        'output' => ['v' => (int) config('console_actions.current_version', 1), 'lines' => []],
-                    ]);
-                    TestSiteHealthJob::dispatch((string) $verifyRun->id, (string) $this->site->id);
+                    try {
+                        $verifyRun = ConsoleAction::query()->create([
+                            'subject_type' => $this->site->getMorphClass(),
+                            'subject_id' => $this->site->id,
+                            'kind' => 'site_test',
+                            'status' => ConsoleAction::STATUS_QUEUED,
+                            'label' => 'Verifying deploy',
+                            // System-run verification has no authenticated user.
+                            // user_id is a nullable ULID FK — integer 0 is never
+                            // a valid id and trips a foreign-key violation.
+                            'user_id' => null,
+                            'output' => ['v' => (int) config('console_actions.current_version', 1), 'lines' => []],
+                        ]);
+                        TestSiteHealthJob::dispatch((string) $verifyRun->id, (string) $this->site->id);
+                    } catch (\Throwable $e) {
+                        Log::warning('Post-deploy verification could not be started', [
+                            'site_id' => $this->site->id,
+                            'deployment_id' => $deployment->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
                 }
             } catch (\Throwable $e) {
                 $msg = DeployLogRedactor::redact($e->getMessage());

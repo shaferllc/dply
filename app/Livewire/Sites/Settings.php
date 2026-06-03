@@ -373,6 +373,12 @@ class Settings extends Show
 
     public string $sync_group_leader_site_id = '';
 
+    /** Worker mode: serve a locked-down "runs workers" page instead of the app. */
+    public bool $worker_mode = false;
+
+    /** Optional custom HTML for the worker page; empty = built-in dply page. */
+    public string $worker_page_html = '';
+
     public function mount(Server $server, Site $site, ?string $section = null): void
     {
         if ($site->server_id !== $server->id) {
@@ -843,6 +849,87 @@ class Settings extends Show
     {
         parent::syncFormFromSite();
         $this->syncLaravelConsoleForm();
+        $this->worker_mode = $this->site->isWorkerSite();
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $this->worker_page_html = (string) ($meta['worker_page_html'] ?? '');
+    }
+
+    /**
+     * Whether the worker-mode toggle is offered for this site. It's a VM
+     * webserver concern only — container/serverless/edge sites don't serve from
+     * a Caddy vhost, and headless (webserver=none) sites have no web front at
+     * all. Worker hosts default the toggle ON; any VM site can opt in.
+     */
+    #[Computed]
+    public function canConfigureWorkerMode(): bool
+    {
+        return $this->server->isVmHost()
+            && ! $this->site->usesFunctionsRuntime()
+            && ! $this->site->usesEdgeRuntime()
+            && ! $this->site->usesDockerRuntime()
+            && ! $this->site->usesKubernetesRuntime()
+            && $this->site->webserver() !== 'none';
+    }
+
+    /**
+     * Persist the worker-mode override on the site and re-apply the webserver
+     * config so Caddy switches between the normal vhost and the locked-down
+     * worker page. Setting it to the host-role default clears the override so
+     * the site tracks its host again.
+     */
+    public function saveWorkerMode(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->canConfigureWorkerMode()) {
+            $this->toastError(__('Worker mode applies to VM sites served by a web server.'));
+
+            return;
+        }
+
+        $this->validate([
+            'worker_page_html' => 'nullable|string|max:100000',
+        ]);
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+
+        // Clear the override when the choice matches the host-role default so the
+        // site keeps following its host; otherwise pin the explicit value.
+        $hostDefault = $this->server->isWorkerHost();
+        if ($this->worker_mode === $hostDefault) {
+            unset($meta['worker_mode']);
+        } else {
+            $meta['worker_mode'] = $this->worker_mode;
+        }
+
+        // Custom worker page: store when non-empty, clear to fall back to the
+        // built-in dply page.
+        $customHtml = trim($this->worker_page_html);
+        if ($customHtml === '') {
+            unset($meta['worker_page_html']);
+        } else {
+            $meta['worker_page_html'] = $customHtml;
+        }
+
+        $this->site->update(['meta' => $meta]);
+        $this->site->refresh();
+        $this->syncFormFromSite();
+
+        \App\Jobs\ApplySiteWebserverConfigJob::dispatch(
+            (string) $this->site->id,
+            (string) auth()->id(),
+        );
+
+        $org = $this->site->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.worker_mode.updated', $this->site, null, [
+                'worker_mode' => $this->worker_mode,
+            ]);
+        }
+
+        $this->toastSuccess($this->worker_mode
+            ? __('Worker mode on — re-applying the web server to lock the site down.')
+            : __('Worker mode off — re-applying the web server to restore the site.'));
     }
 
     protected function syncLaravelConsoleForm(): void
@@ -1718,7 +1805,7 @@ class Settings extends Show
     /**
      * Update the site display name and slug. Mirrors `dply:site:rename` semantics
      * (the CLI command at app/Console/Commands/RenameSiteCommand.php): updates
-     * the row only — the on-disk path under `/var/www/<slug>` is intentionally
+     * the row only — the on-disk path under `/home/dply/<domain>` is intentionally
      * left untouched, since that affects deployments mid-flight.
      */
     public function saveSiteIdentity(): void

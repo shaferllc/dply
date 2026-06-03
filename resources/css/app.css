@@ -340,8 +340,11 @@
     box-shadow: 0 0 0 2px rgb(104 132 121 / 0.45);
 }
 
-/* Unsaved-changes bar: shown via wire:dirty.class or Alpine when modal forms are dirty */
-.dply-unsaved-bar-visible {
+/* Unsaved-changes bar: shown via wire:dirty.class (field edits) or Alpine
+   (…-pending, modal/conditional forms). Two classes so Alpine's object binding
+   never removes the wire:dirty class. */
+.dply-unsaved-bar-visible,
+.dply-unsaved-bar-pending {
     display: block !important;
 }
 
