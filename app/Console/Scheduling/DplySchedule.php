@@ -29,17 +29,19 @@ use App\Console\Commands\ProcessScheduledServerDeletionsCommand;
 use App\Console\Commands\ProcessScheduledSiteDeletionsCommand;
 use App\Console\Commands\ProcessSshKeyRotationRemindersCommand;
 use App\Console\Commands\PruneAuditLogsCommand;
-use App\Console\Commands\PruneLocalWorkspaceArtifactsCommand;
 use App\Console\Commands\PruneFunctionInvocationsCommand;
+use App\Console\Commands\PruneLocalWorkspaceArtifactsCommand;
 use App\Console\Commands\PruneServerCreateDraftsCommand;
 use App\Console\Commands\PruneServerCronJobRunsCommand;
 use App\Console\Commands\PruneTestingHostnameRecordsCommand;
 use App\Console\Commands\RevokeExpiredServerSshSessionsCommand;
-use App\Console\Commands\RunDueDeploymentSchedulesCommand;
 use App\Console\Commands\RollupEdgeAnalyticsEngineCommand;
+use App\Console\Commands\RunDueDeploymentSchedulesCommand;
 use App\Console\Commands\ServerlessTickCommand;
 use App\Console\Commands\SnapshotOrganizationBillingCommand;
 use App\Console\Commands\SyncAllOrganizationBillingCommand;
+use App\Console\Commands\WorkerPoolAutoscaleCommand;
+use App\Console\Commands\WorkerPoolPrimaryHealthCommand;
 use App\Jobs\VerifyEdgeCustomDomainsJob;
 use App\Support\DplyRuntime;
 use Illuminate\Console\Scheduling\Schedule;
@@ -81,6 +83,17 @@ final class DplySchedule
             ->everyMinute()
             ->withoutOverlapping()
             ->name('run-due-deployment-schedules');
+
+        // Worker pools: autoscale by queue backlog, and alert when a pool's
+        // primary is unhealthy (manual promote — see WorkerPoolPrimaryHealthCommand).
+        $schedule->command(WorkerPoolAutoscaleCommand::class)
+            ->everyFiveMinutes()
+            ->withoutOverlapping()
+            ->name('worker-pools-autoscale');
+
+        $schedule->command(WorkerPoolPrimaryHealthCommand::class)
+            ->everyFiveMinutes()
+            ->name('worker-pools-primary-health');
 
         $schedule->command(ServerlessTickCommand::class)
             ->everyMinute()

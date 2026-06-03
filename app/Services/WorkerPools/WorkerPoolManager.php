@@ -131,4 +131,45 @@ class WorkerPoolManager
 
         return $this->cloneProvisioner->provisionReplica($pool, $source);
     }
+
+    /**
+     * Add one replica in a DIFFERENT region (and/or with a different provider
+     * credential or size). Cross-region members can't use the private network,
+     * so the replayer rewrites their env to the backends' public addresses and
+     * records an exposure plan on the member. Bumps desired_count by one so the
+     * same-region reconcile loop doesn't also add a local replica to "fill".
+     */
+    public function addCrossRegionReplica(WorkerPool $pool, string $region, ?string $size = null, ?string $credentialId = null, ?string $provider = null): Server
+    {
+        $source = $pool->primaryServer ?? $pool->sourceServer;
+        if (! $source instanceof Server) {
+            throw new RuntimeException(__('Pool has no source server to clone.'));
+        }
+        $region = trim($region);
+        $provider = trim((string) $provider);
+        $sameProvider = $provider === '' || $provider === $source->provider->value;
+        // A cross-region worker must differ in region OR provider from the source.
+        if ($sameProvider && ($region === '' || $region === (string) $source->region)) {
+            throw new RuntimeException(__('Choose a different region (or provider) from the source for a cross-region worker.'));
+        }
+        if ($pool->desired_count + 1 > $pool->max_size) {
+            throw new RuntimeException(__('Adding a worker would exceed the pool max size (:max).', ['max' => $pool->max_size]));
+        }
+
+        $member = $this->cloneProvisioner->provisionReplica($pool, $source, array_filter([
+            'region' => $region,
+            'size' => (string) $size,
+            'provider' => $provider,
+            'provider_credential_id' => (string) $credentialId,
+        ], fn ($v) => $v !== null && $v !== ''));
+
+        $pool->forceFill([
+            'desired_count' => $pool->desired_count + 1,
+            'status' => WorkerPool::STATUS_SCALING,
+        ])->save();
+
+        ReconcileWorkerPoolJob::dispatch((string) $pool->id);
+
+        return $member;
+    }
 }

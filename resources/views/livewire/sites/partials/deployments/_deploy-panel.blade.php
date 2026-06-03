@@ -6,7 +6,13 @@
     // button off this so it reads "Deploying…" for the whole run, not just
     // the brief request that dispatches it.
     $deployInProgress = $isRunning || (bool) ($this->deployLockInfo ?? null);
-    $deployedSha = $latest?->git_sha;
+    // "Deployed commit" must reflect the code actually live — the last SUCCESSFUL
+    // deploy — not the latest attempt (which may be skipped/failed with no SHA,
+    // the source of the confusing "No deploys yet" when deploys clearly exist).
+    $deployedDeployment = ($latest && $latest->status === 'success')
+        ? $latest
+        : $site->deployments()->where('status', 'success')->latest()->first();
+    $deployedSha = $deployedDeployment?->git_sha;
     $shortSha = $deployedSha ? \Illuminate\Support\Str::limit($deployedSha, 7, '') : null;
     $totalDurationMs = $latest ? $latest->phaseTotalDurationMs() : 0;
     // Phase timeline derived from the site's pipeline (Clone → Build →
@@ -296,6 +302,8 @@
                 <dd class="mt-1 truncate">
                     @if ($shortSha)
                         <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 font-mono text-xs font-semibold text-brand-sage" title="{{ $deployedSha }}">{{ $shortSha }}</span>
+                    @elseif ($latest)
+                        <span class="text-brand-mist">{{ __('No successful deploy yet') }}</span>
                     @else
                         <span class="text-brand-mist">{{ __('No deploys yet') }}</span>
                     @endif
@@ -454,8 +462,17 @@
                                                     <span class="font-mono text-brand-mist">{{ $step['duration_ms'] >= 1000 ? number_format($step['duration_ms'] / 1000, 1).'s' : $step['duration_ms'].'ms' }}</span>
                                                 @endif
                                             </div>
-                                            @if ($stepFailed && $step['output'] !== '')
-                                                <pre class="mt-1.5 max-h-48 overflow-auto rounded-lg bg-brand-ink p-3 font-mono text-[11px] leading-relaxed text-rose-100/95">{{ $step['output'] }}</pre>
+                                            @if (($step['output'] ?? '') !== '')
+                                                {{-- Any step with output is expandable (failed steps open by default),
+                                                     mirroring the slide-over deploy console. --}}
+                                                <div x-data="{ open: @js($stepFailed) }" class="mt-1">
+                                                    <button type="button" x-on:click="open = ! open"
+                                                        class="inline-flex items-center gap-1 text-[10px] font-semibold {{ $stepFailed ? 'text-rose-700' : 'text-brand-moss' }} hover:underline">
+                                                        <span class="font-mono" x-text="open ? '▾' : '▸'"></span>
+                                                        <span x-text="open ? @js(__('Hide output')) : @js(__('Show output'))"></span>
+                                                    </button>
+                                                    <pre x-show="open" x-cloak class="mt-1.5 max-h-96 overflow-auto rounded-lg bg-brand-ink p-3 font-mono text-[11px] leading-relaxed {{ $stepFailed ? 'text-rose-100/95' : 'text-brand-cream/90' }}">{{ $step['output'] }}</pre>
+                                                </div>
                                             @endif
                                         </li>
                                     @endforeach

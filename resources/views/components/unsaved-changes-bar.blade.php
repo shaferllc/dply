@@ -53,57 +53,41 @@
         'bottom-24 sm:bottom-28',
     ]) }}
     @if ($useClientDirty)
-        data-unsaved-targets='@json($targetList)'
+        {{-- Plain comma-separated list (field names are safe identifiers). NOT
+             @json — Blade's @json hex-escapes quotes, which silently breaks
+             JSON.parse and leaves the tracker watching nothing. --}}
+        data-unsaved-targets="{{ implode(',', $targetList) }}"
         @if (filled($formPendingWire)) data-unsaved-pending-prop="{{ $formPendingWire }}" @endif
+        {{-- Dead-simple, can't-miss tracker: ANY input/change on a watched
+             wire:model field flips `dirty`. Listens on `document` (capture) so
+             root resolution is never a factor; resets after a Livewire commit
+             (save/discard re-render). x-effect toggles the built `…-visible`
+             class (display:block !important) over the base `hidden`. --}}
         x-data="{
-            targets: [],
-            pendingProp: null,
+            targets: '{{ implode(',', $targetList) }}'.split(',').filter(Boolean),
+            pendingProp: '{{ $formPendingWire }}',
             dirty: false,
-            initial: {},
-            root: null,
             init() {
-                try { this.targets = JSON.parse(this.$el.dataset.unsavedTargets || '[]'); } catch (e) { this.targets = []; }
-                this.pendingProp = this.$el.dataset.unsavedPendingProp || null;
-                this.root = this.$el.closest('[wire\\:id]') || document.body;
-                this.$nextTick(() => this.snapshot());
-                let on = () => this.recompute();
-                this.root.addEventListener('input', on, true);
-                this.root.addEventListener('change', on, true);
+                document.addEventListener('input', (e) => this.mark(e), true);
+                document.addEventListener('change', (e) => this.mark(e), true);
                 if (window.Livewire) {
-                    window.Livewire.hook('commit', ({ succeed }) => {
-                        succeed(() => { if (this.root && this.root.isConnected) { this.$nextTick(() => this.snapshot()); } });
-                    });
+                    window.Livewire.hook('commit', ({ succeed }) => { succeed(() => { this.dirty = false; }); });
                 }
             },
             modelName(el) {
+                if (! el || ! el.attributes) { return null; }
                 for (let i = 0; i < el.attributes.length; i++) {
                     let a = el.attributes[i];
                     if (a.name === 'wire:model' || a.name.indexOf('wire:model.') === 0) { return a.value; }
                 }
                 return null;
             },
-            fields() {
-                if (! this.root) { return []; }
-                return Array.from(this.root.querySelectorAll('input, select, textarea')).filter((el) => {
-                    let n = this.modelName(el);
-                    return n && this.targets.includes(n);
-                });
-            },
-            readValue(el) { return el.type === 'checkbox' ? el.checked : el.value; },
-            snapshot() {
-                this.initial = {};
-                this.fields().forEach((el) => { this.initial[this.modelName(el)] = this.readValue(el); });
-                this.recompute();
-            },
-            recompute() {
-                this.dirty = this.fields().some((el) => this.initial[this.modelName(el)] !== this.readValue(el));
-            },
-            get show() {
-                if (this.dirty) { return true; }
-                return this.pendingProp ? !! this.$wire[this.pendingProp] : false;
+            mark(e) {
+                let n = this.modelName(e.target);
+                if (n && this.targets.includes(n)) { this.dirty = true; }
             }
         }"
-        x-bind:class="{ 'dply-unsaved-bar-visible': show }"
+        x-effect="$el.classList.toggle('dply-unsaved-bar-visible', dirty || (pendingProp ? !! $wire[pendingProp] : false))"
     @else
         @if (filled($targets))
             wire:target="{{ $targets }}"

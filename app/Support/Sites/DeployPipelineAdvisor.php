@@ -109,6 +109,7 @@ final class DeployPipelineAdvisor
         $this->checkEmptyPipeline($site, $pipeline->steps, $warnings, $checks);
         $this->checkHooks($pipeline->hooks, $pipeline->steps, $errors, $warnings, $checks);
         $this->checkLaravelReleaseSafety($site, $releaseSteps, $pipeline->hooks, $warnings, $checks);
+        $this->checkRestartWithoutManagedProcess($site, $pipeline->steps, $warnings, $checks);
 
         if ($site->deploy_strategy !== 'atomic') {
             $hasReleaseMigrate = $releaseSteps->contains(
@@ -498,6 +499,70 @@ final class DeployPipelineAdvisor
             $message = __('Maintenance down is configured without a matching “up” hook after activate.');
             $warnings[] = $message;
             $checks[] = $this->check('maintenance_down_without_up', 'warning', $message);
+        }
+    }
+
+    /**
+     * Restarting Horizon / queue workers only signals an ALREADY-RUNNING process
+     * to recycle — it does not install or keep one running. If the pipeline has a
+     * restart/terminate step but no Supervisor program manages that process on the
+     * server, the workers never come back. Prompt the operator to define one.
+     *
+     * @param  Collection<int, SiteDeployStep>  $steps
+     * @param  list<string>  $warnings
+     * @param  list<array{key: string, level: string, message: string}>  $checks
+     */
+    private function checkRestartWithoutManagedProcess(
+        Site $site,
+        Collection $steps,
+        array &$warnings,
+        array &$checks,
+    ): void {
+        $server = $site->server;
+        if ($server === null) {
+            return;
+        }
+
+        $hasHorizon = $steps->contains(
+            fn (SiteDeployStep $s) => $s->step_type === SiteDeployStep::TYPE_ARTISAN_HORIZON_TERMINATE,
+        );
+        $hasQueue = $steps->contains(
+            fn (SiteDeployStep $s) => $s->step_type === SiteDeployStep::TYPE_ARTISAN_QUEUE_RESTART,
+        );
+
+        if (! $hasHorizon && ! $hasQueue) {
+            return;
+        }
+
+        // Active programs that could manage these workers — server-wide or scoped
+        // to this site.
+        $programs = $server->supervisorPrograms()
+            ->where('is_active', true)
+            ->where(function ($q) use ($site): void {
+                $q->whereNull('site_id')->orWhere('site_id', $site->id);
+            })
+            ->get(['program_type', 'command']);
+
+        $commandHas = static fn (string $needle): bool => $programs->contains(
+            static fn ($p): bool => str_contains(strtolower((string) $p->command), $needle),
+        );
+
+        $managesHorizon = $programs->contains(static fn ($p): bool => $p->program_type === 'horizon')
+            || $commandHas('horizon');
+        $managesQueue = $programs->contains(
+            static fn ($p): bool => in_array($p->program_type, ['queue', 'horizon'], true),
+        ) || $commandHas('horizon') || $commandHas('queue:work') || $commandHas('queue:listen');
+
+        if ($hasHorizon && ! $managesHorizon) {
+            $message = __('This pipeline runs “horizon:terminate”, but no Supervisor program runs Horizon on this server—terminate only tells a running Horizon to restart, so the workers won’t come back. Add a Horizon daemon under Server → Daemons.');
+            $warnings[] = $message;
+            $checks[] = $this->check('horizon_terminate_without_program', 'warning', $message);
+        }
+
+        if ($hasQueue && ! $managesQueue) {
+            $message = __('This pipeline runs “queue:restart”, but no Supervisor program runs a queue worker on this server—restart only signals running workers to exit. Add a queue worker under Server → Daemons so it stays running.');
+            $warnings[] = $message;
+            $checks[] = $this->check('queue_restart_without_program', 'warning', $message);
         }
     }
 

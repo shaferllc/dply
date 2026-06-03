@@ -1,10 +1,33 @@
 # Worker Pools — Clone & Scale Worker Servers
 
-**Status:** Draft
+**Status:** Phase 1 + Phase 2 implemented (incl. backend exposure, cross-provider, autoscaling, primary-health alerts, cost preview, tests)
 **Author:** Claude Code
 **Date:** 2026-06-03
 **Branch:** preflight/worker-pools
 **Related:** Design resolved via `/grill-me` interview (18 decisions). Builds on the existing worker-host concept (`server_role=worker` / `install_profile=queue_worker`) and the worker-mode site lockdown.
+
+---
+
+## Implementation Status (2026-06-03)
+
+**Built & verified (compiles, migration applied, route/view/DI resolve):**
+- Data model: `worker_pools` table + `servers.worker_pool_id`/`pool_role` + Postgres partial-unique index (one primary per pool). `App\Models\WorkerPool` + `WorkerPoolFactory`; `Server` wiring.
+- Same-region (Phase 1): `WorkerPoolManager` (create/scale/promote/remove), `WorkerCloneProvisioner` (clone via provider job, joins source private network), `WorkerWorkloadReplayer` (replicate sites/processes/bindings/env + replica transform), `ReconcileWorkerPoolJob` (re-entrant converge), `DrainAndDestroyWorkerJob` (graceful drain → `DeleteServerAction`). Livewire `WorkspaceWorkerPool` + blade; nav gated worker-role-only via new `only_server_roles` helper filter.
+- Cross-region core (Phase 2): `PoolEnvTransformer` (rewrite private→public hosts + build exposure plan), cross-region placement in the provisioner (skips private network, marks `cross_region`), `addCrossRegionReplica`, and a UI exposure-plan banner + cross-region add form with a secret-replication ack.
+- **Release pinning:** scaled-in clones deploy the source site's **last successful deployment commit** (`git_branch = <sha>`, `meta.git_ref_kind = 'commit'`, `meta.pinned_release`), falling back to the source's ref when no success is recorded — so a new worker never runs ahead of the pool.
+- **Deploy ordering (reconciler-owned, readiness-gated):** the replayer provisions each replicated site and records it in `meta.pool.pending_deploys`; the reconciler fires the first deploy per site only once it reports `meta.provisioning.state === 'ready'`. Member lifecycle: `PROVISIONING → REPLAYING → DEPLOYING → ACTIVE`. Replaces the earlier fixed-delay best-effort (which raced `ProvisionSiteJob`'s self-polling).
+
+**Backend exposure (now automated, operator-confirmed):** `WorkerPoolExposureApplier` + `ApplyWorkerPoolExposureJob` open each cross-region backend using the multi-IP-safe pattern — DB bound password-gated (`pg_hba` `0.0.0.0/0` scram via `DatabaseEngineInstallScripts`) with one `ServerFirewallRule` per worker `/32` (tagged `worker-pool:{id}`); Redis via `CacheServiceNetworkExposure::expose` + per-`/32` rules. Redis password is never auto-rotated (warns instead, to avoid desyncing workers' env). Auto-triggered when a cross-region member goes active (the operator already confirmed by adding it) and re-runnable via a UI button; grants are pruned on scale-down (`pruneForMember`).
+
+**Cross-provider:** the clone provisioner accepts a provider + credential override and dispatches the matching `Provision*Job` (Hetzner/DO/Linode/Vultr/Scaleway/UpCloud/EquinixMetal/FlyIo/AWS/GCP/Azure/Oracle); a different provider drops the source OS image/DO opts and uses BYO hosting. UI has provider + credential selectors and **region/size dropdowns** populated from `ResolveServerCreateCatalog` (best-effort; free-text fallback when a provider API call fails).
+
+**Autoscaling:** `dply:worker-pools:autoscale` (every 5 min) → `AutoscaleWorkerPoolJob` reads queue backlog over SSH on the primary (`php artisan queue:size`) and sets `desired_count` = clamp(backlog ÷ jobs-per-worker, min, max) with a cooldown. Config + toggle in the UI (`pool.meta.autoscale`).
+
+**Primary-health alert (manual failover, per decision):** `dply:worker-pools:primary-health` (every 5 min) alerts org owners/admins via `NotificationPublisher` when a pool primary is unhealthy >10 min (cooldown 60 min). Promotion stays manual (one-click in UI) + delete-guard; no auto-promotion (split-brain).
+
+**Cost preview:** dollar estimate from the primary's `billingTier()->priceCents()` shown on the scale control.
+
+**Tests:** `tests/Feature/WorkerPoolTest.php` (Pest) covers pool creation, non-worker rejection, scale validation + reconcile dispatch, promote single-primary invariant, primary-removal guard + drain dispatch, and the env-transformer rewrite/exposure-plan (and no-op) paths. Written, not run (per the project's manual-test preference).
 
 ---
 

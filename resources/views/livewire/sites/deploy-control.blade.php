@@ -53,14 +53,14 @@
                 wire:loading.attr="disabled"
                 wire:target="deploy"
                 @disabled($inProgress)
-                class="inline-flex items-center gap-1.5 rounded-xl bg-brand-ink px-3 py-2 text-sm font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:opacity-60"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:opacity-60"
             >
                 @if ($inProgress)
                     <x-spinner variant="white" size="sm" />
                     <span>{{ __('Deploying…') }}</span>
                 @else
-                    <x-heroicon-o-rocket-launch class="h-4 w-4" wire:loading.remove wire:target="deploy" />
-                    <span wire:loading wire:target="deploy" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="white" size="sm" /></span>
+                    <x-heroicon-o-rocket-launch class="h-3.5 w-3.5" wire:loading.remove wire:target="deploy" />
+                    <span wire:loading wire:target="deploy" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="white" size="sm" /></span>
                     <span>{{ __('Deploy') }}</span>
                 @endif
             </button>
@@ -69,9 +69,9 @@
             <button
                 type="button"
                 x-on:click="open = ! open"
-                class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
             >
-                <x-heroicon-o-command-line class="h-4 w-4" />
+                <x-heroicon-o-command-line class="h-3.5 w-3.5" />
                 {{ __('Console') }}
                 @if ($inProgress)
                     <span class="relative flex h-2 w-2">

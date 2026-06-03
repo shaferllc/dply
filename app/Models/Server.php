@@ -167,7 +167,7 @@ class Server extends Model
 
     /**
      * The worker pool this server belongs to (clones + their source), if any.
-     * See {@see \App\Models\WorkerPool}.
+     * See {@see WorkerPool}.
      */
     public function workerPool(): BelongsTo
     {
@@ -445,7 +445,7 @@ class Server extends Model
         return $this->status === self::STATUS_READY;
     }
 
-    public function privateNetwork(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    public function privateNetwork(): BelongsTo
     {
         return $this->belongsTo(PrivateNetwork::class, 'private_network_id');
     }

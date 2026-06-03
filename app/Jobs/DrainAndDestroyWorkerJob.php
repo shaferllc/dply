@@ -4,8 +4,9 @@ namespace App\Jobs;
 
 use App\Actions\Servers\DeleteServerAction;
 use App\Models\Server;
-use App\Models\WorkerPool;
+use App\Models\User;
 use App\Services\SshConnection;
+use App\Services\WorkerPools\WorkerPoolExposureApplier;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -35,7 +36,7 @@ class DrainAndDestroyWorkerJob implements ShouldQueue
         public ?string $actorId = null,
     ) {}
 
-    public function handle(DeleteServerAction $deleteServer): void
+    public function handle(DeleteServerAction $deleteServer, WorkerPoolExposureApplier $exposure): void
     {
         $server = Server::query()->find($this->serverId);
         if (! $server instanceof Server) {
@@ -50,10 +51,24 @@ class DrainAndDestroyWorkerJob implements ShouldQueue
             return;
         }
 
+        // Revoke this worker's backend firewall grants before it's destroyed so
+        // we don't leave dangling allow rules for a recycled public IP.
+        $pool = $server->workerPool;
+        if ($pool !== null) {
+            try {
+                $exposure->pruneForMember($pool, $server);
+            } catch (\Throwable $e) {
+                Log::info('worker-pool: exposure prune failed (continuing)', [
+                    'server_id' => $server->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         $this->drain($server);
 
         $actor = $this->actorId !== null
-            ? \App\Models\User::query()->find($this->actorId)
+            ? User::query()->find($this->actorId)
             : null;
 
         $deleteServer->execute(

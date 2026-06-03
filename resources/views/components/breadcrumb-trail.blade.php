@@ -193,12 +193,12 @@
                 @endif
                 @if ($docContextual)
                     <x-docs-link :slug="$resolvedContextualDocSlug">
-                        <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                        <x-heroicon-o-document-text class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
                         {{ $docLinkLabel }}
                     </x-docs-link>
                 @elseif ($docRoute)
                     <x-docs-link :doc-route="$docRoute" :doc-slug="$docSlug">
-                        <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                        <x-heroicon-o-document-text class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
                         {{ $docLinkLabel }}
                     </x-docs-link>
                 @endif

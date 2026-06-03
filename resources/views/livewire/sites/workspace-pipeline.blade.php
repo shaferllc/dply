@@ -68,6 +68,16 @@
         </div>
     </div>
 
+    @include('livewire.partials.confirm-action-modal')
+</div>
+@else
+</div>
+@endif
+
+    {{-- Outside the embedded gate: the pipeline page is rendered BOTH standalone
+         and embedded (Deployments → Pipeline tab), and the rollout/step fields
+         need a Save bar in both. It's position:fixed, so DOM placement doesn't
+         matter — only that it stays inside the component root for $wire scope. --}}
     @unless ($site->usesEdgeRuntime() || ($functionsHost ?? $server->hostCapabilities()->supportsFunctionDeploy()))
         <x-unsaved-changes-bar
             :message="__('You have unsaved pipeline, step, or rollout changes.')"
@@ -76,13 +86,7 @@
             :targets="$pipelineUnsavedTargets ?? null"
             form-pending-wire="pipeline_form_edits_pending"
             :client-dirty="true"
-            :saveLabel="__('Save pipeline')"
+            :saveLabel="__('Save rollout')"
         />
     @endunless
-
-    @include('livewire.partials.confirm-action-modal')
-</div>
-@else
-</div>
-@endif
 </div>

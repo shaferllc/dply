@@ -3,6 +3,8 @@
 namespace App\Jobs;
 
 use App\Models\Server;
+use App\Models\Site;
+use App\Models\SiteDeployment;
 use App\Models\WorkerPool;
 use App\Services\WorkerPools\WorkerPoolManager;
 use App\Services\WorkerPools\WorkerWorkloadReplayer;
@@ -82,18 +84,33 @@ class ReconcileWorkerPoolJob implements ShouldQueue
                     $this->markState($member, WorkerPool::MEMBER_REPLAYING);
                     try {
                         $replayer->replicate($source, $member, asReplica: true);
-                        $this->markState($member, WorkerPool::MEMBER_ACTIVE);
+                        // Replay recorded pending_deploys on the member; move to
+                        // DEPLOYING so the deploy step below picks it up once each
+                        // site finishes provisioning.
+                        $this->markState($member, WorkerPool::MEMBER_DEPLOYING);
+                        $inFlight = true;
                     } catch (\Throwable $e) {
                         Log::warning('worker-pool: replay failed', [
                             'member_id' => $member->id,
                             'error' => $e->getMessage(),
                         ]);
-                        // Leave in replaying state for a later retry tick.
+                        // Leave in provisioning state for a later retry tick.
                         $this->markState($member, WorkerPool::MEMBER_PROVISIONING);
                         $inFlight = true;
                     }
                 } else {
                     $inFlight = true; // still provisioning at the provider
+                }
+            } elseif ($state === WorkerPool::MEMBER_DEPLOYING) {
+                if ($this->dispatchReadyDeploys($member)) {
+                    $this->markState($member, WorkerPool::MEMBER_ACTIVE);
+                    // A cross-region member needs its backends opened to its IP.
+                    // Auto-apply (the operator already confirmed by adding it).
+                    if ((bool) ($member->meta['cross_region'] ?? false)) {
+                        ApplyWorkerPoolExposureJob::dispatch((string) $pool->id);
+                    }
+                } else {
+                    $inFlight = true; // some sites still provisioning
                 }
             }
         }
@@ -111,6 +128,39 @@ class ReconcileWorkerPoolJob implements ShouldQueue
         if (! $stillScaling) {
             $pool->forceFill(['status' => WorkerPool::STATUS_STEADY])->save();
         }
+    }
+
+    /**
+     * Deploy each of the member's replicated sites once it has finished
+     * provisioning (meta.provisioning.state === 'ready'). Returns true when no
+     * sites remain pending (all deploys dispatched), false while some are still
+     * provisioning. Idempotent: dispatched sites are removed from the list.
+     */
+    private function dispatchReadyDeploys(Server $member): bool
+    {
+        $meta = is_array($member->meta) ? $member->meta : [];
+        $pending = $meta['pool']['pending_deploys'] ?? [];
+        if (! is_array($pending) || $pending === []) {
+            return true;
+        }
+
+        $remaining = [];
+        foreach ($pending as $siteId) {
+            $site = Site::query()->find($siteId);
+            if (! $site instanceof Site) {
+                continue; // site gone — drop it
+            }
+            if (($site->meta['provisioning']['state'] ?? null) === 'ready') {
+                RunSiteDeploymentJob::dispatch($site, SiteDeployment::TRIGGER_MANUAL);
+            } else {
+                $remaining[] = $siteId;
+            }
+        }
+
+        $meta['pool']['pending_deploys'] = $remaining;
+        $member->forceFill(['meta' => $meta])->save();
+
+        return $remaining === [];
     }
 
     private function markState(Server $member, string $state): void

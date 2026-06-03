@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Database\Factories\WorkerPoolFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -17,7 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class WorkerPool extends Model
 {
-    /** @use HasFactory<\Database\Factories\WorkerPoolFactory> */
+    /** @use HasFactory<WorkerPoolFactory> */
     use HasFactory, HasUlids;
 
     public const STATUS_STEADY = 'steady';
@@ -34,6 +35,8 @@ class WorkerPool extends Model
     public const MEMBER_PROVISIONING = 'provisioning';
 
     public const MEMBER_REPLAYING = 'replaying';
+
+    public const MEMBER_DEPLOYING = 'deploying';
 
     public const MEMBER_ACTIVE = 'active';
 
