@@ -63,7 +63,18 @@
                                 'text-amber-950' => ! $isError,
                             ])>{{ $issue['message'] }}</p>
                         </div>
-                        @if ($fix !== null && ($fix['url'] ?? '') !== '')
+                        @if ($fix !== null && ($fix['action'] ?? '') !== '')
+                            <button
+                                type="button"
+                                wire:click="{{ $fix['action'] }}"
+                                wire:loading.attr="disabled"
+                                wire:target="{{ $fix['action'] }}"
+                                class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white px-3 py-2 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:border-brand-sage hover:text-brand-sage disabled:opacity-60"
+                            >
+                                <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" aria-hidden="true" />
+                                {{ $fix['label'] ?? __('Fix') }}
+                            </button>
+                        @elseif ($fix !== null && ($fix['url'] ?? '') !== '')
                             <a
                                 href="{{ $fix['url'] }}"
                                 wire:navigate

@@ -175,6 +175,70 @@
         </x-modal>
     @endif
 
+    {{-- Pipeline suggestions — proactively flag missing-but-needed deploy
+         steps (e.g. installs JS deps but never builds them → the live site
+         500s on a missing Vite manifest) with one-click "Add to pipeline". --}}
+    @php $pipelineSuggestions = method_exists($this, 'optimizePipeline') ? \App\Support\Sites\SitePipelineAdvisor::suggestions($site) : []; @endphp
+    @if ($pipelineSuggestions !== [])
+        <div class="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4">
+            <div class="flex items-start gap-3">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 ring-1 ring-inset ring-indigo-200">
+                    <x-heroicon-o-sparkles class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-start justify-between gap-2">
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-indigo-700">{{ __('Pipeline check') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-indigo-950">
+                                {{ trans_choice('{1} :count suggested deploy step|[2,*] :count suggested deploy steps', count($pipelineSuggestions), ['count' => count($pipelineSuggestions)]) }}
+                            </h3>
+                        </div>
+                        @if (method_exists($this, 'optimizePipeline'))
+                            <button type="button" wire:click="optimizePipeline" wire:loading.attr="disabled" wire:target="optimizePipeline" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-700 shadow-sm hover:bg-indigo-50 disabled:opacity-60" title="{{ __('Read package.json / composer.json on the server and add every step the repo needs.') }}">
+                                <x-heroicon-o-sparkles class="h-3.5 w-3.5" wire:loading.remove wire:target="optimizePipeline" />
+                                <span wire:loading wire:target="optimizePipeline" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
+                                <span wire:loading.remove wire:target="optimizePipeline">{{ __('Optimize pipeline') }}</span>
+                                <span wire:loading wire:target="optimizePipeline">{{ __('Scanning…') }}</span>
+                            </button>
+                        @endif
+                    </div>
+                    <p class="mt-1 text-sm text-indigo-900/80">{{ __('Add these individually, or Optimize pipeline to scan the repo and add everything at once — so a deploy doesn\'t succeed while the site breaks.') }}</p>
+                    <ul class="mt-3 space-y-2">
+                        @foreach ($pipelineSuggestions as $sug)
+                            <li class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-indigo-200/70 bg-white/70 px-3 py-2">
+                                <div class="min-w-0 flex-1">
+                                    <p class="flex items-center gap-1.5 text-sm font-semibold text-brand-ink">
+                                        {{ $sug['label'] }}
+                                        @if ($sug['priority'] === 'high')
+                                            <span class="rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-rose-700">{{ __('recommended') }}</span>
+                                        @endif
+                                        <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 font-mono text-[10px] text-brand-moss">{{ $sug['phase'] }}</span>
+                                    </p>
+                                    <p class="mt-0.5 text-xs text-brand-moss">{{ $sug['reason'] }}@if ($sug['command']) <span class="font-mono text-brand-ink/70">· {{ $sug['command'] }}</span>@endif</p>
+                                </div>
+                                @if (method_exists($this, 'addDeployPipelineStepFromPalette'))
+                                    <button
+                                        type="button"
+                                        wire:click="addDeployPipelineStepFromPalette(@js($sug['step_type']), null, @js($sug['phase']), @js($sug['command']))"
+                                        wire:loading.attr="disabled"
+                                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:opacity-60"
+                                    >
+                                        <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                                        {{ __('Add to pipeline') }}
+                                    </button>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                    <button type="button" wire:click="setTab('pipeline')" class="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 hover:underline">
+                        <x-heroicon-o-pencil-square class="h-3 w-3" />
+                        {{ __('Edit the full pipeline') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
+
     <section class="dply-card overflow-hidden">
         <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:px-8">
             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
@@ -215,6 +279,14 @@
                     <x-heroicon-o-queue-list class="h-3.5 w-3.5" />
                     {{ __('Queue deploy') }}
                 </button>
+                @if (method_exists($this, 'optimizePipeline'))
+                    <button type="button" wire:click="optimizePipeline" wire:loading.attr="disabled" wire:target="optimizePipeline" class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-2 text-xs font-semibold text-indigo-700 shadow-sm transition-colors hover:bg-indigo-100 disabled:opacity-60" title="{{ __('Read package.json / composer.json on the server and add every deploy step the repo needs.') }}">
+                        <x-heroicon-o-sparkles class="h-3.5 w-3.5" wire:loading.remove wire:target="optimizePipeline" />
+                        <span wire:loading wire:target="optimizePipeline" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
+                        <span wire:loading.remove wire:target="optimizePipeline">{{ __('Optimize pipeline') }}</span>
+                        <span wire:loading wire:target="optimizePipeline">{{ __('Scanning…') }}</span>
+                    </button>
+                @endif
             </div>
         </div>
 
@@ -367,12 +439,14 @@
                             @if ($phase['steps'] !== [])
                                 <ul class="mt-2 space-y-1 pl-11">
                                     @foreach ($phase['steps'] as $step)
-                                        @php($stepFailed = ! $step['ok'] && ! $step['skipped'])
+                                        @php($stepFailed = ! $step['ok'] && ! $step['skipped'] && ! ($step['pending'] ?? false))
                                         <li>
                                             <div class="flex items-center gap-2 text-xs">
                                                 <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold {{ $step['glyph_classes'] }}">{{ $step['glyph'] }}</span>
-                                                <span class="min-w-0 truncate {{ $stepFailed ? 'font-medium text-rose-800' : 'text-brand-ink' }}">{{ $step['label'] }}</span>
-                                                @if ($step['skipped'])
+                                                <span class="min-w-0 truncate {{ $stepFailed ? 'font-medium text-rose-800' : (($step['pending'] ?? false) ? 'text-brand-mist' : 'text-brand-ink') }}">{{ $step['label'] }}</span>
+                                                @if ($step['pending'] ?? false)
+                                                    <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-brand-moss">{{ __('queued') }}</span>
+                                                @elseif ($step['skipped'])
                                                     <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-amber-900">{{ __('skipped') }}</span>
                                                 @elseif ($step['duration_ms'] > 0)
                                                     <span class="font-mono text-brand-mist">{{ $step['duration_ms'] >= 1000 ? number_format($step['duration_ms'] / 1000, 1).'s' : $step['duration_ms'].'ms' }}</span>

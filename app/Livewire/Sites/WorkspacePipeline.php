@@ -129,6 +129,23 @@ class WorkspacePipeline extends Show
     }
 
     /**
+     * Switch the site to atomic (zero-downtime) deploys in place. Wired from the
+     * Pipeline review "Enable zero downtime" fix so the simple-deploy-migrations
+     * warning resolves without sending the user to the Rollout tab.
+     */
+    public function enableZeroDowntimeDeploys(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $this->site->update(['deploy_strategy' => 'atomic']);
+        $this->site->refresh();
+        $this->deploy_strategy = (string) ($this->site->deploy_strategy ?? 'simple');
+        $this->zero_downtime_enabled = $this->deploy_strategy === 'atomic';
+
+        $this->toastSuccess(__('Zero-downtime (atomic) deploys enabled.'));
+    }
+
+    /**
      * @return list<string>
      */
     protected function pipelineUnsavedTargetFields(): array

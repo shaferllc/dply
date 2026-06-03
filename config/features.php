@@ -48,6 +48,17 @@
 return [
 
     /*
+    | Beta bundle — NOT a flag namespace. The list of per-org Pennant overrides
+    | applied at beta-invite redemption (see BetaInvitation::redeem). Curate
+    | "what beta orgs get to see" here without touching redemption code. Global
+    | defaults for these flags stay off, so non-beta orgs are unaffected.
+    | FeatureServiceProvider skips this reserved key when registering flags.
+    */
+    'beta_bundle' => [
+        'surface.managed_servers',
+    ],
+
+    /*
     | Cloud providers. MVP ships DigitalOcean + Hetzner + Linode globally;
     | Vultr, UpCloud, Scaleway, and AWS stay per-org gated for design partners.
     */

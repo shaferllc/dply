@@ -73,8 +73,12 @@ class OrganizationBillingStateComputer
                 $tierQuantities[$tier] = ($tierQuantities[$tier] ?? 0) + 1;
             });
 
-        $managedServerCount = $managedServers->count();
-        $managedServerSubtotalCents = $this->serverResourceCalculator->subtotalCents($managedServers);
+        // Comped managed servers (the beta free-CX22 grant, support credits) are
+        // excluded from both the billed count and subtotal — the localized comp
+        // decision lives on Server::isComped() / the comped_until column.
+        $billableManagedServers = $managedServers->reject(fn (Server $server) => $server->isComped());
+        $managedServerCount = $billableManagedServers->count();
+        $managedServerSubtotalCents = $this->serverResourceCalculator->subtotalCents($billableManagedServers);
 
         $serverlessCount = 0;
         $cloudCount = 0;
@@ -152,6 +156,13 @@ class OrganizationBillingStateComputer
 
         // The flat plan is chosen by billable BYO server count; size only
         // feeds the display-only breakdown carried in $tierQuantities.
+        // The canonical fleet bill carries the TRUE plan price (chosen by BYO
+        // server count) even for beta orgs — it's what "subscribe early" charges
+        // and what the fleet preview shows as post-beta value. The beta $0
+        // experience is a lifecycle/display concern, not baked in here: beta
+        // orgs simply have no Stripe subscription and are never paused (see
+        // Organization::trialState / betaFeeWaived). The free CX22 is the one
+        // genuine waiver and is already excluded above via comped_until.
         $serverCount = array_sum($tierQuantities);
         $plan = $this->planResolver->resolveForServerCount($serverCount);
 

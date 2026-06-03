@@ -5,7 +5,13 @@
     $monthlyCents = (int) ($this->billingState->monthlyTotalCents ?? 0);
     $intervalLabel = $this->subscriptionInterval === 'year' ? __('billed annually') : __('billed monthly');
 
-    if ($this->onGracePeriod) {
+    $betaFeeWaived = $this->organization->betaFeeWaived();
+
+    if ($betaFeeWaived) {
+        $statusTone = 'success';
+        $statusLabel = __('Beta');
+        $statusSub = __('$0 — nothing due');
+    } elseif ($this->onGracePeriod) {
         $statusTone = 'warning';
         $statusLabel = __('Cancelled');
         $statusSub = $this->subscriptionEndsAt ? __('Access until :date', ['date' => $this->subscriptionEndsAt->toFormattedDateString()]) : __('In grace period');
@@ -68,6 +74,26 @@
          }">
         <x-organization-shell :organization="$organization" section="billing">
             <x-livewire-validation-errors />
+
+            @if ($betaFeeWaived)
+                <div class="mb-6 rounded-2xl border border-brand-gold/30 bg-brand-gold/8 px-5 py-4">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="min-w-0">
+                            <p class="flex items-center gap-2 text-sm font-semibold text-brand-ink">
+                                <x-heroicon-o-sparkles class="h-4 w-4 shrink-0 text-brand-gold" aria-hidden="true" />
+                                {{ __('You’re in the dply beta — $0, nothing due') }}
+                            </p>
+                            <p class="mt-1 text-sm text-brand-moss">
+                                {{ __('Your platform fee is waived and your dply-managed server is on us during the beta. Connect your own cloud servers free. Need more servers, or want to lock in early? Subscribe any time below — your free managed server stays free.') }}
+                            </p>
+                        </div>
+                        <button type="button" wire:click="subscribeStandard('month')" wire:loading.attr="disabled" wire:target="subscribeStandard"
+                                class="shrink-0 inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink hover:border-brand-sage/40 disabled:opacity-60">
+                            {{ __('Subscribe early') }}
+                        </button>
+                    </div>
+                </div>
+            @endif
 
             <x-breadcrumb-trail :items="[
                 ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],

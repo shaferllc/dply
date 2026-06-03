@@ -66,6 +66,12 @@ return [
             'failed' => 'The fix did not complete — see the output.',
             'stale' => 'Fix did not finish.',
         ],
+        'pipeline_optimize' => [
+            'running' => 'Reading package.json / composer.json on :host …',
+            'completed' => 'Pipeline optimized.',
+            'failed' => 'Pipeline optimize did not complete — see the output.',
+            'stale' => 'Pipeline optimize did not finish.',
+        ],
         'ssl' => [
             'running' => 'Issuing SSL certificate on :host …',
             'completed' => 'SSL certificate issued.',

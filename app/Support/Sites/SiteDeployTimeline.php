@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Support\Sites;
 
 use App\Models\Site;
+use App\Models\SiteDeployHook;
 use App\Models\SiteDeployment;
+use App\Models\SiteDeployStep;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 /**
@@ -47,10 +50,44 @@ final class SiteDeployTimeline
             }
         }
 
+        $finished = $latest !== null && in_array($latest->status, [SiteDeployment::STATUS_SUCCESS, SiteDeployment::STATUS_FAILED], true);
+        // Preview configured steps (as "queued") while a deploy is pending or
+        // running and a phase hasn't recorded yet, so the whole pipeline shows.
+        $previewing = $latest === null || ! $finished;
+
+        $configuredByPhase = $site->deploySteps()->get()->groupBy(static fn ($s): string => (string) $s->phase);
+        $hooksByPhase = self::hooksByPhase($site);
+
+        // Show EVERY canonical phase with its status — clone → build → activate
+        // → release — so the full pipeline and all statuses are always visible.
         $phases = [];
         foreach (self::PHASES as $key => $label) {
             $recorded = $latest !== null && $latest->hasPhase($key);
             $steps = $recorded ? $latest->phaseSteps($key) : [];
+            $configured = $configuredByPhase->get($key) ?? collect();
+            $hooks = $hooksByPhase->get($key) ?? collect();
+
+            $status = self::statusFor($recorded, $steps, $running, $runningPhase === $key);
+            // A phase that recorded with no steps still ran — show it as done on
+            // a finished deploy rather than a stuck "skipped".
+            if ($recorded && $steps === [] && $status === 'skipped' && $finished) {
+                $status = 'success';
+            }
+
+            $items = array_map(static fn (array $step): array => self::stepView($latest, $step), $steps);
+
+            // Not recorded yet but configured → preview the upcoming steps so the
+            // pipeline reads as a plan, not a blank phase.
+            if ($steps === [] && $previewing && $configured->isNotEmpty()) {
+                foreach ($configured as $cfg) {
+                    $items[] = self::configuredStepView($cfg);
+                }
+            }
+
+            foreach ($hooks as $hook) {
+                $items[] = self::hookView($hook, $status, $previewing);
+            }
+
             $durationMs = 0;
             foreach ($steps as $step) {
                 $durationMs += (int) ($step['duration_ms'] ?? 0);
@@ -59,13 +96,95 @@ final class SiteDeployTimeline
             $phases[] = [
                 'key' => $key,
                 'label' => __($label),
-                'status' => self::statusFor($recorded, $steps, $running, $runningPhase === $key),
+                'status' => $status,
                 'duration_ms' => $durationMs,
-                'steps' => array_map(static fn (array $step): array => self::stepView($latest, $step), $steps),
+                'steps' => $items,
             ];
         }
 
         return $phases;
+    }
+
+    /**
+     * A configured-but-not-yet-run pipeline step rendered as a "queued" item.
+     *
+     * @return array<string, mixed>
+     */
+    private static function configuredStepView(SiteDeployStep $step): array
+    {
+        $type = (string) $step->step_type;
+        $label = $type === SiteDeployStep::TYPE_CUSTOM
+            ? (filled($step->custom_command) ? Str::limit((string) $step->custom_command, 60) : __('Custom command'))
+            : Str::headline($type);
+
+        return [
+            'label' => $label,
+            'step_type' => $type,
+            'duration_ms' => 0,
+            'skipped' => false,
+            'ok' => false,
+            'pending' => true,
+            'output' => '',
+            'glyph' => '·',
+            'glyph_classes' => 'bg-brand-sand/60 text-brand-ink',
+        ];
+    }
+
+    /**
+     * Configured deploy hooks bucketed into the canonical phase they fire
+     * around, so they can be listed alongside that phase's steps.
+     *
+     * @return Collection<string, Collection<int, SiteDeployHook>>
+     */
+    private static function hooksByPhase(Site $site): Collection
+    {
+        $map = collect(array_fill_keys(array_keys(self::PHASES), null))
+            ->map(static fn () => collect());
+
+        foreach ($site->deployHooks()->with('anchorStep')->get() as $hook) {
+            $phase = match ($hook->anchor) {
+                SiteDeployHook::ANCHOR_BEFORE_CLONE, SiteDeployHook::ANCHOR_AFTER_CLONE => 'clone',
+                SiteDeployHook::ANCHOR_BEFORE_ACTIVATE, SiteDeployHook::ANCHOR_AFTER_ACTIVATE => 'activate',
+                SiteDeployHook::ANCHOR_AFTER_STEP => (string) ($hook->anchorStep?->phase ?: 'build'),
+                default => 'build',
+            };
+            if (! $map->has($phase)) {
+                $map->put($phase, collect());
+            }
+            $map->get($phase)->push($hook);
+        }
+
+        return $map;
+    }
+
+    /**
+     * A configured hook rendered as a timeline item. Hooks aren't recorded as
+     * their own step results (their output folds into the adjacent step), so
+     * status is inferred from the phase: ran when the phase succeeded, shown as
+     * not-run otherwise. Never rendered as "failed".
+     *
+     * @return array<string, mixed>
+     */
+    private static function hookView(SiteDeployHook $hook, string $phaseStatus, bool $previewing = false): array
+    {
+        $ran = $phaseStatus === 'success';
+        $pending = ! $ran && $previewing;
+        $label = $hook->pillLabel();
+        if (filled($hook->label)) {
+            $label .= ' · '.$hook->label;
+        }
+
+        return [
+            'label' => $label,
+            'step_type' => 'hook',
+            'duration_ms' => 0,
+            'skipped' => ! $ran && ! $pending,
+            'ok' => $ran,
+            'pending' => $pending,
+            'output' => '',
+            'glyph' => $ran ? '✓' : '·',
+            'glyph_classes' => $ran ? 'bg-emerald-100 text-emerald-800' : 'bg-brand-sand/60 text-brand-ink',
+        ];
     }
 
     /**
@@ -108,6 +227,7 @@ final class SiteDeployTimeline
             'duration_ms' => (int) ($step['duration_ms'] ?? 0),
             'skipped' => ($step['skipped'] ?? false) === true,
             'ok' => ($step['ok'] ?? false) === true,
+            'pending' => false,
             'output' => trim((string) ($step['output'] ?? '')),
             'glyph' => $latest?->stepGlyph($step) ?? '·',
             'glyph_classes' => $latest?->stepClasses($step) ?? 'bg-brand-sand/60 text-brand-ink',

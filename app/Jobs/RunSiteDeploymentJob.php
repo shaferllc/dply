@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\ConsoleAction;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\SiteDeploymentEphemeralCredential;
@@ -217,6 +218,23 @@ class RunSiteDeploymentJob implements ShouldQueue
                 // deployed code so the Environment tab can flag missing keys.
                 if ($this->site->server?->hostCapabilities()->supportsEnvPushToHost()) {
                     ScanSiteEnvRequirementsJob::dispatch($this->site->id);
+                }
+                // Post-deploy verification — ALWAYS runs after a VM deploy: a
+                // deploy can report success while the live app 500s (missing
+                // build, migrations, …). Run the health check + smart-fix
+                // detection so a degraded deploy surfaces its cause and
+                // one-click fixes automatically.
+                if ($this->site->server?->isVmHost()) {
+                    $verifyRun = ConsoleAction::query()->create([
+                        'subject_type' => $this->site->getMorphClass(),
+                        'subject_id' => $this->site->id,
+                        'kind' => 'site_test',
+                        'status' => ConsoleAction::STATUS_QUEUED,
+                        'label' => 'Verifying deploy',
+                        'user_id' => 0,
+                        'output' => ['v' => (int) config('console_actions.current_version', 1), 'lines' => []],
+                    ]);
+                    TestSiteHealthJob::dispatch((string) $verifyRun->id, (string) $this->site->id);
                 }
             } catch (\Throwable $e) {
                 $msg = DeployLogRedactor::redact($e->getMessage());

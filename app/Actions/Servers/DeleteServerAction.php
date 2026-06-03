@@ -100,7 +100,9 @@ final class DeleteServerAction
             // dply-owned VM keeps costing us money after cancellation.
             $hetzner = null;
             if ($server->usesManagedHosting()) {
-                $platform = ServerHostingPlatformContext::fromConfig();
+                // Tear down in the same project it was provisioned in — beta
+                // boxes live in the isolated beta project.
+                $platform = ServerHostingPlatformContext::forOrg($server->organization);
                 if ($platform->configured()) {
                     $hetzner = $platform->hetzner();
                 }

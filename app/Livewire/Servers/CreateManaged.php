@@ -9,6 +9,7 @@ use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Services\Billing\ServerResourceCostCalculator;
 use App\Support\Servers\ServerHostingPlatformContext;
 use Illuminate\Contracts\View\View;
+use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -40,6 +41,17 @@ class CreateManaged extends Component
 
         $this->region = (string) (array_key_first((array) config('managed_servers.regions', [])) ?? 'fsn1');
         $this->size = (string) (collect((array) config('managed_servers.sizes', []))->first()['slug'] ?? 'cx22');
+
+        // Beta's free box is pinned to CX22 — preselect it; the view hides the
+        // size picker and shows "Free during beta".
+        if ($this->isBetaOrg()) {
+            $this->size = (string) config('subscription.standard.beta.managed_size', 'cx22');
+        }
+    }
+
+    private function isBetaOrg(): bool
+    {
+        return (bool) auth()->user()?->currentOrganization()?->isBeta();
     }
 
     public function managedAvailable(): bool
@@ -66,6 +78,12 @@ class CreateManaged extends Component
                 'size' => $this->size,
                 'install_profile' => $this->install_profile,
             ]);
+        } catch (ValidationException $e) {
+            // Surface the actionable message (verify email / grant used / not
+            // configured) rather than swallowing it as a generic error.
+            $this->toastError($e->validator->errors()->first());
+
+            return null;
         } catch (Throwable $e) {
             report($e);
             $this->toastError(__('We could not start that server. Please try again.'));
@@ -92,11 +110,19 @@ class CreateManaged extends Component
 
         $selectedMonthlyCents = $calculator->monthlyCentsForSize($this->size);
 
+        $org = auth()->user()?->currentOrganization();
+        $isBeta = (bool) $org?->isBeta();
+
         return view('livewire.servers.create-managed', [
             'regions' => (array) config('managed_servers.regions', []),
             'sizes' => $sizes,
             'profiles' => (array) config('server_provision_options.install_profiles', []),
             'selectedMonthlyCents' => $selectedMonthlyCents,
+            // Beta context: the box is free (comped until cutover) and pinned to
+            // CX22; once the single grant is used the create flow is disabled.
+            'isBeta' => $isBeta,
+            'betaGrantUsed' => $isBeta && $org !== null && ! $org->canCreateManagedServer(),
+            'emailVerified' => (bool) auth()->user()?->hasVerifiedEmail(),
         ]);
     }
 }

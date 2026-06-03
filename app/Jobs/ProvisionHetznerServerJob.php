@@ -45,7 +45,9 @@ class ProvisionHetznerServerJob implements ShouldQueue
             return;
         }
 
-        $platform = $managed ? ServerHostingPlatformContext::fromConfig() : null;
+        // forOrg() routes beta orgs' free boxes to the isolated beta Hetzner
+        // project (blast-radius containment); falls back to the primary project.
+        $platform = $managed ? ServerHostingPlatformContext::forOrg($this->server->organization) : null;
         if ($managed && ! $platform->configured()) {
             $this->markFailed('dply-managed servers are not configured. Set DPLY_MANAGED_HETZNER_API_TOKEN in the environment.');
 

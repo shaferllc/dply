@@ -21,6 +21,22 @@ return [
     ],
 
     /*
+    | Beta blast-radius isolation. The free CX22s handed to beta orgs run in a
+    | SEPARATE Hetzner project (its own API token) from Edge / production-managed
+    | infra. A single abuser (crypto mining, spam, outbound DDoS from a free box)
+    | can get a whole Hetzner project flagged or suspended — isolating beta turns
+    | a catastrophic "every managed server down" incident into a contained
+    | "beta project suspended" one. When the beta token is unset, beta managed
+    | servers fall back to the primary `hetzner` project above (fine for local /
+    | fake-cloud dev). Selected per-org by ServerHostingPlatformContext::forOrg().
+    */
+    'beta_hetzner' => [
+        'api_token' => env('DPLY_MANAGED_BETA_HETZNER_API_TOKEN'),
+        'default_region' => env('DPLY_MANAGED_BETA_HETZNER_REGION', 'fsn1'),
+        'default_image' => env('DPLY_MANAGED_BETA_HETZNER_IMAGE', 'ubuntu-24.04'),
+    ],
+
+    /*
     | Curated set of Hetzner sizes dply offers as managed servers. We do NOT hit
     | the live Hetzner catalog at create time (it needs the platform token and
     | would expose every size) — instead we offer a vetted shortlist. The slug

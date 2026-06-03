@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace App\Livewire\Sites;
 
 use App\Jobs\RunSiteDeploymentJob;
+use App\Jobs\RunSiteFixerJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Sites\Concerns\ManagesSiteDeployExecution;
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
+use App\Support\Sites\SiteFixers;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
@@ -33,6 +36,11 @@ class DeployControl extends Component
     public ?Site $site = null;
 
     public ?Server $server = null;
+
+    /** Console-action id + fixer key of a smart-fix running from the drawer. */
+    public ?string $fixerRunId = null;
+
+    public ?string $fixerRunKey = null;
 
     public function mount(): void
     {
@@ -89,6 +97,50 @@ class DeployControl extends Component
 
         $this->toastSuccess(__('Deployment queued — watch the console.'));
         $this->dispatch('deploy-console-open');
+    }
+
+    /**
+     * Run a smart fixer detected from the failed deploy output (e.g. "npm not
+     * found" → Install Node.js & npm), right from the deploy console. The fix
+     * streams to the page-top console banner; after it finishes, re-deploy.
+     */
+    public function runFixer(string $key): void
+    {
+        if ($this->site === null) {
+            return;
+        }
+        Gate::authorize('update', $this->site);
+
+        $spec = SiteFixers::spec($key);
+        if ($spec === null) {
+            return;
+        }
+
+        $run = ConsoleAction::query()->create([
+            'subject_type' => $this->site->getMorphClass(),
+            'subject_id' => $this->site->id,
+            'kind' => 'site_remediate',
+            'status' => ConsoleAction::STATUS_QUEUED,
+            'label' => (string) $spec['label'],
+            'user_id' => auth()->id() ?? 0,
+            'output' => ['v' => (int) config('console_actions.current_version', 1), 'lines' => []],
+        ]);
+
+        RunSiteFixerJob::dispatch((string) $run->id, (string) $this->site->id, $key);
+
+        $this->fixerRunId = (string) $run->id;
+        $this->fixerRunKey = $key;
+        $this->dispatch('deploy-console-open');
+    }
+
+    /**
+     * The console-action of the smart-fix currently (or last) run from the
+     * drawer, so its live output can stream inline.
+     */
+    #[Computed]
+    public function fixerRun(): ?ConsoleAction
+    {
+        return $this->fixerRunId ? ConsoleAction::query()->find($this->fixerRunId) : null;
     }
 
     public function render()
