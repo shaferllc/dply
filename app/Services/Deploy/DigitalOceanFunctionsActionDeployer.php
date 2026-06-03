@@ -168,15 +168,18 @@ final class DigitalOceanFunctionsActionDeployer
 
         $functionsConfig = $site->serverlessConfig();
 
-        // Keep the last few artifacts so a bad deploy can be rolled back to a
-        // known-good one without rebuilding.
+        // Keep the operator-configured number of artifacts so a bad deploy can
+        // be rolled back to a known-good one without rebuilding. `releases_to_keep`
+        // is the same keep-count knob VM deploys use (1–50, default 5) — respect
+        // it so people who raise it don't lose rollback targets.
+        $keep = max(1, min(50, (int) ($site->releases_to_keep ?? 5)));
         $history = is_array($functionsConfig['artifact_history'] ?? null) ? $functionsConfig['artifact_history'] : [];
         array_unshift($history, [
             'artifact_path' => $realArtifactPath,
             'revision_id' => $revisionId,
             'deployed_at' => now()->toIso8601String(),
         ]);
-        $history = array_slice($history, 0, 5);
+        $history = array_slice($history, 0, $keep);
 
         $siteMeta['serverless'] = array_merge($functionsConfig, [
             'target' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
@@ -195,6 +198,17 @@ final class DigitalOceanFunctionsActionDeployer
         ]);
 
         $site->forceFill(['meta' => $siteMeta])->save();
+
+        // Local cleanup: keep only the retained rollback set on disk so the
+        // artifact dir stops growing by one zip per deploy. Keyed strictly off
+        // the history we just saved — every rollback-listed zip stays, so no
+        // rollback breaks. Best-effort; never fail a completed deploy on it.
+        try {
+            $this->artifactBuilder->pruneArtifactsExcept($site, array_column($history, 'artifact_path'));
+        } catch (\Throwable) {
+            // ignore — the daily prune is the backstop
+        }
+
         $this->revisionTracker->markApplied($site->fresh(), $this->contractBuilder->build($site->fresh())->revision(), 'runtime');
 
         // Point the function's friendly hostname ({slug}.{testing-domain}) at

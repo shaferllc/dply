@@ -68,8 +68,8 @@
                             'h-10 sm:h-11' => auth()->check(),
                             'h-14 sm:h-16 lg:h-[4.25rem]' => ! auth()->check(),
                         ])
-                        width="120"
-                        height="136"
+                        width="148"
+                        height="96"
                     />
                 </a>
                 @auth

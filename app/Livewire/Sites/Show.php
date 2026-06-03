@@ -12,6 +12,7 @@ use App\Jobs\IssueSiteSslJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Jobs\PushSiteEnvJob;
 use App\Jobs\RemoveSiteRepositoryJob;
+use App\Jobs\ScanSiteEnvRequirementsJob;
 use App\Jobs\SyncEnvFromServerJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
@@ -256,6 +257,15 @@ class Show extends Component
      * Stored on the Site row's `env_file_path` column when saved.
      */
     public string $env_file_path_override = '';
+
+    /**
+     * Modal inputs for the "Add missing variables" flow, keyed by the missing
+     * required env KEY. Pre-seeded from the scanner's .env.example samples when
+     * the modal opens; only non-empty entries are written on submit.
+     *
+     * @var array<string, string>
+     */
+    public array $missing_env_values = [];
 
     public string $new_redirect_from = '';
 
@@ -1924,6 +1934,123 @@ class Show extends Component
             return;
         }
         $this->revealed_env_keys[] = $key;
+    }
+
+    /**
+     * Re-scan the deployed code for required env vars. SSH-bound, so it runs
+     * as a backgrounded job whose progress streams to the console banner —
+     * same shape as Sync from server. Each deploy also refreshes this list
+     * automatically; this is the manual escape hatch.
+     */
+    public function rescanEnvRequirements(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->server->hostCapabilities()->supportsEnvPushToHost()) {
+            $this->toastError(__('This host runtime has no on-disk code to scan.'));
+
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('env_scan');
+
+        ScanSiteEnvRequirementsJob::dispatch(
+            $this->site->id,
+            (string) (auth()->id() ?? ''),
+            (string) $run->id,
+        );
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction($run, __('Environment requirements re-scanned.'), __('Environment scan did not finish.'));
+        $this->toastConsoleActionQueued();
+    }
+
+    /**
+     * Open the "Add missing variables" modal, seeding each input with the
+     * .env.example sample value (if any) so the operator can confirm or edit
+     * rather than type from scratch.
+     */
+    public function openMissingEnvModal(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $present = $this->presentNonEmptyEnvKeys();
+        $inherited = $this->site->workspace?->variables->pluck('env_key')->map(fn ($k) => (string) $k)->all() ?? [];
+
+        $seed = [];
+        foreach ($this->site->missingRequiredEnvKeys($present, $inherited) as $entry) {
+            $seed[$entry['key']] = (string) ($entry['example'] ?? '');
+        }
+        $this->missing_env_values = $seed;
+
+        $this->dispatch('open-modal', 'add-missing-env-modal');
+    }
+
+    /**
+     * Bulk-add the still-missing required keys the operator filled in via the
+     * modal. Blank inputs are skipped (they can be added later); the rest merge
+     * into the env cache and auto-push, reusing the same write path as
+     * addEnvVar / bulkImport.
+     */
+    public function addMissingEnvVars(DotEnvFileParser $parser, DotEnvFileWriter $writer): void
+    {
+        $this->authorize('update', $this->site);
+
+        $additions = [];
+        foreach ($this->missing_env_values as $key => $value) {
+            $key = trim((string) $key);
+            $value = (string) $value;
+            if ($key === '' || ! preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $key) || trim($value) === '') {
+                continue;
+            }
+            $additions[$key] = $value;
+        }
+
+        if ($additions === []) {
+            $this->toastError(__('Enter a value for at least one variable.'));
+
+            return;
+        }
+
+        $parsed = $parser->parse((string) ($this->site->env_file_content ?? ''));
+        $map = array_merge($parsed['variables'], $additions);
+
+        $this->site->forceFill([
+            'env_file_content' => $writer->render($map, $parsed['comments']),
+            'env_cache_origin' => 'local-edit',
+        ])->save();
+
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.env.bulk_imported', $this->site, null, [
+                'imported_count' => count($additions),
+                'imported_keys' => array_keys($additions),
+            ]);
+        }
+
+        $this->missing_env_values = [];
+        $this->dispatch('close-modal', 'add-missing-env-modal');
+        $this->autoPushAfterCacheMutation(__(':count variable(s) added.', ['count' => count($additions)]));
+    }
+
+    /**
+     * Keys already set with a non-empty value in the env cache — used to work
+     * out which required keys are still missing.
+     *
+     * @return list<string>
+     */
+    private function presentNonEmptyEnvKeys(): array
+    {
+        $parsed = app(DotEnvFileParser::class)->parse((string) ($this->site->env_file_content ?? ''));
+
+        $keys = [];
+        foreach ($parsed['variables'] as $key => $value) {
+            if (trim((string) $value) !== '') {
+                $keys[] = (string) $key;
+            }
+        }
+
+        return $keys;
     }
 
     public function addRedirectRule(): void

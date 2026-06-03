@@ -2778,6 +2778,55 @@ class Site extends Model
         return rtrim($this->effectiveEnvDirectory(), '/').'/.env';
     }
 
+    /**
+     * The detected env-var requirements cached by {@see \App\Jobs\ScanSiteEnvRequirementsJob}
+     * (from .env.example + env() usages in code and config/). Empty until the
+     * first scan runs.
+     *
+     * @return array{scanned_at?: string, root?: string, example_path?: ?string, keys?: list<array<string, mixed>>}
+     */
+    public function envRequirements(): array
+    {
+        $req = $this->meta['env_requirements'] ?? null;
+
+        return is_array($req) ? $req : [];
+    }
+
+    /**
+     * Required env keys the site declares but that aren't satisfied — i.e. not
+     * present with a non-empty value in its .env cache and not inherited from
+     * the workspace. Drives the "missing variables" warning on the Environment
+     * tab. Only keys flagged `required` by the scanner are returned (config
+     * keys that always carry a default are advisory, not flagged).
+     *
+     * @param  list<string>  $presentKeys  keys already set with a non-empty value
+     * @param  list<string>  $inheritedKeys  workspace-inherited keys (also count as satisfied)
+     * @return list<array{key: string, sources: list<string>, required: bool, example: ?string}>
+     */
+    public function missingRequiredEnvKeys(array $presentKeys, array $inheritedKeys = []): array
+    {
+        $satisfied = array_flip([...$presentKeys, ...$inheritedKeys]);
+
+        $missing = [];
+        foreach (($this->envRequirements()['keys'] ?? []) as $entry) {
+            if (! is_array($entry) || ($entry['required'] ?? false) !== true) {
+                continue;
+            }
+            $key = (string) ($entry['key'] ?? '');
+            if ($key === '' || isset($satisfied[$key])) {
+                continue;
+            }
+            $missing[] = [
+                'key' => $key,
+                'sources' => array_values((array) ($entry['sources'] ?? [])),
+                'required' => true,
+                'example' => isset($entry['example']) ? (string) $entry['example'] : null,
+            ];
+        }
+
+        return $missing;
+    }
+
     public function isSuspended(): bool
     {
         return $this->suspended_at !== null;

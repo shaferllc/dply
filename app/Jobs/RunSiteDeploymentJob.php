@@ -13,6 +13,8 @@ use App\Services\Deploy\EphemeralDeployCredentialManager;
 use App\Services\Notifications\DeployDigestBuffer;
 use App\Services\Notifications\NotificationPublisher;
 use App\Services\Servers\ServerDeployPolicyGuard;
+use App\Services\Sites\DotEnvFileParser;
+use App\Services\Sites\SiteEnvReader;
 use App\Support\DeployLogRedactor;
 use App\Support\ProductLine\ProductLineKillSwitches;
 use Illuminate\Bus\Queueable;
@@ -173,6 +175,13 @@ class RunSiteDeploymentJob implements ShouldQueue
             }
 
             try {
+                // Fail fast (with a clear, actionable message) when the live
+                // .env is missing variables the code can't run without, rather
+                // than letting the build/activate succeed and the app 500 at
+                // runtime. The Deploy panel turns this failure into a fill-in
+                // prompt.
+                $this->assertRequiredEnvPresent($this->site);
+
                 $engine = $deployEngineResolver->forProject($this->site->project);
                 $result = $engine->run(new DeployContext(
                     project: $this->site->project,
@@ -204,6 +213,11 @@ class RunSiteDeploymentJob implements ShouldQueue
                     RunServerInsightsJob::dispatch($this->site->server_id);
                     RunSiteInsightsJob::dispatch($this->site->id);
                 }
+                // Refresh the detected env-var requirements from the freshly
+                // deployed code so the Environment tab can flag missing keys.
+                if ($this->site->server?->hostCapabilities()->supportsEnvPushToHost()) {
+                    ScanSiteEnvRequirementsJob::dispatch($this->site->id);
+                }
             } catch (\Throwable $e) {
                 $msg = DeployLogRedactor::redact($e->getMessage());
                 $deployment->update([
@@ -230,6 +244,82 @@ class RunSiteDeploymentJob implements ShouldQueue
             $lock->release();
             $this->clearIdempotencyInflight();
         }
+    }
+
+    /**
+     * Block the deploy when the live .env is missing variables the code can't
+     * run without (env('KEY') with no default — source 'code'). Reads the real
+     * server .env (truth, not the UI cache) and diffs it against the last
+     * scan's detected requirements. Records the offenders on the site so the
+     * Deploy panel can prompt the operator to fill them, then throws a clear
+     * message that surfaces as the deployment's failure reason.
+     *
+     * Conservative on purpose: hosts with no server .env, sites never scanned
+     * (e.g. their first deploy), and unreadable .env files all pass through —
+     * we only block when we're confident a required value is genuinely absent.
+     */
+    private function assertRequiredEnvPresent(Site $site): void
+    {
+        $server = $site->server;
+        if ($server === null || ! $server->hostCapabilities()->supportsEnvPushToHost()) {
+            return;
+        }
+
+        if (($site->envRequirements()['keys'] ?? []) === []) {
+            return;
+        }
+
+        try {
+            $envRaw = app(SiteEnvReader::class)->read($site);
+        } catch (\Throwable) {
+            return;
+        }
+
+        $parsed = app(DotEnvFileParser::class)->parse($envRaw);
+        $present = [];
+        foreach ($parsed['variables'] as $key => $value) {
+            if (trim((string) $value) !== '') {
+                $present[] = (string) $key;
+            }
+        }
+        $inherited = $site->workspace?->variables->pluck('env_key')->map(fn ($k) => (string) $k)->all() ?? [];
+
+        // Strict gate: only no-default env() references (source 'code'). Keys
+        // that only appear in .env.example or carry a config default are
+        // advisory and never block a deploy.
+        $missing = array_values(array_filter(
+            $site->missingRequiredEnvKeys($present, $inherited),
+            static fn (array $entry): bool => in_array('code', $entry['sources'], true),
+        ));
+
+        $meta = is_array($site->meta) ? $site->meta : [];
+
+        if ($missing === []) {
+            if (array_key_exists('deploy_blocked_env', $meta)) {
+                unset($meta['deploy_blocked_env']);
+                $site->forceFill(['meta' => $meta])->save();
+            }
+
+            return;
+        }
+
+        $meta['deploy_blocked_env'] = [
+            'at' => now()->toIso8601String(),
+            'keys' => array_map(
+                static fn (array $entry): array => ['key' => $entry['key'], 'example' => $entry['example']],
+                $missing,
+            ),
+        ];
+        $site->forceFill(['meta' => $meta])->save();
+
+        $names = array_map(static fn (array $entry): string => $entry['key'], $missing);
+        $shown = implode(', ', array_slice($names, 0, 12));
+        $more = count($names) > 12 ? ' (+'.(count($names) - 12).' more)' : '';
+
+        throw new \RuntimeException(
+            'Deployment blocked: the app requires environment variables that are not set: '
+            .$shown.$more.'. Add them on the Deploy panel (or Settings → Environment) and redeploy.'
+        );
     }
 
     protected function clearIdempotencyInflight(): void

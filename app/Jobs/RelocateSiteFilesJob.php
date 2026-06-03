@@ -75,7 +75,17 @@ class RelocateSiteFilesJob implements ShouldQueue
             $script = sprintf(
                 'mkdir -p %1$s && chown %4$s:%5$s %1$s && chmod 2750 %1$s && '
                 .'if [ -e %2$s ] && [ ! -e %3$s ]; then mv %2$s %3$s; else mkdir -p %3$s; fi && '
-                .'chown -R %4$s:%5$s %3$s && chmod -R g+rX %3$s',
+                .'chown -R %4$s:%5$s %3$s && chmod -R g+rX %3$s; '
+                // Laravel writes into storage/ and bootstrap/cache/ at runtime
+                // (logs, compiled views, caches, sessions) as the web-server
+                // user, so those two trees need to be group-WRITABLE — the
+                // blanket g+rX above only grants read. 2775 dirs / 664 files
+                // give the web group write, and the setgid bit keeps files the
+                // app writes later group-owned by the web group. Mirrors the
+                // writable-dir handling in
+                // ServerSystemUserService::resetSiteFilePermissions().
+                .'for d in storage bootstrap/cache; do p=%3$s/"$d"; [ -d "$p" ] || continue; '
+                .'find "$p" -type d -exec chmod 2775 {} + ; find "$p" -type f -exec chmod 664 {} + ; done',
                 escapeshellarg(dirname($new)),
                 escapeshellarg($old),
                 escapeshellarg($new),

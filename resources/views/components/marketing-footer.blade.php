@@ -2,17 +2,18 @@
     <div class="dply-page-shell py-12 lg:py-14">
         <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-10">
             <div class="max-w-sm">
-                <a href="{{ url('/') }}" class="inline-flex items-center gap-3">
+                <a href="{{ url('/') }}" class="inline-flex items-center gap-1.5">
                     {{-- Dark-background mark (inverse of the light header lockup): gold
-                         square + ink "d". The "dply" wordmark is the text span beside it. --}}
+                         square + ink "d". The mark's "d" is the word's first letter,
+                         so the wordmark beside it is "ply" (reads "dply"). --}}
                     <img
                         src="{{ asset('images/dply-mark-dark.svg') }}"
-                        alt=""
+                        alt="{{ config('app.name') }}"
                         class="h-9 w-9 shrink-0"
                         width="36"
                         height="36"
                     />
-                    <span class="text-lg font-semibold tracking-tight text-brand-cream">{{ config('app.name') }}</span>
+                    <span class="text-lg font-semibold tracking-tight text-brand-cream">ply</span>
                 </a>
                 <p class="mt-4 text-sm leading-relaxed text-brand-mist">
                     Infrastructure control for teams that ship. Start with a real trial on your own servers, then move to flat organization pricing when you are ready to standardize.

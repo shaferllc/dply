@@ -7,6 +7,8 @@ namespace App\Livewire\Sites;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
+use App\Support\Docs\ContextualDocResolver;
+use App\Support\Sites\SiteWorkspaceBreadcrumbs;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
@@ -69,12 +71,32 @@ class DeploymentDetail extends Component
 
         $runtimeMode = $this->site->runtimeTargetMode();
 
+        // Build only the chrome this view actually uses — the Deploy sidebar,
+        // the workspace breadcrumb trail, and the per-deployment content.
+        // (Deliberately NOT SiteSettingsViewData::for(): that assembles ~130
+        // view vars for the full settings workspace, almost none of which
+        // this page touches.)
+        $breadcrumbs = SiteWorkspaceBreadcrumbs::items($this->server, $this->site, __('Deploy'), 'rocket-launch');
+        // Link the trailing "Deploy" crumb back to the deploy hub…
+        $lastKey = array_key_last($breadcrumbs);
+        $breadcrumbs[$lastKey]['href'] = route('sites.deployments.index', [
+            'server' => $this->server,
+            'site' => $this->site,
+            'tab' => 'history',
+        ]);
+        // …then add this deployment as the current (non-linked) crumb.
+        $breadcrumbs[] = [
+            'label' => $this->deployment->id,
+            'icon' => 'rocket-launch',
+        ];
+
         return view('livewire.sites.deployment-detail', [
             'phaseResults' => $phaseResults,
             'phases' => $phases,
-            // Sidebar context — keeps the workspace nav visible so operators
-            // can pivot between deployment history and the rest of the site.
+            // Deploy workspace chrome (sidebar + breadcrumb trail).
             'settingsSidebarItems' => SiteSettingsSidebar::items($this->site, $this->server),
+            'settingsBreadcrumbs' => $breadcrumbs,
+            'contextualDocSlug' => app(ContextualDocResolver::class)->resolveForSiteSection($this->site, 'deploy'),
             'resourceNoun' => $runtimeMode === 'vm' ? __('Site') : __('App'),
             'resourcePlural' => $runtimeMode === 'vm' ? __('sites') : __('apps'),
             'routingTab' => 'domains',

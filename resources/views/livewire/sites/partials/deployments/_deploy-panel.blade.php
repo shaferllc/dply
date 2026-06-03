@@ -12,6 +12,10 @@
     // Phase timeline derived from the site's pipeline (Clone → Build →
     // Activate → Release) overlaid with this deployment's recorded steps.
     $timelinePhases = \App\Support\Sites\SiteDeployTimeline::forDeployment($site, $latest);
+
+    // Env vars the last deploy was blocked on (recorded by the deploy job's
+    // preflight). Non-empty → the deploy stopped early asking for these.
+    $blockedEnv = $this->deployBlockedEnvKeys();
 @endphp
 
 <div class="space-y-6" @if ($deployInProgress) wire:poll.5s @endif>
@@ -31,6 +35,85 @@
                 class="mt-2 text-xs font-semibold text-amber-900 underline hover:text-amber-700"
             >{{ __('Clear lock') }}</button>
         </div>
+    @endif
+
+    {{-- Deploy blocked on missing env. The deploy job's preflight reads the
+         live .env and stops early when a required (no-default) variable is
+         absent, recording the offenders here. Prompt the operator to fill them
+         inline rather than letting the build succeed and the app 500. --}}
+    @if ($blockedEnv !== [])
+        <div class="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="flex min-w-0 items-start gap-3">
+                    <x-heroicon-o-exclamation-triangle class="mt-0.5 h-5 w-5 shrink-0 text-rose-700" aria-hidden="true" />
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-rose-900">
+                            {{ trans_choice('{1} Deploy needs :count environment variable|[2,*] Deploy needs :count environment variables', count($blockedEnv), ['count' => count($blockedEnv)]) }}
+                        </p>
+                        <p class="mt-1 text-sm text-rose-800">{{ __('The last deploy stopped because the app requires these and they aren\'t set. Add them, then deploy again.') }}</p>
+                        <div class="mt-2 flex flex-wrap gap-1.5">
+                            @foreach (array_slice($blockedEnv, 0, 24) as $entry)
+                                <span class="inline-flex items-center rounded-full bg-white px-2 py-0.5 font-mono text-[11px] font-semibold text-rose-800 ring-1 ring-inset ring-rose-200">{{ $entry['key'] }}</span>
+                            @endforeach
+                            @if (count($blockedEnv) > 24)
+                                <span class="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-800">{{ __('+:count more', ['count' => count($blockedEnv) - 24]) }}</span>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    wire:click="openMissingEnvModal"
+                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-rose-800"
+                >
+                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                    {{ __('Add variables') }}
+                </button>
+            </div>
+        </div>
+
+        <x-modal name="deploy-missing-env-modal" maxWidth="2xl" overlayClass="bg-brand-ink/40">
+            <div class="relative border-b border-brand-ink/10 px-6 py-5">
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-rose-700">{{ __('Required variables') }}</p>
+                <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Add the missing variables') }}</h2>
+                <p class="mt-2 pr-10 text-sm leading-6 text-brand-moss">
+                    {{ __('The deploy needs these to run. Fill in the ones you have — blanks are skipped. They\'re saved to the Environment section and pushed to the server.') }}
+                </p>
+                <button
+                    type="button"
+                    x-on:click="$dispatch('close')"
+                    class="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist transition-colors hover:bg-brand-sand/40 hover:text-brand-ink focus:outline-none focus:ring-2 focus:ring-brand-sage/40"
+                    aria-label="{{ __('Close') }}"
+                >
+                    <x-heroicon-o-x-mark class="h-5 w-5" />
+                </button>
+            </div>
+            <div class="max-h-[60vh] overflow-y-auto px-6 py-6">
+                <form wire:submit="addMissingEnvVars" id="deploy-missing-env-form" class="space-y-3">
+                    @foreach ($blockedEnv as $entry)
+                        <div wire:key="blocked-env-{{ md5($entry['key']) }}">
+                            <label class="block font-mono text-xs font-semibold text-brand-ink" for="blocked_env_{{ md5($entry['key']) }}">{{ $entry['key'] }}</label>
+                            <input
+                                id="blocked_env_{{ md5($entry['key']) }}"
+                                wire:model="missing_env_values.{{ $entry['key'] }}"
+                                autocomplete="off"
+                                spellcheck="false"
+                                class="mt-1 block w-full rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-sm text-brand-ink"
+                                placeholder="{{ $entry['example'] !== null && $entry['example'] !== '' ? $entry['example'] : __('value') }}"
+                            />
+                        </div>
+                    @endforeach
+                </form>
+            </div>
+            <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 px-6 py-4">
+                <p class="mr-auto text-xs text-brand-moss">{{ __('Saved and pushed to the server.') }}</p>
+                <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
+                <x-primary-button type="submit" form="deploy-missing-env-form" wire:loading.attr="disabled" wire:target="addMissingEnvVars">
+                    <span wire:loading.remove wire:target="addMissingEnvVars">{{ __('Add variables') }}</span>
+                    <span wire:loading wire:target="addMissingEnvVars">{{ __('Adding…') }}</span>
+                </x-primary-button>
+            </div>
+        </x-modal>
     @endif
 
     <section class="dply-card overflow-hidden">

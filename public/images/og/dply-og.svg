@@ -39,7 +39,7 @@
   <g transform="translate(80, 548)">
     <rect x="0" y="0" width="52" height="52" rx="14" fill="#171a0e"/>
     <text x="26" y="35" font-size="26" font-weight="700" fill="#fdfcf9" text-anchor="middle">d</text>
-    <text x="70" y="26" font-size="30" font-weight="700" fill="#171a0e">dply</text>
+    <text x="70" y="26" font-size="30" font-weight="700" fill="#171a0e">ply</text>
     <text x="70" y="50" font-size="18" font-weight="500" fill="#a7a69a">Infrastructure operations for the servers you own</text>
   </g>
 </svg>

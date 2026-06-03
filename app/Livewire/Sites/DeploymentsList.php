@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
+use App\Jobs\PushSiteEnvJob;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
@@ -13,6 +14,8 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Services\Deploy\DeploymentContractBuilder;
 use App\Services\Deploy\DeploymentPreflightValidator;
+use App\Services\Sites\DotEnvFileParser;
+use App\Services\Sites\DotEnvFileWriter;
 use App\Support\Sites\SiteSettingsViewData;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
@@ -36,6 +39,15 @@ class DeploymentsList extends Component
     public Server $server;
 
     public Site $site;
+
+    /**
+     * Modal inputs for the "Add missing variables" prompt, keyed by the env
+     * KEY the last deploy was blocked on. Seeded from the recorded block with
+     * the .env.example sample value; only non-empty entries are written.
+     *
+     * @var array<string, string>
+     */
+    public array $missing_env_values = [];
 
     public const TAB_OVERVIEW = 'overview';
 
@@ -188,6 +200,109 @@ class DeploymentsList extends Component
 
         RunSiteDeploymentJob::dispatch($this->site, SiteDeployment::TRIGGER_MANUAL);
         $this->toastSuccess(__('Deployment queued.'));
+    }
+
+    /**
+     * The env keys the last deploy was blocked on (recorded by
+     * {@see RunSiteDeploymentJob::assertRequiredEnvPresent()}). Drives the
+     * "fill in your env" prompt on the Deploy panel.
+     *
+     * @return list<array{key: string, example: ?string}>
+     */
+    public function deployBlockedEnvKeys(): array
+    {
+        $blocked = $this->site->meta['deploy_blocked_env']['keys'] ?? null;
+        if (! is_array($blocked)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($blocked as $entry) {
+            $key = is_array($entry) ? (string) ($entry['key'] ?? '') : '';
+            if ($key === '') {
+                continue;
+            }
+            $out[] = ['key' => $key, 'example' => isset($entry['example']) ? (string) $entry['example'] : null];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Open the inline fill-in modal, seeding each input with the .env.example
+     * sample value so the operator can confirm or edit.
+     */
+    public function openMissingEnvModal(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $seed = [];
+        foreach ($this->deployBlockedEnvKeys() as $entry) {
+            $seed[$entry['key']] = (string) ($entry['example'] ?? '');
+        }
+        $this->missing_env_values = $seed;
+
+        $this->dispatch('open-modal', 'deploy-missing-env-modal');
+    }
+
+    /**
+     * Write the filled-in variables into the env cache and push them to the
+     * server, then clear the block marker so the next deploy can proceed.
+     * Blank inputs are skipped. Mirrors the Environment tab's writer; the push
+     * here is a plain queued job (no console banner on this component).
+     */
+    public function addMissingEnvVars(DotEnvFileParser $parser, DotEnvFileWriter $writer): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $additions = [];
+        foreach ($this->missing_env_values as $key => $value) {
+            $key = trim((string) $key);
+            $value = (string) $value;
+            if ($key === '' || ! preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $key) || trim($value) === '') {
+                continue;
+            }
+            $additions[$key] = $value;
+        }
+
+        if ($additions === []) {
+            $this->toastError(__('Enter a value for at least one variable.'));
+
+            return;
+        }
+
+        $parsed = $parser->parse((string) ($this->site->env_file_content ?? ''));
+        $map = array_merge($parsed['variables'], $additions);
+
+        $this->site->forceFill([
+            'env_file_content' => $writer->render($map, $parsed['comments']),
+            'env_cache_origin' => 'local-edit',
+        ])->save();
+
+        // Drop the keys we just supplied from the recorded block so the banner
+        // updates immediately; a re-deploy re-validates against the server.
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        if (isset($meta['deploy_blocked_env']['keys']) && is_array($meta['deploy_blocked_env']['keys'])) {
+            $remaining = array_values(array_filter(
+                $meta['deploy_blocked_env']['keys'],
+                static fn ($e): bool => is_array($e) && ! array_key_exists((string) ($e['key'] ?? ''), $additions),
+            ));
+            if ($remaining === []) {
+                unset($meta['deploy_blocked_env']);
+            } else {
+                $meta['deploy_blocked_env']['keys'] = $remaining;
+            }
+            $this->site->forceFill(['meta' => $meta])->save();
+        }
+
+        $this->missing_env_values = [];
+
+        if ($this->server->hostCapabilities()->supportsEnvPushToHost()) {
+            PushSiteEnvJob::dispatch($this->site->id, (string) (auth()->id() ?? ''));
+        }
+
+        $this->dispatch('close-modal', 'deploy-missing-env-modal');
+        $this->toastSuccess(__(':count variable(s) added and pushed. Re-deploy to continue.', ['count' => count($additions)]));
     }
 
     public function render(): View

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Models\Site;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 
@@ -47,8 +48,10 @@ class PruneLocalWorkspaceArtifactsCommand extends Command
         $removed = 0;
 
         // serverless-artifacts/<site-id>/<slug>-<ts>.zip — prune stale zips at
-        // the file level, then drop now-empty per-site directories.
-        [$f, $r] = $this->pruneArtifacts(storage_path('app/serverless-artifacts'), $artifactsCutoff, $dry);
+        // the file level, then drop now-empty per-site directories. Artifacts
+        // still referenced by a site's rollback history are protected from age
+        // pruning no matter how old, so a rollback never loses its zip.
+        [$f, $r] = $this->pruneArtifacts(storage_path('app/serverless-artifacts'), $artifactsCutoff, $dry, $this->retainedArtifactPaths());
         $freed += $f;
         $removed += $r;
 
@@ -77,11 +80,13 @@ class PruneLocalWorkspaceArtifactsCommand extends Command
 
     /**
      * Per-site artifact dirs hold timestamped zips; delete the stale ones and
-     * remove a site dir once it's empty.
+     * remove a site dir once it's empty. Files in $protected (the rollback
+     * history set) are never deleted, regardless of age.
      *
+     * @param  array<string, true>  $protected  realpath => true
      * @return array{0: int, 1: int} [bytesFreed, entriesRemoved]
      */
-    private function pruneArtifacts(string $root, int $cutoff, bool $dry): array
+    private function pruneArtifacts(string $root, int $cutoff, bool $dry, array $protected): array
     {
         if (! File::isDirectory($root)) {
             return [0, 0];
@@ -92,7 +97,8 @@ class PruneLocalWorkspaceArtifactsCommand extends Command
 
         foreach (File::directories($root) as $siteDir) {
             foreach (File::allFiles($siteDir) as $file) {
-                if ($file->getMTime() >= $cutoff) {
+                $real = realpath($file->getPathname()) ?: $file->getPathname();
+                if (isset($protected[$real]) || $file->getMTime() >= $cutoff) {
                     continue;
                 }
 
@@ -163,6 +169,44 @@ class PruneLocalWorkspaceArtifactsCommand extends Command
         }
 
         return max($candidates);
+    }
+
+    /**
+     * Every artifact zip a site still references for rollback — both the
+     * DO Functions `artifact_history` entries and the live `artifact_path`
+     * pointer (Lambda + the current DO deploy). These are protected from the
+     * age-based prune so a rollback never loses its on-disk zip.
+     *
+     * @return array<string, true> realpath => true
+     */
+    private function retainedArtifactPaths(): array
+    {
+        $keep = [];
+
+        Site::query()
+            ->whereNotNull('meta')
+            ->select(['id', 'meta'])
+            ->cursor()
+            ->each(function (Site $site) use (&$keep): void {
+                $paths = [];
+
+                $history = data_get($site->meta, 'serverless.artifact_history');
+                if (is_array($history)) {
+                    foreach ($history as $entry) {
+                        $paths[] = is_array($entry) ? ($entry['artifact_path'] ?? null) : null;
+                    }
+                }
+
+                $paths[] = data_get($site->meta, 'serverless.artifact_path');
+
+                foreach ($paths as $path) {
+                    if (is_string($path) && $path !== '') {
+                        $keep[realpath($path) ?: $path] = true;
+                    }
+                }
+            });
+
+        return $keep;
     }
 
     private function directorySize(string $dir): int

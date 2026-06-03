@@ -1,24 +1,15 @@
 <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-    <nav class="mb-6 text-sm text-brand-moss" aria-label="{{ __('Breadcrumb') }}">
-        <ol class="flex flex-wrap items-center gap-2">
-            <li><a href="{{ route('dashboard') }}" wire:navigate class="hover:text-brand-ink transition-colors">{{ __('Dashboard') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('servers.index') }}" wire:navigate class="hover:text-brand-ink transition-colors">{{ __('Servers') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('servers.sites', $server) }}" wire:navigate class="hover:text-brand-ink transition-colors truncate max-w-[12rem]" title="{{ $server->name }}">{{ $server->name }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']) }}" wire:navigate class="hover:text-brand-ink transition-colors truncate max-w-[12rem]" title="{{ $site->name }}">{{ $site->name }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('sites.deployments.index', ['server' => $server, 'site' => $site, 'tab' => 'history']) }}" wire:navigate class="hover:text-brand-ink transition-colors">{{ __('Deployments') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li class="font-mono text-xs font-medium text-brand-ink">{{ $deployment->id }}</li>
-        </ol>
-    </nav>
-
-    <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">
+    <div class="lg:grid lg:grid-cols-12 lg:gap-10">
         @include('livewire.sites.settings.partials.sidebar')
 
-        <main class="min-w-0 space-y-6 lg:col-span-9">
+        <div class="min-w-0 lg:col-span-9">
+            <x-breadcrumb-trail
+                :items="$settingsBreadcrumbs"
+                doc-contextual
+                :contextual-doc-slug="$contextualDocSlug ?? null"
+            />
+
+            <main class="min-w-0 space-y-6 mt-6">
             <section class="dply-card overflow-hidden">
                 <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
                     <div class="flex min-w-0 items-start gap-3">
@@ -193,6 +184,7 @@
             @endif
 
             <x-cli-snippet :command="'dply:site:show-deploy '.$deployment->id.' --output'" />
-        </main>
+            </main>
+        </div>
     </div>
 </div>

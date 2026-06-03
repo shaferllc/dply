@@ -22,3 +22,7 @@ Use **atomic deploy** with **`php artisan migrate --force`** in deploy hooks aft
 - **Runtime → PHP** — version matching `composer.json`
 - **Environment** — `APP_*`, `DB_*`, `REDIS_*`
 - **Logs** — `storage/logs/laravel.log`
+
+## Deploy test apps
+
+See [Laravel open-source apps for deploy testing](LARAVEL_DEPLOY_TEST_APPS.md) for a curated list of 20 real-world repos to exercise provisioning, builds, queues, and atomic deploy.

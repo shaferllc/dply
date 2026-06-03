@@ -89,8 +89,8 @@
                                     src="{{ asset('images/dply-logo.svg') }}"
                                     alt="{{ config('app.name') }}"
                                     class="w-48 sm:w-56 mx-auto drop-shadow-sm"
-                                    width="224"
-                                    height="254"
+                                    width="148"
+                                    height="96"
                                 />
                                 <p class="mt-8 text-center text-sm text-brand-moss leading-relaxed">
                                     Your mark for disciplined deploys—olive, gold, and sage tones signal stability and precision across every customer touchpoint.

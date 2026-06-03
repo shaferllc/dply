@@ -63,6 +63,20 @@
         $docroot = rtrim((string) $site->effectiveDocumentRoot(), '/');
         $envInDocroot = $docroot !== '' && str_starts_with($envPath, $docroot.'/');
     }
+
+    // Required env vars detected from the deployed code by the scanner
+    // (.env.example + env() usage in app code and config/). "Missing" = a
+    // required key that isn't set with a non-empty value here and isn't
+    // workspace-inherited. Only VM hosts have code on disk to scan.
+    $envPresentKeys = [];
+    foreach ($envMap as $envK => $envV) {
+        if (trim((string) $envV) !== '') {
+            $envPresentKeys[] = (string) $envK;
+        }
+    }
+    $missingEnv = $supportsEnvPush ? $site->missingRequiredEnvKeys($envPresentKeys, $inheritedKeys) : [];
+    $envRequirements = $site->envRequirements();
+    $envScannedAt = $envRequirements['scanned_at'] ?? null;
 @endphp
 
 <section
@@ -135,6 +149,68 @@
                             <li class="font-mono text-xs">{{ $err }}</li>
                         @endforeach
                     </ul>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- Missing required env warning. Driven by the scanner's detected
+         requirements (refreshed each deploy; re-scan on demand). Lists the
+         keys the deployed code expects but that aren't set here, with a
+         one-click modal to add them. --}}
+    @if ($supportsEnvPush && $missingEnv !== [])
+        <div class="dply-card overflow-hidden">
+            <div class="flex flex-col gap-3 bg-rose-50 px-5 py-4">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="flex min-w-0 items-start gap-3">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-rose-100 text-rose-700 ring-rose-200">
+                            <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Missing variables') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-rose-900">
+                                {{ trans_choice('{1} :count required variable is missing|[2,*] :count required variables are missing', count($missingEnv), ['count' => count($missingEnv)]) }}
+                            </h3>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-rose-900">
+                                {{ __('These are referenced by the deployed code (.env.example, plus env() usage in app code and config/) but aren\'t set here. The app may error until they have values.') }}
+                            </p>
+                            <div class="mt-2 flex flex-wrap gap-1.5">
+                                @foreach (array_slice($missingEnv, 0, 24) as $entry)
+                                    <span
+                                        class="inline-flex items-center rounded-full bg-white px-2 py-0.5 font-mono text-[11px] font-semibold text-rose-800 ring-1 ring-inset ring-rose-200"
+                                        title="{{ __('source: :s', ['s' => implode(', ', $entry['sources'])]) }}"
+                                    >{{ $entry['key'] }}</span>
+                                @endforeach
+                                @if (count($missingEnv) > 24)
+                                    <span class="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-800">
+                                        {{ __('+:count more', ['count' => count($missingEnv) - 24]) }}
+                                    </span>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex shrink-0 flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            wire:click="rescanEnvRequirements"
+                            wire:loading.attr="disabled"
+                            wire:target="rescanEnvRequirements"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-900 shadow-sm hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                            title="{{ __('Re-scan the deployed code for required variables.') }}"
+                        >
+                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="rescanEnvRequirements" />
+                            <span wire:loading wire:target="rescanEnvRequirements" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
+                            {{ __('Re-scan') }}
+                        </button>
+                        <button
+                            type="button"
+                            wire:click="openMissingEnvModal"
+                            class="inline-flex items-center gap-1.5 rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-rose-800"
+                        >
+                            <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                            {{ __('Add missing variables') }}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -345,6 +421,58 @@
             <x-primary-button type="submit" form="add-env-form" wire:loading.attr="disabled" wire:target="addEnvVar">
                 <span wire:loading.remove wire:target="addEnvVar">{{ __('Add variable') }}</span>
                 <span wire:loading wire:target="addEnvVar">{{ __('Adding…') }}</span>
+            </x-primary-button>
+        </div>
+    </x-modal>
+
+    {{-- "Add missing variables" modal: one input per still-missing required
+         key, pre-seeded by openMissingEnvModal() with the .env.example sample
+         value. Blank inputs are skipped on submit (addMissingEnvVars). --}}
+    <x-modal name="add-missing-env-modal" maxWidth="2xl" overlayClass="bg-brand-ink/40">
+        <div class="relative border-b border-brand-ink/10 px-6 py-5">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-rose-700">{{ __('Missing variables') }}</p>
+            <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Add the required variables') }}</h2>
+            <p class="mt-2 pr-10 text-sm leading-6 text-brand-moss">
+                {{ __('Detected from the deployed code but not set on this site. Fill in the ones you have — blanks are skipped. Saved to the Environment section and auto-pushed to the server.') }}
+            </p>
+            <button
+                type="button"
+                x-on:click="$dispatch('close')"
+                class="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist transition-colors hover:bg-brand-sand/40 hover:text-brand-ink focus:outline-none focus:ring-2 focus:ring-brand-sage/40"
+                aria-label="{{ __('Close') }}"
+                title="{{ __('Close') }}"
+            >
+                <x-heroicon-o-x-mark class="h-5 w-5" />
+            </button>
+        </div>
+
+        <div class="max-h-[60vh] overflow-y-auto px-6 py-6">
+            <form wire:submit="addMissingEnvVars" id="add-missing-env-form" class="space-y-3">
+                @forelse ($missingEnv as $entry)
+                    <div wire:key="missing-env-{{ md5($entry['key']) }}">
+                        <label class="block font-mono text-xs font-semibold text-brand-ink" for="missing_env_{{ md5($entry['key']) }}">{{ $entry['key'] }}</label>
+                        <input
+                            id="missing_env_{{ md5($entry['key']) }}"
+                            wire:model="missing_env_values.{{ $entry['key'] }}"
+                            autocomplete="off"
+                            spellcheck="false"
+                            class="mt-1 block w-full rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-sm text-brand-ink"
+                            placeholder="{{ $entry['example'] !== null && $entry['example'] !== '' ? $entry['example'] : __('value') }}"
+                        />
+                        <p class="mt-0.5 text-[11px] text-brand-mist">{{ __('source: :s', ['s' => implode(', ', $entry['sources'])]) }}</p>
+                    </div>
+                @empty
+                    <p class="text-sm text-brand-moss">{{ __('Nothing missing — all required variables are set.') }}</p>
+                @endforelse
+            </form>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 px-6 py-4">
+            <p class="mr-auto text-xs text-brand-moss">{{ __('Saved and auto-pushed to the server.') }}</p>
+            <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
+            <x-primary-button type="submit" form="add-missing-env-form" wire:loading.attr="disabled" wire:target="addMissingEnvVars">
+                <span wire:loading.remove wire:target="addMissingEnvVars">{{ __('Add variables') }}</span>
+                <span wire:loading wire:target="addMissingEnvVars">{{ __('Adding…') }}</span>
             </x-primary-button>
         </div>
     </x-modal>
