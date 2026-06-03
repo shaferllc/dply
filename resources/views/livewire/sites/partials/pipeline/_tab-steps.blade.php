@@ -311,8 +311,8 @@
                     ])
                     @if ($showCloneAnchor)
                         @include('livewire.sites.partials.pipeline._timeline-flow-connector')
+                        {{-- _timeline-item renders its own trailing connector, so no extra one here (that was the stray double-chevron). --}}
                         @include('livewire.sites.partials.pipeline._timeline-item', ['item' => ['type' => 'anchor', 'key' => 'clone']])
-                        @include('livewire.sites.partials.pipeline._timeline-flow-connector')
                     @endif
                     @include('livewire.sites.partials.pipeline._timeline-hook-drop-zone', [
                         'anchor' => 'after_clone',

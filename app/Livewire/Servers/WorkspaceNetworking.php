@@ -43,6 +43,12 @@ class WorkspaceNetworking extends Component
     /** CIDR inputs keyed by database ID. */
     public array $db_networking_allowed_from = [];
 
+    /** Selected jump-host server ID per database ID (jump-host access helper). */
+    public array $db_jump_host = [];
+
+    /** Chosen local tunnel port per database ID (jump-host access helper). */
+    public array $db_jump_local_port = [];
+
     /** Network ID inputs keyed by server ID (for attach-to-network forms). */
     public array $attach_network_id = [];
 

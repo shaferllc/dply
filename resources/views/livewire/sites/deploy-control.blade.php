@@ -29,7 +29,11 @@
                         }
                     }
                 }
-                $deployFixers = \App\Support\Sites\SiteFixers::detect($failOutput);
+                $alreadyRun = $this->completedFixerKeys;
+                $deployFixers = collect(\App\Support\Sites\SiteFixers::detect($failOutput))
+                    ->reject(fn ($fx) => in_array($fx['key'], $alreadyRun, true))
+                    ->values()
+                    ->all();
             }
 
             $fixerRun = $this->fixerRun;

@@ -172,6 +172,41 @@ class DeployControl extends Component
         return $this->fixerRunId ? ConsoleAction::query()->find($this->fixerRunId) : null;
     }
 
+    /**
+     * Fixer keys that have already completed for THIS failed deploy, so they can
+     * be dropped from the "Suggested fixes" list — once a fix has run we don't
+     * need to keep offering it. Scoped to fixes run after the deploy finished so
+     * a recurrence of the same error still surfaces the fix again.
+     *
+     * @return list<string>
+     */
+    #[Computed]
+    public function completedFixerKeys(): array
+    {
+        if ($this->site === null) {
+            return [];
+        }
+
+        $since = $this->latestDeployment?->finished_at ?? $this->latestDeployment?->created_at;
+
+        $query = ConsoleAction::query()
+            ->where('subject_type', $this->site->getMorphClass())
+            ->where('subject_id', $this->site->id)
+            ->where('kind', 'site_remediate')
+            ->where('status', ConsoleAction::STATUS_COMPLETED);
+
+        if ($since !== null) {
+            $query->where('created_at', '>=', $since);
+        }
+
+        return $query->get(['label'])
+            ->map(fn (ConsoleAction $run): ?string => SiteFixers::keyForLabel((string) $run->label))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     public function render()
     {
         return view('livewire.sites.deploy-control');

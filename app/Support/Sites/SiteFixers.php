@@ -65,8 +65,14 @@ final class SiteFixers
                 'label' => 'Install the PHP Redis extension',
                 'reason' => 'PHP is missing the redis extension — the app fails with Class "Redis" not found.',
                 'kind' => 'shell',
-                'command' => 'V=$(php -r "echo PHP_MAJOR_VERSION.\".\".PHP_MINOR_VERSION;"); apt-get update -y >/dev/null 2>&1; DEBIAN_FRONTEND=noninteractive apt-get install -y "php$V-redis" && systemctl restart "php$V-fpm"',
-                'sudo' => true, 'cwd' => false, 'timeout' => 300,
+                // Match the live PHP version. Prefer the apt package; if it doesn't
+                // exist for this version (e.g. very new PHP from a PPA), build the
+                // extension from PECL and enable it for that version.
+                'command' => 'V=$(php -r "echo PHP_MAJOR_VERSION.\".\".PHP_MINOR_VERSION;"); export DEBIAN_FRONTEND=noninteractive; apt-get update -y >/dev/null 2>&1; '
+                    .'if apt-get install -y "php$V-redis"; then :; '
+                    .'else apt-get install -y "php$V-dev" php-pear build-essential autoconf pkg-config && (yes "" | pecl install -f redis) && echo "extension=redis.so" > "/etc/php/$V/mods-available/redis.ini" && phpenmod -v "$V" redis; fi; '
+                    .'systemctl restart "php$V-fpm" 2>/dev/null || true',
+                'sudo' => true, 'cwd' => false, 'timeout' => 600,
                 'detect' => '/Class ["\']Redis["\'] not found|PhpRedisConnector|ext-redis|the redis extension/i',
             ],
 

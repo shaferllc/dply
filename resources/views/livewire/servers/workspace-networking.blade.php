@@ -316,22 +316,55 @@
 
                                   @if ($dbRemote)
                                     @php
+                                        $jumpDefaultPort = \App\Support\Servers\DatabaseJumpHostAccess::BASE_LOCAL_PORT;
+                                        $selectedJumpId = $db_jump_host[$db->id] ?? optional($jumpHosts->first())->id;
+                                        $selectedJump = $jumpHosts->firstWhere('id', $selectedJumpId) ?: $jumpHosts->first();
+                                        $jumpLocalPort = (int) ($db_jump_local_port[$db->id] ?? $jumpDefaultPort);
+                                        if ($jumpLocalPort < 1024 || $jumpLocalPort > 65535) {
+                                            $jumpLocalPort = $jumpDefaultPort;
+                                        }
                                         $accessRows = [];
-                                        $jumpLocalPort = \App\Support\Servers\DatabaseJumpHostAccess::BASE_LOCAL_PORT;
-                                        foreach ($jumpHosts as $jh) {
-                                            $jumpCmds = \App\Support\Servers\DatabaseJumpHostAccess::commandsFor($db, $server, $jh, (int) $engineRow->port, $jumpLocalPort);
-                                            $accessRows[] = ['label' => __('Tunnel via :name', ['name' => $jh->name]), 'command' => $jumpCmds['tunnel']];
+                                        if ($selectedJump) {
+                                            $jumpCmds = \App\Support\Servers\DatabaseJumpHostAccess::commandsFor($db, $server, $selectedJump, (int) $engineRow->port, $jumpLocalPort);
+                                            $accessRows[] = ['label' => __('Tunnel'), 'command' => $jumpCmds['tunnel']];
                                             $accessRows[] = ['label' => __('Then connect'), 'command' => $jumpCmds['connect']];
-                                            $jumpLocalPort += 10;
                                         }
                                     @endphp
                                     <div class="mt-3 rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-3.5 py-3">
                                         <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Access via jump host') }}</p>
-                                        @if (! empty($accessRows))
+                                        @if ($jumpHosts->isNotEmpty())
                                             <p class="mt-1 text-[11px] leading-relaxed text-brand-moss">
-                                                {{ __(':db only accepts connections from :src, so connect through an allowlisted server: run the tunnel, then point your client at localhost on the listed port.', ['db' => $db->name, 'src' => $db->allowed_from]) }}
+                                                {{ __(':db only accepts connections from :src, so connect through an allowlisted server: run the tunnel, then point your client at localhost on the chosen port.', ['db' => $db->name, 'src' => $db->allowed_from]) }}
                                             </p>
-                                            <x-cli-snippet :commands="$accessRows" tone="details" :summary="__('Show tunnel commands')" size="10" class="mt-2" />
+                                            <div class="mt-2 flex flex-wrap items-end gap-3">
+                                                <label class="flex flex-col gap-1">
+                                                    <span class="text-[10px] font-medium uppercase tracking-wide text-brand-mist">{{ __('Jump host') }}</span>
+                                                    @if ($jumpHosts->count() > 1)
+                                                        <select
+                                                            wire:model.live="db_jump_host.{{ $db->id }}"
+                                                            class="w-52 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs text-brand-ink shadow-sm focus:border-brand-forest focus:ring-1 focus:ring-brand-forest"
+                                                        >
+                                                            @foreach ($jumpHosts as $jh)
+                                                                <option value="{{ $jh->id }}">{{ $jh->name }} ({{ $jh->private_ip_address }})</option>
+                                                            @endforeach
+                                                        </select>
+                                                    @else
+                                                        <span class="inline-flex h-[30px] items-center rounded-lg border border-brand-ink/10 bg-white px-2.5 font-mono text-xs text-brand-ink">{{ $selectedJump->name }} ({{ $selectedJump->private_ip_address }})</span>
+                                                    @endif
+                                                </label>
+                                                <label class="flex flex-col gap-1">
+                                                    <span class="text-[10px] font-medium uppercase tracking-wide text-brand-mist">{{ __('Local port') }}</span>
+                                                    <input
+                                                        type="number"
+                                                        min="1024"
+                                                        max="65535"
+                                                        wire:model.live.debounce.600ms="db_jump_local_port.{{ $db->id }}"
+                                                        placeholder="{{ $jumpDefaultPort }}"
+                                                        class="w-24 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 font-mono text-xs text-brand-ink shadow-sm focus:border-brand-forest focus:ring-1 focus:ring-brand-forest"
+                                                    />
+                                                </label>
+                                            </div>
+                                            <x-cli-snippet :commands="$accessRows" tone="details" open :summary="__('Tunnel commands')" size="10" class="mt-2" />
                                         @else
                                             <p class="mt-1 text-[11px] leading-relaxed text-brand-moss">
                                                 {{ __('No server in this organization has a private IP inside :src. Add an allowlisted server\'s private IP to the source above, or connect from a host that is already allowed.', ['src' => $db->allowed_from ?: __('the allowlist')]) }}
