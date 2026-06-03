@@ -786,7 +786,14 @@
                                         <span class="font-mono text-xs text-rose-700/90" x-bind:class="open ? '' : 'truncate'">{{ $fj['exception'] }}</span>
                                     </button>
                                     @if (! empty($fj['exception_full']))
-                                        <pre x-show="open" x-cloak class="mt-2 max-h-96 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-brand-ink/95 p-3 font-mono text-[11px] leading-relaxed text-rose-100">{{ $fj['exception_full'] }}</pre>
+                                        <div x-show="open" x-cloak class="relative mt-2" x-data="{ copied: false, copyTrace() { navigator.clipboard.writeText(@js($fj['exception_full'])).then(() => { this.copied = true; setTimeout(() => this.copied = false, 1500); }); } }">
+                                            <button type="button" x-on:click="copyTrace()" class="absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-md bg-white/10 px-2 py-1 text-[11px] font-medium text-rose-100/90 backdrop-blur transition hover:bg-white/20" :title="copied ? @js(__('Copied!')) : @js(__('Copy stack trace'))">
+                                                <x-heroicon-o-clipboard class="h-3.5 w-3.5" x-show="! copied" />
+                                                <x-heroicon-o-check class="h-3.5 w-3.5" x-show="copied" x-cloak />
+                                                <span x-text="copied ? @js(__('Copied')) : @js(__('Copy'))"></span>
+                                            </button>
+                                            <pre class="max-h-96 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-brand-ink/95 p-3 pr-20 font-mono text-[11px] leading-relaxed text-rose-100">{{ $fj['exception_full'] }}</pre>
+                                        </div>
                                     @endif
                                 @endif
                             </div>
