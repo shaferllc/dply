@@ -77,6 +77,55 @@
     $missingEnv = $supportsEnvPush ? $site->missingRequiredEnvKeys($envPresentKeys, $inheritedKeys) : [];
     $envRequirements = $site->envRequirements();
     $envScannedAt = $envRequirements['scanned_at'] ?? null;
+
+    // Gate opt-out state — only the deploy-hub host component (DeploymentsList)
+    // carries the ignore/re-enable actions, so feature-detect them.
+    $envGateOff = method_exists($this, 'envGateSkipped') && $this->envGateSkipped();
+    $canIgnoreEnv = method_exists($this, 'ignoreMissingEnv');
+    $ignoredEnvKeys = ($canIgnoreEnv && method_exists($this, 'ignoredEnvKeys')) ? $this->ignoredEnvKeys() : [];
+
+    // Config sanity checks (debug-in-prod, missing APP_KEY, placeholder
+    // secrets, …). Keyed by env KEY for per-row badges.
+    $envWarnings = app(\App\Services\Sites\SiteEnvValidator::class)->validate($envMap);
+    $envWarningsByKey = [];
+    foreach ($envWarnings as $w) {
+        if (! empty($w['key'])) {
+            $envWarningsByKey[$w['key']][] = $w;
+        }
+    }
+
+    // Live search over key names + auto-derived prefix groups (APP, DB, AWS,
+    // MAIL, REDIS, …) for one-click filtering.
+    $envSearchTerm = strtolower(trim((string) ($env_search ?? '')));
+    $selectedEnvGroup = trim((string) ($env_group ?? ''));
+    $groupOfKey = function (string $k): string {
+        $p = explode('_', $k, 2);
+        return count($p) > 1 && $p[0] !== '' ? $p[0] : 'MISC';
+    };
+    $envGroups = [];
+    foreach (array_keys($envMap) as $gk) {
+        $g = $groupOfKey((string) $gk);
+        $envGroups[$g] = ($envGroups[$g] ?? 0) + 1;
+    }
+    ksort($envGroups);
+
+    $filteredEnvMap = $envMap;
+    if ($envSearchTerm !== '') {
+        $filteredEnvMap = array_filter($filteredEnvMap, fn ($v, $k) => str_contains(strtolower((string) $k), $envSearchTerm), ARRAY_FILTER_USE_BOTH);
+    }
+    if ($selectedEnvGroup !== '') {
+        $filteredEnvMap = array_filter($filteredEnvMap, fn ($v, $k) => $groupOfKey((string) $k) === $selectedEnvGroup, ARRAY_FILTER_USE_BOTH);
+    }
+
+    // Console-action banner feed (sync / push / scan progress). The Settings
+    // page mounts its own banner at the top level, so we only render one here
+    // in the deploy hub (detected by the absence of $sectionConsoleActionKinds).
+    $envConsoleRun = \App\Models\ConsoleAction::query()
+        ->forSubject($site)
+        ->whereIn('kind', ['env_sync', 'env_push', 'env_scan'])
+        ->notDismissed()
+        ->orderByDesc('created_at')
+        ->first();
 @endphp
 
 <section
@@ -90,9 +139,24 @@
          empty cache, no recorded origin, no in-flight job. The sync banner
          shows progress at the top of the page; the keys list re-renders
          when the job completes (see wire:poll below). --}}
-    {{-- Apply / sync banners are mounted at settings.blade.php top level; adding
-         'env_sync' to config('console_actions.section_kinds.environment') makes
-         the env-sync banner appear here automatically. --}}
+    {{-- On the Settings page the console-action banner is mounted at the top
+         level. In the deploy hub there's no such wrapper, so mount one here
+         (guarded so Settings doesn't show two). Shows env sync/push/scan
+         progress and self-polls while a run is in flight. --}}
+    @unless (isset($sectionConsoleActionKinds))
+        @if ($envConsoleRun)
+            <div
+                id="site-console-action-banner"
+                x-data="{}"
+                x-on:dply-console-action-focus.window="$nextTick(() => { const el = document.getElementById('site-console-action-banner'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); })"
+            >
+                @include('livewire.partials.console-action-banner-static', [
+                    'run' => $envConsoleRun,
+                    'kindLabels' => (array) config('console_actions.kinds', []),
+                ])
+            </div>
+        @endif
+    @endunless
 
     <x-explainer tone="info">
         <p>{{ __('Environment variables are written into the site\'s `.env` file on the server. Dply keeps an encrypted cache of the file so this page renders without an SSH round-trip.') }}</p>
@@ -158,7 +222,7 @@
          requirements (refreshed each deploy; re-scan on demand). Lists the
          keys the deployed code expects but that aren't set here, with a
          one-click modal to add them. --}}
-    @if ($supportsEnvPush && $missingEnv !== [])
+    @if ($supportsEnvPush && $missingEnv !== [] && ! $envGateOff)
         <div class="dply-card overflow-hidden">
             <div class="flex flex-col gap-3 bg-rose-50 px-5 py-4">
                 <div class="flex flex-wrap items-start justify-between gap-3">
@@ -177,9 +241,16 @@
                             <div class="mt-2 flex flex-wrap gap-1.5">
                                 @foreach (array_slice($missingEnv, 0, 24) as $entry)
                                     <span
-                                        class="inline-flex items-center rounded-full bg-white px-2 py-0.5 font-mono text-[11px] font-semibold text-rose-800 ring-1 ring-inset ring-rose-200"
+                                        class="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 font-mono text-[11px] font-semibold text-rose-800 ring-1 ring-inset ring-rose-200"
                                         title="{{ __('source: :s', ['s' => implode(', ', $entry['sources'])]) }}"
-                                    >{{ $entry['key'] }}</span>
+                                    >
+                                        {{ $entry['key'] }}
+                                        @if ($canIgnoreEnv)
+                                            <button type="button" wire:click="confirmIgnoreEnvKey('{{ $entry['key'] }}')" class="-mr-0.5 text-rose-400 hover:text-rose-700" title="{{ __('Ignore :key', ['key' => $entry['key']]) }}" aria-label="{{ __('Ignore :key', ['key' => $entry['key']]) }}">
+                                                <x-heroicon-o-x-mark class="h-3 w-3" />
+                                            </button>
+                                        @endif
+                                    </span>
                                 @endforeach
                                 @if (count($missingEnv) > 24)
                                     <span class="inline-flex items-center rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-800">
@@ -210,7 +281,59 @@
                             <x-heroicon-o-plus class="h-3.5 w-3.5" />
                             {{ __('Add missing variables') }}
                         </button>
+                        @if ($canIgnoreEnv)
+                            <button
+                                type="button"
+                                wire:click="confirmIgnoreMissingEnv"
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
+                                title="{{ __('Stop warning/blocking on missing required variables for this site.') }}"
+                            >
+                                <x-heroicon-o-no-symbol class="h-3.5 w-3.5" />
+                                {{ __('Ignore all') }}
+                            </button>
+                        @endif
                     </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- Required-env checks are off for this site (operator chose to ignore
+         missing vars). Muted reminder with a one-click re-enable. --}}
+    @if ($supportsEnvPush && $envGateOff)
+        <div class="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-4 py-3 text-sm text-brand-moss">
+            <span class="inline-flex items-center gap-2">
+                <x-heroicon-o-no-symbol class="h-4 w-4 text-brand-mist" />
+                {{ __('Required-variable checks are off for this site — deploys won\'t be blocked by missing env.') }}
+            </span>
+            <button type="button" wire:click="enableEnvGate" class="font-semibold text-brand-forest hover:underline">
+                {{ __('Re-enable') }}
+            </button>
+        </div>
+    @endif
+
+    {{-- Validation — config sanity checks (debug-in-prod, empty APP_KEY,
+         plaintext URLs, placeholder secrets). Warnings only; never blocks. --}}
+    @if ($envWarnings !== [])
+        @php $hasDanger = collect($envWarnings)->contains(fn ($w) => $w['level'] === 'danger'); @endphp
+        <div class="dply-card overflow-hidden">
+            <div class="flex items-start gap-3 {{ $hasDanger ? 'bg-rose-50' : 'bg-amber-50' }} px-5 py-4">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 {{ $hasDanger ? 'bg-rose-100 text-rose-700 ring-rose-200' : 'bg-amber-100 text-amber-700 ring-amber-200' }}">
+                    <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] {{ $hasDanger ? 'text-rose-700' : 'text-amber-700' }}">{{ __('Configuration check') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold {{ $hasDanger ? 'text-rose-900' : 'text-amber-950' }}">
+                        {{ trans_choice('{1} :count configuration warning|[2,*] :count configuration warnings', count($envWarnings), ['count' => count($envWarnings)]) }}
+                    </h3>
+                    <ul class="mt-1.5 space-y-1">
+                        @foreach ($envWarnings as $w)
+                            <li class="flex items-start gap-2 text-sm {{ $w['level'] === 'danger' ? 'text-rose-800' : ($w['level'] === 'warn' ? 'text-amber-900' : 'text-brand-moss') }}">
+                                <span class="mt-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full {{ $w['level'] === 'danger' ? 'bg-rose-600' : ($w['level'] === 'warn' ? 'bg-amber-500' : 'bg-brand-mist') }}"></span>
+                                <span>{{ $w['message'] }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
                 </div>
             </div>
         </div>
@@ -493,7 +616,20 @@
                             class="mt-1 block w-full rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-sm text-brand-ink"
                             placeholder="{{ $entry['example'] !== null && $entry['example'] !== '' ? $entry['example'] : __('value') }}"
                         />
-                        <p class="mt-0.5 text-[11px] text-brand-mist">{{ __('source: :s', ['s' => implode(', ', $entry['sources'])]) }}</p>
+                        <div class="mt-0.5 flex items-center justify-between gap-2">
+                            <p class="text-[11px] text-brand-mist">{{ __('source: :s', ['s' => implode(', ', $entry['sources'])]) }}</p>
+                            <div class="flex items-center gap-3">
+                                @if ($entry['key'] === 'APP_KEY')
+                                    <button type="button" wire:click="generateMissingAppKey" class="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-forest hover:underline">
+                                        <x-heroicon-o-sparkles class="h-3 w-3" />
+                                        {{ __('Generate a key') }}
+                                    </button>
+                                @endif
+                                @if ($canIgnoreEnv)
+                                    <button type="button" wire:click="confirmIgnoreEnvKey('{{ $entry['key'] }}')" class="text-[11px] font-semibold text-brand-mist hover:text-rose-700 hover:underline" title="{{ __('Mark this variable as intentionally unset.') }}">{{ __('Ignore this') }}</button>
+                                @endif
+                            </div>
+                        </div>
                     </div>
                 @empty
                     <p class="text-sm text-brand-moss">{{ __('Nothing missing — all required variables are set.') }}</p>
@@ -580,12 +716,57 @@
                         {{ __('View all') }}
                     </button>
                 @endif
+                <button
+                    type="button"
+                    wire:click="openEditAllEnv"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                    title="{{ __('Edit the entire .env at once in a textarea (full replace on save).') }}"
+                >
+                    <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                    {{ __('Edit all') }}
+                </button>
                 <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/40 px-2.5 py-1 text-[11px] font-semibold text-brand-moss">
                     <span class="h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
                     {{ trans_choice('{0} no variables|{1} :count variable|[2,*] :count variables', $variableCount, ['count' => $variableCount]) }}
                 </span>
             </div>
         </div>
+
+        @if ($variableCount > 0)
+            <div class="space-y-2 border-b border-brand-ink/10 bg-white px-6 py-3 sm:px-7">
+                <div class="relative">
+                    <x-heroicon-o-magnifying-glass class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-mist" />
+                    <input
+                        type="search"
+                        wire:model.live.debounce.200ms="env_search"
+                        placeholder="{{ __('Search variables…') }}"
+                        class="block w-full rounded-lg border border-brand-ink/15 bg-brand-cream/40 py-2 pl-9 pr-3 font-mono text-sm text-brand-ink focus:border-brand-sage focus:ring-brand-sage/30"
+                    />
+                </div>
+                @if (count($envGroups) > 1)
+                    {{-- Auto-derived prefix groups (APP_, DB_, AWS_, …). Click to
+                         filter the list to that group; combines with search. --}}
+                    <div class="flex flex-wrap gap-1.5">
+                        <button type="button" wire:click="$set('env_group', '')" @class([
+                            'inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors',
+                            'bg-brand-forest text-brand-cream' => $selectedEnvGroup === '',
+                            'bg-brand-sand/40 text-brand-moss hover:bg-brand-sand/60' => $selectedEnvGroup !== '',
+                        ])>
+                            {{ __('All') }} <span class="opacity-60">{{ $variableCount }}</span>
+                        </button>
+                        @foreach ($envGroups as $g => $cnt)
+                            <button type="button" wire:click="$set('env_group', @js($g))" @class([
+                                'inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-mono text-[11px] font-semibold transition-colors',
+                                'bg-brand-forest text-brand-cream' => $selectedEnvGroup === $g,
+                                'bg-brand-sand/40 text-brand-moss hover:bg-brand-sand/60' => $selectedEnvGroup !== $g,
+                            ])>
+                                {{ $g }} <span class="opacity-60">{{ $cnt }}</span>
+                            </button>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+        @endif
 
         @if ($variableCount === 0)
             <div class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center sm:px-8">
@@ -597,7 +778,10 @@
             </div>
         @else
             <ul class="divide-y divide-brand-ink/8">
-                @foreach ($envMap as $key => $value)
+                @if ($filteredEnvMap === [] && ($envSearchTerm !== '' || $selectedEnvGroup !== ''))
+                    <li class="px-6 py-10 text-center text-sm text-brand-moss sm:px-8">{{ __('No variables match the current filter.') }}</li>
+                @endif
+                @foreach ($filteredEnvMap as $key => $value)
                     @php
                         $isRevealed = in_array($key, $revealed_env_keys, true);
                         $isEditing = $editing_env_key === $key;
@@ -840,6 +1024,69 @@
         </x-modal>
     @endif
 
+    {{-- "Edit all" modal: the whole .env in one editable textarea. Saving is a
+         full replace (saveAllEnv) — distinct from the additive Bulk import. --}}
+    <x-modal name="edit-all-env-modal" maxWidth="3xl" overlayClass="bg-brand-ink/40">
+        <div class="relative border-b border-brand-ink/10 px-6 py-5">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Site variables') }}</p>
+            <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Edit all variables') }}</h2>
+            <p class="mt-2 pr-10 text-sm leading-6 text-brand-moss">
+                {{ __('Edit the entire .env at once. Saving REPLACES every variable — keys you delete here are removed. Changes auto-push to the server.') }}
+            </p>
+            <button
+                type="button"
+                x-on:click="$dispatch('close')"
+                class="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist transition-colors hover:bg-brand-sand/40 hover:text-brand-ink focus:outline-none focus:ring-2 focus:ring-brand-sage/40"
+                aria-label="{{ __('Close') }}"
+            >
+                <x-heroicon-o-x-mark class="h-5 w-5" />
+            </button>
+        </div>
+        <div class="px-6 py-5">
+            <form wire:submit="saveAllEnv" id="edit-all-env-form">
+                <textarea
+                    wire:model="edit_all_env"
+                    rows="20"
+                    spellcheck="false"
+                    class="w-full rounded-lg border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-xs text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage/30"
+                    placeholder="APP_NAME=&quot;My App&quot;&#10;APP_ENV=production&#10;DB_PASSWORD=…"
+                ></textarea>
+                <x-input-error :messages="$errors->get('edit_all_env')" class="mt-1" />
+            </form>
+        </div>
+        <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 px-6 py-4">
+            <p class="mr-auto text-xs text-rose-700">{{ __('Saving replaces ALL variables.') }}</p>
+            <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
+            <x-primary-button type="submit" form="edit-all-env-form" wire:loading.attr="disabled" wire:target="saveAllEnv">
+                <span wire:loading.remove wire:target="saveAllEnv">{{ __('Save all') }}</span>
+                <span wire:loading wire:target="saveAllEnv">{{ __('Saving…') }}</span>
+            </x-primary-button>
+        </div>
+    </x-modal>
+
+    {{-- Ignored variables — the operator marked these as intentionally unset,
+         so they don't count toward "missing required". One-click un-ignore. --}}
+    @if ($canIgnoreEnv && $ignoredEnvKeys !== [])
+        <div class="dply-card overflow-hidden">
+            <div class="flex flex-wrap items-start justify-between gap-3 bg-brand-sand/20 px-5 py-4">
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Ignored variables') }}</p>
+                    <p class="mt-1 text-sm text-brand-moss">{{ __('These required variables are ignored for this site — they won\'t block deploys.') }}</p>
+                    <div class="mt-2 flex flex-wrap gap-1.5">
+                        @foreach ($ignoredEnvKeys as $ik)
+                            <span class="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 font-mono text-[11px] font-semibold text-brand-moss ring-1 ring-inset ring-brand-ink/10">
+                                {{ $ik }}
+                                <button type="button" wire:click="unignoreEnvKey('{{ $ik }}')" class="text-brand-mist hover:text-rose-700" title="{{ __('Un-ignore') }}" aria-label="{{ __('Un-ignore :key', ['key' => $ik]) }}">
+                                    <x-heroicon-o-x-mark class="h-3 w-3" />
+                                </button>
+                            </span>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
     {{-- Advanced: relocate the .env file. Hidden behind a disclosure since
          most operators want the default (the docroot's .env, protected by
          the webserver deny rule we inject by default). Power users can move
@@ -889,7 +1136,13 @@
          deployment contract sees today (mostly VM-derived) as a read-only
          list so operators can confirm what the deploy job will read from
          the resource graph. Attach / provision / detach UI lands in a
-         follow-up alongside per-site binding records. --}}
+         follow-up alongside per-site binding records.
+
+         Only rendered when the host component provides the binding actions +
+         modal state (Show/Settings). The Deployments-hub Environment tab
+         reuses this same partial but doesn't carry the binding plumbing, so
+         the whole block is gated to avoid undefined $bindingModal* vars. --}}
+    @if (method_exists($this, 'openBindingModal'))
     @php
         $siteBindings = app(\App\Services\Deploy\SiteResourceBindingResolver::class)->forSite($site);
         $bindingStatusBadge = [
@@ -1072,6 +1325,7 @@
             </x-primary-button>
         </div>
     </x-modal>
+    @endif
 
     <x-cli-snippet
         :intro="__('Manage env via CLI when you have many keys at once:')"

@@ -129,6 +129,7 @@ class Site extends Model
         'dns_zone',
         'name',
         'slug',
+        'logo_path',
         'type',
         'document_root',
         'repository_path',
@@ -919,6 +920,26 @@ class Site extends Model
         return ($this->primaryDomain()?->hostname)
             ? 'http://'.$this->primaryDomain()->hostname
             : null;
+    }
+
+    /**
+     * Public URL of the site's custom logo (uploaded or pulled from its
+     * favicon), or null when none is set — callers fall back to the generated
+     * gradient + initials avatar. Stored on the `public` disk.
+     */
+    public function logoUrl(): ?string
+    {
+        $path = $this->logo_path;
+        if (! is_string($path) || $path === '') {
+            return null;
+        }
+
+        return \Illuminate\Support\Facades\Storage::disk('public')->url($path);
+    }
+
+    public function hasLogo(): bool
+    {
+        return is_string($this->logo_path) && $this->logo_path !== '';
     }
 
     public function isProvisioning(): bool
@@ -2795,9 +2816,20 @@ class Site extends Model
     /**
      * Required env keys the site declares but that aren't satisfied — i.e. not
      * present with a non-empty value in its .env cache and not inherited from
-     * the workspace. Drives the "missing variables" warning on the Environment
-     * tab. Only keys flagged `required` by the scanner are returned (config
-     * keys that always carry a default are advisory, not flagged).
+     * the workspace. Drives the "missing variables" warning and the deploy
+     * gate.
+     *
+     * "Required" is the INTERSECTION of two signals: the key is referenced by
+     * env() with no default argument (`code` — the app genuinely can't fall
+     * back) AND the author declared it in .env.example (`example` — they
+     * intend every deploy to set it). Requiring both keeps the list realistic:
+     *   - .env.example keys that carry a config default (APP_DEBUG, APP_ENV,
+     *     locales, BCRYPT_ROUNDS) are optional → excluded (no `code`).
+     *   - no-default refs to optional integrations the author did NOT put in
+     *     .env.example (ABLY_KEY, BITBUCKET_*, CLOUDFLARE_*, AWS_EC2_*) are
+     *     opt-in → excluded (no `example`).
+     * On the dply monorepo this collapses ~990 detected vars to ~13 genuinely
+     * required ones (APP_KEY, AWS creds, MAIL_*, REDIS_PASSWORD, REVERB_*).
      *
      * @param  list<string>  $presentKeys  keys already set with a non-empty value
      * @param  list<string>  $inheritedKeys  workspace-inherited keys (also count as satisfied)
@@ -2805,11 +2837,20 @@ class Site extends Model
      */
     public function missingRequiredEnvKeys(array $presentKeys, array $inheritedKeys = []): array
     {
-        $satisfied = array_flip([...$presentKeys, ...$inheritedKeys]);
+        // Per-variable opt-outs (operator ignored specific keys) count as
+        // satisfied — like skip_env_gate but granular.
+        $ignored = array_values((array) ($this->meta['ignored_env_keys'] ?? []));
+        $satisfied = array_flip([...$presentKeys, ...$inheritedKeys, ...$ignored]);
 
         $missing = [];
         foreach (($this->envRequirements()['keys'] ?? []) as $entry) {
-            if (! is_array($entry) || ($entry['required'] ?? false) !== true) {
+            if (! is_array($entry)) {
+                continue;
+            }
+            $sources = array_values((array) ($entry['sources'] ?? []));
+            // Both signals required (see method doc): no-default usage AND
+            // declared in .env.example.
+            if (! in_array('code', $sources, true) || ! in_array('example', $sources, true)) {
                 continue;
             }
             $key = (string) ($entry['key'] ?? '');
@@ -2818,7 +2859,7 @@ class Site extends Model
             }
             $missing[] = [
                 'key' => $key,
-                'sources' => array_values((array) ($entry['sources'] ?? [])),
+                'sources' => $sources,
                 'required' => true,
                 'example' => isset($entry['example']) ? (string) $entry['example'] : null,
             ];

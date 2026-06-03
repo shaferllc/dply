@@ -267,6 +267,13 @@ class Show extends Component
      */
     public array $missing_env_values = [];
 
+    /**
+     * Scratch buffer for the "paste a .env to auto-fill" box in the missing
+     * variables modal. Parsed by {@see fillMissingFromPaste()} into the
+     * matching {@see $missing_env_values} inputs; never persisted directly.
+     */
+    public string $missing_env_paste = '';
+
     public string $new_redirect_from = '';
 
     public string $new_redirect_to = '';

@@ -265,6 +265,12 @@ class RunSiteDeploymentJob implements ShouldQueue
             return;
         }
 
+        // Operator opted out of the required-env gate for this site — deploys
+        // proceed even with missing vars, and it's on them if the app errors.
+        if (($site->meta['skip_env_gate'] ?? false) === true) {
+            return;
+        }
+
         if (($site->envRequirements()['keys'] ?? []) === []) {
             return;
         }

@@ -49,6 +49,15 @@ trait ManagesSiteEnvironment
 
     public string $env_file_path_override = '';
 
+    /** Live filter for the variables list (matches key names, case-insensitive). */
+    public string $env_search = '';
+
+    /** Selected prefix group to filter the variables list ('' = all). */
+    public string $env_group = '';
+
+    /** Editable buffer for the "Edit all" modal (the full .env as text). */
+    public string $edit_all_env = '';
+
     /** @var array<string, string> */
     public array $missing_env_values = [];
 
@@ -277,6 +286,53 @@ trait ManagesSiteEnvironment
     }
 
     /**
+     * Open the "Edit all" modal, pre-filled with the full current .env as
+     * editable text.
+     */
+    public function openEditAllEnv(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->edit_all_env = (string) ($this->site->env_file_content ?? '');
+        $this->dispatch('open-modal', 'edit-all-env-modal');
+    }
+
+    /**
+     * Replace the entire env cache with the edited text. Unlike bulk import
+     * (which merges), this is a full rewrite — keys removed from the textarea
+     * are dropped. Parse errors are surfaced and nothing is written.
+     */
+    public function saveAllEnv(DotEnvFileParser $parser, DotEnvFileWriter $writer): void
+    {
+        $this->authorize('update', $this->site);
+        $this->validate(['edit_all_env' => 'nullable|string|max:200000']);
+
+        $parsed = $parser->parse((string) $this->edit_all_env);
+        if ($parsed['errors'] !== []) {
+            foreach ($parsed['errors'] as $err) {
+                $this->addError('edit_all_env', $err);
+            }
+
+            return;
+        }
+
+        $this->site->forceFill([
+            'env_file_content' => $writer->render($parsed['variables'], $parsed['comments']),
+            'env_cache_origin' => 'local-edit',
+        ])->save();
+
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.env.bulk_imported', $this->site, null, [
+                'imported_count' => count($parsed['variables']),
+                'imported_keys' => array_keys($parsed['variables']),
+            ]);
+        }
+
+        $this->dispatch('close-modal', 'edit-all-env-modal');
+        $this->autoPushAfterCacheMutation(__('Environment replaced — :count variable(s).', ['count' => count($parsed['variables'])]));
+    }
+
+    /**
      * Open the inline editor for a single key.
      */
     public function editEnvVar(DotEnvFileParser $parser, string $key): void
@@ -500,6 +556,61 @@ trait ManagesSiteEnvironment
         $this->missing_env_values = [];
         $this->dispatch('close-modal', 'add-missing-env-modal');
         $this->autoPushAfterCacheMutation(__(':count variable(s) added.', ['count' => count($additions)]));
+    }
+
+    /**
+     * Pre-seed a `queued` console_actions row for the current site so the
+     * progress banner appears the moment a job is dispatched. Mirrors the
+     * helper on {@see \App\Livewire\Sites\Show} — kept here too so this trait
+     * is self-contained for components (e.g. DeploymentsList) that don't carry
+     * Show's inline copy. Auto-dismisses stale rows so one run shows at a time.
+     */
+    protected function seedQueuedConsoleAction(string $kind, ?string $label = null): ConsoleAction
+    {
+        ConsoleAction::query()
+            ->where('subject_type', $this->site->getMorphClass())
+            ->where('subject_id', $this->site->id)
+            ->whereNull('dismissed_at', 'and', false)
+            ->whereIn('status', [ConsoleAction::STATUS_COMPLETED, ConsoleAction::STATUS_FAILED], 'and', false)
+            ->update(['dismissed_at' => now()]);
+
+        $staleSeconds = (int) config('console_actions.stale_after_seconds', 600);
+        ConsoleAction::query()
+            ->where('subject_type', $this->site->getMorphClass())
+            ->where('subject_id', $this->site->id)
+            ->whereNull('dismissed_at', 'and', false)
+            ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING], 'and', false)
+            ->where('created_at', '<', now()->subSeconds($staleSeconds))
+            ->update(['dismissed_at' => now()]);
+
+        return ConsoleAction::query()->create([
+            'subject_type' => $this->site->getMorphClass(),
+            'subject_id' => $this->site->id,
+            'kind' => $kind,
+            'status' => ConsoleAction::STATUS_QUEUED,
+            'label' => $label,
+            'user_id' => request()->user()?->id ?? 0,
+            'output' => ['v' => (int) config('console_actions.current_version', 1), 'lines' => []],
+        ]);
+    }
+
+    /**
+     * Fill the APP_KEY input in the "Add missing variables" modal with a fresh
+     * Laravel-format key, so the operator can generate one inline instead of
+     * running `php artisan key:generate` on the box.
+     */
+    public function generateMissingAppKey(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->missing_env_values['APP_KEY'] = $this->freshAppKey();
+    }
+
+    /**
+     * A Laravel application key: base64: + 32 random bytes (AES-256-CBC).
+     */
+    protected function freshAppKey(): string
+    {
+        return 'base64:'.base64_encode(random_bytes(32));
     }
 
     /**

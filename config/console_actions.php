@@ -42,6 +42,12 @@ return [
             'failed' => '.env push failed.',
             'stale' => '.env push did not finish.',
         ],
+        'env_scan' => [
+            'running' => 'Scanning code for required variables on :host …',
+            'completed' => 'Environment requirements re-scanned.',
+            'failed' => 'Environment scan failed.',
+            'stale' => 'Environment scan did not finish.',
+        ],
         'ssl' => [
             'running' => 'Issuing SSL certificate on :host …',
             'completed' => 'SSL certificate issued.',
@@ -217,7 +223,7 @@ return [
         'wordpress' => ['webserver_config'],
         'basic-auth' => ['basic_auth_sync', 'webserver_config'],
         'webserver-config' => ['webserver_config'],
-        'environment' => ['env_sync', 'env_push'],
+        'environment' => ['env_sync', 'env_push', 'env_scan'],
     ],
 
     /*

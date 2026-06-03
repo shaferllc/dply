@@ -22,9 +22,13 @@
     <div class="{{ $card }}">
         <div class="border-b border-brand-ink/10 p-4 sm:p-5">
             <div class="flex items-start gap-3">
-                <span class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white font-semibold text-base shadow-sm ring-1 ring-brand-ink/10" style="{{ $sidebarAvatarStyle }}">
-                    {{ $sidebarInitials }}
-                </span>
+                @if ($site->logoUrl())
+                    <img src="{{ $site->logoUrl() }}" alt="{{ $site->name }}" class="h-12 w-12 shrink-0 rounded-2xl object-cover bg-white shadow-sm ring-1 ring-brand-ink/10" />
+                @else
+                    <span class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white font-semibold text-base shadow-sm ring-1 ring-brand-ink/10" style="{{ $sidebarAvatarStyle }}">
+                        {{ $sidebarInitials }}
+                    </span>
+                @endif
                 <div class="min-w-0 flex-1">
                     <p class="truncate text-base font-semibold text-brand-ink">{{ $sidebarPrimaryHostname }}</p>
                     @if ($server->workspace)

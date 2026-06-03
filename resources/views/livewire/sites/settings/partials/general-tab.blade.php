@@ -1,3 +1,5 @@
+@include('livewire.sites.settings.partials.logo')
+
 {{-- Read-only overview. Edit affordances live elsewhere:
      primary hostname → Routing > Domains (pencil on the row);
      everything else → Settings tab. --}}

@@ -314,6 +314,161 @@ class DeploymentsList extends Component
         $this->toastSuccess(__(':count variable(s) added and pushed. Re-deploy to continue.', ['count' => count($additions)]));
     }
 
+    /**
+     * Fill the APP_KEY input in the deploy-panel "Add variables" modal with a
+     * fresh Laravel key, so the operator can generate one without SSHing in.
+     */
+    public function generateBlockedAppKey(): void
+    {
+        Gate::authorize('update', $this->site);
+        $this->blocked_env_values['APP_KEY'] = $this->freshAppKey();
+    }
+
+    /**
+     * Skip the required-env gate for this site and deploy now. Persists the
+     * opt-out (meta.skip_env_gate) so future deploys also skip it, clears the
+     * recorded block, and dispatches a deploy — it's then on the operator if
+     * the app errors from missing vars.
+     */
+    public function deployIgnoringEnvGate(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta['skip_env_gate'] = true;
+        unset($meta['deploy_blocked_env']);
+        $this->site->forceFill(['meta' => $meta])->save();
+
+        RunSiteDeploymentJob::dispatch($this->site->fresh(), SiteDeployment::TRIGGER_MANUAL);
+        $this->toastSuccess(__('Required-env check turned off for this site. Deploy queued — it will run even with missing variables.'));
+    }
+
+    /**
+     * Ignore missing required variables for this site WITHOUT deploying — just
+     * turns off the gate and clears the recorded block so the banners go away.
+     * The operator can re-enable later. Use deployIgnoringEnvGate() instead to
+     * skip and ship in one step.
+     */
+    public function ignoreMissingEnv(): void
+    {
+        Gate::authorize('update', $this->site);
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta['skip_env_gate'] = true;
+        unset($meta['deploy_blocked_env']);
+        $this->site->forceFill(['meta' => $meta])->save();
+        $this->toastSuccess(__('Ignoring missing required variables for this site — deploys won\'t be blocked by them.'));
+    }
+
+    /**
+     * Re-enable the required-env gate (undo deployIgnoringEnvGate / ignoreMissingEnv).
+     */
+    public function enableEnvGate(): void
+    {
+        Gate::authorize('update', $this->site);
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        unset($meta['skip_env_gate']);
+        $this->site->forceFill(['meta' => $meta])->save();
+        $this->toastSuccess(__('Required-env check re-enabled. Deploys stop if required variables are missing.'));
+    }
+
+    /** Whether the required-env gate is currently disabled for this site. */
+    public function envGateSkipped(): bool
+    {
+        return ($this->site->meta['skip_env_gate'] ?? false) === true;
+    }
+
+    /**
+     * Confirm-modal wrappers (so these use the app's confirm modal rather than
+     * a native browser alert). Each opens {@see ConfirmsActionWithModal} which
+     * calls the real method on confirm.
+     */
+    public function confirmIgnoreMissingEnv(): void
+    {
+        Gate::authorize('update', $this->site);
+        $this->openConfirmActionModal(
+            method: 'ignoreMissingEnv',
+            title: __('Ignore missing variables?'),
+            message: __('Stop blocking and warning on the missing required variables for this site. Deploys will proceed even if they are unset — it\'s on you if the app errors. You can re-enable this later.'),
+            confirmLabel: __('Ignore them'),
+        );
+    }
+
+    public function confirmDeployIgnoringEnvGate(): void
+    {
+        Gate::authorize('update', $this->site);
+        $this->openConfirmActionModal(
+            method: 'deployIgnoringEnvGate',
+            title: __('Deploy without required variables?'),
+            message: __('The app may error at runtime until these are set. The required-env check will be turned off for this site and a deploy will start now.'),
+            confirmLabel: __('Deploy anyway'),
+        );
+    }
+
+    /** Confirm-modal wrapper for per-variable ignore (modal, not a browser alert). */
+    public function confirmIgnoreEnvKey(string $key): void
+    {
+        Gate::authorize('update', $this->site);
+        $key = trim($key);
+        if ($key === '') {
+            return;
+        }
+        $this->openConfirmActionModal(
+            method: 'ignoreEnvKey',
+            arguments: [$key],
+            title: __('Ignore :key?', ['key' => $key]),
+            message: __('Mark :key as intentionally unset for this site. It won\'t count as a missing required variable or block deploys. You can un-ignore it later.', ['key' => $key]),
+            confirmLabel: __('Ignore'),
+        );
+    }
+
+    /** Per-variable ignore: mark one required key as intentionally unset. */
+    public function ignoreEnvKey(string $key): void
+    {
+        Gate::authorize('update', $this->site);
+        $key = trim($key);
+        if ($key === '') {
+            return;
+        }
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $ignored = array_values(array_unique([...((array) ($meta['ignored_env_keys'] ?? [])), $key]));
+        $meta['ignored_env_keys'] = $ignored;
+        // Drop it from the recorded deploy block so the banner updates.
+        if (isset($meta['deploy_blocked_env']['keys']) && is_array($meta['deploy_blocked_env']['keys'])) {
+            $meta['deploy_blocked_env']['keys'] = array_values(array_filter(
+                $meta['deploy_blocked_env']['keys'],
+                static fn ($e): bool => is_array($e) && (string) ($e['key'] ?? '') !== $key,
+            ));
+            if ($meta['deploy_blocked_env']['keys'] === []) {
+                unset($meta['deploy_blocked_env']);
+            }
+        }
+        $this->site->forceFill(['meta' => $meta])->save();
+        $this->toastSuccess(__(':key will be ignored — deploys won\'t require it.', ['key' => $key]));
+    }
+
+    /** Undo a per-variable ignore. */
+    public function unignoreEnvKey(string $key): void
+    {
+        Gate::authorize('update', $this->site);
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta['ignored_env_keys'] = array_values(array_filter(
+            (array) ($meta['ignored_env_keys'] ?? []),
+            static fn ($k): bool => (string) $k !== trim($key),
+        ));
+        $this->site->forceFill(['meta' => $meta])->save();
+        $this->toastSuccess(__(':key is no longer ignored.', ['key' => $key]));
+    }
+
+    /**
+     * Keys the operator has individually ignored.
+     *
+     * @return list<string>
+     */
+    public function ignoredEnvKeys(): array
+    {
+        return array_values(array_map('strval', (array) ($this->site->meta['ignored_env_keys'] ?? [])));
+    }
+
     public function render(): View
     {
         $query = SiteDeployment::query()

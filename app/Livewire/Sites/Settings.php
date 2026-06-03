@@ -13,6 +13,7 @@ use App\Livewire\Concerns\DismissesConsoleActionRun;
 use App\Livewire\Concerns\ManagesContainerSite;
 use App\Livewire\Concerns\ManagesSiteBindings;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
+use App\Livewire\Sites\Concerns\ManagesSiteLogo;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\NotificationWebhookDestination;
@@ -77,6 +78,7 @@ class Settings extends Show
     use DismissesConsoleActionRun;
     use ManagesContainerSite;
     use ManagesSiteBindings;
+    use ManagesSiteLogo;
     use StreamsRemoteSshLivewire;
 
     protected function consoleActionSubject(): Model
