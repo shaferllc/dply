@@ -2,11 +2,13 @@
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\Server;
 use App\Models\WorkerPool;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -24,13 +26,31 @@ use Illuminate\Support\Facades\Log;
  */
 class CollectWorkerPoolStatsJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, WritesConsoleAction;
 
     public int $tries = 1;
+
+    private ?Server $resolvedSubject = null;
 
     public function __construct(public string $poolId)
     {
         $this->onQueue('dply-control');
+    }
+
+    protected function consoleSubject(): Model
+    {
+        if ($this->resolvedSubject instanceof Server) {
+            return $this->resolvedSubject;
+        }
+        $pool = WorkerPool::query()->with('servers')->find($this->poolId);
+        $server = $pool?->primaryServer ?? $pool?->sourceServer;
+
+        return $this->resolvedSubject = ($server instanceof Server ? $server : new Server);
+    }
+
+    protected function consoleKind(): string
+    {
+        return 'worker_pool_stats';
     }
 
     public function handle(ExecuteRemoteTaskOnServer $exec): void
@@ -39,23 +59,52 @@ class CollectWorkerPoolStatsJob implements ShouldQueue
         if (! $pool instanceof WorkerPool) {
             return;
         }
+        $this->resolvedSubject = $pool->primaryServer ?? $pool->sourceServer;
 
-        foreach ($pool->servers as $member) {
-            if (! $member->isReady()) {
-                continue;
+        $emit = $this->beginConsoleAction();
+
+        try {
+            foreach ($pool->servers as $member) {
+                if (! $member->isReady()) {
+                    $emit->warn(sprintf('%s — not ready, skipped', $member->name), 'stats');
+
+                    continue;
+                }
+
+                $dir = $this->appSiteDir($member);
+                $emit->step('stats', sprintf('probing %s (app dir: %s)', $member->name, $dir ?: '—'));
+
+                try {
+                    [$stats, $raw] = $this->probe($exec, $member, $dir);
+                } catch (\Throwable $e) {
+                    Log::info('worker-pool: stats probe failed', ['server_id' => $member->id, 'error' => $e->getMessage()]);
+                    $emit->error(sprintf('%s probe failed: %s', $member->name, $e->getMessage()), 'stats');
+
+                    continue;
+                }
+
+                // Surface the raw probe output so an operator can SEE why Redis
+                // is down (connection refused / auth / TLS) instead of guessing.
+                foreach (preg_split('/\r?\n/', $raw) ?: [] as $line) {
+                    if (trim($line) !== '') {
+                        $emit($member->name.': '.$line, 'info', 'stats');
+                    }
+                }
+                $redis = $stats['redis_ping'] ?? '';
+                $emit($redis === 'PONG' ? sprintf('%s — Redis OK', $member->name) : sprintf('%s — Redis %s', $member->name, $redis ?: 'unknown'),
+                    $redis === 'PONG' ? 'success' : 'warn', 'stats');
+
+                $meta = is_array($member->meta) ? $member->meta : [];
+                $meta['pool'] = array_merge($meta['pool'] ?? [], ['stats' => $stats]);
+                $member->forceFill(['meta' => $meta])->save();
             }
 
-            try {
-                $stats = $this->probe($exec, $member, $this->appSiteDir($member));
-            } catch (\Throwable $e) {
-                Log::info('worker-pool: stats probe failed', ['server_id' => $member->id, 'error' => $e->getMessage()]);
+            $this->completeConsoleAction();
+        } catch (\Throwable $e) {
+            $emit->error('Stats collection failed: '.$e->getMessage(), 'stats');
+            $this->failConsoleAction($e->getMessage());
 
-                continue;
-            }
-
-            $meta = is_array($member->meta) ? $member->meta : [];
-            $meta['pool'] = array_merge($meta['pool'] ?? [], ['stats' => $stats]);
-            $member->forceFill(['meta' => $meta])->save();
+            throw $e;
         }
     }
 
@@ -72,7 +121,7 @@ class CollectWorkerPoolStatsJob implements ShouldQueue
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{0: array<string, mixed>, 1: string} [parsed stats, raw probe output]
      */
     private function probe(ExecuteRemoteTaskOnServer $exec, Server $member, string $siteDir): array
     {
@@ -118,23 +167,28 @@ if [ -n "\$DIR" ] && [ -d "\$DIR" ]; then
     RP=\$(sed -n 's/^REDIS_PORT=//p' .env | head -n1 | tr -d "\\"' \\r")
   fi
   echo "REDIS_HOST=\${RH:-127.0.0.1}:\${RP:-6379}"
-  printf '%s' {$redisB64} | base64 -d | php artisan tinker 2>/dev/null || echo "REDIS_PING=down"
+  echo "--- redis probe (via app Redis::connection) ---"
+  # Keep stderr (2>&1) so connection/auth/TLS errors are VISIBLE in the console
+  # for debugging — the KEY=VALUE parser ignores any non KEY=VALUE noise.
+  printf '%s' {$redisB64} | base64 -d | php artisan tinker 2>&1 || echo "REDIS_PING=down"
 else
   echo "REDIS_HOST=:"
+  echo "REDIS_PING=down (no app dir resolved)"
 fi
 BASH;
 
         $bash = 'DIR='.escapeshellarg($siteDir)."\n".$probe;
         $out = $exec->runInlineBash($member, 'worker-pool:stats', $bash, timeoutSeconds: 45, asRoot: false);
 
-        $parsed = $this->parse((string) $out->buffer);
+        $raw = (string) $out->buffer;
+        $parsed = $this->parse($raw);
         $parsed['ok'] = $out->exitCode === 0;
         // Stamp is set by the dispatcher path after return is not possible (jobs
         // can't use now() deterministically in resume), but a plain wall-clock
         // read here is fine — this isn't a resumable workflow.
         $parsed['collected_at'] = now()->toIso8601String();
 
-        return $parsed;
+        return [$parsed, $raw];
     }
 
     /**

@@ -860,6 +860,12 @@
                 </div>
             </section>
 
+            {{-- Stats-probe console: raw per-member host/worker/Redis output (incl. Redis errors) from Refresh stats. --}}
+            @include('livewire.partials.console-action-banner-static', [
+                'run' => $statsRun,
+                'kindLabels' => (array) config('console_actions.kinds', []),
+            ])
+
             {{-- Test-jobs console: dispatches throwaway jobs and shows the workers processing them. --}}
             @include('livewire.partials.console-action-banner-static', [
                 'run' => $testRun,

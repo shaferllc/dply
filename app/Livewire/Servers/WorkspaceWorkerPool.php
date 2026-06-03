@@ -523,6 +523,21 @@ class WorkspaceWorkerPool extends Component
     }
 
     /**
+     * Latest non-dismissed stats-probe console run, so Refresh stats shows the
+     * raw per-member probe output (incl. Redis errors) for debugging.
+     */
+    public function statsRun(): ?ConsoleAction
+    {
+        return ConsoleAction::query()
+            ->where('subject_type', $this->server->getMorphClass())
+            ->where('subject_id', $this->server->getKey())
+            ->where('kind', 'worker_pool_stats')
+            ->whereNull('dismissed_at')
+            ->orderByDesc('created_at')
+            ->first();
+    }
+
+    /**
      * Latest non-dismissed test-jobs console run (server subject), for the
      * Traffic tab's test console banner.
      */
@@ -789,6 +804,7 @@ class WorkspaceWorkerPool extends Component
             'perWorkerCents' => $perWorkerCents,
             'scaleRun' => $this->scaleRun(),
             'testRun' => $this->testRun(),
+            'statsRun' => $this->statsRun(),
         ]);
     }
 }

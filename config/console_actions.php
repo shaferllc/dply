@@ -230,6 +230,14 @@ return [
             'failed' => 'Test jobs did not all process.',
             'stale' => 'Test job run did not finish.',
         ],
+        // Live per-member host/worker/Redis probe — streams raw probe output so
+        // operators can see exactly what each box reported (incl. Redis errors).
+        'worker_pool_stats' => [
+            'running' => 'Collecting worker stats on :host …',
+            'completed' => 'Worker stats collected.',
+            'failed' => 'Worker stats collection failed.',
+            'stale' => 'Worker stats collection did not finish.',
+        ],
     ],
 
     /*
