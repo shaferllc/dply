@@ -8,6 +8,9 @@
 @endphp
 
 @unless ($isLocked)
+{{-- The intro card (and its "Open deployments" link) is redundant when embedded
+     inside the Deployments page — we're already there. Show it only standalone. --}}
+@unless ($isEmbedded)
 <section class="{{ $card }}">
     <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
         <div class="flex min-w-0 items-start gap-3">
@@ -44,6 +47,7 @@
         </div>
     </div>
 </section>
+@endunless
 
 <x-server-workspace-tablist :aria-label="__('Pipeline sections')" class="mt-6">
     @foreach ($pipelineTabs as $tabId => $tabLabel)

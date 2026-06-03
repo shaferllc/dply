@@ -75,8 +75,8 @@
                 </p>
                 </div>
             </div>
-            @if (method_exists($this, 'optimizePipeline'))
-                <div class="flex shrink-0 items-center gap-2">
+            <div class="flex shrink-0 flex-wrap items-center gap-2">
+                @if (method_exists($this, 'optimizePipeline'))
                     <button
                         type="button"
                         wire:click="optimizePipeline"
@@ -90,21 +90,20 @@
                         <span wire:loading.remove wire:target="optimizePipeline">{{ __('Optimize pipeline') }}</span>
                         <span wire:loading wire:target="optimizePipeline">{{ __('Scanning…') }}</span>
                     </button>
-                </div>
-            @endif
+                @endif
+                <button
+                    type="button"
+                    x-on:click="$dispatch('open-modal', 'pipeline-share')"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
+                    title="{{ __('Export or import this pipeline') }}"
+                >
+                    <x-heroicon-o-share class="h-3.5 w-3.5" aria-hidden="true" />
+                    {{ __('Share') }}
+                </button>
+            </div>
         </div>
 
-        @if (($pipelineActionableChecks ?? collect())->isNotEmpty())
-            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-8">
-                <x-site-preflight-issues-panel
-                    :checks="$pipelineActionableChecks"
-                    compact
-                    section-id="pipeline-advisor-issues"
-                    :title="__('Pipeline review')"
-                    :description="__('These checks catch common ordering and phase mistakes before the next deploy.')"
-                />
-            </div>
-        @endif
+        {{-- Pipeline review lives on the Overview subtab — not duplicated here. --}}
 
         <div class="space-y-6 border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-4 sm:px-8">
             <div class="flex flex-wrap items-center gap-2">
@@ -140,6 +139,9 @@
                 </button>
             </div>
 
+            {{-- Branch→pipeline routing only matters with 2+ pipelines; with a
+                 single pipeline it always runs regardless, so hide the noise. --}}
+            @if ($pipelineCount > 1)
             <form wire:submit="saveEditingPipelineBranches" class="rounded-2xl border border-brand-ink/10 bg-white p-4">
                 <label for="editing_pipeline_branches" class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Git branches') }}</label>
                 <p class="mb-2 text-sm text-brand-moss">
@@ -160,6 +162,7 @@
                 </div>
                 <x-input-error :messages="$errors->get('editing_pipeline_branches')" class="mt-1" />
             </form>
+            @endif
 
             <div class="flex flex-wrap items-center gap-2">
                 @unless ($isActiveDeployPipeline)
@@ -270,9 +273,9 @@
             </details>
         @endif
 
+        {{-- Share pipeline moved to a modal opened from the pipeline header. --}}
         <div class="space-y-4 px-6 pt-4 sm:px-8">
             @include('livewire.sites.partials.pipeline._pipeline-quick-commands')
-            @include('livewire.sites.partials.pipeline._pipeline-share')
         </div>
 
         <div class="space-y-6 p-6 sm:p-8">
@@ -498,24 +501,9 @@
                 </div>
             </div>
 
-            <details class="rounded-2xl border border-brand-ink/10 bg-white">
-                <summary class="cursor-pointer list-none px-4 py-4 sm:px-5">
-                    <span class="text-sm font-semibold text-brand-ink">{{ __('All available steps & hooks') }}</span>
-                    <span class="ml-2 text-xs text-brand-moss">{{ __('full catalog — including types hidden from the palettes above') }}</span>
-                </summary>
-                <div class="border-t border-brand-ink/10 px-2 pb-4 sm:px-3">
-                    @include('livewire.sites.partials.pipeline._step-catalog')
-                </div>
-            </details>
-
-            <div class="rounded-2xl border border-brand-ink/10 bg-brand-cream/50 p-4 sm:p-5">
-                <p class="text-sm font-semibold text-brand-ink">{{ __('Post-deploy command') }}</p>
-                <p class="mt-1 text-sm text-brand-moss">{{ __('Optional shell script after all pipeline pills finish.') }}</p>
-                <div class="mt-4">
-                    <textarea id="pipeline_post_deploy_command" wire:model="post_deploy_command" rows="3" class="w-full rounded-lg border border-brand-ink/15 font-mono text-sm shadow-sm"></textarea>
-                    <p class="mt-2 text-xs text-brand-moss">{{ __('Use the save bar at the bottom of the page when you are ready to persist changes.') }}</p>
-                </div>
-            </div>
+            {{-- Full step/hook catalog lives on the Reference subtab; the
+                 post-deploy command lives in the deploy recipe settings — not
+                 duplicated here. --}}
         </div>
     </section>
 

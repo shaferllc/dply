@@ -68,7 +68,7 @@
         </div>
         <div class="px-6 py-5 sm:px-8">
             <p class="max-w-2xl text-sm leading-relaxed text-brand-moss">
-                {{ __('Each database can be opened to a specific CIDR — a VPC subnet like 10.0.0.0/8 to allow only your own servers, or 0.0.0.0/0 for public internet. Dply writes the pg_hba rule (or MySQL GRANT) for that database only and manages a UFW rule for port :port.', ['port' => $enginePort]) }}
+                {{ __('Each database can be opened to a specific CIDR — a VPC subnet like 10.0.0.0/8 to allow only your own servers, or a single app server like 203.0.113.5/32. A trusted source is required; leave remote access off to keep the port closed. Dply writes the pg_hba rule (or MySQL GRANT) for that database only and opens the UFW rule for port :port to that source alone.', ['port' => $enginePort]) }}
             </p>
             @if ($anyExposed && ! $engineRunning)
                 <p class="mt-2 max-w-2xl text-sm text-amber-700">
@@ -82,7 +82,7 @@
     @foreach ($engineDatabases as $db)
         @php
             $dbRemote = (bool) $db->remote_access;
-            $dbCidr = $db->allowed_from ?? '0.0.0.0/0';
+            $dbCidr = $db->allowed_from ?: __('no source set');
         @endphp
         <div class="{{ $card }} overflow-hidden" wire:key="db-networking-{{ $db->id }}">
             <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/10 px-6 py-4 sm:px-8">
@@ -137,13 +137,13 @@
                                 id="db_networking_cidr_{{ $db->id }}"
                                 type="text"
                                 wire:model="db_networking_allowed_from.{{ $db->id }}"
-                                placeholder="0.0.0.0/0"
+                                placeholder="10.0.0.0/8"
                                 class="block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-sm text-brand-ink shadow-sm placeholder:text-brand-mist focus:border-brand-forest focus:ring-1 focus:ring-brand-forest"
                             />
                             @error('db_networking_allowed_from.'.$db->id)
                                 <p class="text-xs text-rose-700">{{ $message }}</p>
                             @enderror
-                            <p class="text-[11px] text-brand-moss">{{ __('10.0.0.0/8 for VPC · 0.0.0.0/0 for internet') }}</p>
+                            <p class="text-[11px] text-brand-moss">{{ __('Required · 10.0.0.0/8 for a VPC · 203.0.113.5/32 for one app server') }}</p>
                         </div>
                         <button
                             type="button"

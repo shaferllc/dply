@@ -148,6 +148,12 @@ class DeploymentsList extends Component
         $this->server = $server;
         $this->site = $site;
 
+        // Rollout folded into Pipeline as a subtab (workspace-pipeline's own
+        // Rollout subtab); old ?tab=rollout links resolve to the Pipeline tab.
+        if ($this->tab === self::TAB_ROLLOUT) {
+            $this->tab = self::TAB_PIPELINE;
+        }
+
         if (! in_array($this->tab, self::TABS, true)) {
             $this->tab = self::TAB_DEPLOY;
         }
@@ -524,7 +530,8 @@ class DeploymentsList extends Component
             self::TAB_FILES => false,
             self::TAB_BRANCHES => false,
             self::TAB_PIPELINE => $isVmDeployHub,
-            self::TAB_ROLLOUT => $isVmDeployHub,
+            // Rollout folded into Pipeline as a subtab.
+            self::TAB_ROLLOUT => false,
             self::TAB_RELEASES => $atomicReleases,
             self::TAB_HISTORY => true,
             // Settings consolidated up into Webhook + Hooks tabs.

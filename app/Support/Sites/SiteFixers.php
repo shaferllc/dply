@@ -61,6 +61,14 @@ final class SiteFixers
                 'sudo' => true, 'cwd' => false, 'timeout' => 300,
                 'detect' => '/could not find driver[^)]*mysql|mysql[^)]*could not find driver/is',
             ],
+            'install_php_redis' => [
+                'label' => 'Install the PHP Redis extension',
+                'reason' => 'PHP is missing the redis extension — the app fails with Class "Redis" not found.',
+                'kind' => 'shell',
+                'command' => 'V=$(php -r "echo PHP_MAJOR_VERSION.\".\".PHP_MINOR_VERSION;"); apt-get update -y >/dev/null 2>&1; DEBIAN_FRONTEND=noninteractive apt-get install -y "php$V-redis" && systemctl restart "php$V-fpm"',
+                'sudo' => true, 'cwd' => false, 'timeout' => 300,
+                'detect' => '/Class ["\']Redis["\'] not found|PhpRedisConnector|ext-redis|the redis extension/i',
+            ],
 
             // ---- missing DB client binaries (used by migrate schema load) -
             'install_pg_client' => [
@@ -94,6 +102,20 @@ final class SiteFixers
                 'reason' => 'The Vite manifest is missing — front-end assets were never built.',
                 'kind' => 'shell', 'command' => 'npm ci && npm run build', 'sudo' => false, 'cwd' => true, 'timeout' => 600,
                 'detect' => '/Vite manifest not found|Unable to locate file in Vite manifest/i',
+            ],
+            'npm_clean_reinstall' => [
+                'label' => 'Clean-reinstall npm packages',
+                'reason' => "npm's optional-dependency bug left a native binding missing — a clean reinstall fixes it.",
+                'kind' => 'shell', 'command' => 'rm -rf node_modules package-lock.json && npm install && npm run build', 'sudo' => false, 'cwd' => true, 'timeout' => 900,
+                'detect' => '/Cannot find native binding|npm has a bug related to optional dependencies|Cannot find module .*(rollup|esbuild|lightningcss).*\\.node/i',
+            ],
+            'install_node_20' => [
+                'label' => 'Upgrade to Node.js 20',
+                'reason' => 'The installed Node.js is too old for this build (Vite needs Node 20+).',
+                'kind' => 'shell',
+                'command' => 'curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null 2>&1 && DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs',
+                'sudo' => true, 'cwd' => false, 'timeout' => 600,
+                'detect' => '/You are using Node\.js [0-9.]+\..*requires Node\.js|Vite requires Node\.js version 2[0-9]|EBADENGINE.*node/is',
             ],
 
             // ---- PHP dependencies -----------------------------------------
@@ -150,6 +172,21 @@ final class SiteFixers
     public static function spec(string $key): ?array
     {
         return self::all()[$key] ?? null;
+    }
+
+    /**
+     * Reverse-map a fixer's UI label back to its key (labels are unique). Used to
+     * recover which fixer a persisted ConsoleAction belongs to after a reload.
+     */
+    public static function keyForLabel(string $label): ?string
+    {
+        foreach (self::all() as $key => $spec) {
+            if (($spec['label'] ?? null) === $label) {
+                return $key;
+            }
+        }
+
+        return null;
     }
 
     /**

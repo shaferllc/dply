@@ -177,8 +177,15 @@
                                                                 <span class="font-mono text-brand-mist">{{ $step['duration_ms'] >= 1000 ? number_format($step['duration_ms'] / 1000, 1).'s' : $step['duration_ms'].'ms' }}</span>
                                                             @endif
                                                         </div>
-                                                        @if ($stepFailed && ($step['output'] ?? '') !== '')
-                                                            <pre class="mt-1 max-h-40 overflow-auto rounded-lg bg-brand-ink p-2.5 font-mono text-[11px] leading-relaxed text-rose-100/95">{{ $step['output'] }}</pre>
+                                                        @if (($step['output'] ?? '') !== '')
+                                                            <div x-data="{ open: @js($stepFailed) }" class="mt-1">
+                                                                <button type="button" x-on:click="open = ! open"
+                                                                    class="inline-flex items-center gap-1 text-[10px] font-semibold {{ $stepFailed ? 'text-rose-700' : 'text-brand-moss' }} hover:underline">
+                                                                    <span class="font-mono" x-text="open ? '▾' : '▸'"></span>
+                                                                    <span x-text="open ? @js(__('Hide output')) : @js(__('Show output'))"></span>
+                                                                </button>
+                                                                <pre x-show="open" x-cloak class="mt-1 max-h-96 overflow-auto rounded-lg bg-brand-ink p-2.5 font-mono text-[11px] leading-relaxed {{ $stepFailed ? 'text-rose-100/95' : 'text-brand-cream/90' }}">{{ $step['output'] }}</pre>
+                                                            </div>
                                                         @endif
                                                     </li>
                                                 @endforeach

@@ -49,6 +49,35 @@ class DeployControl extends Component
 
         $this->site = $site instanceof Site ? $site : null;
         $this->server = $server instanceof Server ? $server : $this->site?->server;
+
+        $this->restoreInFlightFixer();
+    }
+
+    /**
+     * Re-attach to a smart-fix that's still queued/running for this site so its
+     * "Processing…" state and live output survive a page reload (the job and its
+     * ConsoleAction keep running in the background regardless of the page).
+     */
+    protected function restoreInFlightFixer(): void
+    {
+        if ($this->site === null) {
+            return;
+        }
+
+        $run = ConsoleAction::query()
+            ->where('subject_type', $this->site->getMorphClass())
+            ->where('subject_id', $this->site->id)
+            ->where('kind', 'site_remediate')
+            ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING])
+            ->latest()
+            ->first();
+
+        if ($run === null) {
+            return;
+        }
+
+        $this->fixerRunId = (string) $run->id;
+        $this->fixerRunKey = SiteFixers::keyForLabel((string) $run->label);
     }
 
     #[Computed]

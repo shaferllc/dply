@@ -128,7 +128,7 @@
                                         <x-heroicon-o-link class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
                                         <code class="min-w-0 flex-1 truncate font-mono text-[11px] text-brand-ink">{{ $connStr }}</code>
                                         <span class="shrink-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 ring-1 ring-amber-200">
-                                            {{ $db->allowed_from ?? '0.0.0.0/0' }}
+                                            {{ $db->allowed_from ?: __('no source set') }}
                                         </span>
                                     </div>
                                 @endforeach
@@ -140,41 +140,31 @@
                             @php
                                 $tunnelCmds = [];
                                 $localPort = 15400;
+                                $sshUser = trim((string) $s->ssh_user) !== '' ? trim((string) $s->ssh_user) : 'deploy';
                                 foreach ($databaseEnginesByServer->get($s->id, collect()) as $eng) {
                                     $tunnelCmds[] = [
-                                        'label' => ($eng->engine === 'postgres' ? 'PostgreSQL' : ucfirst($eng->engine)).' port '.$eng->port,
-                                        'cmd' => "ssh -L {$localPort}:{$s->private_ip_address}:{$eng->port} deploy@{$s->ip_address}",
-                                        'local_port' => $localPort,
+                                        'label' => ($eng->engine === 'postgres' ? 'PostgreSQL' : ucfirst($eng->engine)).' '.$eng->port.' → localhost:'.$localPort,
+                                        'command' => "ssh -L {$localPort}:{$s->private_ip_address}:{$eng->port} {$sshUser}@{$s->ip_address}",
                                     ];
                                     $localPort += 100;
                                 }
                                 foreach ($cacheServicesByServer->get($s->id, collect()) as $cache) {
                                     $tunnelCmds[] = [
-                                        'label' => ucfirst($cache->engine).' port '.$cache->port,
-                                        'cmd' => "ssh -L {$localPort}:{$s->private_ip_address}:{$cache->port} deploy@{$s->ip_address}",
-                                        'local_port' => $localPort,
+                                        'label' => ucfirst($cache->engine).' '.$cache->port.' → localhost:'.$localPort,
+                                        'command' => "ssh -L {$localPort}:{$s->private_ip_address}:{$cache->port} {$sshUser}@{$s->ip_address}",
                                     ];
                                     $localPort += 100;
                                 }
                             @endphp
                             @if (! empty($tunnelCmds))
-                                <details class="mt-3 group">
-                                    <summary class="cursor-pointer text-[11px] font-medium text-brand-sage hover:underline list-none flex items-center gap-1">
-                                        <x-heroicon-m-arrow-right class="h-3 w-3 transition group-open:rotate-90" aria-hidden="true" />
-                                        {{ __('SSH tunnel commands') }}
-                                    </summary>
-                                    <div class="mt-2 space-y-1.5">
-                                        @foreach ($tunnelCmds as $t)
-                                            <div class="flex items-start gap-2 rounded-lg border border-brand-ink/10 bg-white px-3 py-2">
-                                                <x-heroicon-o-command-line class="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
-                                                <div class="min-w-0 flex-1">
-                                                    <p class="text-[10px] text-brand-mist">{{ $t['label'] }} → localhost:{{ $t['local_port'] }}</p>
-                                                    <code class="block truncate font-mono text-[11px] text-brand-ink">{{ $t['cmd'] }}</code>
-                                                </div>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </details>
+                                <x-cli-snippet
+                                    :commands="$tunnelCmds"
+                                    tone="details"
+                                    :summary="__('SSH tunnel commands')"
+                                    :intro="__('Run one of these from your machine, then point your client at localhost on the listed port. Tunnels through this server\'s own SSH — for a database scoped to a different host, use the jump-host access below.')"
+                                    size="10"
+                                    class="mt-3"
+                                />
                             @endif
                             @if ($s->provider->value === 'hetzner' && $s->hetzner_network_id)
                                 <div class="mt-2 flex items-center gap-2">
@@ -259,8 +249,14 @@
                         </div>
                         <div class="divide-y divide-brand-ink/5">
                             @foreach ($dbs as $db)
-                                @php $dbRemote = (bool) $db->remote_access; @endphp
-                                <div class="flex flex-wrap items-center justify-between gap-4 px-6 py-4 sm:px-7" wire:key="net-db-{{ $db->id }}">
+                                @php
+                                    $dbRemote = (bool) $db->remote_access;
+                                    $jumpHosts = $dbRemote
+                                        ? \App\Support\Servers\DatabaseJumpHostAccess::eligibleJumpHosts($db, $server, $peerServers)
+                                        : collect();
+                                @endphp
+                                <div class="px-6 py-4 sm:px-7" wire:key="net-db-{{ $db->id }}">
+                                  <div class="flex flex-wrap items-center justify-between gap-4">
                                     <div class="flex min-w-0 items-center gap-3">
                                         <div class="min-w-0">
                                             <p class="truncate font-mono text-sm font-semibold text-brand-ink">{{ $db->name }}</p>
@@ -271,7 +267,7 @@
                                         @if ($dbRemote)
                                             <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-800 ring-1 ring-amber-200">
                                                 <span aria-hidden="true" class="inline-block h-1 w-1 rounded-full bg-amber-500"></span>
-                                                {{ $db->allowed_from ?? '0.0.0.0/0' }}
+                                                {{ $db->allowed_from ?: __('no source set') }}
                                             </span>
                                         @else
                                             <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-medium text-brand-moss ring-1 ring-brand-ink/10">
@@ -316,6 +312,33 @@
                                             </button>
                                         </div>
                                     @endif
+                                  </div>
+
+                                  @if ($dbRemote)
+                                    @php
+                                        $accessRows = [];
+                                        $jumpLocalPort = \App\Support\Servers\DatabaseJumpHostAccess::BASE_LOCAL_PORT;
+                                        foreach ($jumpHosts as $jh) {
+                                            $jumpCmds = \App\Support\Servers\DatabaseJumpHostAccess::commandsFor($db, $server, $jh, (int) $engineRow->port, $jumpLocalPort);
+                                            $accessRows[] = ['label' => __('Tunnel via :name', ['name' => $jh->name]), 'command' => $jumpCmds['tunnel']];
+                                            $accessRows[] = ['label' => __('Then connect'), 'command' => $jumpCmds['connect']];
+                                            $jumpLocalPort += 10;
+                                        }
+                                    @endphp
+                                    <div class="mt-3 rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-3.5 py-3">
+                                        <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Access via jump host') }}</p>
+                                        @if (! empty($accessRows))
+                                            <p class="mt-1 text-[11px] leading-relaxed text-brand-moss">
+                                                {{ __(':db only accepts connections from :src, so connect through an allowlisted server: run the tunnel, then point your client at localhost on the listed port.', ['db' => $db->name, 'src' => $db->allowed_from]) }}
+                                            </p>
+                                            <x-cli-snippet :commands="$accessRows" tone="details" :summary="__('Show tunnel commands')" size="10" class="mt-2" />
+                                        @else
+                                            <p class="mt-1 text-[11px] leading-relaxed text-brand-moss">
+                                                {{ __('No server in this organization has a private IP inside :src. Add an allowlisted server\'s private IP to the source above, or connect from a host that is already allowed.', ['src' => $db->allowed_from ?: __('the allowlist')]) }}
+                                            </p>
+                                        @endif
+                                    </div>
+                                  @endif
                                 </div>
                             @endforeach
                         </div>

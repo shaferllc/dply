@@ -1,6 +1,7 @@
 @include('livewire.sites.partials.pipeline._pipeline-step-modal')
 @include('livewire.sites.partials.pipeline._pipeline-hook-modal')
 @include('livewire.sites.partials.pipeline._pipeline-anchor-modal')
+@include('livewire.sites.partials.pipeline._pipeline-share-modal')
 
 @if ($show_apply_starter_modal ?? false)
     <x-modal name="apply-pipeline-starter" :show="true" focusable>

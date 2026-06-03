@@ -322,7 +322,7 @@
                                 <div class="px-6 py-4">
                                     <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">
                                         {{ __('Remote (public)') }}
-                                        <span class="ml-1 font-normal normal-case text-amber-700">— {{ $publicIp }} · {{ $cDb->allowed_from ?? '0.0.0.0/0' }}</span>
+                                        <span class="ml-1 font-normal normal-case text-amber-700">— {{ $publicIp }} · {{ $cDb->allowed_from ?: __('no source set') }}</span>
                                     </p>
                                     <div class="space-y-2">
                                         <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-cream/30 px-3 py-2.5" x-data="{ showUrl: false }">
