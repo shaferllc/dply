@@ -116,6 +116,7 @@ use App\Livewire\Servers\ImportFromDigitalOcean as ServersImportFromDigitalOcean
 use App\Livewire\Servers\Index as ServersIndex;
 use App\Livewire\Servers\ProvisionJourney as ServerProvisionJourney;
 use App\Livewire\Servers\WorkspaceActivity;
+use App\Livewire\Servers\WorkspaceErrors;
 use App\Livewire\Servers\WorkspaceBackups;
 use App\Livewire\Servers\WorkspaceBackupsPreview;
 use App\Livewire\Servers\WorkspaceBlueprint;
@@ -193,6 +194,7 @@ use App\Livewire\Sites\EdgePreviewComments;
 use App\Livewire\Sites\EnvDiff as SitesEnvDiff;
 use App\Livewire\Sites\Files;
 use App\Livewire\Sites\Index as SitesIndex;
+use App\Livewire\Sites\Errors as SitesErrors;
 use App\Livewire\Sites\Monitor as SitesMonitor;
 use App\Livewire\Sites\Repository;
 use App\Livewire\Sites\Resources;
@@ -676,6 +678,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites/{site}/insights', SitesWorkspaceInsights::class)->name('sites.insights');
     Route::livewire('servers/{server}/sites/{site}/webserver-config', SitesWebserverConfig::class)->name('sites.webserver-config');
     Route::livewire('servers/{server}/sites/{site}/monitor', SitesMonitor::class)->name('sites.monitor');
+    Route::livewire('servers/{server}/sites/{site}/errors', SitesErrors::class)->name('sites.errors');
     // Commits were merged into the Repository page as a tab. Keep the route
     // name working by redirecting to repository?tab=commits.
     Route::get('servers/{server}/sites/{site}/commits', function (Server $server, Site $site) {
@@ -868,6 +871,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         ->where('path', '.*')
         ->name('servers.envoy.admin');
     Route::livewire('servers/{server}/configuration', WorkspaceConfiguration::class)->name('servers.configuration');
+    Route::livewire('servers/{server}/errors', WorkspaceErrors::class)->name('servers.errors');
     Route::livewire('servers/{server}/databases', WorkspaceDatabases::class)->name('servers.databases');
     Route::middleware('feature:workspace.caches')->group(function (): void {
         Route::livewire('servers/{server}/caches', WorkspaceCaches::class)->name('servers.caches');

@@ -24,6 +24,9 @@ trait ManagesSiteBindings
     /** database | scheduler | workers | redis | queue | storage */
     public ?string $fixBindingId = null;
 
+    /** The in-flight fix run id — when set, the fix modal shows live progress in place. */
+    public ?string $fixBindingRunId = null;
+
     public string $bindingModalType = '';
 
     /** attach | provision */
@@ -131,9 +134,20 @@ trait ManagesSiteBindings
     }
 
     /**
+     * Open the fix modal for a binding: stash the binding id and clear any
+     * progress from a previous run so the options (not stale output) render.
+     */
+    public function startFixBinding(string $bindingId): void
+    {
+        $this->fixBindingId = $bindingId;
+        $this->fixBindingRunId = null;
+    }
+
+    /**
      * Make an UNREACHABLE binding reachable: optionally re-point it at the right
      * backend, then enable remote access + firewall the consumer's /32 and
-     * re-probe. Streams to the deploy hub's console banner.
+     * re-probe. Streams live progress inside the fix modal (the modal stays open
+     * and switches from the options view to the console output).
      */
     public function fixBindingConnectivity(string $bindingId, ?string $repointTargetId = null): void
     {
@@ -158,8 +172,8 @@ trait ManagesSiteBindings
             (string) (auth()->id() ?? '') ?: null,
         );
 
-        $this->dispatch('dply-console-action-focus');
-        $this->dispatch('close-modal', name: 'fix-binding-modal');
+        // Switch the (still-open) modal to the live-progress view.
+        $this->fixBindingRunId = (string) $run->id;
         $this->watchConsoleAction(
             $run,
             __('Connectivity fix applied — re-probing the connection.'),

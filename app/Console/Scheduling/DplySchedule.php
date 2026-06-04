@@ -30,6 +30,8 @@ use App\Console\Commands\ProcessScheduledServerDeletionsCommand;
 use App\Console\Commands\ProcessScheduledSiteDeletionsCommand;
 use App\Console\Commands\ProcessSshKeyRotationRemindersCommand;
 use App\Console\Commands\PruneAuditLogsCommand;
+use App\Console\Commands\PruneErrorEventsCommand;
+use App\Console\Commands\SyncErrorEventsCommand;
 use App\Console\Commands\PruneFunctionInvocationsCommand;
 use App\Console\Commands\PruneLocalWorkspaceArtifactsCommand;
 use App\Console\Commands\PruneServerCreateDraftsCommand;
@@ -124,6 +126,12 @@ final class DplySchedule
         $schedule->command(SnapshotOrganizationBillingCommand::class)->dailyAt('02:10');
 
         $schedule->job(new VerifyEdgeCustomDomainsJob)->everyFifteenMinutes();
+
+        // Capture failed operations into the dedicated error stream, then cap
+        // its growth nightly. The sweeper polls the source tables (failures are
+        // written via the query builder, which bypasses model events).
+        $schedule->command(SyncErrorEventsCommand::class)->everyMinute()->withoutOverlapping();
+        $schedule->command(PruneErrorEventsCommand::class)->dailyAt('03:25');
 
         $schedule->command(PruneServerCronJobRunsCommand::class)->dailyAt('03:15');
         $schedule->command(PruneAuditLogsCommand::class)->dailyAt('03:20');

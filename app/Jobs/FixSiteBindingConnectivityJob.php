@@ -77,6 +77,11 @@ class FixSiteBindingConnectivityJob implements ShouldQueue
         $emit = new ConsoleEmitter($this->consoleActionId);
 
         try {
+            $emit->step('fix', sprintf(
+                'Fixing connectivity for the %s binding on site “%s” (consumer server: %s).',
+                $binding->type, $site->name, $consumer->name,
+            ));
+
             // 1. Re-point if requested.
             $target = $this->repointTargetId !== null
                 ? $this->repoint($binding, $emit)
@@ -89,13 +94,33 @@ class FixSiteBindingConnectivityJob implements ShouldQueue
                 return;
             }
             $backend = $target->server;
+            $emit->info(sprintf(
+                'Backend resolved: %s “%s” on server %s.',
+                $target instanceof ServerCacheService ? 'cache' : 'database',
+                $target->name ?: $target->engine,
+                $backend->name,
+            ), 'fix');
 
             // 2. Ensure the consumer is on the backend's private network — auto-attach if not.
             $backendNet = $this->resolveNetwork($backend);
+            $emit->info($backendNet !== null
+                ? sprintf('Backend private network: “%s” (Hetzner #%s, range %s).', $backendNet->name, $backendNet->hetznerNetworkId() ?: '—', $backendNet->ip_range)
+                : sprintf('Backend %s has no resolvable private network.', $backend->name), 'fix');
+            $emit->info(sprintf(
+                'Consumer %s: private_network_id=%s, hetzner_network_id=%s, private_ip=%s.',
+                $consumer->name,
+                $consumer->private_network_id ?: '—',
+                $consumer->hetzner_network_id ?: '—',
+                $consumer->private_ip_address ?: '—',
+            ), 'fix');
+
             $onSameNet = $backendNet !== null && (
                 (string) $consumer->private_network_id === (string) $backendNet->id
                 || ($consumer->hetzner_network_id !== null && (string) $consumer->hetzner_network_id === (string) $backendNet->hetznerNetworkId())
             );
+            $emit->info($onSameNet
+                ? 'Consumer and backend share a private network — proceeding to open access.'
+                : 'Consumer is NOT on the backend network — will attempt to attach it.', 'fix');
 
             if (! $onSameNet) {
                 if ($backendNet === null || ! $backendNet->hetznerNetworkId()) {
@@ -133,6 +158,10 @@ class FixSiteBindingConnectivityJob implements ShouldQueue
                 return;
             }
             $cidr = $consumerPriv.'/32';
+            $emit->info(sprintf(
+                'Consumer private IP %s, backend private IP %s. Will open %s on the backend.',
+                $consumerPriv, $backendPriv, $cidr,
+            ), 'fix');
 
             // 3. Enable remote access + firewall for the consumer's /32.
             [$port, $label] = $this->exposeBackend($target, $backend, $cidr, $exec, $firewall, $cacheExposure, $emit);
@@ -270,33 +299,60 @@ class FixSiteBindingConnectivityJob implements ShouldQueue
         ConsoleEmitter $emit,
     ): array {
         if ($target instanceof ServerCacheService) {
-            $emit->info('Enabling remote access on the cache + firewalling your app server…', 'fix');
+            $emit->step('fix', sprintf('Enabling remote access on the %s cache on %s…', $target->engine, $backend->name));
             $cacheExposure->expose($backend, $target, $cidr, $this->userId);
-            $port = (int) $target->port;
-            $this->ensureFirewallRule($backend, $port, $cidr, 'cache:'.$target->engine, $firewall);
+            $port = (int) $target->port ?: ServerCacheService::defaultPortFor((string) $target->engine);
+            $emit->info(sprintf('Cache port resolved to %d.', $port), 'fix');
+            $this->ensureFirewallRule($backend, $port, $cidr, 'cache:'.$target->engine, $firewall, $emit);
 
             return [$port, ucfirst((string) $target->engine)];
         }
 
-        $emit->info('Enabling remote access on the database + firewalling your app server…', 'fix');
+        // The tracked row sometimes has no port (older provisions / detected
+        // engines) — fall back to the engine default so the firewall rule below
+        // is actually created instead of silently skipped (port 0 → no rule).
+        $port = (int) ($target->port ?? 0) ?: DatabaseEngineInstallScripts::defaultPortFor((string) $target->engine);
+        $emit->info(sprintf('Database engine %s, port resolved to %d.', $target->engine, $port), 'fix');
+
+        $emit->step('fix', sprintf('Running remote-access script for %s on %s…', $target->engine, $backend->name));
         $script = DatabaseEngineInstallScripts::enableRemoteAccessScript((string) $target->engine, '0.0.0.0/0');
-        $exec->runInlineBash($backend, 'binding-fix:db-expose:'.$target->engine, $script, timeoutSeconds: 120, asRoot: true);
+        $output = $exec->runInlineBash($backend, 'binding-fix:db-expose:'.$target->engine, $script, timeoutSeconds: 120, asRoot: true);
+        // runInlineBash never throws on a non-zero exit, so surface it ourselves.
+        $tail = trim((string) ($output->buffer ?? ''));
+        $tail = $tail === '' ? '(no output)' : mb_substr($tail, -400);
+        if ((int) ($output->exitCode ?? 0) !== 0) {
+            $emit->warn(sprintf('Remote-access script exited %d on %s. Output tail: %s', (int) $output->exitCode, $backend->name, $tail), 'fix');
+        } else {
+            $emit->success(sprintf('Remote-access script applied on %s. Output tail: %s', $backend->name, $tail), 'fix');
+        }
+
+        // NB: server_databases has no `port` column — the port is derived from
+        // the engine (defaultPortFor), not stored on the row. Persist only
+        // remote_access; use the resolved $port purely for the firewall rule.
         $target->forceFill(['remote_access' => true])->save();
-        $port = (int) ($target->port ?? 0);
-        $this->ensureFirewallRule($backend, $port, $cidr, 'db:'.$target->engine, $firewall);
+        $this->ensureFirewallRule($backend, $port, $cidr, 'db:'.$target->engine, $firewall, $emit);
 
         return [$port, strtoupper((string) $target->engine)];
     }
 
-    private function ensureFirewallRule(Server $backend, int $port, string $cidr, string $label, ServerFirewallProvisioner $firewall): void
+    private function ensureFirewallRule(Server $backend, int $port, string $cidr, string $label, ServerFirewallProvisioner $firewall, ConsoleEmitter $emit): void
     {
         if ($port < 1) {
+            $emit->warn(sprintf('No valid port for %s — skipping firewall rule. The connection cannot open without a port.', $label), 'fix');
+
             return;
         }
         if (ServerFirewallRule::query()->where('server_id', $backend->id)->where('port', $port)->where('source', $cidr)->exists()) {
+            $emit->info(sprintf('Firewall rule already exists: allow %s → %d/tcp on %s. Re-applying to the host…', $cidr, $port, $backend->name), 'fix');
+            $existing = ServerFirewallRule::query()->where('server_id', $backend->id)->where('port', $port)->where('source', $cidr)->first();
+            if ($existing) {
+                $this->applyAndReport($backend, $existing, $firewall, $emit);
+            }
+
             return;
         }
 
+        $emit->step('fix', sprintf('Creating firewall rule: allow %s → %d/tcp on %s…', $cidr, $port, $backend->name));
         $rule = ServerFirewallRule::query()->create([
             'server_id' => $backend->id,
             'name' => 'Binding fix '.$label.' '.$cidr,
@@ -309,6 +365,17 @@ class FixSiteBindingConnectivityJob implements ShouldQueue
             'tags' => ['dply-binding-fix'],
         ]);
 
-        $firewall->applyRule($backend, $rule);
+        $this->applyAndReport($backend, $rule, $firewall, $emit);
+    }
+
+    /** Push a single rule to the host's UFW and report success/failure to the console. */
+    private function applyAndReport(Server $backend, ServerFirewallRule $rule, ServerFirewallProvisioner $firewall, ConsoleEmitter $emit): void
+    {
+        try {
+            $firewall->applyRule($backend, $rule);
+            $emit->success(sprintf('Firewall applied on %s: allow %s → %d/tcp.', $backend->name, $rule->source, $rule->port), 'fix');
+        } catch (\Throwable $e) {
+            $emit->error(sprintf('Failed to apply the firewall rule on %s: %s', $backend->name, $e->getMessage()), 'fix');
+        }
     }
 }

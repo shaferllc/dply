@@ -278,6 +278,9 @@
                                 @case('wrench')
                                     <x-heroicon-o-wrench class="h-5 w-5 shrink-0 opacity-90" />
                                     @break
+                                @case('exclamation-triangle')
+                                    <x-heroicon-o-exclamation-triangle class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
                                 @default
                                     <x-heroicon-o-square-2-stack class="h-5 w-5 shrink-0 opacity-90" />
                             @endswitch
@@ -286,6 +289,12 @@
                                 <span class="shrink-0 rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-moss">
                                     {{ __('Soon') }}
                                 </span>
+                            @endif
+                            @if ($key === 'errors')
+                                @php $openErrorCount = \App\Models\ErrorEvent::query()->where('server_id', $server->id)->whereNull('dismissed_at')->count(); @endphp
+                                @if ($openErrorCount > 0)
+                                    <span class="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">{{ $openErrorCount > 99 ? '99+' : $openErrorCount }}</span>
+                                @endif
                             @endif
                             @if ($needsSetup)
                                 <span

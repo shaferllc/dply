@@ -54,6 +54,12 @@ return [
             'failed' => 'Connection check failed — the server could not reach the resource.',
             'stale' => 'Connection check did not finish.',
         ],
+        'binding_connectivity_fix' => [
+            'running' => 'Fixing resource connectivity …',
+            'completed' => 'Connectivity fix applied — re-probing the connection.',
+            'failed' => 'Connectivity fix could not finish — check the log.',
+            'stale' => 'Connectivity fix did not finish.',
+        ],
         'site_test' => [
             'running' => 'Testing whether the site loads …',
             'completed' => 'The site loaded successfully.',
@@ -281,7 +287,7 @@ return [
         'wordpress' => ['webserver_config'],
         'basic-auth' => ['basic_auth_sync', 'webserver_config'],
         'webserver-config' => ['webserver_config'],
-        'environment' => ['env_sync', 'env_push', 'env_scan'],
+        'environment' => ['env_sync', 'env_push', 'env_scan', 'binding_connectivity_fix'],
     ],
 
     /*

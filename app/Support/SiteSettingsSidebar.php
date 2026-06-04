@@ -73,6 +73,7 @@ final class SiteSettingsSidebar
                 ['id' => 'platform', 'label' => __('Platform'), 'icon' => 'heroicon-o-cube', 'group' => 'observability'],
                 ['id' => 'notifications', 'label' => __('Notifications'), 'icon' => 'heroicon-o-bell', 'group' => 'observability'],
                 ['id' => 'monitor', 'label' => __('Monitor'), 'icon' => 'heroicon-o-chart-bar', 'group' => 'observability', 'route' => 'sites.monitor'],
+                ['id' => 'errors', 'label' => __('Errors'), 'icon' => 'heroicon-o-exclamation-triangle', 'group' => 'observability', 'route' => 'sites.errors'],
                 ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-archive-box', 'group' => 'danger'],
             ]
             : [
@@ -97,6 +98,7 @@ final class SiteSettingsSidebar
                 ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability'],
                 ['id' => 'notifications', 'label' => __('Notifications'), 'icon' => 'heroicon-o-bell', 'group' => 'observability'],
                 ['id' => 'monitor', 'label' => __('Monitor'), 'icon' => 'heroicon-o-chart-bar', 'group' => 'observability', 'route' => 'sites.monitor'],
+                ['id' => 'errors', 'label' => __('Errors'), 'icon' => 'heroicon-o-exclamation-triangle', 'group' => 'observability', 'route' => 'sites.errors'],
                 ['id' => 'basic-auth', 'label' => __('Authentication'), 'icon' => 'heroicon-o-lock-closed', 'group' => 'access'],
                 ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-archive-box', 'group' => 'danger'],
             ];

@@ -135,6 +135,12 @@
                             <x-dynamic-component :component="$item['icon']" class="h-5 w-5 shrink-0 opacity-90" />
                         @endif
                         <span class="flex-1 truncate">{{ $item['label'] }}</span>
+                        @if ($item['id'] === 'errors')
+                            @php $openErrorCount = \App\Models\ErrorEvent::query()->where('site_id', $site->id)->whereNull('dismissed_at')->count(); @endphp
+                            @if ($openErrorCount > 0)
+                                <span class="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">{{ $openErrorCount > 99 ? '99+' : $openErrorCount }}</span>
+                            @endif
+                        @endif
                         @if (! empty($item['preview_only']))
                             <span class="shrink-0 rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-moss">
                                 {{ __('Soon') }}

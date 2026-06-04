@@ -222,6 +222,93 @@
             </div>
         </section>
 
+        {{-- ─── ATTACHED RESOURCES: remote DBs/caches this server reaches ──── --}}
+        <section class="dply-card overflow-hidden">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-heroicon-o-arrows-right-left class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0 flex-1">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Attached resources') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Resources on other servers') }}</h3>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Databases and caches hosted on other servers that sites here attach to — what this server reaches over the private network.') }}</p>
+                </div>
+            </div>
+            @if (count($attachedRemoteResources) === 0)
+                <div class="px-6 py-6 sm:px-7">
+                    <x-empty-state
+                        borderless
+                        icon="heroicon-o-arrows-right-left"
+                        tone="sage"
+                        :title="__('No remote resources')"
+                        :description="__('Sites on this server don\'t attach to any database or cache hosted on another server. Resources on this same server appear on the Databases and Caches tabs.')"
+                    />
+                </div>
+            @else
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
+                        <thead class="bg-brand-cream/40">
+                            <tr class="text-left text-[11px] font-semibold uppercase tracking-wide text-brand-mist">
+                                <th class="px-6 py-2.5 sm:px-7">{{ __('Resource') }}</th>
+                                <th class="px-6 py-2.5">{{ __('Hosted on') }}</th>
+                                <th class="px-6 py-2.5">{{ __('Used by') }}</th>
+                                <th class="px-6 py-2.5">{{ __('Reachability') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-brand-ink/5">
+                            @foreach ($attachedRemoteResources as $res)
+                                <tr class="align-top">
+                                    <td class="px-6 py-3 sm:px-7">
+                                        <div class="flex items-center gap-2">
+                                            @if ($res['kind'] === 'database')
+                                                <x-heroicon-o-circle-stack class="h-4 w-4 shrink-0 text-brand-moss" aria-hidden="true" />
+                                            @else
+                                                <x-heroicon-o-bolt class="h-4 w-4 shrink-0 text-brand-moss" aria-hidden="true" />
+                                            @endif
+                                            <span class="font-medium text-brand-ink">{{ $res['resource_name'] }}</span>
+                                            <span class="text-[11px] uppercase tracking-wide text-brand-mist">{{ $res['engine'] }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-3">
+                                        <span class="text-brand-moss">{{ $res['host_server_name'] }}</span>
+                                        <span class="ml-1.5 inline-flex items-center rounded-full bg-brand-sage/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest ring-1 ring-brand-sage/25">{{ __('Remote') }}</span>
+                                    </td>
+                                    <td class="px-6 py-3 text-brand-moss">{{ $res['site_name'] }}</td>
+                                    <td class="px-6 py-3">
+                                        @if ($res['reachable'] === true)
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-600/20">
+                                                <x-heroicon-s-check-circle class="h-3.5 w-3.5" aria-hidden="true" /> {{ __('Reachable') }}
+                                            </span>
+                                        @elseif ($res['reachable'] === false)
+                                            <div class="space-y-1.5">
+                                                <span class="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700 ring-1 ring-red-600/20">
+                                                    <x-heroicon-s-x-circle class="h-3.5 w-3.5" aria-hidden="true" /> {{ __('Unreachable') }}
+                                                </span>
+                                                @if (! empty($res['detail']))
+                                                    <p class="max-w-md text-xs leading-relaxed text-brand-mist">{{ $res['detail'] }}</p>
+                                                @endif
+                                                @if (! empty($res['fix_url']))
+                                                    <a href="{{ $res['fix_url'] }}" class="inline-flex items-center gap-1 text-xs font-semibold text-brand-forest hover:underline">
+                                                        {{ __('Fix connectivity on the site') }}
+                                                        <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" aria-hidden="true" />
+                                                    </a>
+                                                @endif
+                                            </div>
+                                        @else
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-ink/5 px-2 py-0.5 text-xs font-semibold text-brand-mist">{{ __('Not checked') }}</span>
+                                        @endif
+                                        @if (! empty($res['checked_at']))
+                                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Checked :ago', ['ago' => \Illuminate\Support\Carbon::parse($res['checked_at'])->diffForHumans()]) }}</p>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </section>
+
         {{-- ─── THIS SERVER: PER-DATABASE ACCESS CONTROLS ─────────────────── --}}
         @if ($databaseEngines->isNotEmpty())
             <section class="dply-card overflow-hidden">

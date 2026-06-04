@@ -8,6 +8,7 @@ use App\Jobs\AttachServerToNetworkJob;
 use App\Jobs\CreateProviderNetworkJob;
 use App\Jobs\ToggleDatabaseNetworkingJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\SurfacesBindingConsumers;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\Server;
@@ -37,6 +38,7 @@ class WorkspaceNetworking extends Component
     use ConfirmsActionWithModal;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use SurfacesBindingConsumers;
 
     public Server $server;
 
@@ -516,6 +518,8 @@ class WorkspaceNetworking extends Component
             'networkRoutes' => $networkRoutes,
             'networkInfo' => $networkInfo,
             'networkId' => $networkId,
+            // Remote databases/caches that sites on this server reach out to.
+            'attachedRemoteResources' => $this->buildAttachedRemoteResources($this->server->id),
         ]);
     }
 
