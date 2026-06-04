@@ -5,11 +5,26 @@
     :description="__('Load balancers that target this server. Manage all load balancers from the Networking section.')"
 >
     @if (in_array('load-balancers', config('server_workspace.coming_soon_keys', []), true))
-        <x-coming-soon-panel
+        <x-workspace-coming-soon
+            :server="$server"
             icon="heroicon-o-arrows-right-left"
-            :title="__('Load balancers are coming soon')"
+            :title="__('Load balancers')"
             :description="__('Spread traffic across this server and its peers with managed, health-checked load balancers — provisioned and wired up from your dashboard.')"
-            :points="[__('Health-checked backends across your servers'), __('Round-robin and least-connections algorithms'), __('Managed from Networking, no manual config')]"
+            :eyebrow="__('Load balancer preview')"
+            :heroNote="__('Balancers targeting :server will be managed from Networking when this ships.', ['server' => $server->name])"
+            :lines="[
+                ['tone' => 'cmd', 'text' => '~ $ dply lb status'],
+                ['tone' => 'muted', 'text' => 'BACKEND        STATE    CHECKS'],
+                ['tone' => 'muted', 'text' => 'web-1:443      healthy  200 OK'],
+                ['tone' => 'muted', 'text' => 'web-2:443      healthy  200 OK'],
+                ['tone' => 'ok', 'text' => '2 backends · least-conn · 0 ejected'],
+            ]"
+            :features="[
+                ['icon' => 'heart', 'title' => __('Health-checked backends'), 'body' => __('Active checks eject unhealthy nodes and bring them back automatically.')],
+                ['icon' => 'arrows-right-left', 'title' => __('Smart algorithms'), 'body' => __('Round-robin or least-connections, switchable per balancer.')],
+                ['icon' => 'shield-check', 'title' => __('TLS termination'), 'body' => __('Terminate TLS at the edge or pass through to your backends.')],
+                ['icon' => 'squares-2x2', 'title' => __('Managed from Networking'), 'body' => __('Create and attach balancers without touching a config file.')],
+            ]"
         />
     @else
     @include('livewire.servers.partials.workspace-flashes')
