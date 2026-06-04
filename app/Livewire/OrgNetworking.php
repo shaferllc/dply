@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire;
 
+use App\Jobs\AttachServerToNetworkJob;
 use App\Models\LoadBalancer;
 use App\Models\LoadBalancerService;
 use App\Models\LoadBalancerTarget;
@@ -300,6 +301,59 @@ class OrgNetworking extends Component
 
         $network->delete();
         $this->toastSuccess(__('Network deleted.'));
+    }
+
+    /** Per-network server picker model (networkId => serverId to attach). */
+    public array $attach_server_id = [];
+
+    /**
+     * Attach an existing server to an existing network — gives it a private IP
+     * on that network so it can reach the network's other members (database,
+     * cache, etc.). Hetzner-only; the private IP appears once assigned (~30 s).
+     */
+    public function addServerToNetwork(string $networkId): void
+    {
+        $org = Auth::user()->currentOrganization();
+        $network = PrivateNetwork::query()->where('organization_id', $org->id)->with('servers')->find($networkId);
+        if (! $network || ! $network->hetznerNetworkId()) {
+            return;
+        }
+
+        $serverId = trim((string) ($this->attach_server_id[$networkId] ?? ''));
+        $server = Server::query()->where('organization_id', $org->id)->find($serverId);
+        if (! $server instanceof Server) {
+            $this->addError('attach_server_id.'.$networkId, __('Choose a server to attach.'));
+
+            return;
+        }
+        if ($network->servers->contains('id', $server->id)) {
+            $this->addError('attach_server_id.'.$networkId, __(':server is already on this network.', ['server' => $server->name]));
+
+            return;
+        }
+
+        AttachServerToNetworkJob::dispatch((string) $server->id, $network->hetznerNetworkId(), (string) $network->id);
+
+        $this->attach_server_id[$networkId] = '';
+        $this->toastSuccess(__('Attaching :server to :net — its private IP appears in ~30 s.', ['server' => $server->name, 'net' => $network->name]));
+    }
+
+    /**
+     * Org Hetzner servers not yet on the given network (the attach candidates).
+     *
+     * @return \Illuminate\Support\Collection<int, Server>
+     */
+    public function attachableServers(PrivateNetwork $network): \Illuminate\Support\Collection
+    {
+        $org = Auth::user()->currentOrganization();
+        $onNet = $network->servers->pluck('id');
+
+        return Server::query()
+            ->where('organization_id', $org->id)
+            ->where('provider', 'hetzner')
+            ->whereNotIn('id', $onNet)
+            ->orderBy('name')
+            ->get(['id', 'name', 'provider']);
     }
 
     // ── Route actions (per-network) ───────────────────────────────────────────

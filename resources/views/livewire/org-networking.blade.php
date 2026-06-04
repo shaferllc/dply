@@ -171,6 +171,34 @@
                                 </div>
                             @endif
 
+                            {{-- Add a server to this network — gives it a private
+                                 IP here so it can reach the other members. --}}
+                            @if ($network->isHetzner())
+                                @php $attachable = $this->attachableServers($network); @endphp
+                                <div class="border-t border-brand-ink/5 px-6 py-4 sm:px-7">
+                                    <p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Add a server') }}</p>
+                                    @if ($attachable->isEmpty())
+                                        <p class="text-sm text-brand-mist">{{ __('All your Hetzner servers are already on this network.') }}</p>
+                                    @else
+                                        <div class="flex flex-wrap items-end gap-2">
+                                            <div class="min-w-[16rem] flex-1">
+                                                <select wire:model="attach_server_id.{{ $network->id }}" class="block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm focus:border-brand-forest focus:ring-brand-forest">
+                                                    <option value="">{{ __('Choose a server…') }}</option>
+                                                    @foreach ($attachable as $cand)
+                                                        <option value="{{ $cand->id }}">{{ $cand->name }}</option>
+                                                    @endforeach
+                                                </select>
+                                                <x-input-error :messages="$errors->get('attach_server_id.'.$network->id)" class="mt-1" />
+                                            </div>
+                                            <button type="button" wire:click="addServerToNetwork('{{ $network->id }}')" wire:loading.attr="disabled" wire:target="addServerToNetwork('{{ $network->id }}')" class="rounded-lg bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream hover:bg-brand-forest disabled:opacity-60">
+                                                {{ __('Attach server') }}
+                                            </button>
+                                        </div>
+                                        <p class="mt-1.5 text-xs text-brand-mist">{{ __('Gives the server a private IP on this network so it can reach the others (database, cache, app).') }}</p>
+                                    @endif
+                                </div>
+                            @endif
+
                             {{-- Routes --}}
                             @if ($network->isHetzner())
                                 @php $gatewayServers = $network->servers->whereNotNull('private_ip_address'); @endphp

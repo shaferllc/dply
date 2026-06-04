@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Models\ConsoleAction;
+use App\Models\PrivateNetwork;
 use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Models\ServerDatabase;
@@ -89,11 +90,44 @@ class FixSiteBindingConnectivityJob implements ShouldQueue
             }
             $backend = $target->server;
 
-            // 2. Shared-network check — we don't auto-attach networks.
+            // 2. Ensure the consumer is on the backend's private network — auto-attach if not.
+            $backendNet = $this->resolveNetwork($backend);
+            $onSameNet = $backendNet !== null && (
+                (string) $consumer->private_network_id === (string) $backendNet->id
+                || ($consumer->hetzner_network_id !== null && (string) $consumer->hetzner_network_id === (string) $backendNet->hetznerNetworkId())
+            );
+
+            if (! $onSameNet) {
+                if ($backendNet === null || ! $backendNet->hetznerNetworkId()) {
+                    $emit->warn(sprintf('Couldn’t resolve a Hetzner network for %s to attach %s to — attach it on the network page.', $backend->name, $consumer->name), 'fix');
+                    $this->finish(false);
+
+                    return;
+                }
+                // Overlap guard: refuse if the consumer is on a DIFFERENT network
+                // whose range overlaps — a second same-range interface makes routing
+                // ambiguous and wouldn't actually fix reachability.
+                $consumerNet = $this->resolveNetwork($consumer);
+                if ($consumerNet !== null && (string) $consumerNet->id !== (string) $backendNet->id
+                    && $this->rangesOverlap((string) $consumerNet->ip_range, (string) $backendNet->ip_range)) {
+                    $emit->error(sprintf('%s is on “%s” (%s), which overlaps “%s” (%s) — attaching would make routing ambiguous. Consolidate both servers onto one network instead.', $consumer->name, $consumerNet->name, $consumerNet->ip_range, $backendNet->name, $backendNet->ip_range), 'fix');
+                    $this->finish(false);
+
+                    return;
+                }
+
+                $emit->step('fix', sprintf('Attaching %s to “%s” …', $consumer->name, $backendNet->name));
+                AttachServerToNetworkJob::dispatch((string) $consumer->id, $backendNet->hetznerNetworkId(), (string) $backendNet->id);
+                $emit->success(sprintf('Attaching %s to “%s” — its private IP lands in ~30s. Re-run “Fix connectivity” once it shows to open access + re-probe.', $consumer->name, $backendNet->name), 'fix');
+                $this->finish(true);
+
+                return;
+            }
+
             $consumerPriv = trim((string) $consumer->private_ip_address);
             $backendPriv = trim((string) $backend->private_ip_address);
             if ($consumerPriv === '' || $backendPriv === '') {
-                $emit->warn(sprintf('%s or %s has no private IP — attach both to a shared private network first, then re-run.', $consumer->name, $backend->name), 'fix');
+                $emit->warn(sprintf('%s or %s has no private IP yet — wait for the network attach to finish (~30s), then re-run.', $consumer->name, $backend->name), 'fix');
                 $this->finish(false);
 
                 return;
@@ -132,6 +166,48 @@ class FixSiteBindingConnectivityJob implements ShouldQueue
             'finished_at' => now(),
             'updated_at' => now(),
         ]);
+    }
+
+    /** The private network a server belongs to (by FK, else by membership). */
+    private function resolveNetwork(Server $server): ?PrivateNetwork
+    {
+        if ($server->private_network_id) {
+            $net = PrivateNetwork::query()->find($server->private_network_id);
+            if ($net instanceof PrivateNetwork) {
+                return $net;
+            }
+        }
+
+        return PrivateNetwork::query()->whereHas('servers', fn ($q) => $q->whereKey($server->id))->first();
+    }
+
+    /** Whether two IPv4 CIDR ranges intersect (overlap → ambiguous routing). */
+    private function rangesOverlap(string $a, string $b): bool
+    {
+        [$an, $ab] = $this->cidrBounds($a);
+        [$bn, $bb] = $this->cidrBounds($b);
+        if ($an === null || $bn === null) {
+            return false;
+        }
+
+        return $an <= $bb && $bn <= $ab;
+    }
+
+    /**
+     * @return array{0: ?int, 1: ?int}  [network address, broadcast address] or [null, null]
+     */
+    private function cidrBounds(string $cidr): array
+    {
+        $parts = explode('/', trim($cidr));
+        $ip = ip2long($parts[0] ?? '');
+        if ($ip === false) {
+            return [null, null];
+        }
+        $bits = isset($parts[1]) ? max(0, min(32, (int) $parts[1])) : 32;
+        $mask = $bits === 0 ? 0 : ((~((1 << (32 - $bits)) - 1)) & 0xFFFFFFFF);
+        $net = $ip & $mask;
+
+        return [$net, $net | ((~$mask) & 0xFFFFFFFF)];
     }
 
     private function resolveTarget(SiteBinding $binding): ServerDatabase|ServerCacheService|null
