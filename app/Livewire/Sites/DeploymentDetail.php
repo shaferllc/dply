@@ -4,13 +4,19 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
+use App\Jobs\ApplyRemediationJob;
+use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
+use App\Services\Remediations\RemediationCatalog;
 use App\Support\Docs\ContextualDocResolver;
 use App\Support\Sites\SiteWorkspaceBreadcrumbs;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Gate;
+use Livewire\Attributes\Computed;
 use Livewire\Component;
 
 /**
@@ -23,6 +29,8 @@ use Livewire\Component;
  */
 class DeploymentDetail extends Component
 {
+    use DispatchesToastNotifications;
+
     public Server $server;
 
     public Site $site;
@@ -51,6 +59,76 @@ class DeploymentDetail extends Component
     public function toggleOutput(): void
     {
         $this->showOutput = ! $this->showOutput;
+    }
+
+    /**
+     * The recognized remediation for this deployment's failure, if any — drives
+     * the "Fix" panel on a failed deploy. Null when the deploy didn't fail or no
+     * catalog signature matches the failure output.
+     *
+     * @return array<string, mixed>|null
+     */
+    #[Computed]
+    public function remediation(): ?array
+    {
+        if ($this->deployment->status !== SiteDeployment::STATUS_FAILED) {
+            return null;
+        }
+
+        return app(RemediationCatalog::class)->match($this->failureText());
+    }
+
+    /** Failure output to match against — the overall log plus any step outputs. */
+    private function failureText(): string
+    {
+        $parts = [(string) $this->deployment->log_output];
+
+        $phaseResults = is_array($this->deployment->phase_results ?? null) ? $this->deployment->phase_results : [];
+        array_walk_recursive($phaseResults, function ($value) use (&$parts): void {
+            if (is_string($value) && $value !== '') {
+                $parts[] = $value;
+            }
+        });
+
+        return implode("\n", $parts);
+    }
+
+    /** Latest non-dismissed fix run for this site, for the in-page progress banner. */
+    #[Computed]
+    public function remediationRun(): ?ConsoleAction
+    {
+        return ConsoleAction::query()
+            ->where('subject_type', $this->site->getMorphClass())
+            ->where('subject_id', $this->site->id)
+            ->where('kind', 'remediation_apply')
+            ->whereNull('dismissed_at')
+            ->orderByDesc('created_at')
+            ->first();
+    }
+
+    /** Queue a remediation action for the matched failure. */
+    public function applyRemediation(string $actionKey): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $remediation = $this->remediation();
+        $catalog = app(RemediationCatalog::class);
+        if ($remediation === null || $catalog->action((string) $remediation['code'], $actionKey) === null) {
+            $this->toastError(__('That fix is no longer available.'));
+
+            return;
+        }
+
+        ApplyRemediationJob::dispatch(
+            (string) $this->server->id,
+            (string) $this->site->id,
+            (string) $remediation['code'],
+            $actionKey,
+            (string) (auth()->id() ?? '') ?: null,
+        );
+
+        unset($this->remediationRun);
+        $this->toastSuccess(__('Applying the fix — progress shows below. Re-deploy once it finishes.'));
     }
 
     public function render(): View

@@ -110,6 +110,61 @@
             </section>
 
             @if ($deployment->status === 'failed')
+                @php $remediation = $this->remediation; @endphp
+                @if ($remediation)
+                    <section class="mb-6 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/60">
+                        <div class="flex items-start gap-3 px-6 py-5 sm:px-7">
+                            <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 ring-1 ring-amber-600/20">
+                                <x-heroicon-o-wrench-screwdriver class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">{{ __('dply recognized this failure') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $remediation['title'] }}</h3>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $remediation['explanation'] }}</p>
+
+                                <div class="mt-4 flex flex-wrap gap-2">
+                                    @foreach ($remediation['actions'] as $action)
+                                        <button
+                                            type="button"
+                                            wire:click="applyRemediation('{{ $action['key'] }}')"
+                                            wire:loading.attr="disabled"
+                                            wire:target="applyRemediation('{{ $action['key'] }}')"
+                                            @class([
+                                                'inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-60',
+                                                'bg-brand-ink text-brand-cream hover:bg-brand-forest' => ! empty($action['recommended']),
+                                                'border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => empty($action['recommended']),
+                                            ])
+                                        >
+                                            <x-heroicon-o-wrench class="h-4 w-4" aria-hidden="true" />
+                                            {{ $action['label'] }}
+                                            @if (! empty($action['recommended']))
+                                                <span class="rounded-full bg-brand-cream/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">{{ __('Recommended') }}</span>
+                                            @endif
+                                        </button>
+                                    @endforeach
+                                </div>
+                                <p class="mt-2 text-[11px] text-brand-mist">{{ __('Runs over SSH on :server. After it succeeds, re-deploy to continue.', ['server' => $server->name]) }}</p>
+                            </div>
+                        </div>
+
+                        @if ($this->remediationRun)
+                            <div class="border-t border-amber-200/70 px-6 py-4 sm:px-7">
+                                @include('livewire.partials.console-action-banner-static', [
+                                    'run' => $this->remediationRun,
+                                    'kindLabels' => (array) config('console_actions.kinds', []),
+                                ])
+                                @if ($this->remediationRun->status === 'completed')
+                                    <a href="{{ route('sites.deployments.index', ['server' => $server, 'site' => $site]) }}" wire:navigate
+                                        class="mt-2 inline-flex items-center gap-2 rounded-lg bg-brand-ink px-3.5 py-2 text-sm font-semibold text-brand-cream hover:bg-brand-forest">
+                                        <x-heroicon-o-rocket-launch class="h-4 w-4" aria-hidden="true" />
+                                        {{ __('Re-deploy') }}
+                                    </a>
+                                @endif
+                            </div>
+                        @endif
+                    </section>
+                @endif
+
                 <x-ops-copilot-callout :site="$site" :show="true" />
             @endif
 

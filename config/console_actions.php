@@ -60,6 +60,12 @@ return [
             'failed' => 'Connectivity fix could not finish — check the log.',
             'stale' => 'Connectivity fix did not finish.',
         ],
+        'remediation_apply' => [
+            'running' => 'Applying fix …',
+            'completed' => 'Fix applied — re-run the operation to continue.',
+            'failed' => 'The fix could not finish — check the log.',
+            'stale' => 'The fix did not finish.',
+        ],
         'site_test' => [
             'running' => 'Testing whether the site loads …',
             'completed' => 'The site loaded successfully.',

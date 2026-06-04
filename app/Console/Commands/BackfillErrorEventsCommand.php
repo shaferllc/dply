@@ -14,14 +14,16 @@ use Illuminate\Console\Command;
  */
 class BackfillErrorEventsCommand extends Command
 {
-    protected $signature = 'dply:errors:backfill {--days=30 : How far back to seed, in days}';
+    protected $signature = 'dply:errors:backfill
+        {--days=30 : How far back to seed, in days}
+        {--refresh : Re-record already-captured events too (refresh links/titles after a recorder change)}';
 
     protected $description = 'Backfill the error stream from failed operations in the recent past.';
 
     public function handle(ErrorEventSyncer $syncer): int
     {
         $days = max(1, (int) $this->option('days'));
-        $count = $syncer->sync(now()->subDays($days));
+        $count = $syncer->sync(now()->subDays($days), (bool) $this->option('refresh'));
 
         $this->info("Backfilled {$count} error event(s) from the last {$days} day(s).");
 

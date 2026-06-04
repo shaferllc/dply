@@ -12,6 +12,7 @@ use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Models\SiteDeployment;
+use App\Services\Remediations\RemediationCatalog;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
@@ -35,6 +36,14 @@ class ErrorEventRecorder
 
         $subject = $action->subject;
         [$organizationId, $serverId, $siteId, $link] = $this->resolveOwners($subject);
+
+        // Point "Open" at the section where you can actually act on this kind of
+        // error — e.g. a failed connectivity fix lands on the site's Environment
+        // section, where the unreachable binding badge + its Fix button live.
+        $section = $this->actionSectionForCategory((string) $action->kind);
+        if ($section !== null && $serverId && $siteId) {
+            $link = route('sites.show', ['server' => $serverId, 'site' => $siteId, 'section' => $section]);
+        }
 
         $detail = trim((string) ($action->error ?? ''));
         if ($detail === '') {
@@ -136,6 +145,22 @@ class ErrorEventRecorder
             ['source_type' => $source->getMorphClass(), 'source_id' => (string) $source->getKey()],
             $attributes,
         );
+    }
+
+    /**
+     * The site Settings section where a given error category can be acted on,
+     * so "Open" lands on the fix rather than a generic page. Null = keep the
+     * subject's default link.
+     */
+    private function actionSectionForCategory(string $category): ?string
+    {
+        return match ($category) {
+            'binding_connectivity_fix' => 'environment',
+            'env_sync', 'env_push', 'env_scan' => 'environment',
+            'ssl' => 'certificates',
+            'basic_auth_sync' => 'basic-auth',
+            default => null,
+        };
     }
 
     /** A clean title: prefer the run's label (strip trailing ellipsis), else humanize the kind. */

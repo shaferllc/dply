@@ -30,12 +30,17 @@ class ErrorEventSyncer
      * Record every failed ConsoleAction / SiteDeployment finalized at or after
      * $since that isn't already captured. Returns the number of new events.
      */
-    public function sync(CarbonInterface $since): int
+    /**
+     * @param  bool  $refresh  Re-record sources that already have an event too
+     *                         (updateOrCreate refreshes link/title/detail after
+     *                         a recorder change). Default skips captured sources.
+     */
+    public function sync(CarbonInterface $since, bool $refresh = false): int
     {
-        return $this->syncConsoleActions($since) + $this->syncDeployments($since);
+        return $this->syncConsoleActions($since, $refresh) + $this->syncDeployments($since, $refresh);
     }
 
-    private function syncConsoleActions(CarbonInterface $since): int
+    private function syncConsoleActions(CarbonInterface $since, bool $refresh = false): int
     {
         $captured = ConsoleAction::query()->getModel()->getMorphClass();
         $count = 0;
@@ -43,10 +48,10 @@ class ErrorEventSyncer
         ConsoleAction::query()
             ->where('status', ConsoleAction::STATUS_FAILED)
             ->where('updated_at', '>=', $since)
-            ->whereNotExists(fn ($q) => $q->select(DB::raw(1))
+            ->when(! $refresh, fn ($q) => $q->whereNotExists(fn ($sub) => $sub->select(DB::raw(1))
                 ->from('error_events')
                 ->whereColumn('error_events.source_id', 'console_actions.id')
-                ->where('error_events.source_type', $captured))
+                ->where('error_events.source_type', $captured)))
             ->with('subject')
             ->orderBy('id')
             ->chunkById(200, function ($rows) use (&$count): void {
@@ -60,7 +65,7 @@ class ErrorEventSyncer
         return $count;
     }
 
-    private function syncDeployments(CarbonInterface $since): int
+    private function syncDeployments(CarbonInterface $since, bool $refresh = false): int
     {
         $captured = SiteDeployment::query()->getModel()->getMorphClass();
         $count = 0;
@@ -68,10 +73,10 @@ class ErrorEventSyncer
         SiteDeployment::query()
             ->where('status', SiteDeployment::STATUS_FAILED)
             ->where('updated_at', '>=', $since)
-            ->whereNotExists(fn ($q) => $q->select(DB::raw(1))
+            ->when(! $refresh, fn ($q) => $q->whereNotExists(fn ($sub) => $sub->select(DB::raw(1))
                 ->from('error_events')
                 ->whereColumn('error_events.source_id', 'site_deployments.id')
-                ->where('error_events.source_type', $captured))
+                ->where('error_events.source_type', $captured)))
             ->with('site.server')
             ->orderBy('id')
             ->chunkById(200, function ($rows) use (&$count): void {
