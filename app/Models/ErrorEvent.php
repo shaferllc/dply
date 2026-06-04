@@ -28,6 +28,7 @@ class ErrorEvent extends Model
         'source_type',
         'source_id',
         'category',
+        'remediation_code',
         'title',
         'detail',
         'link_url',
@@ -93,5 +94,17 @@ class ErrorEvent extends Model
     public function isRetryable(): bool
     {
         return app(ErrorRetryRegistry::class)->isRetryable((string) $this->category);
+    }
+
+    /**
+     * The recognized remediation for this error, if any (matched at capture time).
+     *
+     * @return array<string, mixed>|null
+     */
+    public function remediation(): ?array
+    {
+        return $this->remediation_code
+            ? app(\App\Services\Remediations\RemediationCatalog::class)->find((string) $this->remediation_code)
+            : null;
     }
 }

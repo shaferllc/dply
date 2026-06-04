@@ -285,6 +285,7 @@ return [
     | `uptime_check` directly and does not consult this table.
     */
     'section_kinds' => [
+        'settings' => ['webserver_config'],
         'routing' => ['webserver_config'],
         'certificates' => ['ssl', 'webserver_config'],
         'runtime' => ['webserver_config'],

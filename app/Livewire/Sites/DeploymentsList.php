@@ -10,6 +10,7 @@ use App\Jobs\RunSiteDeploymentJob;
 use App\Jobs\ViewServerEnvJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Sites\Concerns\SurfacesDeploymentRemediation;
 use App\Livewire\Concerns\ManagesSiteBindings;
 use App\Livewire\Concerns\OptimizesPipeline;
 use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
@@ -45,6 +46,7 @@ class DeploymentsList extends Component
     use ManagesSiteDeploymentSchedules;
     use ManagesSiteEnvironment;
     use OptimizesPipeline;
+    use SurfacesDeploymentRemediation;
     use WatchesConsoleActionOutcomes;
     use WithPagination;
 

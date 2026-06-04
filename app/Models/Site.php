@@ -2544,8 +2544,33 @@ class Site extends Model
             ...$this->aliasHostnames(),
             ...$this->tenantHostnames(),
             ...$this->tenantTestingHostnames(),
+            ...$this->ownTestingHostnames(),
             ...$this->previewHostnames(),
         ])->unique()->values()->all();
+    }
+
+    /**
+     * This site's own dply testing hostname (the provisioned `<hash>.on-dply.com`
+     * stored in meta.testing_hostname). It must be in the vhost's server_name or
+     * nginx 502s when the site is reached by that hostname before real DNS — the
+     * whole point of a testing hostname. Distinct from {@see tenantTestingHostnames()},
+     * which covers multi-tenant domains.
+     *
+     * @return array<int, string>
+     */
+    public function ownTestingHostnames(): array
+    {
+        $testing = is_array($this->meta) ? ($this->meta['testing_hostname'] ?? null) : null;
+        if (! is_array($testing)) {
+            return [];
+        }
+
+        $hostname = strtolower(trim((string) ($testing['hostname'] ?? '')));
+        if ($hostname === '' || ($testing['status'] ?? null) !== 'ready') {
+            return [];
+        }
+
+        return [$hostname];
     }
 
     /**

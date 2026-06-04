@@ -10,4 +10,6 @@
     </x-explainer>
 
     @include('livewire.partials.error-stream')
+
+    @include('livewire.partials.confirm-action-modal')
 </x-server-workspace-layout>

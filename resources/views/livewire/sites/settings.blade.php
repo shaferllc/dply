@@ -1,15 +1,16 @@
 <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+    <x-breadcrumb-trail
+        :items="$settingsBreadcrumbs"
+        doc-contextual
+        :contextual-doc-slug="$contextualDocSlug"
+        class="mb-6"
+    />
+
     <div class="lg:grid lg:grid-cols-12 lg:gap-10">
         @include('livewire.sites.settings.partials.sidebar')
 
         <div class="min-w-0 lg:col-span-9">
-            <x-breadcrumb-trail
-                :items="$settingsBreadcrumbs"
-                doc-contextual
-                :contextual-doc-slug="$contextualDocSlug"
-            />
-
-            <div class="mt-5 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">{{ $workspaceTitle }}</p>
             </div>
 

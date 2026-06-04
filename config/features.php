@@ -184,9 +184,9 @@ return [
         'console_preview' => env('FEATURE_WORKSPACE_CONSOLE_PREVIEW', true),
 
         // exit: ship once remote file-write atomic guarantees are reviewed; security surface
-        'files' => env('FEATURE_WORKSPACE_FILES', true),
+        'files' => env('FEATURE_WORKSPACE_FILES', false),
         // exit: ship alongside files GA; teaser only when files is off
-        'files_preview' => env('FEATURE_WORKSPACE_FILES_PREVIEW', false),
+        'files_preview' => env('FEATURE_WORKSPACE_FILES_PREVIEW', true),
         // exit: ship when systemd inventory UI has been validated against three real OSes
         'services' => env('FEATURE_WORKSPACE_SERVICES', true),
         // exit: ship when system-user deletion policy is signed off (data loss risk)
@@ -198,7 +198,7 @@ return [
         // exit: ship once Redis/Memcached provisioning has parity with the cache audit
         'caches' => env('FEATURE_WORKSPACE_CACHES', true),
         // GA — remote Docker inspector (containers, images, volumes, networks, compose, maintenance)
-        'docker' => env('FEATURE_WORKSPACE_DOCKER', true),
+        'docker' => env('FEATURE_WORKSPACE_DOCKER', false),
         // teaser only when docker is off
         'docker_preview' => env('FEATURE_WORKSPACE_DOCKER_PREVIEW', true),
         // exit: GA — server-scoped database + site-files backup runs and schedules

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\SurfacesErrorStream;
 use App\Models\ErrorEvent;
@@ -25,6 +26,7 @@ use Livewire\WithPagination;
 #[Layout('layouts.app')]
 class Errors extends Component
 {
+    use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
     use SurfacesErrorStream;
     use WithPagination;

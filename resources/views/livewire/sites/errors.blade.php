@@ -25,4 +25,6 @@
             @include('livewire.partials.error-stream')
         </main>
     </div>
+
+    @include('livewire.partials.confirm-action-modal')
 </div>

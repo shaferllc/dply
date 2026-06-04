@@ -36,19 +36,58 @@ return [
                 'recommended' => true,
                 'auto_safe' => true,
                 'script' => <<<'BASH'
-set -e
 export DEBIAN_FRONTEND=noninteractive
 PHPVER=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null || true)
-apt-get update -y
-if [ -n "$PHPVER" ]; then
-  apt-get install -y "php${PHPVER}-redis" || apt-get install -y php-redis
-  phpenmod -v "$PHPVER" redis 2>/dev/null || true
-  systemctl reload "php${PHPVER}-fpm" 2>/dev/null || systemctl restart "php${PHPVER}-fpm" 2>/dev/null || true
-else
-  apt-get install -y php-redis
+apt-get update -y || true
+
+is_loaded() { php -m 2>/dev/null | grep -qi '^redis$'; }
+
+# 1) apt — version-pinned, then generic. (apt-get inside `if` won't trip set -e.)
+if ! is_loaded && [ -n "$PHPVER" ]; then apt-get install -y "php${PHPVER}-redis" 2>/dev/null || true; fi
+if ! is_loaded; then apt-get install -y php-redis 2>/dev/null || true; fi
+
+# 2) PECL fallback — when the apt package is missing or held by a version
+#    conflict (e.g. a newer php-common Breaks the only php-redis in the repo),
+#    build the extension from source so we don't depend on the apt package.
+if ! is_loaded; then
+  echo "apt could not install phpredis — building it from source via PECL…"
+  apt-get install -y php-pear "php${PHPVER}-dev" autoconf build-essential pkg-config 2>/dev/null \
+    || apt-get install -y php-pear php-dev autoconf build-essential pkg-config 2>/dev/null || true
+  pecl channel-update pecl.php.net 2>/dev/null || true
+  printf 'no\nno\nno\n' | pecl install -f redis 2>&1 | tail -8 || true
 fi
-systemctl reload php-fpm 2>/dev/null || true
-php -m | grep -qi redis && echo "phpredis installed and loaded." || { echo "phpredis still not loaded" >&2; exit 1; }
+
+# Enable the extension EXACTLY ONCE. Debian/sury: a single mods-available/redis.ini
+# symlinked per-SAPI by phpenmod. Crucially, strip any stray `extension=redis`
+# PECL appended to the real php.ini files — loading it twice makes PHP-FPM fail to
+# start ("module 'redis' already loaded"), which shows as an nginx 502 on the site.
+if [ -d "/etc/php/${PHPVER}/mods-available" ]; then
+  printf '; phpredis (managed by dply remediation)\nextension=redis.so\n' > "/etc/php/${PHPVER}/mods-available/redis.ini"
+  for sapi in cli fpm apache2; do
+    INI="/etc/php/${PHPVER}/${sapi}/php.ini"
+    [ -f "$INI" ] && sed -i -E '/^[[:space:]]*extension[[:space:]]*=[[:space:]]*"?redis(\.so)?"?[[:space:]]*$/d' "$INI"
+  done
+  phpenmod -v "$PHPVER" redis 2>/dev/null || true
+else
+  PHPINI=$(php -i 2>/dev/null | awk -F'=> ' '/Loaded Configuration File/ {print $2}' | tr -d ' ')
+  if [ -n "$PHPINI" ] && [ -f "$PHPINI" ] && ! grep -qE '^[[:space:]]*extension[[:space:]]*=[[:space:]]*"?redis' "$PHPINI"; then
+    printf 'extension=redis.so\n' >> "$PHPINI"
+  fi
+fi
+
+# Restart (not reload) so a master that died from a double-load comes back clean.
+systemctl restart "php${PHPVER}-fpm" 2>/dev/null || systemctl restart php-fpm 2>/dev/null || true
+
+# Verify BOTH: the extension is loaded AND PHP-FPM is actually running — a loaded
+# CLI extension is meaningless if FPM (what serves the site) is down with a 502.
+fpm_ok=1
+systemctl is-active --quiet "php${PHPVER}-fpm" 2>/dev/null || systemctl is-active --quiet php-fpm 2>/dev/null || fpm_ok=0
+if is_loaded && [ "$fpm_ok" -eq 1 ]; then
+  echo "phpredis installed and loaded for PHP ${PHPVER}; PHP-FPM is running."
+else
+  echo "phpredis was built but PHP-FPM is not healthy (often a duplicate extension line). Check 'systemctl status php${PHPVER}-fpm' and 'journalctl -u php${PHPVER}-fpm -n 50'." >&2
+  exit 1
+fi
 BASH,
             ],
         ],
@@ -87,6 +126,25 @@ apt-get install -y "php${PHPVER}-pgsql" || apt-get install -y php-pgsql
 systemctl reload "php${PHPVER}-fpm" 2>/dev/null || systemctl reload php-fpm 2>/dev/null || true
 echo "pdo_pgsql installed."
 BASH,
+            ],
+        ],
+    ],
+
+    'webserver_vhost_missing' => [
+        // The health-check diagnostics surface this when requests land on nginx's
+        // default server instead of a site vhost — the deploy succeeds but the
+        // site 502s. (See AtomicDeployHealthChecker's "falls through to the
+        // default server" / `_default` probes.)
+        'signature' => '/falls through to the default server|enabled vhost for [^\n]*: NONE|stat\(\) "[^"]*_default[^"]*" failed \(13/i',
+        'title' => 'No nginx vhost is serving this site (502)',
+        'explanation' => 'Requests are falling through to nginx’s default server, so there’s no vhost for this site’s hostname — the deploy succeeds but the site returns 502. Re-applying the webserver config regenerates and enables the vhost.',
+        'actions' => [
+            [
+                'key' => 'rebuild_webserver',
+                'label' => 'Rebuild webserver config (re-apply the nginx vhost)',
+                'recommended' => true,
+                'auto_safe' => true,
+                'handler' => \App\Services\Remediations\Actions\RebuildWebserverConfigAction::class,
             ],
         ],
     ],

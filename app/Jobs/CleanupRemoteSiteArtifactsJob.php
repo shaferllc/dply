@@ -73,20 +73,20 @@ class CleanupRemoteSiteArtifactsJob implements ShouldQueue
         if ($basename !== '' && $webserver !== '' && $webserver !== 'none') {
             $log .= match ($webserver) {
                 'apache' => $ssh->exec(sprintf(
-                    '(a2dissite %1$s >/dev/null 2>&1 || true; rm -f %2$s; apachectl configtest && (systemctl reload apache2 2>/dev/null || service apache2 reload 2>/dev/null)) 2>&1; printf "\nDPLY_WEBSERVER_CLEAN_EXIT:%%s" "$?"',
+                    '(sudo a2dissite %1$s >/dev/null 2>&1 || true; sudo rm -f %2$s; sudo apachectl configtest && (sudo systemctl reload apache2 2>/dev/null || sudo service apache2 reload 2>/dev/null)) 2>&1; printf "\nDPLY_WEBSERVER_CLEAN_EXIT:%%s" "$?"',
                     escapeshellarg($basename.'.conf'),
                     escapeshellarg(rtrim(config('sites.apache_sites_available'), '/').'/'.$basename.'.conf')
                 ), 120),
                 'caddy' => $ssh->exec(sprintf(
-                    '(rm -f %1$s && caddy validate --config /etc/caddy/Caddyfile && (systemctl reload caddy 2>/dev/null || service caddy reload 2>/dev/null || systemctl restart caddy)) 2>&1; printf "\nDPLY_WEBSERVER_CLEAN_EXIT:%%s" "$?"',
+                    '(sudo rm -f %1$s && sudo caddy validate --config /etc/caddy/Caddyfile && (sudo systemctl reload caddy 2>/dev/null || sudo service caddy reload 2>/dev/null || sudo systemctl restart caddy)) 2>&1; printf "\nDPLY_WEBSERVER_CLEAN_EXIT:%%s" "$?"',
                     escapeshellarg(rtrim(config('sites.caddy_sites_enabled'), '/').'/'.$basename.'.caddy')
                 ), 120),
                 'openlitespeed' => $ssh->exec(sprintf(
-                    '(rm -rf %1$s && /usr/local/lsws/bin/lswsctrl restart) 2>&1; printf "\nDPLY_WEBSERVER_CLEAN_EXIT:%%s" "$?"',
+                    '(sudo rm -rf %1$s && sudo /usr/local/lsws/bin/lswsctrl restart) 2>&1; printf "\nDPLY_WEBSERVER_CLEAN_EXIT:%%s" "$?"',
                     escapeshellarg(rtrim(config('sites.openlitespeed_vhosts_path'), '/').'/'.$basename)
                 ), 180),
                 'traefik' => $ssh->exec(sprintf(
-                    '(rm -f %1$s %2$s && caddy validate --config /etc/caddy/Caddyfile && (systemctl reload caddy 2>/dev/null || service caddy reload 2>/dev/null || systemctl restart caddy) && (systemctl reload traefik 2>/dev/null || systemctl restart traefik 2>/dev/null || true)) 2>&1; printf "\nDPLY_WEBSERVER_CLEAN_EXIT:%%s" "$?"',
+                    '(sudo rm -f %1$s %2$s && sudo caddy validate --config /etc/caddy/Caddyfile && (sudo systemctl reload caddy 2>/dev/null || sudo service caddy reload 2>/dev/null || sudo systemctl restart caddy) && (sudo systemctl reload traefik 2>/dev/null || sudo systemctl restart traefik 2>/dev/null || true)) 2>&1; printf "\nDPLY_WEBSERVER_CLEAN_EXIT:%%s" "$?"',
                     escapeshellarg(rtrim(config('sites.traefik_dynamic_config_path'), '/').'/'.$basename.'.yml'),
                     escapeshellarg(rtrim(config('sites.caddy_sites_enabled'), '/').'/'.$basename.'-backend.caddy')
                 ), 180),
@@ -96,8 +96,12 @@ class CleanupRemoteSiteArtifactsJob implements ShouldQueue
                     $confFile = $available.'/'.$basename.'.conf';
                     $linkFile = $enabled.'/'.$basename.'.conf';
 
+                    // The vhost files live under /etc/nginx (root-owned), and
+                    // nginx -t / reload need root — run privileged or the rm
+                    // fails with "Permission denied" and leaves orphaned vhosts
+                    // (→ "conflicting server name" on the next site).
                     return $ssh->exec(sprintf(
-                        '(rm -f %1$s %2$s && nginx -t && (systemctl reload nginx 2>/dev/null || service nginx reload 2>/dev/null || nginx -s reload)) 2>&1; printf "\nDPLY_WEBSERVER_CLEAN_EXIT:%%s" "$?"',
+                        '(sudo rm -f %1$s %2$s && sudo nginx -t && (sudo systemctl reload nginx 2>/dev/null || sudo service nginx reload 2>/dev/null || sudo nginx -s reload)) 2>&1; printf "\nDPLY_WEBSERVER_CLEAN_EXIT:%%s" "$?"',
                         escapeshellarg($confFile),
                         escapeshellarg($linkFile)
                     ), 120);

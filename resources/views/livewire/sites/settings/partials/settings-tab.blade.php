@@ -37,7 +37,10 @@
         </div>
 
         <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
-            <x-primary-button type="submit">{{ __('Save') }}</x-primary-button>
+            <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveSiteIdentity">
+                <span wire:loading.remove wire:target="saveSiteIdentity">{{ __('Save') }}</span>
+                <span wire:loading wire:target="saveSiteIdentity">{{ __('Saving…') }}</span>
+            </x-primary-button>
         </div>
     </form>
 </section>
@@ -70,8 +73,18 @@
                 </div>
         </div>
 
-        <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
-            <x-primary-button type="submit">{{ __('Save') }}</x-primary-button>
+        <div class="flex flex-wrap items-center justify-between gap-2 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
+            <button type="button" wire:click="rebuildWebserverConfig" wire:loading.attr="disabled" wire:target="rebuildWebserverConfig"
+                class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3.5 py-2 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:opacity-60"
+                title="{{ __('Re-apply this site’s nginx vhost — fixes a 502 caused by a missing/stale config without changing anything.') }}">
+                <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
+                <span wire:loading.remove wire:target="rebuildWebserverConfig">{{ __('Rebuild webserver config') }}</span>
+                <span wire:loading wire:target="rebuildWebserverConfig">{{ __('Rebuilding…') }}</span>
+            </button>
+            <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveWebDirectory">
+                <span wire:loading.remove wire:target="saveWebDirectory">{{ __('Save') }}</span>
+                <span wire:loading wire:target="saveWebDirectory">{{ __('Saving…') }}</span>
+            </x-primary-button>
         </div>
     </form>
 </section>
@@ -130,7 +143,10 @@
         @endif
 
         <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
-            <x-primary-button type="submit">{{ __('Save') }}</x-primary-button>
+            <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveWorkerMode">
+                <span wire:loading.remove wire:target="saveWorkerMode">{{ __('Save') }}</span>
+                <span wire:loading wire:target="saveWorkerMode">{{ __('Saving…') }}</span>
+            </x-primary-button>
         </div>
     </form>
 </section>
@@ -185,7 +201,10 @@
         </div>
 
         <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
-            <x-primary-button type="submit">{{ __('Save project settings') }}</x-primary-button>
+            <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveProjectSettings">
+                <span wire:loading.remove wire:target="saveProjectSettings">{{ __('Save project settings') }}</span>
+                <span wire:loading wire:target="saveProjectSettings">{{ __('Saving…') }}</span>
+            </x-primary-button>
         </div>
     </form>
 </section>
@@ -215,7 +234,10 @@
         </div>
 
         <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
-            <x-primary-button type="submit">{{ __('Save') }}</x-primary-button>
+            <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveSiteNotes">
+                <span wire:loading.remove wire:target="saveSiteNotes">{{ __('Save') }}</span>
+                <span wire:loading wire:target="saveSiteNotes">{{ __('Saving…') }}</span>
+            </x-primary-button>
         </div>
     </form>
 </section>

@@ -80,6 +80,22 @@
                         @endif
                     </div>
                     <div class="flex shrink-0 items-center gap-1.5">
+                        @php
+                            $rem = $event->dismissed_at ? null : $event->remediation();
+                            $recAction = $rem ? (collect($rem['actions'])->firstWhere('recommended', true) ?? ($rem['actions'][0] ?? null)) : null;
+                        @endphp
+                        @if ($rem && $recAction)
+                            <button type="button"
+                                wire:click="openConfirmActionModal('applyRemediation', ['{{ $event->id }}'], @js($rem['title']), @js($rem['explanation']), @js($recAction['label']), false, @js([
+                                    ['label' => __('Action'), 'value' => $recAction['label'], 'multiline' => true],
+                                    ['label' => __('Runs on'), 'value' => $event->server?->name ?? __('the server')],
+                                    ['label' => __('How'), 'value' => __('dply runs this over SSH, then resolves this error if it succeeds. You can re-run the original operation afterward.'), 'multiline' => true],
+                                ]))"
+                                class="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-amber-600 disabled:opacity-60"
+                                title="{{ $rem['title'] }}">
+                                <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" aria-hidden="true" /> {{ __('Fix') }}
+                            </button>
+                        @endif
                         @if ($event->isRetryable() && ! $event->dismissed_at)
                             <button type="button" wire:click="retry('{{ $event->id }}')" wire:loading.attr="disabled" wire:target="retry('{{ $event->id }}')"
                                 class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60">

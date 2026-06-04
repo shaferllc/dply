@@ -2749,6 +2749,7 @@ class Show extends Component
     {
         $this->authorize('delete', $this->site);
         $organization = $this->site->server?->organization;
+        $server = $this->site->server;
         $siteName = $this->site->name;
         $snapshot = [
             'name' => $siteName,
@@ -2777,7 +2778,10 @@ class Show extends Component
         // deleted Site → 404. A plain HTTP redirect avoids that round trip.
         session()->flash('success', __('Site :name was removed.', ['name' => $siteName]));
 
-        return redirect()->route('servers.index');
+        // Back to the server's own sites list (not the all-servers index).
+        return $server !== null
+            ? redirect()->route('servers.sites', ['server' => $server->id])
+            : redirect()->route('servers.index');
     }
 
     public function confirmSuspendSite(): void

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
+use App\Jobs\ApplyRemediationJob;
 use App\Models\ErrorEvent;
+use App\Services\Remediations\RemediationCatalog;
 use App\Support\Errors\ErrorRetryRegistry;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -84,9 +86,49 @@ trait SurfacesErrorStream
         }
     }
 
+    /** Apply a recognized remediation for an error. Defaults to the recommended action. */
+    public function applyRemediation(string $id, ?string $actionKey = null): void
+    {
+        $this->authorizeErrorAccess();
+
+        $event = $this->scopedErrors()->whereKey($id)->first();
+        $remediation = $event instanceof ErrorEvent ? $event->remediation() : null;
+        if ($event === null || $remediation === null) {
+            $this->toastError(__('No known fix for this error.'));
+
+            return;
+        }
+
+        $actions = $remediation['actions'] ?? [];
+        $actionKey ??= collect($actions)->firstWhere('recommended', true)['key'] ?? ($actions[0]['key'] ?? null);
+        if ($actionKey === null || app(RemediationCatalog::class)->action((string) $event->remediation_code, $actionKey) === null) {
+            $this->toastError(__('That fix is no longer available.'));
+
+            return;
+        }
+
+        if ($event->server_id === null) {
+            $this->toastError(__('This error isn’t tied to a server, so it can’t be fixed automatically.'));
+
+            return;
+        }
+
+        ApplyRemediationJob::dispatch(
+            (string) $event->server_id,
+            $event->site_id ? (string) $event->site_id : null,
+            (string) $event->remediation_code,
+            $actionKey,
+            (string) (auth()->id() ?? '') ?: null,
+            (string) $event->id,
+        );
+
+        $this->toastSuccess(__('Applying the fix — it resolves this error when it finishes.'));
+    }
+
     public function getEventsProperty(): LengthAwarePaginator
     {
         return $this->scopedErrors()
+            ->with('server:id,name')
             ->when(! $this->showDismissed, fn ($q) => $q->whereNull('dismissed_at'))
             ->when($this->category !== '', fn ($q) => $q->where('category', $this->category))
             ->orderByDesc('occurred_at')

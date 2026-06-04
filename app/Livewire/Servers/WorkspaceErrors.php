@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\SurfacesErrorStream;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\ErrorEvent;
@@ -22,6 +23,7 @@ use Livewire\WithPagination;
 #[Layout('layouts.app')]
 class WorkspaceErrors extends Component
 {
+    use ConfirmsActionWithModal;
     use InteractsWithServerWorkspace;
     use SurfacesErrorStream;
     use WithPagination;

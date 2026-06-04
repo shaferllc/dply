@@ -1786,6 +1786,21 @@ class Settings extends Show
      * intentionally edited from Routing > Domains now — keeping the cascade
      * (cert re-issue, container backend cycle) next to its trigger.
      */
+    /**
+     * Re-apply the site's nginx vhost without changing any setting. The recovery
+     * for "site deploys but 502s" — a missing/stale vhost falling through to the
+     * default server. Streams the apply over the page's console banner.
+     */
+    public function rebuildWebserverConfig(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $this->finalizeRoutingMutation(
+            __('Webserver config rebuilt — the site vhost was re-applied.'),
+            __('Rebuilding webserver config …'),
+        );
+    }
+
     public function saveWebDirectory(): void
     {
         $this->authorize('update', $this->site);

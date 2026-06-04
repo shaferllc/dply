@@ -71,6 +71,10 @@
         },
     }"
 >
+    @isset($breadcrumb)
+        <div class="mb-6">{{ $breadcrumb }}</div>
+    @endisset
+
     <div @class([
         'lg:grid lg:gap-10' => $showNavigation,
         'lg:grid-cols-12' => $showNavigation,

@@ -86,26 +86,30 @@
         $contextualDocSlug = app(\App\Support\Docs\ContextualDocResolver::class)
             ->resolveForServerWorkspace(is_string($active) ? $active : null);
     @endphp
-    <x-breadcrumb-trail
-        :items="$workspaceBreadcrumbs"
-        doc-contextual
-        :contextual-doc-slug="$contextualDocSlug"
-    >
-        @if ($server->workspace || isset($headerActions))
-            <x-slot name="trailing">
-                @isset($headerActions)
-                    {{ $headerActions }}
-                @endisset
-                @if ($server->workspace)
-                    @feature('surface.projects')
-                        <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
-                            {{ __('Open project workspace') }}
-                        </a>
-                    @endfeature
-                @endif
-            </x-slot>
-        @endif
-    </x-breadcrumb-trail>
+    {{-- Full-width breadcrumb at the very top of the workspace (above the sidebar
+         + content grid), matching the site pages. --}}
+    <x-slot:breadcrumb>
+        <x-breadcrumb-trail
+            :items="$workspaceBreadcrumbs"
+            doc-contextual
+            :contextual-doc-slug="$contextualDocSlug"
+        >
+            @if ($server->workspace || isset($headerActions))
+                <x-slot name="trailing">
+                    @isset($headerActions)
+                        {{ $headerActions }}
+                    @endisset
+                    @if ($server->workspace)
+                        @feature('surface.projects')
+                            <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
+                                {{ __('Open project workspace') }}
+                            </a>
+                        @endfeature
+                    @endif
+                </x-slot>
+            @endif
+        </x-breadcrumb-trail>
+    </x-slot:breadcrumb>
 
     <x-page-header
         :title="$contextSite ? $title.' — '.$contextSite->name : $title"

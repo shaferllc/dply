@@ -27,6 +27,8 @@ use Illuminate\Support\Str;
  */
 class ErrorEventRecorder
 {
+    public function __construct(private readonly RemediationCatalog $remediations) {}
+
     /** Record a failed ConsoleAction. No-op if it isn't actually failed. */
     public function recordConsoleAction(ConsoleAction $action): ?ErrorEvent
     {
@@ -55,6 +57,7 @@ class ErrorEventRecorder
             'server_id' => $serverId,
             'site_id' => $siteId,
             'category' => (string) $action->kind,
+            'remediation_code' => $this->remediations->match($detail)['code'] ?? null,
             'title' => $this->humanTitle((string) ($action->label ?: ''), (string) $action->kind),
             'detail' => $detail !== '' ? Str::limit($detail, 2000, '') : null,
             'link_url' => $link,
@@ -72,6 +75,9 @@ class ErrorEventRecorder
         $site = $deployment->site;
         $server = $site?->server;
         $detail = $this->deploymentDetail($deployment);
+        // Match against the FULL failure output (the signature often sits earlier
+        // than the truncated `detail` tail).
+        $matchCode = $this->remediations->match($this->deploymentMatchText($deployment))['code'] ?? null;
 
         $link = ($site && $server)
             ? route('sites.deployments.show', ['server' => $server->id, 'site' => $site->id, 'deployment' => $deployment->id])
@@ -82,6 +88,7 @@ class ErrorEventRecorder
             'server_id' => $server?->id,
             'site_id' => $site?->id,
             'category' => 'deploy',
+            'remediation_code' => $matchCode,
             'title' => $site ? __('Deployment failed — :site', ['site' => $site->name]) : __('Deployment failed'),
             'detail' => $detail !== '' ? Str::limit($detail, 2000, '') : null,
             'link_url' => $link,
@@ -185,6 +192,20 @@ class ErrorEventRecorder
         }
 
         return '';
+    }
+
+    /** Full failure output for signature matching — the whole log plus step outputs. */
+    private function deploymentMatchText(SiteDeployment $deployment): string
+    {
+        $parts = [(string) ($deployment->log_output ?? '')];
+        $phaseResults = is_array($deployment->phase_results ?? null) ? $deployment->phase_results : [];
+        array_walk_recursive($phaseResults, function ($value) use (&$parts): void {
+            if (is_string($value) && $value !== '') {
+                $parts[] = $value;
+            }
+        });
+
+        return implode("\n", $parts);
     }
 
     private function deploymentDetail(SiteDeployment $deployment): string

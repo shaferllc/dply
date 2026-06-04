@@ -110,116 +110,22 @@
             </section>
 
             @if ($deployment->status === 'failed')
-                @php $remediation = $this->remediation; @endphp
-                @if ($remediation)
-                    <section class="mb-6 overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/60">
-                        <div class="flex items-start gap-3 px-6 py-5 sm:px-7">
-                            <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 ring-1 ring-amber-600/20">
-                                <x-heroicon-o-wrench-screwdriver class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0 flex-1">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">{{ __('dply recognized this failure') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $remediation['title'] }}</h3>
-                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $remediation['explanation'] }}</p>
-
-                                <div class="mt-4 flex flex-wrap gap-2">
-                                    @foreach ($remediation['actions'] as $action)
-                                        <button
-                                            type="button"
-                                            wire:click="applyRemediation('{{ $action['key'] }}')"
-                                            wire:loading.attr="disabled"
-                                            wire:target="applyRemediation('{{ $action['key'] }}')"
-                                            @class([
-                                                'inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-60',
-                                                'bg-brand-ink text-brand-cream hover:bg-brand-forest' => ! empty($action['recommended']),
-                                                'border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => empty($action['recommended']),
-                                            ])
-                                        >
-                                            <x-heroicon-o-wrench class="h-4 w-4" aria-hidden="true" />
-                                            {{ $action['label'] }}
-                                            @if (! empty($action['recommended']))
-                                                <span class="rounded-full bg-brand-cream/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">{{ __('Recommended') }}</span>
-                                            @endif
-                                        </button>
-                                    @endforeach
-                                </div>
-                                <p class="mt-2 text-[11px] text-brand-mist">{{ __('Runs over SSH on :server. After it succeeds, re-deploy to continue.', ['server' => $server->name]) }}</p>
-                            </div>
-                        </div>
-
-                        @if ($this->remediationRun)
-                            <div class="border-t border-amber-200/70 px-6 py-4 sm:px-7">
-                                @include('livewire.partials.console-action-banner-static', [
-                                    'run' => $this->remediationRun,
-                                    'kindLabels' => (array) config('console_actions.kinds', []),
-                                ])
-                                @if ($this->remediationRun->status === 'completed')
-                                    <a href="{{ route('sites.deployments.index', ['server' => $server, 'site' => $site]) }}" wire:navigate
-                                        class="mt-2 inline-flex items-center gap-2 rounded-lg bg-brand-ink px-3.5 py-2 text-sm font-semibold text-brand-cream hover:bg-brand-forest">
-                                        <x-heroicon-o-rocket-launch class="h-4 w-4" aria-hidden="true" />
-                                        {{ __('Re-deploy') }}
-                                    </a>
-                                @endif
-                            </div>
-                        @endif
-                    </section>
-                @endif
-
+                @include('livewire.sites.partials.deployments._remediation-panel', ['deployment' => $deployment])
                 <x-ops-copilot-callout :site="$site" :show="true" />
             @endif
 
-            @if ($phaseResults === [])
+            @php $timelinePhases = \App\Support\Sites\SiteDeployTimeline::forDeployment($site, $deployment); @endphp
+            @if ($timelinePhases === [])
                 <section class="dply-card overflow-hidden">
                     <div class="px-6 py-12 text-center text-sm text-brand-moss sm:px-8">
                         {{ __('No phase results recorded for this deployment.') }}
                     </div>
                 </section>
             @else
-                @foreach ($phases as $phase)
-                    {{-- Skip recorded-but-empty phases (e.g. a build phase with no
-                         configured steps); they have nothing to show and phaseOk()
-                         reports false for an empty step list. --}}
-                    @if ($deployment->hasPhase($phase) && $deployment->phaseSteps($phase) !== [])
-                        @php($phaseOk = $deployment->phaseOk($phase))
-                        @php($phaseSteps = $deployment->phaseSteps($phase))
-                        @php($phaseDurationMs = collect($phaseSteps)->sum(fn ($s) => (int) ($s['duration_ms'] ?? 0)))
-                        <section class="dply-card overflow-hidden">
-                            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
-                                <span @class([
-                                    'flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ring-1 ring-inset',
-                                    'bg-emerald-100 text-emerald-800 ring-emerald-200' => $phaseOk,
-                                    'bg-rose-100 text-rose-800 ring-rose-200' => ! $phaseOk,
-                                ])>
-                                    @if ($phaseOk)
-                                        <x-heroicon-m-check class="h-5 w-5" aria-hidden="true" />
-                                    @else
-                                        <x-heroicon-m-x-mark class="h-5 w-5" aria-hidden="true" />
-                                    @endif
-                                </span>
-                                <div class="min-w-0">
-                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Phase') }}</p>
-                                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink capitalize">{{ str_replace(['_', '-'], ' ', $phase) }}</h2>
-                                    <p class="mt-1 text-sm text-brand-moss">
-                                        {{ trans_choice('{1} :count step|[2,*] :count steps', count($phaseSteps), ['count' => count($phaseSteps)]) }}
-                                        @if ($phaseDurationMs > 0)
-                                            · <span class="font-mono">{{ number_format($phaseDurationMs / 1000, 1) }}s</span>
-                                        @endif
-                                    </p>
-                                </div>
-                            </div>
-                            <ol class="space-y-3 px-6 py-5 sm:px-8">
-                                @foreach ($phaseSteps as $step)
-                                    @include('livewire.sites.partials.deployment-detail-step', [
-                                        'step' => $step,
-                                        'showOutput' => $showOutput,
-                                        'glyph' => $deployment->stepGlyph($step),
-                                        'glyphClasses' => $deployment->stepClasses($step),
-                                    ])
-                                @endforeach
-                            </ol>
-                        </section>
-                    @endif
-                @endforeach
+                {{-- Same phase/step timeline the deploy hub's Deploy tab renders, so the two reflect each other. --}}
+                <section class="dply-card overflow-hidden px-6 py-5 sm:px-8">
+                    @include('livewire.sites.partials.deployments._phase-timeline', ['timelinePhases' => $timelinePhases, 'deployment' => $deployment])
+                </section>
             @endif
 
             @if (trim((string) $deployment->log_output) !== '')
