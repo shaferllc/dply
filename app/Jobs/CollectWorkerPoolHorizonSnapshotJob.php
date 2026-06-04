@@ -136,6 +136,11 @@ $wr = $T(fn () => app(\Laravel\Horizon\Contracts\WorkloadRepository::class));
 $msr = $T(fn () => app(\Laravel\Horizon\Contracts\MasterSupervisorRepository::class));
 $sr = $T(fn () => app(\Laravel\Horizon\Contracts\SupervisorRepository::class));
 $out = [];
+// Box clock captured once: per-job ages are computed HERE (box_now - reserved_at)
+// so the UI never subtracts the box's clock from dply's — see WorkerPoolHorizonConfig.
+$boxNow = microtime(true);
+$out['box_now'] = $boxNow;
+$out['horizon_installed'] = $T(fn () => class_exists(\Laravel\Horizon\Horizon::class), false);
 $out['status'] = $T(fn () => collect($msr->all())->first()->status ?? 'inactive', 'unknown');
 // Process counts live on the SUPERVISOR records (each ->processes is a
 // queue => count map). The master record's ->supervisors is only a list of
@@ -151,9 +156,25 @@ $out['jobs_per_minute'] = $T(fn () => $mr->jobsProcessedPerMinute(), null);
 // null (every queue name → '?', every metric → '—').
 $g = fn ($o, $k, $d = null) => is_array($o) ? ($o[$k] ?? $d) : ($o->$k ?? $d);
 $out['workload'] = $T(fn () => collect($wr->get())->map(fn ($w) => ['name' => $g($w, 'name', '?'), 'length' => $g($w, 'length'), 'wait' => $g($w, 'wait'), 'processes' => $g($w, 'processes')])->values()->all(), []);
+// The LIVE applied config — read straight off the running supervisor options
+// (Horizon read the box's HORIZON_* env at boot). This is what the monitor shows
+// as truth and what the UI diffs against the saved pool config (drift badge).
+$out['running_config'] = $T(function () use ($sr, $g) {
+    $supers = collect($sr->all());
+    $first = $supers->first();
+    if (! $first) { return null; }
+    $queues = $supers->flatMap(function ($s) use ($g) { $q = ($g($s, 'options', []) ?: [])['queue'] ?? []; return is_array($q) ? $q : explode(',', (string) $q); })->map(fn ($q) => trim((string) $q))->filter()->unique()->values()->all();
+    $opt = (array) ($g($first, 'options', []) ?: []);
+    return ['queues' => $queues, 'balance' => $opt['balance'] ?? null, 'max_processes' => isset($opt['maxProcesses']) ? (int) $opt['maxProcesses'] : null, 'min_processes' => isset($opt['minProcesses']) ? (int) $opt['minProcesses'] : null, 'memory' => isset($opt['memory']) ? (int) $opt['memory'] : null, 'timeout' => isset($opt['timeout']) ? (int) $opt['timeout'] : null, 'tries' => isset($opt['tries']) ? (int) $opt['tries'] : null];
+}, null);
 // Per-queue throughput time series (Horizon MetricsRepository) for sparklines.
 $out['queue_throughput'] = $T(fn () => collect($mr->measuredQueues())->mapWithKeys(fn ($q) => [(string) $q => collect($mr->snapshotsForQueue($q))->map(fn ($s) => round((float) $g($s, 'throughput', 0), 2))->values()->all()])->all(), []);
-$jobRow = fn ($j) => ['name' => $g($j, 'name') ?: 'job', 'queue' => $g($j, 'queue', '?'), 'status' => $g($j, 'status', '?'), 'at' => $g($j, 'reserved_at', $g($j, 'completed_at'))];
+// `age` (seconds) computed on the box against $boxNow — the UI renders it as
+// "Ns ago" anchored to collected_at, never doing cross-machine clock math.
+$jobRow = function ($j) use ($g, $boxNow) {
+    $at = (float) $g($j, 'reserved_at', $g($j, 'completed_at', 0));
+    return ['name' => $g($j, 'name') ?: 'job', 'queue' => $g($j, 'queue', '?'), 'status' => $g($j, 'status', '?'), 'age' => $at > 0 ? max(0, round($boxNow - $at, 1)) : null];
+};
 $out['pending_jobs'] = $T(fn () => collect($jr->getPending())->take(25)->map($jobRow)->values()->all(), []);
 $out['recent_jobs'] = $T(fn () => collect($jr->getRecent())->take(25)->map($jobRow)->values()->all(), []);
 $out['completed_jobs'] = $T(fn () => collect($jr->getCompleted())->take(25)->map($jobRow)->values()->all(), []);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\WritesPoolMemberEnv;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\WorkerPool;
@@ -17,28 +18,31 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
 
 /**
- * Applies a worker pool's Horizon configuration (queues, process counts,
- * balance, memory, timeout, tries) to every member box by writing the
- * corresponding HORIZON_* env vars into each app's .env over SSH, then
- * restarting the worker units so Horizon re-reads them.
+ * BOX-AUTHORITATIVE user-config push: writes the pool's Horizon knobs (HORIZON_*
+ * + REDIS_QUEUE) into each member's .env and restarts the worker so Horizon
+ * re-reads them. The box .env is the source of truth — dply is a convenience
+ * writer, not an enforcer:
  *
- * "Env-var driven" by design: dply never edits the deployed app's
- * config/horizon.php — it just sets the vars that a dply-aware horizon.php
- * reads (see config/horizon.php). The pool meta is the source of truth; this
- * job is the projection of that truth onto the boxes.
+ *  - $seedOnly = true  → only members that have NEVER had config applied (no
+ *    `horizon_config_applied_at` marker) are written. Used on reconcile to seed
+ *    NEW members without clobbering hand-edited existing ones.
+ *  - $seedOnly = false → all members (explicit "Save & apply" — the user is
+ *    choosing to re-sync everyone).
+ *
+ * dply's own agent plumbing (DPLY_POOL_EVENT_*) is pushed separately and
+ * enforced by {@see PushWorkerPoolAgentConfigJob}.
  */
 class PushWorkerPoolHorizonConfigJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, WritesPoolMemberEnv;
 
     public int $tries = 1;
 
     public int $timeout = 180;
 
-    public function __construct(public string $poolId)
+    public function __construct(public string $poolId, public bool $seedOnly = false)
     {
         $this->onQueue('dply-control');
     }
@@ -54,13 +58,15 @@ class PushWorkerPoolHorizonConfigJob implements ShouldQueue
             return;
         }
 
-        $envVars = array_merge(
-            WorkerPoolHorizonConfig::envVarsFor($pool),
-            $this->eventIngestEnvVars($pool),
-        );
+        $envVars = WorkerPoolHorizonConfig::envVarsFor($pool);
 
         foreach ($pool->servers as $member) {
             if (! $member instanceof Server || ! $member->isReady()) {
+                continue;
+            }
+            // Box-authoritative: in seed mode, leave already-configured members
+            // alone so hand edits survive reconciles.
+            if ($this->seedOnly && ! empty($member->meta['horizon_config_applied_at'] ?? null)) {
                 continue;
             }
             $site = $this->appSite($member);
@@ -68,19 +74,8 @@ class PushWorkerPoolHorizonConfigJob implements ShouldQueue
                 continue;
             }
 
-            try {
-                $this->upsertEnv($site, $envVars, $parser, $writer);
-                $pusher->push($site);
-                // Restart the worker units so `php artisan horizon` re-reads the
-                // new .env (Restart=always also covers the brief exit window).
-                $provisioner->controlWorkerUnits($site, 'restart');
-            } catch (\Throwable $e) {
-                Log::warning('PushWorkerPoolHorizonConfigJob: member failed', [
-                    'pool_id' => $pool->id,
-                    'server_id' => $member->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
+            $this->applyEnvToMember($site, $envVars, $parser, $writer, $pusher, $provisioner);
+            $this->markApplied($member);
         }
 
         // Reflect the freshly applied config back into the dashboard.
@@ -88,53 +83,12 @@ class PushWorkerPoolHorizonConfigJob implements ShouldQueue
     }
 
     /**
-     * Merge the HORIZON_* vars into the site's stored .env content (cache of
-     * record) without disturbing the operator's other keys/comments.
-     *
-     * @param  array<string, string>  $envVars
+     * Stamp the member so future seed-only reconciles skip it (box-authoritative).
      */
-    private function upsertEnv(Site $site, array $envVars, DotEnvFileParser $parser, DotEnvFileWriter $writer): void
+    private function markApplied(Server $member): void
     {
-        $parsed = $parser->parse((string) ($site->env_file_content ?? ''));
-        $variables = $parsed['variables'];
-        foreach ($envVars as $key => $value) {
-            $variables[$key] = (string) $value;
-        }
-        $site->forceFill(['env_file_content' => $writer->render($variables, $parsed['comments'])])->save();
-    }
-
-    /**
-     * Env that turns on the box-side real-time agent
-     * ({@see \App\Listeners\ForwardWorkerPoolJobEvent}): the ingest URL it POSTs
-     * each Horizon job event to, and the per-pool bearer token. The token is
-     * minted once and stored on the pool meta. The base URL defaults to the app
-     * URL but is overridable (DPLY_POOL_EVENT_INGEST_BASE) for when the boxes
-     * must reach dply on a different public host (e.g. a dev tunnel).
-     *
-     * @return array<string, string>
-     */
-    private function eventIngestEnvVars(WorkerPool $pool): array
-    {
-        $meta = is_array($pool->meta) ? $pool->meta : [];
-        $token = (string) ($meta['event_token'] ?? '');
-        if ($token === '') {
-            $token = bin2hex(random_bytes(24));
-            $meta['event_token'] = $token;
-            $pool->forceFill(['meta' => $meta])->save();
-        }
-
-        $base = rtrim((string) (env('DPLY_POOL_EVENT_INGEST_BASE') ?: config('app.url')), '/');
-
-        return [
-            'DPLY_POOL_EVENT_URL' => $base.'/api/worker-pools/'.$pool->id.'/job-events',
-            'DPLY_POOL_EVENT_TOKEN' => $token,
-        ];
-    }
-
-    private function appSite(Server $member): ?Site
-    {
-        $sites = $member->sites()->get();
-
-        return $sites->first(fn (Site $s): bool => $s->isLaravelFrameworkDetected()) ?? $sites->first();
+        $meta = is_array($member->meta) ? $member->meta : [];
+        $meta['horizon_config_applied_at'] = now()->toIso8601String();
+        $member->forceFill(['meta' => $meta])->save();
     }
 }

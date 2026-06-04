@@ -569,7 +569,9 @@ class WorkspaceWorkerPool extends Component
             'name' => (string) ($job['name'] ?? 'job'),
             'queue' => (string) ($job['queue'] ?? '?'),
             'status' => (string) ($job['status'] ?? 'processing'),
-            'at' => (float) ($job['at'] ?? 0),
+            // dply-clock timestamp (stamped at ingest) — rendered as "x ago"
+            // against dply's now(), never the box's clock.
+            'received_at' => (float) ($job['received_at'] ?? 0),
         ]);
         $this->liveJobs = array_slice($this->liveJobs, 0, 30);
     }

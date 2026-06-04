@@ -517,10 +517,58 @@
             $hzAttemptAt = ! empty($hz['last_attempt_at']) ? \Illuminate\Support\Carbon::parse($hz['last_attempt_at']) : null;
             $hzError = $hz['error'] ?? null;
             $hzStatus = $hz['status'] ?? null;
+
+            // Whether the member app actually ships Horizon. Live feed shows
+            // regardless; the Horizon aggregate layer is gated on this.
+            $hzInstalled = ($hz['horizon_installed'] ?? null) !== false;
+
+            // Compact relative-time formatter for a seconds value ("3s", "2m", "1h").
+            $fmtAge = function ($seconds) {
+                if ($seconds === null) { return null; }
+                $s = (int) round($seconds);
+                if ($s < 60) { return $s.'s ago'; }
+                if ($s < 3600) { return floor($s / 60).'m ago'; }
+                if ($s < 86400) { return floor($s / 3600).'h ago'; }
+                return floor($s / 86400).'d ago';
+            };
+
+            // Drift: dply's saved config (#1) vs the box's running supervisor (#3).
+            $hzRunning = is_array($hz['running_config'] ?? null) ? $hz['running_config'] : null;
+            $hzSaved = \App\Support\WorkerPools\WorkerPoolHorizonConfig::for($pool);
+            $hzDrift = [];
+            if ($hzRunning) {
+                $runQ = collect($hzRunning['queues'] ?? [])->sort()->values()->all();
+                $savedQ = collect($hzSaved['queues'] ?? [])->sort()->values()->all();
+                if ($runQ !== $savedQ) { $hzDrift['queues'] = ['saved' => implode(', ', $savedQ) ?: '—', 'running' => implode(', ', $runQ) ?: '—']; }
+                foreach (['balance', 'max_processes', 'min_processes', 'memory', 'timeout'] as $k) {
+                    $r = $hzRunning[$k] ?? null; $sv = $hzSaved[$k] ?? null;
+                    if ($r !== null && (string) $r !== (string) $sv) { $hzDrift[$k] = ['saved' => $sv, 'running' => $r]; }
+                }
+            }
         @endphp
         {{-- No wire:poll here: the Live jobs feed is pushed over Reverb in real
              time. Aggregate tiles/lists refresh on Refresh Horizon / Snapshot. --}}
         <div class="mt-6 space-y-6">
+            @unless ($hzInstalled)
+                <div class="flex items-start gap-2 rounded-xl border border-brand-ink/15 bg-brand-sand/30 px-4 py-3 text-sm text-brand-moss">
+                    <x-heroicon-o-information-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-mist" />
+                    <span>{{ __('Horizon isn’t installed on this app, so aggregate metrics are unavailable — the Live jobs feed below still streams every job in real time. Install laravel/horizon for the full dashboard.') }}</span>
+                </div>
+            @endunless
+            @if ($hzInstalled && ! empty($hzDrift))
+                <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+                    <div class="flex items-center gap-2 font-semibold text-amber-800">
+                        <x-heroicon-o-exclamation-triangle class="h-4 w-4 shrink-0" />
+                        {{ __('Running config differs from saved') }}
+                    </div>
+                    <p class="mt-1 text-xs text-amber-700">{{ __('The workers are running settings that don’t match this pool’s saved config. Click “Save & apply” to push the saved values, or update the saved config to match.') }}</p>
+                    <ul class="mt-2 space-y-0.5 font-mono text-[11px] text-amber-800">
+                        @foreach ($hzDrift as $field => $d)
+                            <li>{{ $field }}: <span class="text-amber-600">saved={{ is_array($d['saved'] ?? null) ? implode(',', $d['saved']) : ($d['saved'] ?? '—') }}</span> → <span class="font-semibold">running={{ is_array($d['running'] ?? null) ? implode(',', $d['running']) : ($d['running'] ?? '—') }}</span></li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
             <section class="dply-card overflow-hidden">
                 <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <div class="min-w-0">
@@ -623,7 +671,8 @@
                 @else
                     <div class="divide-y divide-brand-ink/5">
                         @foreach ($liveJobs as $i => $j)
-                            <div class="flex flex-wrap items-center gap-2 px-6 py-2.5 sm:px-7" wire:key="livejob-{{ $i }}-{{ $j['at'] }}">
+                            @php $liveAge = ! empty($j['received_at']) ? max(0, now()->timestamp - (int) $j['received_at']) : null; @endphp
+                            <div class="flex flex-wrap items-center gap-2 px-6 py-2.5 sm:px-7" wire:key="livejob-{{ $i }}-{{ $j['received_at'] ?? $i }}">
                                 <span class="text-sm font-medium text-brand-ink">{{ $j['name'] }}</span>
                                 <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-[11px] text-brand-moss">{{ $j['queue'] }}</span>
                                 <span @class([
@@ -631,8 +680,12 @@
                                     'bg-sky-50 text-sky-700 ring-sky-200' => $j['status'] === 'processing',
                                     'bg-emerald-50 text-emerald-700 ring-emerald-200' => $j['status'] === 'completed',
                                     'bg-rose-50 text-rose-700 ring-rose-200' => $j['status'] === 'failed',
-                                    'bg-brand-sand/60 text-brand-moss ring-brand-ink/15' => ! in_array($j['status'], ['processing', 'completed', 'failed'], true),
+                                    'bg-amber-50 text-amber-700 ring-amber-200' => $j['status'] === 'dropped',
+                                    'bg-brand-sand/60 text-brand-moss ring-brand-ink/15' => ! in_array($j['status'], ['processing', 'completed', 'failed', 'dropped'], true),
                                 ])>{{ $j['status'] }}</span>
+                                @if ($liveAge !== null)
+                                    <span class="ml-auto text-xs text-brand-mist">{{ $fmtAge($liveAge) }}</span>
+                                @endif
                             </div>
                         @endforeach
                     </div>
@@ -648,7 +701,9 @@
             ])
 
             {{-- Horizon configuration — env-var driven; dply writes HORIZON_* to
-                 each member's .env and restarts the workers. Auto-defaulted. --}}
+                 each member's .env and restarts the workers. Auto-defaulted.
+                 Horizon-only: a queue:work member is configured via its unit. --}}
+            @if ($hzInstalled)
             <section class="dply-card overflow-hidden" x-data="{ open: false }">
                 <button type="button" x-on:click="open = !open" class="flex w-full items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 text-left sm:px-7">
                     <div>
@@ -702,9 +757,10 @@
                     </div>
                 </form>
             </section>
+            @endif {{-- /$hzInstalled : config panel --}}
 
             {{-- Per-queue workload --}}
-            @if (! empty($hz['workload']))
+            @if ($hzInstalled && ! empty($hz['workload']))
                 <section class="dply-card overflow-hidden">
                     <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
                         <h3 class="text-sm font-semibold text-brand-ink">{{ __('Queues') }}</h3>
@@ -755,7 +811,8 @@
                 </section>
             @endif
 
-            {{-- Pending + Recent + Completed jobs --}}
+            {{-- Pending + Recent + Completed jobs (Horizon-only aggregate) --}}
+            @if ($hzInstalled)
             @php
                 $jobLists = [
                     ['key' => 'pending_jobs', 'title' => __('Pending jobs'), 'empty' => __('Nothing waiting in the queue.')],
@@ -786,6 +843,9 @@
                                     <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-[11px] text-brand-moss">{{ $j['queue'] ?? '?' }}</span>
                                     @if (! empty($j['status']))
                                         <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 {{ $statusTone($j['status']) }}">{{ $j['status'] }}</span>
+                                    @endif
+                                    @if (($j['age'] ?? null) !== null)
+                                        <span class="ml-auto text-xs text-brand-mist" title="{{ $hzAt ? $hzAt->copy()->subSeconds((int) $j['age'])->toDayDateTimeString() : '' }}">{{ $fmtAge($j['age']) }}</span>
                                     @endif
                                 </div>
                             @endforeach
@@ -851,6 +911,7 @@
                     </div>
                 @endif
             </section>
+            @endif {{-- /$hzInstalled : buckets + failed jobs --}}
         </div>
         @endif {{-- /horizon --}}
 

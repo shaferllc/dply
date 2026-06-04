@@ -4,6 +4,7 @@ namespace App\Services\WorkerPools;
 
 use App\Jobs\ControlWorkerDaemonJob;
 use App\Jobs\DrainAndDestroyWorkerJob;
+use App\Jobs\PushWorkerPoolAgentConfigJob;
 use App\Jobs\PushWorkerPoolHorizonConfigJob;
 use App\Jobs\ReconcileWorkerPoolJob;
 use App\Support\WorkerPools\WorkerPoolHorizonConfig;
@@ -286,12 +287,18 @@ class WorkerPoolManager
             $count++;
         }
 
-        // Auto-apply the pool's Horizon config (defaults when the user hasn't
-        // tuned anything) as HORIZON_* env vars on every box, so a fresh pool's
-        // workers come up configured without any manual step. Delayed so it lands
-        // after the units above are written/started, then restarts to pick it up.
-        if ($useHorizon && $count > 0) {
-            PushWorkerPoolHorizonConfigJob::dispatch((string) $pool->id)->delay(now()->addSeconds(20));
+        if ($count > 0) {
+            // Enforced: dply's own real-time agent plumbing (DPLY_POOL_EVENT_*) is
+            // always (re)asserted on every reconcile — idempotent, no restart when
+            // unchanged. Not user config, so it never respects box edits.
+            PushWorkerPoolAgentConfigJob::dispatch((string) $pool->id)->delay(now()->addSeconds(20));
+
+            // Box-authoritative: seed the pool's Horizon knobs onto NEW members
+            // only (those without an applied marker). Existing members' hand edits
+            // survive reconciles; "Save & apply" is how the user re-syncs everyone.
+            if ($useHorizon) {
+                PushWorkerPoolHorizonConfigJob::dispatch((string) $pool->id, seedOnly: true)->delay(now()->addSeconds(22));
+            }
         }
 
         return ['daemon' => $useHorizon ? 'horizon' : 'queue', 'command' => $command, 'members' => $count];
