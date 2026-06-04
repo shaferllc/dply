@@ -41,7 +41,7 @@ class NginxSiteConfigBuilder
         }
 
         $names = $hostnames->implode(' ');
-        $basename = $site->nginxConfigBasename();
+        $basename = $site->webserverConfigBasename();
 
         if (VmDockerSiteConfigSupport::applies($site)) {
             return $this->vmDockerProxyBlock($site, $basename, $names, $profile, $listenPort);

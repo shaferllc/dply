@@ -4,6 +4,28 @@
     :title="__('Snapshots')"
     :description="__('Point-in-time RDB snapshots of the cache engine on this server. Run on demand or on a cron, stored in your S3-style backup destination.')"
 >
+    @if (in_array('redis-snapshots', config('server_workspace.coming_soon_keys', []), true))
+        <x-workspace-coming-soon
+            :server="$server"
+            icon="heroicon-o-camera"
+            :title="__('Redis snapshots')"
+            :description="__('Point-in-time RDB snapshots of the cache engine on this server — run on demand or on a schedule, streamed to your S3-style backup destination, with one-click restore.')"
+            :eyebrow="__('RDB snapshot preview')"
+            :heroNote="__('Snapshots will run against the cache engine on :server when it ships.', ['server' => $server->name])"
+            :lines="[
+                ['tone' => 'cmd', 'text' => '~ $ redis-cli BGSAVE'],
+                ['tone' => 'muted', 'text' => 'Background saving started'],
+                ['tone' => 'muted', 'text' => 'snapshot-2026-06-04.rdb → s3://backups/  (412 MB)'],
+                ['tone' => 'ok', 'text' => '3 snapshots retained · next run in 6h'],
+            ]"
+            :features="[
+                ['icon' => 'camera', 'title' => __('On-demand & scheduled'), 'body' => __('Trigger a snapshot now or run BGSAVE on a cron you control.')],
+                ['icon' => 'cloud-arrow-up', 'title' => __('Off-box storage'), 'body' => __('Stream the RDB straight to your existing S3-style backup destination.')],
+                ['icon' => 'arrow-uturn-left', 'title' => __('Point-in-time restore'), 'body' => __('Restore the cache to any retained snapshot in one click.')],
+                ['icon' => 'clock', 'title' => __('Retention windows'), 'body' => __('Keep the last N snapshots and prune the rest automatically.')],
+            ]"
+        />
+    @else
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
@@ -253,4 +275,5 @@
             </div>
         </section>
     </div>
+    @endif
 </x-server-workspace-layout>

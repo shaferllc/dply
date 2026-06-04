@@ -377,6 +377,14 @@ class SiteProvisioner
 
     public function markQueued(Site $site): void
     {
+        // First-ever provision (no prior state): freeze a domain-based vhost
+        // basename so the on-disk config is easy to find by hostname. Skipped on
+        // re-provision — a site provisioned before this existed keeps its legacy
+        // `dply-<id>-<slug>` filename rather than orphaning it for a renamed one.
+        if ($site->provisioningState() === null) {
+            $site->assignWebserverConfigBasename();
+        }
+
         $this->appendLog($site, 'info', 'queued', 'Provisioning job queued.');
 
         $this->updateProvisioning($site, [

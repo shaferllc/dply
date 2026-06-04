@@ -242,7 +242,7 @@ class SiteWebserverConfigEditorService
             ];
         }
 
-        $basename = $site->nginxConfigBasename();
+        $basename = $site->webserverConfigBasename();
         $base = rtrim(config('sites.nginx_dply_site_path'), '/').'/'.$basename;
         $isLayeredRemote = str_contains($main, $base.'/before/') && str_contains($main, $base.'/after/');
 

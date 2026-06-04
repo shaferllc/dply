@@ -163,7 +163,7 @@ return [
         // exit: ship alongside deploy windows GA; teaser only when deploy windows is off
         'deploy_windows_preview' => env('FEATURE_WORKSPACE_DEPLOY_WINDOWS_PREVIEW', true),
         // exit: ship once SSH access graph validated against authorized_keys panel
-        'ssh_access_graph' => env('FEATURE_WORKSPACE_SSH_ACCESS_GRAPH', true),
+        'ssh_access_graph' => env('FEATURE_WORKSPACE_SSH_ACCESS_GRAPH', false),
         // exit: ship alongside SSH access graph GA; teaser only when it is off
         'ssh_access_graph_preview' => env('FEATURE_WORKSPACE_SSH_ACCESS_GRAPH_PREVIEW', true),
         // exit: ship once time-boxed contractor SSH sessions validated with auto-revoke

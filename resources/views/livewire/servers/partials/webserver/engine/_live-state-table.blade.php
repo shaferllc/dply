@@ -182,8 +182,9 @@
                         };
                         // For the vhosts table, resolve each row name back to a Site so
                         // we can render a "Manage on site" link (PHP version, SSL, env, …
-                        // all live there, not here). Names follow the
-                        // `dply-<site_id>-<slug>` pattern emitted by Site::nginxConfigBasename().
+                        // all live there, not here). Names follow the basename from
+                        // Site::webserverConfigBasename() — legacy `dply-<id>-<slug>`
+                        // or the domain-based `dply-<host>-<id>` for newer sites.
                         $caddyDownPhpFpmUpstreams = [];
                         if ($key === 'caddy' && $engine_subtab === 'upstreams' && ! empty($rows)) {
                             foreach ($rows as $upstreamRow) {
@@ -197,17 +198,21 @@
                         $sitesByVhostName = [];
                         $sitesByEnvoyVhost = [];
                         if ($engine_subtab === 'vhosts' && ! empty($rows) && $key === 'openlitespeed') {
+                            // Vhost basenames embed the 26-char site ULID — legacy
+                            // `dply-<id>-<slug>` puts it first, the domain-based
+                            // `dply-<host>-<id>` puts it last — so match it anywhere,
+                            // then key by webserverConfigBasename() to resolve either.
                             $ids = [];
                             foreach ($rows as $row) {
-                                if (preg_match('/^dply-([0-9a-z]+)-/i', (string) ($row['name'] ?? ''), $idMatch) === 1) {
+                                if (preg_match('/([0-9a-hjkmnp-tv-z]{26})/i', (string) ($row['name'] ?? ''), $idMatch) === 1) {
                                     $ids[] = $idMatch[1];
                                 }
                             }
                             if ($ids !== []) {
                                 $sitesByVhostName = \App\Models\Site::query()
                                     ->whereIn('id', array_unique($ids))
-                                    ->get(['id', 'slug'])
-                                    ->keyBy(fn ($s) => 'dply-'.$s->id.'-'.$s->slug)
+                                    ->get(['id', 'slug', 'meta'])
+                                    ->keyBy(fn ($s) => $s->webserverConfigBasename())
                                     ->all();
                             }
                         }

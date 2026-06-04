@@ -1346,9 +1346,10 @@ class Create extends Component
             'name' => $this->form->name,
             'slug' => $slug,
             'type' => SiteType::Php,
+            'runtime' => 'php',
             'document_root' => '/home/dply/'.$slug.'/public',
             'repository_path' => '/home/dply/'.$slug,
-            'status' => Site::STATUS_AWAITING_APP,
+            'status' => Site::STATUS_PENDING,
             'ssl_status' => Site::SSL_NONE,
             'webhook_secret' => Str::random(48),
             'deploy_strategy' => 'simple',
@@ -1360,6 +1361,10 @@ class Create extends Component
                 'choose_app' => [
                     'created_at' => now()->toISOString(),
                     'created_by_user_id' => auth()->id(),
+                    // Services-first: foundation provisions now; the repo is
+                    // connected later. `skipped` keeps it out of the forced
+                    // picker while leaving "Connect repository" re-choosable.
+                    'skipped' => true,
                 ],
             ],
         ]);
@@ -1390,7 +1395,12 @@ class Create extends Component
             );
         }
 
-        return $this->redirect(route('sites.choose-app', [
+        // Provision the foundation now (live PHP default-page site) so services
+        // can be configured against a real site before any repo is connected,
+        // then land in the workspace — not the forced app picker.
+        app(\App\Services\Sites\SiteFoundationProvisioner::class)->provision($site, 'php');
+
+        return $this->redirect(route('sites.show', [
             'server' => $this->server,
             'site' => $site,
         ]), navigate: true);

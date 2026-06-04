@@ -52,6 +52,14 @@ class WorkspaceEdgeProxy extends WorkspaceWebserver
 
     public function render(ServerManageToolsReport $toolsReport): View
     {
+        // Edge proxy ships behind a coming-soon teaser until the L7 routing UI is
+        // finished — render the preview in place of the real (partial) workspace.
+        if (in_array('edge-proxy', config('server_workspace.coming_soon_keys', []), true)) {
+            return view('livewire.servers.workspace-edge-proxy-preview', [
+                'server' => $this->server,
+            ]);
+        }
+
         $consoleLookup = app(ServerConsoleActionLookup::class);
         if ($consoleLookup->shouldRefreshServerMeta($this->server, 'edge-proxy')) {
             $this->server->refresh();

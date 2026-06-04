@@ -3098,14 +3098,70 @@ class Site extends Model
         return trim((string) ($this->suspended_reason ?? ''));
     }
 
+    /**
+     * Legacy vhost basename — `dply-<id>-<slug>`. Kept as the fallback for any
+     * site that predates {@see assignWebserverConfigBasename()} and therefore has
+     * no frozen basename in meta, so we still resolve their on-disk config files.
+     */
     public function nginxConfigBasename(): string
     {
         return 'dply-'.$this->id.'-'.$this->slug;
     }
 
+    /**
+     * The on-disk vhost basename for this site. Once {@see assignWebserverConfigBasename()}
+     * has frozen a domain-based name into meta we always return that (it must stay
+     * stable even if the primary domain later changes, or we'd orphan the file on
+     * disk); sites without a frozen name fall back to the legacy `dply-<id>-<slug>`.
+     */
     public function webserverConfigBasename(): string
     {
-        return $this->nginxConfigBasename();
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $stored = trim((string) ($meta['webserver_config_basename'] ?? ''));
+
+        return $stored !== '' ? $stored : $this->nginxConfigBasename();
+    }
+
+    /**
+     * Compute a human-findable vhost basename keyed on the primary domain with
+     * the `dply-` grouping prefix and the site id appended, e.g.
+     * `dply-example.com-01kt81w92gdc72gs4yznz5ndpc`. An operator can find a site's
+     * config with `ls sites-available | grep example.com`, while the id keeps it
+     * unique and traceable back to the record. Falls back to the slug when the
+     * site has no usable hostname yet.
+     */
+    public function freshWebserverConfigBasename(): string
+    {
+        $domain = $this->primaryDomain();
+        $host = $domain !== null ? strtolower(trim((string) $domain->hostname)) : '';
+        $host = trim((string) preg_replace('/[^a-z0-9.-]+/', '-', $host), '-.');
+
+        $base = $host !== '' ? $host : (string) $this->slug;
+
+        return 'dply-'.$base.'-'.$this->id;
+    }
+
+    /**
+     * Freeze a human-findable vhost basename into meta the first time a site is
+     * provisioned, so the on-disk filename stays stable even if the primary domain
+     * later changes. Idempotent: returns the already-frozen name when present, so
+     * re-provisioning never re-points a site at a new file (which would orphan the
+     * old vhost on disk). Existing sites that never had one frozen keep the legacy
+     * `dply-<id>-<slug>` name via {@see webserverConfigBasename()}.
+     */
+    public function assignWebserverConfigBasename(): string
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $existing = trim((string) ($meta['webserver_config_basename'] ?? ''));
+        if ($existing !== '') {
+            return $existing;
+        }
+
+        $basename = $this->freshWebserverConfigBasename();
+        $meta['webserver_config_basename'] = $basename;
+        $this->forceFill(['meta' => $meta])->save();
+
+        return $basename;
     }
 
     public function webserverLogDirectory(): string
