@@ -655,9 +655,10 @@
             {{-- Live jobs — real-time per-job feed pushed from the worker boxes
                  over Reverb (no polling); newest first. Populated by the
                  #[On('worker-pool-job')] handler as Echo delivers events. --}}
-            <section class="dply-card overflow-hidden">
-                <div class="flex items-center justify-between border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
+            <section class="dply-card overflow-hidden" x-data="{ open: true }">
+                <button type="button" x-on:click="open = ! open" class="flex w-full items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 text-left sm:px-7">
                     <div class="flex items-center gap-2">
+                        <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform" x-bind:class="open ? 'rotate-90' : ''" />
                         <span class="relative flex h-2 w-2" title="{{ __('Live') }}">
                             <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
                             <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
@@ -665,7 +666,8 @@
                         <h3 class="text-sm font-semibold text-brand-ink">{{ __('Live jobs') }}</h3>
                     </div>
                     <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-xs font-semibold text-brand-moss">{{ count($liveJobs) }}</span>
-                </div>
+                </button>
+                <div x-show="open" x-collapse>
                 @if (empty($liveJobs))
                     <div class="px-6 py-5 text-sm text-brand-moss sm:px-7">{{ __('Waiting for job activity… events stream in here the instant workers process them.') }}</div>
                 @else
@@ -690,6 +692,7 @@
                         @endforeach
                     </div>
                 @endif
+                </div>
             </section>
 
             {{-- Test-jobs console — streams the workers processing the throwaway
@@ -761,10 +764,12 @@
 
             {{-- Per-queue workload --}}
             @if ($hzInstalled && ! empty($hz['workload']))
-                <section class="dply-card overflow-hidden">
-                    <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
+                <section class="dply-card overflow-hidden" x-data="{ open: true }">
+                    <button type="button" x-on:click="open = ! open" class="flex w-full items-center gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 text-left sm:px-7">
+                        <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform" x-bind:class="open ? 'rotate-90' : ''" />
                         <h3 class="text-sm font-semibold text-brand-ink">{{ __('Queues') }}</h3>
-                    </div>
+                    </button>
+                    <div x-show="open" x-collapse>
                     <table class="w-full text-sm">
                         <thead>
                             <tr class="border-b border-brand-ink/10 text-left text-[11px] uppercase tracking-wide text-brand-mist">
@@ -808,6 +813,7 @@
                             @endforeach
                         </tbody>
                     </table>
+                    </div>
                 </section>
             @endif
 
@@ -828,11 +834,15 @@
                 };
             @endphp
             @foreach ($jobLists as $list)
-                <section class="dply-card overflow-hidden">
-                    <div class="flex items-center justify-between border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
-                        <h3 class="text-sm font-semibold text-brand-ink">{{ $list['title'] }}</h3>
+                <section class="dply-card overflow-hidden" x-data="{ open: true }">
+                    <button type="button" x-on:click="open = ! open" class="flex w-full items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 text-left sm:px-7">
+                        <div class="flex items-center gap-2">
+                            <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform" x-bind:class="open ? 'rotate-90' : ''" />
+                            <h3 class="text-sm font-semibold text-brand-ink">{{ $list['title'] }}</h3>
+                        </div>
                         <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-xs font-semibold text-brand-moss">{{ count($hz[$list['key']] ?? []) }}</span>
-                    </div>
+                    </button>
+                    <div x-show="open" x-collapse>
                     @if (empty($hz[$list['key']]))
                         <div class="px-6 py-5 text-sm text-brand-moss sm:px-7">{{ $list['empty'] }}</div>
                     @else
@@ -851,18 +861,20 @@
                             @endforeach
                         </div>
                     @endif
+                    </div>
                 </section>
             @endforeach
 
             {{-- Recent failed jobs --}}
-            <section class="dply-card overflow-hidden">
+            <section class="dply-card overflow-hidden" x-data="{ open: true }">
                 <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
-                    <div class="flex items-center gap-2">
+                    <button type="button" x-on:click="open = ! open" class="flex items-center gap-2 text-left">
+                        <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform" x-bind:class="open ? 'rotate-90' : ''" />
                         <h3 class="text-sm font-semibold text-brand-ink">{{ __('Recent failed jobs') }}</h3>
                         @if (($hz['failed_total'] ?? 0) > 0)
                             <span class="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-700">{{ number_format((float) $hz['failed_total']) }}</span>
                         @endif
-                    </div>
+                    </button>
                     @if (! empty($hz['failed_jobs']))
                         <div class="flex items-center gap-2">
                             <button type="button" wire:click="retryAllFailed" class="rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">{{ __('Retry all') }}</button>
@@ -870,6 +882,7 @@
                         </div>
                     @endif
                 </div>
+                <div x-show="open" x-collapse>
                 @if (empty($hz['failed_jobs']))
                     <div class="px-6 py-6 text-sm text-brand-moss sm:px-7">{{ __('No recent failed jobs. 🎉') }}</div>
                 @else
@@ -910,6 +923,7 @@
                         @endforeach
                     </div>
                 @endif
+                </div>
             </section>
             @endif {{-- /$hzInstalled : buckets + failed jobs --}}
         </div>

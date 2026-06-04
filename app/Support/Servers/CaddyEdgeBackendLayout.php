@@ -113,6 +113,12 @@ dply_caddy_holds_port80() {
   ss -ltnpH 'sport = :80' 2>/dev/null | grep -qE '"caddy"|/caddy'
 }
 dply_release_caddy_port80() {
+  # Caddy not installed on this box (nginx-only / no edge) — it can't be holding
+  # :80, so there is nothing to release. Skip entirely instead of writing
+  # /etc/caddy/Caddyfile (dir missing) or `systemctl enable caddy` (unit 404 → exit 13).
+  if ! command -v caddy >/dev/null 2>&1 && ! systemctl list-unit-files 2>/dev/null | grep -q '^caddy\.service'; then
+    return 0
+  fi
   dply_strip_legacy_caddy_site_fragments
   dply_strip_port80_caddy_site_fragments
   dply_install_edge_caddyfile
