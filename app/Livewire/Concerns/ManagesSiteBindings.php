@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns;
 
+use App\Jobs\FixSiteBindingConnectivityJob;
 use App\Jobs\ValidateBindingConnectivityJob;
+use App\Models\Server;
+use App\Models\ServerCacheService;
+use App\Models\ServerDatabase;
 use App\Models\SiteBinding;
 use App\Services\Deploy\SiteBindingManager;
 use Illuminate\Support\Facades\Gate;
@@ -18,6 +22,8 @@ use Illuminate\Support\Facades\Gate;
 trait ManagesSiteBindings
 {
     /** database | scheduler | workers | redis | queue | storage */
+    public ?string $fixBindingId = null;
+
     public string $bindingModalType = '';
 
     /** attach | provision */
@@ -122,6 +128,76 @@ trait ManagesSiteBindings
         $manager->detach($binding);
         $this->site = $this->site->fresh() ?? $this->site;
         $this->toastSuccess(__('Binding detached.'));
+    }
+
+    /**
+     * Make an UNREACHABLE binding reachable: optionally re-point it at the right
+     * backend, then enable remote access + firewall the consumer's /32 and
+     * re-probe. Streams to the deploy hub's console banner.
+     */
+    public function fixBindingConnectivity(string $bindingId, ?string $repointTargetId = null): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $binding = SiteBinding::query()->where('site_id', $this->site->id)->whereKey($bindingId)->first();
+        if (! $binding instanceof SiteBinding) {
+            return;
+        }
+        if (! method_exists($this, 'seedQueuedConsoleAction') || ! method_exists($this, 'watchConsoleAction')) {
+            $this->toastError(__('Connectivity fixes are available from the deploy hub.'));
+
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('binding_connectivity_fix', __('Fixing connectivity'));
+        FixSiteBindingConnectivityJob::dispatch(
+            (string) $run->id,
+            (string) $this->site->id,
+            (string) $binding->id,
+            $repointTargetId !== '' ? $repointTargetId : null,
+            (string) (auth()->id() ?? '') ?: null,
+        );
+
+        $this->dispatch('dply-console-action-focus');
+        $this->dispatch('close-modal', name: 'fix-binding-modal');
+        $this->watchConsoleAction(
+            $run,
+            __('Connectivity fix applied — re-probing the connection.'),
+            __('The connectivity fix could not finish — check the console.'),
+        );
+    }
+
+    /**
+     * Backends this binding could be re-pointed at (same org, same resource
+     * type), for the Fix-connectivity modal's "wrong target?" picker.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function bindingFixCandidates(string $bindingId): array
+    {
+        $binding = SiteBinding::query()->where('site_id', $this->site->id)->whereKey($bindingId)->first();
+        if (! $binding instanceof SiteBinding) {
+            return [];
+        }
+
+        $orgServerIds = Server::query()
+            ->where('organization_id', $this->site->server?->organization_id)
+            ->pluck('id');
+
+        $row = fn ($r): array => [
+            'id' => (string) $r->id,
+            'label' => $r->name ?: ucfirst((string) $r->engine),
+            'engine' => (string) $r->engine,
+            'server' => $r->server?->name,
+            'host' => $r->server?->private_ip_address,
+        ];
+
+        return match ($binding->type) {
+            'database' => ServerDatabase::query()->whereIn('server_id', $orgServerIds)->with('server')->get()->map($row)->values()->all(),
+            'redis' => ServerCacheService::query()->whereIn('server_id', $orgServerIds)
+                ->whereIn('engine', ServerCacheService::FAMILY_REDIS_ENGINES)->with('server')->get()->map($row)->values()->all(),
+            default => [],
+        };
     }
 
     /**

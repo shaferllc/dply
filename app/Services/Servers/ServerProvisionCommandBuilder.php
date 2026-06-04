@@ -969,6 +969,16 @@ final class ServerProvisionCommandBuilder
             $clean[$runtime] = $version;
         }
 
+        // A PHP application server almost always builds front-end assets
+        // (`npm run build`), and the laravel_app profile advertises "NPM" — so
+        // default Node when PHP is installed and no node was pinned, instead of
+        // silently shipping a server with no npm. Operators who truly don't want
+        // it can still pin runtime_defaults without node.
+        $php = trim((string) ($meta['php_version'] ?? 'none'));
+        if (! isset($clean['node']) && $php !== '' && $php !== 'none') {
+            $clean['node'] = (string) config('server_provision.default_node_version', '22');
+        }
+
         return $clean;
     }
 

@@ -161,6 +161,22 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
         $builder = $this->placeholderPageBuilder ??= new SitePlaceholderPageBuilder;
         $this->writeSystemFile($ssh, $root.'/index.html', $builder->render($site));
         $emit?->step($this->emitterSource(), 'installing placeholder page');
+
+        // The mkdir + placeholder write above ran privileged (root), leaving the
+        // site tree root-owned. Hand the deploy base back to the deploy user
+        // (group = the web group, setgid) or the first `git clone` fails with
+        // "Permission denied" on /home/dply/<site>/.git. Best-effort.
+        $base = rtrim((string) $site->effectiveRepositoryPath(), '/');
+        if ($base !== '' && $site->server !== null) {
+            $deployUser = $site->effectiveSystemUser($site->server);
+            $webGroup = (string) config('site_settings.vm_site_file_web_group', 'www-data');
+            $ssh->exec($this->privilegedCommand($site->server, sprintf(
+                'chown -R %1$s:%2$s %3$s 2>/dev/null || true; chmod 2750 %3$s 2>/dev/null || true',
+                escapeshellarg($deployUser),
+                escapeshellarg($webGroup),
+                escapeshellarg($base),
+            )), 60);
+        }
     }
 
     /**

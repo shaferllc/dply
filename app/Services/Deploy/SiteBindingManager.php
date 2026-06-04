@@ -8,6 +8,7 @@ use App\Models\PrivateNetwork;
 use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Models\ServerDatabase;
+use App\Jobs\EnsureSitePhpDatabaseDriverJob;
 use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Services\Servers\ServerDatabaseProvisioner;
@@ -238,7 +239,7 @@ class SiteBindingManager
 
         $crossServer = (string) $db->server_id !== (string) $server->id;
 
-        return $this->persist($site, 'database', [
+        $binding = $this->persist($site, 'database', [
             'mode' => 'attach_existing',
             'status' => SiteBinding::STATUS_CONFIGURED,
             'name' => $db->name,
@@ -253,6 +254,14 @@ class SiteBindingManager
                 'needs_remote_access' => ($crossServer && ! $db->remote_access) ? true : null,
             ]),
         ]);
+
+        // The app server may have been provisioned for a different DB engine
+        // than the one just attached (e.g. MySQL server, Postgres attached).
+        // Install the matching PHP client driver so the app doesn't deploy into
+        // "could not find driver".
+        EnsureSitePhpDatabaseDriverJob::dispatch((string) $site->id, (string) $db->engine);
+
+        return $binding;
     }
 
     /**

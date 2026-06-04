@@ -223,6 +223,87 @@
         wire:init="autoSyncIfFirstVisit"
     @endif
 >
+    {{-- Seed / import .env — surfaced before the first deploy (no .env yet,
+         never deployed) and available on demand thereafter. Workers in the same
+         pool import VERBATIM (same app → shared APP_KEY + backend); other sites
+         import SANITIZED (secrets blanked, APP_KEY regenerated). --}}
+    @if ($this->needsFirstEnv())
+        <div class="rounded-xl border border-brand-forest/25 bg-brand-sage/10 px-5 py-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Set up your .env before the first deploy') }}</h3>
+                    <p class="mt-0.5 text-xs text-brand-moss">{{ __('Import from a worker or another site, paste your own, or add keys one at a time.') }}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" wire:click="$set('env_import_key', null)" x-on:click="$dispatch('open-modal', 'env-import-modal')" class="rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-forest">{{ __('Import a .env') }}</button>
+                    <button type="button" x-data x-on:click="$dispatch('open-modal', 'paste-env-modal')" class="rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">{{ __('Paste / add') }}</button>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    {{-- Import modal — KEY-AWARE and key-agnostic. env_import_key=null → seed the
+         whole .env (workers verbatim, others sanitized). env_import_key=KEY → the
+         universal per-variable import: any key, from any site that has it. No
+         hard-coded key logic anywhere. --}}
+    <x-modal name="env-import-modal" maxWidth="2xl" overlayClass="bg-brand-ink/40">
+        <div class="px-6 py-5">
+            @if ($env_import_key)
+                @php $keySources = $this->envKeySources($env_import_key); @endphp
+                <h3 class="font-mono text-base font-semibold text-brand-ink">{{ __('Import :key', ['key' => $env_import_key]) }}</h3>
+                <p class="mt-1 text-xs text-brand-moss">{{ __('Pick a site or worker that has this value set.') }}</p>
+                <div class="mt-4 divide-y divide-brand-ink/5">
+                    @forelse ($keySources as $s)
+                        <div class="flex items-center justify-between gap-2 py-2">
+                            <span class="min-w-0 truncate text-sm text-brand-ink">{{ $s['label'] }}<span class="text-brand-mist">{{ $s['server'] ? ' · '.$s['server'] : '' }}</span> <span class="font-mono text-[10px] text-brand-mist">{{ $s['masked'] }}</span></span>
+                            <button type="button" wire:click="importEnvKeyFromSite(@js($env_import_key), '{{ $s['id'] }}')" x-on:click="$dispatch('close')" class="shrink-0 rounded-md bg-brand-ink px-2.5 py-1 text-[11px] font-semibold text-brand-cream hover:bg-brand-forest">{{ __('Use') }}</button>
+                        </div>
+                    @empty
+                        <p class="py-3 text-sm text-brand-moss">{{ __('No other site has :key set.', ['key' => $env_import_key]) }}</p>
+                    @endforelse
+                </div>
+            @else
+                @php $importGroups = $this->envImportCandidates(); @endphp
+                <h3 class="text-base font-semibold text-brand-ink">{{ __('Import .env from another site') }}</h3>
+                <p class="mt-1 text-xs text-brand-moss">{{ __('Workers copy verbatim (same app — keeps APP_KEY & backend). Other sites import sanitized (secrets blanked, APP_KEY regenerated).') }}</p>
+                <div class="mt-4 divide-y divide-brand-ink/5">
+                    @if (! empty($importGroups['workers']))
+                        <div class="py-3">
+                            <p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-brand-sage">{{ __('Pool workers — same app') }}</p>
+                            @foreach ($importGroups['workers'] as $c)
+                                <div class="flex items-center justify-between gap-2 py-1.5">
+                                    <span class="text-sm text-brand-ink">{{ $c['label'] }} <span class="text-xs text-brand-mist">{{ $c['server'] ? '· '.$c['server'] : '' }}</span></span>
+                                    <button type="button" wire:click="importEnvFromSite('{{ $c['id'] }}', true)" x-on:click="$dispatch('close')" class="rounded-md bg-brand-ink px-2.5 py-1 text-[11px] font-semibold text-brand-cream hover:bg-brand-forest">{{ __('Import verbatim') }}</button>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                    @foreach (['same_repo' => __('Same repository'), 'org' => __('Other sites')] as $group => $heading)
+                        @php $rows = collect($importGroups[$group] ?? [])->reject(fn ($c) => collect($importGroups['workers'])->pluck('id')->contains($c['id']))->values(); @endphp
+                        @if ($rows->isNotEmpty())
+                            <div class="py-3">
+                                <p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ $heading }}</p>
+                                @foreach ($rows as $c)
+                                    <div class="flex items-center justify-between gap-2 py-1.5">
+                                        <span class="text-sm text-brand-ink">{{ $c['label'] }} <span class="text-xs text-brand-mist">{{ $c['server'] ? '· '.$c['server'] : '' }}</span></span>
+                                        <button type="button" wire:click="importEnvFromSite('{{ $c['id'] }}', false)" x-on:click="$dispatch('close')" class="rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40">{{ __('Import sanitized') }}</button>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+                    @endforeach
+                    @if (empty($importGroups['workers']) && empty($importGroups['same_repo']) && empty($importGroups['org']))
+                        <p class="py-4 text-sm text-brand-moss">{{ __('No other sites with a saved .env yet. Paste your own instead.') }}</p>
+                    @endif
+                </div>
+            @endif
+            <div class="mt-4 flex items-center justify-between border-t border-brand-ink/10 pt-3">
+                <button type="button" x-on:click="$dispatch('close'); $dispatch('open-modal', 'paste-env-modal')" class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Paste / upload a .env instead →') }}</button>
+                <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Close') }}</x-secondary-button>
+            </div>
+        </div>
+    </x-modal>
+
     {{-- Configuration check — surfaced at the very top so risky settings
          (debug-in-prod, empty APP_KEY, plaintext URLs, placeholder secrets)
          are the first thing you see and can jump straight to fixing. Each
@@ -851,7 +932,7 @@
                 @endif
 
                 {{-- Overflow: occasional server-sync + bulk-edit tools. --}}
-                <div x-data="{ open: false }" class="relative">
+                <div x-data="{ open: false }" class="relative z-30">
                     <button
                         type="button"
                         x-on:click="open = ! open"
@@ -866,7 +947,7 @@
                         x-show="open"
                         x-cloak
                         x-transition
-                        class="absolute left-0 z-20 mt-1 w-60 overflow-hidden rounded-xl border border-brand-ink/10 bg-white py-1 shadow-lg"
+                        class="absolute left-0 z-50 mt-1 w-60 overflow-hidden rounded-xl border border-brand-ink/10 bg-white py-1 shadow-lg"
                     >
                         @if ($supportsEnvPush && method_exists($this, 'pushEnvToServer'))
                             <button type="button" wire:click="pushEnvToServer" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40" title="{{ __('Write these variables (including connected resources) to the server\'s .env now.') }}">
@@ -880,6 +961,9 @@
                         @endif
                         <button type="button" x-on:click="$dispatch('open-modal', 'paste-env-modal'); open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
                             <x-heroicon-o-document-text class="h-4 w-4 text-brand-moss" /> {{ __('Paste .env') }}
+                        </button>
+                        <button type="button" wire:click="$set('env_import_key', null)" x-on:click="open = false; $dispatch('open-modal', 'env-import-modal')" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
+                            <x-heroicon-o-arrow-down-on-square class="h-4 w-4 text-brand-moss" /> {{ __('Import from another site') }}
                         </button>
                         @if ($envAdvanced)
                             <button type="button" wire:click="openEditAllEnv" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
@@ -904,7 +988,7 @@
 
                 <button
                     type="button"
-                    x-on:click="$dispatch('open-modal', 'add-env-modal')"
+                    x-on:click="$dispatch('open-modal', 'paste-env-modal')"
                     class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90 sm:ml-auto"
                 >
                     <x-heroicon-o-plus class="h-3.5 w-3.5" />
@@ -994,6 +1078,12 @@
                                 @endif
                             </button>
                             <div class="flex shrink-0 items-center gap-1.5">
+                                @if (($gConn['ok'] ?? null) === false && method_exists($this, 'fixBindingConnectivity'))
+                                    <button type="button" wire:click="$set('fixBindingId', @js((string) $gBindingId))" x-on:click="$dispatch('open-modal', 'fix-binding-modal')" class="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50" title="{{ __('Fix the private-network connectivity for this resource.') }}">
+                                        <x-heroicon-o-wrench-screwdriver class="h-3 w-3" />
+                                        {{ __('Fix') }}
+                                    </button>
+                                @endif
                                 @if ($gManageable && method_exists($this, 'openBindingModal'))
                                     <button type="button" wire:click="openBindingModal('{{ $group['type'] }}', 'attach')" wire:loading.attr="disabled" wire:target="openBindingModal" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60" title="{{ __('Re-point or refresh this resource (re-pulls its current connection values).') }}">
                                         <x-heroicon-o-arrow-path class="h-3 w-3" />
@@ -1001,7 +1091,7 @@
                                     </button>
                                 @endif
                                 @if (method_exists($this, 'detachBinding'))
-                                    <button type="button" wire:click="detachBinding(@js((string) $gBindingId))" wire:confirm="{{ __('Detach the :type binding? Its variables stop being injected at deploy.', ['type' => $gTypeLabel]) }}" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-moss hover:bg-rose-50 hover:text-rose-700" title="{{ __('Detach binding') }}">
+                                    <button type="button" wire:click="openConfirmActionModal('detachBinding', @js([(string) $gBindingId]), @js(__('Detach binding?')), @js(__('Detach the :type binding? Its variables stop being injected at deploy.', ['type' => $gTypeLabel])), @js(__('Detach')), true)" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-moss hover:bg-rose-50 hover:text-rose-700" title="{{ __('Detach binding') }}">
                                         <x-heroicon-o-x-mark class="h-3 w-3" />
                                         {{ __('Detach') }}
                                     </button>
@@ -1253,6 +1343,16 @@
                                     </button>
                                     <button
                                         type="button"
+                                        wire:click="$set('env_import_key', '{{ $key }}')"
+                                        x-on:click="$dispatch('open-modal', 'env-import-modal')"
+                                        class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-brand-mist hover:border-brand-ink/15 hover:bg-brand-sand/40 hover:text-brand-ink"
+                                        title="{{ __('Import :key from another site', ['key' => $key]) }}"
+                                        aria-label="{{ __('Import from another site') }}"
+                                    >
+                                        <x-heroicon-o-arrow-down-on-square class="h-4 w-4" />
+                                    </button>
+                                    <button
+                                        type="button"
                                         wire:click="confirmRemoveEnvVar('{{ $key }}')"
                                         wire:loading.attr="disabled"
                                         wire:target="confirmRemoveEnvVar('{{ $key }}')"
@@ -1499,6 +1599,23 @@
                         {{ __('Use suggested: :value', ['value' => $fixSuggestion]) }}
                     </button>
                 @endif
+                {{-- Universal: import THIS key's value from any other site/worker that
+                     has it set. Works for every variable (REVERB_*, APP_KEY, DB_*, …)
+                     — no per-key special-casing. --}}
+                @php $fixSources = $fixKey ? $this->envKeySources($fixKey) : []; @endphp
+                @if (! empty($fixSources))
+                    <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 p-3">
+                        <p class="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand-sage">{{ __('Or import :key from another site', ['key' => $fixKey]) }}</p>
+                        <div class="space-y-1">
+                            @foreach ($fixSources as $s)
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="min-w-0 truncate text-xs text-brand-ink">{{ $s['label'] }}<span class="text-brand-mist">{{ $s['server'] ? ' · '.$s['server'] : '' }}</span> <span class="font-mono text-[10px] text-brand-mist">{{ $s['masked'] }}</span></span>
+                                    <button type="button" wire:click="importEnvKeyFromSite(@js($fixKey), '{{ $s['id'] }}')" x-on:click="$dispatch('close')" class="shrink-0 rounded-md border border-brand-ink/15 bg-white px-2 py-0.5 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40">{{ __('Use') }}</button>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
             </form>
         </div>
         <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 px-6 py-4">
@@ -1508,6 +1625,43 @@
                 <span wire:loading.remove wire:target="saveFixedEnvVar">{{ __('Save & push') }}</span>
                 <span wire:loading wire:target="saveFixedEnvVar">{{ __('Saving…') }}</span>
             </x-primary-button>
+        </div>
+    </x-modal>
+    @endif
+
+    {{-- Fix connectivity — for an UNREACHABLE resource binding: open access +
+         firewall this app server's /32 + re-probe, or re-point at the right
+         backend if it's aimed at a server that doesn't serve the resource. --}}
+    @if (method_exists($this, 'fixBindingConnectivity'))
+    <x-modal name="fix-binding-modal" maxWidth="lg" overlayClass="bg-brand-ink/40">
+        <div class="px-6 py-5">
+            @if ($fixBindingId)
+                @php $fixCands = $this->bindingFixCandidates($fixBindingId); @endphp
+                <h3 class="text-base font-semibold text-brand-ink">{{ __('Fix connectivity') }}</h3>
+                <p class="mt-1 text-xs text-brand-moss">{{ __('dply will enable remote access on the backend, open its firewall for this app server’s private address, and re-test. If it’s pointing at the wrong server, re-point below.') }}</p>
+                <div class="mt-4 space-y-3">
+                    <button type="button" wire:click="fixBindingConnectivity(@js($fixBindingId))" x-on:click="$dispatch('close')" class="w-full rounded-lg bg-brand-ink px-3 py-2 text-left text-sm font-semibold text-brand-cream hover:bg-brand-forest">
+                        {{ __('Fix in place (keep current target)') }}
+                        <span class="mt-0.5 block text-[11px] font-normal text-brand-cream/70">{{ __('Open remote access + firewall this app server, then re-probe.') }}</span>
+                    </button>
+                    @if (! empty($fixCands))
+                        <div>
+                            <p class="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Wrong server? Re-point to:') }}</p>
+                            <div class="space-y-1">
+                                @foreach ($fixCands as $c)
+                                    <button type="button" wire:click="fixBindingConnectivity(@js($fixBindingId), '{{ $c['id'] }}')" x-on:click="$dispatch('close')" class="flex w-full items-center justify-between gap-2 rounded-lg border border-brand-ink/10 bg-white px-3 py-2 text-left hover:bg-brand-sand/40">
+                                        <span class="min-w-0 truncate text-sm text-brand-ink">{{ $c['label'] }} <span class="text-xs text-brand-mist">{{ $c['server'] ? '· '.$c['server'] : '' }}</span></span>
+                                        <span class="shrink-0 font-mono text-[10px] text-brand-mist">{{ $c['host'] }}</span>
+                                    </button>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+                </div>
+            @endif
+            <div class="mt-4 flex justify-end border-t border-brand-ink/10 pt-3">
+                <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
+            </div>
         </div>
     </x-modal>
     @endif
@@ -1669,7 +1823,7 @@
                             {{ $binding->status }}
                         </span>
                         @if ($binding->bindingId)
-                            <button type="button" wire:click="detachBinding('{{ $binding->bindingId }}')" wire:confirm="{{ __('Detach this :type binding? Its connection variables stop being injected at deploy.', ['type' => $binding->type]) }}" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                            <button type="button" wire:click="openConfirmActionModal('detachBinding', @js([(string) $binding->bindingId]), @js(__('Detach binding?')), @js(__('Detach this :type binding? Its connection variables stop being injected at deploy.', ['type' => $binding->type])), @js(__('Detach')), true)" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                 <x-heroicon-o-x-mark class="h-3.5 w-3.5" />
                                 {{ __('Detach') }}
                             </button>

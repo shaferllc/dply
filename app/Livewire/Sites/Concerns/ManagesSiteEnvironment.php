@@ -45,6 +45,8 @@ trait ManagesSiteEnvironment
 
     public string $bulk_env_input = '';
 
+    public ?string $env_import_key = null;
+
     public ?string $editing_env_key = null;
 
     public string $editing_env_value = '';
@@ -308,6 +310,157 @@ trait ManagesSiteEnvironment
 
         $this->bulk_env_input = '';
         $this->autoPushAfterCacheMutation(__(':count variable(s) imported.', ['count' => $count]));
+    }
+
+    /**
+     * Seed this site's .env from another site. $verbatim distinguishes the two
+     * intents:
+     *  - verbatim (a worker / replica of THE SAME app — shares APP_KEY, DB, Redis):
+     *    copy as-is so the boxes stay in lockstep. Auto-defaulted for pool workers.
+     *  - sanitized (a DIFFERENT app used as a template): blank secret / host-bound
+     *    values for the operator to fill and regenerate APP_KEY (see EnvImportSources).
+     * Keys this site already has set always win, so an import never clobbers work.
+     */
+    public function importEnvFromSite(string $sourceSiteId, bool $verbatim, DotEnvFileParser $parser, DotEnvFileWriter $writer): void
+    {
+        $this->authorize('update', $this->site);
+
+        $source = $this->resolveImportSource($sourceSiteId);
+        if (! $source instanceof Site) {
+            return;
+        }
+
+        $incoming = $parser->parse((string) $source->env_file_content);
+        $vars = $verbatim
+            ? $incoming['variables']
+            : \App\Support\Sites\EnvImportSources::sanitize($incoming['variables']);
+
+        $existing = $parser->parse((string) ($this->site->env_file_content ?? ''));
+        $merged = array_merge($vars, $existing['variables']);
+        $comments = array_merge($incoming['comments'], $existing['comments']);
+
+        $this->site->forceFill([
+            'env_file_content' => $writer->render($merged, $comments),
+            'env_cache_origin' => 'local-edit',
+        ])->save();
+
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.env.imported_from_site', $this->site, null, [
+                'source_site_id' => $source->id,
+                'verbatim' => $verbatim,
+                'imported_keys' => array_keys($vars),
+            ]);
+        }
+
+        $this->dispatch('close-modal', name: 'env-import-modal');
+        $message = $verbatim
+            ? __('Imported .env from :name verbatim (same APP_KEY + backend — they stay in lockstep).', ['name' => $source->name])
+            : __('Imported .env from :name — :n secret(s) blanked to fill in, APP_KEY regenerated.', ['name' => $source->name, 'n' => count(array_filter($vars, fn ($v) => $v === ''))]);
+        $this->autoPushAfterCacheMutation($message);
+    }
+
+    /**
+     * Import a SINGLE variable's value from another site/server (e.g. pull
+     * REVERB_APP_KEY from a worker so the app and worker match). Copies the value
+     * verbatim — a single-key pull is always an explicit, intentional copy.
+     */
+    public function importEnvKeyFromSite(string $key, string $sourceSiteId, DotEnvFileParser $parser, DotEnvFileWriter $writer): void
+    {
+        $this->authorize('update', $this->site);
+
+        $source = $this->resolveImportSource($sourceSiteId);
+        if (! $source instanceof Site) {
+            return;
+        }
+
+        $value = (string) ($parser->parse((string) $source->env_file_content)['variables'][$key] ?? '');
+        if (trim($value) === '') {
+            $this->toastError(__(':name has no :key value to import.', ['name' => $source->name, 'key' => $key]));
+
+            return;
+        }
+
+        $parsed = $parser->parse((string) ($this->site->env_file_content ?? ''));
+        $parsed['variables'][$key] = $value;
+
+        $this->site->forceFill([
+            'env_file_content' => $writer->render($parsed['variables'], $parsed['comments']),
+            'env_cache_origin' => 'local-edit',
+        ])->save();
+
+        $this->env_import_key = null;
+        $this->autoPushAfterCacheMutation(__(':key imported from :name.', ['key' => $key, 'name' => $source->name]));
+    }
+
+    /**
+     * Sites (in the operator's org, other than this one) that have a NON-EMPTY
+     * value for $key — the candidate sources for a per-variable import. Grouped
+     * like the whole-env picker (workers / same-repo / org).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function envKeySources(string $key): array
+    {
+        if (trim($key) === '') {
+            return [];
+        }
+
+        $parser = app(DotEnvFileParser::class);
+        $groups = \App\Support\Sites\EnvImportSources::candidatesFor($this->site);
+        $all = collect($groups['workers'])->merge($groups['same_repo'])->merge($groups['org'])
+            ->unique('id')->values();
+
+        return $all->map(function (array $c) use ($key, $parser): ?array {
+            $src = Site::query()->whereKey($c['id'])->value('env_file_content');
+            $val = trim((string) ($parser->parse((string) $src)['variables'][$key] ?? ''));
+            if ($val === '') {
+                return null;
+            }
+
+            return $c + ['masked' => \App\Support\Sites\EnvImportSources::isSecretKey($key) ? str_repeat('•', 6) : \Illuminate\Support\Str::limit($val, 40)];
+        })->filter()->values()->all();
+    }
+
+    /**
+     * Look up an import source within the operator's org with a usable .env.
+     */
+    private function resolveImportSource(string $sourceSiteId): ?Site
+    {
+        $source = Site::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->whereKey($sourceSiteId)
+            ->first();
+
+        if (! $source instanceof Site || trim((string) $source->env_file_content) === '') {
+            $this->toastError(__('That site has no .env to import.'));
+
+            return null;
+        }
+
+        return $source;
+    }
+
+    /**
+     * Candidate sites this site can seed its .env from, grouped (pool workers /
+     * same-repo / org). Drives the import picker.
+     *
+     * @return array{workers: array<int, array<string, mixed>>, same_repo: array<int, array<string, mixed>>, org: array<int, array<string, mixed>>}
+     */
+    public function envImportCandidates(): array
+    {
+        return \App\Support\Sites\EnvImportSources::candidatesFor($this->site);
+    }
+
+    /**
+     * True when this site has no .env yet AND has never deployed — the moment to
+     * prompt "set up your .env" (with import options) before the first deploy.
+     */
+    public function needsFirstEnv(): bool
+    {
+        return trim((string) ($this->site->env_file_content ?? '')) === ''
+            && $this->site->env_cache_origin === null
+            && $this->site->latestDeployment() === null;
     }
 
     /**
