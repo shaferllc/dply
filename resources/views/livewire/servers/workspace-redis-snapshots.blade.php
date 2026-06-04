@@ -4,6 +4,14 @@
     :title="__('Snapshots')"
     :description="__('Point-in-time RDB snapshots of the cache engine on this server. Run on demand or on a cron, stored in your S3-style backup destination.')"
 >
+    @if (in_array('redis-snapshots', config('server_workspace.coming_soon_keys', []), true))
+        <x-coming-soon-panel
+            icon="heroicon-o-camera"
+            :title="__('Snapshots are coming soon')"
+            :description="__('Point-in-time RDB snapshots of your cache engine — run on demand or on a schedule, stored in your S3-style backup destination, with one-click restore.')"
+            :points="[__('On-demand and scheduled RDB snapshots'), __('Stored in your existing backup destination'), __('One-click restore to a chosen point in time')]"
+        />
+    @else
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
@@ -253,4 +261,5 @@
             </div>
         </section>
     </div>
+    @endif
 </x-server-workspace-layout>

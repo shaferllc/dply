@@ -1,3 +1,24 @@
+{{-- Services-first: a live site with no app yet. Configure services here, then
+     connect a repo — the bindings wire into the first deploy automatically. --}}
+@if ($site->canRechooseApp())
+    <section class="mb-6 overflow-hidden rounded-2xl border border-brand-sage/30 bg-brand-sage/5">
+        <div class="flex flex-wrap items-center gap-4 px-6 py-5 sm:px-7">
+            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-forest text-brand-cream">
+                <x-heroicon-o-code-bracket-square class="h-6 w-6" aria-hidden="true" />
+            </span>
+            <div class="min-w-0 flex-1">
+                <h2 class="text-base font-semibold text-brand-ink">{{ __('Connect a repository to deploy your app') }}</h2>
+                <p class="mt-0.5 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('This site is live and serving a default page. Set up its services (database, cache, queue, env) here first — then connect a Git repo or install an app, and your services are wired into the first deploy automatically.') }}</p>
+            </div>
+            <a href="{{ route('sites.choose-app', ['server' => $server, 'site' => $site]) }}" wire:navigate
+                class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream shadow-sm hover:bg-brand-forest">
+                <x-heroicon-o-rocket-launch class="h-4 w-4" aria-hidden="true" />
+                {{ __('Connect repository') }}
+            </a>
+        </div>
+    </section>
+@endif
+
 @include('livewire.sites.settings.partials.logo')
 
 {{-- Read-only overview. Edit affordances live elsewhere:

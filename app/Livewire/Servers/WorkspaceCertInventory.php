@@ -9,6 +9,8 @@ use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\Server;
 use App\Models\SiteCertificate;
 use App\Services\Servers\ServerCertificateInventory;
+use App\Services\Servers\WebserverCertsAggregator;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -28,10 +30,72 @@ class WorkspaceCertInventory extends Component
 
     public string $certSearch = '';
 
+    /**
+     * Live, on-disk server certificates surfaced from a single cross-engine SSH
+     * sweep ({@see WebserverCertsAggregator}). This is how Caddy's automatic-HTTPS
+     * certificates (managed by Caddy itself under /var/lib/caddy, never by certbot)
+     * show up here — the managed-record table above is DB-only and is blind to them.
+     * Loaded lazily via wire:init so the DB-backed page paints instantly.
+     *
+     * @var list<array<string, mixed>>
+     */
+    public array $liveCerts = [];
+
+    public bool $liveCertsLoaded = false;
+
+    public bool $liveCertsUnreadable = false;
+
+    public ?string $liveCertsError = null;
+
+    public ?string $liveCertsScannedAtIso = null;
+
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
         abort_unless($server->isVmHost(), 404);
+    }
+
+    /**
+     * Cross-engine on-disk cert sweep — surfaces Caddy automatic-HTTPS certs and
+     * any other live server certificate with its real expiry. Cached 60s on the
+     * service; the Rescan button forces a fresh probe. Mirrors the webserver
+     * Health tab's TLS dashboard so the two stay consistent.
+     */
+    public function loadLiveCerts(bool $forceFresh = false): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->liveCertsError = __('Provisioning and SSH must be ready before scanning live certificates.');
+            $this->liveCertsLoaded = true;
+
+            return;
+        }
+
+        try {
+            $result = app(WebserverCertsAggregator::class)->aggregate($this->server, $forceFresh);
+            $this->liveCerts = array_map(function (array $row): array {
+                $row['expires_at'] = $row['expires_at'] instanceof CarbonImmutable
+                    ? $row['expires_at']->toIso8601String()
+                    : null;
+
+                return $row;
+            }, $result['certs']);
+            $this->liveCertsScannedAtIso = $result['scanned_at'] instanceof CarbonImmutable
+                ? $result['scanned_at']->toIso8601String()
+                : null;
+            $this->liveCertsUnreadable = $result['unreadable'];
+            $this->liveCertsLoaded = true;
+            $this->liveCertsError = null;
+        } catch (\Throwable $e) {
+            $this->liveCertsError = __('Failed to scan live certificates: :msg', ['msg' => $e->getMessage()]);
+            $this->liveCertsLoaded = true;
+        }
+    }
+
+    public function refreshLiveCerts(): void
+    {
+        $this->loadLiveCerts(forceFresh: true);
     }
 
     public function setCertFilter(string $filter): void

@@ -4,6 +4,14 @@
     :title="__('Load Balancers')"
     :description="__('Load balancers that target this server. Manage all load balancers from the Networking section.')"
 >
+    @if (in_array('load-balancers', config('server_workspace.coming_soon_keys', []), true))
+        <x-coming-soon-panel
+            icon="heroicon-o-arrows-right-left"
+            :title="__('Load balancers are coming soon')"
+            :description="__('Spread traffic across this server and its peers with managed, health-checked load balancers — provisioned and wired up from your dashboard.')"
+            :points="[__('Health-checked backends across your servers'), __('Round-robin and least-connections algorithms'), __('Managed from Networking, no manual config')]"
+        />
+    @else
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
@@ -490,4 +498,5 @@
     </x-modal>
 
     @include('livewire.partials.confirm-action-modal')
+    @endif
 </x-server-workspace-layout>

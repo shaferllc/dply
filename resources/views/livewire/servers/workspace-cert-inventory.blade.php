@@ -372,6 +372,151 @@
                 </div>
             @endif
         </section>
+
+        {{-- =================================================================
+             LIVE ON-DISK CERTIFICATES. The table above is dply's managed
+             records (DB-only). Caddy terminates TLS with built-in automatic
+             HTTPS — it obtains + renews certs itself under /var/lib/caddy and
+             never touches certbot — so those certs never get a managed record
+             and were invisible here. This panel runs one cross-engine SSH
+             sweep (Let's Encrypt + Caddy local store + every per-engine ssl
+             dir) with real openssl-parsed expiry, bringing Caddy's (and any
+             other on-disk) certs forward. Lazy-loaded via wire:init.
+             ================================================================= --}}
+        <section class="dply-card overflow-hidden" wire:init="loadLiveCerts">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-4 sm:px-7">
+                <div class="min-w-0">
+                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Live certificates on server') }}</h2>
+                    <p class="mt-0.5 text-xs text-brand-moss">
+                        {{ __('Actual certs on disk — including Caddy automatic-HTTPS certs that aren\'t in the managed records above — with real expiry from openssl.') }}
+                        @if ($liveCertsScannedAtIso)
+                            <span class="ml-1 text-brand-mist">· {{ __('Scanned :time', ['time' => \Illuminate\Support\Carbon::parse($liveCertsScannedAtIso)->diffForHumans()]) }}</span>
+                        @endif
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    wire:click="refreshLiveCerts"
+                    wire:loading.attr="disabled"
+                    wire:target="refreshLiveCerts,loadLiveCerts"
+                    class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
+                >
+                    <span wire:loading.remove wire:target="refreshLiveCerts,loadLiveCerts" class="inline-flex">
+                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                    </span>
+                    <span wire:loading wire:target="refreshLiveCerts,loadLiveCerts" class="inline-flex">
+                        <x-spinner class="h-3.5 w-3.5" />
+                    </span>
+                    {{ __('Rescan') }}
+                </button>
+            </div>
+
+            @if ($liveCertsError)
+                <div class="border-b border-rose-200 bg-rose-50/70 px-6 py-3 text-sm text-rose-900 sm:px-7">{{ $liveCertsError }}</div>
+            @endif
+
+            @if (! $liveCertsLoaded)
+                <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7">
+                    <span class="inline-flex items-center gap-2">
+                        <x-spinner class="h-3.5 w-3.5" /> {{ __('Scanning certificates on the server…') }}
+                    </span>
+                </div>
+            @elseif ($liveCertsUnreadable)
+                <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7">
+                    {{ __('Could not run the cert scan over SSH. Check that the deploy user has passwordless sudo for `find` + `openssl`.') }}
+                </div>
+            @elseif (empty($liveCerts))
+                <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7">
+                    <x-heroicon-o-shield-check class="mx-auto h-6 w-6 text-brand-mist" aria-hidden="true" />
+                    <p class="mt-2">{{ __('No server certificates found under the scanned paths.') }}</p>
+                </div>
+            @else
+                @php
+                    $liveUrgencyCounts = ['expired' => 0, 'danger' => 0, 'warn' => 0, 'ok' => 0, 'unknown' => 0];
+                    foreach ($liveCerts as $c) {
+                        $u = (string) ($c['urgency'] ?? 'unknown');
+                        $liveUrgencyCounts[$u] = ($liveUrgencyCounts[$u] ?? 0) + 1;
+                    }
+                @endphp
+                <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 bg-white px-6 py-3 text-[11px] sm:px-7">
+                    <span class="text-brand-moss">{{ __(':n cert(s)', ['n' => count($liveCerts)]) }}</span>
+                    @if ($liveUrgencyCounts['expired'] > 0)
+                        <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 font-semibold text-rose-800">
+                            <x-heroicon-o-x-circle class="h-3 w-3" /> {{ $liveUrgencyCounts['expired'] }} {{ __('expired') }}
+                        </span>
+                    @endif
+                    @if ($liveUrgencyCounts['danger'] > 0)
+                        <span class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 font-semibold text-rose-700">
+                            <x-heroicon-o-exclamation-triangle class="h-3 w-3" /> {{ $liveUrgencyCounts['danger'] }} {{ __('< 14d') }}
+                        </span>
+                    @endif
+                    @if ($liveUrgencyCounts['warn'] > 0)
+                        <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 font-semibold text-amber-800">
+                            <x-heroicon-o-clock class="h-3 w-3" /> {{ $liveUrgencyCounts['warn'] }} {{ __('< 60d') }}
+                        </span>
+                    @endif
+                    @if ($liveUrgencyCounts['ok'] > 0)
+                        <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700">
+                            <x-heroicon-o-check-circle class="h-3 w-3" /> {{ $liveUrgencyCounts['ok'] }} {{ __('healthy') }}
+                        </span>
+                    @endif
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-left text-xs">
+                        <thead class="bg-brand-sand/30 text-brand-moss">
+                            <tr>
+                                <th class="px-3 py-2 font-semibold">{{ __('Path') }}</th>
+                                <th class="px-3 py-2 font-semibold">{{ __('Subject') }}</th>
+                                <th class="px-3 py-2 font-semibold">{{ __('Issuer') }}</th>
+                                <th class="px-3 py-2 font-semibold">{{ __('Engine') }}</th>
+                                <th class="px-3 py-2 font-semibold text-right">{{ __('Expires') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-brand-ink/5 bg-white">
+                            @foreach ($liveCerts as $cert)
+                                @php
+                                    $urgency = (string) ($cert['urgency'] ?? 'unknown');
+                                    $days = $cert['days_until_expiry'] ?? null;
+                                @endphp
+                                <tr>
+                                    <td class="break-all px-3 py-2 font-mono text-[11px] text-brand-ink">{{ $cert['path'] }}</td>
+                                    <td class="max-w-[14rem] px-3 py-2 text-brand-moss">{{ $cert['subject'] ?: '—' }}</td>
+                                    <td class="max-w-[12rem] px-3 py-2 text-brand-moss">{{ $cert['issuer'] ?: '—' }}</td>
+                                    <td class="px-3 py-2">
+                                        <span class="inline-flex items-center rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ $cert['engine_hint'] ?? 'other' }}</span>
+                                    </td>
+                                    <td class="px-3 py-2 text-right">
+                                        @if ($cert['error'])
+                                            <span class="text-[11px] text-rose-700" title="{{ $cert['error'] }}">—</span>
+                                        @else
+                                            <span @class([
+                                                'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1',
+                                                'bg-rose-100 text-rose-900 ring-rose-200' => $urgency === 'expired',
+                                                'bg-rose-50 text-rose-700 ring-rose-200' => $urgency === 'danger',
+                                                'bg-amber-50 text-amber-800 ring-amber-200' => $urgency === 'warn',
+                                                'bg-emerald-50 text-emerald-700 ring-emerald-200' => $urgency === 'ok',
+                                                'bg-brand-sand/40 text-brand-moss ring-brand-ink/10' => $urgency === 'unknown',
+                                            ])>
+                                                @if ($urgency === 'expired')
+                                                    {{ __('expired :n d ago', ['n' => abs((int) $days)]) }}
+                                                @elseif ($days !== null)
+                                                    {{ __(':n d', ['n' => (int) $days]) }}
+                                                @else
+                                                    —
+                                                @endif
+                                            </span>
+                                            @if (! empty($cert['not_after']))
+                                                <p class="mt-0.5 text-[10px] text-brand-mist tabular-nums">{{ $cert['not_after'] }}</p>
+                                            @endif
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </section>
     </div>
 
     <x-modal name="cert-inventory-renew" :show="$showRenewModal" wire:model="showRenewModal">

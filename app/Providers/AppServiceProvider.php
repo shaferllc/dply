@@ -532,7 +532,7 @@ class AppServiceProvider extends ServiceProvider
                 CleanupRemoteSiteArtifactsJob::dispatch([
                     'server_id' => $site->server_id,
                     'webserver' => $site->webserver(),
-                    'nginx_basename' => $site->nginxConfigBasename(),
+                    'nginx_basename' => $site->webserverConfigBasename(),
                     'repository_base' => rtrim($site->effectiveRepositoryPath(), '/'),
                     'deploy_strategy' => $site->deploy_strategy ?? 'simple',
                     'primary_hostname' => $primary?->hostname,

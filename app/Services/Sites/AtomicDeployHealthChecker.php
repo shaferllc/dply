@@ -117,6 +117,13 @@ final class AtomicDeployHealthChecker
             '/shared/storage/logs/laravel.log',
         ]));
 
+        // The nginx error-log filter is an ERE alternation, so the host (which is
+        // user-controlled) must be regex-escaped before it joins the pattern —
+        // otherwise a metachar in the hostname would alter the match. The whole
+        // pattern then ships as one escapeshellarg-quoted argument.
+        $logFilter = $this->ereLiteral($hostHeader)
+            .'|fastcgi|upstream|connect\\(\\)|No such file|Primary script';
+
         $script = <<<BASH
 echo "── response headers ──"
 curl -sS --max-time 20 -o /dev/null -D - -H {$this->sh('Host: '.$hostHeader)} {$this->sh($url)} 2>&1 | head -n 12
@@ -148,7 +155,7 @@ printf 'current -> %s\n' "\$(readlink -f {$this->sh($repo)}/current 2>/dev/null 
 ls -la {$this->sh($repo)}/current/public/index.php 2>/dev/null || echo "  no current/public/index.php — release not activated"
 
 echo "── nginx error log (recent) ──"
-(sudo -n tail -n 40 /var/log/nginx/error.log 2>/dev/null || tail -n 40 /var/log/nginx/error.log 2>/dev/null || echo "(no access to /var/log/nginx/error.log)") | grep -E {$this->sh($hostHeader)}'|fastcgi|upstream|connect\(\)|No such file|Primary script' | tail -n 10
+(sudo -n tail -n 40 /var/log/nginx/error.log 2>/dev/null || tail -n 40 /var/log/nginx/error.log 2>/dev/null || echo "(no access to /var/log/nginx/error.log)") | grep -E {$this->sh($logFilter)} | tail -n 10
 
 echo "── site laravel.log (tail) ──"
 for p in {$logCandidates}; do
@@ -167,6 +174,12 @@ BASH;
     private function sh(string $value): string
     {
         return escapeshellarg($value);
+    }
+
+    /** Escape POSIX ERE metacharacters so $value matches literally inside a grep -E pattern. */
+    private function ereLiteral(string $value): string
+    {
+        return preg_replace('/[.^$*+?()\[\]{}|\\\\]/', '\\\\$0', $value);
     }
 
     public function normalizePath(string $path): string

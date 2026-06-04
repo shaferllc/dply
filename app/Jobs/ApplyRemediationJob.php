@@ -79,7 +79,9 @@ class ApplyRemediationJob implements ShouldQueue
         // Class-backed action (the `handler` path) — for fixes that can't be a
         // declarative script, e.g. regenerating a site's nginx vhost via a job.
         $handlerClass = is_string($action['handler'] ?? null) ? $action['handler'] : null;
-        if ($handlerClass !== null && is_a($handlerClass, RemediationActionInterface::class, true)) {
+        if ($handlerClass !== null
+            && in_array($handlerClass, $catalog->handlerClasses(), true)
+            && is_a($handlerClass, RemediationActionInterface::class, true)) {
             $emit->step('fix', sprintf('Applying “%s” …', (string) ($action['label'] ?? $this->actionKey)));
             $site = $this->siteId !== null ? Site::query()->find($this->siteId) : null;
             $error = app($handlerClass)->apply($server, $site, $this->userId, $emit);

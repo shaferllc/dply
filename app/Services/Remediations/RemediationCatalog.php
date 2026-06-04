@@ -49,6 +49,30 @@ class RemediationCatalog
     }
 
     /**
+     * The allow-list of class-backed handlers: every `handler` declared by any
+     * action in the catalog. {@see \App\Jobs\ApplyRemediationJob} checks a
+     * resolved handler against this set before instantiating it, so only a class
+     * explicitly wired into the static config can ever be constructed — the trust
+     * boundary is the catalog, not "any class implementing the interface."
+     *
+     * @return list<class-string>
+     */
+    public function handlerClasses(): array
+    {
+        $classes = [];
+        foreach ($this->all() as $remediation) {
+            foreach (($remediation['actions'] ?? []) as $action) {
+                $handler = $action['handler'] ?? null;
+                if (is_string($handler) && $handler !== '') {
+                    $classes[$handler] = true;
+                }
+            }
+        }
+
+        return array_keys($classes);
+    }
+
+    /**
      * Resolve a single action within a remediation.
      *
      * @return array<string, mixed>|null
