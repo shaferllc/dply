@@ -1576,6 +1576,9 @@ final class ServerProvisionCommandBuilder
         // server provisioning. The legacy "apps/<server-slug>" tree +
         // dply-prepare-layout systemd unit baked single-app-per-server
         // assumptions into the bare-server pipeline; both come out here.
+        $homeDir = dirname($layout['web_root']); // /home/dply
+        $webGroup = (string) config('site_settings.vm_site_file_web_group', 'www-data');
+
         return $this->withStep('Preparing server filesystem', [
             'install -d -m 0755 '.implode(' ', array_map('escapeshellarg', [
                 $layout['web_root'],
@@ -1594,6 +1597,16 @@ EOF',
             // nginx serves them.
             'chown -R dply:dply '.escapeshellarg($layout['web_root']).' || true',
             'chmod 755 '.escapeshellarg($layout['web_root']),
+            // The dply user's HOME must itself be traversable by the web server,
+            // or every docroot under it 404s — nginx (www-data) / Caddy (caddy ∈
+            // www-data) can't reach /home/dply/<site>/public. `useradd` can create
+            // the home 0750 dply:dply (no traversal for the web group); set it to
+            // 2750 dply:<webgroup> to match the deploy file model (see
+            // RelocateSiteFilesJob), falling back to 0755 if the group is absent.
+            'getent group '.escapeshellarg($webGroup).' >/dev/null 2>&1 '
+                .'&& chgrp '.escapeshellarg($webGroup).' '.escapeshellarg($homeDir).' '
+                .'&& chmod 2750 '.escapeshellarg($homeDir).' '
+                .'|| chmod 0755 '.escapeshellarg($homeDir),
         ]);
     }
 
