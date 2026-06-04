@@ -210,6 +210,12 @@ return [
             'failed' => 'Database engine uninstall failed.',
             'stale' => 'Database engine uninstall did not finish.',
         ],
+        'db_engine_activation' => [
+            'running' => 'Changing database engine state on :host …',
+            'completed' => 'Database engine state changed.',
+            'failed' => 'Database engine state change failed.',
+            'stale' => 'Database engine state change did not finish.',
+        ],
         // Worker pool scaling — the reconciler streams each tick's work
         // (provision / replay / deploy / drain) into one run that spans the
         // whole converge loop, so the operator watches scaling live on the

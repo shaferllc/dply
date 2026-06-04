@@ -392,6 +392,58 @@ BASH,
         return in_array($engine, ['postgres', 'mysql', 'mariadb'], true);
     }
 
+    /**
+     * Start the engine and enable it at boot. The mysql/mariadb unit name
+     * varies by distro/package, so try both when either family is requested.
+     */
+    public static function activateScript(string $engine): string
+    {
+        $unit = self::systemdServiceFor($engine);
+        $alt = self::altSystemdServiceFor($engine);
+        $enable = $alt !== null
+            ? "systemctl enable --now {$unit} 2>/dev/null || systemctl enable --now {$alt}"
+            : "systemctl enable --now {$unit}";
+        $check = $alt !== null
+            ? "systemctl is-active --quiet {$unit} || systemctl is-active --quiet {$alt}"
+            : "systemctl is-active --quiet {$unit}";
+
+        return <<<BASH
+set -e
+{$enable}
+{$check}
+echo "activated"
+BASH;
+    }
+
+    /**
+     * Stop the engine and disable it at boot — the daemon stays installed (data
+     * and binaries untouched) but won't come back after a reboot until activated.
+     */
+    public static function deactivateScript(string $engine): string
+    {
+        $unit = self::systemdServiceFor($engine);
+        $alt = self::altSystemdServiceFor($engine);
+        $disable = $alt !== null
+            ? "systemctl disable --now {$unit} 2>/dev/null || true\nsystemctl disable --now {$alt} 2>/dev/null || true"
+            : "systemctl disable --now {$unit} 2>/dev/null || true";
+
+        return <<<BASH
+set -e
+{$disable}
+echo "deactivated"
+BASH;
+    }
+
+    /** The alternate systemd unit name for mysql/mariadb (the two are interchangeable per distro). */
+    private static function altSystemdServiceFor(string $engine): ?string
+    {
+        return match ($engine) {
+            'mysql' => 'mariadb',
+            'mariadb' => 'mysql',
+            default => null,
+        };
+    }
+
     public static function timescaledbRepoBootstrapScript(): string
     {
         return <<<'BASH'

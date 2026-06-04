@@ -4,10 +4,12 @@ namespace App\Livewire\Servers;
 
 use App\Jobs\ExportServerDatabaseBackupJob;
 use App\Jobs\InstallDatabaseEngineJob;
+use App\Jobs\ToggleDatabaseEngineActivationJob;
 use App\Jobs\ToggleDatabaseEngineRemoteAccessJob;
 use App\Jobs\ToggleDatabaseNetworkingJob;
 use App\Jobs\UninstallDatabaseEngineJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\SurfacesBindingConsumers;
 use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
@@ -47,6 +49,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -62,6 +65,7 @@ class WorkspaceDatabases extends Component
     use InteractsWithServerWorkspace;
     use RunsAllowlistedManageAction;
     use RunsServerConsoleActions;
+    use SurfacesBindingConsumers;
     use WithFileUploads;
 
     #[Url(as: 'tab', except: 'databases', history: true)]
@@ -223,6 +227,22 @@ class WorkspaceDatabases extends Component
         $this->manage_db_bind_host = (string) ($meta['manage_db_bind_host'] ?? '');
         $port = $meta['manage_db_port'] ?? null;
         $this->manage_db_port = is_numeric($port) ? (int) $port : null;
+    }
+
+    /**
+     * Sites consuming this server's databases, grouped by database id — the
+     * "Used by" list on the Connections subtab. One query for the whole tab.
+     *
+     * @return array<string, array<int, array<string, mixed>>>
+     */
+    #[Computed]
+    public function databaseConsumers(): array
+    {
+        return $this->buildBindingConsumers(
+            'server_database',
+            $this->server->serverDatabases->pluck('id')->all(),
+            $this->server->id,
+        );
     }
 
     /**
@@ -508,6 +528,61 @@ class WorkspaceDatabases extends Component
 
         UninstallDatabaseEngineJob::dispatch($row->id, auth()->id());
         $this->toastSuccess(__('Uninstalling :engine — progress shows in the banner above.', ['engine' => $engineLabel]));
+    }
+
+    /**
+     * Activate (start + enable at boot) or deactivate (stop + disable at boot) an
+     * installed database engine. Dispatches {@see ToggleDatabaseEngineActivationJob}
+     * which runs the systemctl change over SSH and flips the row to RUNNING/STOPPED.
+     * The daemon stays installed — data and binaries are untouched.
+     */
+    public function setDatabaseEngineActivation(string $engine, bool $activate): void
+    {
+        $this->authorize('update', $this->server);
+
+        $row = ServerDatabaseEngine::query()
+            ->where('server_id', $this->server->id)
+            ->where('engine', $engine)
+            ->first();
+
+        if (! $row) {
+            $this->toastError(__('No :engine engine on this server.', ['engine' => $engine]));
+
+            return;
+        }
+
+        // Only toggle between the two resting states — never interrupt an install,
+        // uninstall, or a failed row (those have their own recovery actions).
+        if (! in_array($row->status, [ServerDatabaseEngine::STATUS_RUNNING, ServerDatabaseEngine::STATUS_STOPPED], true)) {
+            $this->toastError(__(':engine is busy — wait for the current operation to finish.', ['engine' => $engine]));
+
+            return;
+        }
+
+        $engineLabel = DatabaseEngineInfo::for($engine)['label'];
+        $this->workspace_tab = $engine;
+
+        $this->seedQueuedDatabaseEngineConsoleAction(
+            $row,
+            'db_engine_activation',
+            $activate
+                ? __('Activating :engine on :host …', ['engine' => $engineLabel, 'host' => $this->server->name])
+                : __('Deactivating :engine on :host …', ['engine' => $engineLabel, 'host' => $this->server->name]),
+        );
+
+        // Optimistically flip the pill so the UI reflects intent immediately; the
+        // job confirms (or reverts via its failure path) once SSH completes.
+        $row->update([
+            'status' => $activate ? ServerDatabaseEngine::STATUS_RUNNING : ServerDatabaseEngine::STATUS_STOPPED,
+        ]);
+
+        ToggleDatabaseEngineActivationJob::dispatch($row->id, $activate, auth()->id());
+
+        $this->toastSuccess(
+            $activate
+                ? __('Activating :engine — progress shows in the banner above.', ['engine' => $engineLabel])
+                : __('Deactivating :engine — progress shows in the banner above.', ['engine' => $engineLabel])
+        );
     }
 
     /**

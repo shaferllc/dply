@@ -9,6 +9,7 @@ use App\Jobs\TailCacheServiceMonitorJob;
 use App\Jobs\UninstallCacheServiceJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\RequiresFeature;
+use App\Livewire\Concerns\SurfacesBindingConsumers;
 use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
@@ -45,6 +46,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
@@ -63,6 +65,7 @@ class WorkspaceCaches extends Component
     use InteractsWithServerWorkspace;
     use RunsAllowlistedManageAction;
     use RunsServerConsoleActions;
+    use SurfacesBindingConsumers;
 
     /** Active workspace tab. URL-bound so deep links + back/forward work. */
     #[Url(as: 'tab', except: 'overview', history: true)]
@@ -3713,6 +3716,22 @@ BASH;
             ->where('server_id', $this->server->id)
             ->orderBy('engine')
             ->get();
+    }
+
+    /**
+     * Sites consuming this server's cache services, grouped by cache-service id —
+     * the "Used by" list on each engine's Overview. One query for the whole tab.
+     *
+     * @return array<string, array<int, array<string, mixed>>>
+     */
+    #[Computed]
+    public function cacheConsumers(): array
+    {
+        return $this->buildBindingConsumers(
+            'server_cache_service',
+            $this->cacheServices()->pluck('id')->all(),
+            $this->server->id,
+        );
     }
 
     /**

@@ -518,6 +518,16 @@
                         'engineLabels' => $engineLabels,
                         'server' => $server,
                     ])
+
+                    {{-- Sites consuming this cache service (local + remote). --}}
+                    @if ($row)
+                        @include('livewire.servers.partials._used-by-card', [
+                            'rows' => $this->cacheConsumers[$row->id] ?? [],
+                            'resourceNoun' => 'cache',
+                            'showResource' => false,
+                            'card' => $card,
+                        ])
+                    @endif
                     @endif {{-- /overview subtab --}}
 
                     {{-- Port card (Configure subtab, all engines). Restarts the unit. --}}

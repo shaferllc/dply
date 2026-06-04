@@ -160,6 +160,27 @@
                     \App\Models\ServerDatabaseEngine::STATUS_STOPPED,
                 ], true))
                     <div class="mt-5 flex flex-wrap gap-2">
+                        @if ($engineRow->status === \App\Models\ServerDatabaseEngine::STATUS_RUNNING)
+                            <button
+                                type="button"
+                                wire:click="openConfirmActionModal('setDatabaseEngineActivation', ['{{ $engine }}', false], @js(__('Deactivate :engine?', ['engine' => $dbEngineInfoForTab['label']])), @js(__('Stops the engine and disables it from starting at boot. Sites connected to it will lose their database until you activate it again. Data and binaries on the server are left untouched.')), @js(__('Deactivate')), true)"
+                                class="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-800 hover:bg-amber-100"
+                            >
+                                <x-heroicon-o-pause-circle class="h-4 w-4" aria-hidden="true" />
+                                {{ __('Deactivate') }}
+                            </button>
+                        @else
+                            <button
+                                type="button"
+                                wire:click="setDatabaseEngineActivation('{{ $engine }}', true)"
+                                wire:loading.attr="disabled"
+                                wire:target="setDatabaseEngineActivation('{{ $engine }}', true)"
+                                class="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-60"
+                            >
+                                <x-heroicon-o-play-circle class="h-4 w-4" aria-hidden="true" />
+                                {{ __('Activate') }}
+                            </button>
+                        @endif
                         <button
                             type="button"
                             wire:click="openConfirmActionModal('uninstallDatabaseEngine', ['{{ $engine }}'], @js(__('Uninstall :engine', ['engine' => $dbEngineInfoForTab['label']])), @js(__('apt purge will remove the engine and its data dirs from the server. Existing tracked databases stay in Dply but won\'t have a live engine to talk to.')), @js(__('Uninstall')), true)"

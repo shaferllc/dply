@@ -24,6 +24,24 @@
         'card' => $card,
     ])
 
+    @php
+        // Flatten this engine's databases into one "Used by" list, tagging each
+        // row with its database name (a single card can span several databases).
+        $usedByRows = [];
+        foreach ($engineDatabases as $usedByDb) {
+            foreach ($this->databaseConsumers[$usedByDb->id] ?? [] as $consumerRow) {
+                $consumerRow['resource_name'] = $usedByDb->name;
+                $usedByRows[] = $consumerRow;
+            }
+        }
+    @endphp
+    @include('livewire.servers.partials._used-by-card', [
+        'rows' => $usedByRows,
+        'resourceNoun' => 'database',
+        'showResource' => true,
+        'card' => $card,
+    ])
+
     @if ($engine !== 'sqlite')
         @include('livewire.servers.partials.extra-users-card', [
             'databases' => $engineDatabases,
