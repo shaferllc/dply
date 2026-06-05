@@ -278,6 +278,8 @@ return [
     | checkout caches, and task-runner temp. The scheduled command
     | `dply:prune-local-workspaces` removes entries older than these ages.
     */
+    'quick_login_enabled' => filter_var(env('DPLY_QUICK_LOGIN_ENABLED', false), FILTER_VALIDATE_BOOL),
+
     'local_workspace_prune' => [
         'enabled' => filter_var(env('DPLY_LOCAL_WORKSPACE_PRUNE_ENABLED', true), FILTER_VALIDATE_BOOL),
         // Built artifact zips are byproducts once uploaded to the provider; keep

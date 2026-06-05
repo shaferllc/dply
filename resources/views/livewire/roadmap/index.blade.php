@@ -1,9 +1,4 @@
 <div class="min-h-screen bg-brand-cream text-brand-ink">
-    <div class="fixed inset-0 -z-20 bg-brand-cream"></div>
-    <div class="fixed inset-0 -z-10 bg-mesh-brand"></div>
-
-    <x-site-header active="roadmap" />
-
     <main class="px-4 py-14 sm:px-6 sm:py-16 lg:px-8">
         <section class="mx-auto max-w-7xl">
             <div class="max-w-3xl">

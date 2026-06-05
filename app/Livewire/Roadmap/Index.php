@@ -130,6 +130,7 @@ class Index extends Component
             'recentlyShipped' => $recentlyShipped,
         ])->layout('layouts.status-public', [
             'title' => Str::of(__('Product roadmap'))->append(' – ', config('app.name'))->value(),
+            'active' => 'roadmap',
         ]);
     }
 

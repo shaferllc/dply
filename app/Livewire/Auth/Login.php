@@ -117,6 +117,7 @@ class Login extends Component
 
     protected function canUseQuickLoginButton(): bool
     {
-        return config('app.env') === 'local';
+        return config('app.env') === 'local'
+            && config('dply.quick_login_enabled', false);
     }
 }
