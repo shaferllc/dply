@@ -82,13 +82,13 @@
             <div class="mx-auto max-w-3xl">
                 <div class="relative">
                     {{-- Vertical timeline line --}}
-                    <div class="absolute left-0 top-2 bottom-2 hidden w-px bg-gradient-to-b from-brand-ink/20 via-brand-ink/10 to-transparent sm:block" aria-hidden="true"></div>
+                    <div class="absolute left-0 top-0 bottom-0 hidden w-px bg-gradient-to-b from-brand-ink/15 via-brand-ink/8 to-transparent sm:block" aria-hidden="true"></div>
 
                     <ol class="space-y-10 sm:pl-8">
                         @foreach ($entries as $entry)
                             <li class="relative">
                                 {{-- Timeline dot --}}
-                                <span class="absolute -left-[calc(2rem+1px)] top-5 hidden h-2.5 w-2.5 rounded-full border-2 border-brand-sage bg-brand-cream sm:block" aria-hidden="true"></span>
+                                <span class="absolute -left-[calc(2rem+0.3125rem)] top-1/2 -translate-y-1/2 hidden h-2.5 w-2.5 rounded-full bg-brand-sage ring-4 ring-brand-sage/15 sm:block" aria-hidden="true"></span>
 
                                 <article class="rounded-2xl border border-brand-ink/10 bg-white/85 p-6 shadow-sm sm:p-8">
                                     <div class="flex flex-wrap items-center gap-2">

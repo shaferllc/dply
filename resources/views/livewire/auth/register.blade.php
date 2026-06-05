@@ -43,7 +43,7 @@
         </div>
         <div>
             <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" wire:model="form.email" class="block w-full mt-1 @if ($emailLocked) bg-brand-sand/30 text-brand-moss @endif" type="email" required autocomplete="username" :readonly="$emailLocked" />
+            <x-text-input id="email" wire:model="form.email" class="block w-full mt-1 {{ $emailLocked ? 'bg-brand-sand/30 text-brand-moss' : '' }}" type="email" required autocomplete="username" :readonly="$emailLocked" />
             @if ($emailLocked)
                 <p class="mt-1 text-xs text-brand-moss">{{ __('Your invite is tied to this address.') }}</p>
             @endif

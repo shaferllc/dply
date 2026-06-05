@@ -18,43 +18,22 @@ class RedirectGuestsToComingSoon
         // (gated in any non-local environment).
         $flag = config('dply.coming_soon');
 
-        if ($flag === false) {
+        // Fully disabled, or an authenticated user — always pass.
+        if ($flag === false || auth()->check()) {
             return $next($request);
         }
 
-        if (auth()->check()) {
-            return $next($request);
+        // Coming-soon gates ONLY the registration flow — the marketing site
+        // (homepage, features, roadmap, login, …) stays public. A guest who
+        // tries to sign up is sent to the coming-soon / waitlist page.
+        // Local dev is exempt unless COMING_SOON=true forces it on (for preview).
+        $gateOn = $flag === true || ! $this->isLocalDevelopmentRequest($request);
+
+        if ($gateOn && $request->routeIs($this->gatedRoutes())) {
+            return redirect()->route('coming-soon');
         }
 
-        if ($request->is('livewire/*')) {
-            return $next($request);
-        }
-
-        if ($request->is('hooks/*')) {
-            return $next($request);
-        }
-
-        // Serverless function URLs are public HTTP endpoints — every caller
-        // of a deployed function is a guest by definition.
-        if ($request->is('fn/*')) {
-            return $next($request);
-        }
-
-        if ($request->is('cli/*')) {
-            return $next($request);
-        }
-
-        if ($this->routeIsAllowed($request)) {
-            return $next($request);
-        }
-
-        // Local dev passes through UNLESS coming-soon is explicitly forced on
-        // (set COMING_SOON=true to preview the gate locally).
-        if ($flag !== true && $this->isLocalDevelopmentRequest($request)) {
-            return $next($request);
-        }
-
-        return redirect()->route('coming-soon');
+        return $next($request);
     }
 
     private function isLocalDevelopmentRequest(Request $request): bool
@@ -70,22 +49,17 @@ class RedirectGuestsToComingSoon
         ], true);
     }
 
-    private function routeIsAllowed(Request $request): bool
+    /**
+     * The only routes gated behind coming-soon: the registration flow. The rest
+     * of the site stays public (homepage, features, login, etc.).
+     *
+     * @return list<string>
+     */
+    private function gatedRoutes(): array
     {
-        return $request->routeIs([
-            'coming-soon',
-            'features',
-            'changelog',
-            'roadmap',
-            'login',
-            'password.request',
-            'password.reset',
-            'two-factor.login',
-            'oauth.redirect',
-            'oauth.callback',
-            'oauth.central.redirect',
-            'oauth.central.callback',
-            'logout',
-        ]);
+        return [
+            'register',
+            'register.*',
+        ];
     }
 }
