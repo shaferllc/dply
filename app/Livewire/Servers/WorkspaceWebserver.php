@@ -7,6 +7,7 @@ namespace App\Livewire\Servers;
 use App\Enums\SiteType;
 use App\Jobs\RunWebserverConfigOpJob;
 use App\Jobs\ServerManageRemoteSshJob;
+use App\Livewire\Servers\Concerns\LoadsLiveServerCerts;
 use App\Livewire\Servers\Concerns\ManagesWebserverConfigRevisions;
 use App\Models\ConsoleAction;
 use App\Models\Server;
@@ -68,14 +69,12 @@ use App\Services\Servers\TraefikProvidersConfig;
 use App\Services\Servers\TraefikStaticConfigOptions;
 use App\Services\Servers\TraefikTcpRoutesConfig;
 use App\Services\Servers\TraefikUdpRoutesConfig;
-use App\Services\Servers\WebserverCertsAggregator;
 use App\Services\Servers\WebserverConfigDriftDetector;
 use App\Services\Sites\SiteCaddyProvisioner;
 use App\Services\SshConnection;
 use App\Support\Servers\CaddyPhpFpmUpstreamAddress;
 use App\Support\Servers\ServerConsoleActionLookup;
 use App\Support\Servers\WebserverWorkspaceViewData;
-use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -108,6 +107,7 @@ use Livewire\Attributes\Url;
 #[Layout('layouts.app')]
 class WorkspaceWebserver extends WorkspaceManage
 {
+    use LoadsLiveServerCerts;
     use ManagesWebserverConfigRevisions;
 
     /**
@@ -489,22 +489,9 @@ class WorkspaceWebserver extends WorkspaceManage
     /** @var array<string, string> */
     public array $haproxy_backends_new = ['name' => '', 'servers' => '', 'balance' => 'roundrobin'];
 
-    // ---- Cross-engine TLS certificates dashboard (Overview tab card).
-    /**
-     * The aggregated list. Each entry: path / subject / issuer / not_after /
-     * expires_at / days_until_expiry / urgency / engine_hint / error.
-     *
-     * @var list<array<string, mixed>>
-     */
-    public array $tls_certs = [];
-
-    public ?string $tls_certs_scanned_at_iso = null;
-
-    public bool $tls_certs_unreadable = false;
-
-    public bool $tls_certs_loaded = false;
-
-    public ?string $tls_certs_error = null;
+    // ---- Cross-engine TLS certificates dashboard (Health tab card).
+    // State + loader live in LoadsLiveServerCerts ($liveCerts*), shared with the
+    // server cert-inventory page; the SSH sweep runs async in ScanServerLiveCertsJob.
 
     // ---- Site smoke-test results (Overview tab card).
     /**
@@ -978,11 +965,10 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->loadApacheCacheConfig();
         }
 
-        // Eager-load the Health tab cards (TLS certs + drift detector) so
-        // they paint with data on first render. Services cache for 60s so
-        // subsequent navigations are cheap.
+        // Eager-load the Health tab's drift detector so it paints on first
+        // render. The TLS cert card loads async via the shared partial's
+        // wire:init (loadLiveCerts) so its SSH sweep stays off the request.
         if ($this->workspace_tab === 'health' && $this->serverOpsReady()) {
-            $this->loadTlsCertsDashboard();
             $this->loadDriftDetector();
         }
         // Other engine sub-tab data loads deferred via wire:init → loadActiveEngineSubtabData().
@@ -1000,18 +986,8 @@ class WorkspaceWebserver extends WorkspaceManage
         $this->resetLogViewerState();
 
         if ($this->workspace_tab === 'health' && $this->serverOpsReady()) {
-            $this->loadTlsCertsDashboard();
             $this->loadDriftDetector();
         }
-    }
-
-    /**
-     * Force a fresh SSH scan (bypassing the 60s cache) — wired to the
-     * "Rescan" button on the Health tab TLS card.
-     */
-    public function refreshTlsCertsDashboard(): void
-    {
-        $this->loadTlsCertsDashboard(forceFresh: true);
     }
 
     /**
@@ -1979,36 +1955,6 @@ class WorkspaceWebserver extends WorkspaceManage
         $this->loadDriftDetector(forceFresh: true);
     }
 
-    public function loadTlsCertsDashboard(bool $forceFresh = false): void
-    {
-        $this->authorize('view', $this->server);
-
-        if (! $this->serverOpsReady()) {
-            $this->tls_certs_error = __('Provisioning and SSH must be ready before scanning TLS certs.');
-
-            return;
-        }
-
-        try {
-            $result = app(WebserverCertsAggregator::class)->aggregate($this->server, $forceFresh);
-            $this->tls_certs = array_map(function (array $row): array {
-                $row['expires_at'] = $row['expires_at'] instanceof CarbonImmutable
-                    ? $row['expires_at']->toIso8601String()
-                    : null;
-
-                return $row;
-            }, $result['certs']);
-            $this->tls_certs_scanned_at_iso = $result['scanned_at'] instanceof CarbonImmutable
-                ? $result['scanned_at']->toIso8601String()
-                : null;
-            $this->tls_certs_unreadable = $result['unreadable'];
-            $this->tls_certs_loaded = true;
-            $this->tls_certs_error = null;
-        } catch (\Throwable $e) {
-            $this->tls_certs_error = __('Failed to scan TLS certs: :msg', ['msg' => $e->getMessage()]);
-            $this->tls_certs_loaded = false;
-        }
-    }
 
     public function loadHaproxyBackendsConfig(): void
     {

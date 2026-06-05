@@ -93,7 +93,12 @@ class TestingHostnameProvisioner
                 'hostname' => $hostname,
                 'zone' => $zone,
                 'record_name' => $recordName,
-                'record_id' => (int) ($record['id'] ?? 0),
+                // Keep the provider's id verbatim — DigitalOcean returns an int,
+                // but Hetzner/Cloudflare return a string (Hetzner: "<name>/<TYPE>").
+                // Casting to int (the old behaviour) collapsed those to 0, which
+                // made the delete path unable to find — and therefore unable to
+                // remove — the record when the site was torn down.
+                'record_id' => $record['id'] ?? null,
                 'record_type' => 'A',
                 'record_data' => $serverIp,
                 'provisioned_at' => now()->toIso8601String(),
@@ -395,7 +400,14 @@ class TestingHostnameProvisioner
             if ($credential === null) {
                 return;
             }
-            $recordId = (string) ($testingMeta['record_id'] ?? $previewRow?->provider_record_id ?? '');
+            // Prefer the preview row's stored provider_record_id: the meta
+            // record_id was historically int-cast to 0 for string-id providers
+            // (Hetzner/Cloudflare), so trust it only when it's a non-empty,
+            // non-"0" value and otherwise fall back to the row.
+            $recordId = (string) ($testingMeta['record_id'] ?? '');
+            if ($recordId === '' || $recordId === '0') {
+                $recordId = (string) ($previewRow?->provider_record_id ?? '');
+            }
             if ($recordId === '') {
                 return;
             }
@@ -405,7 +417,14 @@ class TestingHostnameProvisioner
             if ($credential === null || $credential->provider !== $providerType) {
                 return;
             }
-            $recordId = (string) ($testingMeta['record_id'] ?? $previewRow?->provider_record_id ?? '');
+            // Prefer the preview row's stored provider_record_id: the meta
+            // record_id was historically int-cast to 0 for string-id providers
+            // (Hetzner/Cloudflare), so trust it only when it's a non-empty,
+            // non-"0" value and otherwise fall back to the row.
+            $recordId = (string) ($testingMeta['record_id'] ?? '');
+            if ($recordId === '' || $recordId === '0') {
+                $recordId = (string) ($previewRow?->provider_record_id ?? '');
+            }
             if ($recordId === '') {
                 return;
             }

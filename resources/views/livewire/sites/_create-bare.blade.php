@@ -1,16 +1,15 @@
-{{-- Choose-app flow: bare-create (config/dply.php choose_app_enabled). --}}
-{{-- Collects only name + primary hostname; the application is chosen on --}}
-{{-- sites.choose-app after the bare site is created. --}}
+{{-- Services-first bare-create. Collects only name + primary hostname; --}}
+{{-- storeBare() creates the site and provisions its foundation (system user, --}}
+{{-- web server vhost + splash page, testing hostname), then lands on the site --}}
+{{-- page where services and a repository are configured when ready. --}}
 @php
-    $nextApps = [
-        ['icon' => 'heroicon-o-newspaper', 'label' => __('WordPress')],
-        ['icon' => 'heroicon-o-bolt', 'label' => __('Laravel')],
-        ['icon' => 'heroicon-o-document-text', 'label' => __('Statamic')],
-        ['icon' => 'heroicon-o-squares-2x2', 'label' => __('Symfony')],
-        ['icon' => 'heroicon-o-cube', 'label' => __('Craft CMS')],
-        ['icon' => 'heroicon-o-globe-alt', 'label' => __('Drupal')],
-        ['icon' => 'heroicon-o-code-bracket', 'label' => __('Git repository')],
-        ['icon' => 'heroicon-o-minus-circle', 'label' => __('Blank / Skip')],
+    $provisionSteps = [
+        ['icon' => 'heroicon-o-globe-alt', 'label' => __('Web server + vhost')],
+        ['icon' => 'heroicon-o-user', 'label' => __('System user')],
+        ['icon' => 'heroicon-o-folder', 'label' => __('Deploy directory')],
+        ['icon' => 'heroicon-o-link', 'label' => __('Testing URL + SSL')],
+        ['icon' => 'heroicon-o-squares-2x2', 'label' => __('Configure services')],
+        ['icon' => 'heroicon-o-code-bracket', 'label' => __('Connect a repo')],
     ];
 @endphp
 
@@ -28,7 +27,7 @@
             {{ __('Launch a new site on :server', ['server' => $server->name]) }}
         </h1>
         <p class="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-brand-moss sm:text-base">
-            {{ __('Name it and point a domain at it. Next, you’ll choose what to install — WordPress, Laravel, a Git repo, and more.') }}
+            {{ __('Name it and point a domain at it. Dply provisions the foundation — a system user, web server, and a testing URL — then you configure services and connect a repository whenever you’re ready.') }}
         </p>
     </div>
 
@@ -98,7 +97,7 @@
                         {{ __('Cancel') }}
                     </a>
                     <x-primary-button>
-                        {{ __('Continue to choose an application') }}
+                        {{ __('Create & provision site') }}
                         <x-heroicon-o-arrow-right class="h-4 w-4" aria-hidden="true" />
                     </x-primary-button>
                 </div>
@@ -108,14 +107,14 @@
         {{-- What's next preview --}}
         <aside class="lg:col-span-5">
             <div class="rounded-2xl border border-brand-ink/10 bg-gradient-to-b from-brand-sand/40 to-white/80 p-6 shadow-sm">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-rust">{{ __('Step 2 · Coming up') }}</p>
-                <h3 class="mt-1.5 text-lg font-semibold text-brand-ink">{{ __('Choose what to install') }}</h3>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-rust">{{ __('Step 2 · Automatic') }}</p>
+                <h3 class="mt-1.5 text-lg font-semibold text-brand-ink">{{ __('We provision the foundation') }}</h3>
                 <p class="mt-1.5 text-sm leading-relaxed text-brand-moss">
-                    {{ __('Once the shell exists, pick an application. Real installers set everything up for you; or bring your own repo.') }}
+                    {{ __('The moment you create it, Dply sets up the web server, a system user, and a temporary testing URL, and serves a splash page. You then configure services and connect a repository from the site page.') }}
                 </p>
 
                 <div class="mt-5 grid grid-cols-2 gap-2.5">
-                    @foreach ($nextApps as $app)
+                    @foreach ($provisionSteps as $app)
                         <div class="flex items-center gap-2.5 rounded-xl border border-brand-ink/10 bg-white/80 px-3 py-2.5 shadow-sm">
                             <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-sage/12 text-brand-forest">
                                 <x-dynamic-component :component="$app['icon']" class="h-4 w-4" aria-hidden="true" />
@@ -127,7 +126,7 @@
 
                 <p class="mt-5 flex items-start gap-2 rounded-xl bg-white/60 px-3 py-2.5 text-xs leading-relaxed text-brand-moss ring-1 ring-brand-ink/5">
                     <x-heroicon-o-sparkles class="mt-0.5 h-4 w-4 shrink-0 text-brand-gold" aria-hidden="true" />
-                    <span>{{ __('WordPress and Laravel are installed automatically, database and all. The rest deploy straight from a repository.') }}</span>
+                    <span>{{ __('WordPress, Laravel, Statamic, a Git repo, or a blank start — connect any of them from the site once it’s live. The repo is optional and can come later.') }}</span>
                 </p>
             </div>
         </aside>

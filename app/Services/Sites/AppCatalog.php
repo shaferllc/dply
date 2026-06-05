@@ -184,7 +184,7 @@ class AppCatalog
             [
                 'key' => 'blank',
                 'label' => __('Blank / Skip'),
-                'description' => __('Create an empty PHP site now and pick an application later.'),
+                'description' => __('Leave the site empty for now — pick an application whenever you’re ready.'),
                 'icon' => 'heroicon-o-minus-circle',
                 'kind' => 'blank',
                 'needs_db' => false,

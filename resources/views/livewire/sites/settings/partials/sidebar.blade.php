@@ -21,6 +21,11 @@
 >
     <div class="{{ $card }}">
         <div class="border-b border-brand-ink/10 p-4 sm:p-5">
+            <a href="{{ route('servers.sites', $server) }}" wire:navigate
+                class="-ms-1 mb-3 inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium text-brand-moss transition-colors hover:bg-brand-sand/50 hover:text-brand-ink">
+                <x-heroicon-o-arrow-left class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                {{ __('Back to sites') }}
+            </a>
             <div class="flex items-start gap-3">
                 @if ($site->logoUrl())
                     <img src="{{ $site->logoUrl() }}" alt="{{ $site->name }}" class="h-12 w-12 shrink-0 rounded-2xl object-cover bg-white shadow-sm ring-1 ring-brand-ink/10" />

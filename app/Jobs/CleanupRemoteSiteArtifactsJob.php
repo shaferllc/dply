@@ -109,12 +109,16 @@ class CleanupRemoteSiteArtifactsJob implements ShouldQueue
             };
         }
 
+        // Release artifacts are written by privileged provision/deploy steps, so
+        // the deploy user can't always rm them — use sudo or the tree survives
+        // and a re-created same-slug site inherits stale code (wrong PHP socket,
+        // old index.php) and 502s.
         $baseEsc = escapeshellarg($base);
         if ($base !== '' && config('dply.delete_remote_repository_on_site_delete', false)) {
-            $log .= $ssh->exec(sprintf('rm -rf %s 2>&1; printf "\nDPLY_RM_BASE_EXIT:%%s" "$?"', $baseEsc), 600);
+            $log .= $ssh->exec(sprintf('sudo rm -rf %s 2>&1; printf "\nDPLY_RM_BASE_EXIT:%%s" "$?"', $baseEsc), 600);
         } elseif ($base !== '' && $strategy === 'atomic') {
             $log .= $ssh->exec(sprintf(
-                'rm -rf %1$s/releases 2>/dev/null; rm -f %1$s/current 2>/dev/null; printf "\nDPLY_ATOMIC_RM_EXIT:%%s" "$?"',
+                'sudo rm -rf %1$s/releases 2>/dev/null; sudo rm -f %1$s/current 2>/dev/null; printf "\nDPLY_ATOMIC_RM_EXIT:%%s" "$?"',
                 $baseEsc
             ), 300);
         }

@@ -116,7 +116,29 @@
                             @include('livewire.sites.settings.partials.runtime-workspace')
                         @endif
                     @elseif ($section === 'system-user')
-                        @include('livewire.sites.settings.partials.system-user')
+                        @if (workspace_surface_coming_soon('site_system_user'))
+                            <x-workspace-coming-soon
+                                :server="$site->server"
+                                icon="heroicon-o-user"
+                                :title="__('System user')"
+                                :description="__('Run this site under its own dedicated Linux user — isolated home, permissions, and SSH — so a compromise or runaway process stays contained to one site.')"
+                                :eyebrow="__('System user preview')"
+                                :lines="[
+                                    ['tone' => 'cmd', 'text' => '~ $ id dply-site'],
+                                    ['tone' => 'muted', 'text' => 'uid=1042(dply-site) gid=1042'],
+                                    ['tone' => 'muted', 'text' => 'home=/home/dply-site  shell=/bin/bash'],
+                                    ['tone' => 'ok', 'text' => 'isolated · least-privilege'],
+                                ]"
+                                :features="[
+                                    ['icon' => 'user', 'title' => __('Dedicated user'), 'body' => __('Each site gets its own Linux user and home directory, not a shared one.')],
+                                    ['icon' => 'lock-closed', 'title' => __('Contained blast radius'), 'body' => __('Permissions are scoped so one site cannot read or write another.')],
+                                    ['icon' => 'key', 'title' => __('Per-site SSH'), 'body' => __('Grant SSH to just this site without handing over the whole box.')],
+                                    ['icon' => 'arrows-right-left', 'title' => __('Safe to change'), 'body' => __('Reassign ownership and re-permission the tree without a redeploy.')],
+                                ]"
+                            />
+                        @else
+                            @include('livewire.sites.settings.partials.system-user')
+                        @endif
                     @elseif ($section === 'laravel-stack')
                         @include('livewire.sites.settings.partials.laravel-stack')
                     @elseif ($section === 'rails-stack')
@@ -126,7 +148,27 @@
                     @elseif ($section === 'environment')
                         @include('livewire.sites.settings.partials.environment')
                     @elseif ($section === 'logs')
-                        @if ($site->usesFunctionsRuntime())
+                        @if (workspace_surface_coming_soon('site_logs'))
+                            <x-workspace-coming-soon
+                                :server="$site->server"
+                                icon="heroicon-o-clipboard-document-list"
+                                :title="__('Logs')"
+                                :description="__('Tail this site\'s application, web server, and deploy logs in one place — searchable, filterable, and streamed live without SSHing into the box.')"
+                                :eyebrow="__('Log stream preview')"
+                                :lines="[
+                                    ['tone' => 'cmd', 'text' => '~ $ dply logs --tail'],
+                                    ['tone' => 'muted', 'text' => '12:04 [nginx] GET / 200 14ms'],
+                                    ['tone' => 'muted', 'text' => '12:04 [php] production.INFO cache warmed'],
+                                    ['tone' => 'ok', 'text' => 'streaming · 3 sources · live'],
+                                ]"
+                                :features="[
+                                    ['icon' => 'bolt', 'title' => __('Live tail'), 'body' => __('Watch requests and errors stream in as they happen — no refresh.')],
+                                    ['icon' => 'magnifying-glass', 'title' => __('Search & filter'), 'body' => __('Filter by source, level, or text to find the line that matters.')],
+                                    ['icon' => 'square-3-stack-3d', 'title' => __('Every source'), 'body' => __('App, web server, and deploy logs unified into one view.')],
+                                    ['icon' => 'arrow-down-tray', 'title' => __('Export'), 'body' => __('Pull a window of logs out for an incident or a teammate.')],
+                                ]"
+                            />
+                        @elseif ($site->usesFunctionsRuntime())
                             @livewire('serverless.logs-panel', ['site' => $site], key('serverless-logs-'.$site->id))
                         @else
                             @include('livewire.sites.settings.partials.logs')
@@ -134,7 +176,29 @@
                     @elseif ($section === 'platform' && $site->usesFunctionsRuntime())
                         @livewire('serverless.platform-panel', ['site' => $site], key('serverless-platform-'.$site->id))
                     @elseif ($section === 'notifications')
-                        @include('livewire.sites.settings.partials.notifications')
+                        @if (workspace_surface_coming_soon('site_notifications'))
+                            <x-workspace-coming-soon
+                                :server="$site->server"
+                                icon="heroicon-o-bell"
+                                :title="__('Notifications')"
+                                :description="__('Get told the moment a deploy fails, a certificate is about to expire, or the site goes down — routed to the channels your team already lives in.')"
+                                :eyebrow="__('Notifications preview')"
+                                :lines="[
+                                    ['tone' => 'cmd', 'text' => '~ $ dply notifications'],
+                                    ['tone' => 'muted', 'text' => 'deploy.failed   → #deploys (slack)'],
+                                    ['tone' => 'muted', 'text' => 'cert.expiring   → ops@ (email)'],
+                                    ['tone' => 'ok', 'text' => '2 rules · 3 channels armed'],
+                                ]"
+                                :features="[
+                                    ['icon' => 'rocket-launch', 'title' => __('Deploy alerts'), 'body' => __('Know instantly when a build or release fails — with the error attached.')],
+                                    ['icon' => 'shield-exclamation', 'title' => __('Uptime & certs'), 'body' => __('Downtime and expiring TLS surface before your users notice.')],
+                                    ['icon' => 'chat-bubble-left-right', 'title' => __('Your channels'), 'body' => __('Email, Slack, Discord, or a plain webhook — your choice per event.')],
+                                    ['icon' => 'adjustments-horizontal', 'title' => __('Per-event rules'), 'body' => __('Route each event type to the right place, mute the noise.')],
+                                ]"
+                            />
+                        @else
+                            @include('livewire.sites.settings.partials.notifications')
+                        @endif
                     @elseif ($section === 'basic-auth')
                         @include('livewire.sites.settings.partials.basic-auth')
                     @elseif ($section === 'danger')

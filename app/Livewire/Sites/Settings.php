@@ -253,6 +253,8 @@ class Settings extends Show
 
     public bool $caddy_managed_certs_loaded = false;
 
+    public bool $caddy_managed_certs_scanning = false;
+
     public bool $caddy_managed_certs_unreadable = false;
 
     public ?string $caddy_managed_certs_error = null;
@@ -3357,10 +3359,11 @@ class Settings extends Show
     }
 
     /**
-     * Read the live Caddy-managed certificate(s) for this site's hostnames by
-     * scanning Caddy's data dir over SSH (reusing the cross-engine aggregator,
-     * cached 60s). This is a lazy Livewire action — never called from render() —
-     * so SSH stays out of the page-render request.
+     * Surface the live Caddy-managed certificate(s) for this site's hostnames.
+     * The cross-engine SSH sweep runs async in {@see \App\Jobs\ScanServerLiveCertsJob}
+     * (shared with the server cert surfaces); this reads the cached result and
+     * filters it to this site, polling via {@see pollCaddyManagedCerts()} while a
+     * scan is in flight — SSH never runs in the request.
      */
     public function loadCaddyManagedCerts(bool $forceFresh = false): void
     {
@@ -3369,63 +3372,94 @@ class Settings extends Show
         if (! $this->siteUsesCaddyAutoHttps()) {
             $this->caddy_managed_certs = [];
             $this->caddy_managed_certs_loaded = true;
+            $this->caddy_managed_certs_scanning = false;
 
             return;
         }
 
         if (! $this->server->isReady() || empty($this->server->ssh_private_key)) {
             $this->caddy_managed_certs_error = __('Provisioning and SSH must be ready before reading Caddy certificates.');
+            $this->caddy_managed_certs_loaded = true;
+            $this->caddy_managed_certs_scanning = false;
 
             return;
         }
 
-        try {
-            $result = app(WebserverCertsAggregator::class)->aggregate($this->server, $forceFresh);
+        $aggregator = app(WebserverCertsAggregator::class);
+        $cached = $forceFresh ? null : $aggregator->cached($this->server);
+        if ($cached !== null) {
+            $this->applyCaddyManagedCerts($cached);
 
-            $hostnames = collect($this->site->webserverHostnames())
-                ->filter()
-                ->map(fn (string $host): string => strtolower(trim($host)))
-                ->filter()
-                ->values()
-                ->all();
+            return;
+        }
 
-            $certs = array_values(array_filter($result['certs'], function (array $row) use ($hostnames): bool {
-                if (($row['engine_hint'] ?? null) !== 'caddy') {
-                    return false;
-                }
+        $aggregator->dispatchScan($this->server, $forceFresh);
+        $this->caddy_managed_certs_scanning = true;
+        $this->caddy_managed_certs_loaded = false;
+        $this->caddy_managed_certs_error = null;
+    }
 
-                $haystack = strtolower(($row['path'] ?? '').' '.($row['subject'] ?? ''));
-                foreach ($hostnames as $host) {
-                    if (str_contains($haystack, $host)) {
-                        return true;
-                    }
-                }
+    /** Driven by wire:poll while a scan is in flight; resolves once the job caches a result. */
+    public function pollCaddyManagedCerts(): void
+    {
+        if (! $this->caddy_managed_certs_scanning) {
+            return;
+        }
 
-                return false;
-            }));
-
-            $this->caddy_managed_certs = array_map(function (array $row): array {
-                $row['expires_at'] = $row['expires_at'] instanceof CarbonImmutable
-                    ? $row['expires_at']->toIso8601String()
-                    : null;
-
-                return $row;
-            }, $certs);
-            $this->caddy_managed_certs_scanned_at_iso = $result['scanned_at'] instanceof CarbonImmutable
-                ? $result['scanned_at']->toIso8601String()
-                : null;
-            $this->caddy_managed_certs_unreadable = $result['unreadable'];
-            $this->caddy_managed_certs_loaded = true;
-            $this->caddy_managed_certs_error = null;
-        } catch (\Throwable $e) {
-            $this->caddy_managed_certs_error = __('Failed to read Caddy certificates: :msg', ['msg' => $e->getMessage()]);
-            $this->caddy_managed_certs_loaded = false;
+        $cached = app(WebserverCertsAggregator::class)->cached($this->server);
+        if ($cached !== null) {
+            $this->applyCaddyManagedCerts($cached);
         }
     }
 
     public function refreshCaddyManagedCerts(): void
     {
         $this->loadCaddyManagedCerts(forceFresh: true);
+    }
+
+    /**
+     * Filter the cross-engine sweep down to this site's Caddy-managed certs.
+     *
+     * @param  array{certs: list<array<string, mixed>>, scanned_at: ?CarbonImmutable, unreadable: bool}  $result
+     */
+    private function applyCaddyManagedCerts(array $result): void
+    {
+        $hostnames = collect($this->site->webserverHostnames())
+            ->filter()
+            ->map(fn (string $host): string => strtolower(trim($host)))
+            ->filter()
+            ->values()
+            ->all();
+
+        $certs = array_values(array_filter($result['certs'], function (array $row) use ($hostnames): bool {
+            if (($row['engine_hint'] ?? null) !== 'caddy') {
+                return false;
+            }
+
+            $haystack = strtolower(($row['path'] ?? '').' '.($row['subject'] ?? ''));
+            foreach ($hostnames as $host) {
+                if (str_contains($haystack, $host)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }));
+
+        $this->caddy_managed_certs = array_map(function (array $row): array {
+            $row['expires_at'] = $row['expires_at'] instanceof CarbonImmutable
+                ? $row['expires_at']->toIso8601String()
+                : null;
+
+            return $row;
+        }, $certs);
+        $this->caddy_managed_certs_scanned_at_iso = $result['scanned_at'] instanceof CarbonImmutable
+            ? $result['scanned_at']->toIso8601String()
+            : null;
+        $this->caddy_managed_certs_unreadable = (bool) $result['unreadable'];
+        $this->caddy_managed_certs_loaded = true;
+        $this->caddy_managed_certs_scanning = false;
+        $this->caddy_managed_certs_error = null;
     }
 
     public function retryCertificate(string $certificateId, CertificateRepairService $repairService): void

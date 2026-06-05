@@ -88,7 +88,7 @@
         @endif
 
         @if (! $caddy_managed_certs_loaded)
-            <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7">
+            <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7" @if ($caddy_managed_certs_scanning) wire:poll.2s="pollCaddyManagedCerts" @endif>
                 <span class="inline-flex items-center gap-2"><x-heroicon-o-arrow-path class="h-3.5 w-3.5 animate-spin" /> {{ __('Reading Caddy certificate…') }}</span>
             </div>
         @elseif ($caddy_managed_certs_unreadable)

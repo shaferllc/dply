@@ -501,6 +501,15 @@ class AppServiceProvider extends ServiceProvider
                     report: false,
                 );
             }
+            // Remove the managed preview/testing DNS record at the provider
+            // BEFORE dropping the previewDomains rows — the teardown reads the
+            // hostname/zone/record id off those rows, so deleting them first
+            // would orphan the live DNS record (and a re-created same-slug site
+            // would inherit a stale A record pointing at the old box).
+            rescue(
+                fn () => app(\App\Services\Sites\TestingHostnameProvisioner::class)->delete($site),
+                report: false,
+            );
             $site->previewDomains()->delete();
             if ($site->server?->isDigitalOceanFunctionsHost()) {
                 rescue(

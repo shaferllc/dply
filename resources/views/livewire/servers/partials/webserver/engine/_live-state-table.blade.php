@@ -204,7 +204,13 @@
                             // then key by webserverConfigBasename() to resolve either.
                             $ids = [];
                             foreach ($rows as $row) {
-                                if (preg_match('/([0-9a-hjkmnp-tv-z]{26})/i', (string) ($row['name'] ?? ''), $idMatch) === 1) {
+                                // Anchor the ULID to its known positions so a long
+                                // hostname label can't be mistaken for the id:
+                                // legacy `dply-<id>-…` (id first) or domain-based
+                                // `dply-…-<id>` (id last).
+                                $vhostName = (string) ($row['name'] ?? '');
+                                if (preg_match('/^dply-([0-9a-hjkmnp-tv-z]{26})(?:-|$)/i', $vhostName, $idMatch) === 1
+                                    || preg_match('/-([0-9a-hjkmnp-tv-z]{26})$/i', $vhostName, $idMatch) === 1) {
                                     $ids[] = $idMatch[1];
                                 }
                             }

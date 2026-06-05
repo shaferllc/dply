@@ -31,6 +31,27 @@
         @include('livewire.sites.settings.partials.sidebar')
 
         <main class="min-w-0 space-y-6 lg:col-span-9">
+            @if (workspace_surface_coming_soon('site_monitor'))
+                <x-workspace-coming-soon
+                    :server="$site->server"
+                    icon="heroicon-o-chart-bar"
+                    :title="__('Monitor')"
+                    :description="__('Uptime and response-time monitoring for this site from probes around the world — with the alerting and history you need to prove your SLA.')"
+                    :eyebrow="__('Uptime monitor preview')"
+                    :lines="[
+                        ['tone' => 'cmd', 'text' => '~ $ dply monitor status'],
+                        ['tone' => 'muted', 'text' => 'eu-falkenstein  200  142ms'],
+                        ['tone' => 'muted', 'text' => 'us-east         200  189ms'],
+                        ['tone' => 'ok', 'text' => 'up 99.98% · 0 incidents (30d)'],
+                    ]"
+                    :features="[
+                        ['icon' => 'globe-alt', 'title' => __('Global probes'), 'body' => __('Check your site from multiple regions so you see what real users see.')],
+                        ['icon' => 'bolt', 'title' => __('Response times'), 'body' => __('Track latency over time and catch slowdowns before they become outages.')],
+                        ['icon' => 'bell-alert', 'title' => __('Downtime alerts'), 'body' => __('Get paged the moment a check fails, on the channel you choose.')],
+                        ['icon' => 'chart-bar', 'title' => __('Uptime history'), 'body' => __('A running record of availability you can hand to a stakeholder.')],
+                    ]"
+                />
+            @else
             <x-page-header
                 :title="__('Monitor')"
                 :description="__('Uptime monitors for this site. Each entry tracks a hostname (and optional path); checks run from dply infrastructure on demand or on a schedule.')"
@@ -339,6 +360,7 @@
             </p>
 
             <x-cli-snippet tone="stub" />
+            @endif
         </main>
     </div>
 

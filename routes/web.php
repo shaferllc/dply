@@ -682,7 +682,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // Commits were merged into the Repository page as a tab. Keep the route
     // name working by redirecting to repository?tab=commits.
     Route::get('servers/{server}/sites/{site}/commits', function (Server $server, Site $site) {
-        return redirect()->route('sites.repository', ['server' => $server, 'site' => $site, 'tab' => 'commits']);
+        return redirect()->route('sites.repository', ['server' => $server, 'site' => $site, 'repo_tab' => 'commits']);
     })->name('sites.commits');
     Route::livewire('servers/{server}/sites/{site}/cron', WorkspaceCron::class)->name('sites.cron');
     Route::livewire('servers/{server}/sites/{site}/preview-comments', EdgePreviewComments::class)->name('sites.preview-comments');
@@ -716,6 +716,12 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // from the commits redirect above) is forwarded as `?repo_tab=` so the
     // embedded Repository component can pick its sub-tab without colliding
     // with the deployments page's own ?tab= param.
+    // Repository is its own first-class standalone page (renders with the site
+    // sidebar — the component already supports non-embedded mode), so it's
+    // reachable straight from the nav instead of only as a Deployments tab.
+    Route::livewire('servers/{server}/sites/{site}/repository', \App\Livewire\Sites\Repository::class)->name('sites.repository');
+    // Legacy /source bookmarks → the standalone Repository page, forwarding any
+    // ?tab= as the component's ?repo_tab= sub-tab.
     Route::get('servers/{server}/sites/{site}/source', function (Server $server, Site $site) {
         $query = request()->query();
         if (isset($query['tab'])) {
@@ -723,12 +729,8 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
             unset($query['tab']);
         }
 
-        return redirect()->route('sites.deployments.index', [
-            'server' => $server,
-            'site' => $site,
-            'tab' => 'repository',
-        ] + $query);
-    })->name('sites.repository');
+        return redirect()->route('sites.repository', ['server' => $server, 'site' => $site] + $query);
+    })->name('sites.source');
     Route::livewire('servers/{server}/sites/{site}/caching', Caching::class)->name('sites.caching');
     Route::livewire('servers/{server}/sites/{site}/cdn', Cdn::class)->name('sites.cdn');
     Route::livewire('servers/{server}/sites/{site}/files', Files::class)->name('sites.files');

@@ -1597,7 +1597,72 @@ final class ServerProvisionCommandBuilder
             // Render a dply-branded landing page so port 80 returns
             // something honest until the operator creates a site.
             'cat > '.escapeshellarg($layout['web_root'].'/index.html').' <<\'EOF\'
-<!doctype html><html lang="en"><head><meta charset="utf-8"><title>dply server ready</title><style>body{font-family:system-ui,sans-serif;max-width:36rem;margin:6rem auto;padding:0 1.5rem;color:#171a0e}h1{font-size:1.5rem;margin:0 0 .5rem}p{color:#5a6354}code{background:#f6f4ee;padding:.15rem .35rem;border-radius:.25rem}</style></head><body><h1>dply server ready</h1><p>This server is provisioned but has no sites yet. Create one from your dply dashboard or via <code>dply:site:create</code>.</p></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>dply &middot; server ready</title>
+<style>
+:root{--ink:#171a0e;--moss:#5a6354;--mist:#8b9382;--cream:#f7f5ef;--line:rgba(23,26,14,.08);--forest:#1f3d2b;--sage:#7e9b5b;--gold:#c8a13a}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:radial-gradient(55rem 38rem at 88% -12%,rgba(126,155,91,.18),transparent 60%),radial-gradient(48rem 34rem at -12% 112%,rgba(200,161,58,.15),transparent 60%),linear-gradient(180deg,var(--cream),#fff 62%);display:flex;align-items:center;justify-content:center;padding:1.5rem;-webkit-font-smoothing:antialiased}
+.card{width:100%;max-width:40rem;background:rgba(255,255,255,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:1.5rem;box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 28px 64px -30px rgba(23,26,14,.3)}
+.top{padding:2.4rem 2.4rem 0}
+.row{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:2rem}
+.mark{display:inline-flex;align-items:center;gap:.6rem;font-weight:800;letter-spacing:-.03em;font-size:1.1rem}
+.glyph{width:1.8rem;height:1.8rem;border-radius:.55rem;background:linear-gradient(150deg,var(--forest),#35684a);color:#eef3e8;display:inline-flex;align-items:center;justify-content:center;font-size:1.05rem;font-weight:800;box-shadow:0 8px 20px -10px rgba(31,61,43,.9)}
+.pill{display:inline-flex;align-items:center;gap:.5rem;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:var(--forest);background:rgba(126,155,91,.15);border:1px solid rgba(126,155,91,.32);padding:.42rem .72rem;border-radius:999px}
+.live{position:relative;display:inline-block;width:.5rem;height:.5rem}
+.live i{position:absolute;inset:0;border-radius:999px;background:var(--sage)}
+.live i.p{animation:ping 1.6s cubic-bezier(0,0,.2,1) infinite}
+@keyframes ping{75%,100%{transform:scale(2.6);opacity:0}}
+h1{font-size:2.1rem;line-height:1.08;letter-spacing:-.03em;margin:.2rem 0 .65rem}
+.sub{color:var(--moss);font-size:1.02rem;line-height:1.62;margin:0;max-width:33rem}
+.term{margin:2rem 2.4rem 0}
+.tbar{display:flex;align-items:center;gap:.45rem;padding:.7rem .85rem;background:#10160f;border:1px solid #0a0e09;border-bottom:0;border-radius:.9rem .9rem 0 0}
+.tbar b{width:.62rem;height:.62rem;border-radius:999px;display:inline-block}
+.tbar span{margin-left:auto;color:#5d6b58;font:600 .66rem/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase}
+.tbody{background:#0c110b;border:1px solid #0a0e09;border-radius:0 0 .9rem .9rem;padding:1rem 1.1rem;font:.86rem/1.7 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.tbody .c{color:#5d6b58}
+.tbody .p{color:#7e9b5b}
+.tbody .cmd{color:#e9efe1}
+.cur{display:inline-block;width:.55rem;height:1.05rem;background:#7e9b5b;vertical-align:-.15rem;margin-left:.15rem;animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.steps{display:flex;flex-wrap:wrap;gap:.55rem;padding:1.6rem 2.4rem 0}
+.chip{display:inline-flex;align-items:center;gap:.5rem;font-size:.82rem;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:.7rem;padding:.55rem .8rem;box-shadow:0 1px 2px rgba(23,26,14,.04)}
+.chip i{width:.5rem;height:.5rem;border-radius:999px;background:var(--sage)}
+.foot{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-top:2rem;padding:1.1rem 2.4rem;border-top:1px solid var(--line);color:var(--mist);font-size:.78rem}
+.foot a{color:var(--moss);text-decoration:none;font-weight:600}
+@media (max-width:480px){.top,.term,.steps,.foot{padding-left:1.5rem;padding-right:1.5rem}h1{font-size:1.7rem}}
+@media (prefers-color-scheme:dark){body{color:#eef3e8;background:radial-gradient(55rem 38rem at 88% -12%,rgba(126,155,91,.14),transparent 60%),linear-gradient(180deg,#0c110b,#0e140d)}.card{background:rgba(20,26,18,.72);border-color:rgba(255,255,255,.08);box-shadow:0 28px 64px -30px #000}h1{color:#f3f7ee}.sub{color:#aeb8a4}.chip{background:rgba(255,255,255,.04);color:#eef3e8;border-color:rgba(255,255,255,.08)}.foot{border-color:rgba(255,255,255,.08)}.pill{color:#aac083}}
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="top">
+    <div class="row">
+      <span class="mark"><span class="glyph">d</span>dply</span>
+      <span class="pill"><span class="live"><i class="p"></i><i></i></span>Server ready</span>
+    </div>
+    <h1>Your server is provisioned.</h1>
+    <p class="sub">It is wired up and listening on port 80 &mdash; there are just no sites on it yet. Spin up your first one from the dply dashboard, or straight from the CLI.</p>
+  </div>
+  <div class="term">
+    <div class="tbar"><b style="background:#f1645c"></b><b style="background:#f5c14e"></b><b style="background:#5fcf80"></b><span>dply</span></div>
+    <div class="tbody"><span class="c"># create your first site</span><br><span class="p">~ $</span> <span class="cmd">dply:site:create</span><span class="cur"></span></div>
+  </div>
+  <div class="steps">
+    <span class="chip"><i></i>Connect a repository</span>
+    <span class="chip"><i></i>Install WordPress</span>
+    <span class="chip"><i></i>Start from blank</span>
+  </div>
+  <div class="foot"><span>Powered by dply</span><a href="https://dply.io">dply.io &rarr;</a></div>
+</main>
+</body>
+</html>
 EOF',
             // Owned by dply:dply since the docroot now lives under
             // /home/dply/. Nginx (running as www-data) needs read +

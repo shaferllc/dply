@@ -228,6 +228,29 @@ return [
         'site_caching' => env('FEATURE_WORKSPACE_SITE_CACHING', false),
         // exit: ship alongside site caching GA; teaser only when site caching is off
         'site_caching_preview' => env('FEATURE_WORKSPACE_SITE_CACHING_PREVIEW', true),
+        // Observability surfaces — coming-soon teaser until the real per-site
+        // experience ships. Real flag off, preview flag on (sidebar shows "Soon").
+        'site_logs' => env('FEATURE_WORKSPACE_SITE_LOGS', false),
+        'site_logs_preview' => env('FEATURE_WORKSPACE_SITE_LOGS_PREVIEW', true),
+        'site_notifications' => env('FEATURE_WORKSPACE_SITE_NOTIFICATIONS', false),
+        'site_notifications_preview' => env('FEATURE_WORKSPACE_SITE_NOTIFICATIONS_PREVIEW', true),
+        'site_monitor' => env('FEATURE_WORKSPACE_SITE_MONITOR', false),
+        'site_monitor_preview' => env('FEATURE_WORKSPACE_SITE_MONITOR_PREVIEW', true),
+        'site_errors' => env('FEATURE_WORKSPACE_SITE_ERRORS', false),
+        'site_errors_preview' => env('FEATURE_WORKSPACE_SITE_ERRORS_PREVIEW', true),
+        'site_files' => env('FEATURE_WORKSPACE_SITE_FILES', false),
+        'site_files_preview' => env('FEATURE_WORKSPACE_SITE_FILES_PREVIEW', true),
+        'site_system_user' => env('FEATURE_WORKSPACE_SITE_SYSTEM_USER', false),
+        'site_system_user_preview' => env('FEATURE_WORKSPACE_SITE_SYSTEM_USER_PREVIEW', true),
+        // Routing sub-tabs — coming-soon teaser until each ships.
+        'site_aliases' => env('FEATURE_WORKSPACE_SITE_ALIASES', false),
+        'site_aliases_preview' => env('FEATURE_WORKSPACE_SITE_ALIASES_PREVIEW', true),
+        'site_redirects' => env('FEATURE_WORKSPACE_SITE_REDIRECTS', false),
+        'site_redirects_preview' => env('FEATURE_WORKSPACE_SITE_REDIRECTS_PREVIEW', true),
+        'site_preview' => env('FEATURE_WORKSPACE_SITE_PREVIEW', false),
+        'site_preview_preview' => env('FEATURE_WORKSPACE_SITE_PREVIEW_PREVIEW', true),
+        'site_tenants' => env('FEATURE_WORKSPACE_SITE_TENANTS', false),
+        'site_tenants_preview' => env('FEATURE_WORKSPACE_SITE_TENANTS_PREVIEW', true),
     ],
 
     /*

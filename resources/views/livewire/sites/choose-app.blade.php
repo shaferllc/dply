@@ -3,29 +3,29 @@
         $selectedTile = collect($tiles)->firstWhere('key', $selected);
     @endphp
 
-    <div class="py-10">
-        <div class="dply-page-shell">
-            <div class="relative">
-                {{-- Decorative brand mesh wash behind the hero. --}}
-                <div class="pointer-events-none absolute inset-x-0 -top-16 -z-10 h-80 bg-mesh-brand opacity-90"></div>
+    <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        @include('livewire.sites.partials.workspace-breadcrumb-bar', [
+            'server' => $server,
+            'site' => $site,
+            'currentLabel' => __('Connect application'),
+            'currentIcon' => 'code-bracket-square',
+        ])
 
-                {{-- Hero --}}
-                <div class="mx-auto max-w-2xl text-center">
-                    <span class="inline-flex items-center gap-2 rounded-full border border-brand-sage/25 bg-white/70 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-brand-forest shadow-sm backdrop-blur">
-                        <span class="inline-flex h-1.5 w-1.5 rounded-full bg-brand-gold"></span>
-                        {{ __('Step 2 of 2 · Choose an application') }}
-                    </span>
-                    <h1 class="mt-4 text-3xl font-semibold tracking-tight text-brand-ink sm:text-4xl">
-                        {{ __('What runs on :site?', ['site' => $site->name]) }}
-                    </h1>
-                    <p class="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-brand-moss sm:text-base">
-                        {{ __('Install a fresh app, deploy an existing repository, or start blank. WordPress and Laravel set themselves up — database included.') }}
-                    </p>
-                </div>
+        <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">
+            @include('livewire.sites.settings.partials.sidebar')
+
+            <main class="min-w-0 space-y-6 lg:col-span-9">
+                <x-page-header
+                    :title="__('Connect an application')"
+                    :description="__('Install a fresh app, connect an existing repository, or leave it blank. WordPress and Laravel set themselves up — database included.')"
+                    :show-documentation="false"
+                    flush
+                    compact
+                />
 
                 {{-- Tile grid --}}
-                <div class="mx-auto mt-10 max-w-5xl">
-                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div>
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                         @foreach ($tiles as $tile)
                             @php
                                 $isSelected = $selected === $tile['key'];
@@ -69,7 +69,7 @@
 
                 {{-- Config + submit --}}
                 @if ($selectedTile)
-                    <form wire:submit="run" class="mx-auto mt-6 max-w-5xl">
+                    <form wire:submit="run">
                         <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-md shadow-brand-ink/5">
                             <div class="flex items-center gap-3 rounded-t-2xl border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-4">
                                 <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
@@ -120,7 +120,7 @@
                                 @elseif ($selectedTile['kind'] === 'blank')
                                     <p class="flex items-start gap-2 rounded-xl border border-brand-ink/10 bg-brand-cream/70 px-4 py-3 text-sm leading-relaxed text-brand-moss">
                                         <x-heroicon-o-information-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-mist" aria-hidden="true" />
-                                        <span>{{ __('An empty PHP site is provisioned and serves a default page. Return to this picker any time to install a real application.') }}</span>
+                                        <span>{{ __('Your site stays empty and keeps serving its splash page. Come back to this picker any time to install a real application.') }}</span>
                                     </p>
                                 @else
                                     <div class="flex flex-wrap items-center justify-between gap-3">
@@ -328,9 +328,11 @@
                                         @if ($selectedTile['kind'] === 'scaffold')
                                             {{ __('Install :app', ['app' => $selectedTile['label']]) }}
                                         @elseif ($selectedTile['kind'] === 'blank')
-                                            {{ __('Create blank site') }}
+                                            {{ __('Leave it blank') }}
+                                        @elseif ($selectedTile['kind'] === 'static')
+                                            {{ __('Set up static site') }}
                                         @else
-                                            {{ __('Create site') }}
+                                            {{ __('Connect & deploy') }}
                                         @endif
                                         <x-heroicon-o-arrow-right class="h-4 w-4" aria-hidden="true" />
                                     </span>
@@ -339,7 +341,7 @@
                                         @if ($selectedTile['kind'] === 'scaffold')
                                             {{ __('Starting installer…') }}
                                         @else
-                                            {{ __('Creating site…') }}
+                                            {{ __('Setting up…') }}
                                         @endif
                                     </span>
                                 </x-primary-button>
@@ -347,7 +349,7 @@
                         </div>
                     </form>
                 @endif
-            </div>
+            </main>
         </div>
     </div>
 </div>

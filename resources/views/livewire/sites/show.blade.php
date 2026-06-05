@@ -198,8 +198,10 @@
             @endif
         </div>
 
-        <x-slot name="modals">
-            @include('livewire.partials.confirm-action-modal')
-        </x-slot>
+        {{-- The page root is a plain <div>, not a component, so a named "modals"
+             slot here is orphaned and silently dropped — which left the
+             confirm-action modal (Cancel build, remove env var, …) never
+             rendering. The partial teleports to <body>, so include it directly. --}}
+        @include('livewire.partials.confirm-action-modal')
     </div>
 </div>

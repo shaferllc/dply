@@ -43,6 +43,10 @@ class WorkspaceHealth extends Component
 
     public function render(ServerHealthCockpit $cockpit): View
     {
+        if (in_array('health', config('server_workspace.coming_soon_keys', []), true)) {
+            return view('livewire.servers.workspace-health-preview', ['server' => $this->server]);
+        }
+
         $report = $cockpit->forServer($this->server);
 
         return view('livewire.servers.workspace-health', [

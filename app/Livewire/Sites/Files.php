@@ -100,7 +100,9 @@ class Files extends Component
 
     public function render(): View
     {
-        $listing = $this->safeList();
+        // Skip the SSH directory listing entirely while the surface is behind
+        // its coming-soon teaser — the blade renders the teaser, not the tree.
+        $listing = workspace_surface_coming_soon('site_files') ? [] : $this->safeList();
         $runtimeMode = $this->site->runtimeTargetMode();
         $runtimeTarget = $this->site->runtimeTarget();
 

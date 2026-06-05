@@ -53,10 +53,16 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
 
         $ssh = $this->systemSsh($site);
 
-        // First-apply only — nginx_installed_at flips on the first successful
-        // provision, so subsequent applies (rotations, SSL, etc.) never even
-        // probe the doc root for a placeholder.
-        if ($site->nginx_installed_at === null) {
+        // Ensure the "being set up" splash whenever the site has no deployed
+        // release yet — first apply (nginx_installed_at null) OR any apply for a
+        // site that has never deployed (last_deploy_at null). A services-first
+        // bare site lives in that state until its first deploy, and a botched
+        // first provision can flip nginx_installed_at without ever landing the
+        // placeholder, leaving an empty doc root that nginx 403s on. Once the
+        // site has deployed, steady-state applies (rotations, SSL) skip the
+        // probe. installPlaceholderPage() is idempotent — it leaves a real
+        // release's index untouched — so this never clobbers deployed content.
+        if ($site->nginx_installed_at === null || $site->last_deploy_at === null) {
             $this->installPlaceholderPage($site, $ssh, $emit);
         }
         $this->ensureSuspendedPage($site, $ssh, $emit);

@@ -14,7 +14,7 @@
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
             <a href="{{ route('sites.deployments.index', [$server, $site]) }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Deployments') }}</a>
             <span class="text-brand-mist" aria-hidden="true">·</span>
-            <a href="{{ route('sites.repository', ['server' => $server, 'site' => $site, 'tab' => 'commits']) }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Commits') }}</a>
+            <a href="{{ route('sites.repository', ['server' => $server, 'site' => $site, 'repo_tab' => 'commits']) }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Commits') }}</a>
             <span class="text-brand-mist" aria-hidden="true">·</span>
             <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'logs']) }}" wire:navigate class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('Site logs') }}</a>
             <span class="text-brand-mist" aria-hidden="true">·</span>

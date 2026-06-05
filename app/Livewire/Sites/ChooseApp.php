@@ -5,14 +5,13 @@ declare(strict_types=1);
 namespace App\Livewire\Sites;
 
 use App\Enums\SiteType;
-use App\Jobs\ProvisionSiteJob;
 use App\Jobs\RunComposerScaffoldJob;
 use App\Livewire\Concerns\Sites\PicksRepositoryRef;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Deploy\SiteDeployPipelineManager;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Sites\AppCatalog;
+use App\Services\Sites\SiteFoundationProvisioner;
 use App\Services\Sites\SiteProvisioner;
 use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
@@ -476,43 +475,15 @@ class ChooseApp extends Component
 
     private function seedDeployStepsAndProvision(array $tile, string $runtime, SiteProvisioner $siteProvisioner): void
     {
-        $framework = (string) ($tile['framework'] ?? '');
-        app(SiteDeployPipelineManager::class)->seedRuntimeDefaults(
+        // Single home for the bare-foundation provisioning sequence (seed
+        // pipeline → markQueued → install-webserver-first-or-provision). The
+        // services-first create flow uses the same provisioner; keep them in
+        // sync by delegating rather than duplicating the block here.
+        (new SiteFoundationProvisioner($siteProvisioner))->provision(
             $this->site,
             $runtime,
-            $framework !== '' ? $framework : null,
+            (string) ($tile['framework'] ?? ''),
         );
-
-        $this->site->loadMissing(['server', 'domains']);
-        $siteProvisioner->markQueued($this->site);
-
-        // If the server was provisioned without a webserver (legacy
-        // queue_worker hosts), site provisioning would take the headless
-        // fast-path and flip straight to "ready" with no testing hostname —
-        // the operator would land on an empty dashboard. Install caddy
-        // first; that job re-queues ProvisionSiteJob for this site once the
-        // webserver is up, so the site stays in STATUS_PENDING and the
-        // provisioning journey shows real progress.
-        $serverWebserver = (string) ($this->server->meta['webserver'] ?? '');
-        if ($serverWebserver === 'none') {
-            $meta = is_array($this->server->meta) ? $this->server->meta : [];
-            if (! ($meta['webserver_install_pending'] ?? false)) {
-                $meta['webserver_install_pending'] = true;
-                $this->server->forceFill(['meta' => $meta])->save();
-            }
-            $siteProvisioner->appendLog(
-                $this->site,
-                'info',
-                'queued',
-                __('Installing Caddy on the server before this site can be provisioned…'),
-                ['server_id' => (string) $this->server->id],
-            );
-            \App\Jobs\InstallServerWebserverJob::dispatch((string) $this->server->id, 'caddy');
-
-            return;
-        }
-
-        ProvisionSiteJob::dispatch($this->site->id);
     }
 
     private function documentRoot(array $tile): string
@@ -583,6 +554,21 @@ class ChooseApp extends Component
 
     public function render(): View
     {
-        return view('livewire.sites.choose-app');
+        // Feed the shared site workspace sidebar the same vars the sibling
+        // routed pages (Errors, Monitor, Files) provide, so this page renders
+        // inside the full site wrapper with breadcrumb + nav context.
+        $runtimeMode = $this->site->runtimeTargetMode();
+
+        return view('livewire.sites.choose-app', [
+            'settingsSidebarItems' => \App\Support\SiteSettingsSidebar::items($this->site, $this->server),
+            'resourceNoun' => $runtimeMode === 'vm' ? __('Site') : __('App'),
+            'resourcePlural' => $runtimeMode === 'vm' ? __('sites') : __('apps'),
+            'routingTab' => 'domains',
+            'laravel_tab' => 'commands',
+            'section' => 'general',
+            'runtimeMode' => $runtimeMode,
+            'openErrorCount' => 0,
+            'runtimePublication' => [],
+        ]);
     }
 }

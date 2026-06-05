@@ -58,7 +58,7 @@
             :icon="$routingTabIcons[$tab] ?? 'heroicon-o-share'"
             href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'routing', 'tab' => $tab]) }}"
             wire:navigate
-        >{{ $routingTabLabels[$tab] ?? \Illuminate\Support\Str::headline($tab) }}</x-server-workspace-tab>
+        >{{ $routingTabLabels[$tab] ?? \Illuminate\Support\Str::headline($tab) }}@if (in_array($tab, ['aliases', 'redirects', 'preview', 'tenants'], true) && workspace_surface_coming_soon('site_'.$tab))<span class="ml-1.5 rounded-full bg-brand-sage/20 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none tracking-wide text-brand-forest">{{ __('Soon') }}</span>@endif</x-server-workspace-tab>
     @endforeach
 </x-server-workspace-tablist>
 
@@ -248,6 +248,26 @@
 @elseif ($routingTab === 'dns')
     @include('livewire.sites.settings.partials.routing._tab-dns')
 
+@elseif ($routingTab === 'aliases' && workspace_surface_coming_soon('site_aliases'))
+    <x-workspace-coming-soon
+        :server="$site->server"
+        icon="heroicon-o-link"
+        :title="__('Aliases')"
+        :description="__('Point extra hostnames at this site without duplicating any config — every alias serves the same app and shares its certificate.')"
+        :eyebrow="__('Aliases preview')"
+        :lines="[
+            ['tone' => 'cmd', 'text' => '~ $ dply aliases'],
+            ['tone' => 'muted', 'text' => 'www.example.com   → example.com'],
+            ['tone' => 'muted', 'text' => 'example.net       → example.com'],
+            ['tone' => 'ok', 'text' => '2 aliases · shared cert'],
+        ]"
+        :features="[
+            ['icon' => 'link', 'title' => __('Many hosts, one app'), 'body' => __('Add as many hostnames as you need — they all serve this exact site.')],
+            ['icon' => 'shield-check', 'title' => __('Shared certificate'), 'body' => __('Aliases ride the same TLS cert, no extra issuance to manage.')],
+            ['icon' => 'bolt', 'title' => __('Instant apply'), 'body' => __('Adding an alias rewrites the live webserver config automatically.')],
+            ['icon' => 'arrows-right-left', 'title' => __('www & apex'), 'body' => __('Cover the bare domain and its www twin in one move.')],
+        ]"
+    />
 @elseif ($routingTab === 'aliases')
     @php $aliasCount = $site->domainAliases->count(); @endphp
 
@@ -448,6 +468,26 @@
         ['label' => __('List'), 'command' => 'dply:site:alias-list '.$site->slug],
     ]" />
 
+@elseif ($routingTab === 'redirects' && workspace_surface_coming_soon('site_redirects'))
+    <x-workspace-coming-soon
+        :server="$site->server"
+        icon="heroicon-o-arrow-uturn-right"
+        :title="__('Redirects')"
+        :description="__('Send old URLs, www/apex, or whole paths to their new home with managed 301/302 rules — applied to the live webserver config for you.')"
+        :eyebrow="__('Redirects preview')"
+        :lines="[
+            ['tone' => 'cmd', 'text' => '~ $ dply redirects'],
+            ['tone' => 'muted', 'text' => '301  /old-blog/*  → /blog/\$1'],
+            ['tone' => 'muted', 'text' => '301  www         → apex'],
+            ['tone' => 'ok', 'text' => '2 rules · live'],
+        ]"
+        :features="[
+            ['icon' => 'arrow-uturn-right', 'title' => __('301 & 302'), 'body' => __('Permanent or temporary redirects, your call per rule.')],
+            ['icon' => 'map', 'title' => __('Path & host'), 'body' => __('Match on hostname, path prefix, or an exact URL — with captures.')],
+            ['icon' => 'arrows-right-left', 'title' => __('www ↔ apex'), 'body' => __('Canonicalize to bare or www with a single toggle.')],
+            ['icon' => 'bolt', 'title' => __('Auto-applied'), 'body' => __('Rules land in the active webserver config the moment you save.')],
+        ]"
+    />
 @elseif ($routingTab === 'redirects')
     @php $redirectCount = $site->redirects->count(); @endphp
 
@@ -734,6 +774,26 @@
         ['label' => __('Export CSV'), 'command' => 'dply:site:redirect-export '.$site->slug.' --to=redirects.csv'],
     ]" />
 
+@elseif ($routingTab === 'preview' && workspace_surface_coming_soon('site_preview'))
+    <x-workspace-coming-soon
+        :server="$site->server"
+        icon="heroicon-o-sparkles"
+        :title="__('Preview hostnames')"
+        :description="__('Hand out a shareable, auto-SSL preview URL for this site before you point real DNS — perfect for stakeholder review and staging links.')"
+        :eyebrow="__('Preview hostname preview')"
+        :lines="[
+            ['tone' => 'cmd', 'text' => '~ $ dply preview set'],
+            ['tone' => 'muted', 'text' => 'preview-7f3a.on-dply.cc → this site'],
+            ['tone' => 'muted', 'text' => 'tls: issued · auto-renew'],
+            ['tone' => 'ok', 'text' => 'shareable · live in seconds'],
+        ]"
+        :features="[
+            ['icon' => 'sparkles', 'title' => __('Shareable URL'), 'body' => __('A clean managed hostname you can send before real DNS is cut over.')],
+            ['icon' => 'lock-closed', 'title' => __('Automatic SSL'), 'body' => __('TLS is issued and renewed for the preview host with no setup.')],
+            ['icon' => 'globe-alt', 'title' => __('Managed DNS'), 'body' => __('The record is created and pointed at your server automatically.')],
+            ['icon' => 'arrow-path', 'title' => __('Throwaway'), 'body' => __('Spin one up for review, then retire it when you go live.')],
+        ]"
+    />
 @elseif ($routingTab === 'preview')
     @php $previewCount = $site->previewDomains->count(); @endphp
 
@@ -822,6 +882,26 @@
         ['label' => __('Remove preview'), 'command' => 'dply:site:preview-remove '.$site->slug.' preview.example.dply.cc'],
     ]" />
 
+@elseif ($routingTab === 'tenants' && workspace_surface_coming_soon('site_tenants'))
+    <x-workspace-coming-soon
+        :server="$site->server"
+        icon="heroicon-o-building-office-2"
+        :title="__('Tenants')"
+        :description="__('Serve many customers from one codebase — map each tenant to its own hostname with isolated routing and a managed preview URL apiece.')"
+        :eyebrow="__('Tenants preview')"
+        :lines="[
+            ['tone' => 'cmd', 'text' => '~ $ dply tenants'],
+            ['tone' => 'muted', 'text' => 'acme   → acme.app.com    ready'],
+            ['tone' => 'muted', 'text' => 'globex → globex.app.com  ready'],
+            ['tone' => 'ok', 'text' => '2 tenants · isolated routing'],
+        ]"
+        :features="[
+            ['icon' => 'building-office-2', 'title' => __('Per-tenant hosts'), 'body' => __('Each customer gets their own hostname pointed at the shared app.')],
+            ['icon' => 'lock-closed', 'title' => __('Isolated routing'), 'body' => __('Tenant hostnames route independently with their own TLS.')],
+            ['icon' => 'sparkles', 'title' => __('Preview per tenant'), 'body' => __('Hand each tenant a managed preview URL before their DNS is live.')],
+            ['icon' => 'square-3-stack-3d', 'title' => __('Bulk publish'), 'body' => __('Add, publish, and retire tenants without touching server config.')],
+        ]"
+    />
 @elseif ($routingTab === 'tenants')
     @php $tenantCount = $site->tenantDomains->count(); @endphp
 

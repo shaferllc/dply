@@ -330,6 +330,23 @@ if (! function_exists('workspace_server_blueprint_preview_active')) {
     }
 }
 
+if (! function_exists('workspace_surface_coming_soon')) {
+    /**
+     * Generic coming-soon check for a `workspace.<feature>` surface: true when the
+     * real feature is off but its `<feature>_preview` teaser flag is on. Lets a
+     * blade swap real content for the shared <x-workspace-coming-soon> teaser
+     * without a per-surface helper. Mirrors {@see SiteSettingsSidebar::markPreviewOnly()}.
+     */
+    function workspace_surface_coming_soon(string $feature, ?Organization $organization = null): bool
+    {
+        $active = static fn (string $flag): bool => $organization === null
+            ? Feature::active($flag)
+            : Feature::for($organization)->active($flag);
+
+        return ! $active('workspace.'.$feature) && $active('workspace.'.$feature.'_preview');
+    }
+}
+
 if (! function_exists('workspace_files_preview_active')) {
     /**
      * True when remote files is off but the coming-soon teaser should

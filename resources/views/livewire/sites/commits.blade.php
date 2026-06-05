@@ -110,7 +110,7 @@
                                     {{ __('Choose an application') }}
                                 </a>
                             @endif
-                            <a href="{{ route('sites.repository', [$server, $site]) }}?tab=connection" wire:navigate
+                            <a href="{{ route('sites.repository', [$server, $site, 'repo_tab' => 'connection']) }}" wire:navigate
                                 class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
                                 <x-heroicon-o-link class="h-4 w-4" aria-hidden="true" />
                                 {{ __('Connect a repository') }}

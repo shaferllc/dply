@@ -46,6 +46,10 @@ class WorkspaceErrors extends Component
 
     public function render(): View
     {
+        if (in_array('errors', config('server_workspace.coming_soon_keys', []), true)) {
+            return view('livewire.servers.workspace-errors-preview', ['server' => $this->server]);
+        }
+
         return view('livewire.servers.workspace-errors');
     }
 }

@@ -45,6 +45,27 @@
         @include('livewire.sites.settings.partials.sidebar')
 
         <main class="min-w-0 space-y-6 lg:col-span-9">
+            @if (workspace_surface_coming_soon('site_files'))
+                <x-workspace-coming-soon
+                    :server="$site->server"
+                    icon="heroicon-o-folder"
+                    :title="__('Files')"
+                    :description="__('Browse and edit your site tree right in the dashboard over SSH — no terminal, no SFTP client — with safe size limits and per-site scoping.')"
+                    :eyebrow="__('File browser preview')"
+                    :lines="[
+                        ['tone' => 'cmd', 'text' => '~ $ ls -la current/'],
+                        ['tone' => 'muted', 'text' => 'drwxr-xr-x  app/   config/   public/'],
+                        ['tone' => 'muted', 'text' => '-rw-r--r--  .env   composer.json'],
+                        ['tone' => 'ok', 'text' => 'scoped to this site · read + edit'],
+                    ]"
+                    :features="[
+                        ['icon' => 'folder-open', 'title' => __('Browse the tree'), 'body' => __('Walk the release and shared directories without opening a terminal.')],
+                        ['icon' => 'pencil-square', 'title' => __('Edit in place'), 'body' => __('Tweak a config or template file inline, within safe size limits.')],
+                        ['icon' => 'arrow-down-tray', 'title' => __('Download anything'), 'body' => __('Pull a log, a build artifact, or a generated file straight down.')],
+                        ['icon' => 'lock-closed', 'title' => __('Scoped & safe'), 'body' => __('Locked to this site\'s directory and its system user — nothing else.')],
+                    ]"
+                />
+            @else
             <x-page-header
                 :title="__('Files')"
                 :description="__('Browse the site tree over SSH as :user. Edit text files (≤:edit MB), download anything (≤:dl MB).', ['user' => $effectiveLoginUser, 'edit' => (int) ($editMaxBytes / 1024 / 1024), 'dl' => (int) ($downloadMaxBytes / 1024 / 1024)])"
@@ -181,7 +202,7 @@
             </div>
         </div>
     @endif
-
+            @endif
         </main>
     </div>
 

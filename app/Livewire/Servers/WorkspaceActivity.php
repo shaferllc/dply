@@ -339,6 +339,10 @@ class WorkspaceActivity extends Component
 
     public function render(): View
     {
+        if (in_array('activity', config('server_workspace.coming_soon_keys', []), true)) {
+            return view('livewire.servers.workspace-activity-preview', ['server' => $this->server]);
+        }
+
         return view('livewire.servers.workspace-activity');
     }
 }
