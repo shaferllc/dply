@@ -346,6 +346,10 @@ Route::get('/features', function () {
     return view('features');
 })->name('features');
 
+Route::get('/changelog', function () {
+    return view('changelog');
+})->name('changelog');
+
 Route::livewire('/roadmap', RoadmapIndex::class)
     ->middleware(['throttle:60,1'])
     ->name('roadmap');

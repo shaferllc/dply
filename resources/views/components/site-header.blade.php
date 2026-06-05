@@ -22,6 +22,7 @@
 
     $notificationTablesReady = \App\Support\NotificationTablesReady::all();
     $featuresActive = $active === 'features' || request()->routeIs('features');
+    $changelogActive = $active === 'changelog' || request()->routeIs('changelog');
     $pricingActive = $active === 'pricing' || request()->routeIs('pricing');
     $roadmapActive = $active === 'roadmap' || request()->routeIs('roadmap');
     $homeActive = $active === 'home' || (request()->is('/') && ! request()->routeIs('dashboard'));
@@ -33,6 +34,7 @@
         || request()->routeIs('backups.*')
         || request()->routeIs('scripts.*')
         || $featuresActive
+        || $changelogActive
         || $pricingActive
         || $roadmapActive
         || request()->routeIs('docs.*');
@@ -120,6 +122,13 @@
                     >
                         <x-heroicon-o-map class="{{ $hiGuest }}" />
                         {{ __('Roadmap') }}
+                    </a>
+                    <a
+                        href="{{ route('changelog') }}"
+                        class="inline-flex items-center gap-1.5 {{ $changelogActive ? 'text-brand-ink' : 'text-brand-moss hover:text-brand-ink' }} transition-colors"
+                    >
+                        <x-heroicon-o-sparkles class="{{ $hiGuest }}" />
+                        {{ __('Changelog') }}
                     </a>
                     <a
                         href="{{ route('pricing') }}"
