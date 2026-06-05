@@ -287,6 +287,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->registerCustomPulseCards();
+
         $this->registerEdgeR2FilesystemDisk();
 
         $this->discardCorruptedViteHotFile();
@@ -666,6 +668,17 @@ class AppServiceProvider extends ServiceProvider
         if ($line === '' || ! preg_match('/\Ahttps?:\/\//i', $line)) {
             @unlink($path);
         }
+    }
+
+    /**
+     * Register the per-service Pulse cards (Redis / Database / Workers) that
+     * surface dply's centrally-collected server metrics on the Pulse dashboard.
+     */
+    private function registerCustomPulseCards(): void
+    {
+        \Livewire\Livewire::component('pulse.redis-servers', \App\Livewire\Pulse\RedisServersCard::class);
+        \Livewire\Livewire::component('pulse.database-servers', \App\Livewire\Pulse\DatabaseServersCard::class);
+        \Livewire\Livewire::component('pulse.worker-servers', \App\Livewire\Pulse\WorkerServersCard::class);
     }
 
     private function registerEdgeR2FilesystemDisk(): void

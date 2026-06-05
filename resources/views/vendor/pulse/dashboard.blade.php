@@ -1,6 +1,12 @@
 <x-pulse>
     <livewire:pulse.servers cols="full" />
 
+    <livewire:pulse.redis-servers cols="4" />
+
+    <livewire:pulse.database-servers cols="4" />
+
+    <livewire:pulse.worker-servers cols="4" />
+
     <livewire:reverb.connections cols="6" />
 
     <livewire:reverb.messages cols="6" />

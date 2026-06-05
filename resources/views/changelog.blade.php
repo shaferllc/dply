@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 5, 2026',
+                    'tags'    => ['new'],
+                    'title'   => 'Per-Service Pulse Server Cards',
+                    'summary' => 'The Pulse dashboard now shows dedicated cards for Redis, database, and worker servers with live CPU, memory, and disk metrics, including those infrastructure hosts that don\'t run the dply app.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 5, 2026',
                     'tags'    => ['fixed'],
                     'title'   => 'Backups Empty-State Copy Fix',
                     'summary' => 'Fixed a grammatical typo in the empty-state message shown when no database backup schedules exist.',
