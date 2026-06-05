@@ -39,7 +39,7 @@
                     </span>
                 </h1>
                 <p class="mt-6 text-lg text-brand-moss leading-relaxed">
-                    Provision from your cloud or bring any box over SSH. Deploy from git, manage TLS, databases, cron, firewall, and backups—and give the whole team one audited place to work, without scattering secrets across laptops.
+                    Provision from your cloud or bring any box over SSH. Deploy from git, manage TLS, databases, cron, firewall, and backups—and give the whole team one audited place to work. Need to skip the server entirely? Cloud and Edge hosting add container apps, serverless functions, and managed realtime under the same org.
                 </p>
                 <div class="mt-9 flex flex-col sm:flex-row items-center justify-center gap-4">
                     @auth
@@ -57,6 +57,7 @@
                             '#deploy' => 'Deploy &amp; releases',
                             '#servers' => 'Servers',
                             '#sites' => 'Sites &amp; TLS',
+                            '#edge' => 'Edge &amp; Cloud',
                             '#recovery' => 'Backups &amp; recovery',
                             '#teams' => 'Teams &amp; projects',
                             '#api' => 'API &amp; CLI',
@@ -194,7 +195,7 @@
                             ['icon' => 'command-line', 'title' => 'Remote execution', 'body' => 'Run shell commands over SSH from the dashboard for quick fixes—no keys handed out to every laptop.'],
                             ['icon' => 'signal', 'title' => 'Health checks', 'body' => 'Point at an HTTP endpoint and track whether the service answers, with status next to the server.'],
                             ['icon' => 'circle-stack', 'title' => 'Databases', 'body' => 'Create databases and users on the box (MySQL, MariaDB, PostgreSQL) over SSH, kept with the server.'],
-                            ['icon' => 'clock', 'title' => 'Cron &amp; workers', 'body' => 'Managed crontab blocks and Supervisor programs so scheduled jobs and queues are documented and reproducible.'],
+                            ['icon' => 'clock', 'title' => 'Cron, queues &amp; workers', 'body' => 'Managed crontab blocks, Supervisor programs, and dedicated Horizon worker pools—queue config, balancing strategy, and retry settings are environment-driven and live-editable from the panel.'],
                             ['icon' => 'shield-exclamation', 'title' => 'Firewall', 'body' => 'Declarative UFW rules with presets and templates—open the ports you mean to, with a history you can review.'],
                             ['icon' => 'cpu-chip', 'title' => 'Metrics', 'body' => 'CPU, memory, disk, and load with historical charts and deployment correlation in the same place.'],
                         ];
@@ -223,6 +224,7 @@
                         <li class="flex gap-3"><x-heroicon-m-check class="mt-0.5 h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" /> PHP-FPM, Node behind a reverse proxy, or static/HTML</li>
                         <li class="flex gap-3"><x-heroicon-m-check class="mt-0.5 h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" /> Certbot / Let's Encrypt with certificate status</li>
                         <li class="flex gap-3"><x-heroicon-m-check class="mt-0.5 h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" /> GitHub, GitLab &amp; Bitbucket via OAuth</li>
+                        <li class="flex gap-3"><x-heroicon-m-check class="mt-0.5 h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" /> Edge &amp; Cloud sites — skip the server entirely (see below)</li>
                     </ul>
                 </div>
                 <div class="mt-10 lg:mt-0 lg:col-span-7 grid gap-5 sm:grid-cols-2">
@@ -242,6 +244,51 @@
                         <h3 class="font-semibold text-brand-ink">Per-environment config</h3>
                         <p class="mt-2 text-sm text-brand-moss leading-relaxed">Encrypted <code class="text-xs bg-brand-sand/50 px-1 rounded">.env</code>, post-deploy commands, and extra Nginx config sit beside the site they belong to.</p>
                     </div>
+                </div>
+            </div>
+        </section>
+
+        {{-- Edge & Cloud --}}
+        <section id="edge" class="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 border-t border-brand-ink/10 bg-gradient-to-b from-brand-sand/20 to-white/70 scroll-mt-24">
+            <div class="mx-auto max-w-7xl">
+                <div class="max-w-2xl">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">Code without a server</p>
+                    <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">Edge &amp; Cloud hosting</h2>
+                    <p class="mt-4 text-brand-moss leading-relaxed">Deploy container apps via DigitalOcean App Platform or AWS App Runner without provisioning a server. Add serverless HTTP functions, a managed Pusher-compatible realtime relay, and global CDN storage—all billed, governed, and deployed from the same control plane as your VMs.</p>
+                </div>
+
+                <div class="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                    <article class="rounded-2xl border border-brand-ink/10 bg-white/85 p-6 shadow-sm">
+                        <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-forest/10 text-brand-forest">
+                            <x-heroicon-o-cloud class="h-5 w-5" aria-hidden="true" />
+                        </div>
+                        <h3 class="mt-5 font-semibold text-brand-ink">Cloud apps</h3>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">App-first PaaS backed by DigitalOcean App Platform or AWS App Runner. Deploy from git—no server, no OS, no Nginx config to manage.</p>
+                    </article>
+
+                    <article class="rounded-2xl border border-brand-ink/10 bg-white/85 p-6 shadow-sm">
+                        <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-gold/25 text-brand-rust">
+                            <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
+                        </div>
+                        <h3 class="mt-5 font-semibold text-brand-ink">Serverless functions</h3>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">HTTP web functions via DigitalOcean Functions. Create, deploy, and invoke from the dashboard—billed flat per function, no cold-start infrastructure to provision.</p>
+                    </article>
+
+                    <article class="rounded-2xl border border-brand-ink/10 bg-white/85 p-6 shadow-sm">
+                        <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-sage">
+                            <x-heroicon-o-signal class="h-5 w-5" aria-hidden="true" />
+                        </div>
+                        <h3 class="mt-5 font-semibold text-brand-ink">Managed Realtime</h3>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">A dply-hosted Pusher-compatible WebSocket relay built on Cloudflare Workers and DigitalOcean. Drop-in replacement for Pusher or Laravel Reverb—billed through dply, zero infra to run.</p>
+                    </article>
+
+                    <article class="rounded-2xl border border-brand-ink/10 bg-white/85 p-6 shadow-sm">
+                        <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-forest/10 text-brand-forest">
+                            <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
+                        </div>
+                        <h3 class="mt-5 font-semibold text-brand-ink">CDN &amp; edge storage</h3>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">Global Cloudflare CDN with R2 object storage and KV backing Edge sites. Assets, purge, and edge config are managed alongside the app—not in a separate provider console.</p>
+                    </article>
                 </div>
             </div>
         </section>
@@ -320,7 +367,7 @@
                 <div class="lg:col-span-5">
                     <p class="text-xs font-semibold uppercase tracking-wider text-brand-gold">Scriptable platform</p>
                     <h2 class="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">An API and a CLI behind every action</h2>
-                    <p class="mt-4 text-brand-sand/85 leading-relaxed">A public REST API with an <a href="{{ url('/openapi/edge.json') }}" class="font-semibold text-brand-gold underline decoration-brand-gold/40 underline-offset-2 hover:decoration-brand-gold">OpenAPI&nbsp;3 spec</a> and a zero-dependency Node CLI mean CI pipelines, agents, and scripts run the same operations as the dashboard—against the same org and audit trail.</p>
+                    <p class="mt-4 text-brand-sand/85 leading-relaxed">A public REST API with an <a href="{{ url('/openapi/edge.json') }}" class="font-semibold text-brand-gold underline decoration-brand-gold/40 underline-offset-2 hover:decoration-brand-gold">OpenAPI&nbsp;3 spec</a> and a PHP CLI mean CI pipelines, agents, and scripts run the same operations as the dashboard—against the same org and audit trail.</p>
                     <ul class="mt-8 space-y-4 text-sm">
                         <li class="flex gap-3">
                             <x-heroicon-o-code-bracket class="h-5 w-5 shrink-0 text-brand-gold" aria-hidden="true" />
@@ -350,7 +397,7 @@
                             <div class="text-brand-mist">deploy  web-1  active</div>
                         </div>
                     </div>
-                    <p class="mt-4 text-xs text-brand-mist">The CLI is hosted by your {{ config('app.name') }} instance, not npm. Node 18+. Same code path as a GitHub webhook—no dashboard-only features to give up.</p>
+                    <p class="mt-4 text-xs text-brand-mist">The CLI is a PHP binary—install via the one-liner and authenticate through the OAuth device flow. Same code path as a GitHub webhook or a button click—no dashboard-only features to give up.</p>
                 </div>
             </div>
         </section>
@@ -384,10 +431,14 @@
                                     ['Server provisioning', 'ok', 'Create or destroy servers via DigitalOcean, Hetzner, Linode, Vultr, UpCloud, Scaleway, Equinix Metal, Fly.io, AWS EC2, and more; attach Custom servers over SSH. The OS and base image stay yours—no resident agent.'],
                                     ['Git deploys &amp; rollbacks', 'ok', 'Git remotes, signed webhooks, deploy hooks, atomic deploys with a <code class="text-xs bg-brand-sand/60 px-1 rounded">releases/</code> directory, and rollback to a prior release.'],
                                     ['PHP / Laravel / Node / static', 'ok', 'Site types for PHP-FPM, Node reverse proxy, and static; Laravel options like scheduler, Octane, and env in the deploy flow.'],
+                                    ['Edge &amp; Cloud hosting', 'ok', 'Container apps on DigitalOcean App Platform or AWS App Runner via a unified EdgeBackend. Deploy from git without a server, Nginx config, or OS to maintain. Cloudflare CDN, R2 object storage, and KV included.'],
+                                    ['Serverless functions (FaaS)', 'partial', 'HTTP web functions via DigitalOcean Functions—create, deploy, and invoke from the dashboard. Multi-language adapters and package-level features are in progress.'],
+                                    ['Managed Realtime', 'ok', 'Pusher-compatible WebSocket relay built on Cloudflare Workers and DigitalOcean. Drop-in for Laravel Echo / Reverb, billed through dply, no relay infra to operate.'],
                                     ['Databases (MySQL, MariaDB, PostgreSQL)', 'ok', 'Create databases and users on the server over SSH through the provisioning paths.'],
                                     ['SSL (Let\'s Encrypt)', 'ok', 'Certbot over SSH for site domains; renewal follows the server\'s certbot setup.'],
-                                    ['Firewall (UFW)', 'ok', 'Per-server UFW rules with presets, templates, apply, status, and recent history.'],
+                                    ['Firewall (UFW)', 'ok', 'Per-server UFW rules with presets, templates, apply, status, and recent history. Hetzner cloud firewall managed via provider API.'],
                                     ['Cron &amp; Supervisor', 'ok', 'Managed crontab blocks and Supervisor programs tied to servers and sites.'],
+                                    ['Worker pools &amp; Horizon', 'ok', 'Dedicated queue-worker servers with managed Laravel Horizon config. Queues, processes, balancing strategy, memory limit, and retry settings are environment-driven and live-editable from the panel.'],
                                     ['Monitoring (CPU / RAM / disk)', 'ok', 'Server metrics, historical charts, deployment correlation, diagnostics, and project-aware drilldowns.'],
                                     ['Backups', 'ok', 'Database and file backup planning, storage destinations, retention, and restore-oriented guidance.'],
                                     ['Teams &amp; audit', 'ok', 'Organizations, invitations, roles, and audit-log entries for infrastructure actions.'],

@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 5, 2026',
                     'tags'    => ['new'],
+                    'title'   => 'Edge & Cloud Hosting Features',
+                    'summary' => 'The features page now showcases Edge and Cloud hosting—container apps, serverless functions, managed realtime, and CDN storage—alongside the new PHP CLI and worker-pool details.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 5, 2026',
+                    'tags'    => ['new'],
                     'title'   => 'Public Changelog Page Entries',
                     'summary' => 'Deploys now publish titled entries to the public changelog page alongside CHANGELOG.md.',
                     'items'   => [],
