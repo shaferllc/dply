@@ -289,6 +289,10 @@ class Repository extends Component
         $this->branchOverride = '';
         $this->clearRepoRefSelection();
 
+        if ($this->startFirstDeploySetupIfEligible()) {
+            return;
+        }
+
         $this->toastSuccess(__('Repository switched to :url.', ['url' => $url]));
     }
 
@@ -324,7 +328,43 @@ class Repository extends Component
         ])->save();
         $reader->invalidate($this->site);
 
+        if ($this->startFirstDeploySetupIfEligible()) {
+            return;
+        }
+
         $this->toastSuccess(__('Repository connection saved.'));
+    }
+
+    /**
+     * If this is the FIRST repo connected to a never-deployed, provisioned VM
+     * site, kick the post-connect setup wizard (pre-flight scan → env / resources
+     * → deploy) exactly like the choose-app picker — instead of leaving the repo
+     * connected with nothing else done. Already-deployed sites (switching repos)
+     * and non-VM hosts skip this and keep their existing behaviour.
+     */
+    private function startFirstDeploySetupIfEligible(): bool
+    {
+        $site = $this->site->fresh() ?? $this->site;
+
+        if (trim((string) $site->git_repository_url) === '' || $site->last_deploy_at !== null) {
+            return false;
+        }
+        if (! $this->server->isVmHost() || ! $site->isReadyForWorkspace()) {
+            return false;
+        }
+        if ($site->isInFirstDeploySetup()) {
+            return false; // a scan is already in flight — don't double-dispatch
+        }
+
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta['setup'] = ['state' => 'scanning', 'started_at' => now()->toIso8601String()];
+        $site->forceFill(['meta' => $meta])->save();
+
+        \App\Jobs\PreflightSiteSetupJob::dispatch($site->id, (string) auth()->id());
+
+        $this->redirect(route('sites.setup', [$this->server, $site]), navigate: true);
+
+        return true;
     }
 
     /**

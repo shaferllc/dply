@@ -195,7 +195,10 @@
                                                 {{ __('This page updates live as the installer moves through each step. The site is considered ready as soon as either the testing URL or the real domain responds.') }}
                                             </p>
                                             @if ($provisioningLog->isNotEmpty())
-                                                <details class="mt-4 overflow-hidden rounded-xl border border-brand-ink/10 bg-slate-950 shadow-inner group" x-data>
+                                                {{-- wire:ignore.self keeps the browser-set `open` attribute across
+                                                     wire:poll morphs (so a user-expanded panel stays open) while still
+                                                     letting Livewire morph the children — the live transcript below. --}}
+                                                <details wire:key="install-activity" wire:ignore.self class="mt-4 overflow-hidden rounded-xl border border-brand-ink/10 bg-slate-950 shadow-inner group" x-data>
                                                     <summary class="flex cursor-pointer items-center justify-between gap-3 border-b border-white/5 bg-slate-900/80 px-4 py-2.5">
                                                         <span class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                                                             <x-heroicon-o-chevron-right class="h-3.5 w-3.5 transition-transform group-open:rotate-90" />

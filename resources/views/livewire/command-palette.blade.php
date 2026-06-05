@@ -49,6 +49,13 @@
             if (el.tagName === 'A') this.close();
             el.click();
         },
+        drillIn() {
+            // Right-arrow: drill INTO the highlighted row, but only when it's a
+            // nestable context (a <button> that pushes). Leaf anchors aren't a
+            // drill-in, so right-arrow is a no-op on them.
+            const el = this.rows()[this.active];
+            if (el && el.tagName === 'BUTTON') el.click();
+        },
     }"
     @keydown.escape.window="open && ($wire.stack.length ? $wire.pop() : close())"
     @cmdk-changed.window="active = 0; $nextTick(() => $refs.input && $refs.input.focus())"
@@ -112,6 +119,8 @@
                         @keydown.arrow-down.prevent="move(1)"
                         @keydown.arrow-up.prevent="move(-1)"
                         @keydown.enter.prevent="choose()"
+                        @keydown.arrow-right="if ($event.target.selectionStart === $event.target.value.length && $event.target.selectionStart === $event.target.selectionEnd) { $event.preventDefault(); drillIn(); }"
+                        @keydown.arrow-left="if ($event.target.selectionStart === 0 && $event.target.selectionEnd === 0 && $wire.stack.length) { $event.preventDefault(); $wire.pop(); }"
                         @keydown.backspace="if ($event.target.value === '' && $wire.stack.length) { $event.preventDefault(); $wire.pop(); }"
                         placeholder="{{ $placeholder }}"
                         class="w-full border-0 bg-transparent py-3.5 text-base text-brand-ink placeholder:text-brand-mist focus:outline-none focus:ring-0"
@@ -122,10 +131,10 @@
                 </div>
 
                 {{-- Results --}}
-                <div class="max-h-[55vh] overflow-y-auto py-2" wire:loading.class="opacity-60">
+                <div class="max-h-[55vh] overflow-y-auto px-1.5 py-2" wire:loading.class="opacity-60">
                     @php $i = 0; @endphp
                     @forelse ($groups as $group)
-                        <div class="px-3 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
+                        <div class="px-1.5 pb-1 pt-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
                             {{ $group['label'] }}
                         </div>
                         @foreach ($group['items'] as $item)
@@ -136,8 +145,8 @@
                                     wire:click="push('{{ $item['into']['type'] }}'@if(! empty($item['into']['id'])), '{{ $item['into']['id'] }}'@endif)"
                                     data-cmdk-item
                                     @mouseenter="active = {{ $i }}"
-                                    :class="active === {{ $i }} ? 'bg-brand-sage/15 text-brand-ink' : 'text-brand-ink/90'"
-                                    class="mx-1.5 flex w-[calc(100%-0.75rem)] appearance-none items-center gap-3 rounded-lg border-0 bg-transparent px-2.5 py-2 text-left text-sm focus:outline-none"
+                                    :class="active === {{ $i }} ? 'bg-brand-sand/60 text-brand-ink' : 'text-brand-ink/90'"
+                                    class="flex w-full appearance-none items-center gap-3 rounded-lg border-0 px-2.5 py-2 text-left text-sm hover:bg-brand-sand/60 focus:outline-none"
                                 >
                                     @include('livewire.partials.command-palette-row', ['item' => $item, 'i' => $i, 'isNest' => true])
                                 </button>
@@ -147,8 +156,8 @@
                                     wire:navigate
                                     data-cmdk-item
                                     @mouseenter="active = {{ $i }}"
-                                    :class="active === {{ $i }} ? 'bg-brand-sage/15 text-brand-ink' : 'text-brand-ink/90'"
-                                    class="mx-1.5 flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm"
+                                    :class="active === {{ $i }} ? 'bg-brand-sand/60 text-brand-ink' : 'text-brand-ink/90'"
+                                    class="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-sm hover:bg-brand-sand/60"
                                 >
                                     @include('livewire.partials.command-palette-row', ['item' => $item, 'i' => $i, 'isNest' => false])
                                 </a>
@@ -177,6 +186,13 @@
                         <kbd class="rounded bg-white px-1 py-0.5 font-semibold ring-1 ring-brand-ink/10">↵</kbd>
                         {{ __('select') }}
                     </span>
+                    @if (count($stack) || ! empty($groups))
+                        <span class="hidden items-center gap-1 sm:inline-flex">
+                            <kbd class="rounded bg-white px-1 py-0.5 font-semibold ring-1 ring-brand-ink/10">→</kbd>
+                            <kbd class="rounded bg-white px-1 py-0.5 font-semibold ring-1 ring-brand-ink/10">←</kbd>
+                            {{ __('open / back') }}
+                        </span>
+                    @endif
                     <span class="inline-flex items-center gap-1">
                         <kbd class="rounded bg-white px-1.5 py-0.5 font-semibold ring-1 ring-brand-ink/10">esc</kbd>
                         {{ __('back') }}

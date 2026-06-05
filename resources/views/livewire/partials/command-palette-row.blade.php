@@ -47,5 +47,10 @@
 @if ($isNest)
     <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-mist" />
 @else
-    <x-heroicon-o-arrow-up-right class="h-3.5 w-3.5 shrink-0 text-brand-mist" x-show="active === {{ $i }}" />
+    {{-- Leaf "open" arrow: always present so every row carries a trailing
+         affordance, brightened on the active row. --}}
+    <x-heroicon-o-arrow-up-right
+        class="h-3.5 w-3.5 shrink-0 text-brand-mist transition-opacity"
+        x-bind:class="active === {{ $i }} ? 'opacity-100' : 'opacity-40'"
+    />
 @endif

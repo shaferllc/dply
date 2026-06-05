@@ -121,15 +121,35 @@ trait ResolvesWebserverConfig
     }
 
     /**
-     * Directory that receives .env (project root).
+     * Directory that receives .env — always the site's PROJECT ROOT, never the
+     * public docroot, so the file sits one level above the web-served directory.
      */
     public function effectiveEnvDirectory(): string
     {
+        $projectRoot = $this->effectiveProjectRoot();
+
         if ($this->isAtomicDeploys()) {
-            return rtrim($this->effectiveRepositoryPath(), '/').'/current';
+            return $projectRoot.'/current';
         }
 
-        return rtrim($this->effectiveRepositoryPath(), '/');
+        return $projectRoot;
+    }
+
+    /**
+     * The site's project root (clone target) for env / path derivation. Prefers
+     * the explicit repository_path; otherwise the conventional /home/dply/<host>
+     * — deliberately NOT document_root, which points at the …/public subdir.
+     * Using document_root here would drop the .env *inside* the served directory,
+     * leaving only the webserver deny-rule between it and the public internet.
+     */
+    public function effectiveProjectRoot(): string
+    {
+        $path = $this->repository_path;
+        if ($path !== null && $path !== '') {
+            return rtrim($path, '/');
+        }
+
+        return rtrim($this->conventionalRepositoryPath(), '/');
     }
 
     /**

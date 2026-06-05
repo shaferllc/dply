@@ -20,7 +20,7 @@
             @else
                 @can('update', $site)
                     <div class="rounded-2xl border border-red-200 bg-red-50/50 p-5" x-data="{ confirming: false }">
-                        <div class="flex flex-wrap items-start justify-between gap-4">
+                        <div class="flex items-start justify-between gap-4">
                             <div class="min-w-0">
                                 <h3 class="text-sm font-semibold text-red-900">{{ __('Disconnect repository & start over') }}</h3>
                                 <p class="mt-1 max-w-xl text-xs leading-relaxed text-red-800/80">
