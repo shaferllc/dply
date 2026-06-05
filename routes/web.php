@@ -33,6 +33,7 @@ use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Jobs\RunSetupScriptJob;
 use App\Livewire\Admin\AuditLog as AdminAuditLog;
 use App\Livewire\Admin\BetaInvites as AdminBetaInvites;
+use App\Livewire\Admin\ComingSoonAccess as AdminComingSoonAccess;
 use App\Livewire\Admin\Flags\GlobalFlags as AdminGlobalFlags;
 use App\Livewire\Admin\Flags\ProductLineFlags as AdminProductLineFlags;
 use App\Livewire\Admin\Operations as AdminOperations;
@@ -461,6 +462,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
             Route::livewire('/organizations', AdminOrganizationsIndex::class)->name('organizations.index');
             Route::livewire('/organizations/{organization}', AdminOrganizationsShow::class)->name('organizations.show');
             Route::livewire('/beta-invites', AdminBetaInvites::class)->name('beta-invites');
+            Route::livewire('/coming-soon-access', AdminComingSoonAccess::class)->name('coming-soon-access');
         });
     Route::redirect('/admin/dashboard', '/admin')->middleware('can:viewPlatformAdmin')->name('admin.dashboard');
     Route::middleware('feature:surface.marketplace')->group(function (): void {

@@ -18,12 +18,21 @@ return [
     /*
     | IP allow-list for the coming-soon gate. These addresses (and any logged-in
     | user) see the FULL site; everyone else only sees the coming-soon page.
-    | Comma-separated, supports IPv4, IPv6, and CIDR ranges.
+    | Supports IPv4, IPv6, and CIDR ranges. Sources are merged: the base list
+    | below + the comma-separated COMING_SOON_ALLOWED_IPS env var + the
+    | admin-managed rows (coming_soon_allowed_ips table).
     */
-    'coming_soon_allowed_ips' => array_values(array_filter(array_map(
-        'trim',
-        explode(',', (string) env('COMING_SOON_ALLOWED_IPS', ''))
-    ))),
+    'coming_soon_allowed_ips' => array_values(array_unique(array_filter(array_map(
+        static fn ($v): string => trim((string) $v),
+        array_merge(
+            [
+                // Base allow-list (operator addresses).
+                '2600:1701:408:173e:28cc:b5fa:9fd3:c347',
+                '66.10.105.85',
+            ],
+            explode(',', (string) env('COMING_SOON_ALLOWED_IPS', '')),
+        )
+    )))),
 
     /*
     |--------------------------------------------------------------------------

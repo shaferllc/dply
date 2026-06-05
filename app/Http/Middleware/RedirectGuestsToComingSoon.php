@@ -64,7 +64,7 @@ class RedirectGuestsToComingSoon
      */
     private function ipAllowed(Request $request): bool
     {
-        $allowed = (array) config('dply.coming_soon_allowed_ips', []);
+        $allowed = \App\Models\ComingSoonAllowedIp::allowList();
         if ($allowed === []) {
             return false;
         }
