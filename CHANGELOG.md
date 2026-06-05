@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- The Backups page now shows backup health metrics, schedules you can pause or run on demand, recent runs, and storage destinations when the feature is enabled.
 ### Changed
 - The Backups section now appears under the main Browse menu as a coming-soon feature, and server-side broadcast events are correctly proxied to Reverb over the site's vhost.
 ### Added

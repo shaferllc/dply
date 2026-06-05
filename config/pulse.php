@@ -3,6 +3,8 @@
 use Laravel\Pulse\Http\Middleware\Authorize;
 use Laravel\Pulse\Pulse;
 use Laravel\Pulse\Recorders;
+use Laravel\Reverb\Pulse\Recorders\ReverbConnections;
+use Laravel\Reverb\Pulse\Recorders\ReverbMessages;
 
 return [
 
@@ -137,6 +139,14 @@ return [
     */
 
     'recorders' => [
+        ReverbConnections::class => [
+            'sample_rate' => env('PULSE_REVERB_CONNECTIONS_SAMPLE_RATE', 1),
+        ],
+
+        ReverbMessages::class => [
+            'sample_rate' => env('PULSE_REVERB_MESSAGES_SAMPLE_RATE', 1),
+        ],
+
         Recorders\CacheInteractions::class => [
             'enabled' => env('PULSE_CACHE_INTERACTIONS_ENABLED', true),
             'sample_rate' => env('PULSE_CACHE_INTERACTIONS_SAMPLE_RATE', 1),

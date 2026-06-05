@@ -418,14 +418,6 @@
                                         </x-slot>
                                         {{ __('Laravel Pulse') }}
                                     </x-dropdown-link>
-                                    @if (reverb_health_check_url())
-                                        <x-dropdown-link :href="reverb_health_check_url()" target="_blank" rel="noopener noreferrer">
-                                            <x-slot name="icon">
-                                                <x-heroicon-o-signal class="{{ $hi }}" />
-                                            </x-slot>
-                                            {{ __('Reverb health') }}
-                                        </x-dropdown-link>
-                                    @endif
                                     </div>
                                     <div class="my-2 h-px bg-brand-ink/10" role="presentation"></div>
                                 @endcan
@@ -692,17 +684,6 @@
                             </x-slot>
                             {{ __('Laravel Pulse') }}
                         </x-responsive-nav-link>
-                        @if (reverb_health_check_url())
-                            <a
-                                href="{{ reverb_health_check_url() }}"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                class="flex items-center gap-2.5 border-l-4 border-transparent py-2 ps-3 pe-4 text-base font-medium text-brand-moss hover:bg-brand-sand/30"
-                            >
-                                <x-heroicon-o-signal class="{{ $hi }}" />
-                                {{ __('Reverb health') }}
-                            </a>
-                        @endif
                     </div>
                 @endcan
                 <a href="{{ route('features') }}" class="flex items-center gap-2.5 border-l-4 {{ $featuresActive ? 'border-brand-gold bg-brand-sand/30 text-brand-ink' : 'border-transparent text-brand-moss hover:bg-brand-sand/30' }} py-2 ps-3 pe-4 text-base font-medium">

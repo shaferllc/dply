@@ -25,12 +25,6 @@
                 <x-heroicon-o-chart-bar class="h-5 w-5 text-brand-moss" />
                 {{ __('Laravel Pulse') }}
             </a>
-            @if ($reverbHealthUrl)
-                <a href="{{ $reverbHealthUrl }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-brand-sand/40">
-                    <x-heroicon-o-signal class="h-5 w-5 text-brand-moss" />
-                    {{ __('Reverb health') }}
-                </a>
-            @endif
         </div>
     </section>
 
