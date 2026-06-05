@@ -123,6 +123,8 @@
                             <button
                                 type="button"
                                 wire:click="setDaemonsWorkspaceTab(@js($alertTab))"
+                                x-data="{}"
+                                x-on:click="$nextTick(() => { const el = document.getElementById('daemons-workspace-tablist'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); })"
                                 class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40"
                             >
                                 {{ $alert['link_label'] }}
@@ -274,7 +276,7 @@
                                     @if ($row['site_id'] !== null)
                                         <a href="{{ $row['href'] }}" wire:navigate class="font-semibold text-brand-forest hover:underline">{{ __('Site workers') }}</a>
                                     @else
-                                        <button type="button" wire:click="setDaemonsWorkspaceTab('programs')" class="font-semibold text-brand-forest hover:underline">{{ __('Programs tab') }}</button>
+                                        <button type="button" wire:click="setDaemonsWorkspaceTab('programs')" x-data="{}" x-on:click="$nextTick(() => { const el = document.getElementById('daemons-workspace-tablist'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); })" class="font-semibold text-brand-forest hover:underline">{{ __('Programs tab') }}</button>
                                     @endif
                                 </td>
                             </tr>

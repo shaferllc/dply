@@ -6,6 +6,7 @@ namespace App\Livewire\Servers;
 
 use App\Jobs\RunServerConfigOpJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Servers\Concerns\ClonesServer;
 use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
@@ -32,6 +33,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class WorkspaceConfiguration extends Component
 {
+    use ClonesServer;
     use ConfirmsActionWithModal;
     use DismissesServerConsoleActionRun;
     use HandlesServerRemovalFlow;

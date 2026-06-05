@@ -141,22 +141,19 @@
 
 @if ($opsReady)
     <x-server-workspace-tablist :aria-label="__('Schedule workspace sections')">
-        <x-server-workspace-tab id="schedule-tab-overview" :active="$schedule_workspace_tab === 'overview'" wire:click="setScheduleWorkspaceTab('overview')">
-            <x-heroicon-o-heart class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        <x-server-workspace-tab id="schedule-tab-overview" icon="heroicon-o-heart" :active="$schedule_workspace_tab === 'overview'" wire:click="setScheduleWorkspaceTab('overview')">
             {{ __('Overview') }}
             @if ($scheduleStats['attention'] > 0)
                 <span class="inline-flex shrink-0 items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-amber-900">{{ number_format($scheduleStats['attention']) }}</span>
             @endif
         </x-server-workspace-tab>
-        <x-server-workspace-tab id="schedule-tab-schedulers" :active="$schedule_workspace_tab === 'schedulers'" wire:click="setScheduleWorkspaceTab('schedulers')">
-            <x-heroicon-o-clock class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        <x-server-workspace-tab id="schedule-tab-schedulers" icon="heroicon-o-clock" :active="$schedule_workspace_tab === 'schedulers'" wire:click="setScheduleWorkspaceTab('schedulers')">
             {{ __('Schedulers') }}
             @if ($scheduleStats['total'] > 0)
                 <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-brand-moss">{{ number_format($scheduleStats['total']) }}</span>
             @endif
         </x-server-workspace-tab>
-        <x-server-workspace-tab id="schedule-tab-enable" :active="$schedule_workspace_tab === 'enable'" wire:click="setScheduleWorkspaceTab('enable')">
-            <x-heroicon-o-plus-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        <x-server-workspace-tab id="schedule-tab-enable" icon="heroicon-o-plus-circle" :active="$schedule_workspace_tab === 'enable'" wire:click="setScheduleWorkspaceTab('enable')">
             {{ __('Enable') }}
         </x-server-workspace-tab>
     </x-server-workspace-tablist>

@@ -673,12 +673,20 @@ class WorkspaceDaemons extends Component
     {
         $this->authorize('update', $this->server);
         try {
-            $out = $provisioner->syncProgram($this->server->fresh(), $id);
+            $result = $provisioner->syncProgramResult($this->server->fresh(), $id);
             $prog = SupervisorProgram::query()->where('server_id', $this->server->id)->whereKey($id)->first();
-            SupervisorDaemonAudit::log($this->server->fresh(), $prog, 'sync_one', ['output' => Str::limit($out, 800)]);
-            $this->toastSuccess(__('Re-registered on the server. :out', ['out' => Str::limit(trim($out), 600)]));
-            // Re-probe so the row's state badge and Start/Stop gating update.
+            SupervisorDaemonAudit::log($this->server->fresh(), $prog, 'sync_one', [
+                'output' => Str::limit($result['log'], 800),
+                'state' => $result['state'],
+                'ok' => $result['ok'],
+            ]);
+            // Re-probe first so the row's state badge and Start/Stop gating update.
             $this->loadProgramStatuses($provisioner);
+            if ($result['ok']) {
+                $this->toastSuccess($result['message']);
+            } else {
+                $this->toastError($result['message']);
+            }
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
         }

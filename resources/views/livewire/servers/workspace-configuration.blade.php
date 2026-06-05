@@ -103,6 +103,28 @@
             </div>
             </div>
         </div>
+
+        @if ($this->canCloneServer())
+            <div class="{{ $card ?? 'rounded-2xl border border-brand-ink/10 bg-brand-cream shadow-sm' }} mt-6 p-6 sm:p-8">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="max-w-2xl">
+                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Clone server') }}</h2>
+                        <p class="mt-2 text-sm text-brand-moss leading-relaxed">
+                            {{ __('Snapshot this DigitalOcean droplet and provision a new server from the snapshot. The clone lands in the same region and size, with a fresh SSH key. Snapshots typically take 3–8 minutes.') }}
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        wire:click="openCloneServerModal"
+                        @disabled($isDeployer)
+                        class="inline-flex shrink-0 items-center gap-2 self-start rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        <x-heroicon-o-document-duplicate class="h-4 w-4 opacity-80" aria-hidden="true" />
+                        {{ __('Clone server') }}
+                    </button>
+                </div>
+            </div>
+        @endif
     @endif
 
     <x-slot name="modals">
@@ -114,5 +136,71 @@
             'serverId' => $server->id,
             'deletionSummary' => $deletionSummary,
         ])
+
+        {{-- Clone server modal. Triggered from the Clone server card above. --}}
+        @if ($clone_open)
+            <x-modal
+                name="clone-server-modal"
+                maxWidth="2xl"
+                overlayClass="bg-brand-ink/30"
+                panelClass="dply-modal-panel overflow-hidden shadow-xl flex max-h-[min(90vh,880px)] flex-col"
+                focusable
+            >
+                <form wire:submit.prevent="confirmCloneServer" class="flex min-h-0 flex-1 flex-col">
+                    <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-document-duplicate class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Clone') }}</p>
+                            <h2 class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Clone :name?', ['name' => $server->name]) }}</h2>
+                            <p class="mt-1 text-sm leading-6 text-brand-moss">{{ __('Region and size mirror the source. To change them, edit on the provider after the clone completes — or resize via the standard server settings.') }}</p>
+                        </div>
+                    </div>
+
+                    <div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-6">
+                        <div>
+                            <label for="clone-name" class="block text-sm font-medium text-brand-ink">{{ __('New server name') }}</label>
+                            <input
+                                id="clone-name"
+                                type="text"
+                                wire:model="clone_name"
+                                required
+                                minlength="2"
+                                maxlength="120"
+                                class="mt-2 block w-full rounded-lg border border-brand-ink/15 px-3 py-2.5 text-sm shadow-sm focus:border-brand-sage focus:ring-2 focus:ring-brand-sage/30"
+                            />
+                            @error('clone_name')
+                                <p class="mt-1 text-sm text-red-700">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <dl class="grid grid-cols-2 gap-2">
+                            <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Region') }}</dt>
+                                <dd class="mt-0.5 truncate font-mono text-sm font-semibold text-brand-ink">{{ $server->region ?: '—' }}</dd>
+                            </div>
+                            <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Size') }}</dt>
+                                <dd class="mt-0.5 truncate font-mono text-sm font-semibold text-brand-ink">{{ $server->size ?: '—' }}</dd>
+                            </div>
+                        </dl>
+                    </div>
+
+                    <div class="flex shrink-0 flex-wrap justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+                        <x-secondary-button type="button" wire:click="cancelCloneServer">
+                            {{ __('Cancel') }}
+                        </x-secondary-button>
+                        <button
+                            type="submit"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                        >
+                            <x-heroicon-o-document-duplicate class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Start clone') }}
+                        </button>
+                    </div>
+                </form>
+            </x-modal>
+        @endif
     </x-slot>
 </x-server-workspace-layout>
