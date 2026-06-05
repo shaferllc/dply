@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -30,19 +31,45 @@ final class NotificationTablesReady
         return self::has('notification_events') && self::has('notification_inbox_items');
     }
 
-    /** Single-table check, memoised per request. */
+    /** Single-table check, memoised per request and (once true) persistently. */
     public static function has(string $table): bool
     {
         if (array_key_exists($table, self::$cache)) {
             return self::$cache[$table];
         }
 
-        return self::$cache[$table] = Schema::hasTable($table);
+        // A migrated table is never dropped, so a positive result is cached
+        // persistently — once seen, future requests skip the ~15ms
+        // information_schema round-trip entirely. A negative result is only
+        // memoised per request, so a pending migration is picked up on the
+        // next request instead of being pinned to "missing" forever.
+        if (Cache::get(self::cacheKey($table)) === true) {
+            return self::$cache[$table] = true;
+        }
+
+        $exists = Schema::hasTable($table);
+        if ($exists) {
+            Cache::forever(self::cacheKey($table), true);
+        }
+
+        return self::$cache[$table] = $exists;
     }
 
     /** Drop the memo (between requests in long-running processes / tests). */
     public static function flush(): void
     {
         self::$cache = [];
+    }
+
+    /** Forget the persistent positive cache for a table (tests / teardown). */
+    public static function forget(string $table): void
+    {
+        unset(self::$cache[$table]);
+        Cache::forget(self::cacheKey($table));
+    }
+
+    private static function cacheKey(string $table): string
+    {
+        return "schema.table-exists.{$table}";
     }
 }

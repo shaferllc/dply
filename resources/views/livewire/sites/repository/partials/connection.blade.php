@@ -183,4 +183,7 @@
          Deployments → Settings (rendered by repository/partials/webhook.blade.php
          via lockedTab="webhook"). The methods + state still live on this
          Repository Livewire component, so wiring is unchanged. --}}
+
+    {{-- "Disconnect repository & start over" lives on the Danger tab
+         (repository/partials/danger.blade.php). --}}
 </section>

@@ -52,6 +52,7 @@ class ScaffoldLaravelPipeline
         private readonly ExecuteRemoteTaskOnServer $executor,
         private readonly SiteAuditWriter $audit,
         private readonly PlaceholderDnsManager $placeholderDns,
+        private readonly ScaffoldRepoSeeder $repoSeeder,
     ) {}
 
     /**
@@ -110,10 +111,24 @@ class ScaffoldLaravelPipeline
             }
         }
 
+        // Best-effort: seed a local Git repo so this code-first scaffold is
+        // versioned + redeployable. Never fails the scaffold — on error the site
+        // stays live and a repo can be connected later.
+        try {
+            $this->repoSeeder->seed($site->fresh() ?? $site);
+        } catch (Throwable $e) {
+            Log::warning('Scaffold repo seed failed (non-fatal)', [
+                'site_id' => $site->getKey(),
+                'framework' => self::FRAMEWORK,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         // Pipeline succeeded — flip status. nginx wiring + hardening
         // are intentionally deferred to a follow-up PR; the site row
         // is already viable and points at meta.scaffold.steps for
         // the journey to render.
+        $site = $site->fresh() ?? $site;
         $site->status = Site::STATUS_PENDING;
         $site->save();
 

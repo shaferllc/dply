@@ -48,6 +48,10 @@ class ChooseApp extends Component
      */
     public array $tiles = [];
 
+    /** True when the site was already a live, provisioned host before this app
+     *  choice — captured at run() entry, before status is flipped to PENDING. */
+    private bool $siteWasProvisioned = false;
+
     /** Currently selected tile key (empty until the user picks one). */
     #[Url(as: 'app', except: '')]
     public string $selected = '';
@@ -297,6 +301,12 @@ class ChooseApp extends Component
         Gate::authorize('update', $this->server);
         abort_unless($this->site->canRechooseApp(), 404);
 
+        // Capture this BEFORE any forceFill flips status to PENDING. A
+        // services-first site is already a live, provisioned host — installing
+        // an app onto it must be "pull the repo + deploy", not a re-run of the
+        // whole foundation/site-creation provisioning.
+        $this->siteWasProvisioned = $this->site->isReadyForWorkspace();
+
         $tile = $this->tileFor($this->selected);
         if ($tile === null) {
             $this->addError('selected', __('Choose an application to continue.'));
@@ -373,7 +383,9 @@ class ChooseApp extends Component
 
         $this->auditChosen($tile, 'scaffold');
 
-        return $this->redirect(route('sites.scaffold-journey', [
+        // Land on the site workspace — the scaffold-install flow renders inside
+        // the shell (Show) while STATUS_SCAFFOLDING keeps it pre-workspace.
+        return $this->redirect(route('sites.show', [
             'server' => $this->server,
             'site' => $this->site,
         ]), navigate: true);
@@ -475,15 +487,30 @@ class ChooseApp extends Component
 
     private function seedDeployStepsAndProvision(array $tile, string $runtime, SiteProvisioner $siteProvisioner): void
     {
-        // Single home for the bare-foundation provisioning sequence (seed
-        // pipeline → markQueued → install-webserver-first-or-provision). The
-        // services-first create flow uses the same provisioner; keep them in
-        // sync by delegating rather than duplicating the block here.
-        (new SiteFoundationProvisioner($siteProvisioner))->provision(
-            $this->site,
-            $runtime,
-            (string) ($tile['framework'] ?? ''),
-        );
+        $framework = (string) ($tile['framework'] ?? '');
+        $site = $this->site->fresh() ?? $this->site;
+        $hasRepo = is_string($site->git_repository_url) && trim((string) $site->git_repository_url) !== '';
+
+        // Services-first: the site is already a live, provisioned host. Installing
+        // an app onto it is strictly "pull the repo + deploy it" — NEVER a re-run
+        // of the whole foundation/site-creation provisioning. A blank/no-repo
+        // choice needs no deploy at all: the splash page already serves.
+        if ($this->siteWasProvisioned) {
+            if ($hasRepo) {
+                app(\App\Services\Deploy\SiteDeployPipelineManager::class)
+                    ->seedRuntimeDefaults($site, $runtime, $framework !== '' ? $framework : null);
+                app(\App\Services\Sites\SiteDeploySyncCoordinator::class)
+                    ->dispatchManualForGroup($site->fresh());
+            }
+
+            return;
+        }
+
+        // Legacy path: the foundation isn't provisioned yet (pre-services-first
+        // awaiting-app sites). Run the full bare-foundation sequence (seed
+        // pipeline → markQueued → install-webserver-first-or-provision); the
+        // repo's first deploy follows the foundation.
+        (new SiteFoundationProvisioner($siteProvisioner))->provision($site, $runtime, $framework);
     }
 
     private function documentRoot(array $tile): string

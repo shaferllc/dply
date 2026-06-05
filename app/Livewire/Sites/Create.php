@@ -644,7 +644,9 @@ class Create extends Component
             );
         }
 
-        return $this->redirect(route('sites.scaffold-journey', [
+        // Land on the site workspace — the scaffold-install flow renders inside
+        // the shell (Show) while STATUS_SCAFFOLDING keeps it pre-workspace.
+        return $this->redirect(route('sites.show', [
             'server' => $this->server,
             'site' => $site,
         ]), navigate: true);

@@ -160,6 +160,15 @@ class DeploymentsList extends Component
             $this->tab = self::TAB_PIPELINE;
         }
 
+        // Repository is now its own standalone page (sites.repository) with the
+        // site sidebar — it's no longer a tab in this hub. Old ?tab=repository
+        // bookmarks / deep links resolve to the standalone page.
+        if ($this->tab === self::TAB_REPOSITORY) {
+            $this->redirect(route('sites.repository', ['server' => $server, 'site' => $site]), navigate: true);
+
+            return;
+        }
+
         if (! in_array($this->tab, self::TABS, true)) {
             $this->tab = self::TAB_DEPLOY;
         }

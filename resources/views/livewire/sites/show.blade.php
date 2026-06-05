@@ -150,6 +150,10 @@
             @if (! $readyForWorkspace)
                 @if ($site->usesEdgeRuntime())
                     @include('livewire.sites.partials.show.edge-provisioning-journey')
+                @elseif ($site->isScaffoldJourneyActive())
+                    {{-- App install (scaffold) — its own flow, distinct from the
+                         bare-site provisioning journey above. --}}
+                    @include('livewire.sites.partials.show.scaffold-install-journey')
                 @else
                     @include('livewire.sites.partials.show.provisioning-journey')
                 @endif

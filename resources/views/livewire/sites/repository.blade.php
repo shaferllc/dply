@@ -80,6 +80,7 @@
                         ['id' => 'files',      'label' => __('Files'),      'icon' => 'heroicon-o-folder'],
                         ['id' => 'branches',   'label' => __('Branches'),   'icon' => 'heroicon-o-rectangle-stack'],
                         ['id' => 'connection', 'label' => __('Connection'), 'icon' => 'heroicon-o-link'],
+                        ['id' => 'danger',     'label' => __('Danger'),     'icon' => 'heroicon-o-exclamation-triangle', 'variant' => 'danger'],
                     ];
                 @endphp
 
@@ -90,6 +91,7 @@
                                 id="repository-tab-{{ $entry['id'] }}"
                                 :active="$activeTab === $entry['id']"
                                 :icon="$entry['icon']"
+                                :variant="$entry['variant'] ?? 'default'"
                                 wire:click="selectTab('{{ $entry['id'] }}')"
                             >{{ $entry['label'] }}</x-server-workspace-tab>
                         @endforeach
@@ -118,6 +120,7 @@
                         @includeWhen($activeTab === 'files',      'livewire.sites.repository.partials.files')
                         @includeWhen($activeTab === 'branches',   'livewire.sites.repository.partials.branches')
                         @includeWhen($activeTab === 'connection', 'livewire.sites.repository.partials.connection')
+                        @includeWhen($activeTab === 'danger',     'livewire.sites.repository.partials.danger')
                         @includeWhen($activeTab === 'webhook',    'livewire.sites.repository.partials.webhook')
                     </div>
                 </div>

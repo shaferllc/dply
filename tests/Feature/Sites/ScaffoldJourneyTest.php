@@ -70,7 +70,7 @@ test('running pipeline renders step list', function () {
         ->test(ScaffoldJourney::class, ['server' => $server, 'site' => $site])
         ->assertSee('Verify prerequisites')
         ->assertSee('Create database')
-        ->assertSee('Auto-refreshing every 2 seconds');
+        ->assertSee('Auto-refreshing');
 });
 test('failed pipeline shows retry button when under attempt cap', function () {
     [$user, $server, $site] = makeSite(Site::STATUS_SCAFFOLD_FAILED, [
@@ -82,8 +82,8 @@ test('failed pipeline shows retry button when under attempt cap', function () {
 
     Livewire::actingAs($user)
         ->test(ScaffoldJourney::class, ['server' => $server, 'site' => $site])
-        ->assertSee('Scaffold failed')
-        ->assertSee('Retry scaffold')
+        ->assertSee('Install failed')
+        ->assertSee('Retry install')
         ->assertSee('wp-cli unavailable');
 });
 test('failed pipeline after three attempts offers delete only', function () {
@@ -96,7 +96,7 @@ test('failed pipeline after three attempts offers delete only', function () {
 
     Livewire::actingAs($user)
         ->test(ScaffoldJourney::class, ['server' => $server, 'site' => $site])
-        ->assertDontSee('Retry scaffold')
+        ->assertDontSee('Retry install')
         ->assertSee('Delete site and start fresh');
 });
 test('retry dispatches pipeline and resets state', function () {
@@ -112,7 +112,7 @@ test('retry dispatches pipeline and resets state', function () {
 
     Livewire::actingAs($user)
         ->test(ScaffoldJourney::class, ['server' => $server, 'site' => $site])
-        ->call('retry');
+        ->call('retryScaffold');
 
     $site->refresh();
     expect($site->status)->toBe(Site::STATUS_SCAFFOLDING);
@@ -134,7 +134,7 @@ test('retry dispatches laravel job for laravel framework', function () {
 
     Livewire::actingAs($user)
         ->test(ScaffoldJourney::class, ['server' => $server, 'site' => $site])
-        ->call('retry');
+        ->call('retryScaffold');
 
     Bus::assertDispatched(RunLaravelScaffoldJob::class);
 });
@@ -162,7 +162,7 @@ test('retry releases prior placeholder and drops site domain row', function () {
 
     Livewire::actingAs($user)
         ->test(ScaffoldJourney::class, ['server' => $server, 'site' => $site])
-        ->call('retry');
+        ->call('retryScaffold');
 
     $site->refresh();
     expect($site->domains()->where('hostname', 'old-blog.198-51-100-1.nip.io')->count())->toBe(0, 'Stale SiteDomain row from prior attempt must be deleted to free the unique hostname constraint');
@@ -178,7 +178,7 @@ test('retry is a no op after attempt cap', function () {
 
     Livewire::actingAs($user)
         ->test(ScaffoldJourney::class, ['server' => $server, 'site' => $site])
-        ->call('retry');
+        ->call('retryScaffold');
 
     $site->refresh();
     expect($site->status)->toBe(Site::STATUS_SCAFFOLD_FAILED);
@@ -196,11 +196,11 @@ test('completed state renders password reveal', function () {
 
     Livewire::actingAs($user)
         ->test(ScaffoldJourney::class, ['server' => $server, 'site' => $site])
-        ->assertSee('Scaffold complete')
+        ->assertSee('Install complete')
         ->assertSee('Reveal password')
         ->assertDontSee('hunter2')
-        ->call('revealPassword')
-        ->assertSet('passwordRevealed', true)
+        ->call('revealScaffoldPassword')
+        ->assertSet('scaffoldPasswordRevealed', true)
         ->assertSee('hunter2');
 });
 test('member role cannot reveal password', function () {
@@ -211,8 +211,8 @@ test('member role cannot reveal password', function () {
 
     Livewire::actingAs($user)
         ->test(ScaffoldJourney::class, ['server' => $server, 'site' => $site])
-        ->call('revealPassword')
-        ->assertSet('passwordRevealed', false)
+        ->call('revealScaffoldPassword')
+        ->assertSet('scaffoldPasswordRevealed', false)
         ->assertHasErrors('reveal');
 });
 test('404s for non scaffolded site', function () {

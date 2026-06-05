@@ -46,6 +46,7 @@ class ScaffoldComposerPipeline
         private readonly ExecuteRemoteTaskOnServer $executor,
         private readonly SiteAuditWriter $audit,
         private readonly PlaceholderDnsManager $placeholderDns,
+        private readonly ScaffoldRepoSeeder $repoSeeder,
     ) {}
 
     /**
@@ -115,6 +116,21 @@ class ScaffoldComposerPipeline
             }
         }
 
+        // Best-effort: seed a local Git repo for code-first scaffolds (Statamic /
+        // Symfony / Craft — not Drupal, which is manage-in-place). A failure here
+        // must never fail the scaffold: the site is already installed + live, so
+        // we just log and leave it repo-less to connect one later.
+        try {
+            $this->repoSeeder->seed($site->fresh() ?? $site);
+        } catch (Throwable $e) {
+            Log::warning('Scaffold repo seed failed (non-fatal)', [
+                'site_id' => $site->getKey(),
+                'framework' => $framework,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        $site = $site->fresh() ?? $site;
         $site->status = Site::STATUS_PENDING;
         $site->save();
 

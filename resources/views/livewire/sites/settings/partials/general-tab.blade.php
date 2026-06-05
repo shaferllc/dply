@@ -1,20 +1,56 @@
 {{-- Services-first: a live site with no app yet. Configure services here, then
      connect a repo — the bindings wire into the first deploy automatically. --}}
 @if ($site->canRechooseApp())
-    <section class="mb-6 overflow-hidden rounded-2xl border border-brand-sage/30 bg-brand-sage/5">
-        <div class="flex flex-wrap items-center gap-4 px-6 py-5 sm:px-7">
-            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-forest text-brand-cream">
-                <x-heroicon-o-code-bracket-square class="h-6 w-6" aria-hidden="true" />
-            </span>
-            <div class="min-w-0 flex-1">
-                <h2 class="text-base font-semibold text-brand-ink">{{ __('Connect a repository to deploy your app') }}</h2>
-                <p class="mt-0.5 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('This site is live and serving a default page. Set up its services (database, cache, queue, env) here first — then connect a Git repo or install an app, and your services are wired into the first deploy automatically.') }}</p>
+    @php
+        // Each option is a shortcut that deep-links into the picker pre-selected
+        // (?app=<key>) so the click lands on the exact action. "Install an app"
+        // is a category (many installers), so it opens the picker un-filtered.
+        $chooseAppLink = fn (string $app = '') => route('sites.choose-app', array_filter([
+            'server' => $server->id,
+            'site' => $site->id,
+            'app' => $app,
+        ], fn ($v) => $v !== ''));
+        $chooseAppUrl = $chooseAppLink();
+        $setupOptions = [
+            ['icon' => 'heroicon-o-sparkles', 'title' => __('Install an app'), 'body' => __('WordPress, Laravel, Statamic & more — set up for you.'), 'app' => ''],
+            ['icon' => 'heroicon-o-code-bracket', 'title' => __('Connect a Git repo'), 'body' => __('Deploy an existing application from your repository.'), 'app' => 'git'],
+            ['icon' => 'heroicon-o-minus-circle', 'title' => __('Start blank'), 'body' => __('Keep the splash page and decide later.'), 'app' => 'blank'],
+        ];
+    @endphp
+    <section class="mb-6 overflow-hidden rounded-2xl border border-brand-sage/30 bg-gradient-to-br from-brand-sage/10 via-white to-white shadow-sm">
+        <div class="px-6 py-6 sm:px-7">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div class="flex min-w-0 items-start gap-4">
+                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-forest text-brand-cream shadow-sm">
+                        <x-heroicon-o-rocket-launch class="h-6 w-6" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Next step') }}</p>
+                        <h2 class="mt-0.5 text-lg font-semibold tracking-tight text-brand-ink">{{ __('Set up your app') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('This site is live and serving its splash page. Configure its services (database, cache, queue, env) below if you need them, then choose how to ship — your services wire into the first deploy automatically.') }}</p>
+                    </div>
+                </div>
+                <a href="{{ $chooseAppUrl }}" wire:navigate
+                    class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest">
+                    <x-heroicon-o-rocket-launch class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Set up your app') }}
+                </a>
             </div>
-            <a href="{{ route('sites.choose-app', ['server' => $server, 'site' => $site]) }}" wire:navigate
-                class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream shadow-sm hover:bg-brand-forest">
-                <x-heroicon-o-rocket-launch class="h-4 w-4" aria-hidden="true" />
-                {{ __('Connect repository') }}
-            </a>
+
+            <div class="mt-5 grid gap-2.5 sm:grid-cols-3">
+                @foreach ($setupOptions as $option)
+                    <a href="{{ $chooseAppLink($option['app']) }}" wire:navigate
+                        class="group flex items-start gap-3 rounded-xl border border-brand-ink/8 bg-white/80 p-3.5 shadow-sm ring-1 ring-brand-ink/[0.02] transition hover:-translate-y-0.5 hover:border-brand-sage/40 hover:shadow-md">
+                        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-sage/12 text-brand-forest ring-1 ring-brand-sage/15 transition group-hover:bg-brand-sage/20">
+                            <x-dynamic-component :component="$option['icon']" class="h-4 w-4" aria-hidden="true" />
+                        </span>
+                        <span class="min-w-0">
+                            <span class="block text-sm font-semibold text-brand-ink">{{ $option['title'] }}</span>
+                            <span class="mt-0.5 block text-xs leading-snug text-brand-moss">{{ $option['body'] }}</span>
+                        </span>
+                    </a>
+                @endforeach
+            </div>
         </div>
     </section>
 @endif

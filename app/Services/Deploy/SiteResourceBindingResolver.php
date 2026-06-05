@@ -126,7 +126,10 @@ final class SiteResourceBindingResolver
         // authoritative: it replaces the derived inference for its type so the
         // UI shows the managed state and the deploy reads the bound resource.
         // The publication binding stays runtime-owned and is never manageable.
-        $persisted = $site->bindings()->get()->keyBy('type');
+        // Reuse the already-loaded relation (effectiveEnvironmentMapForSite()
+        // above calls loadMissing('bindings')) rather than bindings()->get(),
+        // which would re-query the same rows.
+        $persisted = $site->loadMissing('bindings')->bindings->keyBy('type');
         $bindings = array_map(function (SiteResourceBinding $derived) use ($persisted): SiteResourceBinding {
             $manageable = $derived->type !== 'publication';
 

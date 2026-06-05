@@ -235,6 +235,19 @@ trait TracksProvisioningStatus
         return $this->type === SiteType::Custom;
     }
 
+    /**
+     * The app-install (scaffold) pipeline owns the pre-workspace surface for a
+     * scaffolded site — a flow distinct from the bare-site provisioning journey.
+     * True while a scaffold is running, has failed, or just completed but the
+     * site shell isn't workspace-ready yet (the one-time password reveal window).
+     * Once the shell is ready the normal workspace takes over.
+     */
+    public function isScaffoldJourneyActive(): bool
+    {
+        return is_array(data_get($this->meta, 'scaffold'))
+            && ! $this->isReadyForWorkspace();
+    }
+
     public function isCustomGitMode(): bool
     {
         return $this->isCustom() && trim((string) $this->git_repository_url) !== '';
@@ -322,19 +335,24 @@ trait TracksProvisioningStatus
      */
     public function canRechooseApp(): bool
     {
-        // A site already routed through the picker (awaiting an app, or created
-        // services-first with "skipped") keeps its "Connect repository" path even
-        // if the feature flag is later turned off — otherwise the flag would
-        // strand live, app-less sites with no way to attach a repo. The flag only
-        // gates NEW entries (pre-existing web sites with no app installed).
+        // Once an application is actually installed (scaffolded, repo connected,
+        // or deployed) there is nothing left to choose — never offer the picker,
+        // even for services-first sites that still carry the "skipped" marker.
+        // Resetting a site (disconnect & start over) clears those signals, which
+        // flips lacksInstalledApp() back to true and re-opens the picker.
+        if (! $this->lacksInstalledApp()) {
+            return false;
+        }
+
+        // No app yet. A site already routed through the picker (awaiting an app,
+        // or created services-first with "skipped") keeps its path even if the
+        // feature flag is later turned off — otherwise the flag would strand
+        // live, app-less sites with no way to attach a repo. The flag only gates
+        // NEW entries (pre-existing web sites with no app installed).
         $alreadyInFlow = $this->isAwaitingApp()
             || (bool) data_get($this->meta, 'choose_app.skipped', false);
 
-        if (! config('dply.choose_app_enabled')) {
-            return $alreadyInFlow;
-        }
-
-        return $alreadyInFlow || $this->lacksInstalledApp();
+        return config('dply.choose_app_enabled') ? true : $alreadyInFlow;
     }
 
     /**

@@ -285,6 +285,19 @@ trait ResolvesSiteRuntime
     }
 
     /**
+     * True when this site is a "manage-in-place" CMS — scaffolded WordPress or
+     * Drupal, which dply installs and maintains on the box rather than deploying
+     * from a Git repo. The Repository surfaces are hidden for these (there's no
+     * developer-owned repo; the install itself is the source of truth).
+     */
+    public function isManageInPlaceCms(): bool
+    {
+        $scaffoldFramework = strtolower((string) ($this->meta['scaffold']['framework'] ?? ''));
+
+        return in_array($scaffoldFramework, ['wordpress', 'drupal'], true);
+    }
+
+    /**
      * @param  array<string, mixed>  $blob
      */
     private function runtimeAppDetectionIsMeaningful(array $blob): bool

@@ -21,7 +21,8 @@ use App\Models\Server;
  * Tile `kind` values:
  *  - scaffold:  real one-click installer backed by a queued pipeline job
  *               (WordPress / Laravel today). Sets meta.scaffold + dispatches
- *               `pipeline_job`; the site walks the scaffold-journey UI.
+ *               `pipeline_job`; the site shows the scaffold-install flow inside
+ *               the workspace shell (Show) while STATUS_SCAFFOLDING.
  *  - import:    bring an existing git repository. Reveals repo URL + branch.
  *  - preset:    import with framework defaults pre-filled (web subdir, build
  *               command hint). Really "import with sensible defaults" — not a
@@ -84,7 +85,7 @@ class AppCatalog
             [
                 'key' => 'wordpress',
                 'label' => __('WordPress'),
-                'description' => __('Install a fresh WordPress site, database and admin user included.'),
+                'description' => __('Install a fresh WordPress site, database and admin user included. Managed in place — no Git repo.'),
                 'icon' => 'heroicon-o-newspaper',
                 'kind' => 'scaffold',
                 'needs_db' => true,
@@ -157,7 +158,7 @@ class AppCatalog
             [
                 'key' => 'drupal',
                 'label' => __('Drupal'),
-                'description' => __('Install Drupal with a database; finish the install wizard in your browser.'),
+                'description' => __('Install Drupal with a database; finish the install wizard in your browser. Managed in place — no Git repo.'),
                 'icon' => 'heroicon-o-globe-alt',
                 'kind' => 'scaffold',
                 'needs_db' => true,

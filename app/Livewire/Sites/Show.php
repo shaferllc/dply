@@ -25,6 +25,7 @@ use App\Livewire\Concerns\OptimizesPipeline;
 use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
 use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
 use App\Livewire\Sites\Concerns\HandlesSiteRemovalFlow;
+use App\Livewire\Sites\Concerns\InteractsWithScaffoldJourney;
 use App\Livewire\Sites\Concerns\ManagesSiteDeployExecution;
 use App\Livewire\Sites\Concerns\ManagesSiteDeployHooks;
 use App\Livewire\Sites\Concerns\ManagesSiteDeploySteps;
@@ -75,6 +76,7 @@ class Show extends Component
     use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
     use HandlesSiteRemovalFlow;
+    use InteractsWithScaffoldJourney;
     use ManagesEdgeRedeploy;
     use ManagesServerlessRuntime;
     use ManagesSiteDeployExecution;
@@ -2926,6 +2928,13 @@ class Show extends Component
             ? app(ServerPhpManager::class)->sitePhpData($this->server, $this->site)
             : null;
 
+        // The scaffold-install partial (a flow distinct from the bare-site
+        // provisioning journey) needs its step/retry/reveal payload. Only
+        // computed while a scaffold owns the pre-workspace surface.
+        $scaffoldData = $this->site->isScaffoldJourneyActive()
+            ? $this->scaffoldJourneyData()
+            : [];
+
         return view('livewire.sites.show', array_merge(
             SiteShowViewData::for(
                 $this->server,
@@ -2942,6 +2951,7 @@ class Show extends Component
                 'deploymentPreflight' => $deploymentPreflight,
                 'sitePhpData' => $sitePhpData,
             ],
+            $scaffoldData,
         ));
     }
 

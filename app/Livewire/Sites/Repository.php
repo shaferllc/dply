@@ -327,6 +327,45 @@ class Repository extends Component
         $this->toastSuccess(__('Repository connection saved.'));
     }
 
+    /**
+     * Uninstall the connected repository and start the site over: clear the repo
+     * fields locally, mark it re-choosable, then queue {@see ResetSiteToBlankJob}
+     * to wipe the deployed code on the server and restore the splash page. The
+     * site shell (server, domains, testing URL, certificates) is kept — only the
+     * application is removed — so the operator can connect a different repo or
+     * pick a new app from a clean slate.
+     */
+    public function disconnectAndStartOver(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $site = $this->site;
+        $meta = is_array($site->meta) ? $site->meta : [];
+        foreach (['git_ref_kind', 'git_source_control_account_id', 'git_provider_kind', 'scaffold'] as $key) {
+            unset($meta[$key]);
+        }
+        // Re-open the app picker for this site (services-first "skipped" sentinel
+        // makes Site::canRechooseApp() return true).
+        $meta['choose_app'] = [
+            'skipped' => true,
+            'reset_at' => now()->toIso8601String(),
+            'reset_by_user_id' => auth()->id(),
+        ];
+
+        $site->forceFill([
+            'git_repository_url' => '',
+            'git_branch' => 'main',
+            'last_deploy_at' => null,
+            'meta' => $meta,
+        ])->save();
+
+        \App\Jobs\ResetSiteToBlankJob::dispatch((string) $site->id);
+
+        $this->toastSuccess(__('Repository disconnected — wiping the deployed app and resetting to a blank splash page.'));
+
+        $this->redirect(route('sites.show', ['server' => $this->server, 'site' => $site]), navigate: true);
+    }
+
     public function enableQuickDeploy(RepositoryWebhookProvisioner $provisioner): void
     {
         Gate::authorize('update', $this->site);
@@ -442,6 +481,9 @@ class Repository extends Component
             // live on the Connection payload. We render only the webhook
             // card via lockedTab="webhook" on the embedded component.
             'webhook' => $payload + $this->renderConnectionPayload($browser, $user),
+            // Danger zone (disconnect repo + start over) needs no remote reads —
+            // just the base payload (server/site are public props on the view).
+            'danger' => $payload,
             default => $payload + $this->renderOverviewPayload($reader, $commitsFetcher, $user, $branchInUse),
         });
     }
@@ -451,7 +493,7 @@ class Repository extends Component
      * the unlocked Repository view. 'webhook' is intentionally NOT here —
      * it's only ever reachable through a locked embed.
      */
-    private const UNLOCKED_TABS = ['overview', 'commits', 'files', 'branches', 'connection'];
+    private const UNLOCKED_TABS = ['overview', 'commits', 'files', 'branches', 'connection', 'danger'];
 
     /** Page size for the "Repositories on this account" library list. */
     private const REPO_LIBRARY_PER_PAGE = 8;

@@ -2,7 +2,6 @@
     use App\Livewire\Sites\DeploymentsList;
     $tabs = [
         ['id' => DeploymentsList::TAB_OVERVIEW,   'label' => __('Overview'),   'icon' => 'heroicon-o-chart-bar'],
-        ['id' => DeploymentsList::TAB_REPOSITORY, 'label' => __('Repository'), 'icon' => 'heroicon-o-code-bracket'],
         ['id' => DeploymentsList::TAB_DEPLOY,     'label' => __('Deploy'),     'icon' => 'heroicon-o-rocket-launch'],
         ['id' => DeploymentsList::TAB_ENVIRONMENT, 'label' => __('Environment'), 'icon' => 'heroicon-o-key'],
         ['id' => DeploymentsList::TAB_WEBHOOK,  'label' => __('Webhook'),  'icon' => 'heroicon-o-bolt'],

@@ -100,6 +100,16 @@ final class SiteShowViewData
                 SiteCertificate::STATUS_INSTALLING,
             ], true));
         $latestCertificate = $activeCertificate ?? $pendingCertificate ?? $site->certificates->first();
+        // Only serverless / container runtimes enter "awaiting_first_deploy" —
+        // for them the first deploy is what publishes a live endpoint. A VM site
+        // provisions to a live splash page (reachability → ready) and deploys
+        // SEPARATELY once a repo is connected, so showing a "Waiting for first
+        // deploy" step in its provisioning journey would imply provisioning waits
+        // for a deploy it never triggers. Drop it for VM hosts.
+        $entersFirstDeployState = $site->usesFunctionsRuntime()
+            || $site->usesDockerRuntime()
+            || $site->usesKubernetesRuntime();
+
         $statusSteps = [
             'queued' => __('Queued'),
             'preparing_runtime_artifacts' => __('Preparing runtime artifacts'),
@@ -107,10 +117,12 @@ final class SiteShowViewData
             'provisioning_testing_hostname' => __('Assigning testing hostname'),
             'writing_site_config' => __('Writing site config'),
             'waiting_for_http' => __('Checking reachability'),
-            'awaiting_first_deploy' => __('Waiting for first deploy'),
-            'ready' => __('Site available'),
-            'failed' => __('Needs attention'),
         ];
+        if ($entersFirstDeployState) {
+            $statusSteps['awaiting_first_deploy'] = __('Waiting for first deploy');
+        }
+        $statusSteps['ready'] = __('Site available');
+        $statusSteps['failed'] = __('Needs attention');
         $stepKeys = array_keys($statusSteps);
         $currentStepIndex = array_search($provisioningState, $stepKeys, true);
         $currentStepIndex = $currentStepIndex === false ? 0 : $currentStepIndex;
