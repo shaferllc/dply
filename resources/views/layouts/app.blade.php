@@ -99,6 +99,10 @@
         </div>
 
         @auth
+            {{-- Global command palette (Cmd/Ctrl+K). Mounted once here so the
+                 shortcut and search work on every authenticated page. --}}
+            <livewire:command-palette :key="'global-command-palette'" />
+
             {{-- Shared Git provider connect modal (OAuth + PAT). Mounted here — not
                  inside page Livewire components — so teleported modal actions stay
                  bound to this component instead of the parent page. --}}

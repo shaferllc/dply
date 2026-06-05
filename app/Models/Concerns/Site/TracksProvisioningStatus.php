@@ -199,6 +199,16 @@ trait TracksProvisioningStatus
             return true;
         }
 
+        // A site whose foundation provisioning completed ('ready') has a live,
+        // navigable workspace even while an app install (scaffold) or redeploy is
+        // in flight — the install is an operation INSIDE the site, not a reason
+        // to un-render it and lock the operator out. (A brand-new, never-
+        // provisioned scaffold has no 'ready' foundation yet, so it still gets
+        // the full-page install journey until its shell exists.)
+        if ($this->provisioningState() === 'ready') {
+            return true;
+        }
+
         if (in_array($this->status, [
             self::STATUS_DOCKER_CONFIGURED,
             self::STATUS_KUBERNETES_CONFIGURED,
@@ -246,6 +256,20 @@ trait TracksProvisioningStatus
     {
         return is_array(data_get($this->meta, 'scaffold'))
             && ! $this->isReadyForWorkspace();
+    }
+
+    /**
+     * An app install (scaffold) is running or just failed — regardless of
+     * whether the site already has a live workspace. Used to surface the install
+     * pipeline as a banner INSIDE an already-provisioned site's workspace (so the
+     * install never takes the whole page over), distinct from
+     * {@see isScaffoldJourneyActive()} which owns the pre-workspace surface for a
+     * brand-new scaffold that has no shell yet.
+     */
+    public function isScaffoldInstalling(): bool
+    {
+        return is_array(data_get($this->meta, 'scaffold'))
+            && in_array($this->status, [self::STATUS_SCAFFOLDING, self::STATUS_SCAFFOLD_FAILED], true);
     }
 
     public function isCustomGitMode(): bool
@@ -353,6 +377,106 @@ trait TracksProvisioningStatus
             || (bool) data_get($this->meta, 'choose_app.skipped', false);
 
         return config('dply.choose_app_enabled') ? true : $alreadyInFlow;
+    }
+
+    /**
+     * Lifecycle state of the post-repo-connect setup wizard (import/preset
+     * sites), written by {@see \App\Jobs\PreflightSiteSetupJob} into
+     * meta.setup.state: 'scanning' | 'deploying' | 'needs_setup' |
+     * 'scan_failed'. Null once the site has deployed at least once, or for
+     * sites that never entered the flow.
+     */
+    public function firstDeploySetupState(): ?string
+    {
+        if ($this->last_deploy_at !== null) {
+            return null;
+        }
+        $state = data_get($this->meta, 'setup.state');
+
+        return is_string($state) ? $state : null;
+    }
+
+    /** The pre-flight scan is still running; the wizard shows an "analyzing" state. */
+    public function isPreflightScanning(): bool
+    {
+        return $this->firstDeploySetupState() === 'scanning';
+    }
+
+    /** The pre-flight scan failed (auth/not-found/network); the wizard fails open with a fix-it banner. */
+    public function setupScanFailed(): bool
+    {
+        return $this->firstDeploySetupState() === 'scan_failed';
+    }
+
+    public function setupScanFailureReason(): ?string
+    {
+        if (! $this->setupScanFailed()) {
+            return null;
+        }
+        $reason = data_get($this->meta, 'setup.error');
+
+        return is_string($reason) ? $reason : 'unknown';
+    }
+
+    /**
+     * The site has connected a repo but is being held before its first deploy
+     * pending setup (missing required env, or a failed scan to fix). Drives the
+     * setup wizard and the Overview "finish setting up" card. The site stays
+     * live (no status change) throughout — see {@see \App\Jobs\PreflightSiteSetupJob}.
+     */
+    public function needsFirstDeploySetup(): bool
+    {
+        return in_array($this->firstDeploySetupState(), ['needs_setup', 'scan_failed'], true);
+    }
+
+    /** Still scanning or actively held for setup — i.e. the setup wizard owns this site. */
+    public function isInFirstDeploySetup(): bool
+    {
+        return in_array($this->firstDeploySetupState(), ['scanning', 'needs_setup', 'scan_failed'], true);
+    }
+
+    /**
+     * Required env keys still unsatisfied in the current env cache — the
+     * "N variables left" the wizard and Overview card count, and the final
+     * Deploy completeness gate. A key is satisfied when the cached .env carries
+     * a non-empty value for it (resource keys included: they become satisfied
+     * when the Resources step provisions and injects their credentials).
+     * APP_KEY is excluded — the deploy mints it.
+     *
+     * Distinct from {@see missingRequiredEnvKeys()} (the deploy-gate's strict,
+     * present-keys-driven check): this is the wizard's cache-driven count.
+     *
+     * @return list<string>
+     */
+    public function unsatisfiedRequiredEnvKeys(): array
+    {
+        $keys = data_get($this->envRequirements(), 'keys');
+        if (! is_array($keys) || $keys === []) {
+            return [];
+        }
+
+        $current = [];
+        if (filled($this->env_file_content)) {
+            $parsed = app(\App\Services\Sites\DotEnvFileParser::class)->parse((string) $this->env_file_content);
+            $current = is_array($parsed['variables'] ?? null) ? $parsed['variables'] : [];
+        }
+
+        $missing = [];
+        foreach ($keys as $key) {
+            if (! ($key['required'] ?? false)) {
+                continue;
+            }
+            $name = (string) ($key['key'] ?? '');
+            if ($name === '' || $name === 'APP_KEY') {
+                continue;
+            }
+            $value = trim((string) ($current[$name] ?? ''));
+            if ($value === '' || strtolower($value) === 'null') {
+                $missing[] = $name;
+            }
+        }
+
+        return $missing;
     }
 
     /**

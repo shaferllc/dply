@@ -246,7 +246,7 @@ return [
         'site_aliases' => env('FEATURE_WORKSPACE_SITE_ALIASES', false),
         'site_aliases_preview' => env('FEATURE_WORKSPACE_SITE_ALIASES_PREVIEW', true),
         'site_redirects' => env('FEATURE_WORKSPACE_SITE_REDIRECTS', false),
-        'site_redirects_preview' => env('FEATURE_WORKSPACE_SITE_REDIRECTS_PREVIEW', true),
+        'site_redirects_preview' => env('FEATURE_WORKSPACE_SITE_REDIRECTS_PREVIEW', false),
         'site_preview' => env('FEATURE_WORKSPACE_SITE_PREVIEW', false),
         'site_preview_preview' => env('FEATURE_WORKSPACE_SITE_PREVIEW_PREVIEW', true),
         'site_tenants' => env('FEATURE_WORKSPACE_SITE_TENANTS', false),

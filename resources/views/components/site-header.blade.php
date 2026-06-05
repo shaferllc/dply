@@ -149,6 +149,16 @@
                     {{-- overflow visible so dropdown panels are not clipped (CSS overflow-x:auto implies vertical clipping) --}}
                     <div class="min-w-0 shrink overflow-visible">
                         <nav class="flex min-h-[2.5rem] flex-nowrap items-center justify-end gap-x-0.5 pe-1 text-sm font-medium" aria-label="{{ __('App') }}">
+                            <button
+                                type="button"
+                                @click="window.dispatchEvent(new CustomEvent('dply-command-palette-open'))"
+                                class="group me-1 inline-flex shrink-0 items-center gap-2 rounded-lg border border-brand-ink/10 bg-white/60 px-2.5 py-1.5 text-brand-moss transition hover:border-brand-sage/40 hover:text-brand-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/40"
+                                aria-label="{{ __('Search') }}"
+                                title="{{ __('Search — ⌘K') }}"
+                            >
+                                <x-heroicon-o-magnifying-glass class="h-4 w-4 shrink-0" />
+                                <kbd class="hidden items-center rounded bg-brand-sand/60 px-1 py-0.5 text-[10px] font-semibold text-brand-moss lg:inline-flex">⌘K</kbd>
+                            </button>
                             <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                                 <x-slot name="icon">
                                     <x-heroicon-o-squares-2x2 class="{{ $hi }}" />

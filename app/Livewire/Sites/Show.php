@@ -2928,10 +2928,11 @@ class Show extends Component
             ? app(ServerPhpManager::class)->sitePhpData($this->server, $this->site)
             : null;
 
-        // The scaffold-install partial (a flow distinct from the bare-site
-        // provisioning journey) needs its step/retry/reveal payload. Only
-        // computed while a scaffold owns the pre-workspace surface.
-        $scaffoldData = $this->site->isScaffoldJourneyActive()
+        // The scaffold-install partial needs its step/retry/reveal payload —
+        // whether it owns the pre-workspace surface (brand-new scaffold) OR is
+        // shown as a banner inside an already-provisioned site's workspace while
+        // an install runs.
+        $scaffoldData = ($this->site->isScaffoldJourneyActive() || $this->site->isScaffoldInstalling())
             ? $this->scaffoldJourneyData()
             : [];
 

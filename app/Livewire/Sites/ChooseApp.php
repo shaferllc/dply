@@ -108,12 +108,20 @@ class ChooseApp extends Component
         Gate::authorize('view', $site);
         Gate::authorize('update', $server);
 
-        // Only bare or explicitly-skipped sites may (re)choose an app. A site
-        // with a real app installed is locked.
-        abort_unless($site->canRechooseApp(), 404);
-
         $this->server = $server;
         $this->site = $site;
+
+        // Only bare or explicitly-skipped sites may (re)choose an app. A site
+        // that already has an app installed has nothing to choose — but that must
+        // never dead-end on a 404 (e.g. Back/refresh after connecting a repo, or a
+        // stale link): gracefully send the operator to the live site instead, so
+        // they can still get to it.
+        if (! $site->canRechooseApp()) {
+            $this->redirectRoute('sites.show', ['server' => $server->id, 'site' => $site->id], navigate: true);
+
+            return;
+        }
+
         $this->tiles = $catalog->forServer($server);
 
         if ($server->hostCapabilities()->supportsMachinePhpManagement()) {
@@ -283,7 +291,8 @@ class ChooseApp extends Component
      */
     public function selectTile(string $key): void
     {
-        if ($this->tileFor($key) === null) {
+        $tile = $this->tileFor($key);
+        if ($tile === null || ($tile['coming_soon'] ?? false)) {
             return;
         }
 
@@ -299,7 +308,11 @@ class ChooseApp extends Component
     public function run(SiteProvisioner $siteProvisioner): mixed
     {
         Gate::authorize('update', $this->server);
-        abort_unless($this->site->canRechooseApp(), 404);
+        // If the site picked up an app between page load and submit (double-submit,
+        // a concurrent install), don't 404 — just land them on the live site.
+        if (! $this->site->canRechooseApp()) {
+            return $this->redirectRoute('sites.show', ['server' => $this->server->id, 'site' => $this->site->id], navigate: true);
+        }
 
         // Capture this BEFORE any forceFill flips status to PENDING. A
         // services-first site is already a live, provisioned host — installing
@@ -310,6 +323,11 @@ class ChooseApp extends Component
         $tile = $this->tileFor($this->selected);
         if ($tile === null) {
             $this->addError('selected', __('Choose an application to continue.'));
+
+            return null;
+        }
+        if ($tile['coming_soon'] ?? false) {
+            $this->addError('selected', __('That installer is coming soon — pick a Git repository, static site, or start blank for now.'));
 
             return null;
         }
@@ -424,6 +442,34 @@ class ChooseApp extends Component
             : null;
         $existingRepoMeta = $this->site->repositoryMeta();
 
+        // Repo import/preset on a live VM site → run the post-connect SETUP
+        // WIZARD instead of a blind first deploy: a pre-flight job clones +
+        // scans the repo, then either auto-deploys (clean) or holds for env /
+        // resources configuration. The site STAYS LIVE (splash still serving)
+        // — no flip to PENDING — so the workspace remains reachable throughout.
+        // Static sites carry no env/runtime, so they keep the direct deploy.
+        $useSetupWizard = $type === SiteType::Php
+            && $this->siteWasProvisioned
+            && $this->server->isVmHost();
+
+        $metaPayload = [
+            'git_ref_kind' => $refKind,
+            'repository' => array_merge($existingRepoMeta, [
+                'git_source_control_account_id' => $accountId,
+            ]),
+            'choose_app' => array_merge($this->chooseAppMeta(), [
+                'chosen_kind' => (string) $tile['kind'],
+                'chosen_key' => (string) $tile['key'],
+                'chosen_at' => now()->toISOString(),
+                'skipped' => false,
+                'repo_source' => $this->repo_source,
+                'source_control_account_id' => $accountId,
+            ]),
+        ];
+        if ($useSetupWizard) {
+            $metaPayload['setup'] = ['state' => 'scanning', 'started_at' => now()->toISOString()];
+        }
+
         $this->site->forceFill([
             'type' => $type,
             'runtime' => $runtime,
@@ -431,26 +477,20 @@ class ChooseApp extends Component
             'document_root' => $this->documentRoot($tile),
             'git_repository_url' => $repoUrl,
             'git_branch' => trim($this->git_branch) !== '' ? trim($this->git_branch) : 'main',
-            'status' => Site::STATUS_PENDING,
-            'meta' => $this->mergedMeta([
-                'git_ref_kind' => $refKind,
-                'repository' => array_merge($existingRepoMeta, [
-                    'git_source_control_account_id' => $accountId,
-                ]),
-                'choose_app' => array_merge($this->chooseAppMeta(), [
-                    'chosen_kind' => (string) $tile['kind'],
-                    'chosen_key' => (string) $tile['key'],
-                    'chosen_at' => now()->toISOString(),
-                    'skipped' => false,
-                    'repo_source' => $this->repo_source,
-                    'source_control_account_id' => $accountId,
-                ]),
-            ]),
+            // Stay live for the wizard path; legacy/static path keeps PENDING.
+            'status' => $useSetupWizard ? $this->site->status : Site::STATUS_PENDING,
+            'meta' => $this->mergedMeta($metaPayload),
         ])->save();
 
-        $this->seedDeployStepsAndProvision($tile, $runtime, $siteProvisioner);
-
         $this->auditChosen($tile, (string) $tile['kind']);
+
+        if ($useSetupWizard) {
+            \App\Jobs\PreflightSiteSetupJob::dispatch($this->site->id, (string) auth()->id());
+
+            return $this->redirect(route('sites.setup', [$this->server, $this->site]), navigate: true);
+        }
+
+        $this->seedDeployStepsAndProvision($tile, $runtime, $siteProvisioner);
 
         return $this->redirect(route('sites.show', [$this->server, $this->site]), navigate: true);
     }

@@ -1,6 +1,10 @@
 <div>
     @php
         $selectedTile = collect($tiles)->firstWhere('key', $selected);
+        // A "coming soon" tile (deep-linked ?app=) must never open the config form.
+        if ($selectedTile && ($selectedTile['coming_soon'] ?? false)) {
+            $selectedTile = null;
+        }
     @endphp
 
     <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
@@ -30,14 +34,17 @@
                             @php
                                 $isSelected = $selected === $tile['key'];
                                 $isInstaller = ($tile['kind'] ?? '') === 'scaffold';
+                                $isComingSoon = $tile['coming_soon'] ?? false;
                             @endphp
                             <button
                                 type="button"
-                                wire:click="selectTile('{{ $tile['key'] }}')"
+                                @unless ($isComingSoon) wire:click="selectTile('{{ $tile['key'] }}')" @endunless
+                                @disabled($isComingSoon)
                                 @class([
                                     'group relative flex items-start gap-3 rounded-2xl border p-4 text-left transition-all',
-                                    'border-brand-forest bg-white shadow-md shadow-brand-ink/5 ring-2 ring-brand-sage/30' => $isSelected,
-                                    'border-brand-ink/10 bg-white/80 shadow-sm hover:-translate-y-0.5 hover:border-brand-ink/20 hover:shadow-md' => ! $isSelected,
+                                    'cursor-not-allowed opacity-70 border-brand-ink/10 bg-brand-sand/15' => $isComingSoon,
+                                    'border-brand-forest bg-white shadow-md shadow-brand-ink/5 ring-2 ring-brand-sage/30' => $isSelected && ! $isComingSoon,
+                                    'border-brand-ink/10 bg-white/80 shadow-sm hover:-translate-y-0.5 hover:border-brand-ink/20 hover:shadow-md' => ! $isSelected && ! $isComingSoon,
                                 ])
                             >
                                 <span @class([
@@ -50,7 +57,9 @@
                                 <span class="min-w-0 flex-1">
                                     <span class="flex items-center gap-2">
                                         <span class="block text-sm font-semibold text-brand-ink">{{ $tile['label'] }}</span>
-                                        @if ($isInstaller)
+                                        @if ($isComingSoon)
+                                            <span class="inline-flex items-center rounded-full bg-brand-ink/[0.06] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-mist">{{ __('Coming soon') }}</span>
+                                        @elseif ($isInstaller)
                                             <span class="inline-flex items-center rounded-full bg-brand-gold/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-rust">{{ __('Auto-install') }}</span>
                                         @endif
                                     </span>

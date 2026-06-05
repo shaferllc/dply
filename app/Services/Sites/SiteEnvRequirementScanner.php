@@ -6,6 +6,7 @@ namespace App\Services\Sites;
 
 use App\Models\Site;
 use App\Services\SshConnection;
+use Symfony\Component\Process\Process;
 
 /**
  * Scans a deployed site's code over SSH to work out which environment
@@ -59,6 +60,56 @@ class SiteEnvRequirementScanner
 
         $output = (new SshConnection($server))->exec($this->buildScript($root), 120);
 
+        return $this->parseOutput($output, $root);
+    }
+
+    /**
+     * Pre-flight variant: scan a repository checkout that lives in a LOCAL
+     * directory on this worker (e.g. the ephemeral temp clone the
+     * {@see \App\Jobs\PreflightSiteSetupJob} makes before the first deploy
+     * exists on the box). The detection script is plain bash/grep, so we run
+     * the exact same program locally via Process instead of over SSH — same
+     * markers, same parser, identical result shape to {@see scan()}.
+     *
+     * @return array{
+     *     scanned_at: string,
+     *     root: string,
+     *     example_path: ?string,
+     *     keys: list<array{key: string, sources: list<string>, required: bool, example: ?string}>
+     * }
+     */
+    public function scanLocalPath(string $root): array
+    {
+        $root = rtrim($root, '/');
+        if ($root === '' || ! is_dir($root)) {
+            throw new \RuntimeException('Local repository path to scan does not exist: '.$root);
+        }
+
+        $process = Process::fromShellCommandline($this->buildScript($root));
+        $process->setTimeout(120);
+        $process->run();
+
+        if (! $process->isSuccessful()) {
+            throw new \RuntimeException('Local env scan failed: '.trim($process->getErrorOutput()));
+        }
+
+        return $this->parseOutput($process->getOutput(), $root);
+    }
+
+    /**
+     * Turn the labelled marker output (from SSH or a local run) into the
+     * merged, sorted key list. Pure — shared by {@see scan()} and
+     * {@see scanLocalPath()}.
+     *
+     * @return array{
+     *     scanned_at: string,
+     *     root: string,
+     *     example_path: ?string,
+     *     keys: list<array{key: string, sources: list<string>, required: bool, example: ?string}>
+     * }
+     */
+    private function parseOutput(string $output, string $root): array
+    {
         $exampleBlock = $this->section($output, 'EXAMPLE');
         $requiredBlock = $this->section($output, 'REQUIRED');
         $configBlock = $this->section($output, 'CONFIG');

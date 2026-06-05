@@ -40,13 +40,61 @@ class AppCatalog
      *
      * @return list<array<string, mixed>>
      */
+    /**
+     * DB engine families each DB-backed installer supports. Apps absent here (or
+     * with needs_db=false) carry no DB constraint. Drives the architecture gate.
+     */
+    private const SUPPORTED_DB_ENGINES = [
+        'wordpress' => ['mysql', 'mariadb'],
+        'laravel' => ['mysql', 'mariadb', 'postgres', 'sqlite'],
+        'craft' => ['mysql', 'mariadb', 'postgres'],
+        'drupal' => ['mysql', 'mariadb', 'postgres', 'sqlite'],
+    ];
+
     public function forServer(Server $server): array
     {
         if (! $server->isVmHost()) {
             return [];
         }
 
-        return $this->vmTiles();
+        $installedFamilies = $this->installedDatabaseFamilies($server);
+
+        return collect($this->vmTiles())
+            // Architecture gate: hide a DB-backed installer when the server has
+            // no engine it supports (e.g. WordPress on a Postgres-only box).
+            ->filter(function (array $tile) use ($installedFamilies): bool {
+                if (! ($tile['needs_db'] ?? false)) {
+                    return true;
+                }
+                $supported = self::SUPPORTED_DB_ENGINES[$tile['key']] ?? null;
+
+                return $supported === null
+                    || array_intersect($supported, $installedFamilies) !== [];
+            })
+            // Auto-install (scaffold) apps are temporarily marked "coming soon".
+            ->map(function (array $tile): array {
+                $tile['coming_soon'] = ($tile['kind'] ?? '') === 'scaffold';
+
+                return $tile;
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Normalized families (mysql/mariadb/postgres/sqlite) of every engine
+     * installed on the server.
+     *
+     * @return list<string>
+     */
+    private function installedDatabaseFamilies(Server $server): array
+    {
+        return $server->databaseEngines()
+            ->get(['engine'])
+            ->map(fn ($e) => \App\Support\Servers\DatabaseWorkspaceEngines::family((string) $e->engine))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**

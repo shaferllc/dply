@@ -655,6 +655,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites/create-custom', SitesCreateCustom::class)->name('sites.create-custom');
     Route::livewire('servers/{server}/sites/{site}/scaffold-journey', ScaffoldJourney::class)->name('sites.scaffold-journey');
     Route::livewire('servers/{server}/sites/{site}/choose-app', SitesChooseApp::class)->name('sites.choose-app');
+    Route::livewire('servers/{server}/sites/{site}/setup', \App\Livewire\Sites\SiteSetup::class)->name('sites.setup');
     Route::livewire('servers/{server}/sites/{site}/clone', SitesClone::class)->name('sites.clone');
     Route::middleware('feature:workspace.site_promote')->group(function (): void {
         Route::livewire('servers/{server}/sites/{site}/promote', SitesPromote::class)->name('sites.promote');

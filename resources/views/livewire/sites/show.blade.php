@@ -163,6 +163,21 @@
                 @else
                     @include('livewire.sites.partials.show.dashboard-header')
 
+                    {{-- App install (scaffold) running on an already-live site:
+                         show the pipeline as a banner INSIDE the workspace, not a
+                         full-page takeover — the site stays fully navigable. --}}
+                    @if ($site->isScaffoldInstalling())
+                        <div class="mt-6">
+                            @include('livewire.sites.partials.show.scaffold-install-journey')
+                        </div>
+                    @endif
+
+                    {{-- Repo connected but held for setup (env/resources) before the
+                         first deploy — resume the wizard. Stays live; non-forcing. --}}
+                    @if ($site->needsFirstDeploySetup())
+                        @include('livewire.sites.partials.show.finish-setup-banner')
+                    @endif
+
                     <x-ops-copilot-callout :site="$site" compact class="mt-6" />
 
                     <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="dashboard_tab">

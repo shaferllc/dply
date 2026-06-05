@@ -208,7 +208,7 @@ class ServerDatabaseProvisioner
         $user = $db->username;
         $pass = $db->password;
 
-        if ($db->engine === 'sqlite') {
+        if (DatabaseWorkspaceEngines::family($db->engine) === 'sqlite') {
             // SQLite "create" is just `mkdir -p` the parent + `touch`
             // the file + chown. No auth, no cluster, no port. The path
             // is stored in the host column; we sanity-check it sits
@@ -231,7 +231,7 @@ class ServerDatabaseProvisioner
             return $out;
         }
 
-        if ($db->engine === 'postgres') {
+        if (DatabaseWorkspaceEngines::family($db->engine) === 'postgres') {
             $userSql = "CREATE USER {$user} WITH PASSWORD '".str_replace("'", "''", $pass)."';";
             [$out] = $this->remoteExec->postgresRun($server, $userSql, 120);
             $dbSql = "CREATE DATABASE {$name} OWNER {$user};";

@@ -265,17 +265,23 @@ class ScaffoldLaravelPipeline
 
         $dbName = 'dply_'.Str::slug($site->slug, '_');
         $username = 'dply_'.Str::slug($site->slug, '_');
-        $password = Str::password(24, symbols: false);
-
-        $db = new ServerDatabase([
+        // Idempotent on retry: a prior failed attempt may have already created
+        // this server_databases row. Reuse it (keeping its stored password so
+        // the server-side user and .env stay in sync) rather than inserting a
+        // duplicate, which trips the (server_id, name) unique constraint.
+        $db = ServerDatabase::firstOrNew([
             'server_id' => $site->server->id,
             'name' => $dbName,
-            'username' => $username,
-            'password' => $password,
-            'engine' => $engine,
-            'host' => 'localhost',
         ]);
-        $db->save();
+        if (! $db->exists) {
+            $db->fill([
+                'username' => $username,
+                'password' => Str::password(24, symbols: false),
+                'engine' => $engine,
+                'host' => 'localhost',
+            ])->save();
+        }
+        $password = $db->password;
         $this->databaseProvisioner->createOnServer($db);
 
         $this->setMeta($site, 'scaffold.database', [

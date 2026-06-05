@@ -173,9 +173,6 @@ final class SiteSettingsSidebar
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'laravel-stack' || $site->isLaravelFrameworkDetected())
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'rails-stack' || $site->isRailsFrameworkDetected())
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'wordpress' || $site->isWordPressDetected())
-                // Repository is meaningless for manage-in-place CMS installs
-                // (scaffolded WordPress / Drupal) — there's no developer repo.
-                ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'repository' || ! $site->isManageInPlaceCms())
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'services' || Site::supportsSystemdServices($site, $server))
                 ->filter(fn (array $item): bool => ($item['id'] ?? null) !== 'files' || $supportsSsh)
                 // Hide gated items when neither the full feature nor its coming-soon

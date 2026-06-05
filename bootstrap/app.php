@@ -20,6 +20,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Laravel\Pennant\Middleware\EnsureFeaturesAreActive;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -119,5 +120,22 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             return response()->view('errors.redis-unreachable', $payload, 503);
+        });
+
+        // A 404 raised inside a Livewire request must NOT render the full-page
+        // errors.layout: that view carries <x-site-header />, so when Livewire
+        // morphs (wire:navigate) or injects (update overlay) it into a page that
+        // already has the header, you get a duplicated header and a broken-looking
+        // nested 404. Serve a chrome-less variant to Livewire requests instead —
+        // it morphs in cleanly and offers a Refresh, since the usual cause is a
+        // stale snapshot pointing at a route/resource that has since moved.
+        // (API callers still fall through to Laravel's JSON 404.)
+        $exceptions->render(function (NotFoundHttpException $e, Request $request) {
+            // X-Livewire = component update (POST); X-Livewire-Navigate = the
+            // wire:navigate SPA fetch (GET) — the latter is what morphed the
+            // duplicated header in. Catch both.
+            if ($request->hasHeader('X-Livewire') || $request->hasHeader('X-Livewire-Navigate')) {
+                return response()->view('errors.livewire-404', [], 404);
+            }
         });
     })->create();
