@@ -6,15 +6,15 @@ set -euo pipefail
 # Usage: ./deploy.sh "commit message"
 #
 # Required env:
-#   DEPLOY_HOST          SSH host for the web server
+#   DEPLOY_HOST             SSH host for the web server
 #
 # Optional env:
-#   DEPLOY_WORKER_HOSTS  Space-separated SSH hosts for worker servers.
-#                        Defaults to DEPLOY_HOST (single-server setup).
-#   DEPLOY_REMOTE        Git remote (default: origin)
-#   DEPLOY_BRANCH        Git branch (default: main)
-#   DEPLOY_APP_DIR       App path on servers (default: /var/www/dply)
-#   DEPLOY_PHP           PHP binary (default: php)
+#   DEPLOY_WORKER_HOSTS     Space-separated SSH aliases for worker servers
+#   DEPLOY_APP_DIR          App path on the web server (default: /var/www/dply)
+#   DEPLOY_WORKER_APP_DIR   App path on worker servers (defaults to DEPLOY_APP_DIR)
+#   DEPLOY_REMOTE           Git remote (default: origin)
+#   DEPLOY_BRANCH           Git branch (default: main)
+#   DEPLOY_PHP              PHP binary (default: php)
 # ---------------------------------------------------------------------------
 
 # Load deploy config from .deploy.env if it exists (not committed to git)
@@ -27,8 +27,8 @@ BRANCH="${DEPLOY_BRANCH:-main}"
 APP_DIR="${DEPLOY_APP_DIR:-/var/www/dply}"
 PHP="${DEPLOY_PHP:-php}"
 WEB_HOST="${DEPLOY_HOST:?Set DEPLOY_HOST}"
-# Default workers to the web host for single-server setups
-WORKER_HOSTS="${DEPLOY_WORKER_HOSTS:-$WEB_HOST}"
+WORKER_HOSTS="${DEPLOY_WORKER_HOSTS:-}"
+WORKER_APP_DIR="${DEPLOY_WORKER_APP_DIR:-$APP_DIR}"
 
 log() { echo "[deploy] $*"; }
 hr()  { echo "[deploy] ────────────────────────────────────────"; }
@@ -51,7 +51,7 @@ hr
 log "Deploying web server ($WEB_HOST)..."
 hr
 
-ssh "$WEB_HOST" "
+/usr/bin/ssh "$WEB_HOST" "
   set -euo pipefail
   cd $APP_DIR
 
@@ -82,37 +82,24 @@ ssh "$WEB_HOST" "
   $PHP artisan event:cache
 
   echo '[web] Restarting Reverb...'
-  sudo supervisorctl restart dply-reverb || true
+  sudo supervisorctl restart dply-reverb 2>/dev/null || true
 
   echo '[web] Done.'
 "
 
 # ---------------------------------------------------------------------------
-# 3. Deploy worker servers (pull + restart Horizon)
+# 3. Deploy worker servers in parallel (pull + restart Horizon)
 # ---------------------------------------------------------------------------
-for WORKER_HOST in $WORKER_HOSTS; do
-  # Skip if this is the same host as the web server — already pulled above
-  if [ "$WORKER_HOST" = "$WEB_HOST" ]; then
+if [ -n "$WORKER_HOSTS" ]; then
+  deploy_worker() {
+    local HOST="$1"
+    local DIR="$2"
     hr
-    log "Restarting Horizon on web/worker host ($WORKER_HOST)..."
+    log "Deploying worker ($HOST)..."
     hr
-    ssh "$WORKER_HOST" "
+    /usr/bin/ssh "$HOST" "
       set -euo pipefail
-      cd $APP_DIR
-      echo '[worker] Terminating Horizon gracefully...'
-      $PHP artisan horizon:terminate || true
-      echo '[worker] Restarting via supervisor...'
-      sudo supervisorctl restart dply-horizon || true
-      echo '[worker] Horizon status:'
-      sudo supervisorctl status dply-horizon || true
-    "
-  else
-    hr
-    log "Deploying worker ($WORKER_HOST)..."
-    hr
-    ssh "$WORKER_HOST" "
-      set -euo pipefail
-      cd $APP_DIR
+      cd $DIR
 
       echo '[worker] Pulling...'
       git pull origin $BRANCH
@@ -120,20 +107,30 @@ for WORKER_HOST in $WORKER_HOSTS; do
       echo '[worker] Installing PHP dependencies...'
       composer install --no-interaction --no-dev --optimize-autoloader
 
-      echo '[worker] Syncing cached config...'
+      echo '[worker] Caching config...'
       $PHP artisan config:cache
       $PHP artisan route:cache
       $PHP artisan event:cache
 
-      echo '[worker] Terminating Horizon gracefully...'
+      echo '[worker] Restarting Horizon gracefully...'
       $PHP artisan horizon:terminate || true
-      echo '[worker] Restarting via supervisor...'
       sudo supervisorctl restart dply-horizon || true
+
       echo '[worker] Horizon status:'
       sudo supervisorctl status dply-horizon || true
     "
-  fi
-done
+  }
+
+  # Fan out — deploy all workers in parallel
+  pids=()
+  for WORKER_HOST in $WORKER_HOSTS; do
+    deploy_worker "$WORKER_HOST" "$WORKER_APP_DIR" &
+    pids+=($!)
+  done
+  for pid in "${pids[@]}"; do
+    wait "$pid"
+  done
+fi
 
 hr
 log "Deploy complete."

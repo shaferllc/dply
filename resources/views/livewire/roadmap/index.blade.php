@@ -1,23 +1,32 @@
-<div class="min-h-screen bg-brand-cream text-brand-ink">
+<div class="min-h-screen text-brand-ink">
+    {{-- Cream canvas + mesh gradient. The root div must stay transparent so the
+         fixed -z-10 mesh shows through (an opaque bg here would cover it). --}}
     <div class="fixed inset-0 -z-20 bg-brand-cream"></div>
     <div class="fixed inset-0 -z-10 bg-mesh-brand"></div>
 
     <x-site-header active="roadmap" />
 
-    <main class="px-4 py-14 sm:px-6 sm:py-16 lg:px-8">
-        <section class="mx-auto max-w-7xl">
-            <div class="max-w-3xl">
-                <p class="inline-flex items-center gap-2 rounded-full border border-brand-sage/20 bg-white/75 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-brand-forest">
-                    <span class="h-2 w-2 rounded-full bg-brand-gold" aria-hidden="true"></span>
+    <main class="px-4 pb-16 sm:px-6 lg:px-8">
+        {{-- Hero — mirrors the changelog's centered marketing hero. --}}
+        <section class="relative pt-16 pb-14 sm:pt-24 sm:pb-20">
+            <div class="mx-auto max-w-3xl text-center">
+                <p class="inline-flex items-center gap-2 rounded-full border border-brand-sage/25 bg-white/60 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand-forest">
+                    <span class="relative flex h-1.5 w-1.5">
+                        <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-gold opacity-60"></span>
+                        <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-brand-gold"></span>
+                    </span>
                     {{ __('Product direction') }}
                 </p>
-                <h1 class="mt-6 text-4xl font-bold tracking-tight text-brand-ink sm:text-5xl">
+                <h1 class="mt-8 text-4xl font-bold tracking-tight text-brand-ink sm:text-5xl">
                     {{ __('Product roadmap') }}
                 </h1>
-                <p class="mt-4 max-w-2xl text-lg leading-8 text-brand-moss">
+                <p class="mt-6 text-lg leading-relaxed text-brand-moss">
                     {{ __('See what we are building next across the dply platform. This board is read-only — share ideas using the suggestion form below.') }}
                 </p>
             </div>
+        </section>
+
+        <section class="mx-auto max-w-7xl">
 
             @if ($recentlyShipped->isNotEmpty())
                 <section class="mt-10 rounded-2xl border border-brand-ink/10 bg-white/85 p-6 shadow-sm sm:p-8">

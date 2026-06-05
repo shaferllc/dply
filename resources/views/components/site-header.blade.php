@@ -467,6 +467,12 @@
                                     </x-slot>
                                     {{ __('Roadmap') }}
                                 </x-dropdown-link>
+                                <x-dropdown-link :href="route('changelog')">
+                                    <x-slot name="icon">
+                                        <x-heroicon-o-megaphone class="{{ $hi }}" />
+                                    </x-slot>
+                                    {{ __('Changelog') }}
+                                </x-dropdown-link>
                                 <x-dropdown-link :href="route('pricing')">
                                     <x-slot name="icon">
                                         <x-heroicon-o-credit-card class="{{ $hi }}" />
@@ -707,6 +713,10 @@
                 <a href="{{ route('roadmap') }}" class="flex items-center gap-2.5 border-l-4 {{ $roadmapActive ? 'border-brand-gold bg-brand-sand/30 text-brand-ink' : 'border-transparent text-brand-moss hover:bg-brand-sand/30' }} py-2 ps-3 pe-4 text-base font-medium">
                     <x-heroicon-o-map class="h-5 w-5 shrink-0 opacity-90" />
                     {{ __('Roadmap') }}
+                </a>
+                <a href="{{ route('changelog') }}" class="flex items-center gap-2.5 border-l-4 {{ $changelogActive ? 'border-brand-gold bg-brand-sand/30 text-brand-ink' : 'border-transparent text-brand-moss hover:bg-brand-sand/30' }} py-2 ps-3 pe-4 text-base font-medium">
+                    <x-heroicon-o-megaphone class="h-5 w-5 shrink-0 opacity-90" />
+                    {{ __('Changelog') }}
                 </a>
                 <a href="{{ route('pricing') }}" class="flex items-center gap-2.5 border-l-4 {{ $pricingActive ? 'border-brand-gold bg-brand-sand/30 text-brand-ink' : 'border-transparent text-brand-moss hover:bg-brand-sand/30' }} py-2 ps-3 pe-4 text-base font-medium">
                     <x-heroicon-o-credit-card class="h-5 w-5 shrink-0 opacity-90" />
