@@ -47,6 +47,7 @@ hr()  { echo "[deploy] ───────────────────
 _ai_generate() {
     AI_COMMIT_MSG=""
     AI_CL_TYPE=""
+    AI_CL_TITLE=""
     AI_CL_ENTRY=""
 
     command -v claude >/dev/null 2>&1 || return 1
@@ -59,9 +60,10 @@ _ai_generate() {
         diff="${diff:0:14000}"$'\n... [truncated]'
     fi
 
-    local prompt="Analyze this git diff and respond with EXACTLY three lines, no markdown, no extra text:
+    local prompt="Analyze this git diff and respond with EXACTLY four lines, no markdown, no extra text:
 COMMIT: <conventional commit message, imperative mood, ≤72 chars>
 TYPE: <Added|Changed|Fixed|Removed|Security|Deprecated>
+TITLE: <short 3-6 word public-facing changelog title, title case>
 CHANGELOG: <one concise sentence describing the user-visible change>
 
 ${diff}"
@@ -71,6 +73,7 @@ ${diff}"
 
     AI_COMMIT_MSG=$(printf '%s' "$output" | grep '^COMMIT:'    | sed 's/^COMMIT: *//')
     AI_CL_TYPE=$(   printf '%s' "$output" | grep '^TYPE:'      | sed 's/^TYPE: *//')
+    AI_CL_TITLE=$(  printf '%s' "$output" | grep '^TITLE:'     | sed 's/^TITLE: *//')
     AI_CL_ENTRY=$(  printf '%s' "$output" | grep '^CHANGELOG:' | sed 's/^CHANGELOG: *//')
 
     [ -z "$AI_COMMIT_MSG" ] && return 1
@@ -78,48 +81,97 @@ ${diff}"
 }
 
 # ---------------------------------------------------------------------------
-# Prepend a new entry into CHANGELOG.md under ## [Unreleased].
-# Creates the file if it doesn't exist yet.
+# Prepend a new entry into:
+#   1. resources/views/changelog.blade.php  ($entries PHP array)
+#   2. CHANGELOG.md                         (Keep a Changelog format)
 # ---------------------------------------------------------------------------
 _update_changelog() {
     local type="$1"
-    local entry="$2"
+    local title="$2"
+    local entry="$3"
 
     export _DPLY_CL_TYPE="$type"
+    export _DPLY_CL_TITLE="$title"
     export _DPLY_CL_ENTRY="$entry"
 
     python3 << 'PYEOF'
 import os, re, sys
+from datetime import date
 
 type_  = os.environ["_DPLY_CL_TYPE"]
+title  = os.environ["_DPLY_CL_TITLE"].strip()
 entry  = os.environ["_DPLY_CL_ENTRY"].lstrip("- ").strip()
-path   = "CHANGELOG.md"
-line   = f"- {entry}"
+
+def php_escape(s):
+    return s.replace("\\", "\\\\").replace("'", "\\'")
+
+TAG_MAP = {
+    "Added": "new", "Changed": "improved", "Fixed": "fixed",
+    "Removed": "improved", "Security": "security", "Deprecated": "improved",
+}
+tag   = TAG_MAP.get(type_, "improved")
+today = date.today()
+date_str = f"{today.strftime('%B')} {today.day}, {today.year}"
+
+# ------------------------------------------------------------------
+# 1. Update changelog.blade.php
+# ------------------------------------------------------------------
+blade_path = "resources/views/changelog.blade.php"
+blade_entry = (
+    "\n"
+    "                [\n"
+    f"                    'date'    => '{date_str}',\n"
+    f"                    'tags'    => ['{tag}'],\n"
+    f"                    'title'   => '{php_escape(title)}',\n"
+    f"                    'summary' => '{php_escape(entry)}',\n"
+    "                    'items'   => [],\n"
+    "                ],"
+)
+
+marker = "$entries = ["
+try:
+    with open(blade_path) as f:
+        blade = f.read()
+    if marker in blade:
+        idx = blade.index(marker) + len(marker)
+        blade = blade[:idx] + blade_entry + blade[idx:]
+        with open(blade_path, "w") as f:
+            f.write(blade)
+        print(f"  changelog.blade.php: [{tag}] {title}")
+    else:
+        print(f"  WARNING: could not find $entries in {blade_path}", file=sys.stderr)
+except FileNotFoundError:
+    print(f"  WARNING: {blade_path} not found", file=sys.stderr)
+
+# ------------------------------------------------------------------
+# 2. Update CHANGELOG.md
+# ------------------------------------------------------------------
+md_path = "CHANGELOG.md"
+md_line = f"- {entry}"
 
 try:
-    with open(path) as f:
-        content = f.read()
+    with open(md_path) as f:
+        md = f.read()
 except FileNotFoundError:
-    with open(path, "w") as f:
-        f.write(f"# Changelog\n\n## [Unreleased]\n### {type_}\n{line}\n")
-    print(f"  created {path}")
+    with open(md_path, "w") as f:
+        f.write(f"# Changelog\n\n## [Unreleased]\n### {type_}\n{md_line}\n")
+    print(f"  created {md_path}")
     sys.exit(0)
 
-marker = "## [Unreleased]"
-if marker in content:
-    idx = content.index(marker) + len(marker)
-    content = content[:idx] + f"\n### {type_}\n{line}" + content[idx:]
+if "## [Unreleased]" in md:
+    idx = md.index("## [Unreleased]") + len("## [Unreleased]")
+    md = md[:idx] + f"\n### {type_}\n{md_line}" + md[idx:]
 else:
-    m = re.search(r"\n## ", content)
-    pos = m.start() if m else len(content)
-    content = content[:pos] + f"\n\n## [Unreleased]\n### {type_}\n{line}" + content[pos:]
+    m = re.search(r"\n## ", md)
+    pos = m.start() if m else len(md)
+    md = md[:pos] + f"\n\n## [Unreleased]\n### {type_}\n{md_line}" + md[pos:]
 
-with open(path, "w") as f:
-    f.write(content)
-print(f"  [{type_}] {line}")
+with open(md_path, "w") as f:
+    f.write(md)
+print(f"  CHANGELOG.md: [{type_}] {md_line}")
 PYEOF
 
-    unset _DPLY_CL_TYPE _DPLY_CL_ENTRY
+    unset _DPLY_CL_TYPE _DPLY_CL_TITLE _DPLY_CL_ENTRY
 }
 
 # ---------------------------------------------------------------------------
@@ -135,9 +187,9 @@ if ! git diff --cached --quiet; then
     if _ai_generate; then
         log "AI commit:  $AI_COMMIT_MSG"
         if [ -n "$AI_CL_ENTRY" ]; then
-            log "Changelog: [${AI_CL_TYPE:-Changed}]"
-            _update_changelog "${AI_CL_TYPE:-Changed}" "$AI_CL_ENTRY"
-            git add CHANGELOG.md
+            log "Changelog: [${AI_CL_TYPE:-Changed}] ${AI_CL_TITLE}"
+            _update_changelog "${AI_CL_TYPE:-Changed}" "$AI_CL_TITLE" "$AI_CL_ENTRY"
+            git add CHANGELOG.md resources/views/changelog.blade.php 2>/dev/null || true
         fi
         COMMIT_MSG="$AI_COMMIT_MSG"
     else

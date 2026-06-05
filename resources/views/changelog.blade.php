@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 5, 2026',
                     'tags'    => ['new'],
+                    'title'   => 'Public Changelog Page Entries',
+                    'summary' => 'Deploys now publish titled entries to the public changelog page alongside CHANGELOG.md.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 5, 2026',
+                    'tags'    => ['new'],
                     'title'   => 'Changelog',
                     'summary' => 'This page.',
                     'items'   => [],
