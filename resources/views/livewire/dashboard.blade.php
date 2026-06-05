@@ -5,6 +5,14 @@
     $openFindings = (int) ($fleetInsights['total_open'] ?? 0);
     $avgHealthScore = $fleetInsights['avg_health_score'] ?? null;
 
+    // Card click-through targets. Servers always go to the fleet list; findings
+    // and health land on the fleet health view when that surface is enabled,
+    // otherwise fall back to the servers list so the cards are never dead links.
+    $serversCardHref = route('servers.index');
+    $insightsCardHref = \Laravel\Pennant\Feature::active('surface.fleet')
+        ? route('fleet.health')
+        : route('servers.index');
+
     $tonePalette = [
         'sage' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
         'sky' => 'bg-sky-50 text-sky-700 ring-sky-200',
@@ -129,19 +137,30 @@
                             </p>
                         </div>
                     </div>
+                    {{-- All three actions share one sizing class so they render at
+                         identical height/padding; only color differs. --}}
+                    @php $headerBtn = 'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 py-2 text-sm font-semibold shadow-sm transition-colors'; @endphp
                     <div class="mt-4 flex flex-wrap items-center gap-2">
-                        <x-outline-link href="{{ route('credentials.index') }}" wire:navigate>
+                        <a
+                            href="{{ route('credentials.index') }}"
+                            wire:navigate
+                            class="{{ $headerBtn }} border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40"
+                        >
                             <x-heroicon-o-key class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                             {{ __('Provider credentials') }}
-                        </x-outline-link>
-                        <x-docs-link doc-route="docs.connect-provider">
+                        </a>
+                        <button
+                            type="button"
+                            class="{{ $headerBtn }} border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40"
+                            x-on:click="window.dispatchEvent(new CustomEvent('dply-docs-open', { detail: { docRoute: 'docs.connect-provider' } }))"
+                        >
                             <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                             {{ __('Setup guide') }}
-                        </x-docs-link>
+                        </button>
                         <a
                             href="{{ $primaryHref }}"
                             wire:navigate
-                            class="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                            class="{{ $headerBtn }} bg-brand-ink text-brand-cream shadow-md hover:bg-brand-forest"
                         >
                             <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
                             {{ $primaryLabel }}
@@ -150,11 +169,15 @@
                 </div>
                 <dl class="grid grid-cols-3 gap-2 lg:col-span-5">
                     <div @class([
-                        'rounded-2xl border px-4 py-3 shadow-sm',
-                        'border-brand-sage/30 bg-brand-sage/8' => $serverCount > 0,
-                        'border-brand-ink/10 bg-white' => $serverCount === 0,
+                        'group relative rounded-2xl border px-4 py-3 shadow-sm transition hover:shadow-md focus-within:ring-2 focus-within:ring-brand-sage/40',
+                        'border-brand-sage/30 bg-brand-sage/8 hover:border-brand-sage/50' => $serverCount > 0,
+                        'border-brand-ink/10 bg-white hover:border-brand-ink/20' => $serverCount === 0,
                     ])>
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Servers') }}</dt>
+                        <a href="{{ $serversCardHref }}" wire:navigate class="absolute inset-0 rounded-2xl" aria-label="{{ __('View servers') }}"></a>
+                        <dt class="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                            {{ __('Servers') }}
+                            <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0 text-brand-mist opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
+                        </dt>
                         <dd class="mt-1 flex items-baseline gap-1.5">
                             <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $serverCount }}</span>
                             <span class="text-[11px] text-brand-moss">{{ trans_choice('in scope|in scope', $serverCount) }}</span>
@@ -162,19 +185,27 @@
                         <p class="mt-1 text-[11px] text-brand-mist">{{ __('Across your org') }}</p>
                     </div>
                     <div @class([
-                        'rounded-2xl border px-4 py-3 shadow-sm',
-                        'border-amber-200 bg-amber-50/60' => $openFindings > 0,
-                        'border-brand-ink/10 bg-white' => $openFindings === 0,
+                        'group relative rounded-2xl border px-4 py-3 shadow-sm transition hover:shadow-md focus-within:ring-2 focus-within:ring-brand-sage/40',
+                        'border-amber-200 bg-amber-50/60 hover:border-amber-300' => $openFindings > 0,
+                        'border-brand-ink/10 bg-white hover:border-brand-ink/20' => $openFindings === 0,
                     ])>
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Open findings') }}</dt>
+                        <a href="{{ $insightsCardHref }}" wire:navigate class="absolute inset-0 rounded-2xl" aria-label="{{ __('Review open findings') }}"></a>
+                        <dt class="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                            {{ __('Open findings') }}
+                            <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0 text-brand-mist opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
+                        </dt>
                         <dd class="mt-1 flex items-baseline gap-1.5">
                             <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $openFindings }}</span>
                             <span class="text-[11px] text-brand-moss">{{ trans_choice('issue|issues', $openFindings) }}</span>
                         </dd>
                         <p class="mt-1 text-[11px] text-brand-mist">{{ __('Need triage') }}</p>
                     </div>
-                    <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Health') }}</dt>
+                    <div class="group relative rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm transition hover:border-brand-ink/20 hover:shadow-md focus-within:ring-2 focus-within:ring-brand-sage/40">
+                        <a href="{{ $insightsCardHref }}" wire:navigate class="absolute inset-0 rounded-2xl" aria-label="{{ __('View fleet health') }}"></a>
+                        <dt class="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                            {{ __('Health') }}
+                            <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0 text-brand-mist opacity-0 transition group-hover:opacity-100" aria-hidden="true" />
+                        </dt>
                         <dd class="mt-1 flex items-baseline gap-1.5">
                             <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $avgHealthScore !== null ? (int) $avgHealthScore : '—' }}</span>
                             @if ($avgHealthScore !== null)
@@ -518,11 +549,38 @@
                                                     <span class="inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $statusTone }}">{{ str_replace('_', ' ', $status) }}</span>
                                                 @endif
                                             </div>
-                                            @if ($server->ip_address)
-                                                <p class="mt-0.5 font-mono text-[11px] text-brand-mist">{{ $server->ip_address }}</p>
-                                            @endif
+                                            <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-brand-mist">
+                                                @if ($server->ip_address)
+                                                    <span class="font-mono text-brand-moss">{{ $server->ip_address }}</span>
+                                                @endif
+                                                <span class="inline-flex items-center gap-1">
+                                                    <x-heroicon-m-cloud class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                                    {{ $server->providerDisplayLabel() }}
+                                                </span>
+                                                @if ($server->region)
+                                                    <span aria-hidden="true" class="text-brand-mist/50">·</span>
+                                                    <span>{{ $server->region }}</span>
+                                                @endif
+                                                @if ($server->size)
+                                                    <span aria-hidden="true" class="text-brand-mist/50">·</span>
+                                                    <span class="font-mono">{{ $server->size }}</span>
+                                                @endif
+                                            </p>
+                                            <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-brand-moss">
+                                                <span class="inline-flex items-center gap-1">
+                                                    <x-heroicon-m-globe-alt class="h-3 w-3 shrink-0 text-brand-mist" aria-hidden="true" />
+                                                    {{ $server->sites_count }} {{ trans_choice('site|sites', $server->sites_count) }}
+                                                </span>
+                                                @if ($server->created_at)
+                                                    <span aria-hidden="true" class="text-brand-mist/50">·</span>
+                                                    <span class="inline-flex items-center gap-1">
+                                                        <x-heroicon-m-clock class="h-3 w-3 shrink-0 text-brand-mist" aria-hidden="true" />
+                                                        {{ __('added :time', ['time' => $server->created_at->diffForHumans()]) }}
+                                                    </span>
+                                                @endif
+                                            </p>
                                         </div>
-                                        <span class="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-brand-sage">
+                                        <span class="inline-flex shrink-0 items-center gap-1 self-start text-xs font-semibold text-brand-sage">
                                             {{ __('Manage') }}
                                             <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0" aria-hidden="true" />
                                         </span>
