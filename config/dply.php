@@ -16,6 +16,16 @@ return [
         : null,
 
     /*
+    | IP allow-list for the coming-soon gate. These addresses (and any logged-in
+    | user) see the FULL site; everyone else only sees the coming-soon page.
+    | Comma-separated, supports IPv4, IPv6, and CIDR ranges.
+    */
+    'coming_soon_allowed_ips' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('COMING_SOON_ALLOWED_IPS', ''))
+    ))),
+
+    /*
     |--------------------------------------------------------------------------
     | Require verified email (dashboard and gated actions)
     |--------------------------------------------------------------------------

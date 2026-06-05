@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\IpUtils;
 use Symfony\Component\HttpFoundation\Response;
 
 class RedirectGuestsToComingSoon
@@ -23,17 +24,24 @@ class RedirectGuestsToComingSoon
             return $next($request);
         }
 
-        // Coming-soon gates ONLY the registration flow — the marketing site
-        // (homepage, features, roadmap, login, …) stays public. A guest who
-        // tries to sign up is sent to the coming-soon / waitlist page.
-        // Local dev is exempt unless COMING_SOON=true forces it on (for preview).
+        // Gate active in non-local (or forced on with COMING_SOON=true).
         $gateOn = $flag === true || ! $this->isLocalDevelopmentRequest($request);
-
-        if ($gateOn && $request->routeIs($this->gatedRoutes())) {
-            return redirect()->route('coming-soon');
+        if (! $gateOn) {
+            return $next($request);
         }
 
-        return $next($request);
+        // Allow-listed IPs see the FULL site; everyone else only sees the
+        // coming-soon page (plus the Livewire requests it needs to render and
+        // run the waitlist signup form).
+        if ($this->ipAllowed($request)) {
+            return $next($request);
+        }
+
+        if ($request->routeIs('coming-soon') || $request->is('livewire/*')) {
+            return $next($request);
+        }
+
+        return redirect()->route('coming-soon');
     }
 
     private function isLocalDevelopmentRequest(Request $request): bool
@@ -50,16 +58,17 @@ class RedirectGuestsToComingSoon
     }
 
     /**
-     * The only routes gated behind coming-soon: the registration flow. The rest
-     * of the site stays public (homepage, features, login, etc.).
-     *
-     * @return list<string>
+     * Is the request from an allow-listed IP? Those clients (and authenticated
+     * users) see the full site; everyone else only sees the coming-soon page.
+     * Supports IPv4, IPv6, and CIDR ranges via Symfony's IpUtils.
      */
-    private function gatedRoutes(): array
+    private function ipAllowed(Request $request): bool
     {
-        return [
-            'register',
-            'register.*',
-        ];
+        $allowed = (array) config('dply.coming_soon_allowed_ips', []);
+        if ($allowed === []) {
+            return false;
+        }
+
+        return IpUtils::checkIp((string) $request->ip(), $allowed);
     }
 }
