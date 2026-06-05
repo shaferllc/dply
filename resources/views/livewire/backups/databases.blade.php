@@ -88,7 +88,7 @@
             <div class="mb-4 flex items-center justify-between gap-4">
                 <div>
                     <h2 class="text-base font-semibold text-brand-ink">{{ __('Schedules') }}</h2>
-                    <p class="text-xs text-brand-moss mt-0.5">{{ __('All recurring backup schedules across your servers. Manage targets and cadence from each server's workspace.') }}</p>
+                    <p class="text-xs text-brand-moss mt-0.5">{{ __('All recurring backup schedules across your servers. Manage targets and cadence from each server workspace.') }}</p>
                 </div>
             </div>
 

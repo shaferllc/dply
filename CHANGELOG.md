@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- The Realtime page now shows a preview of the managed Pusher-compatible WebSocket relay when the feature isn't yet enabled for your organization.
 ### Removed
 - Removed the unused Reverb health check link from the admin Operations dashboard.
 ### Added
