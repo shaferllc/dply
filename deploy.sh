@@ -29,6 +29,8 @@ PHP="${DEPLOY_PHP:-php}"
 WEB_HOST="${DEPLOY_HOST:?Set DEPLOY_HOST}"
 WORKER_HOSTS="${DEPLOY_WORKER_HOSTS:-}"
 WORKER_APP_DIR="${DEPLOY_WORKER_APP_DIR:-$APP_DIR}"
+COMPOSER="${DEPLOY_COMPOSER:-composer}"
+WORKER_COMPOSER="${DEPLOY_WORKER_COMPOSER:-$COMPOSER}"
 
 log() { echo "[deploy] $*"; }
 hr()  { echo "[deploy] ────────────────────────────────────────"; }
@@ -59,7 +61,7 @@ hr
   git pull origin $BRANCH
 
   echo '[web] Installing PHP dependencies...'
-  composer install --no-interaction --no-dev --optimize-autoloader
+  $COMPOSER install --no-interaction --no-dev --optimize-autoloader
 
   echo '[web] Installing JS dependencies...'
   npm ci --prefer-offline
@@ -105,7 +107,7 @@ if [ -n "$WORKER_HOSTS" ]; then
       git pull origin $BRANCH
 
       echo '[worker] Installing PHP dependencies...'
-      composer install --no-interaction --no-dev --optimize-autoloader
+      $WORKER_COMPOSER install --no-interaction --no-dev --optimize-autoloader
 
       echo '[worker] Caching config...'
       $PHP artisan config:cache
