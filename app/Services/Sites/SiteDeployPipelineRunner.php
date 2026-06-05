@@ -58,6 +58,18 @@ class SiteDeployPipelineRunner
     }
 
     /**
+     * Run user-authored RESTART-phase steps (the simple text pipeline's
+     * "Restart" block) — after dply's own managed restart, for restarting
+     * workers/daemons the app owns. A no-op when no restart steps exist.
+     *
+     * @return array{log: string, steps: list<array<string, mixed>>, ok: bool}
+     */
+    public function runRestart(RemoteShell $ssh, Site $site, string $workingDirectory): array
+    {
+        return $this->runPhase($ssh, $site, $workingDirectory, SiteDeployStep::PHASE_RESTART);
+    }
+
+    /**
      * @return array{log: string, steps: list<array<string, mixed>>, ok: bool}
      */
     protected function runPhase(RemoteShell $ssh, Site $site, string $workingDirectory, string $phase): array

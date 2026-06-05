@@ -180,6 +180,15 @@ class SiteGitDeployer
 
         $log .= app(SupervisorDeployRestarter::class)->restartAfterDeployIfEnabled($site);
 
+        // RESTART phase — user-authored restart commands (the text pipeline's
+        // "Restart" block) run AFTER dply's managed restart.
+        $restart = $this->pipelineRunner->runRestart($ssh, $site, $path);
+        $log .= $restart['log'];
+        $deployment?->recordPhaseResults('restart', $restart['steps']);
+        if (! $restart['ok']) {
+            throw new \RuntimeException('Deploy failed during the restart phase. See the deployment log for details.');
+        }
+
         $syncResult = app(ByoRepoConfigSync::class)->syncAfterDeploy($site, $ssh, $path);
         if ($syncResult['applied']) {
             $log .= "\n--- dply.yaml sync ---\n";

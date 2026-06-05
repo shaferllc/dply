@@ -228,6 +228,11 @@ return [
         'site_caching' => env('FEATURE_WORKSPACE_SITE_CACHING', false),
         // exit: ship alongside site caching GA; teaser only when site caching is off
         'site_caching_preview' => env('FEATURE_WORKSPACE_SITE_CACHING_PREVIEW', true),
+        // Visual (step-builder) deploy pipeline — gated as "coming soon" for now;
+        // the simple text deploy-script editor is the live default. Flip
+        // deploy_pipeline_visual on to bring the visual builder back.
+        'deploy_pipeline_visual' => env('FEATURE_WORKSPACE_DEPLOY_PIPELINE_VISUAL', false),
+        'deploy_pipeline_visual_preview' => env('FEATURE_WORKSPACE_DEPLOY_PIPELINE_VISUAL_PREVIEW', true),
         // Observability surfaces — coming-soon teaser until the real per-site
         // experience ships. Real flag off, preview flag on (sidebar shows "Soon").
         'site_logs' => env('FEATURE_WORKSPACE_SITE_LOGS', false),

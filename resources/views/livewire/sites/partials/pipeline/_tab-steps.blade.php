@@ -1,3 +1,14 @@
+@if (workspace_surface_coming_soon('deploy_pipeline_visual'))
+    {{-- The visual step builder is gated as "coming soon"; the simple text
+         deploy-script editor is the live default (embedded). --}}
+    <div class="space-y-4">
+        <div class="flex items-start gap-2 rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-4 py-3 text-sm text-brand-moss">
+            <x-heroicon-o-sparkles class="mt-0.5 h-4 w-4 shrink-0 text-brand-sage" />
+            <span>{{ __('The visual pipeline builder is coming soon. For now, edit your deploy as a simple script — pick a preset and tweak.') }}</span>
+        </div>
+        @livewire(\App\Livewire\Sites\DeployScript::class, ['server' => $server, 'site' => $site, 'embedded' => true], key('deploy-script-'.$site->id))
+    </div>
+@else
 @php
     $functionsHost = $functionsHost ?? $server->hostCapabilities()->supportsFunctionDeploy();
     $orderedSteps = ($editingDeploySteps ?? collect())->sortBy('sort_order')->values();
@@ -552,4 +563,5 @@
     </section>
 
     @include('livewire.sites.partials.pipeline._pipeline-modals')
+@endif
 @endif

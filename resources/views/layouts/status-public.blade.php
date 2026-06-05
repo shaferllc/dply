@@ -14,9 +14,6 @@
         @livewireStyles
     </head>
     <body class="font-sans antialiased bg-brand-cream text-brand-ink min-h-screen flex flex-col" style="font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;">
-        <div class="fixed inset-0 -z-20 bg-brand-cream"></div>
-        <div class="fixed inset-0 -z-10 bg-mesh-brand"></div>
-        <x-site-header active="{{ $active ?? null }}" />
         <div class="flex-1 w-full">
             {{ $slot }}
         </div>
