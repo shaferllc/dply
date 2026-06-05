@@ -57,7 +57,7 @@ class Login extends Component
             ]);
         }
 
-        $user = User::where('email', $this->email)->first();
+        $user = User::whereRaw('lower(email) = ?', [Str::lower(trim($this->email))])->first();
         if (! $user || (! $this->canUsePasswordlessLocalLogin() && ! Hash::check($this->password, $user->password))) {
             RateLimiter::hit($key);
             throw ValidationException::withMessages([

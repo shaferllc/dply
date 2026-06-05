@@ -15,7 +15,7 @@
     <form wire:submit="submit" class="space-y-5">
         <div>
             <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" wire:model="email" class="block w-full mt-1" type="email" required autofocus autocomplete="username" />
+            <x-text-input id="email" wire:model="email" class="block w-full mt-1" type="email" required autofocus autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" inputmode="email" />
             <x-input-error :messages="$errors->get('email')" class="mt-2" />
         </div>
         <div>
