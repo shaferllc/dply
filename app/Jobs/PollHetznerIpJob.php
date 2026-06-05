@@ -46,8 +46,10 @@ class PollHetznerIpJob implements ShouldQueue
                 'status' => Server::STATUS_READY,
             ];
 
+            // Capture the private_net IP at provision time. Don't clobber a
+            // value already on the row (e.g. a manually-set internal IP).
             $privateIp = HetznerService::getPrivateIp($instance);
-            if ($privateIp !== null) {
+            if ($privateIp !== null && blank($this->server->private_ip_address)) {
                 $updates['private_ip_address'] = $privateIp;
             }
 

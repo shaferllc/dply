@@ -275,10 +275,19 @@ trait ManagesExtendedServerSettings
             }
         }
 
+        // Persist the most recent provider-pull estimate (catalog rate, MTD,
+        // YTD, runtime hours) alongside the note so the inline summary cards
+        // survive the save and are rebuilt on reload. Cleared when the user
+        // wipes the monthly note (the figure no longer applies).
+        if (($meta['cost_monthly_note'] ?? null) === null) {
+            unset($meta['cost_pulled_estimate']);
+        } elseif ($this->lastPulledCostEstimate !== null) {
+            $meta['cost_pulled_estimate'] = $this->lastPulledCostEstimate;
+        }
+
         $this->server->update(['meta' => $meta]);
         $this->server->refresh();
         $this->syncExtendedServerSettingsFromServer();
-        $this->lastPulledCostEstimate = null;
         $this->toastSuccess(__('Cost & lifecycle notes saved.'));
     }
 
@@ -539,6 +548,9 @@ trait ManagesExtendedServerSettings
         $this->settingsCostMonthlyNote = (string) ($m['cost_monthly_note'] ?? '');
         $this->settingsCostRenewalDate = (string) ($m['cost_renewal_date'] ?? '');
         $this->settingsCostProviderUrl = (string) ($m['cost_provider_console_url'] ?? '');
+
+        $pulled = $m['cost_pulled_estimate'] ?? null;
+        $this->lastPulledCostEstimate = is_array($pulled) ? $pulled : null;
 
         $this->settingsEnvType = (string) ($m['env_type'] ?? 'other');
         if ($this->settingsEnvType === '') {

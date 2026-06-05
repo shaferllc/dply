@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Servers\Concerns;
 
+use App\Jobs\RefreshServerPrivateIpJob;
 use App\Services\Servers\ServerSshAccessRepairer;
 use App\Support\Servers\ServerDateFormatter;
 use Illuminate\Validation\Rule;
@@ -17,6 +18,12 @@ trait ManagesWorkspaceSettingsForm
     public string $settingsIpAddress = '';
 
     public string $settingsInternalIp = '';
+
+    /** True while a queued provider internal-IP refresh is in flight; gates UI polling. */
+    public bool $internalIpRefreshing = false;
+
+    /** Epoch seconds the in-flight refresh was requested; bounds how long the UI polls. */
+    public ?int $internalIpRefreshStartedAt = null;
 
     public string $settingsSshPort = '22';
 
@@ -70,10 +77,9 @@ trait ManagesWorkspaceSettingsForm
 
         $meta = $this->server->meta ?? [];
         $meta['tags'] = $tags;
-        $meta['internal_ip'] = trim($this->settingsInternalIp) ?: null;
-        if ($meta['internal_ip'] === null) {
-            unset($meta['internal_ip']);
-        }
+        // Legacy manual internal IP lived in meta; it now maps to the
+        // private_ip_address column (same value provisioning + refresh write).
+        unset($meta['internal_ip']);
         $meta['os_version'] = $this->settingsOsVersion !== '' ? $this->settingsOsVersion : null;
         if (($meta['os_version'] ?? null) === null) {
             unset($meta['os_version']);
@@ -82,6 +88,7 @@ trait ManagesWorkspaceSettingsForm
         $this->server->update([
             'name' => trim($this->settingsName),
             'ip_address' => trim($this->settingsIpAddress) ?: null,
+            'private_ip_address' => trim($this->settingsInternalIp) ?: null,
             'ssh_port' => (int) $this->settingsSshPort,
             'ssh_user' => trim($this->settingsSshUser),
             'workspace_id' => $this->settingsWorkspaceId ?: null,
@@ -106,6 +113,76 @@ trait ManagesWorkspaceSettingsForm
 
         $this->syncSettingsFormFromServer();
         $this->toastSuccess(__('Server information saved.'));
+    }
+
+    /**
+     * Whether the connection card should show the "Refresh" affordance next to
+     * the Internal IP field: the provider must expose a private-IP lookup and the
+     * server must still have a credential + provider server ID to query.
+     */
+    public function canRefreshInternalIp(): bool
+    {
+        $provider = $this->server->provider;
+
+        return $provider !== null
+            && $provider->supportsPrivateIpLookup()
+            && $this->server->providerCredential !== null
+            && filled($this->server->provider_id);
+    }
+
+    /**
+     * Dispatch a queued job that re-queries the provider API for this server's
+     * private/internal IP and updates the private_ip_address column. The provider
+     * call must not run inline (PHP request timeout / project rule), so the UI
+     * polls for the refreshed value after this returns.
+     */
+    public function refreshInternalIp(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->deployerCannotEditServerSettings()) {
+            $this->toastError(__('Deployers cannot refresh server connection details.'));
+
+            return;
+        }
+
+        if (! $this->canRefreshInternalIp()) {
+            $this->toastError(__('This provider does not support internal IP lookup.'));
+
+            return;
+        }
+
+        RefreshServerPrivateIpJob::dispatch((string) $this->server->id);
+
+        $this->internalIpRefreshing = true;
+        $this->internalIpRefreshStartedAt = now()->getTimestamp();
+
+        $this->toastSuccess(__('Refreshing internal IP from the provider — the value updates here in a moment.'));
+    }
+
+    /**
+     * Re-pull the server row and resync the connection form. Polled by the UI
+     * while {@see $internalIpRefreshing} is set, so the new private_ip_address
+     * appears without a manual page reload. Stops polling once the column value
+     * changes from what was shown when the refresh was requested.
+     */
+    public function reloadInternalIp(): void
+    {
+        $previous = $this->settingsInternalIp;
+        $this->server->refresh();
+
+        // Only resync the internal IP — leave any other in-progress edits on the
+        // connection form (name, tags, SSH) untouched while polling.
+        $meta = $this->server->meta ?? [];
+        $this->settingsInternalIp = (string) ($this->server->private_ip_address ?? $meta['internal_ip'] ?? '');
+
+        $changed = $this->settingsInternalIp !== $previous;
+        $timedOut = $this->internalIpRefreshStartedAt !== null
+            && (now()->getTimestamp() - $this->internalIpRefreshStartedAt) > 45;
+
+        if ($changed || $timedOut) {
+            $this->internalIpRefreshing = false;
+            $this->internalIpRefreshStartedAt = null;
+        }
     }
 
     public function repairSshAccess(ServerSshAccessRepairer $repairer): void
@@ -241,7 +318,9 @@ trait ManagesWorkspaceSettingsForm
         $tags = $meta['tags'] ?? [];
         $this->settingsTags = is_array($tags) ? implode(', ', $tags) : (string) $tags;
         $this->settingsIpAddress = (string) ($s->ip_address ?? '');
-        $this->settingsInternalIp = (string) ($meta['internal_ip'] ?? '');
+        // Internal IP is the private_ip_address column (provisioning + provider
+        // refresh write it); fall back to any legacy meta value for old rows.
+        $this->settingsInternalIp = (string) ($s->private_ip_address ?? $meta['internal_ip'] ?? '');
         $this->settingsSshPort = (string) ($s->ssh_port ?: 22);
         $this->settingsSshUser = (string) ($s->ssh_user ?: 'root');
         $this->settingsOsVersion = (string) ($meta['os_version'] ?? '');

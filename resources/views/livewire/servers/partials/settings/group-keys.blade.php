@@ -242,27 +242,9 @@
             </a>
         </div>
 
-        @if ($repairAvailable)
-            <div class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
-                <div class="text-sm text-amber-900">
-                    <p class="font-medium">{{ __('Operational key locked out?') }}</p>
-                    <p class="mt-0.5 text-xs">{{ __('Reinstall the operational key for :user using the recovery root key.', ['user' => $server->ssh_user]) }}</p>
-                </div>
-                <button
-                    type="button"
-                    wire:click="repairSshAccess"
-                    wire:loading.attr="disabled"
-                    wire:target="repairSshAccess"
-                    class="inline-flex shrink-0 items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
-                >
-                    <span wire:loading.remove wire:target="repairSshAccess">{{ __('Repair access') }}</span>
-                    <span wire:loading wire:target="repairSshAccess" class="inline-flex items-center gap-1.5">
-                        <x-spinner variant="forest" size="sm" />
-                        {{ __('Repairing…') }}
-                    </span>
-                </button>
-            </div>
-        @endif
+        {{-- Repair-access banner removed: it duplicated the "Repair SSH access"
+             recovery card in the Connect settings group (identical gate + same
+             repairSshAccess action). The Connect card is the single entry point. --}}
         </div>
     </div>
 </section>

@@ -33,6 +33,18 @@ final class ServerMonthlyCostNoteParser
             return ['amount' => (float) $matches[1], 'currency' => 'EUR'];
         }
 
+        // Provider-pull format for non-USD currencies carries no symbol; the
+        // amount is bare ("~7.99/mo · …") with the currency as a trailing word
+        // ("… EUR"). Match the "/mo" amount and read the currency word from the
+        // note so EUR (Hetzner) pulls round-trip instead of parsing to null.
+        if (preg_match('/(\d+(?:\.\d+)?)\s*\/\s*mo/i', $text, $matches) === 1) {
+            $currency = preg_match('/\b(EUR|USD)\b/i', $text, $cur) === 1
+                ? strtoupper($cur[1])
+                : 'USD';
+
+            return ['amount' => (float) $matches[1], 'currency' => $currency];
+        }
+
         if (preg_match('/\$(\d+(?:\.\d+)?)/', $text, $matches) === 1) {
             return ['amount' => (float) $matches[1], 'currency' => 'USD'];
         }

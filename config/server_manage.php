@@ -2246,7 +2246,11 @@ BASH
         // with the feature disabled.
         'updates' => ['label' => 'Updates', 'icon' => 'arrow-path'],
         'tools' => ['label' => 'Tools', 'icon' => 'wrench-screwdriver'],
-        'configuration' => ['label' => 'Configuration', 'icon' => 'document-text'],
+        // 'configuration' sub-tab retired: it never rendered its own content —
+        // mount() unconditionally redirects ?section=configuration to the
+        // dedicated Configuration workspace (servers.configuration), so the tab
+        // was only ever a redirect link. The mount() redirect stays for
+        // back-compat deep links; the group-configuration partial is now dead.
         'danger' => ['label' => 'Danger', 'icon' => 'exclamation-triangle'],
     ],
 

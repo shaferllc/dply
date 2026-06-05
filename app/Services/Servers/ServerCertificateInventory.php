@@ -7,6 +7,7 @@ namespace App\Services\Servers;
 use App\Jobs\ExecuteSiteCertificateJob;
 use App\Models\Server;
 use App\Models\SiteCertificate;
+use Carbon\CarbonImmutable;
 
 /**
  * Server-scoped TLS certificate inventory — expiry, challenge type, failures.
@@ -237,6 +238,127 @@ final class ServerCertificateInventory
         }
 
         return $alerts;
+    }
+
+    /**
+     * Back-fill `expires_at`/`days_left` on inventory items from the live on-disk
+     * cert scan. Managed certbot-issued certs transition to ACTIVE without the
+     * issuance flow ever persisting an expiry to `site_certificates.expires_at`
+     * (certbot computes it on-box), so the stored value is null and the Expires
+     * column renders "—". The live openssl sweep is the only source of the real
+     * notAfter date; when an item's domain matches a scanned cert we copy the
+     * expiry across (display-only — the DB row is untouched).
+     *
+     * No SSH happens here: the caller passes the cached scan rows so the SSH
+     * probe stays in the queue job, never the request.
+     *
+     * @param  list<array<string, mixed>>  $items       items from {@see forServer()}
+     * @param  list<array<string, mixed>>  $liveCerts   `certs` from {@see WebserverCertsAggregator::cached()}
+     * @return list<array<string, mixed>>
+     */
+    public function withLiveExpiry(array $items, array $liveCerts): array
+    {
+        if ($items === [] || $liveCerts === []) {
+            return $items;
+        }
+
+        $warningDays = max(1, (int) config('server_cert_inventory.warning_days', 30));
+        $criticalDays = max(1, (int) config('server_cert_inventory.critical_days', 7));
+
+        // domain (lowercased) => earliest CarbonImmutable expiry from the scan.
+        $expiryByDomain = [];
+        foreach ($liveCerts as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $expiresAt = $row['expires_at'] ?? null;
+            if (! $expiresAt instanceof CarbonImmutable) {
+                continue;
+            }
+            foreach ($this->liveCertDomains($row) as $domain) {
+                if (! isset($expiryByDomain[$domain]) || $expiresAt->lt($expiryByDomain[$domain])) {
+                    $expiryByDomain[$domain] = $expiresAt;
+                }
+            }
+        }
+
+        if ($expiryByDomain === []) {
+            return $items;
+        }
+
+        foreach ($items as &$item) {
+            // Only fill the gap — never overwrite a real stored expiry.
+            if (($item['expires_at'] ?? null) !== null) {
+                continue;
+            }
+
+            $match = null;
+            foreach ((array) ($item['all_domains'] ?? []) as $domain) {
+                if (! is_string($domain)) {
+                    continue;
+                }
+                $domain = strtolower(trim($domain));
+                if ($domain !== '' && isset($expiryByDomain[$domain])) {
+                    if ($match === null || $expiryByDomain[$domain]->lt($match)) {
+                        $match = $expiryByDomain[$domain];
+                    }
+                }
+            }
+
+            if ($match === null) {
+                continue;
+            }
+
+            $daysLeft = (int) now()->diffInDays($match, false);
+            $item['expires_at'] = $match;
+            $item['days_left'] = $daysLeft;
+            $item['expires_at_source'] = 'live_scan';
+
+            // Re-derive display severity for active certs now that we know the
+            // real expiry (failed/expired/pending keep their status-driven tone).
+            if (($item['status'] ?? '') === SiteCertificate::STATUS_ACTIVE && ($item['severity'] ?? 'ok') === 'ok') {
+                if ($daysLeft <= $criticalDays) {
+                    $item['severity'] = 'critical';
+                } elseif ($daysLeft <= $warningDays) {
+                    $item['severity'] = 'warning';
+                }
+            }
+        }
+        unset($item);
+
+        return $items;
+    }
+
+    /**
+     * Candidate hostnames a live-scanned cert covers: the subject CN plus the
+     * Let's Encrypt live-directory name embedded in the path. Used to match a
+     * scan row back to an inventory item by domain.
+     *
+     * @param  array<string, mixed>  $row
+     * @return list<string>
+     */
+    private function liveCertDomains(array $row): array
+    {
+        $domains = [];
+
+        $subject = is_string($row['subject'] ?? null) ? $row['subject'] : '';
+        if ($subject !== '' && preg_match('/CN\s*=\s*([^,\/]+)/i', $subject, $m)) {
+            $domains[] = trim($m[1]);
+        }
+
+        // /etc/letsencrypt/live/<domain>/fullchain.pem -> <domain>
+        $path = is_string($row['path'] ?? null) ? $row['path'] : '';
+        if ($path !== '' && preg_match('#/etc/letsencrypt/live/([^/]+)/#', $path, $m)) {
+            // Strip certbot's "-0001" dedupe suffix on renewed lineages.
+            $domains[] = preg_replace('/-\d{4}$/', '', $m[1]) ?? $m[1];
+        }
+
+        return collect($domains)
+            ->filter(fn (mixed $d): bool => is_string($d) && trim($d) !== '' && ! str_starts_with(trim($d), '*'))
+            ->map(fn (string $d): string => strtolower(trim($d)))
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**

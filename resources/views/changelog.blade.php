@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 5, 2026',
                     'tags'    => ['new'],
+                    'title'   => 'Refresh Server Private IP',
+                    'summary' => 'You can now re-query DigitalOcean and Hetzner for a server\'s private IP from the connection settings, with live certificate scans now timing out gracefully instead of spinning forever.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 5, 2026',
+                    'tags'    => ['new'],
                     'title'   => 'Search And Filter Sites',
                     'summary' => 'The sites list now supports search, status filtering, sorting, and a summary stat strip, with dashboard cards linking through to servers and fleet health.',
                     'items'   => [],

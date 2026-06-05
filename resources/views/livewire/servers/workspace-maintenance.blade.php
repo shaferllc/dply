@@ -134,7 +134,7 @@
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Schedule') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Preferred maintenance schedule') }}</h3>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Advisory recurring local-time schedule for disruptive server actions (firewall apply, supervisor restarts). Stored in Settings → Alerts.') }}</p>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Advisory recurring local-time schedule for disruptive server actions (firewall apply, supervisor restarts). Stored in Settings → Connection.') }}</p>
                     </div>
                 </div>
                 <div class="space-y-3 px-6 py-5 text-sm sm:px-7">
@@ -156,7 +156,7 @@
                         <p class="text-brand-moss">{{ __('Not configured — disruptive actions proceed without a schedule gate.') }}</p>
                     @endif
                     <a
-                        href="{{ route('servers.settings', ['server' => $server, 'section' => 'operations']) }}#settings-maintenance"
+                        href="{{ route('servers.settings', ['server' => $server, 'section' => 'connection']) }}#settings-maintenance"
                         wire:navigate
                         class="inline-flex items-center gap-1 text-xs font-semibold text-brand-moss hover:text-brand-ink"
                     >

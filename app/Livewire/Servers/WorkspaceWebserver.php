@@ -37,6 +37,7 @@ use App\Services\Servers\LiveState\NginxLiveStateProbe;
 use App\Services\Servers\LiveState\OlsLiveStateProbe;
 use App\Services\Servers\LiveState\OpenRestyLiveStateProbe;
 use App\Services\Servers\LiveState\TraefikLiveStateProbe;
+use App\Services\Servers\NginxAccessLogParser;
 use App\Services\Servers\NginxCustomHostsConfig;
 use App\Services\Servers\NginxEngineCacheConfig;
 use App\Services\Servers\NginxEngineCachePurger;
@@ -175,6 +176,9 @@ class WorkspaceWebserver extends WorkspaceManage
 
     /** When true, the Logs tab adds a wire:poll so the buffer refreshes every few seconds. */
     public bool $log_live = false;
+
+    /** When true, force the raw text dump even for parseable nginx access logs. */
+    public bool $log_raw = false;
 
     /**
      * Time range for the per-engine Overview health charts. One of the
@@ -7581,6 +7585,46 @@ class WorkspaceWebserver extends WorkspaceManage
         }
     }
 
+    public function toggleWebserverLogRaw(): void
+    {
+        $this->log_raw = ! $this->log_raw;
+    }
+
+    /**
+     * Structured view of the current access-log buffer for the Logs tab.
+     *
+     * Only engages for the nginx-family "combined" format and only on the
+     * access log; everything else (error log, journal, non-combined engines,
+     * or operator-forced raw mode) returns ['structured' => false] so the
+     * blade falls back to the existing <pre> dump. The SSH fetch itself is
+     * unchanged — this purely parses the already-fetched text.
+     *
+     * @return array<string, mixed>
+     */
+    public function getParsedAccessLogProperty(): array
+    {
+        $off = ['structured' => false, 'rows' => [], 'summary' => null];
+
+        if ($this->log_raw || $this->log_kind !== 'access' || $this->log_output === '') {
+            return $off;
+        }
+
+        // Combined format is the nginx default. Other engines (caddy JSON,
+        // apache, haproxy, …) won't match looksLikeCombined() and fall back.
+        $parser = app(NginxAccessLogParser::class);
+        if (! $parser->looksLikeCombined($this->log_output)) {
+            return $off;
+        }
+
+        $rows = $parser->parse($this->log_output);
+
+        return [
+            'structured' => true,
+            'rows' => $rows,
+            'summary' => $parser->summarize($rows),
+        ];
+    }
+
     public function render(ServerManageToolsReport $toolsReport): View
     {
         $consoleLookup = app(ServerConsoleActionLookup::class);
@@ -7701,5 +7745,6 @@ class WorkspaceWebserver extends WorkspaceManage
         $this->log_output = '';
         $this->log_lines = 300;
         $this->log_live = false;
+        $this->log_raw = false;
     }
 }

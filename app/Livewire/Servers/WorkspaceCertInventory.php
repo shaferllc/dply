@@ -10,6 +10,7 @@ use App\Livewire\Servers\Concerns\LoadsLiveServerCerts;
 use App\Models\Server;
 use App\Models\SiteCertificate;
 use App\Services\Servers\ServerCertificateInventory;
+use App\Services\Servers\WebserverCertsAggregator;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -143,6 +144,14 @@ class WorkspaceCertInventory extends Component
     {
         $this->server->refresh();
         $report = $inventory->forServer($this->server);
+
+        // Managed certbot-issued certs never persist an expiry to the DB, so
+        // back-fill `expires_at`/`days_left` from the cached live on-disk scan
+        // when a domain matches. Read-only cache lookup — no SSH in the request.
+        $liveScan = app(WebserverCertsAggregator::class)->cached($this->server);
+        if ($liveScan !== null && ($liveScan['certs'] ?? []) !== []) {
+            $report['items'] = $inventory->withLiveExpiry($report['items'], $liveScan['certs']);
+        }
 
         return view('livewire.servers.workspace-cert-inventory', [
             'report' => $report,

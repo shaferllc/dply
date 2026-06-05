@@ -20,6 +20,16 @@ use Carbon\CarbonImmutable;
  */
 trait LoadsLiveServerCerts
 {
+    /**
+     * How long the blade polls for a queued scan's result before giving up and
+     * showing the timed-out/Retry state instead of spinning forever. Sized to
+     * comfortably cover the job's own 90s timeout + queue latency without
+     * leaving the operator staring at a spinner if the worker is down.
+     */
+    private const LIVE_CERTS_POLL_INTERVAL_SECONDS = 4;
+
+    private const LIVE_CERTS_POLL_TIMEOUT_SECONDS = 60;
+
     /** @var list<array<string, mixed>> */
     public array $liveCerts = [];
 
@@ -29,9 +39,14 @@ trait LoadsLiveServerCerts
 
     public bool $liveCertsUnreadable = false;
 
+    public bool $liveCertsTimedOut = false;
+
     public ?string $liveCertsError = null;
 
     public ?string $liveCertsScannedAtIso = null;
+
+    /** Number of poll ticks elapsed for the in-flight scan; drives the client-side timeout. */
+    public int $liveCertsPollCount = 0;
 
     /** Fired from wire:init (and the Rescan button via refreshLiveCerts). */
     public function loadLiveCerts(bool $forceFresh = false): void
@@ -42,11 +57,15 @@ trait LoadsLiveServerCerts
             $this->liveCertsError = __('Provisioning and SSH must be ready before scanning live certificates.');
             $this->liveCertsLoaded = true;
             $this->liveCertsScanning = false;
+            $this->liveCertsTimedOut = false;
 
             return;
         }
 
         $aggregator = app(WebserverCertsAggregator::class);
+
+        // On a plain load (wire:init), serve an existing cached result immediately
+        // and never kick off a fresh scan — only Rescan (forceFresh) re-dispatches.
         $cached = $forceFresh ? null : $aggregator->cached($this->server);
         if ($cached !== null) {
             $this->applyLiveCertResult($cached);
@@ -58,10 +77,17 @@ trait LoadsLiveServerCerts
         $aggregator->dispatchScan($this->server, $forceFresh);
         $this->liveCertsScanning = true;
         $this->liveCertsLoaded = false;
+        $this->liveCertsTimedOut = false;
         $this->liveCertsError = null;
+        $this->liveCertsPollCount = 0;
     }
 
-    /** Driven by wire:poll while a scan is in flight; resolves once the job caches a result. */
+    /**
+     * Driven by wire:poll while a scan is in flight; resolves once the job caches
+     * a result, or stops and flips to the timed-out state once the poll budget is
+     * exhausted so the panel never spins indefinitely (e.g. when the worker that
+     * runs ScanServerLiveCertsJob is down).
+     */
     public function pollLiveCerts(): void
     {
         if (! $this->liveCertsScanning) {
@@ -71,12 +97,32 @@ trait LoadsLiveServerCerts
         $cached = app(WebserverCertsAggregator::class)->cached($this->server);
         if ($cached !== null) {
             $this->applyLiveCertResult($cached);
+
+            return;
+        }
+
+        $this->liveCertsPollCount++;
+        if ($this->liveCertsPollCount >= $this->liveCertsMaxPolls()) {
+            $this->liveCertsScanning = false;
+            $this->liveCertsTimedOut = true;
+            $this->liveCertsLoaded = false;
         }
     }
 
     public function refreshLiveCerts(): void
     {
         $this->loadLiveCerts(forceFresh: true);
+    }
+
+    /** Poll-interval the blade should use (seconds). */
+    public function liveCertsPollInterval(): int
+    {
+        return self::LIVE_CERTS_POLL_INTERVAL_SECONDS;
+    }
+
+    private function liveCertsMaxPolls(): int
+    {
+        return (int) ceil(self::LIVE_CERTS_POLL_TIMEOUT_SECONDS / self::LIVE_CERTS_POLL_INTERVAL_SECONDS);
     }
 
     /** @param  array{certs: list<array<string, mixed>>, scanned_at: ?CarbonImmutable, unreadable: bool}  $result */
@@ -95,6 +141,8 @@ trait LoadsLiveServerCerts
         $this->liveCertsUnreadable = (bool) $result['unreadable'];
         $this->liveCertsLoaded = true;
         $this->liveCertsScanning = false;
+        $this->liveCertsTimedOut = false;
         $this->liveCertsError = null;
+        $this->liveCertsPollCount = 0;
     }
 }

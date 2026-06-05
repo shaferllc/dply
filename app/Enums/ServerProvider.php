@@ -223,6 +223,21 @@ enum ServerProvider: string
     }
 
     /**
+     * Whether Dply can re-query this provider's API for a server's private /
+     * internal networking IP after creation. Only providers whose service class
+     * exposes a private-IP reader qualify (DigitalOcean VPC, Hetzner private_net).
+     * Gates the "Refresh" affordance on the connection settings card.
+     */
+    public function supportsPrivateIpLookup(): bool
+    {
+        return match ($this) {
+            self::DigitalOcean,
+            self::Hetzner => true,
+            default => false,
+        };
+    }
+
+    /**
      * Whether this provider has full support: service class, provision/poll jobs,
      * create tab, and destroy handling. Otherwise only credentials are stored.
      */

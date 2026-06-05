@@ -1,5 +1,6 @@
 @php
     $osVersions = $osVersions ?? config('server_settings.os_versions', []);
+    $maintenanceWeekdays = config('server_settings.maintenance_weekdays', []);
     $showRepairCard = $server->isReady()
         && filled($server->ip_address)
         && $server->recoverySshPrivateKey() !== null
@@ -41,15 +42,82 @@
                         </div>
                         <div class="sm:col-span-2">
                             <x-input-label for="settings-tags" value="{{ __('Tags') }}" />
-                            <input
-                                id="settings-tags"
-                                type="text"
-                                wire:model="settingsTags"
-                                placeholder="{{ __('e.g. production, api') }}"
-                                autocomplete="off"
-                                class="{{ $inputClass }} placeholder:text-brand-mist"
-                                @disabled(! $this->canEditServerSettings)
-                            />
+                            @php($tagsDisabled = ! $this->canEditServerSettings)
+                            <div
+                                x-data="{
+                                    raw: @entangle('settingsTags'),
+                                    draft: '',
+                                    disabled: @js($tagsDisabled),
+                                    get chips() {
+                                        return this.raw
+                                            .split(',')
+                                            .map((t) => t.trim())
+                                            .filter((t) => t.length > 0);
+                                    },
+                                    sync(list) {
+                                        this.raw = list.join(', ');
+                                    },
+                                    add() {
+                                        if (this.disabled) return;
+                                        const value = this.draft.trim().replace(/,+$/, '').trim();
+                                        this.draft = '';
+                                        if (value === '') return;
+                                        const list = this.chips;
+                                        if (! list.includes(value)) {
+                                            list.push(value);
+                                            this.sync(list);
+                                        }
+                                    },
+                                    remove(index) {
+                                        if (this.disabled) return;
+                                        const list = this.chips;
+                                        list.splice(index, 1);
+                                        this.sync(list);
+                                    },
+                                    backspace() {
+                                        if (this.disabled || this.draft !== '') return;
+                                        const list = this.chips;
+                                        if (list.length > 0) {
+                                            list.pop();
+                                            this.sync(list);
+                                        }
+                                    },
+                                }"
+                                class="mt-1 flex w-full flex-wrap items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2 py-1.5 text-sm shadow-sm focus-within:border-brand-sage focus-within:ring-2 focus-within:ring-brand-sage/30"
+                                :class="disabled ? 'cursor-not-allowed opacity-60' : 'cursor-text'"
+                                @click="$refs.tagInput && $refs.tagInput.focus()"
+                            >
+                                <template x-for="(chip, index) in chips" :key="index">
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-xs font-medium text-brand-ink ring-1 ring-brand-ink/10">
+                                        <span x-text="chip"></span>
+                                        <button
+                                            type="button"
+                                            x-show="! disabled"
+                                            @click.stop="remove(index)"
+                                            class="-mr-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full text-brand-moss transition hover:bg-brand-ink/10 hover:text-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-sage"
+                                            :aria-label="'Remove ' + chip"
+                                        >
+                                            <svg class="h-3 w-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+                                                <path d="M3 3l6 6M9 3l-6 6" />
+                                            </svg>
+                                        </button>
+                                    </span>
+                                </template>
+                                <input
+                                    id="settings-tags"
+                                    type="text"
+                                    x-ref="tagInput"
+                                    x-model="draft"
+                                    @keydown.enter.prevent="add()"
+                                    @keydown="if ($event.key === ',') { $event.preventDefault(); add(); }"
+                                    @keydown.backspace="backspace()"
+                                    @blur="add()"
+                                    placeholder="{{ __('e.g. production, api') }}"
+                                    autocomplete="off"
+                                    class="min-w-[8rem] flex-1 border-0 bg-transparent px-1 py-1 text-sm text-brand-ink placeholder:text-brand-mist focus:outline-none focus:ring-0 disabled:cursor-not-allowed"
+                                    :disabled="disabled"
+                                />
+                            </div>
                             <p class="mt-1 text-xs text-brand-moss">{{ __('Comma-separated labels for search and filters.') }}</p>
                             <x-input-error :messages="$errors->get('settingsTags')" class="mt-2" />
                         </div>
@@ -101,8 +169,34 @@
                             />
                             <x-input-error :messages="$errors->get('settingsIpAddress')" class="mt-2" />
                         </div>
-                        <div>
-                            <x-input-label for="settings-internal-ip" value="{{ __('Internal IP') }}" />
+                        <div @if ($this->internalIpRefreshing) wire:poll.4s="reloadInternalIp" @endif>
+                            <div class="flex items-center justify-between gap-2">
+                                <x-input-label for="settings-internal-ip" value="{{ __('Internal IP') }}" />
+                                @if ($this->canRefreshInternalIp() && $this->canEditServerSettings)
+                                    <button
+                                        type="button"
+                                        wire:click="refreshInternalIp"
+                                        wire:loading.attr="disabled"
+                                        wire:target="refreshInternalIp"
+                                        @disabled($this->internalIpRefreshing)
+                                        class="inline-flex items-center gap-1 rounded text-xs font-medium text-brand-forest transition hover:text-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30 disabled:opacity-50"
+                                    >
+                                        @if ($this->internalIpRefreshing)
+                                            <x-spinner variant="forest" size="sm" />
+                                            {{ __('Refreshing…') }}
+                                        @else
+                                            <span wire:loading.remove wire:target="refreshInternalIp" class="inline-flex items-center gap-1">
+                                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                                                {{ __('Refresh') }}
+                                            </span>
+                                            <span wire:loading wire:target="refreshInternalIp" class="inline-flex items-center gap-1">
+                                                <x-spinner variant="forest" size="sm" />
+                                                {{ __('Requesting…') }}
+                                            </span>
+                                        @endif
+                                    </button>
+                                @endif
+                            </div>
                             <input
                                 id="settings-internal-ip"
                                 type="text"
@@ -111,6 +205,9 @@
                                 class="{{ $monoInputClass }} placeholder:font-sans placeholder:text-brand-mist"
                                 @disabled(! $this->canEditServerSettings)
                             />
+                            @if ($this->canRefreshInternalIp())
+                                <p class="mt-1 text-xs text-brand-mist">{{ __('Re-fetch the private networking address from :provider.', ['provider' => $server->provider?->label() ?? __('the provider')]) }}</p>
+                            @endif
                             <x-input-error :messages="$errors->get('settingsInternalIp')" class="mt-2" />
                         </div>
                         <div>
@@ -220,6 +317,77 @@
             <p class="mt-3 text-xs text-brand-mist">{{ __('Preview:') }} <span class="font-mono text-brand-ink">{{ $previewSample }}</span></p>
             @if ($this->canEditServerSettings)
                 <x-primary-button type="submit" class="mt-4" wire:loading.attr="disabled">{{ __('Save format') }}</x-primary-button>
+            @endif
+        </form>
+        </div>
+    </div>
+
+    <div id="settings-maintenance" class="{{ $card }} scroll-mt-24">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-bell-alert class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Schedule') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Preferred maintenance schedule') }}</h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                    {{ __('Advisory only — the days and hours you\'d prefer Dply to run disruptive work (upgrades, reboots). Dply uses it to warn before risky actions; it doesn\'t pause cron or suspend sites. Times use your Dply timezone preference above, not the server OS clock.') }}
+                </p>
+            </div>
+        </div>
+        <div class="px-6 py-6 sm:px-7">
+        <form wire:submit="saveMaintenanceWindow" class="space-y-5">
+            <fieldset @disabled(! $this->canEditServerSettings)>
+                <legend class="text-sm font-medium text-brand-ink">{{ __('Preferred days') }}</legend>
+                <div class="mt-2 flex flex-wrap gap-3">
+                    @foreach ($maintenanceWeekdays as $key => $label)
+                        <label class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2 text-sm">
+                            <input type="checkbox" wire:model="settingsMaintenanceDays" value="{{ $key }}" class="rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage" />
+                            <span>{{ $label }}</span>
+                        </label>
+                    @endforeach
+                </div>
+                <x-input-error :messages="$errors->get('settingsMaintenanceDays')" class="mt-2" />
+            </fieldset>
+            <div class="grid gap-5 sm:grid-cols-2">
+                <div>
+                    <x-input-label for="settings-maint-start" value="{{ __('Start (local)') }}" />
+                    <input
+                        id="settings-maint-start"
+                        type="time"
+                        wire:model="settingsMaintenanceStart"
+                        class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                        @disabled(! $this->canEditServerSettings)
+                    />
+                    <x-input-error :messages="$errors->get('settingsMaintenanceStart')" class="mt-2" />
+                </div>
+                <div>
+                    <x-input-label for="settings-maint-end" value="{{ __('End (local)') }}" />
+                    <input
+                        id="settings-maint-end"
+                        type="time"
+                        wire:model="settingsMaintenanceEnd"
+                        class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                        @disabled(! $this->canEditServerSettings)
+                    />
+                    <x-input-error :messages="$errors->get('settingsMaintenanceEnd')" class="mt-2" />
+                </div>
+            </div>
+            <div>
+                <x-input-label for="settings-maint-note" value="{{ __('Note') }}" />
+                <textarea
+                    id="settings-maint-note"
+                    wire:model="settingsMaintenanceNote"
+                    rows="3"
+                    class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                    @disabled(! $this->canEditServerSettings)
+                ></textarea>
+                <x-input-error :messages="$errors->get('settingsMaintenanceNote')" class="mt-2" />
+            </div>
+            @if ($this->canEditServerSettings)
+                <div class="flex justify-end">
+                    <x-primary-button type="submit" wire:loading.attr="disabled">{{ __('Save preferred schedule') }}</x-primary-button>
+                </div>
             @endif
         </form>
         </div>

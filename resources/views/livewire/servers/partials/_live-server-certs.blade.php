@@ -46,9 +46,29 @@
         <div class="border-b border-rose-200 bg-rose-50/70 px-6 py-3 text-sm text-rose-900 sm:px-7">{{ $liveCertsError }}</div>
     @endif
 
-    @if (! $liveCertsLoaded)
-        {{-- Scanning placeholder polls for the async job's result, then stops once loaded. --}}
-        <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7" @if ($liveCertsScanning) wire:poll.2s="pollLiveCerts" @endif>
+    @if ($liveCertsTimedOut)
+        {{-- Poll budget exhausted (no result cached in time — usually a stopped worker).
+             Stop spinning and offer an explicit retry instead of polling forever. --}}
+        <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7">
+            <x-heroicon-o-clock class="mx-auto h-6 w-6 text-brand-mist" aria-hidden="true" />
+            <p class="mt-2 font-medium text-brand-ink">{{ __('Scan didn\'t return in time') }}</p>
+            <p class="mt-1">{{ __('The certificate scan was queued but no result came back. The scan worker may be busy or offline.') }}</p>
+            <button
+                type="button"
+                wire:click="refreshLiveCerts"
+                wire:loading.attr="disabled"
+                wire:target="refreshLiveCerts"
+                class="mt-4 inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
+            >
+                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                {{ __('Retry scan') }}
+            </button>
+        </div>
+    @elseif (! $liveCertsLoaded)
+        {{-- Scanning placeholder polls for the async job's result, then stops once a
+             result is cached OR the poll budget runs out (pollLiveCerts flips to the
+             timed-out state above), so the panel never spins indefinitely. --}}
+        <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7" @if ($liveCertsScanning) wire:poll.{{ $this->liveCertsPollInterval() }}s="pollLiveCerts" @endif>
             <span class="inline-flex items-center gap-2">
                 <x-spinner class="h-3.5 w-3.5" /> {{ __('Scanning certificates on the server…') }}
             </span>
