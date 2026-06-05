@@ -1,13 +1,20 @@
 @if (! $featureActive)
-    <x-coming-soon-panel
+    <x-workspace-coming-soon
         icon="heroicon-o-signal"
         :title="__('Realtime')"
         :description="__('A managed Pusher-compatible WebSocket relay built on Cloudflare Workers and DigitalOcean. Drop-in for Laravel Echo and pusher-js — connect with your credentials, no relay server to run.')"
-        :points="[
-            __('Pusher-compatible channels — works with existing Laravel Echo and pusher-js setups'),
-            __('Managed infrastructure on Cloudflare Workers and DigitalOcean'),
-            __('Billed flat per app through dply — no separate Pusher account needed'),
-            __('Credentials and endpoint served from your dply workspace'),
+        :eyebrow="__('Realtime preview')"
+        :lines="[
+            ['tone' => 'cmd', 'text' => '~ $ dply realtime apps:create my-app'],
+            ['tone' => 'muted', 'text' => 'endpoint  wss://realtime.dply.io/app/…'],
+            ['tone' => 'muted', 'text' => 'protocol  pusher (Laravel Echo + pusher-js)'],
+            ['tone' => 'ok', 'text' => 'app provisioned · credentials issued · billed per app'],
+        ]"
+        :features="[
+            ['icon' => 'bolt', 'title' => __('Pusher-compatible'), 'body' => __('Drop-in for existing Laravel Echo and pusher-js setups — no code changes.')],
+            ['icon' => 'cloud', 'title' => __('Managed infrastructure'), 'body' => __('Runs on Cloudflare Workers and DigitalOcean — no relay server to operate.')],
+            ['icon' => 'credit-card', 'title' => __('Flat per-app billing'), 'body' => __('Billed through dply — no separate Pusher account needed.')],
+            ['icon' => 'key', 'title' => __('Workspace credentials'), 'body' => __('Credentials and endpoint served straight from your dply workspace.')],
         ]"
     />
 @else

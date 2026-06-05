@@ -290,12 +290,7 @@
                                             {{ __('Projects') }}
                                         </x-dropdown-link>
                                     @endfeature
-                                    <x-dropdown-link :href="route('deploy-sync.index')">
-                                        <x-slot name="icon">
-                                            <x-heroicon-o-arrows-right-left class="{{ $hi }}" />
-                                        </x-slot>
-                                        {{ __('Deploy sync') }}
-                                    </x-dropdown-link>
+
                                     <x-coming-soon-dropdown-link :href="route('backups.databases')">
                                         <x-slot name="icon">
                                             <x-heroicon-o-archive-box class="{{ $hi }}" />
