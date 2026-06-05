@@ -3,9 +3,13 @@
 namespace App\Livewire\Servers\Concerns;
 
 use App\Models\FirewallRuleTemplate;
+use App\Models\ServerFirewallAuditEvent;
 use App\Models\ServerFirewallRule;
 use App\Services\Servers\FirewallRuleTemplateApplicator;
+use App\Services\Servers\ServerFirewallAuditLogger;
+use App\Services\Servers\ServerFirewallProvisioner;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 trait ManagesFirewallWorkspaceAdvanced
 {
@@ -84,6 +88,113 @@ trait ManagesFirewallWorkspaceAdvanced
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
         }
+    }
+
+    /**
+     * Remove the rules a bundled template added, from the panel. Mirrors
+     * {@see deleteFirewallRule()}: matches by (port, protocol, action, source)
+     * and goes through the same panel-delete + host-removal path the rest of
+     * the firewall UI uses. Rules aren't tagged by origin preset, so we match
+     * structurally — but the SSH lifeline rule (configured ssh_port, tcp,
+     * allow, from any) is ALWAYS skipped so a click can never lock the
+     * operator out. The operator must remove SSH manually if they truly want
+     * it gone.
+     */
+    public function removeBundledFirewallTemplate(string $key, ServerFirewallProvisioner $firewall, ServerFirewallAuditLogger $audit): void
+    {
+        $this->authorize('update', $this->server);
+
+        $bundled = config('server_firewall.bundled_templates', []);
+        $bundle = $bundled[$key] ?? null;
+        if (! is_array($bundle) || ! is_array($bundle['rules'] ?? null) || $bundle['rules'] === []) {
+            $this->toastError(__('Unknown bundled firewall template.'));
+
+            return;
+        }
+
+        $sshPort = (int) ($this->server->ssh_port ?: 22);
+
+        $removed = 0;
+        $skippedSsh = false;
+        $this->server->refresh();
+        $opsReady = $this->opsReady();
+
+        foreach ($bundle['rules'] as $def) {
+            if (! is_array($def)) {
+                continue;
+            }
+
+            $port = isset($def['port']) && is_numeric($def['port']) ? (int) $def['port'] : null;
+            $proto = strtolower((string) ($def['protocol'] ?? 'tcp'));
+            $action = strtolower((string) ($def['action'] ?? 'allow'));
+            $source = strtolower(trim((string) ($def['source'] ?? 'any')));
+
+            // SAFETY: never remove the SSH management lifeline.
+            $isSsh = $action === 'allow'
+                && $proto === 'tcp'
+                && $port === $sshPort
+                && in_array($source, ['any', '0.0.0.0/0', '::/0'], true);
+            if ($isSsh) {
+                $skippedSsh = true;
+
+                continue;
+            }
+
+            $matches = ServerFirewallRule::query()
+                ->where('server_id', $this->server->id)
+                ->where('port', $port)
+                ->whereRaw('LOWER(protocol) = ?', [$proto])
+                ->whereRaw('LOWER(action) = ?', [$action])
+                ->whereRaw('LOWER(TRIM(source)) = ?', [$source])
+                ->get();
+
+            foreach ($matches as $rule) {
+                if ($opsReady && $rule->enabled) {
+                    try {
+                        $firewall->removeFromHost($this->server, $rule);
+                    } catch (\Throwable $e) {
+                        // Host reconcile happens on the next Apply regardless.
+                    }
+                }
+
+                $audit->record($this->server, ServerFirewallAuditEvent::EVENT_RULE_DELETED, [
+                    'rule_id' => (string) $rule->id,
+                    'via' => 'bundle_remove:'.$key,
+                ], auth()->user());
+
+                if ($this->editing_rule_id === (string) $rule->id) {
+                    $this->cancelEditRule();
+                }
+
+                $rule->delete();
+                $removed++;
+            }
+        }
+
+        if ($removed === 0) {
+            if ($skippedSsh) {
+                $this->toastSuccess(__('Nothing removed — the SSH rule is kept to avoid locking you out. Remove it from the rules list manually if you really need to.'));
+            } else {
+                $this->toastSuccess(__('No matching rules to remove.'));
+            }
+
+            return;
+        }
+
+        $this->emitPanelEvent(
+            __('Bundle rules removed — apply to push to the server'),
+            array_values(array_filter([
+                sprintf('> Removed %d rule(s) from the "%s" bundle.', $removed, $bundle['label'] ?? $key),
+                $skippedSsh ? '  Kept the SSH allow rule to avoid lockout.' : null,
+                '> Click "Apply rules" to reconcile the host firewall.',
+            ])),
+        );
+
+        $msg = __('Removed :n rule(s) from the bundle.', ['n' => $removed]);
+        if ($skippedSsh) {
+            $msg .= ' '.__('Kept SSH to avoid lockout.');
+        }
+        $this->toastSuccess(Str::limit($msg, 500));
     }
 
     public function applySavedFirewallTemplate(string $templateId): void

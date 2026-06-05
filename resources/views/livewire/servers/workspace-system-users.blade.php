@@ -40,8 +40,6 @@
         </section>
     @else
         <div class="space-y-6">
-            @include('livewire.servers.partials.system-users._cli-reference', ['server' => $server])
-
             {{-- Server-scoped console-actions banner. Surfaces the in-flight + most-recent
                  system_user run (create, remove) for this server. --}}
             @include('livewire.partials.console-action-banner-static', [

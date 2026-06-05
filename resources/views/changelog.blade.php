@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 5, 2026',
                     'tags'    => ['new'],
+                    'title'   => 'Server CLI Tab And Firewall Bundle Removal',
+                    'summary' => 'Adds a CLI tab for installing and managing servers from your terminal, and lets you remove bundled firewall templates with per-rule status while always preserving the SSH lifeline rule.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 5, 2026',
+                    'tags'    => ['new'],
                     'title'   => 'Refresh Server Private IP',
                     'summary' => 'You can now re-query DigitalOcean and Hetzner for a server\'s private IP from the connection settings, with live certificate scans now timing out gracefully instead of spinning forever.',
                     'items'   => [],

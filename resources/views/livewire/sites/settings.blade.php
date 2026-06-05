@@ -201,6 +201,8 @@
                         @endif
                     @elseif ($section === 'basic-auth')
                         @include('livewire.sites.settings.partials.basic-auth')
+                    @elseif ($section === 'cli')
+                        @include('livewire.sites.settings.partials.cli')
                     @elseif ($section === 'danger')
                         @include('livewire.sites.settings.partials.danger')
                     @endif

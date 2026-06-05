@@ -1390,16 +1390,77 @@ class WorkspaceFirewall extends Component
                 ->mapWithKeys(fn ($r) => [$this->ruleMatchKey($r->port, $r->protocol, $r->action, $r->source) => true])
                 ->all();
 
+            $sshPort = (int) ($this->server->ssh_port ?: 22);
+
             foreach ($bundledTemplates as $key => $bundle) {
                 $rules = $bundle['rules'] ?? [];
                 if ($rules === []) {
-                    $bundledAppliedMap[$key] = false;
+                    $bundledAppliedMap[$key] = [
+                        'state' => 'none',
+                        'present_count' => 0,
+                        'total' => 0,
+                        'removable_count' => 0,
+                        'has_ssh' => false,
+                        'chips' => [],
+                    ];
 
                     continue;
                 }
-                $bundledAppliedMap[$key] = collect($rules)->every(fn ($r) => isset($appliedKeys[
-                    $this->ruleMatchKey($r['port'] ?? null, $r['protocol'] ?? null, $r['action'] ?? null, $r['source'] ?? null)
-                ]));
+
+                $chips = [];
+                $presentCount = 0;
+                $removableCount = 0;
+                $hasSsh = false;
+
+                foreach ($rules as $r) {
+                    $rPort = isset($r['port']) ? (is_numeric($r['port']) ? (int) $r['port'] : null) : null;
+                    $rProto = strtolower((string) ($r['protocol'] ?? 'tcp'));
+                    $rAction = strtolower((string) ($r['action'] ?? 'allow'));
+                    $rSource = strtolower(trim((string) ($r['source'] ?? 'any')));
+                    $present = isset($appliedKeys[$this->ruleMatchKey($r['port'] ?? null, $r['protocol'] ?? null, $r['action'] ?? null, $r['source'] ?? null)]);
+                    // An SSH allow rule on the server's configured SSH port from
+                    // any source is the management lifeline — never auto-removable.
+                    $isSsh = $rAction === 'allow'
+                        && $rProto === 'tcp'
+                        && $rPort === $sshPort
+                        && in_array($rSource, ['any', '0.0.0.0/0', '::/0'], true);
+
+                    if ($present) {
+                        $presentCount++;
+                    }
+                    if ($present && ! $isSsh) {
+                        $removableCount++;
+                    }
+                    if ($isSsh) {
+                        $hasSsh = true;
+                    }
+
+                    $label = $rPort === null
+                        ? $rProto
+                        : $rPort.'/'.$rProto;
+                    if ($rSource !== 'any' && $rSource !== '') {
+                        $label .= ' ← '.($r['source'] ?? '');
+                    }
+
+                    $chips[] = [
+                        'label' => $label,
+                        'name' => (string) ($r['name'] ?? ''),
+                        'present' => $present,
+                        'is_ssh' => $isSsh,
+                    ];
+                }
+
+                $total = count($rules);
+                $state = $presentCount === 0 ? 'none' : ($presentCount >= $total ? 'all' : 'partial');
+
+                $bundledAppliedMap[$key] = [
+                    'state' => $state,
+                    'present_count' => $presentCount,
+                    'total' => $total,
+                    'removable_count' => $removableCount,
+                    'has_ssh' => $hasSsh,
+                    'chips' => $chips,
+                ];
             }
         }
 

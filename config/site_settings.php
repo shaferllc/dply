@@ -25,6 +25,7 @@ return [
         'platform' => ['label' => 'Platform'],
         'notifications' => ['label' => 'Notifications'],
         'basic-auth' => ['label' => 'Authentication'],
+        'cli' => ['label' => 'CLI'],
         'danger' => ['label' => 'Danger zone'],
         'edge-deploys' => ['label' => 'Deploys'],
         'edge-domains' => ['label' => 'Domains'],

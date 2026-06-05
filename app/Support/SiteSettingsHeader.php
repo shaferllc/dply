@@ -101,6 +101,11 @@ final class SiteSettingsHeader
                 'description' => __('Username and password gate that the webserver checks before letting a request reach this :resource.', ['resource' => $resourceNoun]),
                 'icon' => 'heroicon-o-lock-closed',
             ],
+            'cli' => [
+                'title' => __('CLI'),
+                'description' => __('Install the dply CLI and manage this :resource from your terminal.', ['resource' => $resourceNoun]),
+                'icon' => 'heroicon-o-command-line',
+            ],
             'danger' => [
                 'title' => __('Danger zone'),
                 'description' => __('Suspend, archive, transfer, or delete this :resource. Actions here are scoped tightly and most are irreversible.', ['resource' => $resourceNoun]),

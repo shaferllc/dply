@@ -169,6 +169,7 @@ use App\Livewire\Servers\WorkspaceSharedHostPreview;
 use App\Livewire\Servers\WorkspaceSites;
 use App\Livewire\Servers\WorkspaceSshAccessGraph;
 use App\Livewire\Servers\WorkspaceSshAccessGraphPreview;
+use App\Livewire\Servers\WorkspaceCli;
 use App\Livewire\Servers\WorkspaceSshKeys;
 use App\Livewire\Servers\WorkspaceSystemUsers;
 use App\Livewire\Servers\WorkspaceWebserver;
@@ -936,6 +937,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::get('servers/{server}/files/download', ServerWorkspaceFileDownloadController::class)->name('servers.files.download');
     Route::livewire('servers/{server}/files-preview', WorkspaceFilesPreview::class)->name('servers.files-preview');
     Route::get('log-shares/{token}', [LogViewerShareController::class, 'show'])->name('log-viewer-shares.show');
+    Route::livewire('servers/{server}/cli', WorkspaceCli::class)->name('servers.cli');
     Route::livewire('servers/{server}/manage/{section?}', WorkspaceManage::class)->name('servers.manage');
     Route::livewire('servers/{server}/settings/{section?}', WorkspaceSettings::class)->name('servers.settings');
 
