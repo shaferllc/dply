@@ -22,9 +22,6 @@
     </div>
 
     <div class="space-y-5 p-6 sm:p-7">
-        @if ($sitesForServer->count() < 2)
-            <p class="text-sm text-brand-moss">{{ __('Add another site on this server to import programs from it.') }}</p>
-        @else
             <div class="grid gap-4 sm:grid-cols-2">
                 <div>
                     <x-input-label for="import_from_site_id" value="{{ __('From site') }}" />
@@ -118,6 +115,5 @@
                     </p>
                 @endif
             @endif
-        @endif
     </div>
 </section>

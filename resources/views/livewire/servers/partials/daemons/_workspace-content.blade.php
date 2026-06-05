@@ -120,41 +120,23 @@
         @include('livewire.servers.partials.daemons._banner')
 
         <x-server-workspace-tablist :aria-label="__('Workers workspace sections')">
-            <x-server-workspace-tab id="daemons-tab-programs" :active="$daemons_workspace_tab === 'programs'" wire:click="setDaemonsWorkspaceTab('programs')">
-                <span class="inline-flex items-center gap-1.5">
-                    <x-heroicon-o-cpu-chip class="h-4 w-4" aria-hidden="true" />
-                    {{ __('Programs') }}
-                </span>
+            <x-server-workspace-tab id="daemons-tab-programs" icon="heroicon-o-cpu-chip" :active="$daemons_workspace_tab === 'programs'" wire:click="setDaemonsWorkspaceTab('programs')">
+                {{ __('Programs') }}
             </x-server-workspace-tab>
-            <x-server-workspace-tab id="daemons-tab-service" :active="$daemons_workspace_tab === 'service'" wire:click="setDaemonsWorkspaceTab('service')">
-                <span class="inline-flex items-center gap-1.5">
-                    <x-heroicon-o-server class="h-4 w-4" aria-hidden="true" />
-                    {{ __('Service') }}
-                </span>
+            <x-server-workspace-tab id="daemons-tab-service" icon="heroicon-o-server" :active="$daemons_workspace_tab === 'service'" wire:click="setDaemonsWorkspaceTab('service')">
+                {{ __('Service') }}
             </x-server-workspace-tab>
-            <x-server-workspace-tab id="daemons-tab-sync" :active="$daemons_workspace_tab === 'sync'" wire:click="setDaemonsWorkspaceTab('sync')">
-                <span class="inline-flex items-center gap-1.5">
-                    <x-heroicon-o-arrow-path-rounded-square class="h-4 w-4" aria-hidden="true" />
-                    {{ __('Sync') }}
-                </span>
+            <x-server-workspace-tab id="daemons-tab-sync" icon="heroicon-o-arrow-path-rounded-square" :active="$daemons_workspace_tab === 'sync'" wire:click="setDaemonsWorkspaceTab('sync')">
+                {{ __('Sync') }}
             </x-server-workspace-tab>
-            <x-server-workspace-tab id="daemons-tab-logs" :active="$daemons_workspace_tab === 'logs'" wire:click="setDaemonsWorkspaceTab('logs')">
-                <span class="inline-flex items-center gap-1.5">
-                    <x-heroicon-o-document-text class="h-4 w-4" aria-hidden="true" />
-                    {{ __('Logs') }}
-                </span>
+            <x-server-workspace-tab id="daemons-tab-logs" icon="heroicon-o-document-text" :active="$daemons_workspace_tab === 'logs'" wire:click="setDaemonsWorkspaceTab('logs')">
+                {{ __('Logs') }}
             </x-server-workspace-tab>
-            <x-server-workspace-tab id="daemons-tab-inspect" :active="$daemons_workspace_tab === 'inspect'" wire:click="setDaemonsWorkspaceTab('inspect')">
-                <span class="inline-flex items-center gap-1.5">
-                    <x-heroicon-o-magnifying-glass class="h-4 w-4" aria-hidden="true" />
-                    {{ __('Inspect') }}
-                </span>
+            <x-server-workspace-tab id="daemons-tab-inspect" icon="heroicon-o-magnifying-glass" :active="$daemons_workspace_tab === 'inspect'" wire:click="setDaemonsWorkspaceTab('inspect')">
+                {{ __('Inspect') }}
             </x-server-workspace-tab>
-            <x-server-workspace-tab id="daemons-tab-activity" :active="$daemons_workspace_tab === 'activity'" wire:click="setDaemonsWorkspaceTab('activity')">
-                <span class="inline-flex items-center gap-1.5">
-                    <x-heroicon-o-clock class="h-4 w-4" aria-hidden="true" />
-                    {{ __('Activity') }}
-                </span>
+            <x-server-workspace-tab id="daemons-tab-activity" icon="heroicon-o-clock" :active="$daemons_workspace_tab === 'activity'" wire:click="setDaemonsWorkspaceTab('activity')">
+                {{ __('Activity') }}
             </x-server-workspace-tab>
         </x-server-workspace-tablist>
 

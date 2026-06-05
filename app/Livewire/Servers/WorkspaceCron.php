@@ -191,6 +191,92 @@ class WorkspaceCron extends Component
         $this->new_cron_user = $site->effectiveSystemUser($this->server);
     }
 
+    /**
+     * Sets the Command field from a common-command preset (mostly Laravel artisan).
+     * Pure form-fill: it only touches {@see $new_cron_command} so the user can keep editing.
+     */
+    public function applyArtisanCommandPreset(string $key): void
+    {
+        $this->authorize('update', $this->server);
+
+        $def = $this->artisanCommandPresets()[$key] ?? null;
+        if ($def === null) {
+            return;
+        }
+
+        $this->new_cron_command = $def['command'];
+    }
+
+    /**
+     * Prefix that runs an artisan command for the in-context site, fully resolved when we
+     * know the site path + PHP version (e.g. `php8.3 /home/dply/app/current/artisan`), or a
+     * clear editable template (`php /home/dply/<site>/artisan`) when no site is selected.
+     */
+    protected function artisanInvocationPrefix(): string
+    {
+        $site = $this->schedulerHelperTargetSite();
+
+        if ($site !== null && $site->isLaravelFrameworkDetected()) {
+            $version = $site->phpVersion();
+            $php = ($version !== null && $version !== '') ? 'php'.$version : 'php';
+            $artisan = rtrim($site->effectiveRepositoryPath(), '/').'/current/artisan';
+
+            return $php.' '.escapeshellarg($artisan);
+        }
+
+        return 'php /home/dply/<site>/current/artisan';
+    }
+
+    /**
+     * Common commands offered under the Command field. Primarily Laravel artisan tasks
+     * grouped into scheduler / queues / maintenance, plus a couple of generic entries.
+     * Each command is the full string written into {@see $new_cron_command}; artisan
+     * entries are prefixed by {@see artisanInvocationPrefix()} (resolved path + PHP binary
+     * when a Laravel site is in context, otherwise an editable template).
+     *
+     * @return array<string, array<int, array{key: string, label: string, command: string}>>
+     */
+    protected function artisanCommandPresets(): array
+    {
+        $artisan = $this->artisanInvocationPrefix();
+
+        $make = fn (string $key, string $label, string $args): array => [
+            'key' => $key,
+            'label' => $label,
+            'command' => $artisan.' '.$args,
+        ];
+
+        return [
+            __('Laravel scheduler') => [
+                $make('schedule_run', __('schedule:run (per-minute scheduler)'), 'schedule:run >> /dev/null 2>&1'),
+            ],
+            __('Queues') => [
+                $make('queue_work', __('queue:work --stop-when-empty'), 'queue:work --stop-when-empty'),
+                $make('queue_restart', __('queue:restart'), 'queue:restart'),
+                $make('horizon_snapshot', __('horizon:snapshot'), 'horizon:snapshot'),
+            ],
+            __('Maintenance') => [
+                $make('backup_run', __('backup:run'), 'backup:run'),
+                $make('model_prune', __('model:prune'), 'model:prune'),
+                $make('cache_prune_tags', __('cache:prune-stale-tags'), 'cache:prune-stale-tags'),
+                $make('sanctum_prune', __('sanctum:prune-expired'), 'sanctum:prune-expired --hours=24'),
+                $make('telescope_prune', __('telescope:prune'), 'telescope:prune --hours=48'),
+            ],
+            __('Generic') => [
+                [
+                    'key' => 'curl_health',
+                    'label' => __('curl health check (HTTP ping)'),
+                    'command' => 'curl -fsS -o /dev/null https://example.com/health',
+                ],
+                [
+                    'key' => 'shell_script',
+                    'label' => __('run a shell script'),
+                    'command' => '/home/dply/<site>/current/scripts/task.sh',
+                ],
+            ],
+        ];
+    }
+
     public function updatedFrequencyPreset(string $value): void
     {
         if ($value !== 'custom' && isset($this->presetExpressions[$value])) {
@@ -1489,6 +1575,7 @@ class WorkspaceCron extends Component
                         ->find($this->viewing_logs_job_id)
                     : null,
                 'commandInstallPresets' => $needsJobsModal ? $this->commandInstallPresets() : [],
+                'artisanCommandPresets' => $needsJobsModal ? $this->artisanCommandPresets() : [],
                 'bundledCronJobs' => $needsTemplates ? $this->bundledCronJobsForView() : [],
                 'crontabInspectUserChoices' => $needsInspect ? $this->crontabInspectUserChoices() : [],
                 'runAsUserDatalistChoices' => $runAsUserDatalistChoices,

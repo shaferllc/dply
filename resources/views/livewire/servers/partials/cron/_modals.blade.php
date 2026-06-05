@@ -26,6 +26,31 @@
                     {{ __('Use an explicit PHP binary if needed (for example') }}
                     <span class="font-mono text-brand-ink/80">php8.2</span>).
                 </p>
+                @if (! empty($artisanCommandPresets))
+                    <div class="mt-3">
+                        <label for="cron_common_command" class="block text-xs font-medium text-brand-moss">
+                            {{ __('Common commands') }}
+                        </label>
+                        <select
+                            id="cron_common_command"
+                            x-data
+                            x-on:change="if ($event.target.value) { $wire.applyArtisanCommandPreset($event.target.value); $event.target.value = '' }"
+                            class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
+                        >
+                            <option value="">{{ __('Insert a preset…') }}</option>
+                            @foreach ($artisanCommandPresets as $group => $items)
+                                <optgroup label="{{ $group }}">
+                                    @foreach ($items as $item)
+                                        <option value="{{ $item['key'] }}">{{ $item['label'] }}</option>
+                                    @endforeach
+                                </optgroup>
+                            @endforeach
+                        </select>
+                        <p class="mt-1 text-xs text-brand-moss">
+                            {{ __('Fills the Command field above. Laravel paths resolve to the selected site when one is attached; otherwise edit the template before saving.') }}
+                        </p>
+                    </div>
+                @endif
                 @if ($schedulerSiteIsLaravel)
                     <button
                         type="button"

@@ -204,6 +204,67 @@ class SupervisorProvisioner
         return $this->supervisorctlProgramAction($server, $programId, 'start');
     }
 
+    /**
+     * Re-register a single Dply-managed program on the host: (re)write its
+     * supervisor conf file, then `supervisorctl reread && supervisorctl update`
+     * so supervisord learns the program. This is the remediation for programs
+     * that exist in Dply but are "NOT REPORTED" by supervisorctl (the conf was
+     * never applied, or was removed on the box) and therefore fail start/stop
+     * with "no such process". Reuses the same conf path and reread/update line
+     * as {@see sync()} — this is sync() scoped to one program.
+     */
+    public function syncProgram(Server $server, string $programId): string
+    {
+        if (! $server->isReady() || empty($server->ssh_private_key)) {
+            throw new \RuntimeException('Server must be ready with an SSH key.');
+        }
+
+        $packagePresent = $server->supervisor_package_status === Server::SUPERVISOR_PACKAGE_INSTALLED
+            || $this->isSupervisorPackageInstalled($server);
+        if (! $packagePresent) {
+            throw new \RuntimeException(
+                'Supervisor is not installed on this server. Install it from Server → Daemons first.'
+            );
+        }
+
+        $program = SupervisorProgram::query()->where('server_id', $server->id)->whereKey($programId)->first();
+        if (! $program) {
+            throw new \RuntimeException('Program not found.');
+        }
+        if (! $program->is_active) {
+            throw new \RuntimeException('This program is inactive — activate it before syncing.');
+        }
+
+        $dir = rtrim(config('sites.supervisor_conf_d'), '/');
+        $rereadUpdate = $this->supervisorRereadUpdateExecLine($server);
+
+        return app(ServerSshConnectionRunner::class)->run(
+            $server,
+            function ($ssh) use ($program, $dir, $rereadUpdate): string {
+                $ini = $this->buildIni($program);
+                $path = $dir.'/dply-sv-'.$program->id.'.conf';
+                $ssh->putFile($path, $ini);
+                $log = "Wrote {$path}\n";
+                $log .= $ssh->exec($rereadUpdate, 180);
+
+                return $log;
+            },
+            $this->useRootSsh(),
+            $this->fallbackToDeployUserSsh()
+        );
+    }
+
+    /**
+     * Whether a supervisorctl output/error string indicates the program group
+     * is unknown to supervisord (config never applied / removed on the box).
+     * Drives the friendly "not registered — use Sync" message instead of leaking
+     * the raw `ERROR (no such process)`.
+     */
+    public function indicatesUnregisteredProgram(string $output): bool
+    {
+        return (bool) preg_match('/no such (process|group)/i', $output);
+    }
+
     protected function supervisorctlProgramAction(Server $server, string $programId, string $verb): string
     {
         if (! in_array($verb, ['restart', 'stop', 'start'], true)) {

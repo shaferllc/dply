@@ -172,8 +172,21 @@
         <ul class="divide-y divide-brand-ink/10">
             @foreach ($filteredSupervisorPrograms as $sp)
                 @php
+                    // Have we fetched supervisorctl statuses this page-load? When the map is
+                    // empty we simply don't know the state yet (Refresh not run) — distinct from
+                    // a program that WAS probed but is absent from the output.
+                    $statusesLoaded = ! empty($program_status_map);
                     $pst = $program_status_map[$sp->id]['state'] ?? 'unknown';
                     $badgeClass = $programStatusBadgeClass($pst);
+
+                    // A program that exists in Dply but is missing from the last supervisorctl
+                    // output ("NOT REPORTED"): its conf was never applied / was removed on the box.
+                    // Start/Stop would fail with "no such process" — offer Sync instead.
+                    $isUnreported = $statusesLoaded && $pst === 'unknown';
+                    // Reported + running-ish → only Stop makes sense.
+                    $isRunningState = in_array($pst, ['running', 'starting'], true);
+                    // Reported + not running → only Start makes sense.
+                    $isStoppedState = in_array($pst, ['stopped', 'exited', 'fatal', 'backoff'], true);
                 @endphp
                 <li id="program-{{ $sp->id }}" class="relative flex flex-col scroll-mt-24 sm:flex-row" wire:key="program-{{ $sp->id }}">
                     <span
@@ -199,6 +212,12 @@
                         </p>
                         <p class="mt-2 break-all font-mono text-xs leading-relaxed text-brand-moss">{{ $sp->command }}</p>
                         <p class="mt-1 text-xs text-brand-mist">{{ $sp->directory }}</p>
+                        @if ($isUnreported)
+                            <div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
+                                <p class="font-semibold">{{ __('Not reported by Supervisor') }}</p>
+                                <p class="mt-0.5 text-amber-800">{{ __('This program is saved in Dply but is missing from the last supervisorctl output, so Start / Stop won’t work yet (Supervisor returns “no such process”). Sync re-applies its config to the server and reloads Supervisor so it’s registered.') }}</p>
+                            </div>
+                        @endif
                         @if ($orgServersForCopy->isNotEmpty() && ! $contextSiteModel)
                             <div class="mt-4 rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-3 text-xs">
                                 <p class="font-medium text-brand-ink">{{ __('Copy to another server') }}</p>
@@ -253,39 +272,64 @@
                         >
                             <x-heroicon-o-pencil-square class="h-5 w-5" />
                         </button>
-                        <button
-                            type="button"
-                            wire:click="startOneProgram('{{ $sp->id }}')"
-                            wire:loading.attr="disabled"
-                            wire:target="startOneProgram"
-                            @disabled($supervisor_installed !== true)
-                            class="rounded-lg p-2 text-brand-forest hover:bg-emerald-50 disabled:opacity-40"
-                            title="{{ __('Start') }}"
-                        >
-                            <x-heroicon-o-play class="h-5 w-5" />
-                        </button>
-                        <button
-                            type="button"
-                            wire:click="stopOneProgram('{{ $sp->id }}')"
-                            wire:loading.attr="disabled"
-                            wire:target="stopOneProgram"
-                            @disabled($supervisor_installed !== true)
-                            class="rounded-lg p-2 text-amber-800 hover:bg-amber-50 disabled:opacity-40"
-                            title="{{ __('Stop') }}"
-                        >
-                            <x-heroicon-o-stop class="h-5 w-5" />
-                        </button>
-                        <button
-                            type="button"
-                            wire:click="restartOneProgram('{{ $sp->id }}')"
-                            wire:loading.attr="disabled"
-                            wire:target="restartOneProgram"
-                            @disabled($supervisor_installed !== true)
-                            class="rounded-lg p-2 text-brand-forest hover:bg-emerald-50 disabled:opacity-40"
-                            title="{{ __('Restart') }}"
-                        >
-                            <x-heroicon-o-arrow-path class="h-5 w-5" />
-                        </button>
+                        @if ($isUnreported)
+                            <button
+                                type="button"
+                                wire:click="syncOneProgram('{{ $sp->id }}')"
+                                wire:loading.attr="disabled"
+                                wire:target="syncOneProgram"
+                                @disabled($supervisor_installed !== true)
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-40"
+                                title="{{ __('Re-register this program with Supervisor on the server') }}"
+                            >
+                                <x-heroicon-o-cloud-arrow-up class="h-4 w-4" />
+                                {{ __('Sync') }}
+                            </button>
+                        @else
+                            {{-- Start only when the program is reported as stopped/exited/fatal/backoff.
+                                 Stop only when reported running/starting. When the state is unknown
+                                 (statuses not refreshed yet), show neither — the operator should
+                                 Refresh first. --}}
+                            @if ($isStoppedState)
+                                <button
+                                    type="button"
+                                    wire:click="startOneProgram('{{ $sp->id }}')"
+                                    wire:loading.attr="disabled"
+                                    wire:target="startOneProgram"
+                                    @disabled($supervisor_installed !== true)
+                                    class="rounded-lg p-2 text-brand-forest hover:bg-emerald-50 disabled:opacity-40"
+                                    title="{{ __('Start') }}"
+                                >
+                                    <x-heroicon-o-play class="h-5 w-5" />
+                                </button>
+                            @endif
+                            @if ($isRunningState)
+                                <button
+                                    type="button"
+                                    wire:click="stopOneProgram('{{ $sp->id }}')"
+                                    wire:loading.attr="disabled"
+                                    wire:target="stopOneProgram"
+                                    @disabled($supervisor_installed !== true)
+                                    class="rounded-lg p-2 text-amber-800 hover:bg-amber-50 disabled:opacity-40"
+                                    title="{{ __('Stop') }}"
+                                >
+                                    <x-heroicon-o-stop class="h-5 w-5" />
+                                </button>
+                            @endif
+                        @endif
+                        @unless ($isUnreported)
+                            <button
+                                type="button"
+                                wire:click="restartOneProgram('{{ $sp->id }}')"
+                                wire:loading.attr="disabled"
+                                wire:target="restartOneProgram"
+                                @disabled($supervisor_installed !== true)
+                                class="rounded-lg p-2 text-brand-forest hover:bg-emerald-50 disabled:opacity-40"
+                                title="{{ __('Restart') }}"
+                            >
+                                <x-heroicon-o-arrow-path class="h-5 w-5" />
+                            </button>
+                        @endunless
                         <button
                             type="button"
                             wire:click="openConfirmActionModal('deleteSupervisorProgram', ['{{ $sp->id }}'], @js(__('Delete program')), @js(__('Delete this program? Sync Supervisor afterward to remove its config from the server.')), @js(__('Delete program')), true)"
@@ -315,7 +359,18 @@
     @endif
 </section>
 
-@include('livewire.servers.partials.daemons._import-from-site')
+@php
+    // Only show the import card when there is at least one OTHER site to import from.
+    // Site context: destination is fixed, so any other site qualifies ($sitesForImport excludes it).
+    // Server context: a source/destination pair is only possible with 2+ sites on the server.
+    $showImportFromSite = $contextSiteModel !== null
+        ? $sitesForImport->isNotEmpty()
+        : $sitesForServer->count() >= 2;
+@endphp
+
+@if ($showImportFromSite)
+    @include('livewire.servers.partials.daemons._import-from-site')
+@endif
 
 @include('livewire.servers.partials.supervisor-program-modal', [
     'modalName' => 'daemon-program-modal',
