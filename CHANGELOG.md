@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Fixed
+- Fixed a grammatical typo in the empty-state message shown when no database backup schedules exist.
 ### Added
 - The Realtime page now shows a preview of the managed Pusher-compatible WebSocket relay when the feature isn't yet enabled for your organization.
 ### Removed

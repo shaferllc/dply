@@ -96,7 +96,7 @@
                 <div class="rounded-2xl border border-brand-ink/10 bg-white/85 px-6 py-12 text-center shadow-sm">
                     <x-heroicon-o-clock class="mx-auto h-8 w-8 text-brand-mist" aria-hidden="true" />
                     <p class="mt-3 text-sm text-brand-moss">{{ __('No backup schedules yet.') }}</p>
-                    <p class="mt-1 text-xs text-brand-mist">{{ __('Add schedules from a server's Backups workspace.') }}</p>
+                    <p class="mt-1 text-xs text-brand-mist">{{ __('Add schedules from a server Backups workspace.') }}</p>
                     <a href="{{ route('servers.index') }}" wire:navigate class="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-brand-sage hover:text-brand-ink">
                         {{ __('Go to servers') }}
                         <x-heroicon-m-arrow-right class="h-3.5 w-3.5" aria-hidden="true" />

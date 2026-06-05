@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 5, 2026',
+                    'tags'    => ['fixed'],
+                    'title'   => 'Backups Empty-State Copy Fix',
+                    'summary' => 'Fixed a grammatical typo in the empty-state message shown when no database backup schedules exist.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 5, 2026',
                     'tags'    => ['new'],
                     'title'   => 'Realtime Coming Soon Preview',
                     'summary' => 'The Realtime page now shows a preview of the managed Pusher-compatible WebSocket relay when the feature isn\'t yet enabled for your organization.',
