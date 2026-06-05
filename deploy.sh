@@ -3,7 +3,7 @@ set -euo pipefail
 
 # ---------------------------------------------------------------------------
 # deploy.sh — commit, push, and deploy dply to production
-# Usage: ./deploy.sh "commit message"
+# Usage: ./deploy.sh ["commit message"]
 #
 # Required env:
 #   DEPLOY_HOST             SSH host for the web server
@@ -15,6 +15,9 @@ set -euo pipefail
 #   DEPLOY_REMOTE           Git remote (default: origin)
 #   DEPLOY_BRANCH           Git branch (default: main)
 #   DEPLOY_PHP              PHP binary (default: php)
+#
+# AI commit messages + CHANGELOG entries are generated automatically when the
+# `claude` CLI (Claude Code) is available in PATH. No API key required.
 # ---------------------------------------------------------------------------
 
 # Load deploy config from .deploy.env if it exists (not committed to git)
@@ -36,6 +39,90 @@ log() { echo "[deploy] $*"; }
 hr()  { echo "[deploy] ────────────────────────────────────────"; }
 
 # ---------------------------------------------------------------------------
+# AI commit message + changelog generation via `claude -p` (Claude Code CLI).
+#
+# Sets globals: AI_COMMIT_MSG, AI_CL_TYPE, AI_CL_ENTRY
+# Returns 0 on success, 1 to fall back to the manual $COMMIT_MSG.
+# ---------------------------------------------------------------------------
+_ai_generate() {
+    AI_COMMIT_MSG=""
+    AI_CL_TYPE=""
+    AI_CL_ENTRY=""
+
+    command -v claude >/dev/null 2>&1 || return 1
+
+    local diff
+    diff=$(git diff --cached --stat && printf '\n---\n' && git diff --cached)
+
+    # Truncate very large diffs — stays well under shell arg-size limits.
+    if [ "${#diff}" -gt 14000 ]; then
+        diff="${diff:0:14000}"$'\n... [truncated]'
+    fi
+
+    local prompt="Analyze this git diff and respond with EXACTLY three lines, no markdown, no extra text:
+COMMIT: <conventional commit message, imperative mood, ≤72 chars>
+TYPE: <Added|Changed|Fixed|Removed|Security|Deprecated>
+CHANGELOG: <one concise sentence describing the user-visible change>
+
+${diff}"
+
+    local output
+    output=$(claude -p "$prompt" 2>/dev/null) || return 1
+
+    AI_COMMIT_MSG=$(printf '%s' "$output" | grep '^COMMIT:'    | sed 's/^COMMIT: *//')
+    AI_CL_TYPE=$(   printf '%s' "$output" | grep '^TYPE:'      | sed 's/^TYPE: *//')
+    AI_CL_ENTRY=$(  printf '%s' "$output" | grep '^CHANGELOG:' | sed 's/^CHANGELOG: *//')
+
+    [ -z "$AI_COMMIT_MSG" ] && return 1
+    return 0
+}
+
+# ---------------------------------------------------------------------------
+# Prepend a new entry into CHANGELOG.md under ## [Unreleased].
+# Creates the file if it doesn't exist yet.
+# ---------------------------------------------------------------------------
+_update_changelog() {
+    local type="$1"
+    local entry="$2"
+
+    export _DPLY_CL_TYPE="$type"
+    export _DPLY_CL_ENTRY="$entry"
+
+    python3 << 'PYEOF'
+import os, re, sys
+
+type_  = os.environ["_DPLY_CL_TYPE"]
+entry  = os.environ["_DPLY_CL_ENTRY"].lstrip("- ").strip()
+path   = "CHANGELOG.md"
+line   = f"- {entry}"
+
+try:
+    with open(path) as f:
+        content = f.read()
+except FileNotFoundError:
+    with open(path, "w") as f:
+        f.write(f"# Changelog\n\n## [Unreleased]\n### {type_}\n{line}\n")
+    print(f"  created {path}")
+    sys.exit(0)
+
+marker = "## [Unreleased]"
+if marker in content:
+    idx = content.index(marker) + len(marker)
+    content = content[:idx] + f"\n### {type_}\n{line}" + content[idx:]
+else:
+    m = re.search(r"\n## ", content)
+    pos = m.start() if m else len(content)
+    content = content[:pos] + f"\n\n## [Unreleased]\n### {type_}\n{line}" + content[pos:]
+
+with open(path, "w") as f:
+    f.write(content)
+print(f"  [{type_}] {line}")
+PYEOF
+
+    unset _DPLY_CL_TYPE _DPLY_CL_ENTRY
+}
+
+# ---------------------------------------------------------------------------
 # 1. Commit and push
 # ---------------------------------------------------------------------------
 hr
@@ -43,7 +130,24 @@ log "Committing and pushing..."
 hr
 
 git add -A
-git diff --cached --quiet && log "Nothing to commit, skipping." || git commit -m "$COMMIT_MSG"
+
+if ! git diff --cached --quiet; then
+    if _ai_generate; then
+        log "AI commit:  $AI_COMMIT_MSG"
+        if [ -n "$AI_CL_ENTRY" ]; then
+            log "Changelog: [${AI_CL_TYPE:-Changed}]"
+            _update_changelog "${AI_CL_TYPE:-Changed}" "$AI_CL_ENTRY"
+            git add CHANGELOG.md
+        fi
+        COMMIT_MSG="$AI_COMMIT_MSG"
+    else
+        log "⚠  AI generation failed — using: '$COMMIT_MSG'"
+    fi
+    git commit -m "$COMMIT_MSG"
+else
+    log "Nothing to commit, skipping."
+fi
+
 git push "$REMOTE" "$BRANCH"
 
 # ---------------------------------------------------------------------------

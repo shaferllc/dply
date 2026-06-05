@@ -98,7 +98,7 @@
     "
 >
     <div class="relative mx-auto mb-8 max-w-lg" aria-hidden="true">
-        <div class="forbidden-vault relative mx-auto aspect-[5/4] w-full max-w-[min(100%,20rem)] overflow-hidden rounded-3xl border border-brand-ink/12 bg-linear-to-b from-brand-sand/40 to-brand-sand/15 shadow-inner shadow-brand-forest/10 dark:from-brand-sand/15 dark:to-brand-cream/5">
+        <div class="forbidden-vault relative mx-auto aspect-[4/5] w-full max-w-[min(100%,20rem)] overflow-hidden rounded-3xl border border-brand-ink/12 bg-linear-to-b from-brand-sand/40 to-brand-sand/15 shadow-inner shadow-brand-forest/10 dark:from-brand-sand/15 dark:to-brand-cream/5">
             <div class="forbidden-scanlines pointer-events-none absolute inset-0 opacity-40"></div>
             <div class="forbidden-vault-glow pointer-events-none absolute inset-x-6 top-8 h-24 rounded-full bg-brand-gold/15 blur-2xl"></div>
 

@@ -828,6 +828,50 @@ NGINX;
             return $config;
         }
 
-        return $config."\n\n".$tlsBlock;
+        // Enforce HTTP→HTTPS: replace the :80 app block with a slim redirect
+        // that still serves the ACME http-01 challenge from the document root
+        // so certbot renewals keep working. Falls back to serving the app on
+        // both :80 and :443 if we can't parse server_name/root out of $config.
+        $http80 = $this->httpsRedirectServerBlock($config);
+        if ($http80 === null) {
+            return $config."\n\n".$tlsBlock;
+        }
+
+        return $http80."\n\n".$tlsBlock;
+    }
+
+    /**
+     * Build a minimal :80 server block that 301-redirects to HTTPS while still
+     * serving `/.well-known/acme-challenge/` from the site's document root.
+     * Returns null when server_name/root can't be extracted from $config.
+     */
+    protected function httpsRedirectServerBlock(string $config): ?string
+    {
+        if (! preg_match('/^\s*server_name\s+([^;]+);/m', $config, $sn)
+            || ! preg_match('/^\s*root\s+([^;]+);/m', $config, $rt)) {
+            return null;
+        }
+
+        $serverNames = trim($sn[1]);
+        $root = trim($rt[1]);
+
+        return <<<NGINX
+# Managed by Dply — HTTP→HTTPS redirect
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {$serverNames};
+
+    location ^~ /.well-known/acme-challenge/ {
+        root {$root};
+        default_type "text/plain";
+        try_files \$uri =404;
+    }
+
+    location / {
+        return 301 https://\$host\$request_uri;
+    }
+}
+NGINX;
     }
 }
