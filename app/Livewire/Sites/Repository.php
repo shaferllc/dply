@@ -114,6 +114,15 @@ class Repository extends Component
     /** Filter box for the "Repositories on this account" library list (matches name / url). */
     public string $repoSearch = '';
 
+    /**
+     * Target of a pending "switch to this repo" action, awaiting confirmation
+     * in the modal. Shape: ['url' => ..., 'branch' => ..., 'label' => ...].
+     * Null when the modal is closed.
+     *
+     * @var array{url: string, branch: string, label: string}|null
+     */
+    public ?array $pendingRepoSwitch = null;
+
     public function mount(Server $server, Site $site): void
     {
         abort_unless($site->server_id === $server->id, 404);
@@ -256,6 +265,42 @@ class Repository extends Component
 
     /* ──────────── Repository switch ──────────── */
 
+    /**
+     * Stage a repo switch for confirmation. Opens the confirm modal instead of
+     * firing immediately (switching resets the deploy branch, so it warrants a
+     * real confirmation surface rather than a native browser prompt).
+     */
+    public function askSwitchRepository(string $repositoryUrl, ?string $defaultBranch, ?string $label = null): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $branch = trim((string) $defaultBranch);
+
+        $this->pendingRepoSwitch = [
+            'url' => trim($repositoryUrl),
+            'branch' => $branch !== '' ? $branch : 'main',
+            'label' => trim((string) ($label ?? $repositoryUrl)),
+        ];
+    }
+
+    public function cancelSwitchRepository(): void
+    {
+        $this->pendingRepoSwitch = null;
+    }
+
+    /** Confirm handler for the switch modal — performs the staged switch. */
+    public function confirmSwitchRepository(SourceControlRepositoryReader $reader): void
+    {
+        $pending = $this->pendingRepoSwitch;
+        $this->pendingRepoSwitch = null;
+
+        if ($pending === null) {
+            return;
+        }
+
+        $this->switchRepository((string) $pending['url'], (string) $pending['branch'], $reader);
+    }
+
     public function switchRepository(string $repositoryUrl, ?string $defaultBranch, SourceControlRepositoryReader $reader): void
     {
         Gate::authorize('update', $this->site);
@@ -362,7 +407,7 @@ class Repository extends Component
 
         \App\Jobs\PreflightSiteSetupJob::dispatch($site->id, (string) auth()->id());
 
-        $this->redirect(route('sites.setup', [$this->server, $site]), navigate: true);
+        $this->redirect(route('sites.repository', [$this->server, $site, 'repo_tab' => 'setup']), navigate: true);
 
         return true;
     }
@@ -502,6 +547,10 @@ class Repository extends Component
             'currentBranch' => (string) ($this->site->git_branch ?: 'main'),
             'currentRepositoryUrl' => (string) ($this->site->git_repository_url ?: ''),
             'providerKind' => (string) ($this->site->repositoryMeta()['git_provider_kind'] ?? ''),
+            // Conditional "Set up" tab: only while the first-deploy setup wizard
+            // owns this site (held for env/resources, scanning, or scan failure).
+            // It disappears the moment the first deploy lands.
+            'showSetupTab' => $this->site->isInFirstDeploySetup() || $this->site->needsFirstDeploySetup(),
         ];
 
         if ($payload['currentRepositoryUrl'] === '') {
@@ -524,6 +573,9 @@ class Repository extends Component
             // Danger zone (disconnect repo + start over) needs no remote reads —
             // just the base payload (server/site are public props on the view).
             'danger' => $payload,
+            // Setup wizard tab embeds the SiteSetup component, which loads its
+            // own data — the base payload is all the host view needs.
+            'setup' => $payload,
             default => $payload + $this->renderOverviewPayload($reader, $commitsFetcher, $user, $branchInUse),
         });
     }
@@ -533,7 +585,7 @@ class Repository extends Component
      * the unlocked Repository view. 'webhook' is intentionally NOT here —
      * it's only ever reachable through a locked embed.
      */
-    private const UNLOCKED_TABS = ['overview', 'commits', 'files', 'branches', 'connection', 'danger'];
+    private const UNLOCKED_TABS = ['overview', 'commits', 'files', 'branches', 'connection', 'danger', 'setup'];
 
     /** Page size for the "Repositories on this account" library list. */
     private const REPO_LIBRARY_PER_PAGE = 8;

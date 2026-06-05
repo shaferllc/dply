@@ -487,7 +487,7 @@ class ChooseApp extends Component
         if ($useSetupWizard) {
             \App\Jobs\PreflightSiteSetupJob::dispatch($this->site->id, (string) auth()->id());
 
-            return $this->redirect(route('sites.setup', [$this->server, $this->site]), navigate: true);
+            return $this->redirect(route('sites.repository', [$this->server, $this->site, 'repo_tab' => 'setup']), navigate: true);
         }
 
         $this->seedDeployStepsAndProvision($tile, $runtime, $siteProvisioner);

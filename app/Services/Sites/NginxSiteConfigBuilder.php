@@ -10,11 +10,61 @@ use App\Models\SiteWebserverConfigProfile;
 use App\Support\SiteRedirectConfigSupport;
 use App\Support\Sites\OpenLiteSpeedTlsPaths;
 use App\Support\Sites\SiteAccessGateConfigSupport;
+use App\Support\Servers\InstalledStack;
 use App\Support\Sites\SiteManagedErrorPageSupport;
 use App\Support\Sites\VmDockerSiteConfigSupport;
 
 class NginxSiteConfigBuilder
 {
+    /**
+     * The PHP-FPM version to point `fastcgi_pass` at. The bug this guards: a
+     * site with no (or a stale) configured PHP version would fall back to a
+     * hardcoded '8.3', producing `/run/php/php8.3-fpm.sock` — which doesn't
+     * exist on a box dply provisioned with 8.4 → every request 502s. So we
+     * trust what dply actually installed: use the site's configured version
+     * only when it's among the installed set; otherwise the server's
+     * provisioned version (installed_stack), then a last-resort default.
+     */
+    private function phpFpmVersion(Site $site): string
+    {
+        $server = $site->server;
+        $installedPrimary = $server !== null ? InstalledStack::fromMeta($server)->phpVersion : null;
+        $configured = $site->phpVersion();
+
+        if ($configured !== null && $configured !== '') {
+            $installed = $this->installedPhpVersions($site, $installedPrimary);
+            if ($installed === [] || in_array($configured, $installed, true)) {
+                return $configured;
+            }
+        }
+
+        return ($installedPrimary !== null && $installedPrimary !== '') ? $installedPrimary : '8.3';
+    }
+
+    /**
+     * PHP versions believed to exist on the box: the inventory list plus the
+     * provisioned primary. Empty means "unknown" (don't second-guess the site).
+     *
+     * @return list<string>
+     */
+    private function installedPhpVersions(Site $site, ?string $primary): array
+    {
+        $server = $site->server;
+        $versions = [];
+        if ($server !== null) {
+            foreach ((array) data_get($server->meta, 'php_inventory.installed_versions', []) as $v) {
+                $id = (string) (is_array($v) ? ($v['version'] ?? $v['id'] ?? '') : $v);
+                if ($id !== '') {
+                    $versions[] = $id;
+                }
+            }
+        }
+        if ($primary !== null && $primary !== '' && ! in_array($primary, $versions, true)) {
+            $versions[] = $primary;
+        }
+
+        return $versions;
+    }
     /**
      * Full vhost config. Pass a profile for layered includes and main snippet; omit for legacy nginx_extra_raw-only behavior.
      *
@@ -63,7 +113,7 @@ class NginxSiteConfigBuilder
         $root = $site->effectiveDocumentRootForNginx();
         $phpSock = str_replace(
             '{version}',
-            $site->phpVersion() ?? '8.3',
+            $this->phpFpmVersion($site),
             config('sites.php_fpm_socket')
         );
 
@@ -326,7 +376,12 @@ NGINX;
         $phpBa = $this->nginxBasicAuthPhpFragments($site, $root, $phpSock, $fcgiEngine);
         $formGate = SiteAccessGateConfigSupport::nginxFragments($site, $root);
         $managedErrors = SiteManagedErrorPageSupport::nginxServerBlock($site);
-        $fastcgiIntercept = SiteManagedErrorPageSupport::nginxFastcgiInterceptErrors();
+        // With APP_DEBUG=true, let Laravel's own error page through instead of
+        // masking app 5xx with the branded page (nginx 502s with no app response
+        // still hit error_page).
+        $fastcgiIntercept = SiteManagedErrorPageSupport::appDebugEnabled($site)
+            ? "        fastcgi_intercept_errors off;\n"
+            : SiteManagedErrorPageSupport::nginxFastcgiInterceptErrors();
 
         return <<<NGINX
 # Managed by Dply — {$basename}

@@ -480,6 +480,24 @@ trait TracksProvisioningStatus
     }
 
     /**
+     * The subset of {@see unsatisfiedRequiredEnvKeys()} that genuinely blocks a
+     * first boot — the first-deploy setup wizard's HARD gate. The scanner marks
+     * hundreds of keys "required"; only the boot-critical ones (framework URL +
+     * database connection) should hold the deploy. Everything else is optional
+     * and the operator can fill it from the Environment tab any time.
+     * See {@see \App\Support\Sites\BootCriticalEnv}.
+     *
+     * @return list<string>
+     */
+    public function unsatisfiedBootCriticalEnvKeys(): array
+    {
+        return array_values(array_filter(
+            $this->unsatisfiedRequiredEnvKeys(),
+            static fn (string $key): bool => \App\Support\Sites\BootCriticalEnv::isBootCritical($key),
+        ));
+    }
+
+    /**
      * True when this is a VM web site (PHP/Node) that has no application
      * installed yet: no git repository, never deployed, and not already
      * scaffolded or routed through the choose-app flow. Static, custom,

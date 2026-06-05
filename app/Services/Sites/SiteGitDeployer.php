@@ -93,6 +93,24 @@ class SiteGitDeployer
             ));
         }
 
+        // ── ENV ── compose the .env (env cache + attached resource bindings'
+        // connection vars + workspace variables) and write it BEFORE build, so
+        // composer/asset steps and the live app see bound resources (DB_*,
+        // REDIS_*, …). The simple deployer historically skipped this entirely —
+        // so attached resources (and any env held until deploy) never reached
+        // the box. Mirrors AtomicSiteDeployer's pre-build env push.
+        if ($server->hostCapabilities()->supportsEnvPushToHost()) {
+            $envOverride = trim((string) ($site->env_file_path ?? ''));
+            if ($envOverride !== '') {
+                app(SiteEnvPusher::class)->push($site, $envOverride);
+                $ssh->exec(sprintf('ln -sfn %s %s', escapeshellarg($envOverride), escapeshellarg($path.'/.env')), 30);
+                $log .= sprintf("\n[dply] ENV → external env_file_path %s; symlinked %s/.env → it\n", $envOverride, $path);
+            } else {
+                app(SiteEnvPusher::class)->push($site, $path.'/.env');
+                $log .= "\n[dply] ENV → composed .env (cache + connected resources) written to ".$path."/.env\n";
+            }
+        }
+
         // ── BUILD ── install deps / compile assets from the build steps.
         $build = $this->pipelineRunner->runBuild($ssh, $site, $path);
         $log .= $build['log'];

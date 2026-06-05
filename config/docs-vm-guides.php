@@ -1,6 +1,40 @@
 <?php
 
 return [
+    // Sidebar groups are derived from the slug prefix (server-* / vm-site-*) and
+    // sorted alphabetically, so these slot into the right group automatically.
+    'server-networking' => [
+        'file' => 'SERVER_NETWORKING.md',
+        'title' => 'Networking',
+    ],
+    'server-load-balancers' => [
+        'file' => 'SERVER_LOAD_BALANCERS.md',
+        'title' => 'Load balancers',
+    ],
+    'server-worker-pool' => [
+        'file' => 'SERVER_WORKER_POOL.md',
+        'title' => 'Worker pool',
+    ],
+    'server-errors' => [
+        'file' => 'SERVER_ERRORS.md',
+        'title' => 'Errors',
+    ],
+    'server-snapshots' => [
+        'file' => 'SERVER_SNAPSHOTS.md',
+        'title' => 'Cache snapshots',
+    ],
+    'vm-site-errors' => [
+        'file' => 'VM_SITE_ERRORS.md',
+        'title' => 'Site errors',
+    ],
+    'vm-site-files' => [
+        'file' => 'VM_SITE_FILES.md',
+        'title' => 'Site files',
+    ],
+    'vm-site-resources' => [
+        'file' => 'VM_SITE_RESOURCES.md',
+        'title' => 'Site resources',
+    ],
     'server-activity' => [
         'file' => 'SERVER_ACTIVITY.md',
         'title' => 'Activity log',

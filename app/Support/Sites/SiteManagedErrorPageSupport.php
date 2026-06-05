@@ -51,6 +51,26 @@ NGINX;
         return "        fastcgi_intercept_errors on;\n";
     }
 
+    /**
+     * True when the site's cached env has APP_DEBUG enabled. When it does, the
+     * webserver should NOT intercept the app's 5xx responses with the branded
+     * page — let Laravel's own debug error page through so the developer can see
+     * the actual exception. (nginx-level 502s with no app response still hit
+     * error_page regardless.)
+     */
+    public static function appDebugEnabled(Site $site): bool
+    {
+        $content = (string) ($site->env_file_content ?? '');
+        if ($content === '') {
+            return false;
+        }
+
+        $vars = app(\App\Services\Sites\DotEnvFileParser::class)->parse($content)['variables'] ?? [];
+        $value = strtolower(trim((string) ($vars['APP_DEBUG'] ?? '')));
+
+        return in_array($value, ['true', '1', 'on', 'yes'], true);
+    }
+
     public static function apacheVirtualHostBlock(Site $site): string
     {
         $uri = self::ERROR_URI;

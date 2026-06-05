@@ -204,16 +204,39 @@ class SiteDeployPipelineRunner
         $usesComposer = $step->step_type === SiteDeployStep::TYPE_COMPOSER_INSTALL
             || preg_match('/\bcomposer\s/', $cmd) === 1;
 
-        if (! $usesComposer) {
-            return '';
+        if ($usesComposer) {
+            return '{ export PATH="$HOME/.local/bin:/usr/local/bin:$PATH"; '
+                .'command -v composer >/dev/null 2>&1 || { '
+                .'echo "[dply] composer not found — installing…"; '
+                .'if [ -w /usr/local/bin ]; then DPLY_COMPOSER_DIR=/usr/local/bin; '
+                .'else DPLY_COMPOSER_DIR="$HOME/.local/bin"; mkdir -p "$DPLY_COMPOSER_DIR"; fi; '
+                .'curl -fsSL https://getcomposer.org/installer | php -- --install-dir="$DPLY_COMPOSER_DIR" --filename=composer; '
+                .'}; } && ';
         }
 
-        return '{ export PATH="$HOME/.local/bin:/usr/local/bin:$PATH"; '
-            .'command -v composer >/dev/null 2>&1 || { '
-            .'echo "[dply] composer not found — installing…"; '
-            .'if [ -w /usr/local/bin ]; then DPLY_COMPOSER_DIR=/usr/local/bin; '
-            .'else DPLY_COMPOSER_DIR="$HOME/.local/bin"; mkdir -p "$DPLY_COMPOSER_DIR"; fi; '
-            .'curl -fsSL https://getcomposer.org/installer | php -- --install-dir="$DPLY_COMPOSER_DIR" --filename=composer; '
-            .'}; } && ';
+        // npm/node steps: the base box ships with mise but no Node, so `npm ci`
+        // dies with "npm: command not found" (and a Laravel/Vite app then 500s
+        // with ViteManifestNotFoundException). Self-heal like Composer: put the
+        // mise shims on PATH, install node@lts via mise if npm is still missing.
+        // And skip cleanly on an API-only app that has no package.json.
+        $usesNode = in_array($step->step_type, [SiteDeployStep::TYPE_NPM_CI, SiteDeployStep::TYPE_NPM_RUN], true)
+            || preg_match('/\b(npm|npx|node|yarn|pnpm)\s/', $cmd) === 1;
+
+        if ($usesNode) {
+            return '{ '
+                .'[ -f package.json ] || { echo "[dply] no package.json — skipping frontend build"; exit 0; }; '
+                .'export PATH="$HOME/.local/share/mise/shims:$HOME/.local/bin:$PATH"; '
+                .'command -v npm >/dev/null 2>&1 || { '
+                .'echo "[dply] node/npm not found — installing node@lts via mise…"; '
+                .'if command -v mise >/dev/null 2>&1; then '
+                .'mise use -g node@lts >/dev/null 2>&1 || mise install node@lts >/dev/null 2>&1; '
+                .'eval "$(mise env -s bash 2>/dev/null)" 2>/dev/null || true; '
+                .'export PATH="$HOME/.local/share/mise/shims:$PATH"; '
+                .'fi; }; '
+                .'command -v npm >/dev/null 2>&1 || { echo "[dply] npm unavailable — install Node on the server, then redeploy."; exit 1; }; '
+                .'} && ';
+        }
+
+        return '';
     }
 }

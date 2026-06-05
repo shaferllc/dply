@@ -13,6 +13,7 @@ use App\Models\CloudDatabase;
 use App\Models\CloudWorker;
 use App\Models\Server;
 use App\Models\Site;
+use App\Support\Sites\SiteWorkerCoverage;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Gate;
@@ -39,6 +40,14 @@ class Resources extends Component
     public Server $server;
 
     public Site $site;
+
+    /**
+     * Container (Cloud) sites get the full attach/detach CRUD against
+     * CloudWorker/CloudDatabase. VM sites get a read-only roll-up of their
+     * Supervisor + systemd workers that links out to the Workers page to
+     * manage. Set in mount() from the runtime.
+     */
+    public bool $isContainer = true;
 
     /** Modal pane: '' (closed) | 'attach' (root picker) | 'database-existing' | 'database-new' | 'worker' | 'scheduler'. */
     public string $modal = '';
@@ -68,13 +77,30 @@ class Resources extends Component
         abort_unless($server->organization_id === auth()->user()->currentOrganization()?->id, 404);
         Gate::authorize('view', $site);
 
-        // Only container-runtime (Cloud) sites have CloudWorker rows or
-        // CloudDatabase pivots. VM / serverless workspaces should bounce
-        // out — they have their own resource surfaces.
-        abort_unless($site->usesContainerRuntime(), 404);
+        // Container (Cloud) sites have CloudWorker rows + CloudDatabase pivots
+        // and get the full attach/detach surface. VM sites are admitted too —
+        // they show a read-only roll-up of their Supervisor + systemd workers
+        // (their databases/services live on other panels). Serverless keeps its
+        // dedicated Workers page, so it still bounces out.
+        $this->isContainer = $site->usesContainerRuntime();
+        abort_unless($this->isContainer || $site->runtimeTargetMode() === 'vm', 404);
 
         $this->server = $server;
         $this->site = $site;
+    }
+
+    /**
+     * VM worker roll-up: every long-running process that keeps a queue /
+     * Horizon / scheduler alive for this site — on the site's own box AND on any
+     * worker server sharing its private network / worker pool. Read-only;
+     * management lives on the Workers page. See {@see SiteWorkerCoverage}.
+     *
+     * @return \Illuminate\Support\Collection<int, array{name: string, type: string, command: string, source: string, server_id: string, server_name: string, off_box: bool, instances: int, active: bool}>
+     */
+    #[Computed]
+    public function vmWorkers(): \Illuminate\Support\Collection
+    {
+        return SiteWorkerCoverage::workers($this->site);
     }
 
     public function openAttach(string $pane = 'attach'): void

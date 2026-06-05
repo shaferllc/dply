@@ -179,9 +179,9 @@ return [
         // exit: ship once multi-node provisioning is end-to-end tested
         'cluster' => env('FEATURE_WORKSPACE_CLUSTER', true),
         // exit: ship once browser-SSH session auditing + RBAC are validated
-        'console' => env('FEATURE_WORKSPACE_CONSOLE', false),
+        'console' => env('FEATURE_WORKSPACE_CONSOLE', true),
         // exit: ship alongside console GA; teaser only when console is off
-        'console_preview' => env('FEATURE_WORKSPACE_CONSOLE_PREVIEW', true),
+        'console_preview' => env('FEATURE_WORKSPACE_CONSOLE_PREVIEW', false),
 
         // exit: ship once remote file-write atomic guarantees are reviewed; security surface
         'files' => env('FEATURE_WORKSPACE_FILES', false),
@@ -236,8 +236,8 @@ return [
         'site_notifications_preview' => env('FEATURE_WORKSPACE_SITE_NOTIFICATIONS_PREVIEW', true),
         'site_monitor' => env('FEATURE_WORKSPACE_SITE_MONITOR', false),
         'site_monitor_preview' => env('FEATURE_WORKSPACE_SITE_MONITOR_PREVIEW', true),
-        'site_errors' => env('FEATURE_WORKSPACE_SITE_ERRORS', false),
-        'site_errors_preview' => env('FEATURE_WORKSPACE_SITE_ERRORS_PREVIEW', true),
+        'site_errors' => env('FEATURE_WORKSPACE_SITE_ERRORS', true),
+        'site_errors_preview' => env('FEATURE_WORKSPACE_SITE_ERRORS_PREVIEW', false),
         'site_files' => env('FEATURE_WORKSPACE_SITE_FILES', false),
         'site_files_preview' => env('FEATURE_WORKSPACE_SITE_FILES_PREVIEW', true),
         'site_system_user' => env('FEATURE_WORKSPACE_SITE_SYSTEM_USER', false),

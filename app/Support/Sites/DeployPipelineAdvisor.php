@@ -534,33 +534,21 @@ final class DeployPipelineAdvisor
             return;
         }
 
-        // Active programs that could manage these workers — server-wide or scoped
-        // to this site.
-        $programs = $server->supervisorPrograms()
-            ->where('is_active', true)
-            ->where(function ($q) use ($site): void {
-                $q->whereNull('site_id')->orWhere('site_id', $site->id);
-            })
-            ->get(['program_type', 'command']);
-
-        $commandHas = static fn (string $needle): bool => $programs->contains(
-            static fn ($p): bool => str_contains(strtolower((string) $p->command), $needle),
-        );
-
-        $managesHorizon = $programs->contains(static fn ($p): bool => $p->program_type === 'horizon')
-            || $commandHas('horizon');
-        $managesQueue = $programs->contains(
-            static fn ($p): bool => in_array($p->program_type, ['queue', 'horizon'], true),
-        ) || $commandHas('horizon') || $commandHas('queue:work') || $commandHas('queue:listen');
+        // A worker can run on the site's own box (SupervisorProgram or a systemd
+        // SiteProcess) OR on a separate worker server sharing the private
+        // network / worker pool — that off-box daemon drains the same queue, so
+        // it counts as coverage too. SiteWorkerCoverage resolves all of these.
+        $managesHorizon = SiteWorkerCoverage::coversHorizon($site);
+        $managesQueue = SiteWorkerCoverage::coversQueue($site);
 
         if ($hasHorizon && ! $managesHorizon) {
-            $message = __('This pipeline runs “horizon:terminate”, but no Supervisor program runs Horizon on this server—terminate only tells a running Horizon to restart, so the workers won’t come back. Add a Horizon daemon under Server → Daemons.');
+            $message = __('This pipeline runs “horizon:terminate”, but no worker runs Horizon on this server—terminate only tells a running Horizon to restart, so the workers won’t come back. Add a Horizon worker under this site’s Workers so it stays running.');
             $warnings[] = $message;
             $checks[] = $this->check('horizon_terminate_without_program', 'warning', $message);
         }
 
         if ($hasQueue && ! $managesQueue) {
-            $message = __('This pipeline runs “queue:restart”, but no Supervisor program runs a queue worker on this server—restart only signals running workers to exit. Add a queue worker under Server → Daemons so it stays running.');
+            $message = __('This pipeline runs “queue:restart”, but no worker runs a queue on this server—restart only signals running workers to exit. Add a queue worker under this site’s Workers so it stays running.');
             $warnings[] = $message;
             $checks[] = $this->check('queue_restart_without_program', 'warning', $message);
         }

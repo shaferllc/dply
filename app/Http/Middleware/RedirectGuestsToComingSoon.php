@@ -13,11 +13,16 @@ class RedirectGuestsToComingSoon
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (auth()->check()) {
+        // COMING_SOON env (via config): true forces the gate on (even locally,
+        // for preview), false turns it fully off, null = legacy behavior
+        // (gated in any non-local environment).
+        $flag = config('dply.coming_soon');
+
+        if ($flag === false) {
             return $next($request);
         }
 
-        if ($this->isLocalDevelopmentRequest($request)) {
+        if (auth()->check()) {
             return $next($request);
         }
 
@@ -40,6 +45,12 @@ class RedirectGuestsToComingSoon
         }
 
         if ($this->routeIsAllowed($request)) {
+            return $next($request);
+        }
+
+        // Local dev passes through UNLESS coming-soon is explicitly forced on
+        // (set COMING_SOON=true to preview the gate locally).
+        if ($flag !== true && $this->isLocalDevelopmentRequest($request)) {
             return $next($request);
         }
 

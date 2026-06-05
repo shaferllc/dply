@@ -13,6 +13,14 @@
     x-data="{
         open: false,
         active: 0,
+        // Stack depth of the page's context seed (1 if the palette opens drilled
+        // into a site/server, 0 at bare root). Esc dismisses at this depth; only
+        // deeper drill-downs pop first.
+        seedLen: {{ $contextSeed !== null ? 1 : 0 }},
+        // Index of the action row currently armed for confirmation (-1 = none).
+        // A destructive/consequential action arms on first activation and only
+        // runs on the second — guarding against a stray Enter.
+        confirming: -1,
         init() {
             window.addEventListener('keydown', (e) => {
                 if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -30,35 +38,49 @@
         },
         close() {
             this.open = false;
-            // Reset back to root so the next open starts fresh (round-trip is
-            // invisible since the panel is already hidden).
-            if (this.$wire.stack && this.$wire.stack.length) this.$wire.resetStack();
+            // Return to the page's context (or true root) so the next open starts
+            // where this page expects. Only round-trips when the stack drifted
+            // from the seed — and it's invisible since the panel is hidden.
+            if (this.$wire.stack.length !== this.seedLen) this.$wire.resetToContext();
         },
         rows() { return Array.from(this.$root.querySelectorAll('[data-cmdk-item]')); },
         move(dir) {
             const rows = this.rows();
             if (! rows.length) return;
             this.active = (this.active + dir + rows.length) % rows.length;
+            this.confirming = -1; // moving off an armed action disarms it
             rows[this.active] && rows[this.active].scrollIntoView({ block: 'nearest' });
         },
         choose() {
             const el = this.rows()[this.active];
             if (! el) return;
-            // Anchors navigate (close first); nestable buttons drill in and the
-            // palette stays open. el.click() routes to whichever handler applies.
+            // Anchors navigate (close first); action buttons run via their own
+            // @click (which handles confirm + close); nestable buttons drill in
+            // and the palette stays open. el.click() routes to the right handler.
             if (el.tagName === 'A') this.close();
             el.click();
         },
+        // Run an action row, gating consequential ones behind a second press.
+        // `i` is the row index, `needsConfirm` whether it must be armed first,
+        // `run` the thunk that actually fires the wire:click.
+        activate(i, needsConfirm, run) {
+            if (needsConfirm && this.confirming !== i) {
+                this.confirming = i; // arm — the row now shows '↵ again'
+                return;
+            }
+            this.confirming = -1;
+            this.close();
+            run();
+        },
         drillIn() {
             // Right-arrow: drill INTO the highlighted row, but only when it's a
-            // nestable context (a <button> that pushes). Leaf anchors aren't a
-            // drill-in, so right-arrow is a no-op on them.
+            // nestable context. Leaf anchors and action buttons aren't drill-ins.
             const el = this.rows()[this.active];
-            if (el && el.tagName === 'BUTTON') el.click();
+            if (el && el.hasAttribute('data-cmdk-nest')) el.click();
         },
     }"
-    @keydown.escape.window="open && ($wire.stack.length ? $wire.pop() : close())"
-    @cmdk-changed.window="active = 0; $nextTick(() => $refs.input && $refs.input.focus())"
+    @keydown.escape.window="open && ($wire.stack.length > seedLen ? $wire.pop() : close())"
+    @cmdk-changed.window="active = 0; confirming = -1; $nextTick(() => $refs.input && $refs.input.focus())"
     class="contents"
 >
     <div x-show="open" x-cloak style="z-index: 200;" class="fixed inset-0 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="{{ __('Search') }}">
@@ -115,7 +137,7 @@
                         x-ref="input"
                         type="text"
                         wire:model.live.debounce.200ms="query"
-                        @input="active = 0"
+                        @input="active = 0; confirming = -1"
                         @keydown.arrow-down.prevent="move(1)"
                         @keydown.arrow-up.prevent="move(-1)"
                         @keydown.enter.prevent="choose()"
@@ -138,12 +160,47 @@
                             {{ $group['label'] }}
                         </div>
                         @foreach ($group['items'] as $item)
-                            @php $isNest = empty($item['url']); @endphp
-                            @if ($isNest)
+                            @php
+                                $isAction = ! empty($item['action']);
+                                $isDoc = ! $isAction && ! empty($item['docSlug']);
+                                $isNest = ! $isAction && ! $isDoc && empty($item['url']);
+                            @endphp
+                            @if ($isDoc)
+                                {{-- Documentation row: opens the in-app docs panel
+                                     (dply-docs-open bubbles to the layout listener)
+                                     so you read the guide without leaving the page. --}}
+                                <button
+                                    type="button"
+                                    @click="window.dispatchEvent(new CustomEvent('dply-docs-open', { detail: { slug: '{{ $item['docSlug'] }}' } })); close()"
+                                    data-cmdk-item
+                                    @mouseenter="active = {{ $i }}"
+                                    :class="active === {{ $i }} ? 'bg-brand-sand/60 text-brand-ink' : 'text-brand-ink/90'"
+                                    class="flex w-full appearance-none items-center gap-3 rounded-lg border-0 px-2.5 py-2 text-left text-sm hover:bg-brand-sand/60 focus:outline-none"
+                                >
+                                    @include('livewire.partials.command-palette-row', ['item' => $item, 'i' => $i, 'isNest' => false])
+                                </button>
+                            @elseif ($isAction)
+                                @php
+                                    $actId = $item['action']['id'] ?? null;
+                                    $runCall = "\$wire.run('".$item['action']['key']."'".($actId !== null ? ", '".$actId."'" : '').')';
+                                @endphp
+                                <button
+                                    type="button"
+                                    @click="activate({{ $i }}, {{ empty($item['confirm']) ? 'false' : 'true' }}, () => {{ $runCall }})"
+                                    data-cmdk-item
+                                    data-cmdk-action
+                                    @mouseenter="active = {{ $i }}"
+                                    :class="active === {{ $i }} ? 'bg-brand-sand/60 text-brand-ink' : 'text-brand-ink/90'"
+                                    class="flex w-full appearance-none items-center gap-3 rounded-lg border-0 px-2.5 py-2 text-left text-sm hover:bg-brand-sand/60 focus:outline-none"
+                                >
+                                    @include('livewire.partials.command-palette-row', ['item' => $item, 'i' => $i, 'isNest' => false, 'isAction' => true])
+                                </button>
+                            @elseif ($isNest)
                                 <button
                                     type="button"
                                     wire:click="push('{{ $item['into']['type'] }}'@if(! empty($item['into']['id'])), '{{ $item['into']['id'] }}'@endif)"
                                     data-cmdk-item
+                                    data-cmdk-nest
                                     @mouseenter="active = {{ $i }}"
                                     :class="active === {{ $i }} ? 'bg-brand-sand/60 text-brand-ink' : 'text-brand-ink/90'"
                                     class="flex w-full appearance-none items-center gap-3 rounded-lg border-0 px-2.5 py-2 text-left text-sm hover:bg-brand-sand/60 focus:outline-none"

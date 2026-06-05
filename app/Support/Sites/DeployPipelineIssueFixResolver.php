@@ -137,6 +137,23 @@ final class DeployPipelineIssueFixResolver
             );
         }
 
+        // "Restart without a running worker" → take the operator straight to
+        // this site's Workers page with the matching worker preset, and open
+        // the create-worker modal pre-filled (the page honours ?open=worker).
+        if ($key === 'queue_restart_without_program') {
+            return self::link(
+                __('Add queue worker'),
+                self::workersWithPreset($site, $server, 'laravel-queue'),
+            );
+        }
+
+        if ($key === 'horizon_terminate_without_program') {
+            return self::link(
+                __('Add Horizon worker'),
+                self::workersWithPreset($site, $server, 'laravel-horizon'),
+            );
+        }
+
         return self::link(
             __('Edit pipeline'),
             self::pipelineTab($site, $server, 'steps'),
@@ -164,6 +181,22 @@ final class DeployPipelineIssueFixResolver
         }
 
         return self::link($label, self::pipelineTab($site, $server, 'steps'));
+    }
+
+    /**
+     * The site's Workers (Daemons) page deep-linked to pre-fill a Supervisor
+     * program from a preset and auto-open the create-worker modal. The
+     * WorkspaceDaemons mount honours ?preset= (fills the form) and ?open=worker
+     * (pops the modal).
+     */
+    private static function workersWithPreset(Site $site, Server $server, string $preset): string
+    {
+        return route('sites.daemons', [
+            'server' => $server,
+            'site' => $site,
+            'preset' => $preset,
+            'open' => 'worker',
+        ]);
     }
 
     private static function pipelineTab(Site $site, Server $server, string $tab): string

@@ -41,7 +41,7 @@ trait ManagesSiteDeployExecution
             'deployment_id' => null,
         ], 600);
 
-        RunSiteDeploymentJob::dispatch($this->site->fresh(), SiteDeployment::TRIGGER_MANUAL);
+        RunSiteDeploymentJob::dispatch($this->site, SiteDeployment::TRIGGER_MANUAL);
 
         $this->toastSuccess(__('Deployment queued. Watch the phase timeline below.'));
     }
@@ -49,7 +49,7 @@ trait ManagesSiteDeployExecution
     public function queueDeploy(SiteDeploySyncCoordinator $coordinator): void
     {
         $this->authorize('update', $this->site);
-        $coordinator->dispatchManualForGroup($this->site->fresh());
+        $coordinator->dispatchManualForGroup($this->site);
         $base = __('Deployment queued. If another run is in progress, the new one may be recorded as skipped. Refresh deployments below.');
         $this->toastSuccess(config('insights.queue_after_deploy', true)
             ? $base.' '.__('After a successful deploy, server and site insight runs are queued automatically.')

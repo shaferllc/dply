@@ -99,34 +99,39 @@ trait ManagesSupervisorPrograms
      */
     protected function allowedSupervisorPresetKeys(): array
     {
-        $generic = ['nodejs'];
+        $laravelKeys = ['laravel-queue', 'laravel-horizon', 'reverb', 'laravel-schedule', 'laravel-octane'];
+        $railsKeys = ['sidekiq', 'solid-queue', 'action-cable'];
+
         $site = $this->supervisorFormSite();
 
+        // No site context: server-wide daemon, show everything.
         if ($site === null) {
-            return $generic;
+            return array_merge($laravelKeys, ['nodejs'], $railsKeys);
         }
 
-        $keys = $generic;
+        $detection = $site->resolvedRuntimeAppDetection();
 
-        if ($site->isLaravelFrameworkDetected()) {
-            $keys = array_merge($keys, [
-                'laravel-queue',
-                'laravel-horizon',
-                'reverb',
-                'laravel-schedule',
-                'laravel-octane',
-            ]);
+        // No detection data yet (site hasn't deployed): default to PHP/Laravel.
+        if ($detection === null) {
+            return $laravelKeys;
         }
+
+        $language = strtolower((string) ($detection['language'] ?? ''));
 
         if ($site->isRailsFrameworkDetected()) {
-            $keys = array_merge($keys, [
-                'sidekiq',
-                'solid-queue',
-                'action-cable',
-            ]);
+            return $railsKeys;
         }
 
-        return $keys;
+        if ($language === 'node') {
+            return ['nodejs'];
+        }
+
+        if ($site->isLaravelFrameworkDetected() || $language === 'php') {
+            return $laravelKeys;
+        }
+
+        // Unknown/unsupported framework: show everything.
+        return array_merge($laravelKeys, ['nodejs'], $railsKeys);
     }
 
     public function supervisorFormSite(): ?Site

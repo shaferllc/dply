@@ -81,6 +81,23 @@ class RuntimeAwareDeployStepDefaults
         ];
 
         if ($framework === 'laravel') {
+            // Laravel ships with a Vite frontend by default — build the assets so
+            // `@vite(...)` finds public/build/manifest.json (otherwise the app
+            // 500s with ViteManifestNotFoundException). These no-op gracefully on
+            // an API-only app with no package.json (see ensureToolingPrefix), and
+            // are user-removable like any default step. Node is self-healed via
+            // mise at deploy time since the base box ships without it.
+            $steps[] = [
+                'step_type' => SiteDeployStep::TYPE_NPM_CI,
+                'phase' => SiteDeployStep::PHASE_BUILD,
+                'timeout_seconds' => 900,
+            ];
+            $steps[] = [
+                'step_type' => SiteDeployStep::TYPE_NPM_RUN,
+                'custom_command' => 'build',
+                'phase' => SiteDeployStep::PHASE_BUILD,
+                'timeout_seconds' => 900,
+            ];
             $steps[] = [
                 'step_type' => SiteDeployStep::TYPE_ARTISAN_MIGRATE,
                 'phase' => SiteDeployStep::PHASE_RELEASE,

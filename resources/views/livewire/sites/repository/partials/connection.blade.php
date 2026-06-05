@@ -40,7 +40,7 @@
                         class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-mono shadow-sm focus:border-brand-ink focus:ring-1 focus:ring-brand-ink"
                     />
                 </label>
-                <div class="block text-sm">
+                <div class="relative block text-sm">
                     <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Deploy ref') }}</span>
                     <div class="mt-1 flex flex-wrap items-center gap-2">
                         <span @class([
@@ -67,7 +67,11 @@
                     <p class="mt-1 text-xs text-brand-moss">{{ __('Pick a branch, tag, or specific commit. Saved when you click “Save connection”.') }}</p>
 
                     @if ($repo_ref_picker_open)
-                        @include('livewire.sites.partials._repository-ref-picker')
+                        {{-- Anchored dropdown: floats over the form instead of pushing
+                             the layout. The picker partial closes on outside-click. --}}
+                        <div class="absolute left-0 top-full z-30 w-[min(28rem,90vw)]">
+                            @include('livewire.sites.partials._repository-ref-picker')
+                        </div>
                     @endif
                 </div>
             </div>
@@ -136,8 +140,7 @@
                         @else
                             <button
                                 type="button"
-                                wire:click="switchRepository('{{ addslashes($repo['url']) }}', '{{ addslashes($repo['branch'] ?? 'main') }}')"
-                                wire:confirm="{{ __('Switch this app to :label? Deploy branch will reset to :branch.', ['label' => $repo['label'], 'branch' => $repo['branch'] ?? 'main']) }}"
+                                wire:click="askSwitchRepository('{{ addslashes($repo['url']) }}', '{{ addslashes($repo['branch'] ?? 'main') }}', '{{ addslashes($repo['label']) }}')"
                                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                             >
                                 <x-heroicon-o-arrow-right class="h-3.5 w-3.5" />
@@ -186,4 +189,43 @@
 
     {{-- "Disconnect repository & start over" lives on the Danger tab
          (repository/partials/danger.blade.php). --}}
+
+    {{-- Switch-repo confirmation. Replaces the native browser confirm() so the
+         "deploy branch will reset" warning reads in-product. --}}
+    @if ($pendingRepoSwitch !== null)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-brand-ink/40 p-4" wire:click.self="cancelSwitchRepository">
+            <div class="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-800">
+                        <x-heroicon-o-arrow-path-rounded-square class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Switch repository?') }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                            {{ __('Switch this app to :label? The deploy branch will reset to :branch.', [
+                                'label' => $pendingRepoSwitch['label'],
+                                'branch' => $pendingRepoSwitch['branch'],
+                            ]) }}
+                        </p>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+                    <button type="button" wire:click="cancelSwitchRepository"
+                        class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                        {{ __('Cancel') }}
+                    </button>
+                    <button type="button"
+                        wire:click="confirmSwitchRepository"
+                        wire:loading.attr="disabled"
+                        wire:target="confirmSwitchRepository"
+                        class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-ink/90 disabled:cursor-wait disabled:opacity-60"
+                    >
+                        <x-heroicon-o-arrow-right class="h-4 w-4" aria-hidden="true" />
+                        <span wire:loading.remove wire:target="confirmSwitchRepository">{{ __('Switch repository') }}</span>
+                        <span wire:loading wire:target="confirmSwitchRepository">{{ __('Switching…') }}</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
 </section>

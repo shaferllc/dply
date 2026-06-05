@@ -320,13 +320,14 @@ foreach ((array) config('services.digitalocean.testing_domains', []) as $functio
 }
 
 Route::get('/', function () {
-    // Allow visitors to preview an alternate, animated homepage and remember
-    // their choice. `?v=1` (classic) or `?v=2` (animated); persisted via cookie.
+    // The animated homepage (v2) is the default; visitors can switch to the
+    // classic one and we remember it. `?v=1` (classic) or `?v=2` (animated);
+    // persisted via cookie. With no preference, show the animated default.
     $requested = request()->query('v');
     $valid = in_array($requested, ['1', '2'], true);
     $version = $valid
         ? $requested
-        : (request()->cookie('home_version') === '2' ? '2' : '1');
+        : (request()->cookie('home_version') === '1' ? '1' : '2');
 
     $response = response()->view($version === '2' ? 'welcome-v2' : 'welcome');
 
@@ -655,7 +656,11 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites/create-custom', SitesCreateCustom::class)->name('sites.create-custom');
     Route::livewire('servers/{server}/sites/{site}/scaffold-journey', ScaffoldJourney::class)->name('sites.scaffold-journey');
     Route::livewire('servers/{server}/sites/{site}/choose-app', SitesChooseApp::class)->name('sites.choose-app');
-    Route::livewire('servers/{server}/sites/{site}/setup', \App\Livewire\Sites\SiteSetup::class)->name('sites.setup');
+    // The first-deploy setup wizard was folded into the Repository page as a
+    // conditional tab. Keep the route name working by redirecting to it.
+    Route::get('servers/{server}/sites/{site}/setup', function (Server $server, Site $site) {
+        return redirect()->route('sites.repository', ['server' => $server, 'site' => $site, 'repo_tab' => 'setup']);
+    })->name('sites.setup');
     Route::livewire('servers/{server}/sites/{site}/clone', SitesClone::class)->name('sites.clone');
     Route::middleware('feature:workspace.site_promote')->group(function (): void {
         Route::livewire('servers/{server}/sites/{site}/promote', SitesPromote::class)->name('sites.promote');

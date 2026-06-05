@@ -26,13 +26,66 @@
     <div class="mb-6 flex items-center justify-between gap-3 border-b border-brand-ink/10 pb-6">
         <div>
             <h1 class="text-2xl font-semibold text-brand-ink">{{ __('Resources') }}</h1>
-            <p class="mt-1 text-sm text-brand-moss">{{ __('Every backing service attached to this app. Attach more in one click; detach in place.') }}</p>
+            <p class="mt-1 text-sm text-brand-moss">
+                {{ $isContainer
+                    ? __('Every backing service attached to this app. Attach more in one click; detach in place.')
+                    : __('Background workers that keep this site\'s queue and Horizon running — on this server and any worker server on the same network.') }}
+            </p>
         </div>
-        <button type="button" wire:click="openAttach('attach')" class="{{ $btnPrimary }}">
-            + {{ __('Attach resource') }}
-        </button>
+        @if ($isContainer)
+            <button type="button" wire:click="openAttach('attach')" class="{{ $btnPrimary }}">
+                + {{ __('Attach resource') }}
+            </button>
+        @else
+            <a href="{{ route('sites.daemons', [$server, $site]) }}" wire:navigate class="{{ $btnPrimary }}">
+                {{ __('Manage workers') }}
+            </a>
+        @endif
     </div>
 
+@if (! $isContainer)
+    {{-- VM workers roll-up — read-only; management lives on the Workers page. --}}
+    <div class="{{ $card }}">
+        <div class="flex items-baseline justify-between gap-3">
+            <div>
+                <h2 class="text-sm font-semibold uppercase tracking-wide text-brand-moss">{{ __('Workers') }}</h2>
+                <p class="mt-1 text-xs text-brand-moss">{{ __('Queue / Horizon / scheduler processes draining this site\'s work. Off-box rows run on a worker server that shares this site\'s private network.') }}</p>
+            </div>
+            <div class="flex gap-2">
+                <a href="{{ route('sites.daemons', [$server, $site]) }}?preset=laravel-queue&open=worker" wire:navigate class="{{ $btnSecondary }}">+ {{ __('Queue worker') }}</a>
+                <a href="{{ route('sites.daemons', [$server, $site]) }}?preset=laravel-horizon&open=worker" wire:navigate class="{{ $btnSecondary }}">+ {{ __('Horizon') }}</a>
+            </div>
+        </div>
+
+        @if ($this->vmWorkers->isEmpty())
+            <p class="mt-4 text-xs italic text-brand-moss">{{ __('No workers detected for this site — on this server or any worker server on the same network.') }}</p>
+        @else
+            <ul class="mt-4 divide-y divide-brand-ink/8 rounded-lg border border-brand-ink/10">
+                @foreach ($this->vmWorkers as $worker)
+                    <li class="px-4 py-3">
+                        <div class="flex flex-wrap items-center justify-between gap-3">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="font-semibold text-sm text-brand-ink">{{ $worker['name'] }}</span>
+                                    <span class="rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $worker['active'] ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700' }}">{{ $worker['active'] ? __('active') : __('inactive') }}</span>
+                                    <span class="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-700">{{ $worker['type'] }}</span>
+                                    <span class="text-[10px] text-brand-moss">{{ $worker['source'] }} · ×{{ $worker['instances'] }}</span>
+                                    @if ($worker['off_box'])
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-800" title="{{ __('Runs on a worker server on the same private network') }}">
+                                            <x-heroicon-o-server class="h-3 w-3" aria-hidden="true" />
+                                            {{ $worker['server_name'] }}
+                                        </span>
+                                    @endif
+                                </div>
+                                <div class="mt-1 font-mono text-[11px] text-brand-ink break-all">{{ $worker['command'] }}</div>
+                            </div>
+                        </div>
+                    </li>
+                @endforeach
+            </ul>
+        @endif
+    </div>
+@else
     {{-- Databases --}}
     <div class="{{ $card }} mb-6">
         <div class="flex items-baseline justify-between gap-3">
@@ -261,4 +314,5 @@
             </div>
         </div>
     @endif
+@endif
 </div>

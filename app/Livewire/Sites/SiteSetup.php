@@ -5,74 +5,70 @@ declare(strict_types=1);
 namespace App\Livewire\Sites;
 
 use App\Jobs\PreflightSiteSetupJob;
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\ManagesSiteBindings;
+use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
+use App\Livewire\Sites\Concerns\ManagesSiteEnvironment;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\Deploy\SiteBindingManager;
 use App\Services\Deploy\SiteDeployPipelineManager;
-use App\Services\Sites\DotEnvFileParser;
-use App\Services\Sites\DotEnvFileWriter;
 use App\Services\Sites\SiteDeploySyncCoordinator;
-use App\Support\Servers\DatabaseWorkspaceEngines;
+use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
  * Post-repo-connect SETUP WIZARD for import/preset VM sites — the guided
- * "now configure your site" flow that runs after {@see ChooseApp} connects a
- * repository (see /grill design). Rendered inside the site shell at
- * `sites.setup`; the site stays LIVE (splash serving) throughout, so the
- * sidebar is always one click away and "I'll configure later" is a first-class
- * escape that preserves the held state.
+ * "now configure your site" flow that runs after a repo is connected. Rendered
+ * as the Repository "Set up" tab (embedded) while the site is held for first
+ * deploy; the site stays LIVE (splash serving) throughout.
  *
- * Three scan-derived steps:
- *   1. Environment  — required plain vars, pre-filled from the pre-flight
- *                     scan's .env.example. Blocks advancing until satisfied.
- *   2. Resources    — databases / cache / queue / mail the env implies, via the
- *                     existing {@see ManagesSiteBindings} machinery (provision a
- *                     ServerDatabase, inject DB_*, etc.). Advisory / skippable.
- *   3. Review       — auto-detected build, plus the completeness gate: Deploy
- *                     unlocks only when every required key is satisfied.
+ * Two steps:
+ *   1. Environment — IS the real Environment tab (the {@see ManagesSiteEnvironment}
+ *      + {@see ManagesSiteBindings} editor rendered from
+ *      `settings/partials/environment.blade.php`): variables with masked
+ *      Show/Edit rows, prefix filter chips, import, AND "Connect resource"
+ *      (attach/provision databases, cache, queue, storage). The same surface as
+ *      Deployments → Environment, so there's one editor, zero drift.
+ *   2. Review — confirm repo/runtime, soft-warn on unset boot-critical vars
+ *      ("Deploy anyway"), and dispatch the first deploy.
+ *
+ * Env edits write only to the encrypted cache during setup — the SSH push is
+ * HELD until deploy (see {@see autoPushAfterCacheMutation}); the first deploy
+ * composes the .env from the cache.
  *
  * Lifecycle is driven by meta.setup.state (written by
- * {@see PreflightSiteSetupJob}): 'scanning' shows an analyzing state; a clean
+ * {@see PreflightSiteSetupJob}): 'scanning' shows an analyzing timeline; a clean
  * scan flips to 'deploying' and we bounce to the live site; 'needs_setup' /
  * 'scan_failed' land in the steps.
  */
 #[Layout('layouts.app')]
 class SiteSetup extends Component
 {
+    use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
     use ManagesSiteBindings;
+    use ManagesSiteEnvironment;
+    use WatchesConsoleActionOutcomes;
 
     public Server $server;
 
     public Site $site;
 
-    /** Resources step — inline "create a database" form. */
-    public string $dbName = '';
+    /**
+     * When true, the wizard renders inside another page (the Repository "Set up"
+     * tab) — suppress its own breadcrumb / sidebar / page chrome so the host
+     * provides the framing. Mirrors {@see Repository::$embedded}.
+     */
+    public bool $embedded = false;
 
-    public string $dbEngine = '';
-
-    /** Active step: 'environment' | 'resources' | 'review'. */
+    /** Active step: 'environment' | 'review'. */
     #[Url(as: 'step', except: '')]
     public string $step = '';
-
-    /**
-     * Editable env values for the Environment step (key => value), parsed from
-     * the encrypted cache the pre-flight seeded from .env.example.
-     *
-     * @var array<string, string>
-     */
-    public array $env = [];
-
-    /** Key prefixes that denote a provisionable/configurable resource (step 2). */
-    private const RESOURCE_PREFIXES = ['DB_', 'DATABASE_', 'REDIS_', 'QUEUE_', 'CACHE_', 'MAIL_', 'MAILER_'];
 
     public function mount(Server $server, Site $site): void
     {
@@ -95,69 +91,20 @@ class SiteSetup extends Component
             return;
         }
 
-        $this->loadEnvFromCache();
-        $this->dbName = Str::slug((string) $this->site->slug, '_') ?: 'app';
-        $engines = $this->installedDbEngines();
-        $this->dbEngine = $engines[0]['value'] ?? 'mysql';
-
-        if ($this->step === '' || ! in_array($this->step, ['environment', 'resources', 'review'], true)) {
-            $this->step = $this->firstIncompleteStep();
+        if (! in_array($this->step, ['environment', 'review'], true)) {
+            $this->step = 'environment';
         }
     }
 
     /**
-     * Provisionable database engines installed on this server (the Resources
-     * step's engine choices), architecture-gated to what the binding manager
-     * can actually create.
-     *
-     * @return list<array{value: string, label: string}>
+     * HOLD the .env push until deploy. The real Environment tab pushes every
+     * edit to the server's live .env over SSH; during first-deploy setup the app
+     * isn't deployed yet, so we write only to the encrypted cache and let the
+     * first deploy compose the .env. Overrides {@see ManagesSiteEnvironment::autoPushAfterCacheMutation}.
      */
-    public function installedDbEngines(): array
+    protected function autoPushAfterCacheMutation(string $savedMessage): void
     {
-        $supported = ['mysql', 'postgres', 'sqlite'];
-
-        return $this->server->databaseEngines()
-            ->get(['engine'])
-            ->map(fn ($e) => DatabaseWorkspaceEngines::family((string) $e->engine))
-            ->filter(fn (string $family) => in_array($family, $supported, true))
-            ->unique()
-            ->values()
-            ->map(fn (string $family) => ['value' => $family, 'label' => DatabaseWorkspaceEngines::label($family)])
-            ->all();
-    }
-
-    /**
-     * Create a fresh database on the server and inject its DB_* credentials
-     * into the env cache — the Resources step's primary action. Reuses the
-     * binding machinery ({@see SiteBindingManager::provisionNew}) which adopts
-     * the connection vars into env_file_content.
-     */
-    public function createDatabase(SiteBindingManager $manager): void
-    {
-        Gate::authorize('update', $this->site);
-
-        $name = trim($this->dbName);
-        if ($name === '' || preg_match('/^[a-zA-Z0-9_]+$/', $name) !== 1) {
-            $this->addError('dbName', __('Database name must be alphanumeric / underscore.'));
-
-            return;
-        }
-
-        try {
-            $manager->provisionNew($this->site, 'database', [
-                'name' => $name,
-                'engine' => $this->dbEngine !== '' ? $this->dbEngine : 'mysql',
-            ]);
-        } catch (\Throwable $e) {
-            $this->toastError($e->getMessage());
-
-            return;
-        }
-
-        $this->site = $this->site->fresh() ?? $this->site;
-        $this->loadEnvFromCache();
-        $this->resetErrorBag('dbName');
-        $this->toastSuccess(__('Database created and connected.'));
+        $this->toastSuccess($savedMessage.' '.__('Saved — applies on first deploy.'));
     }
 
     /**
@@ -175,9 +122,8 @@ class SiteSetup extends Component
             return;
         }
 
-        if (! $this->site->isPreflightScanning()) {
-            $this->loadEnvFromCache();
-            $this->step = $this->firstIncompleteStep();
+        if (! $this->site->isPreflightScanning() && $this->step === '') {
+            $this->step = 'environment';
         }
     }
 
@@ -202,41 +148,9 @@ class SiteSetup extends Component
 
     public function goToStep(string $step): void
     {
-        if (in_array($step, ['environment', 'resources', 'review'], true)) {
+        if (in_array($step, ['environment', 'review'], true)) {
             $this->step = $step;
         }
-    }
-
-    /** Persist the Environment step into the encrypted cache and advance. */
-    public function saveEnvironment(): void
-    {
-        Gate::authorize('update', $this->site);
-
-        // Block advancing while any required plain var is still empty.
-        $missing = [];
-        foreach ($this->planEnvFields() as $field) {
-            if ($field['required'] && trim((string) ($this->env[$field['key']] ?? '')) === '') {
-                $missing[] = $field['key'];
-            }
-        }
-        if ($missing !== []) {
-            $this->addError('env', __('Fill the required variables to continue: :keys', ['keys' => implode(', ', $missing)]));
-
-            return;
-        }
-
-        $this->writeEnvCache($this->env);
-        $this->resetErrorBag('env');
-        $this->step = 'resources';
-    }
-
-    /** Persist any resource-key edits from the Resources step and advance to Review. */
-    public function saveResourcesAndReview(): void
-    {
-        Gate::authorize('update', $this->site);
-
-        $this->writeEnvCache($this->env);
-        $this->step = 'review';
     }
 
     /** Final action: dispatch the first deploy (which composes .env from the cache). */
@@ -244,16 +158,18 @@ class SiteSetup extends Component
     {
         Gate::authorize('update', $this->server);
 
-        // Persist any last edits, then enforce the completeness gate.
-        $this->writeEnvCache($this->env);
+        // We do NOT hard-block on unset required vars: the Review step warns and
+        // the operator can deploy anyway and let it fail — their call. The env is
+        // already persisted in the cache (the editor writes it directly).
         $this->site->refresh();
 
-        if ($this->site->unsatisfiedRequiredEnvKeys() !== []) {
-            $this->addError('deploy', __('Some required variables are still unset — finish them before deploying.'));
-            $this->step = 'review';
-
-            return null;
-        }
+        // Guarantee a Laravel APP_KEY at the LAST moment — only when still empty,
+        // so a verbatim worker import (which carries the worker's key) or a
+        // manually-generated key is never clobbered. The VM deploy pipeline does
+        // NOT run `key:generate`, so without this a Laravel app boots keyless and
+        // 500s. Mirrors ServerlessEnvironmentPreparer for the VM path.
+        $this->ensureLaravelAppKey();
+        $this->site->refresh();
 
         $meta = is_array($this->site->meta) ? $this->site->meta : [];
         $meta['setup'] = ['state' => 'deploying', 'deployed_at' => now()->toISOString()];
@@ -263,174 +179,58 @@ class SiteSetup extends Component
         $pipeline->seedRuntimeDefaults($fresh, (string) $fresh->runtime ?: 'php');
         $coordinator->dispatchManualForGroup($fresh->fresh() ?? $fresh);
 
-        return $this->redirectRoute('sites.show', ['server' => $this->server->id, 'site' => $this->site->id], navigate: true);
-    }
-
-    // --- View data -----------------------------------------------------
-
-    /**
-     * Required + optional NON-resource env fields for the Environment step,
-     * pre-filled from the cache. Required (blocking) ones sort first.
-     *
-     * @return list<array{key: string, value: string, example: ?string, required: bool, sources: list<string>}>
-     */
-    public function planEnvFields(): array
-    {
-        $fields = [];
-        foreach ($this->requirementKeys() as $key) {
-            $name = (string) ($key['key'] ?? '');
-            if ($name === '' || $name === 'APP_KEY' || $this->isResourceKey($name)) {
-                continue;
-            }
-            $fields[] = [
-                'key' => $name,
-                'value' => (string) ($this->env[$name] ?? $key['example'] ?? ''),
-                'example' => $key['example'] ?? null,
-                'required' => (bool) ($key['required'] ?? false),
-                'sources' => is_array($key['sources'] ?? null) ? $key['sources'] : [],
-            ];
-        }
-
-        usort($fields, static fn (array $a, array $b): int => [$b['required'], $a['key']] <=> [$a['required'], $b['key']]);
-
-        return $fields;
+        // Land on the deploy screen so the operator watches the first deploy run,
+        // not the bare site dashboard.
+        return $this->redirectRoute('sites.deployments.index', ['server' => $this->server->id, 'site' => $this->site->id], navigate: true);
     }
 
     /**
-     * Resource-shaped keys grouped by family (database/cache/queue/mail) for
-     * the Resources step. Each group reports whether it's still unsatisfied.
-     *
-     * @return list<array{family: string, label: string, keys: list<string>, satisfied: bool}>
+     * Mint a Laravel APP_KEY into the env cache iff the app wants one (it's
+     * declared in the .env or scanned from code) AND it's still empty — so an
+     * imported/worker key or a manually-generated one is never overwritten.
+     * {@see freshAppKey()} comes from {@see ManagesSiteEnvironment}.
      */
-    public function resourceGroups(): array
+    private function ensureLaravelAppKey(): void
     {
-        $families = [
-            'database' => ['label' => __('Database'), 'prefixes' => ['DB_', 'DATABASE_'], 'keys' => []],
-            'cache' => ['label' => __('Cache / Redis'), 'prefixes' => ['REDIS_', 'CACHE_'], 'keys' => []],
-            'queue' => ['label' => __('Queue'), 'prefixes' => ['QUEUE_'], 'keys' => []],
-            'mail' => ['label' => __('Mail'), 'prefixes' => ['MAIL_', 'MAILER_'], 'keys' => []],
-        ];
+        $parser = app(\App\Services\Sites\DotEnvFileParser::class);
+        $parsed = $parser->parse((string) ($this->site->env_file_content ?? ''));
+        $vars = is_array($parsed['variables'] ?? null) ? $parsed['variables'] : [];
 
-        foreach ($this->requirementKeys() as $key) {
-            $name = (string) ($key['key'] ?? '');
-            if ($name === '' || ! $this->isResourceKey($name)) {
-                continue;
-            }
-            foreach ($families as $family => &$cfg) {
-                foreach ($cfg['prefixes'] as $prefix) {
-                    if (str_starts_with($name, $prefix)) {
-                        $cfg['keys'][] = $name;
-                        break 2;
-                    }
-                }
-            }
-            unset($cfg);
+        $wantsKey = array_key_exists('APP_KEY', $vars)
+            || collect(data_get($this->site->envRequirements(), 'keys', []))
+                ->contains(fn ($k) => is_array($k) && ($k['key'] ?? '') === 'APP_KEY');
+
+        if (! $wantsKey || trim((string) ($vars['APP_KEY'] ?? '')) !== '') {
+            return; // not a Laravel app, or a key is already set (imported / generated)
         }
 
-        $missing = $this->site->unsatisfiedRequiredEnvKeys();
-
-        $groups = [];
-        foreach ($families as $family => $cfg) {
-            if ($cfg['keys'] === []) {
-                continue;
-            }
-            $groups[] = [
-                'family' => $family,
-                'label' => $cfg['label'],
-                'keys' => array_values(array_unique($cfg['keys'])),
-                'satisfied' => array_intersect($cfg['keys'], $missing) === [],
-            ];
-        }
-
-        return $groups;
+        $vars['APP_KEY'] = $this->freshAppKey();
+        $this->site->forceFill([
+            'env_file_content' => app(\App\Services\Sites\DotEnvFileWriter::class)->render($vars, $parsed['comments'] ?? []),
+            'env_cache_origin' => 'local-edit',
+        ])->save();
     }
 
-    /** Required keys still unsatisfied — the "N left" count and Deploy gate. */
+    /** Boot-critical keys still unsatisfied — the "N left" count and the Review soft gate. */
     public function missingRequired(): array
     {
-        return $this->site->unsatisfiedRequiredEnvKeys();
+        return $this->site->unsatisfiedBootCriticalEnvKeys();
     }
 
     public function render(): View
     {
-        return view('livewire.sites.site-setup');
-    }
+        // Non-embedded chrome (breadcrumb/sidebar) needs the shared settings
+        // sidebar payload; mirror Commits/Repository so it never 500s on
+        // $resourceNoun. (Embedded mode skips the sidebar entirely.)
+        $runtimeMode = $this->site->runtimeTargetMode();
 
-    // --- Internals -----------------------------------------------------
-
-    private function loadEnvFromCache(): void
-    {
-        $this->env = [];
-        if (filled($this->site->env_file_content)) {
-            $parsed = app(DotEnvFileParser::class)->parse((string) $this->site->env_file_content);
-            $this->env = is_array($parsed['variables'] ?? null) ? $parsed['variables'] : [];
-        }
-    }
-
-    /**
-     * Merge $values into the existing cache and persist. Keeps keys the wizard
-     * doesn't surface (e.g. resource keys adopted by a binding).
-     *
-     * @param  array<string, string>  $values
-     */
-    private function writeEnvCache(array $values): void
-    {
-        $parser = app(DotEnvFileParser::class);
-        $writer = app(DotEnvFileWriter::class);
-
-        $current = [];
-        if (filled($this->site->env_file_content)) {
-            $parsed = $parser->parse((string) $this->site->env_file_content);
-            $current = is_array($parsed['variables'] ?? null) ? $parsed['variables'] : [];
-        }
-
-        foreach ($values as $key => $value) {
-            $current[$key] = (string) $value;
-        }
-
-        $this->site->forceFill([
-            'env_file_content' => $writer->render($current),
-        ])->save();
-        $this->site->refresh();
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    private function requirementKeys(): array
-    {
-        $keys = data_get($this->site->envRequirements(), 'keys');
-
-        return is_array($keys) ? $keys : [];
-    }
-
-    private function isResourceKey(string $name): bool
-    {
-        foreach (self::RESOURCE_PREFIXES as $prefix) {
-            if (str_starts_with($name, $prefix)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function firstIncompleteStep(): string
-    {
-        // Step 1 incomplete while a required plain var is empty.
-        foreach ($this->planEnvFields() as $field) {
-            if ($field['required'] && trim((string) ($this->env[$field['key']] ?? '')) === '') {
-                return 'environment';
-            }
-        }
-
-        // Step 2 incomplete while a required resource key is unmet.
-        foreach ($this->resourceGroups() as $group) {
-            if (! $group['satisfied']) {
-                return 'resources';
-            }
-        }
-
-        return 'review';
+        return view('livewire.sites.site-setup', [
+            'settingsSidebarItems' => SiteSettingsSidebar::items($this->site, $this->server),
+            'resourceNoun' => $runtimeMode === 'vm' ? __('Site') : __('App'),
+            'resourcePlural' => $runtimeMode === 'vm' ? __('sites') : __('apps'),
+            'routingTab' => 'domains',
+            'laravel_tab' => 'commands',
+            'section' => 'setup',
+        ]);
     }
 }

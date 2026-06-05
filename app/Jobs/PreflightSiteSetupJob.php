@@ -13,6 +13,7 @@ use App\Services\Sites\SiteDeploySyncCoordinator;
 use App\Services\Sites\SiteEnvRequirementScanner;
 use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
+use App\Support\Sites\BootCriticalEnv;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -96,14 +97,18 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
         }
         $branch = trim((string) $site->git_branch) !== '' ? trim((string) $site->git_branch) : 'main';
 
+        $this->markScanStep($site, 'resolving');
         $cloneUrl = $this->resolveCloneUrl($site, $repoUrl, $resolver, $browser);
 
         $tmpRoot = rtrim(sys_get_temp_dir(), '/').'/dply-preflight-'.bin2hex(random_bytes(6));
         $checkout = $tmpRoot.'/repo';
 
         try {
+            $this->markScanStep($site, 'cloning');
             $cloner->shallowClone($cloneUrl, $branch, $checkout);
+            $this->markScanStep($site, 'scanning');
             $requirements = $scanner->scanLocalPath($checkout);
+            $this->markScanStep($site, 'detecting');
         } catch (\Throwable $e) {
             // Fail OPEN: hold and route to setup with a classified reason.
             Log::warning('PreflightSiteSetupJob clone/scan failed', [
@@ -204,7 +209,12 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
     /**
      * Keys the user MUST supply before a first deploy can succeed: required,
      * with no usable example value (empty/placeholder), excluding the keys the
-     * deploy mints itself.
+     * deploy mints itself — AND narrowed to the boot-critical set (framework URL
+     * + database connection). The scanner marks hundreds of keys "required"
+     * (everything in .env.example or a no-default env() call); holding the
+     * deploy on all of them is unusable, so optional integrations never block —
+     * they're surfaced in the wizard as advanced/optional instead.
+     * See {@see \App\Support\Sites\BootCriticalEnv}.
      *
      * @param  array{keys: list<array{key: string, example: ?string, sources: list<string>, required: bool}>}  $requirements
      * @return list<string>
@@ -217,6 +227,9 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
                 continue;
             }
             if (in_array($key['key'], self::AUTO_MANAGED_KEYS, true)) {
+                continue;
+            }
+            if (! BootCriticalEnv::isBootCritical((string) $key['key'])) {
                 continue;
             }
             $example = trim((string) ($key['example'] ?? ''));
@@ -239,6 +252,30 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
             str_contains($m, 'branch') => 'branch',
             default => 'unknown',
         };
+    }
+
+    /**
+     * Ordered scan phases the "Analyzing your repository…" view renders as a
+     * live progress timeline. Keep in sync with site-setup.blade.php.
+     *
+     * @var list<string>
+     */
+    public const SCAN_STEPS = ['resolving', 'cloning', 'scanning', 'detecting'];
+
+    /**
+     * Record which scan phase is currently running into meta.setup.scan_step
+     * (without disturbing state='scanning'), so the polling wizard can show a
+     * step-by-step progress timeline instead of an opaque spinner.
+     */
+    private function markScanStep(Site $site, string $step): void
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $setup = is_array($meta['setup'] ?? null) ? $meta['setup'] : [];
+        $setup['state'] = 'scanning';
+        $setup['scan_step'] = $step;
+        $setup['scan_step_at'] = now()->toIso8601String();
+        $meta['setup'] = $setup;
+        $site->forceFill(['meta' => $meta])->save();
     }
 
     private function writeSetup(Site $site, string $state, array $extra = []): void

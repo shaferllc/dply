@@ -47,6 +47,11 @@ return [
         'manage' => 'server-manage',
         'settings' => 'server-settings',
         'cluster' => 'server-cluster',
+        'errors' => 'server-errors',
+        'networking' => 'server-networking',
+        'load-balancers' => 'server-load-balancers',
+        'worker-pool' => 'server-worker-pool',
+        'redis-snapshots' => 'server-snapshots',
     ],
 
     'site_section_slugs' => [
@@ -102,5 +107,9 @@ return [
         'sites.repository' => 'vm-site-repository',
         'sites.pipeline' => 'vm-site-deploy',
         'sites.routing' => 'vm-site-routing',
+        'sites.errors' => 'vm-site-errors',
+        'sites.resources' => 'vm-site-resources',
+        'sites.files' => 'vm-site-files',
+        'sites.source' => 'vm-site-repository',
     ],
 ];

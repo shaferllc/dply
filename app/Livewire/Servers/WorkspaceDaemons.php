@@ -137,6 +137,13 @@ class WorkspaceDaemons extends Component
                 'action-cable',
             ], true)) {
             $this->applySupervisorPreset($preset);
+
+            // Deep-linked "Add worker" entry points (e.g. the pipeline review
+            // "queue restart without program" fix) pass ?open=worker so the
+            // pre-filled create-worker modal pops on arrival.
+            if (request()->query('open') === 'worker') {
+                $this->dispatch('open-modal', $this->supervisorProgramModalName());
+            }
         }
 
         $tab = request()->query('tab');

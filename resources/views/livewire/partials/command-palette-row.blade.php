@@ -46,6 +46,19 @@
 </span>
 @if ($isNest)
     <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-mist" />
+@elseif (! empty($isAction))
+    {{-- Action rows: a bolt affordance normally; when armed for confirmation
+         (Alpine `confirming === i`) it flips to a "press ↵ again" hint. --}}
+    <span
+        x-show="confirming === {{ $i }}"
+        x-cloak
+        class="shrink-0 rounded bg-brand-forest/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest"
+    >{{ __('↵ again') }}</span>
+    <x-heroicon-o-bolt
+        x-show="confirming !== {{ $i }}"
+        class="h-3.5 w-3.5 shrink-0 text-brand-mist transition-opacity"
+        x-bind:class="active === {{ $i }} ? 'opacity-100' : 'opacity-40'"
+    />
 @else
     {{-- Leaf "open" arrow: always present so every row carries a trailing
          affordance, brightened on the active row. --}}

@@ -82,6 +82,10 @@
                         ['id' => 'connection', 'label' => __('Connection'), 'icon' => 'heroicon-o-link'],
                         ['id' => 'danger',     'label' => __('Danger'),     'icon' => 'heroicon-o-exclamation-triangle', 'variant' => 'danger'],
                     ];
+                    // First-deploy setup wizard surfaces as a tab while it owns the site.
+                    if ($showSetupTab ?? false) {
+                        array_unshift($tabs, ['id' => 'setup', 'label' => __('Set up'), 'icon' => 'heroicon-o-wrench-screwdriver']);
+                    }
                 @endphp
 
                 @unless ($isLocked)
@@ -115,6 +119,7 @@
                     </div>
 
                     <div wire:loading.class="opacity-40 pointer-events-none" wire:target="selectTab">
+                        @includeWhen($activeTab === 'setup',      'livewire.sites.repository.partials.setup')
                         @includeWhen($activeTab === 'overview',   'livewire.sites.repository.partials.overview')
                         @includeWhen($activeTab === 'commits',    'livewire.sites.repository.partials.commits')
                         @includeWhen($activeTab === 'files',      'livewire.sites.repository.partials.files')

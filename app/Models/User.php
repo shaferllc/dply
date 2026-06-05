@@ -99,6 +99,11 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
         return $this->hasMany(Server::class, 'user_id');
     }
 
+    public function recentResources(): HasMany
+    {
+        return $this->hasMany(RecentResource::class);
+    }
+
     public function sshKeys(): HasMany
     {
         return $this->hasMany(UserSshKey::class);

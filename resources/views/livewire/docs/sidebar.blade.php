@@ -2,41 +2,55 @@
     wire:ignore.self
     class="flex h-full flex-col bg-brand-cream text-brand-ink dark:bg-zinc-950 dark:text-brand-cream"
 >
-    <div class="flex min-w-0 items-start justify-between gap-3 border-b border-brand-ink/10 px-4 py-3 dark:border-brand-mist/20">
-        <div class="min-w-0 flex-1">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Documentation') }}</p>
-            @if (count($breadcrumbs) > 1)
-                <nav aria-label="{{ __('Documentation breadcrumb') }}" class="docs-sidebar-breadcrumb mt-1.5 flex min-w-0 items-center gap-1 overflow-x-auto text-[11px] leading-snug text-brand-moss [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    @foreach ($breadcrumbs as $index => $crumb)
-                        @if ($index > 0)
-                            <x-heroicon-m-chevron-right class="h-3 w-3 shrink-0 text-brand-mist/80" aria-hidden="true" />
-                        @endif
-                        @if ($index === count($breadcrumbs) - 1)
-                            <span class="min-w-0 truncate font-medium text-brand-ink dark:text-brand-cream">{{ $crumb['label'] }}</span>
-                        @elseif (($crumb['slug'] ?? null) === 'docs-index')
-                            <button
-                                type="button"
-                                wire:click="showIndex"
-                                class="rounded-md px-0.5 font-medium text-brand-forest transition-colors hover:text-brand-sage hover:underline dark:text-brand-sage"
-                            >
-                                {{ $crumb['label'] }}
-                            </button>
-                        @elseif (is_string($crumb['slug'] ?? null) && $crumb['slug'] !== '')
-                            <button
-                                type="button"
-                                wire:click="loadGuide('{{ $crumb['slug'] }}')"
-                                class="rounded-md px-0.5 font-medium text-brand-forest transition-colors hover:text-brand-sage hover:underline dark:text-brand-sage"
-                            >
-                                {{ $crumb['label'] }}
-                            </button>
-                        @else
-                            <span>{{ $crumb['label'] }}</span>
-                        @endif
-                    @endforeach
-                </nav>
-            @else
-                <h2 class="mt-1 truncate text-base font-semibold text-brand-ink dark:text-brand-cream">{{ $title }}</h2>
-            @endif
+    <div class="flex min-w-0 items-center justify-between gap-3 border-b border-brand-ink/10 bg-gradient-to-b from-brand-sand/40 to-transparent px-4 py-3 dark:border-brand-mist/20 dark:from-zinc-900/60">
+        <div class="flex min-w-0 flex-1 items-center gap-3">
+            {{-- Brand chip: gives the panel a clear "docs" identity and lets the
+                 breadcrumb (which already begins with "Documentation") be the
+                 primary line instead of a redundant eyebrow. --}}
+            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/20 text-brand-forest ring-1 ring-brand-sage/30 dark:bg-brand-sage/10 dark:text-brand-sage">
+                <x-heroicon-o-book-open class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0 flex-1">
+                @if (count($breadcrumbs) > 1)
+                    @php
+                        $current = $breadcrumbs[count($breadcrumbs) - 1];
+                        $ancestors = array_slice($breadcrumbs, 0, -1);
+                    @endphp
+                    {{-- Ancestors stay on one muted line and truncate; the current
+                         page reads as the title below. Avoids the breadcrumb
+                         wrapping vertically in a narrow panel. --}}
+                    <nav aria-label="{{ __('Documentation breadcrumb') }}" class="flex min-w-0 items-center gap-1 text-[11px] leading-none text-brand-moss">
+                        @foreach ($ancestors as $index => $crumb)
+                            @if ($index > 0)
+                                <x-heroicon-m-chevron-right class="h-3 w-3 shrink-0 text-brand-mist/70" aria-hidden="true" />
+                            @endif
+                            @if (($crumb['slug'] ?? null) === 'docs-index')
+                                <button
+                                    type="button"
+                                    wire:click="showIndex"
+                                    class="shrink-0 font-medium text-brand-forest transition-colors hover:text-brand-sage hover:underline dark:text-brand-sage"
+                                >
+                                    {{ $crumb['label'] }}
+                                </button>
+                            @elseif (is_string($crumb['slug'] ?? null) && $crumb['slug'] !== '')
+                                <button
+                                    type="button"
+                                    wire:click="loadGuide('{{ $crumb['slug'] }}')"
+                                    class="min-w-0 truncate font-medium text-brand-forest transition-colors hover:text-brand-sage hover:underline dark:text-brand-sage"
+                                >
+                                    {{ $crumb['label'] }}
+                                </button>
+                            @else
+                                <span class="min-w-0 truncate">{{ $crumb['label'] }}</span>
+                            @endif
+                        @endforeach
+                    </nav>
+                    <h2 class="mt-1 truncate text-base font-semibold leading-tight text-brand-ink dark:text-brand-cream">{{ $current['label'] }}</h2>
+                @else
+                    <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('Documentation') }}</p>
+                    <h2 class="truncate text-base font-semibold leading-tight text-brand-ink dark:text-brand-cream">{{ $title }}</h2>
+                @endif
+            </div>
         </div>
         <div class="flex shrink-0 items-center gap-1">
             @if ($fullPageUrl)
@@ -44,16 +58,18 @@
                     href="{{ $fullPageUrl }}"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class="rounded-lg px-2 py-1 text-xs font-medium text-brand-forest hover:bg-brand-sand/50 dark:text-brand-sage dark:hover:bg-zinc-800"
+                    title="{{ __('Open full page') }}"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white/80 px-2.5 py-1 text-xs font-medium text-brand-forest shadow-sm transition-colors hover:bg-white hover:text-brand-ink dark:border-brand-mist/20 dark:bg-zinc-900/80 dark:text-brand-sage dark:hover:bg-zinc-800"
                 >
-                    {{ __('Open full page') }}
+                    <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <span class="hidden sm:inline">{{ __('Open full page') }}</span>
                 </a>
             @endif
             <button
                 type="button"
                 wire:click="close"
                 x-on:click="window.dispatchEvent(new CustomEvent('dply-docs-close'))"
-                class="rounded-lg p-1.5 text-brand-mist hover:bg-brand-sand/50 hover:text-brand-ink dark:hover:bg-zinc-800 dark:hover:text-brand-cream"
+                class="rounded-lg p-1.5 text-brand-mist transition-colors hover:bg-brand-sand/60 hover:text-brand-ink dark:hover:bg-zinc-800 dark:hover:text-brand-cream"
                 aria-label="{{ __('Close documentation') }}"
             >
                 <x-heroicon-o-x-mark class="h-4 w-4" aria-hidden="true" />

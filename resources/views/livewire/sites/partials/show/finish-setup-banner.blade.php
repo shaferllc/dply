@@ -28,7 +28,7 @@
                 </p>
             </div>
         </div>
-        <a href="{{ route('sites.setup', [$server, $site]) }}" wire:navigate
+        <a href="{{ route('sites.repository', [$server, $site, 'repo_tab' => 'setup']) }}" wire:navigate
             class="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-brand-forest px-4 py-2.5 text-sm font-semibold text-brand-cream transition-colors hover:bg-brand-forest/90">
             <x-heroicon-o-arrow-right class="h-4 w-4" />
             {{ __('Resume setup') }}

@@ -47,7 +47,7 @@
                     <x-input-label for="new_sv_site_id" value="{{ __('Related site (optional)') }}" />
                     <select
                         id="new_sv_site_id"
-                        wire:model="new_sv_site_id"
+                        wire:model.live="new_sv_site_id"
                         class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
                     >
                         <option value="">{{ __('None') }}</option>
