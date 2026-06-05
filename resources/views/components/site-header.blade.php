@@ -28,10 +28,9 @@
     $homeActive = $active === 'home' || (request()->is('/') && ! request()->routeIs('dashboard'));
     $hi = 'h-5 w-5 shrink-0';
     $hiGuest = 'h-4 w-4 shrink-0 opacity-90';
-    $browseActive = request()->routeIs('infrastructure.*', 'servers.*', 'cloud.*', 'serverless.*', 'edge.*', 'realtime.*', 'sites.*', 'projects.*', 'organizations.*', 'fleet.*');
+    $browseActive = request()->routeIs('infrastructure.*', 'servers.*', 'cloud.*', 'serverless.*', 'edge.*', 'realtime.*', 'sites.*', 'projects.*', 'organizations.*', 'fleet.*', 'backups.*');
     $moreMenuActive = request()->routeIs('status-pages.*')
         || request()->routeIs('marketplace.index')
-        || request()->routeIs('backups.*')
         || request()->routeIs('scripts.*')
         || $featuresActive
         || $changelogActive
@@ -297,6 +296,12 @@
                                         </x-slot>
                                         {{ __('Deploy sync') }}
                                     </x-dropdown-link>
+                                    <x-coming-soon-dropdown-link :href="route('backups.databases')">
+                                        <x-slot name="icon">
+                                            <x-heroicon-o-archive-box class="{{ $hi }}" />
+                                        </x-slot>
+                                        {{ __('Backups') }}
+                                    </x-coming-soon-dropdown-link>
                                     <div class="mx-3 my-2 flex items-center gap-2" role="presentation">
                                         <div class="h-px flex-1 bg-brand-ink/10"></div>
                                         <span class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Org') }}</span>
@@ -440,12 +445,6 @@
                                         {{ __('Marketplace') }}
                                     </x-dropdown-link>
                                 @endfeature
-                                <x-dropdown-link :href="route('backups.databases')">
-                                    <x-slot name="icon">
-                                        <x-heroicon-o-archive-box class="{{ $hi }}" />
-                                    </x-slot>
-                                    {{ __('Backups') }}
-                                </x-dropdown-link>
                                 @feature('surface.scripts')
                                     <x-dropdown-link :href="route('scripts.index')">
                                         <x-slot name="icon">
@@ -627,6 +626,12 @@
                         {{ __('Projects') }}
                     </x-responsive-nav-link>
                 @endfeature
+                <x-coming-soon-responsive-nav-link :href="route('backups.databases')">
+                    <x-slot name="icon">
+                        <x-heroicon-o-archive-box class="{{ $hi }}" />
+                    </x-slot>
+                    {{ __('Backups') }}
+                </x-coming-soon-responsive-nav-link>
                 <p class="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-brand-mist">{{ __('Org') }}</p>
                 <x-responsive-nav-link :href="route('organizations.index')" :active="request()->routeIs('organizations.*')">
                     <x-slot name="icon">
@@ -658,12 +663,6 @@
                         {{ __('Marketplace') }}
                     </x-responsive-nav-link>
                 @endfeature
-                <x-responsive-nav-link :href="route('backups.databases')" :active="request()->routeIs('backups.*')">
-                    <x-slot name="icon">
-                        <x-heroicon-o-archive-box class="{{ $hi }}" />
-                    </x-slot>
-                    {{ __('Backups') }}
-                </x-responsive-nav-link>
                 @feature('surface.scripts')
                     <x-responsive-nav-link :href="route('scripts.index')" :active="request()->routeIs('scripts.*')">
                         <x-slot name="icon">

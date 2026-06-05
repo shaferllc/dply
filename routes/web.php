@@ -513,8 +513,8 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('organizations/{organization}/credentials', CredentialsIndex::class)->name('organizations.credentials');
     Route::livewire('organizations/{organization}/webserver-templates', SettingsWebserverTemplates::class)->name('organizations.webserver-templates');
 
-    Route::redirect('/backups', '/backups/databases')->name('backups.index');
-    Route::livewire('/backups/databases', BackupsDatabases::class)->name('backups.databases');
+    Route::livewire('/backups', BackupsDatabases::class)->name('backups.databases');
+    Route::redirect('/backups/databases', '/backups', 301);
     Route::livewire('/backups/files', BackupsFiles::class)->name('backups.files');
 
     Route::middleware('feature:surface.scripts')->group(function (): void {

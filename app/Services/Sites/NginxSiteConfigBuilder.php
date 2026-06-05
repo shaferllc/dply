@@ -498,6 +498,10 @@ NGINX;
         $port = $site->reverbLocalPort();
         $loc = $site->reverbWebSocketPath();
 
+        // Two locations: the websocket path (client wss handshake) and the
+        // Pusher HTTP API base `/apps/` so the server-side broadcaster can
+        // publish events to Reverb through the same vhost (REVERB_HOST points
+        // here). Both proxy to the local Reverb server.
         return <<<NGINX
     location ^~ {$loc} {
         proxy_http_version 1.1;
@@ -506,6 +510,14 @@ NGINX;
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header Connection "upgrade";
+        proxy_pass http://127.0.0.1:{$port};
+    }
+
+    location ^~ /apps/ {
+        proxy_http_version 1.1;
+        proxy_set_header Host \$http_host;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_pass http://127.0.0.1:{$port};
     }
 
