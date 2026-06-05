@@ -167,7 +167,6 @@ class Operations extends Component
             'recentFailedJobs' => AdminPlatformMetrics::recentFailedJobs(),
             'failedJobsCount' => DB::table('failed_jobs')->count(),
             'logTail' => AdminPlatformMetrics::readLogTail(storage_path('logs/laravel.log')),
-            'reverbHealthUrl' => reverb_health_check_url(),
             'horizonUrl' => route('horizon.index'),
             'pulseUrl' => route('pulse'),
         ]);

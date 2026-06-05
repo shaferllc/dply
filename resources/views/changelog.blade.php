@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 5, 2026',
+                    'tags'    => ['improved'],
+                    'title'   => 'Drop Reverb Health Check Link',
+                    'summary' => 'Removed the unused Reverb health check link from the admin Operations dashboard.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 5, 2026',
                     'tags'    => ['new'],
                     'title'   => 'Backups Dashboard And Controls',
                     'summary' => 'The Backups page now shows backup health metrics, schedules you can pause or run on demand, recent runs, and storage destinations when the feature is enabled.',
