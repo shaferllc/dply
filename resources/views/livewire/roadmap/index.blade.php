@@ -20,7 +20,7 @@
             </div>
 
             @if ($recentlyShipped->isNotEmpty())
-                <section class="mt-10 rounded-2xl border border-brand-sage/20 bg-brand-sage/10 p-6 sm:p-8">
+                <section class="mt-10 rounded-2xl border border-brand-ink/10 bg-white/85 p-6 shadow-sm sm:p-8">
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div>
                             <p class="text-sm font-semibold uppercase tracking-[0.18em] text-brand-forest">{{ __('Recently shipped') }}</p>
@@ -50,7 +50,7 @@
             @endif
 
             @if ($activeRelease)
-                <section class="mt-10 rounded-2xl border border-brand-ink/10 bg-white/90 p-6 shadow-sm">
+                <section class="mt-10 rounded-2xl border border-brand-ink/10 bg-white/85 p-6 shadow-sm">
                     <p class="text-sm font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ $activeRelease->trainLabel() }}</p>
                     <h2 class="mt-2 text-2xl font-semibold text-brand-ink">{{ $activeRelease->displayTitle() }}</h2>
                     @if ($activeRelease->summary)
@@ -137,7 +137,7 @@
                 <div class="mt-10 grid gap-6 lg:grid-cols-3">
                     @foreach ($statusLabels as $statusKey => $statusLabel)
                         @php $columnItems = $itemsByStatus[$statusKey] ?? collect(); @endphp
-                        <section wire:key="roadmap-column-{{ $statusKey }}" class="flex flex-col rounded-2xl border border-brand-ink/10 bg-white/80 shadow-sm">
+                        <section wire:key="roadmap-column-{{ $statusKey }}" class="flex flex-col rounded-2xl border border-brand-ink/10 bg-white/85 shadow-sm">
                             <header class="border-b border-brand-ink/10 px-4 py-3">
                                 <div class="flex items-center justify-between gap-2">
                                     <h2 class="text-sm font-semibold uppercase tracking-[0.14em] text-brand-ink">{{ __($statusLabel) }}</h2>

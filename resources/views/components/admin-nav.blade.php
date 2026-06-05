@@ -15,6 +15,7 @@
     $productLineActive = request()->routeIs('admin.flags.*') && ! $globalFlagsActive;
     $organizationsActive = request()->routeIs('admin.organizations.*');
     $betaInvitesActive = request()->routeIs('admin.beta-invites');
+    $comingSoonAccessActive = request()->routeIs('admin.coming-soon-access');
 
     $productLines = \App\Support\Admin\AdminFeatureFlags::productLineSlugs();
     $vmLines = ['vm-servers', 'vm-sites'];
@@ -89,5 +90,9 @@
     <a href="{{ route('admin.beta-invites') }}" wire:navigate @class([$navBase, $betaInvitesActive ? $navOn : $navOff])>
         <x-heroicon-o-sparkles class="{{ $navIcon }}" />
         {{ __('Beta invites') }}
+    </a>
+    <a href="{{ route('admin.coming-soon-access') }}" wire:navigate @class([$navBase, $comingSoonAccessActive ? $navOn : $navOff])>
+        <x-heroicon-o-lock-closed class="{{ $navIcon }}" />
+        {{ __('Coming-soon access') }}
     </a>
 </nav>
