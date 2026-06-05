@@ -896,7 +896,9 @@ class WorkspaceDaemons extends Component
     public function render(): View
     {
         $this->server->refresh();
-        $this->server->load(['supervisorPrograms']);
+        // Eager-load each program's site so effectiveDirectory() (which resolves
+        // the working dir from the site for site-scoped programs) doesn't N+1.
+        $this->server->load(['supervisorPrograms.site']);
 
         $orgId = $this->server->organization_id;
 

@@ -68,7 +68,7 @@ class SupervisorProvisioner
         }
 
         $dir = rtrim(config('sites.supervisor_conf_d'), '/');
-        $programs = $server->supervisorPrograms()->where('is_active', true)->get();
+        $programs = $server->supervisorPrograms()->with('site')->where('is_active', true)->get();
         $rereadUpdate = $this->supervisorRereadUpdateExecLine($server);
 
         return app(ServerSshConnectionRunner::class)->run(
@@ -87,8 +87,7 @@ class SupervisorProvisioner
                     /** @var SupervisorProgram $program */
                     $ini = $this->buildIni($program);
                     $path = $dir.'/dply-sv-'.$program->id.'.conf';
-                    $ssh->putFile($path, $ini);
-                    $log .= "Wrote {$path}\n";
+                    $log .= $this->writeConfFile($ssh, $server, $path, $ini);
                 }
 
                 $log .= $ssh->exec($rereadUpdate, 180);
@@ -288,8 +287,7 @@ class SupervisorProvisioner
                 // there directly (root-owned /etc/supervisor/conf.d), surface it
                 // rather than letting reread silently not see the file.
                 try {
-                    $ssh->putFile($path, $ini);
-                    $writeLog = "Wrote {$path}\n";
+                    $writeLog = $this->writeConfFile($ssh, $server, $path, $ini);
                 } catch (\Throwable $e) {
                     $writeLog = "Failed to write {$path}: ".$e->getMessage()."\n";
                 }
@@ -612,6 +610,43 @@ class SupervisorProvisioner
     }
 
     /**
+     * Write a Supervisor program conf into the (root-owned) include dir reliably.
+     *
+     * SFTP putFile runs AS THE SSH USER, so when dply connects as a non-root
+     * deploy user it cannot write /etc/supervisor/conf.d directly — the file
+     * silently never lands and supervisorctl then reports "no such process"
+     * (the program looks like it "didn't install"). For non-root users we stage
+     * the file in a writable temp path and move it into place with
+     * `sudo -n install` (a harmless no-op elevation for root SSH users, which
+     * keep using a direct putFile). Returns a log line; on a sudo/install
+     * failure the line is marked so the caller surfaces it instead of pretending
+     * the write succeeded.
+     */
+    protected function writeConfFile($ssh, Server $server, string $path, string $contents): string
+    {
+        $user = trim((string) $server->ssh_user);
+        if ($user === '' || $user === 'root') {
+            $ssh->putFile($path, $contents);
+
+            return "Wrote {$path}\n";
+        }
+
+        $tmp = '/tmp/'.basename($path);
+        $ssh->putFile($tmp, $contents);
+        $out = trim((string) $ssh->exec(
+            'sudo -n install -o root -g root -m 0644 '.escapeshellarg($tmp).' '.escapeshellarg($path).' 2>&1; '
+            .'printf "DPLY_CONF_EXIT:%s" "$?"; rm -f '.escapeshellarg($tmp),
+            60
+        ));
+
+        if (! str_contains($out, 'DPLY_CONF_EXIT:0')) {
+            return "Failed to install {$path} as root (sudo): ".$out."\n";
+        }
+
+        return "Wrote {$path}\n";
+    }
+
+    /**
      * Shell line for: supervisorctl reread; supervisorctl update (with sudo when SSH user is not root).
      * Deploy users often cannot access supervisord's socket without sudo — matches {@see privilegedBash}.
      */
@@ -897,7 +932,10 @@ class SupervisorProvisioner
     {
         $name = 'dply-sv-'.$program->id;
         $cmd = $program->command;
-        $cwd = $program->directory;
+        // Resolve the working dir from the site for site-scoped programs so an
+        // imported/stale stored path (e.g. a Forge "apps/<x>/current" that does
+        // not exist on a dply box) can't make supervisord FATAL on a bad chdir.
+        $cwd = $program->effectiveDirectory();
         $user = $program->user ?: 'www-data';
         $num = max(1, (int) $program->numprocs);
         $logPath = $program->stdout_logfile !== null && $program->stdout_logfile !== ''

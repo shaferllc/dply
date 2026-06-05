@@ -199,12 +199,17 @@ class WorkspaceCron extends Component
     {
         $this->authorize('update', $this->server);
 
-        $def = $this->artisanCommandPresets()[$key] ?? null;
-        if ($def === null) {
-            return;
-        }
+        // Presets are grouped ($group => [['key'=>…, 'command'=>…], …]), so find
+        // the entry by its key across every group.
+        foreach ($this->artisanCommandPresets() as $items) {
+            foreach ($items as $item) {
+                if (($item['key'] ?? null) === $key) {
+                    $this->new_cron_command = $item['command'];
 
-        $this->new_cron_command = $def['command'];
+                    return;
+                }
+            }
+        }
     }
 
     /**

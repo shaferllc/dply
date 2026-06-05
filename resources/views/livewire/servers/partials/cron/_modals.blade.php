@@ -15,19 +15,8 @@
     <div class="p-6 sm:p-8">
         <form id="cron-job-form" wire:submit="saveCronJob" class="space-y-6">
             <div>
-                <x-input-label for="new_cron_command" value="{{ __('Command') }}" />
-                <x-text-input
-                    id="new_cron_command"
-                    wire:model="new_cron_command"
-                    class="mt-1 block w-full font-mono text-sm"
-                    placeholder="{{ __('e.g. php /home/deploy/app/artisan schedule:run') }}"
-                />
-                <p class="mt-1.5 text-xs text-brand-moss">
-                    {{ __('Use an explicit PHP binary if needed (for example') }}
-                    <span class="font-mono text-brand-ink/80">php8.2</span>).
-                </p>
                 @if (! empty($artisanCommandPresets))
-                    <div class="mt-3">
+                    <div class="mb-3">
                         <label for="cron_common_command" class="block text-xs font-medium text-brand-moss">
                             {{ __('Common commands') }}
                         </label>
@@ -47,10 +36,21 @@
                             @endforeach
                         </select>
                         <p class="mt-1 text-xs text-brand-moss">
-                            {{ __('Fills the Command field above. Laravel paths resolve to the selected site when one is attached; otherwise edit the template before saving.') }}
+                            {{ __('Fills the Command field below. Laravel paths resolve to the selected site when one is attached; otherwise edit the template before saving.') }}
                         </p>
                     </div>
                 @endif
+                <x-input-label for="new_cron_command" value="{{ __('Command') }}" />
+                <x-text-input
+                    id="new_cron_command"
+                    wire:model="new_cron_command"
+                    class="mt-1 block w-full font-mono text-sm"
+                    placeholder="{{ __('e.g. php /home/deploy/app/artisan schedule:run') }}"
+                />
+                <p class="mt-1.5 text-xs text-brand-moss">
+                    {{ __('Use an explicit PHP binary if needed (for example') }}
+                    <span class="font-mono text-brand-ink/80">php8.2</span>).
+                </p>
                 @if ($schedulerSiteIsLaravel)
                     <button
                         type="button"
