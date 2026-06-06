@@ -249,7 +249,14 @@ fi
 
 p "Fetching origin/$BRANCH ..."
 if [ ! -d "$REPO/HEAD" ] && [ ! -d "$REPO/.git" ]; then
-  git clone --bare "$ORIGIN_URL" "$REPO"
+  # Prefer the URL the server already authenticates with (e.g. an HTTPS remote
+  # on the flat checkout) over the laptop's remote, which may be an SSH URL the
+  # server has no key for.
+  SRC_URL="$ORIGIN_URL"
+  if git -C "$ROOT" remote get-url origin >/dev/null 2>&1; then
+    SRC_URL="$(git -C "$ROOT" remote get-url origin)"
+  fi
+  git clone --bare "$SRC_URL" "$REPO"
   git --git-dir="$REPO" config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
 fi
 git --git-dir="$REPO" fetch origin "$BRANCH" --prune

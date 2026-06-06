@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Fixed
+- Deployments now clone the bare repository using the server's own authenticated remote URL, avoiding failures when the local remote uses an SSH URL the server can't access.
 ### Changed
 - Deploys now build immutable releases and flip an atomic current symlink across web and worker hosts, preventing long-running workers from serving stale code and breaking queued-job deserialization.
 ### Fixed
