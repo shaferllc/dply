@@ -175,17 +175,41 @@ final class SiteGitCommitsFetcher
             ];
         }
 
-        $response = Http::withHeaders([
+        $call = fn (string $ref) => Http::withHeaders([
             'User-Agent' => 'Dply (git-commits)',
             'Accept' => 'application/vnd.github+json',
         ])
             ->withToken($identity->accessToken())
             ->acceptJson()
             ->get($identity->apiBaseUrl().'/repos/'.$remote['owner'].'/'.$remote['repo'].'/commits', [
-                'sha' => $branch,
+                'sha' => $ref,
                 'per_page' => $limit,
                 'page' => $page,
             ]);
+
+        $effectiveBranch = $branch;
+        $notice = null;
+        $response = $call($branch);
+
+        // A 404 on list-commits almost always means the configured branch doesn't
+        // exist (e.g. the repo's default is "master" but we stored "main"). Don't
+        // hard-fail: fall back to the repo's real default branch, show its commits,
+        // and tell the operator the branch was missing so they can pick another via
+        // the ref picker.
+        if (! $response->successful() && $response->status() === 404) {
+            $default = $this->githubDefaultBranch($identity, $remote);
+            if ($default !== null && strcasecmp($default, $branch) !== 0) {
+                $retry = $call($default);
+                if ($retry->successful()) {
+                    $response = $retry;
+                    $effectiveBranch = $default;
+                    $notice = __('Branch ":requested" wasn\'t found in this repository — showing the default branch ":actual" instead. Use "Change…" to pick another branch, tag, or commit.', [
+                        'requested' => $branch,
+                        'actual' => $default,
+                    ]);
+                }
+            }
+        }
 
         if (! $response->successful()) {
             return [
@@ -193,7 +217,7 @@ final class SiteGitCommitsFetcher
                 'commits' => [],
                 'error' => $this->formatApiError($response->status(), $response->body()),
                 'provider' => 'github',
-                'branch' => $branch,
+                'branch' => $effectiveBranch,
                 'remote_label' => $remote['label'],
                 'account' => $this->accountInfo($identity),
             ];
@@ -241,13 +265,43 @@ final class SiteGitCommitsFetcher
             'ok' => true,
             'commits' => $commits,
             'error' => null,
+            'notice' => $notice,
             'provider' => 'github',
-            'branch' => $branch,
+            'branch' => $effectiveBranch,
+            'requested_branch' => $branch,
             'remote_label' => $remote['label'],
             'page' => $page,
             'has_more' => count($commits) >= $limit,
             'account' => $this->accountInfo($identity),
         ];
+    }
+
+    /**
+     * The repo's default branch (e.g. "master") via GET /repos/{owner}/{repo}.
+     * Used to recover from a list-commits 404 when the configured branch is
+     * stale/missing. Returns null when the repo can't be read.
+     */
+    private function githubDefaultBranch(GitIdentity $identity, array $remote): ?string
+    {
+        try {
+            $r = Http::withHeaders([
+                'User-Agent' => 'Dply (git-commits)',
+                'Accept' => 'application/vnd.github+json',
+            ])
+                ->withToken($identity->accessToken())
+                ->acceptJson()
+                ->get($identity->apiBaseUrl().'/repos/'.$remote['owner'].'/'.$remote['repo']);
+
+            if ($r->successful()) {
+                $default = $r->json('default_branch');
+
+                return is_string($default) && $default !== '' ? $default : null;
+            }
+        } catch (\Throwable) {
+            // fall through — caller keeps the original 404
+        }
+
+        return null;
     }
 
     private function fetchGitlab(array $remote, Site $site, User $user, string $branch, int $limit, int $page = 1): array

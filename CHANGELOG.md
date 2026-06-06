@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Fixed
+- Repository commit views now fall back to the repository's default branch with a notice when the configured branch no longer exists, instead of showing an error.
 ### Added
 - The repository commits view now shows a retry button when commits fail to load and displays which linked account answered the read, with a quick link to change it.
 ### Added

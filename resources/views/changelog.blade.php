@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 5, 2026',
+                    'tags'    => ['fixed'],
+                    'title'   => 'Repo Commits Branch Fallback',
+                    'summary' => 'Repository commit views now fall back to the repository\'s default branch with a notice when the configured branch no longer exists, instead of showing an error.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 5, 2026',
                     'tags'    => ['new'],
                     'title'   => 'Repository Commit Retry And Account',
                     'summary' => 'The repository commits view now shows a retry button when commits fail to load and displays which linked account answered the read, with a quick link to change it.',
