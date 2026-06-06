@@ -740,3 +740,12 @@
         </div>
     @endauth
 </header>
+
+@auth
+    {{-- Global command palette (⌘K). Mounted alongside the header so it's
+         available on EVERY page that renders the header — including the guest
+         marketing pages (changelog, features, pricing, welcome) when viewed
+         while signed in. Rendered as a sibling of <header> (not nested) so the
+         full-screen overlay isn't trapped in the header's stacking context. --}}
+    <livewire:command-palette :key="'global-command-palette'" />
+@endauth

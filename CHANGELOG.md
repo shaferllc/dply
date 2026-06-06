@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 ### Changed
+- The repository picker now supports arrow-key navigation and Enter-to-select, and the ⌘K command palette is available on marketing pages while signed in.
+### Changed
 - The Git repository picker now behaves consistently across the choose-app, custom-site create, and repository connection flows.
 ### Added
 - Repository commit views now show a dismissible notice when a missing configured branch falls back to the repo's default branch.

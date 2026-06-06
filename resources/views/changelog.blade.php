@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 5, 2026',
                     'tags'    => ['improved'],
+                    'title'   => 'Keyboard-Navigable Repository Picker',
+                    'summary' => 'The repository picker now supports arrow-key navigation and Enter-to-select, and the ⌘K command palette is available on marketing pages while signed in.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 5, 2026',
+                    'tags'    => ['improved'],
                     'title'   => 'Unified Git Repository Picker',
                     'summary' => 'The Git repository picker now behaves consistently across the choose-app, custom-site create, and repository connection flows.',
                     'items'   => [],

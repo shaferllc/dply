@@ -99,9 +99,10 @@
         </div>
 
         @auth
-            {{-- Global command palette (Cmd/Ctrl+K). Mounted once here so the
-                 shortcut and search work on every authenticated page. --}}
-            <livewire:command-palette :key="'global-command-palette'" />
+            {{-- The global command palette (⌘K) is now mounted inside
+                 <x-site-header> (rendered above) so the shortcut + search also
+                 work on guest marketing pages (changelog / features / pricing)
+                 when signed in — not just inside this app layout. --}}
 
             {{-- Shared Git provider connect modal (OAuth + PAT). Mounted here — not
                  inside page Livewire components — so teleported modal actions stay
