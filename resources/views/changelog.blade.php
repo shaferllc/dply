@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 5, 2026',
+                    'tags'    => ['new'],
+                    'title'   => 'Default Branch Fallback Notice',
+                    'summary' => 'Repository commit views now show a dismissible notice when a missing configured branch falls back to the repo\'s default branch.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 5, 2026',
                     'tags'    => ['fixed'],
                     'title'   => 'Repo Commits Branch Fallback',
                     'summary' => 'Repository commit views now fall back to the repository\'s default branch with a notice when the configured branch no longer exists, instead of showing an error.',

@@ -1,6 +1,9 @@
 <section class="space-y-6">
-    <div class="dply-card overflow-hidden">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+    {{-- No overflow-hidden here: the Deploy-ref picker is an absolutely-positioned
+         dropdown that must escape the card bounds. Header/footer round their own
+         corners instead so the card still looks clipped. --}}
+    <div class="dply-card">
+        <div class="flex items-start gap-3 rounded-t-2xl border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
                 <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
             </span>
@@ -74,7 +77,7 @@
             </div>
         </form>
 
-        <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
+        <div class="flex justify-end rounded-b-2xl border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
             <button
                 type="button"
                 wire:click="saveConnection"

@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Repository commit views now show a dismissible notice when a missing configured branch falls back to the repo's default branch.
 ### Fixed
 - Repository commit views now fall back to the repository's default branch with a notice when the configured branch no longer exists, instead of showing an error.
 ### Added

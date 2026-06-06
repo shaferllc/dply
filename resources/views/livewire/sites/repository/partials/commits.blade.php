@@ -27,6 +27,14 @@
             </div>
 
             <div class="px-2 py-2 sm:px-3">
+                @if (! empty($commitsResult['notice']))
+                    {{-- Configured branch was missing → fell back to the repo's
+                         default branch. Non-fatal; they can pick another via "Change…". --}}
+                    <div class="m-4 mb-2 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                        <x-heroicon-o-information-circle class="mt-0.5 h-4 w-4 shrink-0 text-amber-500" aria-hidden="true" />
+                        <span class="min-w-0">{{ $commitsResult['notice'] }}</span>
+                    </div>
+                @endif
                 @if (! ($commitsResult['ok'] ?? false))
                     <div class="m-4 flex flex-col gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                         <span class="min-w-0">{{ $commitsResult['error'] ?? __('Could not load commits.') }}</span>

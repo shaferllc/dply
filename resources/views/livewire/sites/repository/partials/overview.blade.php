@@ -50,6 +50,14 @@
         </div>
 
         <div class="px-6 py-6 sm:px-7">
+            @if (! empty($overviewCommits['notice']))
+                {{-- Non-fatal: the configured branch was missing, so we fell back to
+                     the repo's default branch. Tell the operator they can pick another. --}}
+                <div class="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                    <x-heroicon-o-information-circle class="mt-0.5 h-4 w-4 shrink-0 text-amber-500" aria-hidden="true" />
+                    <span class="min-w-0">{{ $overviewCommits['notice'] }}</span>
+                </div>
+            @endif
             @if (! ($overviewCommits['ok'] ?? false))
                 <div class="flex flex-col gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <span class="min-w-0">{{ $overviewCommits['error'] ?? __('Could not load commits.') }}</span>
