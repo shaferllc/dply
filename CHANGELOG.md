@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Changed
+- The site environment settings page has been reorganized internally for faster loading and easier maintenance, with no change to available options.
 ### Added
 - Connecting object storage to a site now offers AWS S3, DigitalOcean Spaces, and Hetzner provider presets with region pickers that auto-derive the endpoint, plus a custom S3 option.
 ### Added
