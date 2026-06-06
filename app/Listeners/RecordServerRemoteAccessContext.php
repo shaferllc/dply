@@ -81,7 +81,14 @@ final class RecordServerRemoteAccessContext
             $payload = $event->job->payload();
             $command = unserialize($payload['data']['command'], ['allowed_classes' => true]);
 
-            return is_object($command) ? $command : null;
+            // A stale release can serialize a command whose class no longer
+            // matches; PHP rebuilds it as __PHP_Incomplete_Class, which throws
+            // on any property access. Treat those as "no instance".
+            if (! is_object($command) || $command instanceof \__PHP_Incomplete_Class) {
+                return null;
+            }
+
+            return $command;
         } catch (\Throwable) {
             return null;
         }

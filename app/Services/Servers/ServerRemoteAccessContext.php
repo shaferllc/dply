@@ -69,7 +69,7 @@ final class ServerRemoteAccessContext
 
     private static function extractUserId(?object $job): ?string
     {
-        if ($job === null) {
+        if ($job === null || $job instanceof \__PHP_Incomplete_Class) {
             return null;
         }
 

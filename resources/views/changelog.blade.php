@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 5, 2026',
                     'tags'    => ['fixed'],
+                    'title'   => 'Stale Job Crash Prevention',
+                    'summary' => 'Server remote-access tracking no longer errors when a stale release leaves a queued job\'s command class unresolved.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 5, 2026',
+                    'tags'    => ['fixed'],
                     'title'   => 'Reliable Supervisor Program Installs',
                     'summary' => 'Supervisor program configs now install correctly under non-root SSH users and resolve their working directory from the attached site, preventing silent install failures and stale imported paths.',
                     'items'   => [],
