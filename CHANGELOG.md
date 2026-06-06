@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 ### Changed
+- The browser-based server console is now shown as a coming-soon preview while the full console feature is gated off.
+### Changed
 - The site CLI settings tab now shows a coming-soon preview of upcoming terminal commands when the feature is not yet available for your server.
 ### Added
 - Site settings now include an in-browser CLI console for running dply commands against your site with quick-run shortcuts for common operations.

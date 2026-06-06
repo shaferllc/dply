@@ -179,9 +179,9 @@ return [
         // exit: ship once multi-node provisioning is end-to-end tested
         'cluster' => env('FEATURE_WORKSPACE_CLUSTER', true),
         // exit: ship once browser-SSH session auditing + RBAC are validated
-        'console' => env('FEATURE_WORKSPACE_CONSOLE', true),
+        'console' => env('FEATURE_WORKSPACE_CONSOLE', false),
         // exit: ship alongside console GA; teaser only when console is off
-        'console_preview' => env('FEATURE_WORKSPACE_CONSOLE_PREVIEW', false),
+        'console_preview' => env('FEATURE_WORKSPACE_CONSOLE_PREVIEW', true),
         // exit: ship once server-scoped CLI reference + install UX are validated
         'cli' => env('FEATURE_WORKSPACE_CLI', true),
         // exit: ship alongside CLI GA; teaser only when CLI is off

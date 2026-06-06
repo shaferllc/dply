@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 6, 2026',
                     'tags'    => ['improved'],
+                    'title'   => 'Console Preview Teaser',
+                    'summary' => 'The browser-based server console is now shown as a coming-soon preview while the full console feature is gated off.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
+                    'tags'    => ['improved'],
                     'title'   => 'Site CLI Coming Soon Preview',
                     'summary' => 'The site CLI settings tab now shows a coming-soon preview of upcoming terminal commands when the feature is not yet available for your server.',
                     'items'   => [],
