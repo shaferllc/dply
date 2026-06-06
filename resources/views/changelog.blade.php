@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 6, 2026',
                     'tags'    => ['new'],
+                    'title'   => 'In-Browser CLI Console',
+                    'summary' => 'Site settings now include an in-browser CLI console for running dply commands against your site with quick-run shortcuts for common operations.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
+                    'tags'    => ['new'],
                     'title'   => 'Site Database Management',
                     'summary' => 'You can now create and link a database directly from a VM site\'s page, manage workers, schedules, and basic auth via a new site resource API.',
                     'items'   => [],

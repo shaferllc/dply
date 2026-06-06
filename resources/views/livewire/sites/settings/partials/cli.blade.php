@@ -1,6 +1,6 @@
 @php
     $installUrl = route('cli.install');
-    $siteFlag = '--site '.$site->id;
+    $siteFlag = '--site '.$site->slug;
 @endphp
 
 <section class="dply-card overflow-hidden">
@@ -47,5 +47,19 @@ dply site status {{ $siteFlag }}</code></pre>
             <span class="mx-2 text-brand-mist/50" aria-hidden="true">·</span>
             {{ __('Slug:') }} <span class="text-brand-ink">{{ $site->slug }}</span>
         </p>
+    </div>
+</section>
+
+{{-- In-browser CLI console --}}
+<section class="dply-card overflow-hidden p-0">
+    <div class="flex items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('In-browser') }}</p>
+            <h2 class="mt-0.5 text-sm font-semibold text-brand-ink">{{ __('CLI console') }}</h2>
+            <p class="mt-0.5 text-xs text-brand-moss">{{ __('Run dply commands against this site without installing the CLI locally. Uses a short-lived session token.') }}</p>
+        </div>
+    </div>
+    <div class="p-4 sm:p-6">
+        @livewire('sites.cli-console', ['site' => $site, 'server' => $server], key('cli-console-'.$site->id))
     </div>
 </section>

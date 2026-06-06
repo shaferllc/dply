@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 ### Added
+- Site settings now include an in-browser CLI console for running dply commands against your site with quick-run shortcuts for common operations.
+### Added
 - You can now create and link a database directly from a VM site's page, manage workers, schedules, and basic auth via a new site resource API.
 ### Fixed
 - Worker deploys now restart dply-managed systemd Horizon and scheduler units on each release swap so daemons no longer run stale code, with legacy supervisor restarts kept as a fallback.

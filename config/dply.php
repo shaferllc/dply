@@ -299,6 +299,10 @@ return [
     */
     'quick_login_enabled' => filter_var(env('DPLY_QUICK_LOGIN_ENABLED', false), FILTER_VALIDATE_BOOL),
 
+    // Path to the dply CLI binary for the in-browser CLI console.
+    // Defaults to a sibling dply-cli repo in dev; set DPLY_CLI_BINARY in prod.
+    'cli_binary' => env('DPLY_CLI_BINARY'),
+
     'local_workspace_prune' => [
         'enabled' => filter_var(env('DPLY_LOCAL_WORKSPACE_PRUNE_ENABLED', true), FILTER_VALIDATE_BOOL),
         // Built artifact zips are byproducts once uploaded to the provider; keep
