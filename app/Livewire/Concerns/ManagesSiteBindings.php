@@ -224,6 +224,7 @@ trait ManagesSiteBindings
             $type === 'database' => ['target_id' => ''],
             $type === 'redis' => ['target_id' => ''],
             $type === 'queue' => ['driver' => 'database'],
+            $type === 'cache' => ['driver' => 'database'],
             $type === 'storage' => ['bucket' => '', 'access_key_id' => '', 'secret_access_key' => '', 'region' => '', 'url' => '', 'endpoint' => ''],
             default => [],
         };

@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 ### Added
+- You can now bind a cache store (database, redis, file, or array) to a site, and freshly provisioned servers ship the phpredis, GD, sodium, GMP, APCu, igbinary, and SQLite PHP extensions out of the box.
+### Added
 - Operators can now temporarily bypass the branded error page to surface real 5xx errors when debugging a failing site.
 ### Added
 - The deploy panel now shows a "scanning the repo" placeholder while a pipeline suggestion scan is running instead of flashing stale suggestions.

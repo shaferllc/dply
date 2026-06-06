@@ -46,6 +46,23 @@
             </x-page-header>
 
             <main class="min-w-0 space-y-6 mt-8">
+            @php $consoleRun = $this->activeConsoleRun(); @endphp
+            @if ($consoleRun !== null)
+                <div
+                    id="deploy-console-action-banner"
+                    x-data="{}"
+                    x-on:dply-console-action-focus.window="$nextTick(() => {
+                        const el = document.getElementById('deploy-console-action-banner');
+                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    })"
+                >
+                    @include('livewire.partials.console-action-banner-static', [
+                        'run' => $consoleRun,
+                        'kindLabels' => (array) config('console_actions.kinds', []),
+                    ])
+                </div>
+            @endif
+
             <x-ops-copilot-callout :site="$site" />
 
             @if ($site->server?->isDigitalOceanFunctionsHost())

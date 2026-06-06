@@ -120,6 +120,7 @@ final class SiteResourceBindingResolver
 
         $bindings[] = $this->redisBinding($env);
         $bindings[] = $this->queueBinding($env);
+        $bindings[] = $this->cacheBinding($env);
         $bindings[] = $this->objectStorageBinding($env);
 
         // A persisted SiteBinding (an explicit operator attach/provision) is
@@ -236,6 +237,39 @@ final class SiteResourceBindingResolver
             status: 'configured',
             source: 'environment',
             name: 'queue-'.$driver,
+            config: ['driver' => $driver],
+        );
+    }
+
+    /**
+     * @param  array<string, string>  $env
+     */
+    private function cacheBinding(array $env): SiteResourceBinding
+    {
+        $driver = strtolower(trim((string) ($env['CACHE_STORE'] ?? $env['CACHE_DRIVER'] ?? '')));
+
+        // No store, or the per-request `array` store (which caches nothing
+        // across requests), reads as "not configured yet" — same treatment the
+        // queue binding gives sync/null.
+        if ($driver === '' || $driver === 'array') {
+            return new SiteResourceBinding(
+                type: 'cache',
+                mode: 'attach_existing',
+                required: false,
+                status: 'pending',
+                source: $driver === 'array' ? 'environment' : 'environment_defaults',
+                name: null,
+                config: ['driver' => $driver !== '' ? $driver : 'array'],
+            );
+        }
+
+        return new SiteResourceBinding(
+            type: 'cache',
+            mode: 'attach_existing',
+            required: false,
+            status: 'configured',
+            source: 'environment',
+            name: 'cache-'.$driver,
             config: ['driver' => $driver],
         );
     }

@@ -171,6 +171,7 @@
         'database' => __('Database'),
         'redis' => __('Redis'),
         'queue' => __('Queue'),
+        'cache' => __('Cache'),
         'storage' => __('Object storage'),
     ];
 
@@ -940,6 +941,9 @@
                             <button type="button" wire:click="openBindingModal('queue', 'attach')" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
                                 <x-heroicon-o-queue-list class="h-4 w-4 text-brand-moss" /> {{ __('Configure queue') }}
                             </button>
+                            <button type="button" wire:click="openBindingModal('cache', 'attach')" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
+                                <x-heroicon-o-cpu-chip class="h-4 w-4 text-brand-moss" /> {{ __('Configure cache') }}
+                            </button>
                             <button type="button" wire:click="openBindingModal('storage', 'attach')" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
                                 <x-heroicon-o-archive-box class="h-4 w-4 text-brand-moss" /> {{ __('Connect object storage') }}
                             </button>
@@ -1209,6 +1213,165 @@
             </div>
         @endif
 
+        @php
+            // .env keys that override a connected resource binding — shown as a
+            // grouped collapsible (same style as managed groups above) so the six
+            // DB_* rows don't scatter individually through the regular list.
+            $overrideGroups = [];   // bindingId => ['type','name','bindingId','keys'=>[KEY=>value]]
+            foreach ($filteredEnvMap as $_oKey => $_oVal) {
+                $_ob = $bindingProvidedKeys[$_oKey] ?? null;
+                if ($_ob === null) {
+                    continue;
+                }
+                $_bid = $_ob['bindingId'];
+                if (! isset($overrideGroups[$_bid])) {
+                    $overrideGroups[$_bid] = ['type' => $_ob['type'], 'name' => $_ob['name'], 'bindingId' => $_bid, 'keys' => []];
+                }
+                $overrideGroups[$_bid]['keys'][$_oKey] = (string) $_oVal;
+            }
+            foreach ($overrideGroups as &$_og) { ksort($_og['keys']); }
+            unset($_og);
+            $overrideGroupedKeySet = [];
+            foreach ($overrideGroups as $_og) {
+                foreach (array_keys($_og['keys']) as $_ogk) {
+                    $overrideGroupedKeySet[$_ogk] = true;
+                }
+            }
+        @endphp
+
+        @if ($overrideGroups !== [])
+            <div class="border-b border-brand-ink/10 bg-sky-50/20">
+                <div class="flex items-center gap-2 px-6 py-2.5 sm:px-8">
+                    <x-heroicon-o-link class="h-3.5 w-3.5 text-sky-700" aria-hidden="true" />
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-800">{{ __('Overriding connected resources') }}</p>
+                    <span class="text-[11px] text-brand-moss">{{ __('your .env values take precedence over the binding') }}</span>
+                </div>
+
+                @foreach ($overrideGroups as $ogBindingId => $ogGroup)
+                    @php
+                        $ogTypeLabel = $bindingTypeLabelsInline[$ogGroup['type']] ?? (string) str($ogGroup['type'])->title();
+                        $ogHasEditing = ($editing_env_key ?? null) !== null && array_key_exists((string) $editing_env_key, $ogGroup['keys']);
+                    @endphp
+                    <div class="border-t border-sky-200/40" wire:key="override-group-{{ md5($ogBindingId) }}" x-data="{ expanded: @js($ogHasEditing) }">
+                        <div class="flex flex-wrap items-center justify-between gap-2 bg-sky-50/60 px-6 py-2.5 sm:px-8">
+                            <button type="button" x-on:click="expanded = ! expanded" class="flex min-w-0 flex-1 items-center gap-2 text-left">
+                                <x-heroicon-m-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform" x-bind:class="expanded && 'rotate-90'" />
+                                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-700 ring-1 ring-inset ring-sky-200/70">
+                                    <x-heroicon-o-link class="h-3.5 w-3.5" />
+                                </span>
+                                <span class="text-sm font-semibold text-brand-ink">{{ $ogTypeLabel }}</span>
+                                @if ($ogGroup['name'])
+                                    <span class="truncate font-mono text-xs text-brand-moss">· {{ $ogGroup['name'] }}</span>
+                                @endif
+                                <span class="shrink-0 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 ring-1 ring-inset ring-amber-200/70">{{ trans_choice('{1} :count override|[2,*] :count overrides', count($ogGroup['keys']), ['count' => count($ogGroup['keys'])]) }}</span>
+                            </button>
+                        </div>
+
+                        <ul class="divide-y divide-brand-ink/8" x-show="expanded" x-cloak>
+                            @foreach ($ogGroup['keys'] as $oKey => $oValue)
+                                @php
+                                    $oIsRevealed = in_array($oKey, $revealed_env_keys, true);
+                                    $oIsEditing  = ($editing_env_key ?? null) === $oKey;
+                                    $oValueLength = strlen($oValue);
+                                    $oRowComment  = $envComments[$oKey] ?? null;
+                                @endphp
+                                <li class="px-6 py-3 sm:px-8" wire:key="env-row-{{ md5($oKey) }}">
+                                    @if ($oIsEditing)
+                                        <form wire:submit="saveEditedEnvVar" class="space-y-3">
+                                            <div class="flex flex-wrap items-end gap-3">
+                                                <div class="flex-1 min-w-[10rem]">
+                                                    <x-input-label for="og_edit_key_{{ md5($oKey) }}" :value="__('Key')" />
+                                                    <x-text-input id="og_edit_key_{{ md5($oKey) }}" wire:model="editing_env_key" class="mt-1 block w-full font-mono text-sm" />
+                                                    <x-input-error :messages="$errors->get('editing_env_key')" class="mt-1" />
+                                                </div>
+                                                @php $oEditHint = \App\Support\Sites\SiteEnvFieldHints::hint((string) $editing_env_key, (string) $editing_env_value); @endphp
+                                                <div class="flex-1 min-w-[12rem]" x-data="{ showValue: true }">
+                                                    <label class="mb-1 flex items-center justify-between text-sm font-medium text-brand-ink" for="og_edit_val_{{ md5($oKey) }}">
+                                                        <span>{{ __('Value') }}@if ($oEditHint['type'] === 'bool')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(true / false)') }}</span>@elseif ($oEditHint['type'] === 'enum')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(pick one)') }}</span>@endif</span>
+                                                        @if ($oEditHint['type'] === 'text')
+                                                            <button type="button" class="text-xs font-medium text-brand-sage hover:underline" @click="showValue = !showValue">
+                                                                <span x-show="!showValue">{{ __('Show') }}</span>
+                                                                <span x-show="showValue" x-cloak>{{ __('Hide') }}</span>
+                                                            </button>
+                                                        @endif
+                                                    </label>
+                                                    @if ($oEditHint['type'] !== 'text')
+                                                        <select id="og_edit_val_{{ md5($oKey) }}" wire:model="editing_env_value" class="block w-full rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-sm text-brand-ink">
+                                                            @foreach ($oEditHint['options'] as $oOpt)
+                                                                <option value="{{ $oOpt }}">{{ $oOpt }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                    @else
+                                                        <input id="og_edit_val_{{ md5($oKey) }}" wire:model="editing_env_value" x-bind:type="showValue ? 'text' : 'password'" autocomplete="off" spellcheck="false" class="block w-full rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-sm text-brand-ink" />
+                                                    @endif
+                                                    <x-input-error :messages="$errors->get('editing_env_value')" class="mt-1" />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <x-input-label for="og_edit_comment_{{ md5($oKey) }}" :value="__('Comment (optional)')" />
+                                                <textarea id="og_edit_comment_{{ md5($oKey) }}" wire:model="editing_env_comment" rows="2" class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30" placeholder="{{ __('Renders as a # comment line above this variable in the .env file.') }}"></textarea>
+                                                <x-input-error :messages="$errors->get('editing_env_comment')" class="mt-1" />
+                                            </div>
+                                            <div class="flex items-center justify-end gap-2">
+                                                <x-secondary-button type="button" wire:click="cancelEditEnvVar">{{ __('Cancel') }}</x-secondary-button>
+                                                <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveEditedEnvVar">
+                                                    <span wire:loading.remove wire:target="saveEditedEnvVar">{{ __('Save') }}</span>
+                                                    <span wire:loading wire:target="saveEditedEnvVar" class="inline-flex items-center gap-1.5"><span class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
+                                                </x-primary-button>
+                                            </div>
+                                        </form>
+                                    @else
+                                        <div class="flex flex-wrap items-center justify-between gap-3">
+                                            <div class="flex min-w-0 items-center gap-3">
+                                                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/40 text-brand-forest ring-brand-ink/10">
+                                                    <x-heroicon-o-key class="h-4 w-4" />
+                                                </span>
+                                                <div class="min-w-0">
+                                                    <p class="font-mono text-sm font-semibold text-brand-ink">{{ $oKey }}</p>
+                                                    <p class="mt-0.5 break-all font-mono text-[11px] text-brand-moss">
+                                                        @if ($oIsRevealed)
+                                                            {{ $oValue === '' ? '(empty)' : $oValue }}
+                                                        @else
+                                                            @if ($oValueLength === 0)
+                                                                <span class="text-brand-mist">(empty)</span>
+                                                            @else
+                                                                {{ str_repeat('•', min(24, max(4, $oValueLength))) }}
+                                                            @endif
+                                                        @endif
+                                                    </p>
+                                                    @if ($oRowComment !== null && $oRowComment !== '')
+                                                        <p class="mt-1 whitespace-pre-line text-[11px] italic text-brand-mist"># {{ $oRowComment }}</p>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <button type="button" wire:click="toggleRevealEnvVar('{{ $oKey }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40" title="{{ $oIsRevealed ? __('Hide value') : __('Reveal value') }}">
+                                                    @if ($oIsRevealed) <x-heroicon-o-eye-slash class="h-3.5 w-3.5" /> {{ __('Hide') }}
+                                                    @else <x-heroicon-o-eye class="h-3.5 w-3.5" /> {{ __('Show') }}
+                                                    @endif
+                                                </button>
+                                                <button type="button" wire:click="editEnvVar('{{ $oKey }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40" title="{{ __('Edit value') }}">
+                                                    <x-heroicon-o-pencil-square class="h-3.5 w-3.5" /> {{ __('Edit') }}
+                                                </button>
+                                                <button type="button" wire:click="$set('env_import_key', '{{ $oKey }}')" x-on:click="$dispatch('open-modal', 'env-import-modal')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40" title="{{ __('Import :key from another site', ['key' => $oKey]) }}">
+                                                    <x-heroicon-o-arrow-down-on-square class="h-3.5 w-3.5" /> {{ __('Import') }}
+                                                </button>
+                                                <button type="button" wire:click="confirmRemoveEnvVar('{{ $oKey }}')" wire:loading.attr="disabled" wire:target="confirmRemoveEnvVar('{{ $oKey }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40" title="{{ __('Remove variable') }}">
+                                                    <x-heroicon-o-trash class="h-3.5 w-3.5" wire:loading.remove wire:target="confirmRemoveEnvVar('{{ $oKey }}')" />
+                                                    <span wire:loading wire:target="confirmRemoveEnvVar('{{ $oKey }}')"><x-spinner variant="forest" size="sm" /></span>
+                                                    {{ __('Remove') }}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+
         @if ($variableCount === 0 && $bindingManagedEnv === [])
             <div class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center sm:px-8">
                 <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-moss">
@@ -1223,6 +1386,7 @@
                     <li class="px-6 py-10 text-center text-sm text-brand-moss sm:px-8">{{ __('No variables match the current filter.') }}</li>
                 @endif
                 @foreach ($listEnvMap as $key => $value)
+                    @if (isset($overrideGroupedKeySet[$key]))@continue@endif
                     @php
                         $isRevealed = in_array($key, $revealed_env_keys, true);
                         $isEditing = $editing_env_key === $key;
@@ -1832,6 +1996,7 @@
             'database' => __('Database'),
             'redis' => __('Redis'),
             'queue' => __('Queue'),
+            'cache' => __('Cache'),
             'storage' => __('Object storage'),
             'scheduler' => __('Scheduler'),
             'workers' => __('Workers'),
@@ -1842,7 +2007,7 @@
         // only the runtime resources that don't map to env vars.
         $resourceBindings = array_values(array_filter(
             $siteBindings,
-            fn ($b) => ! in_array($b->type, ['database', 'redis', 'queue', 'storage'], true),
+            fn ($b) => ! in_array($b->type, ['database', 'redis', 'queue', 'cache', 'storage'], true),
         ));
     @endphp
     @if ($resourceBindings !== [])
@@ -1856,7 +2021,7 @@
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Resources') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Runtime resources') }}</h3>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                        {{ __('Runtime resources that don\'t map to environment variables — the scheduler, queue workers, and publication. Databases, Redis, queue, and storage appear inline with the variables above as managed rows.') }}
+                        {{ __('Runtime resources that don\'t map to environment variables — the scheduler, queue workers, and publication. Databases, Redis, queue, cache, and storage appear inline with the variables above as managed rows.') }}
                     </p>
                 </div>
             </div>
@@ -1927,7 +2092,7 @@
         </ul>
 
         <div class="border-t border-brand-ink/10 bg-brand-sand/15 px-6 py-4 sm:px-8 text-xs text-brand-moss">
-            {{ __('These resources back the runtime rather than the .env. Publication is managed by the runtime and can\'t be detached here. Database, Redis, queue, and storage are managed inline with the variables above — use Connect resource to add one.') }}
+            {{ __('These resources back the runtime rather than the .env. Publication is managed by the runtime and can\'t be detached here. Database, Redis, queue, cache, and storage are managed inline with the variables above — use Connect resource to add one.') }}
         </div>
     </section>
     @endif
@@ -1987,6 +2152,17 @@
                         <option value="redis">{{ __('Redis') }}</option>
                     </select>
                     <p class="mt-2 text-xs text-brand-moss">{{ __('Sets QUEUE_CONNECTION. Redis requires the Redis binding to be attached too.') }}</p>
+                </div>
+            @elseif ($bindingModalType === 'cache')
+                <div>
+                    <x-input-label for="binding_cache_driver" :value="__('Cache store')" />
+                    <select id="binding_cache_driver" wire:model="bindingForm.driver" class="dply-input">
+                        <option value="database">{{ __('Database') }}</option>
+                        <option value="redis">{{ __('Redis') }}</option>
+                        <option value="file">{{ __('File') }}</option>
+                        <option value="array">{{ __('Array (no shared cache)') }}</option>
+                    </select>
+                    <p class="mt-2 text-xs text-brand-moss">{{ __('Sets CACHE_STORE. Redis requires the Redis binding to be attached too; database uses the app database.') }}</p>
                 </div>
             @elseif ($bindingModalType === 'storage')
                 <div class="grid gap-4 sm:grid-cols-2">

@@ -30,6 +30,7 @@ class SiteBinding extends Model
         'redis',
         'queue',
         'storage',
+        'cache',
     ];
 
     public const STATUS_CONFIGURED = 'configured';

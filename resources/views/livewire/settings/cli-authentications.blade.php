@@ -30,7 +30,9 @@
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('1. Install') }}</p>
                         @php $installUrl = route('cli.install'); @endphp
-                        <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-4 py-3 text-sm text-brand-cream"><code>curl -fsSL {{ $installUrl }} | bash -s -- --login</code></pre>
+                        <x-cli-snippet class="mt-2" :commands="[
+                            ['label' => '', 'command' => 'curl -fsSL '.$installUrl.' | bash -s -- --login'],
+                        ]" />
                         <p class="mt-2 text-xs leading-relaxed text-brand-moss">
                             {{ __('The CLI is hosted by this dply instance — not npm. The script downloads /cli/dply-cli.tgz and installs it globally. Node 18+ required.') }}
                         </p>
@@ -40,25 +42,30 @@
                         <p class="mt-2 text-xs leading-relaxed text-brand-moss">
                             {{ __('If you used `--login` above, you are already authenticated. Otherwise run:') }}
                         </p>
-                        <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-4 py-3 text-sm text-brand-cream"><code>dply login --base-url {{ $appUrl }}</code></pre>
+                        <x-cli-snippet class="mt-2" :commands="[
+                            ['label' => '', 'command' => 'dply login --base-url '.$appUrl],
+                        ]" />
                         <p class="mt-2 text-xs leading-relaxed text-brand-moss">
                             {{ __('Need more scopes later? Run `dply auth refresh` (or `dply refresh`) — same browser approval, new token on that machine.') }}
                         </p>
                     </div>
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('3. Verify') }}</p>
-                        <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-4 py-3 text-sm text-brand-cream"><code>dply account show
-dply menu
-dply server list
-dply site list</code></pre>
+                        <x-cli-snippet class="mt-2" :commands="[
+                            ['label' => __('Account'), 'command' => 'dply account show'],
+                            ['label' => __('Menu'),    'command' => 'dply menu'],
+                            ['label' => __('Servers'), 'command' => 'dply server list'],
+                            ['label' => __('Sites'),   'command' => 'dply site list'],
+                        ]" />
                     </div>
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('4. Deploy a BYO site from your repo') }}</p>
-                        <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-4 py-3 text-sm text-brand-cream"><code>cd /path/to/your/app
-dply link
-dply deploy --follow
-dply site status
-dply site logs --follow</code></pre>
+                        <x-cli-snippet class="mt-2" :commands="[
+                            ['label' => __('Link'),   'command' => 'dply link'],
+                            ['label' => __('Deploy'), 'command' => 'dply deploy --follow'],
+                            ['label' => __('Status'), 'command' => 'dply site status'],
+                            ['label' => __('Logs'),   'command' => 'dply site logs --follow'],
+                        ]" />
                         <p class="mt-2 text-xs leading-relaxed text-brand-moss">
                             {{ __('`dply link` opens a picker (BYO + Edge). Edge: `dply edge status --wait` or `dply deploy --wait`. Server SSH: `dply server run --server <id> <command>` needs `commands.run`. Firewall: `dply server firewall show` needs `network.read` — run `dply auth refresh` if scopes are missing.') }}
                         </p>

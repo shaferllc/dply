@@ -1176,6 +1176,35 @@ final class ServerProvisionCommandBuilder
             $stem.'-zip',
             $stem.'-intl',
             $stem.'-bcmath',
+            // phpredis client extension. Provisioning installs the Redis *daemon*
+            // (see roleCacheHost/roleRedis) but the PHP client was missing, so a
+            // Laravel app — which defaults to REDIS_CLIENT=phpredis — boots straight
+            // into `Class "Redis" not found` for cache/session/queue/Horizon. The
+            // baked DO snapshot and the manual setup-script presets already ship it;
+            // this aligns the core apt path so fresh servers match.
+            $stem.'-redis',
+            // GD image library — needed by spatie/media-library, intervention/image,
+            // QR-code generators, avatar packages, and many other ecosystem packages.
+            // Shipped by the DO snapshot bake and both setup-script presets but was
+            // missing here, so fresh apt-provisioned servers broke on first image op.
+            $stem.'-gd',
+            // Sodium cryptography — Laravel 9+ prefers ext-sodium for encryption
+            // (falls back to openssl) and several packages declare it as a hard
+            // requirement. Included in the setup-script presets; aligning here.
+            $stem.'-sodium',
+            // GNU Multiple Precision — suggested/required by ramsey/uuid (which
+            // Laravel depends on), moneyphp/money, league/uri, and several
+            // web-auth / CBOR libs. No system-level dep; pure PHP extension.
+            $stem.'-gmp',
+            // APCu in-memory user cache — suggested by laravel/framework for the
+            // `apcu` cache driver. Small package, zero external deps, and a useful
+            // local-memory cache for things like permission/config micro-caching.
+            $stem.'-apcu',
+            // igbinary serializer — pairs with ext-redis: phpredis can use igbinary
+            // instead of PHP's native serialize, producing ~40% smaller payloads and
+            // faster (de)serialization for cache/session/queue values. No downside
+            // to having it installed alongside ext-redis even if not configured yet.
+            $stem.'-igbinary',
         ];
 
         // OPcache is a standalone phpX.Y-opcache package up to 8.4; from 8.5 it
@@ -1189,11 +1218,18 @@ final class ServerProvisionCommandBuilder
             $pkgs[] = $stem.'-pgsql';
         } elseif (in_array($database, ['mysql84', 'mysql80', 'mysql57', 'mariadb114', 'mariadb11', 'mariadb1011'], true)) {
             $pkgs[] = $stem.'-mysql';
-        } elseif ($database === 'sqlite3') {
-            $pkgs[] = $stem.'-sqlite3';
         } else {
+            // Default / unrecognised → install MySQL driver. SQLite is always
+            // included unconditionally below so it doesn't need a branch here.
             $pkgs[] = $stem.'-mysql';
         }
+
+        // SQLite is always installed regardless of the chosen primary database:
+        // virtually every Laravel app uses SQLite for the test suite (RefreshDatabase
+        // with :memory: or a tmp file), even when production runs MySQL or Postgres.
+        // The setup-script presets already bundle it unconditionally; this aligns
+        // the apt-provisioned path so `php artisan test` works out of the box.
+        $pkgs[] = $stem.'-sqlite3';
 
         $lines = array_merge($lines, $this->ensurePackagesInstalled(
             $pkgs,
@@ -1230,8 +1266,14 @@ final class ServerProvisionCommandBuilder
         }
 
         if ($web === 'openlitespeed') {
+            // OpenLiteSpeed runs its own lsphp build, separate from the phpX.Y-fpm
+            // packages above — so it needs lsphpNN-redis explicitly, or OLS-served
+            // Laravel apps still hit `Class "Redis" not found` even though the
+            // phpX.Y CLI has the extension.
+            $lsphp = 'lsphp'.str_replace('.', '', $php);
+
             return [
-                'apt-get install -y --no-install-recommends lsphp'.str_replace('.', '', $php).' lsphp'.str_replace('.', '', $php).'-mysql lsphp'.str_replace('.', '', $php).'-pgsql || true',
+                'apt-get install -y --no-install-recommends '.$lsphp.' '.$lsphp.'-mysql '.$lsphp.'-pgsql '.$lsphp.'-redis || true',
                 '/usr/local/lsws/bin/lswsctrl restart || true',
             ];
         }

@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 6, 2026',
                     'tags'    => ['new'],
+                    'title'   => 'Site Cache Store Binding',
+                    'summary' => 'You can now bind a cache store (database, redis, file, or array) to a site, and freshly provisioned servers ship the phpredis, GD, sodium, GMP, APCu, igbinary, and SQLite PHP extensions out of the box.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
+                    'tags'    => ['new'],
                     'title'   => 'Expose Raw Server Errors',
                     'summary' => 'Operators can now temporarily bypass the branded error page to surface real 5xx errors when debugging a failing site.',
                     'items'   => [],

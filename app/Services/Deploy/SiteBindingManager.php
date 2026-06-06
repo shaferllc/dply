@@ -131,6 +131,7 @@ class SiteBindingManager
             'database' => $this->attachDatabase($site, $params),
             'redis' => $this->attachRedis($site, $params),
             'queue' => $this->attachQueue($site, $params),
+            'cache' => $this->attachCache($site, $params),
             'storage' => $this->attachStorage($site, $params),
             'scheduler', 'workers' => $this->attachMarker($site, $type),
             default => throw new InvalidArgumentException(__('This binding type cannot be attached yet.')),
@@ -583,6 +584,37 @@ class SiteBindingManager
             'target_type' => 'queue_driver',
             'target_id' => null,
             'injected_env' => ['QUEUE_CONNECTION' => $driver],
+            'config' => ['driver' => $driver],
+        ]);
+    }
+
+    // ---- cache ------------------------------------------------------------
+
+    /**
+     * Pick the cache store Laravel should use. Like the queue binding this is a
+     * driver choice rather than an attached resource — it injects CACHE_STORE
+     * (and the legacy CACHE_DRIVER alias so pre-11 apps pick it up too). Redis
+     * needs the Redis binding attached to supply the connection variables.
+     *
+     * @param  array<string, mixed>  $params
+     */
+    private function attachCache(Site $site, array $params): SiteBinding
+    {
+        $driver = strtolower(trim((string) ($params['driver'] ?? 'database')));
+        if (! in_array($driver, ['database', 'redis', 'file', 'array'], true)) {
+            throw new InvalidArgumentException(__('Cache store must be database, redis, file, or array.'));
+        }
+
+        return $this->persist($site, 'cache', [
+            'mode' => 'attach_existing',
+            'status' => SiteBinding::STATUS_CONFIGURED,
+            'name' => 'cache-'.$driver,
+            'target_type' => 'cache_driver',
+            'target_id' => null,
+            'injected_env' => [
+                'CACHE_STORE' => $driver,
+                'CACHE_DRIVER' => $driver,
+            ],
             'config' => ['driver' => $driver],
         ]);
     }
