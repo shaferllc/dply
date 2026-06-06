@@ -86,6 +86,14 @@ class SiteSetup extends Component
         // already-deployed site, or one that never connected a repo → just land
         // on the live site (never dead-end on a 404).
         if (! $site->isInFirstDeploySetup()) {
+            // NEVER redirect from an embedded child during mount: a child
+            // component issuing a redirect mid-mount crashes Livewire's nested
+            // render ("Redirector could not be converted to int"). The host
+            // (Repository) already avoids rendering this tab when setup is over;
+            // if we're embedded anyway, just no-op and let the parent navigate.
+            if ($this->embedded) {
+                return;
+            }
             $this->redirectRoute('sites.show', ['server' => $server->id, 'site' => $site->id], navigate: true);
 
             return;

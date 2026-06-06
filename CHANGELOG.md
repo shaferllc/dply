@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Fixed
+- Fixed a crash when loading a site with a stale setup tab link after first-deploy setup had already completed.
 ### Added
 - The site setup wizard now shows a live console streaming the pre-flight job's progress and the exact reason it stalls or fails.
 ### Changed

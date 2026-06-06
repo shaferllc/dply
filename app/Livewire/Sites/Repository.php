@@ -614,7 +614,19 @@ class Repository extends Component
             return $this->lockedTab;
         }
 
-        return in_array($this->tab, self::UNLOCKED_TABS, true) ? $this->tab : 'overview';
+        $tab = in_array($this->tab, self::UNLOCKED_TABS, true) ? $this->tab : 'overview';
+
+        // A stale ?repo_tab=setup left over after the site has LEFT first-deploy
+        // setup (scan cleared / already deployed) would embed the SiteSetup
+        // component — whose mount() redirects, and a child component redirecting
+        // during mount crashes Livewire ("Redirector could not be converted to
+        // int"). The Set-up tab only exists while setup is active, so fall back
+        // to overview otherwise.
+        if ($tab === 'setup' && ! ($this->site->isInFirstDeploySetup() || $this->site->needsFirstDeploySetup())) {
+            return 'overview';
+        }
+
+        return $tab;
     }
 
     /**
