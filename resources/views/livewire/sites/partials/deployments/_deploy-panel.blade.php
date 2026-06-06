@@ -212,6 +212,22 @@
          500s on a missing Vite manifest) with one-click "Add to pipeline". --}}
     @php $pipelineSuggestions = method_exists($this, 'optimizePipeline') ? \App\Support\Sites\SitePipelineAdvisor::suggestions($site) : []; @endphp
     @if ($pipelineSuggestions !== [])
+        {{-- While the optimizePipeline Livewire request is in flight, swap the
+             card for a starting placeholder so old suggestions don't flash. --}}
+        <div wire:loading.flex wire:target="optimizePipeline" class="hidden items-center justify-center gap-3 rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/40 px-4 py-8 text-sm text-indigo-700">
+            <x-spinner size="sm" />
+            <span>{{ __('Starting pipeline scan…') }}</span>
+        </div>
+
+        <div wire:loading.remove wire:target="optimizePipeline">
+        @if ($watchedConsoleRunId)
+            {{-- Scan job is running on the worker; the hidden poll div above
+                 calls resolveWatchedConsoleAction every 3 s and re-renders. --}}
+            <div class="flex items-center justify-center gap-3 rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/40 px-4 py-8 text-sm text-indigo-700">
+                <x-spinner size="sm" />
+                <span>{{ __('Scanning the repo for pipeline steps…') }}</span>
+            </div>
+        @else
         <div class="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-4">
             <div class="flex items-start gap-3">
                 <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 ring-1 ring-inset ring-indigo-200">
@@ -268,6 +284,8 @@
                     </button>
                 </div>
             </div>
+        </div>
+        @endif
         </div>
     @endif
 

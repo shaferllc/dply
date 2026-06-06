@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 6, 2026',
+                    'tags'    => ['new'],
+                    'title'   => 'Pipeline Scan Loading State',
+                    'summary' => 'The deploy panel now shows a "scanning the repo" placeholder while a pipeline suggestion scan is running instead of flashing stale suggestions.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
                     'tags'    => ['fixed'],
                     'title'   => 'Pipeline Optimize Feedback Fix',
                     'summary' => 'The "Optimize pipeline" action now clears the pipeline-check warning once steps are added and shows the proposed-changes preview when the repo scan finishes, instead of appearing to do nothing.',
