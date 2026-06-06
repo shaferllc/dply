@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 5, 2026',
                     'tags'    => ['improved'],
+                    'title'   => 'Repository URL Field Styling',
+                    'summary' => 'The repository URL input now uses the shared text input component for consistent styling.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 5, 2026',
+                    'tags'    => ['improved'],
                     'title'   => 'Refined Repository Account Selector',
                     'summary' => 'The linked source-control account dropdown now uses the standard styled select component for a consistent appearance.',
                     'items'   => [],

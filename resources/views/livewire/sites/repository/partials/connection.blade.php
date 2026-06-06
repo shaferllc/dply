@@ -30,11 +30,11 @@
             <div class="grid gap-3 sm:grid-cols-2">
                 <label class="block text-sm">
                     <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Repository URL') }}</span>
-                    <input
+                    <x-text-input
                         type="text"
                         wire:model="connectionRepositoryUrl"
                         placeholder="git@github.com:acme/api.git"
-                        class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-mono shadow-sm focus:border-brand-ink focus:ring-1 focus:ring-brand-ink"
+                        class="font-mono"
                     />
                 </label>
                 <div class="relative block text-sm">
