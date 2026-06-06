@@ -315,18 +315,30 @@ if [ "$ROLE" = "web" ]; then
     if sudo systemctl reload "$svc" 2>/dev/null; then p "reloaded $svc"; break; fi
   done
 else
-  # Bounce every long-running daemon so none keep the old release in memory.
-  # SIGTERM lets Horizon drain in-flight jobs before supervisor relaunches it
-  # against current/ (where the supervisor command now points).
-  sudo supervisorctl restart dply-horizon 2>/dev/null || echo "[$ROLE] WARN: dply-horizon restart returned an error."
+  # Worker daemons are dply-managed systemd units (the canonical runtime for a
+  # managed worker site): dply-site-<id>-horizon.service + dply-scheduler.service,
+  # both with WorkingDirectory=current. They DON'T reload on a current/ swap on
+  # their own — a long-running Horizon keeps the old release's code in memory —
+  # so bounce them here. (Legacy supervisor programs are restarted best-effort
+  # too, for any box not yet migrated off supervisor.)
+  restarted_any=0
+  for u in $(systemctl list-units --plain --no-legend 'dply-site-*-horizon.service' 2>/dev/null | awk '{print $1}'); do
+    if sudo systemctl restart "$u" 2>/dev/null; then p "restarted $u"; restarted_any=1; fi
+  done
+  sudo systemctl restart dply-scheduler.service 2>/dev/null || true
+  # Best-effort legacy supervisor fallback (no-op once migrated to systemd).
+  sudo supervisorctl restart dply-horizon 2>/dev/null && restarted_any=1 || true
   sudo supervisorctl restart dply-scheduler 2>/dev/null || true
-  sudo supervisorctl restart dply-default-worker 2>/dev/null || true
-  sleep 2
-  if sudo supervisorctl status dply-horizon 2>/dev/null | grep -q RUNNING; then
-    p "OK: dply-horizon RUNNING on releases/$TS."
+  sleep 3
+  hz_ok=0
+  for u in $(systemctl list-units --plain --no-legend 'dply-site-*-horizon.service' 2>/dev/null | awk '{print $1}'); do
+    [ "$(systemctl is-active "$u" 2>/dev/null)" = "active" ] && hz_ok=1
+  done
+  sudo supervisorctl status dply-horizon 2>/dev/null | grep -q RUNNING && hz_ok=1 || true
+  if [ "$hz_ok" = "1" ]; then
+    p "OK: a Horizon master is running on releases/$TS."
   else
-    echo "[$ROLE] ERROR: dply-horizon NOT RUNNING after restart — investigate before trusting this box." >&2
-    sudo supervisorctl status dply-horizon || true
+    echo "[$ROLE] ERROR: no Horizon master active after restart — investigate before trusting this box." >&2
     exit 1
   fi
 fi

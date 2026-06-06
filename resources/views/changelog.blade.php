@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 5, 2026',
                     'tags'    => ['fixed'],
+                    'title'   => 'Reliable Worker Restarts On Deploy',
+                    'summary' => 'Worker deploys now restart dply-managed systemd Horizon and scheduler units on each release swap so daemons no longer run stale code, with legacy supervisor restarts kept as a fallback.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 5, 2026',
+                    'tags'    => ['fixed'],
                     'title'   => 'Deploy Clone Auth Fix',
                     'summary' => 'Deployments now clone the bare repository using the server\'s own authenticated remote URL, avoiding failures when the local remote uses an SSH URL the server can\'t access.',
                     'items'   => [],
