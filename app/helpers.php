@@ -292,6 +292,35 @@ if (! function_exists('workspace_console_preview_active')) {
     }
 }
 
+if (! function_exists('workspace_cli_active')) {
+    /**
+     * True when the server workspace CLI reference surface is enabled for the org.
+     */
+    function workspace_cli_active(?Organization $organization = null): bool
+    {
+        return $organization === null
+            ? Feature::active('workspace.cli')
+            : Feature::for($organization)->active('workspace.cli');
+    }
+}
+
+if (! function_exists('workspace_cli_preview_active')) {
+    /**
+     * True when CLI is off but the coming-soon teaser should surface in nav
+     * and the preview workspace page.
+     */
+    function workspace_cli_preview_active(?Organization $organization = null): bool
+    {
+        if (workspace_cli_active($organization)) {
+            return false;
+        }
+
+        return $organization === null
+            ? Feature::active('workspace.cli_preview')
+            : Feature::for($organization)->active('workspace.cli_preview');
+    }
+}
+
 if (! function_exists('workspace_insights_preview_active')) {
     /**
      * True when insights is off but the coming-soon teaser should surface in

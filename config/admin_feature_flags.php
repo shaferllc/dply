@@ -75,6 +75,10 @@ $serverWorkspaceSections = [
         'workspace.console' => 'Full workspace',
         'workspace.console_preview' => 'Coming soon preview',
     ],
+    'CLI' => [
+        'workspace.cli' => 'Server CLI reference',
+        'workspace.cli_preview' => 'Coming soon preview',
+    ],
     'Blueprint' => [
         'workspace.server_blueprint' => 'Capture & apply',
         'workspace.server_blueprint_preview' => 'Coming soon preview',
@@ -240,6 +244,7 @@ return [
     */
     'feature_preview_pairs' => [
         'workspace.console' => 'workspace.console_preview',
+        'workspace.cli' => 'workspace.cli_preview',
         'workspace.insights' => 'workspace.insights_preview',
         'workspace.server_blueprint' => 'workspace.server_blueprint_preview',
         'workspace.files' => 'workspace.files_preview',

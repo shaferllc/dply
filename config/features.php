@@ -182,6 +182,10 @@ return [
         'console' => env('FEATURE_WORKSPACE_CONSOLE', true),
         // exit: ship alongside console GA; teaser only when console is off
         'console_preview' => env('FEATURE_WORKSPACE_CONSOLE_PREVIEW', false),
+        // exit: ship once server-scoped CLI reference + install UX are validated
+        'cli' => env('FEATURE_WORKSPACE_CLI', true),
+        // exit: ship alongside CLI GA; teaser only when CLI is off
+        'cli_preview' => env('FEATURE_WORKSPACE_CLI_PREVIEW', false),
 
         // exit: ship once remote file-write atomic guarantees are reviewed; security surface
         'files' => env('FEATURE_WORKSPACE_FILES', false),

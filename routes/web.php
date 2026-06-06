@@ -59,9 +59,6 @@ use App\Livewire\Edge\Import;
 use App\Livewire\Edge\Index as EdgeIndex;
 use App\Livewire\Edge\Templates;
 use App\Livewire\Edge\Usage;
-use App\Livewire\Realtime\Create as RealtimeCreate;
-use App\Livewire\Realtime\Index as RealtimeIndex;
-use App\Livewire\Realtime\Show as RealtimeShow;
 use App\Livewire\Fleet\BlastRadius as FleetBlastRadius;
 use App\Livewire\Fleet\DeployContracts as FleetDeployContracts;
 use App\Livewire\Fleet\Deploys as FleetDeploys;
@@ -94,10 +91,14 @@ use App\Livewire\Organizations\Members as OrganizationsMembers;
 use App\Livewire\Organizations\NotificationChannels as OrganizationsNotificationChannels;
 use App\Livewire\Organizations\Show as OrganizationsShow;
 use App\Livewire\Organizations\Teams as OrganizationsTeams;
+use App\Livewire\OrgNetworking;
 use App\Livewire\Profile\DeleteAccount as ProfileDeleteAccount;
 use App\Livewire\Profile\Referrals as ProfileReferrals;
 use App\Livewire\Projects\Index as ProjectsIndex;
 use App\Livewire\Projects\Show as ProjectsShow;
+use App\Livewire\Realtime\Create as RealtimeCreate;
+use App\Livewire\Realtime\Index as RealtimeIndex;
+use App\Livewire\Realtime\Show as RealtimeShow;
 use App\Livewire\Roadmap\Index as RoadmapIndex;
 use App\Livewire\Scripts\Create as ScriptsCreate;
 use App\Livewire\Scripts\Edit as ScriptsEdit;
@@ -117,13 +118,14 @@ use App\Livewire\Servers\ImportFromDigitalOcean as ServersImportFromDigitalOcean
 use App\Livewire\Servers\Index as ServersIndex;
 use App\Livewire\Servers\ProvisionJourney as ServerProvisionJourney;
 use App\Livewire\Servers\WorkspaceActivity;
-use App\Livewire\Servers\WorkspaceErrors;
 use App\Livewire\Servers\WorkspaceBackups;
 use App\Livewire\Servers\WorkspaceBackupsPreview;
 use App\Livewire\Servers\WorkspaceBlueprint;
 use App\Livewire\Servers\WorkspaceBlueprintPreview;
 use App\Livewire\Servers\WorkspaceCaches;
 use App\Livewire\Servers\WorkspaceCertInventory;
+use App\Livewire\Servers\WorkspaceCli;
+use App\Livewire\Servers\WorkspaceCliPreview;
 use App\Livewire\Servers\WorkspaceCluster;
 use App\Livewire\Servers\WorkspaceConfiguration;
 use App\Livewire\Servers\WorkspaceConsole;
@@ -138,19 +140,20 @@ use App\Livewire\Servers\WorkspaceDeployPolicyPreview;
 use App\Livewire\Servers\WorkspaceDocker;
 use App\Livewire\Servers\WorkspaceDockerPreview;
 use App\Livewire\Servers\WorkspaceEdgeProxy;
+use App\Livewire\Servers\WorkspaceErrors;
 use App\Livewire\Servers\WorkspaceFiles;
 use App\Livewire\Servers\WorkspaceFilesPreview;
 use App\Livewire\Servers\WorkspaceFirewall;
-use App\Livewire\Servers\WorkspaceLoadBalancers;
-use App\Livewire\Servers\WorkspaceNetworking;
 use App\Livewire\Servers\WorkspaceHealth;
 use App\Livewire\Servers\WorkspaceInsights;
 use App\Livewire\Servers\WorkspaceInsightsPreview;
+use App\Livewire\Servers\WorkspaceLoadBalancers;
 use App\Livewire\Servers\WorkspaceLogs;
 use App\Livewire\Servers\WorkspaceMaintenance;
 use App\Livewire\Servers\WorkspaceMaintenancePreview;
 use App\Livewire\Servers\WorkspaceManage;
 use App\Livewire\Servers\WorkspaceMonitor;
+use App\Livewire\Servers\WorkspaceNetworking;
 use App\Livewire\Servers\WorkspaceOverview;
 use App\Livewire\Servers\WorkspacePatchAdvisor;
 use App\Livewire\Servers\WorkspacePhp;
@@ -169,7 +172,6 @@ use App\Livewire\Servers\WorkspaceSharedHostPreview;
 use App\Livewire\Servers\WorkspaceSites;
 use App\Livewire\Servers\WorkspaceSshAccessGraph;
 use App\Livewire\Servers\WorkspaceSshAccessGraphPreview;
-use App\Livewire\Servers\WorkspaceCli;
 use App\Livewire\Servers\WorkspaceSshKeys;
 use App\Livewire\Servers\WorkspaceSystemUsers;
 use App\Livewire\Servers\WorkspaceWebserver;
@@ -185,19 +187,20 @@ use App\Livewire\Settings\SourceControl as SettingsSourceControl;
 use App\Livewire\Settings\SshKeys as SettingsSshKeys;
 use App\Livewire\Settings\WebserverTemplates as SettingsWebserverTemplates;
 use App\Livewire\Sites\Caching;
-use App\Livewire\Sites\Database as SitesDatabase;
 use App\Livewire\Sites\Cdn;
 use App\Livewire\Sites\ChooseApp as SitesChooseApp;
 use App\Livewire\Sites\Create as SitesCreate;
 use App\Livewire\Sites\CreateCustom as SitesCreateCustom;
+use App\Livewire\Sites\Database as SitesDatabase;
 use App\Livewire\Sites\DeploymentDetail as SitesDeploymentDetail;
 use App\Livewire\Sites\DeploymentsList as SitesDeploymentsList;
+use App\Livewire\Sites\DeploySyncGroups;
 use App\Livewire\Sites\EdgeDeploymentDetail;
 use App\Livewire\Sites\EdgePreviewComments;
 use App\Livewire\Sites\EnvDiff as SitesEnvDiff;
+use App\Livewire\Sites\Errors as SitesErrors;
 use App\Livewire\Sites\Files;
 use App\Livewire\Sites\Index as SitesIndex;
-use App\Livewire\Sites\Errors as SitesErrors;
 use App\Livewire\Sites\Monitor as SitesMonitor;
 use App\Livewire\Sites\Repository;
 use App\Livewire\Sites\Resources;
@@ -209,7 +212,6 @@ use App\Livewire\Sites\SitePromote as SitesPromote;
 use App\Livewire\Sites\WebserverConfig as SitesWebserverConfig;
 use App\Livewire\Sites\Workers;
 use App\Livewire\Sites\WorkspaceInsights as SitesWorkspaceInsights;
-use App\Livewire\Sites\WorkspacePipeline;
 use App\Livewire\Sites\WorkspaceSystemd;
 use App\Livewire\Status\PublicPage as StatusPublicPage;
 use App\Livewire\StatusPages\Index as StatusPagesIndex;
@@ -409,7 +411,7 @@ Route::prefix('cli')->middleware('throttle:60,1')->group(function (): void {
 Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('invitations/accept/{token}', InvitationsAccept::class)->name('invitations.accept');
     Route::livewire('/dashboard', Dashboard::class)->name('dashboard');
-    Route::livewire('/networking', \App\Livewire\OrgNetworking::class)->name('networking.index');
+    Route::livewire('/networking', OrgNetworking::class)->name('networking.index');
     // OAuth-style device-flow approval page for the dply CLI. The CLI
     // prints a short code; user lands here (deep link or paste),
     // confirms scopes + org, and we mint an ApiToken that the polling
@@ -483,7 +485,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('/settings/profile', SettingsHub::class)->name('settings.profile');
     Route::livewire('/settings/servers', SettingsHub::class)->name('settings.servers');
     Route::livewire('/notifications', NotificationsIndex::class)->name('notifications.index');
-    Route::livewire('/deploy-sync', \App\Livewire\Sites\DeploySyncGroups::class)->name('deploy-sync.index');
+    Route::livewire('/deploy-sync', DeploySyncGroups::class)->name('deploy-sync.index');
 
     Route::livewire('/profile/referrals', ProfileReferrals::class)->name('profile.referrals');
     Route::livewire('/profile/security', SettingsSecurity::class)->name('profile.security');
@@ -733,7 +735,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // Repository is its own first-class standalone page (renders with the site
     // sidebar — the component already supports non-embedded mode), so it's
     // reachable straight from the nav instead of only as a Deployments tab.
-    Route::livewire('servers/{server}/sites/{site}/repository', \App\Livewire\Sites\Repository::class)->name('sites.repository');
+    Route::livewire('servers/{server}/sites/{site}/repository', Repository::class)->name('sites.repository');
     // Legacy /source bookmarks → the standalone Repository page, forwarding any
     // ?tab= as the component's ?repo_tab= sub-tab.
     Route::get('servers/{server}/sites/{site}/source', function (Server $server, Site $site) {
@@ -939,7 +941,10 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::get('servers/{server}/files/download', ServerWorkspaceFileDownloadController::class)->name('servers.files.download');
     Route::livewire('servers/{server}/files-preview', WorkspaceFilesPreview::class)->name('servers.files-preview');
     Route::get('log-shares/{token}', [LogViewerShareController::class, 'show'])->name('log-viewer-shares.show');
-    Route::livewire('servers/{server}/cli', WorkspaceCli::class)->name('servers.cli');
+    Route::middleware('feature:workspace.cli')->group(function (): void {
+        Route::livewire('servers/{server}/cli', WorkspaceCli::class)->name('servers.cli');
+    });
+    Route::livewire('servers/{server}/cli-preview', WorkspaceCliPreview::class)->name('servers.cli-preview');
     Route::livewire('servers/{server}/manage/{section?}', WorkspaceManage::class)->name('servers.manage');
     Route::livewire('servers/{server}/settings/{section?}', WorkspaceSettings::class)->name('servers.settings');
 

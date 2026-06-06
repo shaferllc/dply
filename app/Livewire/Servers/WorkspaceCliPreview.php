@@ -4,32 +4,33 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers;
 
-use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\Server;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
+/**
+ * Coming-soon placeholder for the server CLI reference when
+ * {@see workspace.cli_preview} is on and {@see workspace.cli} is off.
+ */
 #[Layout('layouts.app')]
-class WorkspaceCli extends Component
+class WorkspaceCliPreview extends Component
 {
     use InteractsWithServerWorkspace;
-    use RequiresFeature;
-
-    protected string $requiredFeature = 'workspace.cli';
 
     public Server $server;
 
     public function mount(Server $server): void
     {
+        abort_if(workspace_cli_active(), 404);
+        abort_unless(workspace_cli_preview_active(), 404);
+
         $this->bootWorkspace($server);
     }
 
     public function render(): View
     {
-        return view('livewire.servers.workspace-cli', [
-            'server' => $this->server,
-        ]);
+        return view('livewire.servers.workspace-cli-preview');
     }
 }
