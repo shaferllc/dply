@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Livewire\Sites;
 
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
+use App\Livewire\Concerns\Sites\ConfiguresGitRepository;
 use App\Livewire\Concerns\Sites\PicksRepositoryRef;
 use App\Models\Server;
 use App\Models\Site;
@@ -19,7 +21,6 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
-use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
@@ -40,8 +41,10 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Repository extends Component
 {
+    use ConfiguresGitRepository;
     use DispatchesToastNotifications;
     use PicksRepositoryRef;
+    use RefreshesLinkedSourceControlAccounts;
 
     public Server $server;
 
@@ -108,35 +111,12 @@ class Repository extends Component
         // No state to mutate — the re-render re-runs the fetches in render().
     }
 
-    /** Connection-tab form mirrors of the equivalent fields on the Site. */
-    public string $connectionRepositoryUrl = '';
+    // Connection-tab repository picker state (repo_source, source_control_account_id,
+    // repository_selection, git_repository_url, git_branch, git_ref_kind,
+    // linkedSourceControlAccounts, availableRepositories) lives in the
+    // ConfiguresGitRepository trait; the rich picker renders from those.
 
-    public string $connectionBranch = '';
-
-    /**
-     * Ref kind for $connectionBranch: 'branch', 'tag', or 'commit'. Driven
-     * by the ref picker; falls back to 'branch' on save when unset.
-     */
-    public ?string $connectionRefKind = null;
-
-    public string $connectionAccountId = '';
-
-    /** Pagination cursor for the "Repositories on this account" library list. */
-    public int $repoPage = 1;
-
-    /** Filter box for the "Repositories on this account" library list (matches name / url). */
-    public string $repoSearch = '';
-
-    /**
-     * Target of a pending "switch to this repo" action, awaiting confirmation
-     * in the modal. Shape: ['url' => ..., 'branch' => ..., 'label' => ...].
-     * Null when the modal is closed.
-     *
-     * @var array{url: string, branch: string, label: string}|null
-     */
-    public ?array $pendingRepoSwitch = null;
-
-    public function mount(Server $server, Site $site): void
+    public function mount(Server $server, Site $site, SourceControlRepositoryBrowser $browser): void
     {
         abort_unless($site->server_id === $server->id, 404);
         abort_unless($server->organization_id === auth()->user()->currentOrganization()?->id, 404);
@@ -154,12 +134,77 @@ class Repository extends Component
         // locked partial too. activeTab() resolves the effective tab at
         // render time without touching the URL-bound property.
 
-        $this->connectionRepositoryUrl = (string) ($site->git_repository_url ?? '');
-        $this->connectionBranch = (string) ($site->git_branch ?? '');
-        $this->connectionAccountId = (string) ($site->repositoryMeta()['git_source_control_account_id'] ?? '');
+        $this->git_repository_url = (string) ($site->git_repository_url ?? '');
+        $this->git_branch = (string) ($site->git_branch ?? '') !== '' ? (string) $site->git_branch : 'main';
+        $this->source_control_account_id = (string) ($site->repositoryMeta()['git_source_control_account_id'] ?? '');
 
         $storedKind = is_array($site->meta ?? null) ? (string) ($site->meta['git_ref_kind'] ?? '') : '';
-        $this->connectionRefKind = in_array($storedKind, ['branch', 'tag', 'commit'], true) ? $storedKind : null;
+        $this->git_ref_kind = in_array($storedKind, ['branch', 'tag', 'commit'], true) ? $storedKind : null;
+
+        $this->primeRepositoryPicker($browser);
+    }
+
+    /**
+     * Seed the rich picker: load the user's linked accounts and, when one is
+     * wired, the repositories for it. Decide provider vs manual mode so an
+     * existing connection is never hidden — provider mode only when the stored
+     * URL actually matches a listed repo for the stored account (otherwise the
+     * URL shows in the manual field). A never-connected site with linked
+     * accounts defaults to the provider picker (auto-selects the first repo).
+     */
+    private function primeRepositoryPicker(SourceControlRepositoryBrowser $browser): void
+    {
+        $user = auth()->user();
+        if ($user === null) {
+            $this->repo_source = 'manual';
+
+            return;
+        }
+
+        $this->linkedSourceControlAccounts = $browser->accountsForUser($user);
+        if ($this->linkedSourceControlAccounts === []) {
+            $this->repo_source = 'manual';
+
+            return;
+        }
+
+        if ($this->git_repository_url === '') {
+            // No repo yet — offer the provider picker.
+            $this->repo_source = 'provider';
+            if ($this->source_control_account_id === '') {
+                $this->source_control_account_id = (string) $this->linkedSourceControlAccounts[0]['id'];
+            }
+            $this->refreshRepositories($browser);
+
+            return;
+        }
+
+        // Existing connection: pre-set the selection so refreshRepositories does
+        // not auto-pick the first repo, then only stay in provider mode if the
+        // stored URL is genuinely one of the account's repos.
+        $this->repository_selection = $this->git_repository_url;
+        if ($this->source_control_account_id !== '') {
+            $this->refreshRepositories($browser);
+        }
+        $match = collect($this->availableRepositories)->firstWhere('url', $this->git_repository_url);
+        if ($match !== null) {
+            $this->repo_source = 'provider';
+        } else {
+            $this->repo_source = 'manual';
+            $this->repository_selection = '';
+        }
+    }
+
+    /** Trait hook: linked accounts refreshed after connecting a provider mid-flow. */
+    protected function afterLinkedSourceControlAccountsRefreshed(): void
+    {
+        if ($this->linkedSourceControlAccounts === []) {
+            return;
+        }
+        if ($this->source_control_account_id === '') {
+            $this->source_control_account_id = (string) $this->linkedSourceControlAccounts[0]['id'];
+        }
+        $this->refreshRepositories(app(SourceControlRepositoryBrowser::class));
     }
 
     /**
@@ -173,7 +218,7 @@ class Repository extends Component
     {
         Gate::authorize('update', $this->site);
 
-        $url = trim($this->connectionRepositoryUrl);
+        $url = trim($this->git_repository_url);
         if ($url === '') {
             $this->toastError(__('Enter a repository URL first.'));
 
@@ -193,34 +238,31 @@ class Repository extends Component
         if ($label === '') {
             return;
         }
-        $this->connectionBranch = $label;
-        $this->connectionRefKind = $this->repo_ref_selected_kind;
-    }
-
-    #[On('source-control-linked')]
-    public function onSourceControlLinked(): void
-    {
-        // Re-render loads fresh accounts in renderConnectionPayload().
+        $this->git_branch = $label;
+        $this->git_ref_kind = $this->repo_ref_selected_kind;
     }
 
     /**
-     * Switching the linked account loads a different repo set — jump back to
-     * page 1, AND persist the choice immediately so every read (commits /
-     * branches / files / README) resolves to the operator's chosen identity
-     * right away, exactly like the setup wizard's account selector. Without the
-     * persist, the pick only lands on "Save connection" and reads silently fall
-     * back to the first available token for the provider
-     * ({@see GitIdentityResolver::forUserProvider}) — the wrong one when several
-     * tokens are linked, which 404s on private repos the first token can't see.
+     * Trait hook (before the account list/selection clears): authorize the edit.
      */
-    public function updatedConnectionAccountId(): void
+    protected function onSourceControlAccountChanging(): void
     {
-        $this->repoPage = 1;
-
         Gate::authorize('update', $this->site);
+    }
 
+    /**
+     * Trait hook (after the account changes + repos reload): persist the choice
+     * immediately so every read (commits / branches / files / README) resolves to
+     * the operator's chosen identity right away, exactly like the setup wizard's
+     * account selector. Without the persist, the pick only lands on "Save
+     * connection" and reads silently fall back to the first available token for
+     * the provider ({@see GitIdentityResolver::forUserProvider}) — the wrong one
+     * when several tokens are linked, which 404s on private repos.
+     */
+    protected function onSourceControlAccountChanged(): void
+    {
         $this->site->mergeRepositoryMeta([
-            'git_source_control_account_id' => $this->connectionAccountId !== '' ? $this->connectionAccountId : null,
+            'git_source_control_account_id' => $this->source_control_account_id !== '' ? $this->source_control_account_id : null,
         ]);
         $this->site->save();
 
@@ -229,10 +271,20 @@ class Repository extends Component
         app(SourceControlRepositoryReader::class)->invalidate($this->site);
     }
 
-    /** Typing in the repo filter should always land you on the first page of results. */
-    public function updatedRepoSearch(): void
+    /** Trait hook: a repo was picked / the manual URL changed — reset any chosen ref. */
+    protected function onRepositorySelected(): void
     {
-        $this->repoPage = 1;
+        $this->clearRepoRefSelection();
+    }
+
+    protected function onManualRepoUrlChanged(): void
+    {
+        $this->clearRepoRefSelection();
+    }
+
+    protected function onRepositoryAutoselected(): void
+    {
+        $this->clearRepoRefSelection();
     }
 
     /**
@@ -290,88 +342,10 @@ class Repository extends Component
             'meta' => $meta,
         ])->save();
         $reader->invalidate($this->site);
-        $this->connectionBranch = $branch;
-        $this->connectionRefKind = 'branch';
+        $this->git_branch = $branch;
+        $this->git_ref_kind = 'branch';
         $this->branchOverride = '';
         $this->toastSuccess(__('Deploy branch set to :branch.', ['branch' => $branch]));
-    }
-
-    /* ──────────── Repository switch ──────────── */
-
-    /**
-     * Stage a repo switch for confirmation. Opens the confirm modal instead of
-     * firing immediately (switching resets the deploy branch, so it warrants a
-     * real confirmation surface rather than a native browser prompt).
-     */
-    public function askSwitchRepository(string $repositoryUrl, ?string $defaultBranch, ?string $label = null): void
-    {
-        Gate::authorize('update', $this->site);
-
-        $branch = trim((string) $defaultBranch);
-
-        $this->pendingRepoSwitch = [
-            'url' => trim($repositoryUrl),
-            'branch' => $branch !== '' ? $branch : 'main',
-            'label' => trim((string) ($label ?? $repositoryUrl)),
-        ];
-    }
-
-    public function cancelSwitchRepository(): void
-    {
-        $this->pendingRepoSwitch = null;
-    }
-
-    /** Confirm handler for the switch modal — performs the staged switch. */
-    public function confirmSwitchRepository(SourceControlRepositoryReader $reader): void
-    {
-        $pending = $this->pendingRepoSwitch;
-        $this->pendingRepoSwitch = null;
-
-        if ($pending === null) {
-            return;
-        }
-
-        $this->switchRepository((string) $pending['url'], (string) $pending['branch'], $reader);
-    }
-
-    public function switchRepository(string $repositoryUrl, ?string $defaultBranch, SourceControlRepositoryReader $reader): void
-    {
-        Gate::authorize('update', $this->site);
-
-        $url = trim($repositoryUrl);
-        if ($url === '') {
-            $this->toastError(__('Repository URL is empty.'));
-
-            return;
-        }
-
-        $branch = trim((string) $defaultBranch);
-        if ($branch === '') {
-            $branch = 'main';
-        }
-
-        $meta = is_array($this->site->meta) ? $this->site->meta : [];
-        $meta['git_ref_kind'] = 'branch';
-        $this->site->forceFill([
-            'git_repository_url' => $url,
-            'git_branch' => $branch,
-            'meta' => $meta,
-        ])->save();
-        $reader->invalidate($this->site);
-
-        $this->connectionRepositoryUrl = $url;
-        $this->connectionBranch = $branch;
-        $this->connectionRefKind = 'branch';
-        $this->filesPath = '';
-        $this->filesOpenFile = '';
-        $this->branchOverride = '';
-        $this->clearRepoRefSelection();
-
-        if ($this->startFirstDeploySetupIfEligible()) {
-            return;
-        }
-
-        $this->toastSuccess(__('Repository switched to :url.', ['url' => $url]));
     }
 
     /* ──────────── Connection tab actions ──────────── */
@@ -380,20 +354,24 @@ class Repository extends Component
     {
         Gate::authorize('update', $this->site);
 
+        // In provider mode the picker mirrors the chosen repo into
+        // git_repository_url, so validating that single field covers both modes.
         $this->validate([
-            'connectionRepositoryUrl' => 'required|string|max:500',
-            'connectionBranch' => 'required|string|max:120',
-            'connectionAccountId' => 'nullable|string|max:26',
+            'git_repository_url' => 'required|string|max:500',
+            'git_branch' => 'required|string|max:120',
+            'source_control_account_id' => 'nullable|string|max:26',
         ]);
 
-        $url = trim($this->connectionRepositoryUrl);
-        $branch = trim($this->connectionBranch) !== '' ? trim($this->connectionBranch) : 'main';
-        $refKind = in_array($this->connectionRefKind, ['branch', 'tag', 'commit'], true)
-            ? $this->connectionRefKind
+        $url = $this->repo_source === 'provider' && trim($this->repository_selection) !== ''
+            ? trim($this->repository_selection)
+            : trim($this->git_repository_url);
+        $branch = trim($this->git_branch) !== '' ? trim($this->git_branch) : 'main';
+        $refKind = in_array($this->git_ref_kind, ['branch', 'tag', 'commit'], true)
+            ? $this->git_ref_kind
             : 'branch';
 
         $this->site->mergeRepositoryMeta([
-            'git_source_control_account_id' => $this->connectionAccountId !== '' ? $this->connectionAccountId : null,
+            'git_source_control_account_id' => $this->source_control_account_id !== '' ? $this->source_control_account_id : null,
             'git_provider_kind' => $this->detectProviderKind($url),
         ]);
 
@@ -501,8 +479,8 @@ class Repository extends Component
         }
 
         $resolver = app(GitIdentityResolver::class);
-        $account = $this->connectionAccountId !== ''
-            ? $resolver->forId(auth()->user(), $this->connectionAccountId)
+        $account = $this->source_control_account_id !== ''
+            ? $resolver->forId(auth()->user(), $this->source_control_account_id)
             : null;
         $account ??= $resolver->forSite($this->site, auth()->user(), $provider);
 
@@ -520,7 +498,7 @@ class Repository extends Component
         $patch = ['git_provider_kind' => $provider];
         if ((string) ($this->site->repositoryMeta()['git_source_control_account_id'] ?? '') === '') {
             $patch['git_source_control_account_id'] = $account->id();
-            $this->connectionAccountId = (string) $account->id();
+            $this->source_control_account_id = (string) $account->id();
         }
         $this->site->mergeRepositoryMeta($patch);
         $this->site->save();
@@ -619,9 +597,6 @@ class Repository extends Component
      * it's only ever reachable through a locked embed.
      */
     private const UNLOCKED_TABS = ['overview', 'commits', 'files', 'branches', 'connection', 'danger', 'setup'];
-
-    /** Page size for the "Repositories on this account" library list. */
-    private const REPO_LIBRARY_PER_PAGE = 8;
 
     /**
      * The tab that should actually render. When the component is embedded
@@ -730,50 +705,12 @@ class Repository extends Component
 
     private function renderConnectionPayload(SourceControlRepositoryBrowser $browser, $user): array
     {
-        $accounts = $user !== null ? $browser->accountsForUser($user) : [];
-        $repositories = [];
-        if ($user !== null && $this->connectionAccountId !== '') {
-            $account = app(GitIdentityResolver::class)->forId($user, $this->connectionAccountId);
-            if ($account !== null) {
-                $repositories = $browser->repositoriesForAccount($account);
-            }
-        }
-
-        // Total repos under the account (pre-filter) — drives whether the
-        // Library card (and its search box) renders at all.
-        $accountTotal = count($repositories);
-
-        // Filter by name / url before pinning + paginating so search spans the
-        // whole account, not just the current page.
-        $search = trim($this->repoSearch);
-        if ($search !== '') {
-            $needle = mb_strtolower($search);
-            $repositories = array_values(array_filter($repositories, fn (array $r): bool =>
-                str_contains(mb_strtolower((string) ($r['label'] ?? '')), $needle)
-                || str_contains(mb_strtolower((string) ($r['url'] ?? '')), $needle)));
-        }
-
-        // Pin the currently-connected repo to the very top (PHP 8 sort is
-        // stable, so the rest keep the browser's order), then paginate — an
-        // account can expose hundreds of repos and the unpaginated list ran
-        // off the page.
-        $currentUrl = (string) ($this->site->git_repository_url ?: '');
-        usort($repositories, fn (array $a, array $b): int =>
-            (((string) ($b['url'] ?? '')) === $currentUrl ? 1 : 0)
-            <=> (((string) ($a['url'] ?? '')) === $currentUrl ? 1 : 0));
-
-        $perPage = self::REPO_LIBRARY_PER_PAGE;
-        $total = count($repositories);
-        $pages = max(1, (int) ceil($total / $perPage));
-        $page = min(max(1, $this->repoPage), $pages);
-
+        // The rich picker (account select + repository dropdown) is driven by the
+        // ConfiguresGitRepository trait's public props ($linkedSourceControlAccounts,
+        // $availableRepositories), not this payload. The old "Repositories on this
+        // account" library card + its swap modal were removed; only the quick-deploy
+        // / webhook keys remain (the locked webhook embed reuses them).
         return [
-            'connectionAccounts' => $accounts,
-            'connectionRepositories' => array_slice($repositories, ($page - 1) * $perPage, $perPage),
-            'connectionRepositoriesTotal' => $total,
-            'connectionRepositoriesAccountTotal' => $accountTotal,
-            'connectionRepositoriesPage' => $page,
-            'connectionRepositoriesPages' => $pages,
             'connectionQuickDeploy' => (bool) ($this->site->repositoryMeta()['quick_deploy_enabled'] ?? ($this->site->meta['quick_deploy_enabled'] ?? false)),
             'connectionDeployHookUrl' => method_exists($this->site, 'deployHookUrl') ? $this->site->deployHookUrl() : null,
         ];

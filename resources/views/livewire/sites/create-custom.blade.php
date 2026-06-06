@@ -40,57 +40,10 @@
                             <x-input-error :messages="$errors->get('name')" class="mt-1" />
                         </div>
 
-                        <div class="sm:col-span-2">
-                            <div class="flex items-center justify-between gap-2">
-                                <x-input-label for="repo_source" :value="__('Repository (optional)')" />
-                                <x-connect-provider-link>{{ __('Connect a provider') }} &rarr;</x-connect-provider-link>
-                            </div>
-                            <select id="repo_source" wire:model.live="repo_source" class="dply-input mt-1 block w-full text-sm">
-                                <option value="provider" @disabled($linkedSourceControlAccounts === [])>{{ __('Pick from a linked account') }}</option>
-                                <option value="manual">{{ __('Paste a Git URL') }}</option>
-                            </select>
-                            <p class="mt-1 text-xs text-brand-mist">{{ __('Connect GitHub / GitLab / Bitbucket to pick a repo, or paste a URL. Leave blank for no-repo mode (CI pushes code, dply runs your script). The mode is fixed once created.') }}</p>
+                        <div class="sm:col-span-2 space-y-4">
+                            @include('livewire.sites.partials._git-repository-configurator', ['idPrefix' => 'custom', 'required' => false])
+                            <p class="text-xs text-brand-mist">{{ __('Connect GitHub / GitLab / Bitbucket to pick a repo, or paste a URL. Leave blank for no-repo mode (CI pushes code, dply runs your script). The mode is fixed once created.') }}</p>
                         </div>
-
-                        @if ($repo_source === 'provider')
-                            <div class="sm:col-span-2">
-                                <x-input-label for="source_control_account_id" :value="__('Account')" />
-                                <select id="source_control_account_id" wire:model.live="source_control_account_id" class="dply-input mt-1 block w-full text-sm">
-                                    @forelse ($linkedSourceControlAccounts as $account)
-                                        <option value="{{ $account['id'] }}">{{ $account['label'] }}</option>
-                                    @empty
-                                        <option value="">{{ __('No connected accounts — connect a provider first.') }}</option>
-                                    @endforelse
-                                </select>
-                                <x-input-error :messages="$errors->get('source_control_account_id')" class="mt-1" />
-                            </div>
-
-                            <div class="sm:col-span-2">
-                                <x-input-label for="repository_selection" :value="__('Repository')" />
-                                <select id="repository_selection" wire:model.live="repository_selection" class="dply-input mt-1 block w-full font-mono text-sm" @disabled($availableRepositories === [])>
-                                    @forelse ($availableRepositories as $repository)
-                                        <option value="{{ $repository['url'] }}">{{ $repository['label'] }}</option>
-                                    @empty
-                                        <option value="">{{ __('No repositories found for this account.') }}</option>
-                                    @endforelse
-                                </select>
-                                <x-input-error :messages="$errors->get('repository_selection')" class="mt-1" />
-                            </div>
-                        @else
-                            <div class="sm:col-span-2">
-                                <x-input-label for="custom_git_url" :value="__('Git repository URL (optional)')" />
-                                <x-text-input
-                                    id="custom_git_url"
-                                    type="text"
-                                    wire:model.live.debounce.500ms="git_repository_url"
-                                    class="mt-1 block w-full font-mono text-sm"
-                                    placeholder="git@github.com:you/worker.git"
-                                    autocomplete="off"
-                                />
-                                <p class="mt-1 text-xs text-brand-mist">{{ __('Leave blank for no-repo mode.') }}</p>
-                                <x-input-error :messages="$errors->get('git_repository_url')" class="mt-1" />
-                            </div>
-                        @endif
 
                         <div @class(['transition-opacity', 'opacity-40 pointer-events-none' => trim($git_repository_url) === ''])>
                             <x-input-label for="custom_branch" :value="__('Branch')" />

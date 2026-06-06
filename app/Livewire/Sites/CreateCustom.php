@@ -6,10 +6,10 @@ use App\Enums\SiteType;
 use App\Jobs\ProvisionCustomSiteJob;
 use App\Livewire\Concerns\EnforcesSiteQuota;
 use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
+use App\Livewire\Concerns\Sites\ConfiguresGitRepository;
 use App\Models\Script;
 use App\Models\Server;
 use App\Models\Site;
-use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
@@ -20,6 +20,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class CreateCustom extends Component
 {
+    use ConfiguresGitRepository;
     use EnforcesSiteQuota;
     use RefreshesLinkedSourceControlAccounts;
 
@@ -27,26 +28,12 @@ class CreateCustom extends Component
 
     public string $name = '';
 
-    public string $git_repository_url = '';
-
-    public string $git_branch = 'main';
-
     public string $system_user_override = '';
 
-    // ── Source-control repo picker (shared UX with the standard create flow) ──
-    /** @var list<array{id:string,provider:string,label:string,kind:string}> */
-    public array $linkedSourceControlAccounts = [];
-
-    /** 'manual' = paste a Git URL · 'provider' = pick from a linked account. */
-    public string $repo_source = 'manual';
-
-    public string $source_control_account_id = '';
-
-    /** @var list<array{label:string,url:string,branch:string}> */
-    public array $availableRepositories = [];
-
-    /** Selected repository clone URL (mirrors into git_repository_url). */
-    public string $repository_selection = '';
+    // The Git-repository picker state (repo_source, source_control_account_id,
+    // repository_selection, git_repository_url, git_branch, availableRepositories,
+    // linkedSourceControlAccounts) + its updated* hooks live in the
+    // ConfiguresGitRepository trait.
 
     public function mount(Server $server, SourceControlRepositoryBrowser $repositoryBrowser): void
     {
@@ -70,42 +57,6 @@ class CreateCustom extends Component
         }
     }
 
-    public function updatedGitRepositoryUrl(): void
-    {
-        $this->git_repository_url = trim($this->git_repository_url);
-    }
-
-    public function updatedRepoSource(): void
-    {
-        // Switching back to manual clears any provider-derived selection so the
-        // URL field is the single source of truth (and vice-versa).
-        if ($this->repo_source === 'manual') {
-            $this->repository_selection = '';
-        } elseif ($this->source_control_account_id !== '') {
-            $this->refreshRepositories(app(SourceControlRepositoryBrowser::class));
-        }
-    }
-
-    public function updatedSourceControlAccountId(): void
-    {
-        $this->repository_selection = '';
-        $this->refreshRepositories(app(SourceControlRepositoryBrowser::class));
-    }
-
-    public function updatedRepositorySelection(string $value): void
-    {
-        foreach ($this->availableRepositories as $repository) {
-            if (($repository['url'] ?? null) !== $value) {
-                continue;
-            }
-
-            $this->git_repository_url = (string) $repository['url'];
-            $this->git_branch = (string) ($repository['branch'] ?: 'main');
-
-            return;
-        }
-    }
-
     protected function afterLinkedSourceControlAccountsRefreshed(): void
     {
         // A provider was just linked via the modal — switch to the picker and
@@ -119,28 +70,6 @@ class CreateCustom extends Component
             $this->source_control_account_id = (string) $this->linkedSourceControlAccounts[0]['id'];
         }
         $this->refreshRepositories(app(SourceControlRepositoryBrowser::class));
-    }
-
-    private function refreshRepositories(SourceControlRepositoryBrowser $repositoryBrowser): void
-    {
-        $user = auth()->user();
-        if ($user === null || $this->source_control_account_id === '') {
-            $this->availableRepositories = [];
-
-            return;
-        }
-
-        $account = app(GitIdentityResolver::class)->forId($user, $this->source_control_account_id);
-        $this->availableRepositories = $account ? $repositoryBrowser->repositoriesForAccount($account) : [];
-
-        // Auto-select the first repo so the URL/branch are populated without an
-        // extra click — matches the standard create flow's behaviour.
-        if ($this->availableRepositories !== [] && $this->repository_selection === '') {
-            $first = $this->availableRepositories[0];
-            $this->repository_selection = (string) $first['url'];
-            $this->git_repository_url = (string) $first['url'];
-            $this->git_branch = (string) ($first['branch'] ?: 'main');
-        }
     }
 
     public function store(): mixed

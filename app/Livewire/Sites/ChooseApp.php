@@ -6,6 +6,7 @@ namespace App\Livewire\Sites;
 
 use App\Enums\SiteType;
 use App\Jobs\RunComposerScaffoldJob;
+use App\Livewire\Concerns\Sites\ConfiguresGitRepository;
 use App\Livewire\Concerns\Sites\PicksRepositoryRef;
 use App\Models\Server;
 use App\Models\Site;
@@ -13,7 +14,6 @@ use App\Services\Servers\ServerPhpManager;
 use App\Services\Sites\AppCatalog;
 use App\Services\Sites\SiteFoundationProvisioner;
 use App\Services\Sites\SiteProvisioner;
-use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
@@ -35,6 +35,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class ChooseApp extends Component
 {
+    use ConfiguresGitRepository;
     use PicksRepositoryRef;
 
     public Server $server;
@@ -60,44 +61,12 @@ class ChooseApp extends Component
     public string $phpVersion = '';
 
     // --- Tile-specific config sub-form ---------------------------------
-
-    /**
-     * Repository source for import/preset/static tiles:
-     *  - 'provider': pick from a connected git account's repositories
-     *  - 'manual':   paste a repository URL
-     * Defaults to 'provider' when the user has linked accounts.
-     */
-    public string $repo_source = 'manual';
-
-    public string $source_control_account_id = '';
-
-    public string $repository_selection = '';
-
-    public string $git_repository_url = '';
-
-    public string $git_branch = 'main';
-
-    /**
-     * Ref kind tracked for the chosen $git_branch: 'branch', 'tag', or
-     * 'commit'. Null means we treat it as a branch (legacy default).
-     */
-    public ?string $git_ref_kind = null;
+    // The Git-repository picker state (repo_source, source_control_account_id,
+    // repository_selection, git_repository_url, git_branch, git_ref_kind,
+    // linkedSourceControlAccounts, availableRepositories) + its updated* hooks
+    // live in the ConfiguresGitRepository trait.
 
     public string $scaffold_admin_email = '';
-
-    /**
-     * Connected source-control accounts for the current user.
-     *
-     * @var list<array{id: string, provider: string, label: string}>
-     */
-    public array $linkedSourceControlAccounts = [];
-
-    /**
-     * Repositories surfaced from the selected account.
-     *
-     * @var list<array{label: string, url: string, branch: string}>
-     */
-    public array $availableRepositories = [];
 
     public function mount(Server $server, Site $site, AppCatalog $catalog, ServerPhpManager $phpManager, SourceControlRepositoryBrowser $repositoryBrowser): void
     {
@@ -147,55 +116,32 @@ class ChooseApp extends Component
         }
     }
 
-    public function updatedRepoSource(string $value): void
+    /** Trait hook: after the account changes + repos reload. */
+    protected function onSourceControlAccountChanged(): void
     {
-        if ($value === 'manual') {
-            $this->source_control_account_id = '';
-            $this->repository_selection = '';
-            $this->availableRepositories = [];
-
-            return;
-        }
-
-        if ($this->linkedSourceControlAccounts === []) {
-            return;
-        }
-
-        if ($this->source_control_account_id === '') {
-            $this->source_control_account_id = (string) $this->linkedSourceControlAccounts[0]['id'];
-        }
-        $this->refreshRepositories(app(SourceControlRepositoryBrowser::class));
-    }
-
-    public function updatedSourceControlAccountId(string $value): void
-    {
-        $this->source_control_account_id = $value;
-        $this->repository_selection = '';
         $this->clearRepoRefSelection();
-        $this->refreshRepositories(app(SourceControlRepositoryBrowser::class));
         $this->syncRepoUrlToSite();
     }
 
-    public function updatedRepositorySelection(string $value): void
-    {
-        foreach ($this->availableRepositories as $repository) {
-            if (($repository['url'] ?? null) !== $value) {
-                continue;
-            }
-            $this->git_repository_url = (string) $repository['url'];
-            $this->git_branch = (string) ($repository['branch'] ?: 'main');
-            $this->git_ref_kind = 'branch';
-            $this->clearRepoRefSelection();
-            $this->syncRepoUrlToSite();
-
-            return;
-        }
-    }
-
-    public function updatedGitRepositoryUrl(): void
+    /** Trait hook: after a repository row is picked. */
+    protected function onRepositorySelected(): void
     {
         $this->clearRepoRefSelection();
+        $this->syncRepoUrlToSite();
+    }
+
+    /** Trait hook: after a manual URL is typed. */
+    protected function onManualRepoUrlChanged(): void
+    {
         $this->git_ref_kind = null;
+        $this->clearRepoRefSelection();
+        $this->syncRepoUrlToSite();
+    }
+
+    /** Trait hook: after the first repo is auto-selected on account load. */
+    protected function onRepositoryAutoselected(): void
+    {
+        $this->clearRepoRefSelection();
         $this->syncRepoUrlToSite();
     }
 
@@ -259,30 +205,6 @@ class ChooseApp extends Component
             return;
         }
         $this->openRepoRefPicker();
-    }
-
-    private function refreshRepositories(SourceControlRepositoryBrowser $repositoryBrowser): void
-    {
-        if ($this->source_control_account_id === '' || auth()->user() === null) {
-            $this->availableRepositories = [];
-
-            return;
-        }
-
-        $account = app(GitIdentityResolver::class)->forId(auth()->user(), $this->source_control_account_id);
-        $this->availableRepositories = $account
-            ? $repositoryBrowser->repositoriesForAccount($account)
-            : [];
-
-        if ($this->availableRepositories !== [] && $this->repository_selection === '') {
-            $first = $this->availableRepositories[0];
-            $this->repository_selection = (string) $first['url'];
-            $this->git_repository_url = (string) $first['url'];
-            $this->git_branch = (string) ($first['branch'] ?: 'main');
-            $this->git_ref_kind = 'branch';
-            $this->clearRepoRefSelection();
-            $this->syncRepoUrlToSite();
-        }
     }
 
     /**
