@@ -626,6 +626,12 @@ class SiteBindingManager
      */
     private function attachStorage(Site $site, array $params): SiteBinding
     {
+        $providers = (array) config('object_storage.providers', []);
+        $provider = strtolower(trim((string) ($params['provider'] ?? 'aws_s3')));
+        if (! array_key_exists($provider, $providers)) {
+            throw new InvalidArgumentException(__('Unsupported object storage provider.'));
+        }
+
         $bucket = trim((string) ($params['bucket'] ?? ''));
         $key = trim((string) ($params['access_key_id'] ?? ''));
         $secret = trim((string) ($params['secret_access_key'] ?? ''));
@@ -633,14 +639,30 @@ class SiteBindingManager
             throw new InvalidArgumentException(__('Bucket, access key, and secret are required.'));
         }
 
+        $region = trim((string) ($params['region'] ?? ''));
+
+        // Endpoint resolution: an explicit endpoint always wins; otherwise derive
+        // it from the provider's template (needs a region). AWS leaves the
+        // template empty so AWS_ENDPOINT stays unset and the SDK picks the
+        // regional endpoint itself. Custom providers must supply the endpoint.
+        $endpoint = trim((string) ($params['endpoint'] ?? ''));
+        $template = (string) ($providers[$provider]['endpoint_template'] ?? '');
+        if ($endpoint === '' && $template !== '' && $region !== '') {
+            $endpoint = str_replace('{region}', $region, $template);
+        }
+
+        if ($provider === 'custom_s3' && $endpoint === '') {
+            throw new InvalidArgumentException(__('Custom S3 storage needs an endpoint.'));
+        }
+
         $env = array_filter([
             'FILESYSTEM_DISK' => 's3',
             'AWS_BUCKET' => $bucket,
             'AWS_ACCESS_KEY_ID' => $key,
             'AWS_SECRET_ACCESS_KEY' => $secret,
-            'AWS_DEFAULT_REGION' => trim((string) ($params['region'] ?? '')) ?: null,
+            'AWS_DEFAULT_REGION' => $region ?: null,
             'AWS_URL' => trim((string) ($params['url'] ?? '')) ?: null,
-            'AWS_ENDPOINT' => trim((string) ($params['endpoint'] ?? '')) ?: null,
+            'AWS_ENDPOINT' => $endpoint ?: null,
         ], fn ($v) => $v !== null);
 
         return $this->persist($site, 'storage', [
@@ -650,7 +672,11 @@ class SiteBindingManager
             'target_type' => 'object_storage',
             'target_id' => null,
             'injected_env' => $env,
-            'config' => ['bucket' => $bucket],
+            'config' => array_filter([
+                'bucket' => $bucket,
+                'provider' => $provider,
+                'region' => $region ?: null,
+            ]),
         ]);
     }
 

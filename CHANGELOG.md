@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 ### Added
+- Connecting object storage to a site now offers AWS S3, DigitalOcean Spaces, and Hetzner provider presets with region pickers that auto-derive the endpoint, plus a custom S3 option.
+### Added
 - You can now bind a cache store (database, redis, file, or array) to a site, and freshly provisioned servers ship the phpredis, GD, sodium, GMP, APCu, igbinary, and SQLite PHP extensions out of the box.
 ### Added
 - Operators can now temporarily bypass the branded error page to surface real 5xx errors when debugging a failing site.

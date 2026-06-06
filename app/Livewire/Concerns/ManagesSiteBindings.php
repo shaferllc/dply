@@ -225,8 +225,48 @@ trait ManagesSiteBindings
             $type === 'redis' => ['target_id' => ''],
             $type === 'queue' => ['driver' => 'database'],
             $type === 'cache' => ['driver' => 'database'],
-            $type === 'storage' => ['bucket' => '', 'access_key_id' => '', 'secret_access_key' => '', 'region' => '', 'url' => '', 'endpoint' => ''],
+            $type === 'storage' => $this->defaultStorageBindingForm(),
             default => [],
         };
+    }
+
+    /**
+     * Default object-storage form, seeded to the first provider and its first
+     * region so the modal opens on a usable preset.
+     *
+     * @return array<string, mixed>
+     */
+    private function defaultStorageBindingForm(): array
+    {
+        $providers = (array) config('object_storage.providers', []);
+        $provider = (string) (array_key_first($providers) ?? 'aws_s3');
+        $regions = array_keys((array) ($providers[$provider]['regions'] ?? []));
+
+        return [
+            'provider' => $provider,
+            'region' => $regions[0] ?? '',
+            'bucket' => '',
+            'access_key_id' => '',
+            'secret_access_key' => '',
+            'url' => '',
+            'endpoint' => '',
+        ];
+    }
+
+    /**
+     * When the storage provider changes, reset the region to that provider's
+     * first known region so the derived endpoint stays consistent — an AWS
+     * region left selected after switching to Hetzner would build a bogus
+     * endpoint. Custom providers carry no region list, so the field clears.
+     */
+    public function updatedBindingForm(mixed $value, ?string $key = null): void
+    {
+        if ($key !== 'provider' || $this->bindingModalType !== 'storage') {
+            return;
+        }
+
+        $regions = array_keys((array) config('object_storage.providers.'.$value.'.regions', []));
+        $this->bindingForm['region'] = $regions[0] ?? '';
+        $this->bindingForm['endpoint'] = '';
     }
 }

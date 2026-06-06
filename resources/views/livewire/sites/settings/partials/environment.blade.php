@@ -2165,7 +2165,26 @@
                     <p class="mt-2 text-xs text-brand-moss">{{ __('Sets CACHE_STORE. Redis requires the Redis binding to be attached too; database uses the app database.') }}</p>
                 </div>
             @elseif ($bindingModalType === 'storage')
+                @php
+                    $osProviders = (array) config('object_storage.providers', []);
+                    $osProvider = (string) ($bindingForm['provider'] ?? 'aws_s3');
+                    $osRegions = (array) ($osProviders[$osProvider]['regions'] ?? []);
+                    $osTemplate = (string) ($osProviders[$osProvider]['endpoint_template'] ?? '');
+                    $osRegion = (string) ($bindingForm['region'] ?? '');
+                    $osDerivedEndpoint = ($osTemplate !== '' && $osRegion !== '')
+                        ? str_replace('{region}', $osRegion, $osTemplate)
+                        : '';
+                    $osIsCustom = $osProvider === 'custom_s3';
+                @endphp
                 <div class="grid gap-4 sm:grid-cols-2">
+                    <div class="sm:col-span-2">
+                        <x-input-label for="binding_storage_provider" :value="__('Provider')" />
+                        <select id="binding_storage_provider" wire:model.live="bindingForm.provider" class="dply-input">
+                            @foreach ($osProviders as $slug => $meta)
+                                <option value="{{ $slug }}">{{ $meta['label'] ?? $slug }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                     <div class="sm:col-span-2">
                         <x-input-label for="binding_storage_bucket" :value="__('Bucket')" />
                         <x-text-input id="binding_storage_bucket" wire:model="bindingForm.bucket" class="mt-1 block w-full font-mono text-sm" placeholder="my-app-assets" />
@@ -2179,14 +2198,33 @@
                         <x-text-input id="binding_storage_secret" type="password" wire:model="bindingForm.secret_access_key" class="mt-1 block w-full font-mono text-sm" />
                     </div>
                     <div>
-                        <x-input-label for="binding_storage_region" :value="__('Region (optional)')" />
-                        <x-text-input id="binding_storage_region" wire:model="bindingForm.region" class="mt-1 block w-full font-mono text-sm" placeholder="us-east-1" />
+                        <x-input-label for="binding_storage_region" :value="$osIsCustom ? __('Region (optional)') : __('Region')" />
+                        @if ($osRegions !== [])
+                            <select id="binding_storage_region" wire:model.live="bindingForm.region" class="dply-input">
+                                @foreach ($osRegions as $slug => $label)
+                                    <option value="{{ $slug }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        @else
+                            <x-text-input id="binding_storage_region" wire:model="bindingForm.region" class="mt-1 block w-full font-mono text-sm" placeholder="us-east-1" />
+                        @endif
                     </div>
-                    <div>
-                        <x-input-label for="binding_storage_endpoint" :value="__('Endpoint (optional)')" />
-                        <x-text-input id="binding_storage_endpoint" wire:model="bindingForm.endpoint" class="mt-1 block w-full font-mono text-sm" placeholder="https://nyc3.digitaloceanspaces.com" />
+                    @if ($osIsCustom)
+                        <div>
+                            <x-input-label for="binding_storage_endpoint" :value="__('Endpoint')" />
+                            <x-text-input id="binding_storage_endpoint" wire:model="bindingForm.endpoint" class="mt-1 block w-full font-mono text-sm" placeholder="https://s3.example.com" />
+                        </div>
+                    @endif
+                    <div class="{{ $osIsCustom ? '' : 'sm:col-span-2' }}">
+                        <x-input-label for="binding_storage_url" :value="__('Public URL (optional)')" />
+                        <x-text-input id="binding_storage_url" wire:model="bindingForm.url" class="mt-1 block w-full font-mono text-sm" placeholder="https://cdn.example.com" />
                     </div>
                 </div>
+                @if (! $osIsCustom && $osDerivedEndpoint !== '')
+                    <p class="text-xs text-brand-moss">{{ __('Endpoint :endpoint is set automatically for this provider and region.', ['endpoint' => $osDerivedEndpoint]) }}</p>
+                @elseif ($osIsCustom)
+                    <p class="text-xs text-brand-moss">{{ __('Custom S3 storage needs the endpoint of your provider (path-style or virtual-hosted).') }}</p>
+                @endif
                 <p class="text-xs text-brand-moss">{{ __('Injects FILESYSTEM_DISK=s3 and the AWS_* connection variables at deploy.') }}</p>
             @elseif ($bindingModalType === 'redis')
                 <div>
