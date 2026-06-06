@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 5, 2026',
+                    'tags'    => ['new'],
+                    'title'   => 'Repository Read Account Visibility',
+                    'summary' => 'The repository overview now shows which linked Git account answered each read and persists the account choice immediately so commits, branches, and files resolve to the selected identity.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 5, 2026',
                     'tags'    => ['improved'],
                     'title'   => 'Repository URL Field Styling',
                     'summary' => 'The repository URL input now uses the shared text input component for consistent styling.',

@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- The repository overview now shows which linked Git account answered each read and persists the account choice immediately so commits, branches, and files resolve to the selected identity.
 ### Changed
 - The repository URL input now uses the shared text input component for consistent styling.
 ### Changed

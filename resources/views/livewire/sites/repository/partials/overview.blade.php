@@ -90,6 +90,20 @@
                     @endforeach
                 </ul>
             @endif
+
+            @if (! empty($overviewCommits['account']['label']))
+                {{-- Which linked identity answered this read — so a wrong-token
+                     404 is self-evident instead of looking like a missing repo. --}}
+                <p class="mt-4 flex flex-wrap items-center gap-1.5 border-t border-brand-ink/10 pt-3 text-[11px] text-brand-moss">
+                    <x-heroicon-o-key class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
+                    <span>{{ __('Read using :label', ['label' => $overviewCommits['account']['label']]) }}</span>
+                    @if (! empty($overviewCommits['account']['kind']))
+                        <span class="rounded bg-brand-sand/50 px-1.5 py-0.5 font-medium uppercase tracking-wide">{{ $overviewCommits['account']['kind'] }}</span>
+                    @endif
+                    <a href="{{ route('sites.repository', [$server, $site, 'repo_tab' => 'connection']) }}" wire:navigate
+                       class="font-semibold text-brand-forest hover:underline">{{ __('Change account') }}</a>
+                </p>
+            @endif
         </div>
     </div>
 

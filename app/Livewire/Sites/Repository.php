@@ -203,10 +203,30 @@ class Repository extends Component
         // Re-render loads fresh accounts in renderConnectionPayload().
     }
 
-    /** Switching the linked account loads a different repo set — jump back to page 1. */
+    /**
+     * Switching the linked account loads a different repo set — jump back to
+     * page 1, AND persist the choice immediately so every read (commits /
+     * branches / files / README) resolves to the operator's chosen identity
+     * right away, exactly like the setup wizard's account selector. Without the
+     * persist, the pick only lands on "Save connection" and reads silently fall
+     * back to the first available token for the provider
+     * ({@see GitIdentityResolver::forUserProvider}) — the wrong one when several
+     * tokens are linked, which 404s on private repos the first token can't see.
+     */
     public function updatedConnectionAccountId(): void
     {
         $this->repoPage = 1;
+
+        Gate::authorize('update', $this->site);
+
+        $this->site->mergeRepositoryMeta([
+            'git_source_control_account_id' => $this->connectionAccountId !== '' ? $this->connectionAccountId : null,
+        ]);
+        $this->site->save();
+
+        // Branch/file/README reads are cached per-site; drop the cache so the
+        // next render re-fetches with the newly-selected identity.
+        app(SourceControlRepositoryReader::class)->invalidate($this->site);
     }
 
     /** Typing in the repo filter should always land you on the first page of results. */

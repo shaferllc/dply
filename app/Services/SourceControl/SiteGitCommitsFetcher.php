@@ -195,6 +195,7 @@ final class SiteGitCommitsFetcher
                 'provider' => 'github',
                 'branch' => $branch,
                 'remote_label' => $remote['label'],
+                'account' => $this->accountInfo($identity),
             ];
         }
 
@@ -207,6 +208,7 @@ final class SiteGitCommitsFetcher
                 'provider' => 'github',
                 'branch' => $branch,
                 'remote_label' => $remote['label'],
+                'account' => $this->accountInfo($identity),
             ];
         }
 
@@ -244,6 +246,7 @@ final class SiteGitCommitsFetcher
             'remote_label' => $remote['label'],
             'page' => $page,
             'has_more' => count($commits) >= $limit,
+            'account' => $this->accountInfo($identity),
         ];
     }
 
@@ -281,6 +284,7 @@ final class SiteGitCommitsFetcher
                 'provider' => 'gitlab',
                 'branch' => $branch,
                 'remote_label' => $remote['label'],
+                'account' => $this->accountInfo($identity),
             ];
         }
 
@@ -293,6 +297,7 @@ final class SiteGitCommitsFetcher
                 'provider' => 'gitlab',
                 'branch' => $branch,
                 'remote_label' => $remote['label'],
+                'account' => $this->accountInfo($identity),
             ];
         }
 
@@ -328,6 +333,7 @@ final class SiteGitCommitsFetcher
             'remote_label' => $remote['label'],
             'page' => $page,
             'has_more' => count($commits) >= $limit,
+            'account' => $this->accountInfo($identity),
         ];
     }
 
@@ -359,6 +365,7 @@ final class SiteGitCommitsFetcher
                 'provider' => 'bitbucket',
                 'branch' => $branch,
                 'remote_label' => $remote['label'],
+                'account' => $this->accountInfo($identity),
             ];
         }
 
@@ -403,6 +410,7 @@ final class SiteGitCommitsFetcher
             'remote_label' => $remote['label'],
             'page' => $page,
             'has_more' => $hasMore,
+            'account' => $this->accountInfo($identity),
         ];
     }
 
@@ -416,6 +424,22 @@ final class SiteGitCommitsFetcher
         $fromRemote = (string) ($remote['gitlab_api_base'] ?? '');
 
         return $fromRemote !== '' ? rtrim($fromRemote, '/') : rtrim($base, '/');
+    }
+
+    /**
+     * Which identity a read was performed with — surfaced in the UI so an
+     * operator can see exactly which linked account/token answered (or 404'd),
+     * instead of guessing when several are linked.
+     *
+     * @return array{label: string, id: string, kind: string}
+     */
+    private function accountInfo(GitIdentity $identity): array
+    {
+        return [
+            'label' => $identity->displayLabel(),
+            'id' => $identity->id(),
+            'kind' => $identity->kind(),
+        ];
     }
 
     private function formatApiError(int $status, string $body): string
