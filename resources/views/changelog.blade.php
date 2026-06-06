@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 6, 2026',
+                    'tags'    => ['fixed'],
+                    'title'   => 'Private HTTPS Repo Deploys',
+                    'summary' => 'Deploys from private HTTPS repositories now authenticate automatically using your stored Git provider token, with tokens redacted from deploy logs.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
                     'tags'    => ['improved'],
                     'title'   => 'Richer Deploy Diagnostics',
                     'summary' => 'Deploy logs now include detailed pre-clone, post-clone, and phase-probe snapshots, plus a "Scan for required variables" action in site environment settings.',

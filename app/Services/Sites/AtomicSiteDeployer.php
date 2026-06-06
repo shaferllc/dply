@@ -7,6 +7,8 @@ use App\Models\SiteDeployHook;
 use App\Models\SiteDeployment;
 use App\Models\SiteRelease;
 use App\Services\Servers\SupervisorDeployRestarter;
+use App\Services\SourceControl\GitIdentityResolver;
+use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use App\Services\SshConnectionFactory;
 use App\Support\Sites\DeployPipelineBranchResolver;
 
@@ -47,6 +49,17 @@ class AtomicSiteDeployer
         $gitSsh = $privateKey
             ? 'export GIT_SSH_COMMAND='.escapeshellarg('ssh -i '.$keyPath.' -o StrictHostKeyChecking=accept-new').' && '
             : '';
+
+        // For HTTPS repos with no deploy key, inject the stored OAuth/PAT token.
+        if (! $privateKey && $site->user !== null && str_starts_with($repo, 'http')) {
+            $provider = (string) ($site->repositoryMeta()['git_provider_kind'] ?? '');
+            if ($provider !== '' && $provider !== 'custom') {
+                $identity = app(GitIdentityResolver::class)->forSite($site, $site->user, $provider);
+                if ($identity !== null) {
+                    $repo = app(SourceControlRepositoryBrowser::class)->authenticatedCloneUrl($identity, $repo);
+                }
+            }
+        }
 
         $folder = gmdate('YmdHis');
         $releasesDir = $base.'/releases';
@@ -109,7 +122,7 @@ class AtomicSiteDeployer
         $this->anchorRunner->assertReleaseHasGit($ssh, $newRelease);
 
         // Post-clone snapshot: confirm exactly what landed in the release dir.
-        $cloneSha = trim($ssh->exec(sprintf('cd %s && git rev-parse HEAD 2>/dev/null', $newEsc), 15));
+        $cloneSha = trim($ssh->exec(sprintf('git -C %s rev-parse --verify HEAD 2>/dev/null', $newEsc), 15));
         $cloneLog .= $ssh->exec(sprintf(
             'echo "=== [dply] POST-CLONE SNAPSHOT ==="; '
             .'echo "[dply] whoami=$(whoami)"; '

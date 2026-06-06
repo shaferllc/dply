@@ -6,6 +6,8 @@ use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Models\SiteDeployment;
 use App\Services\Servers\SupervisorDeployRestarter;
+use App\Services\SourceControl\GitIdentityResolver;
+use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use App\Services\SshConnectionFactory;
 use App\Support\Sites\DeployPipelineBranchResolver;
 
@@ -50,6 +52,20 @@ class SiteGitDeployer
             ? 'export GIT_SSH_COMMAND='.escapeshellarg('ssh -i '.$keyPath.' -o StrictHostKeyChecking=accept-new').' && '
             : '';
 
+        // For HTTPS repos with no deploy key, inject the stored OAuth/PAT token
+        // into the URL so git can authenticate without a TTY.
+        // The authenticated URL is used only for the clone command; the raw URL
+        // is what appears everywhere else (logs, UI) to avoid leaking tokens.
+        if (! $privateKey && $site->user !== null && str_starts_with($repo, 'http')) {
+            $provider = (string) ($site->repositoryMeta()['git_provider_kind'] ?? '');
+            if ($provider !== '' && $provider !== 'custom') {
+                $identity = app(GitIdentityResolver::class)->forSite($site, $site->user, $provider);
+                if ($identity !== null) {
+                    $repo = app(SourceControlRepositoryBrowser::class)->authenticatedCloneUrl($identity, $repo);
+                }
+            }
+        }
+
         $log = '';
         $pathEsc = escapeshellarg($path);
 
@@ -80,7 +96,10 @@ class SiteGitDeployer
         $cloneLog .= $this->anchorRunner->runClone($ssh, $site, $path, $gitSsh, $repo, $branch, false, $checkGit);
         $this->hookRunner->assertHooksSucceeded($cloneLog, 'clone');
 
-        $sha = trim($ssh->exec(sprintf('cd %s && git rev-parse HEAD 2>/dev/null', $pathEsc), 30));
+        // Use --verify so git exits non-zero and prints nothing when HEAD is
+        // unborn (no commits yet) — `git rev-parse HEAD` prints the literal
+        // string "HEAD" in that case, which would fool the $sha !== '' check.
+        $sha = trim($ssh->exec(sprintf('git -C %s rev-parse --verify HEAD 2>/dev/null', $pathEsc), 30));
 
         // Post-clone snapshot: confirm exactly what landed on disk.
         $cloneLog .= $ssh->exec(sprintf(
@@ -119,12 +138,13 @@ class SiteGitDeployer
             'skipped' => false,
         ]]);
         if (! $cloneOk) {
-            throw new \RuntimeException(sprintf(
-                'Deploy failed: no Git checkout at %s after clone. Check the repository URL, branch (%s), and deploy key — see the clone output above.%s',
-                $path,
-                $branch,
-                "\n\n".$log
-            ));
+            $hint = str_contains($log, 'could not read Username')
+                ? ' The repository appears to be private — use an SSH URL (git@github.com:org/repo.git) and add a deploy key.'
+                : ' Check the repository URL, branch ('.$branch.'), and deploy key.';
+            throw new \RuntimeException(
+                'Deploy failed: no Git checkout at '.$path.' after clone.'.$hint.' See the clone output above.'
+                ."\n\n".$log
+            );
         }
 
         // ── ENV ── compose the .env (env cache + attached resource bindings'
