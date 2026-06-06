@@ -69,7 +69,7 @@
                     </ul>
                 </div>
             @endif
-            <x-cli-snippet class="mt-4" command="dply:fleet:doctor" />
+            <x-cli-snippet class="mt-4" command="dply fleet:doctor" />
         </section>
     @endif
 
@@ -87,7 +87,7 @@
                     </li>
                 @endforeach
             </ul>
-            <x-cli-snippet class="mt-4" command="dply:fleet:failed-deploys" />
+            <x-cli-snippet class="mt-4" command="dply fleet:deploys:failed" />
         </section>
     @endif
 
@@ -214,6 +214,6 @@
         </section>
     @endif
 
-    <x-cli-snippet class="mt-8" command="dply:fleet:doctor" />
+    <x-cli-snippet class="mt-8" command="dply fleet:doctor" />
     </x-fleet-shell>
 </div>

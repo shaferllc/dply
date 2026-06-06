@@ -717,6 +717,28 @@
                 </button>
                 <form wire:submit="saveHorizonConfig" x-show="open" x-cloak class="space-y-5 px-6 py-6 sm:px-7">
                     <div>
+                        <x-input-label :value="__('Process manager')" />
+                        <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            @foreach ([
+                                ['v' => 'systemd', 'label' => __('systemd'), 'desc' => __('One unit per worker (dply default). Restart=always, journald logs.')],
+                                ['v' => 'supervisor', 'label' => __('Supervisor'), 'desc' => __('supervisord [program] groups. Installs supervisor if missing.')],
+                            ] as $pm)
+                                <label @class([
+                                    'flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition-colors',
+                                    'border-brand-forest bg-brand-sage/10 ring-1 ring-brand-sage/30' => $hz_process_manager === $pm['v'],
+                                    'border-brand-ink/10 hover:border-brand-ink/20' => $hz_process_manager !== $pm['v'],
+                                ])>
+                                    <input type="radio" wire:model="hz_process_manager" value="{{ $pm['v'] }}" class="mt-0.5 text-brand-forest focus:ring-brand-forest" />
+                                    <span class="min-w-0">
+                                        <span class="block text-sm font-medium text-brand-ink">{{ $pm['label'] }}</span>
+                                        <span class="block text-xs text-brand-moss">{{ $pm['desc'] }}</span>
+                                    </span>
+                                </label>
+                            @endforeach
+                        </div>
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('Changing this re-provisions each member’s worker daemons under the chosen manager and tears down the other.') }}</p>
+                    </div>
+                    <div>
                         <x-input-label for="hz_queues" :value="__('Queues watched')" />
                         <x-text-input id="hz_queues" wire:model="hz_queues" class="mt-2 block w-full font-mono text-sm" placeholder="default, emails, notifications" />
                         <p class="mt-1 text-xs text-brand-moss">{{ __('Comma-separated. Workers process these queues in priority order.') }}</p>

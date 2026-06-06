@@ -70,8 +70,8 @@
     @endif
 
     <x-cli-snippet class="mt-8" :commands="[
-        ['label' => __('List all'), 'command' => 'dply:fleet:domain-list'],
-        ['label' => __('Find by hostname'), 'command' => 'dply:fleet:domain-find example.com'],
+        ['label' => __('List all'), 'command' => 'dply fleet:domains:list'],
+        ['label' => __('Find by hostname'), 'command' => 'dply fleet:domains:find example.com'],
     ]" />
     </x-fleet-shell>
 </div>

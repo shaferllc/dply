@@ -108,29 +108,52 @@ class DeployPhaseRunner
      *   - Other runtimes: `sudo systemctl restart dply-site-{id}.service`
      *     to bring the long-running process onto the new release.
      *
-     * Per the strategy memo: "Restart is dply-owned, not user-editable
-     * (preserves atomic-release/FPM-reload correctness)." Users don't
-     * author steps in this phase.
+     * The dply-owned reload/restart runs FIRST (preserves atomic-release/FPM-reload
+     * correctness). Any user-authored PHASE_RESTART steps then run on the live
+     * release path — this is the "restart your own workers/daemons" escape hatch.
+     * If the dply-owned reload fails we abort before the user steps, mirroring
+     * runPhase's stop-on-first-failure semantics.
      *
      * @param  (Closure(Server): RemoteShell)|null  $shellFactory
-     * @return list<array{step_id: string, step_type: string, command: string, ok: bool, output: string, duration_ms: int}>
+     * @return list<array{step_id: string, step_type: string, command: ?string, ok: bool, output: string, duration_ms: int}>
      */
     public function runRestart(Site $site, ?Closure $shellFactory = null): array
     {
+        // Container/custom-runtime sites restart through their own runtime
+        // manager, not this phase.
         if ($site->isCustom()) {
             return [];
         }
 
+        $results = [];
         $runtime = $site->runtimeKey();
-        if ($runtime === 'static') {
-            return [];
+
+        // Operators can opt out of the dply-owned reload (e.g. they restart the
+        // service themselves in a restart step). User restart steps still run.
+        $managedRestartDisabled = (bool) data_get($site->meta, 'deploy.skip_managed_restart', false);
+
+        // dply-owned reload/restart. Static sites skip it — NGINX already serves
+        // the new files after the swap — but user restart steps may still apply.
+        if ($runtime !== 'static' && ! $managedRestartDisabled) {
+            $command = $runtime === 'php'
+                ? sprintf('sudo systemctl reload php%s-fpm', $site->phpVersion() ?? '8.3')
+                : sprintf('sudo systemctl restart %s', escapeshellarg('dply-site-'.$site->id.'.service'));
+
+            $owned = $this->runOne($site, 'restart', SiteDeployStep::PHASE_RESTART, $command, $this->repositoryBase($site), $shellFactory);
+            $results[] = $owned;
+
+            if (! ($owned['ok'] ?? false)) {
+                return $results;
+            }
         }
 
-        $command = $runtime === 'php'
-            ? sprintf('sudo systemctl reload php%s-fpm', $site->phpVersion() ?? '8.3')
-            : sprintf('sudo systemctl restart %s', escapeshellarg('dply-site-'.$site->id.'.service'));
+        // User restart steps run AFTER the dply-owned reload, on the live path
+        // (the `current` symlink for atomic deploys, the checkout otherwise).
+        $liveCwd = $site->isAtomicDeploys()
+            ? rtrim($this->repositoryBase($site), '/').'/current'
+            : $this->repositoryBase($site);
 
-        return [$this->runOne($site, 'restart', SiteDeployStep::PHASE_RESTART, $command, $this->repositoryBase($site), $shellFactory)];
+        return array_merge($results, $this->runPhase($site, SiteDeployStep::PHASE_RESTART, $liveCwd, $shellFactory));
     }
 
     /**

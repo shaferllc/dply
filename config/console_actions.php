@@ -24,6 +24,12 @@ return [
             'failed' => 'Webserver config apply failed.',
             'stale' => 'Webserver config apply did not finish.',
         ],
+        'site_db_create' => [
+            'running' => 'Creating the database on :host …',
+            'completed' => 'Database created.',
+            'failed' => 'Database creation failed.',
+            'stale' => 'Database creation did not finish.',
+        ],
         'basic_auth_sync' => [
             'running' => 'Scanning :host for .htpasswd files …',
             'completed' => 'Basic-auth sync complete.',

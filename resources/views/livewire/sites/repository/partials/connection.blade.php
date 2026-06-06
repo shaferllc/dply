@@ -19,7 +19,7 @@
         <form wire:submit.prevent="saveConnection" class="space-y-4 px-6 py-6 sm:px-7">
             {{-- Rich picker: source toggle + account select + searchable repository
                  dropdown + manual URL (shared with choose-app / create-custom). --}}
-            @include('livewire.sites.partials._git-repository-configurator', ['idPrefix' => 'conn'])
+            @include('livewire.sites.partials._git-repository-configurator', ['idPrefix' => 'conn', 'reposLoading' => ! $connectionReposPrimed])
 
             <div class="relative block text-sm">
                 <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Deploy ref') }}</span>

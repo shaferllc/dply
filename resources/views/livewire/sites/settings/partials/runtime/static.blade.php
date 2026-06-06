@@ -27,5 +27,5 @@
 </section>
 
 <x-cli-snippet :commands="[
-    ['label' => __('Set published path'), 'command' => 'dply:site:set-runtime '.$site->slug.' --runtime=static --document-root=/var/www/app/public'],
+    ['label' => __('Set published path'), 'command' => 'dply sites:runtime:set '.$site->slug.' --runtime=static --document-root=/var/www/app/public'],
 ]" />

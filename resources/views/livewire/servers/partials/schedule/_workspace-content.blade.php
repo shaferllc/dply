@@ -186,6 +186,6 @@
 @if ($contextSiteModel)
     <x-cli-snippet :commands="[
         ['label' => __('List all cron jobs (server)'), 'command' => 'dply:server:cron:list '.$server->id],
-        ['label' => __('Add a schedule:run cron entry for a site'), 'command' => 'dply:site:cron:add '.$contextSiteModel->slug.' \'* * * * *\' \'php artisan schedule:run\''],
+        ['label' => __('Add a schedule:run cron entry for a site'), 'command' => 'dply sites:crons:add '.$contextSiteModel->slug.' \'* * * * *\' \'php artisan schedule:run\''],
     ]" />
 @endif

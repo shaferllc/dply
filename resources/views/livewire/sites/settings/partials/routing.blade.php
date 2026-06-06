@@ -239,10 +239,10 @@
     </div>
 
     <x-cli-snippet class="mt-6" :commands="[
-        ['label' => __('Add'), 'command' => 'dply:site:domain-add '.$site->slug.' new.example.com --primary'],
-        ['label' => __('Remove'), 'command' => 'dply:site:domain-remove '.$site->slug.' old.example.com'],
-        ['label' => __('Print primary URL'), 'command' => 'dply:site:url '.$site->slug],
-        ['label' => __('Find by hostname'), 'command' => 'dply:fleet:domain-find example.com'],
+        ['label' => __('Add'), 'command' => 'dply sites:domains:add '.$site->slug.' new.example.com --primary'],
+        ['label' => __('Remove'), 'command' => 'dply sites:domains:remove '.$site->slug.' old.example.com'],
+        ['label' => __('Print primary URL'), 'command' => 'dply sites:url '.$site->slug],
+        ['label' => __('Find by hostname'), 'command' => 'dply fleet:domains:find example.com'],
     ]" />
 
 @elseif ($routingTab === 'dns')
@@ -463,9 +463,9 @@
     </div>
 
     <x-cli-snippet class="mt-6" :commands="[
-        ['label' => __('Add'), 'command' => 'dply:site:alias-add '.$site->slug.' alt.example.com --label=Marketing'],
-        ['label' => __('Remove'), 'command' => 'dply:site:alias-remove '.$site->slug.' alt.example.com'],
-        ['label' => __('List'), 'command' => 'dply:site:alias-list '.$site->slug],
+        ['label' => __('Add'), 'command' => 'dply sites:aliases:add '.$site->slug.' alt.example.com --label=Marketing'],
+        ['label' => __('Remove'), 'command' => 'dply sites:aliases:remove '.$site->slug.' alt.example.com'],
+        ['label' => __('List'), 'command' => 'dply sites:aliases:list '.$site->slug],
     ]" />
 
 @elseif ($routingTab === 'redirects' && workspace_surface_coming_soon('site_redirects'))
@@ -767,11 +767,11 @@
     </div>
 
     <x-cli-snippet class="mt-6" :commands="[
-        ['label' => __('Add'), 'command' => 'dply:site:redirect-add '.$site->slug.' /old /new --code=301'],
-        ['label' => __('Remove'), 'command' => 'dply:site:redirect-remove '.$site->slug.' /old'],
-        ['label' => __('List'), 'command' => 'dply:site:redirect-list '.$site->slug],
-        ['label' => __('Bulk import'), 'command' => 'dply:site:redirect-import '.$site->slug.' --file=redirects.csv'],
-        ['label' => __('Export CSV'), 'command' => 'dply:site:redirect-export '.$site->slug.' --to=redirects.csv'],
+        ['label' => __('Add'), 'command' => 'dply sites:redirects:add '.$site->slug.' /old /new --code=301'],
+        ['label' => __('Remove'), 'command' => 'dply sites:redirects:remove '.$site->slug.' /old'],
+        ['label' => __('List'), 'command' => 'dply sites:redirects:list '.$site->slug],
+        ['label' => __('Bulk import'), 'command' => 'dply sites:redirects:import '.$site->slug.' --file=redirects.csv'],
+        ['label' => __('Export CSV'), 'command' => 'dply sites:redirects:export '.$site->slug.' --to=redirects.csv'],
     ]" />
 
 @elseif ($routingTab === 'preview' && workspace_surface_coming_soon('site_preview'))
@@ -878,8 +878,8 @@
     </div>
 
     <x-cli-snippet class="mt-6" :commands="[
-        ['label' => __('Set preview'), 'command' => 'dply:site:preview-set '.$site->slug.' preview.example.dply.cc --label=Preview --auto-ssl'],
-        ['label' => __('Remove preview'), 'command' => 'dply:site:preview-remove '.$site->slug.' preview.example.dply.cc'],
+        ['label' => __('Set preview'), 'command' => 'dply sites:preview:set '.$site->slug.' preview.example.dply.cc --label=Preview --auto-ssl'],
+        ['label' => __('Remove preview'), 'command' => 'dply sites:preview:remove '.$site->slug.' preview.example.dply.cc'],
     ]" />
 
 @elseif ($routingTab === 'tenants' && workspace_surface_coming_soon('site_tenants'))
@@ -1120,9 +1120,9 @@
     </div>
 
     <x-cli-snippet class="mt-6" :commands="[
-        ['label' => __('Add'), 'command' => 'dply:site:tenant-add '.$site->slug.' acme.example.com --key=acme --label=Acme'],
-        ['label' => __('Remove'), 'command' => 'dply:site:tenant-remove '.$site->slug.' acme.example.com'],
-        ['label' => __('List'), 'command' => 'dply:site:tenant-list '.$site->slug],
+        ['label' => __('Add'), 'command' => 'dply sites:tenants:add '.$site->slug.' acme.example.com --key=acme --label=Acme'],
+        ['label' => __('Remove'), 'command' => 'dply sites:tenants:remove '.$site->slug.' acme.example.com'],
+        ['label' => __('List'), 'command' => 'dply sites:tenants:list '.$site->slug],
     ]" />
 
 @endif

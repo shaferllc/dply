@@ -38,4 +38,7 @@
     @endif
 @endif
 
-<x-cli-snippet tone="stub" />
+<x-cli-snippet :commands="[
+    ['label' => __('Tail logs'), 'command' => 'dply sites:logs '.$site->slug.' --tail'],
+    ['label' => __('Show log files'), 'command' => 'dply sites:logs:list '.$site->slug],
+]" />

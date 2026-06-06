@@ -51,6 +51,6 @@
         <p class="mt-3 text-xs text-brand-mist">{{ trans_choice('{1} 1 match|[2,*] :count matches', count($rows), ['count' => count($rows)]) }}</p>
     @endif
 
-    <x-cli-snippet class="mt-8" :command="'dply:fleet:env-find '.($query !== '' ? $query : 'KEY').($mode === 'prefix' ? ' --prefix' : '')" />
+    <x-cli-snippet class="mt-8" :command="'dply fleet:env:find '.($query !== '' ? $query : 'KEY').($mode === 'prefix' ? ' --prefix' : '')" />
     </x-fleet-shell>
 </div>

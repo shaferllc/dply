@@ -194,7 +194,7 @@ final class DeployPipelineStarterCatalog
             'releases_to_keep' => null,
             'deploy_health_enabled' => false,
             'deploy_health_auto_rollback' => false,
-            'deploy_health_path' => '/health',
+            'deploy_health_path' => '/up',
         ];
     }
 

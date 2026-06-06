@@ -44,6 +44,7 @@
                 </x-explainer>
 
                 @include('livewire.partials.error-stream')
+                <x-cli-snippet class="mt-6" :command="'dply sites:errors '.$site->slug" />
             @endif
         </main>
     </div>

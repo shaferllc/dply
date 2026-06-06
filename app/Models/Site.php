@@ -368,6 +368,18 @@ class Site extends Model
      *
      * @return array<string, mixed>
      */
+    public function resolveRouteBinding($value, $field = null): ?static
+    {
+        // Accepts slug (human-readable, used by CLI) or primary key (ULID,
+        // used by web routes). Tries slug first so CLI commands like
+        // `dply sites:show my-site` resolve correctly without changing how
+        // web URL generation works (which still uses the primary key).
+        return static::query()
+            ->where('slug', $value)
+            ->orWhere($this->getKeyName(), $value)
+            ->first();
+    }
+
     public function ensureUniqueSlug(): void
     {
         $base = $this->slug;

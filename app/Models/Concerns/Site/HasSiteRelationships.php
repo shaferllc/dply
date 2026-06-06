@@ -17,6 +17,7 @@ use App\Models\Project;
 use App\Models\ProviderCredential;
 use App\Models\Script;
 use App\Models\Server;
+use App\Models\ServerDatabase;
 use App\Models\Site;
 use App\Models\SiteAccessGate;
 use App\Models\SiteAccessGatePassword;
@@ -262,6 +263,17 @@ trait HasSiteRelationships
     public function processes(): HasMany
     {
         return $this->hasMany(SiteProcess::class)->orderBy('name');
+    }
+
+    /**
+     * Databases on the site's server that belong to this site (via the
+     * server_databases.site_id single-owner link). Server-wide databases
+     * with a null site_id are not included — they surface only on the
+     * server-level Databases manager.
+     */
+    public function serverDatabases(): HasMany
+    {
+        return $this->hasMany(ServerDatabase::class)->orderBy('name');
     }
 
     public function bindings(): HasMany

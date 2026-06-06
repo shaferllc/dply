@@ -115,7 +115,7 @@ final class DeployPipelineJsonExporter
             'releases_to_keep' => (int) ($site->releases_to_keep ?? 5),
             'deploy_health_enabled' => (bool) ($meta['deploy_health_enabled'] ?? false),
             'deploy_health_auto_rollback' => (bool) ($meta['deploy_health_auto_rollback'] ?? false),
-            'deploy_health_path' => (string) ($meta['deploy_health_path'] ?? '/health'),
+            'deploy_health_path' => (string) ($meta['deploy_health_path'] ?? '/up'),
             'deploy_health_expect_status' => (int) ($meta['deploy_health_expect_status'] ?? 200),
             'deploy_health_attempts' => (int) ($meta['deploy_health_attempts'] ?? 5),
             'deploy_health_delay_ms' => (int) ($meta['deploy_health_delay_ms'] ?? 500),

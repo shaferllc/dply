@@ -163,6 +163,9 @@
                             <x-input-error :messages="$errors->get('php_fpm_user')" class="mt-1" />
                         </div>
                     @endif
+                    {{-- Hidden for confidently-non-Laravel PHP stacks (Symfony,
+                         WordPress…), where `php artisan schedule:run` doesn't exist. --}}
+                    @if ($site->supportsLaravelScheduler())
                     <div class="flex flex-col justify-end">
                         <label class="flex items-center gap-2 text-sm text-brand-ink">
                             <input type="checkbox" wire:model="laravel_scheduler" class="rounded border-brand-ink/15 text-brand-forest shadow-sm focus:ring-brand-forest">
@@ -172,6 +175,7 @@
                             <p class="mt-1 pl-6 text-xs text-brand-moss">{{ $site->runtimeSchedulerCheckboxHelp() }}</p>
                         @endif
                     </div>
+                    @endif
                 </div>
             </div>
 
@@ -183,7 +187,7 @@
 @endif
 
 <x-cli-snippet :commands="[
-    ['label' => __('Set PHP version'), 'command' => 'dply:site:set-runtime '.$site->slug.' --runtime=php --runtime-version=8.4'],
+    ['label' => __('Set PHP version'), 'command' => 'dply sites:runtime:set '.$site->slug.' --runtime=php --runtime-version=8.4'],
     ['label' => __('Open server PHP workspace'), 'command' => 'dply:server:php '.($server->name ?? 'SERVER')],
 ]" />
 

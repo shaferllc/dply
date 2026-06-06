@@ -7,7 +7,7 @@ namespace App\Jobs;
 use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\Site;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
-use App\Services\Sites\SiteSystemdProvisioner;
+use App\Services\WorkerPools\WorkerDaemonBackend;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
@@ -22,13 +22,14 @@ use Illuminate\Support\Facades\Log;
  * pool's worker buttons.
  *
  * Unlike {@see ProvisionSiteSystemdUnitsJob} (which short-circuits for php/static
- * web sites because FPM is implicit), this drives the WORKER units directly via
- * {@see SiteSystemdProvisioner}, so a Laravel (php) site's Horizon daemon is
- * managed even though its web tier is FPM. Streams to the site's `systemd`
- * console banner.
+ * web sites because FPM is implicit), this drives the WORKER daemons directly via
+ * {@see \App\Services\WorkerPools\WorkerDaemonBackend}, so a Laravel (php) site's
+ * Horizon daemon is managed even though its web tier is FPM. The backend runs the
+ * daemons under the pool's chosen process manager (systemd or supervisor) and
+ * tears down the other. Streams to the site's `systemd` console banner.
  *
- *   action 'ensure'  → provision() (write units + `systemctl enable --now`)
- *   action 'start' | 'stop' | 'restart' → systemctl on the worker units
+ *   action 'ensure'  → backend->ensure() (provision chosen PM, tear down other)
+ *   action 'start' | 'stop' | 'restart' → backend->control() on the active PM
  */
 class ControlWorkerDaemonJob implements ShouldQueue
 {
@@ -62,7 +63,7 @@ class ControlWorkerDaemonJob implements ShouldQueue
         return $this->userId;
     }
 
-    public function handle(SiteSystemdProvisioner $provisioner, ExecuteRemoteTaskOnServer $exec): void
+    public function handle(WorkerDaemonBackend $backend, ExecuteRemoteTaskOnServer $exec): void
     {
         $site = Site::query()->with('server', 'processes')->find($this->siteId);
         if ($site === null) {
@@ -149,12 +150,12 @@ class ControlWorkerDaemonJob implements ShouldQueue
                     }
                 }
 
-                $emit->step('systemd', 'writing + starting worker units');
-                $written = $provisioner->provision($site);
-                $emit->success('units: '.(implode(', ', (array) $written) ?: 'none'), 'systemd');
+                $emit->step('systemd', 'writing + starting worker daemons');
+                $result = $backend->ensure($site);
+                $emit->success(($result['backend'] === 'supervisor' ? 'supervisor' : 'systemd').': '.$result['detail'], 'systemd');
             } else {
-                $emit->step('systemd', $this->action.' worker units');
-                $out = $provisioner->controlWorkerUnits($site, $this->action);
+                $emit->step('systemd', $this->action.' worker daemons');
+                $out = $backend->control($site, $this->action);
                 $emit(trim($out) !== '' ? $out : '(no output)', 'info', 'systemd');
             }
 

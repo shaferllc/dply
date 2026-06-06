@@ -309,6 +309,7 @@ trait ManagesSiteEnvironment
         }
 
         $this->bulk_env_input = '';
+        $this->dispatch('close-modal', 'paste-env-modal');
         $this->autoPushAfterCacheMutation(__(':count variable(s) imported.', ['count' => $count]));
     }
 
@@ -849,6 +850,141 @@ trait ManagesSiteEnvironment
         $this->dispatch('dply-console-action-focus');
         $this->watchConsoleAction($run, __('Environment requirements re-scanned.'), __('Environment scan did not finish.'));
         $this->toastConsoleActionQueued();
+    }
+
+    /** Disable the required-env gate for this site (no-deploy variant). */
+    public function ignoreMissingEnv(): void
+    {
+        $this->authorize('update', $this->site);
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta['skip_env_gate'] = true;
+        unset($meta['deploy_blocked_env']);
+        $this->site->forceFill(['meta' => $meta])->save();
+        $this->toastSuccess(__('Ignoring missing required variables for this site — deploys won\'t be blocked by them.'));
+    }
+
+    /** Re-enable the required-env gate. */
+    public function enableEnvGate(): void
+    {
+        $this->authorize('update', $this->site);
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        unset($meta['skip_env_gate']);
+        $this->site->forceFill(['meta' => $meta])->save();
+        $this->toastSuccess(__('Required-env check re-enabled. Deploys stop if required variables are missing.'));
+    }
+
+    /** Whether the required-env gate is currently disabled. */
+    public function envGateSkipped(): bool
+    {
+        return ($this->site->meta['skip_env_gate'] ?? false) === true;
+    }
+
+    public function confirmIgnoreMissingEnv(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->openConfirmActionModal(
+            method: 'ignoreMissingEnv',
+            title: __('Ignore missing variables?'),
+            message: __('Stop blocking and warning on the missing required variables for this site. Deploys will proceed even if they are unset — it\'s on you if the app errors. You can re-enable this later.'),
+            confirmLabel: __('Ignore them'),
+        );
+    }
+
+    public function confirmIgnoreEnvKey(string $key): void
+    {
+        $this->authorize('update', $this->site);
+        $key = trim($key);
+        if ($key === '') {
+            return;
+        }
+        $this->openConfirmActionModal(
+            method: 'ignoreEnvKey',
+            arguments: [$key],
+            title: __('Ignore :key?', ['key' => $key]),
+            message: __('Mark :key as intentionally unset for this site. It won\'t count as a missing required variable or block deploys. You can un-ignore it later.', ['key' => $key]),
+            confirmLabel: __('Ignore'),
+        );
+    }
+
+    /** Per-variable ignore: mark one required key as intentionally unset. */
+    public function ignoreEnvKey(string $key): void
+    {
+        $this->authorize('update', $this->site);
+        $key = trim($key);
+        if ($key === '') {
+            return;
+        }
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $ignored = array_values(array_unique([...((array) ($meta['ignored_env_keys'] ?? [])), $key]));
+        $meta['ignored_env_keys'] = $ignored;
+        if (isset($meta['deploy_blocked_env']['keys']) && is_array($meta['deploy_blocked_env']['keys'])) {
+            $meta['deploy_blocked_env']['keys'] = array_values(array_filter(
+                $meta['deploy_blocked_env']['keys'],
+                static fn ($e): bool => is_array($e) && (string) ($e['key'] ?? '') !== $key,
+            ));
+            if ($meta['deploy_blocked_env']['keys'] === []) {
+                unset($meta['deploy_blocked_env']);
+            }
+        }
+        $this->site->forceFill(['meta' => $meta])->save();
+        $this->toastSuccess(__(':key will be ignored — deploys won\'t require it.', ['key' => $key]));
+    }
+
+    /** Undo a per-variable ignore. */
+    public function unignoreEnvKey(string $key): void
+    {
+        $this->authorize('update', $this->site);
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta['ignored_env_keys'] = array_values(array_filter(
+            (array) ($meta['ignored_env_keys'] ?? []),
+            static fn ($k): bool => (string) $k !== trim($key),
+        ));
+        $this->site->forceFill(['meta' => $meta])->save();
+        $this->toastSuccess(__(':key is no longer ignored.', ['key' => $key]));
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function ignoredEnvKeys(): array
+    {
+        return array_values(array_map('strval', (array) ($this->site->meta['ignored_env_keys'] ?? [])));
+    }
+
+    /** Suppress a SiteEnvValidator warning by its env key. */
+    public function ignoreEnvWarning(string $key): void
+    {
+        $this->authorize('update', $this->site);
+        $key = trim($key);
+        if ($key === '') {
+            return;
+        }
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $suppressed = array_values(array_unique([...((array) ($meta['suppressed_env_warnings'] ?? [])), $key]));
+        $meta['suppressed_env_warnings'] = $suppressed;
+        $this->site->forceFill(['meta' => $meta])->save();
+        $this->toastSuccess(__(':key warning suppressed.', ['key' => $key]));
+    }
+
+    /** Re-enable a previously suppressed SiteEnvValidator warning. */
+    public function unignoreEnvWarning(string $key): void
+    {
+        $this->authorize('update', $this->site);
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta['suppressed_env_warnings'] = array_values(array_filter(
+            (array) ($meta['suppressed_env_warnings'] ?? []),
+            static fn ($k): bool => (string) $k !== trim($key),
+        ));
+        $this->site->forceFill(['meta' => $meta])->save();
+        $this->toastSuccess(__(':key warning re-enabled.', ['key' => $key]));
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function suppressedEnvWarningKeys(): array
+    {
+        return array_values(array_map('strval', (array) ($this->site->meta['suppressed_env_warnings'] ?? [])));
     }
 
     /**

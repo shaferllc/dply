@@ -7,7 +7,7 @@ namespace App\Support\Sites;
 use App\Models\Site;
 use App\Models\SiteDeployStep;
 use App\Services\Deploy\RuntimeAwareDeployStepDefaults;
-use App\Services\Sites\SiteDeployPipelineManager;
+use App\Services\Deploy\SiteDeployPipelineManager;
 
 /**
  * The "simple text pipeline": each deploy phase (build / release / restart) is a
@@ -30,7 +30,10 @@ class DeployScriptComposer
     ];
 
     /**
-     * Render a site's current deploy steps to one shell script per phase.
+     * Render a site's freeform (TYPE_CUSTOM) deploy commands to one editable
+     * script per phase. Typed steps are deliberately excluded — they're shown
+     * read-only in the editor via {@see lockedSteps()} and managed in the visual
+     * builder — so the textarea only ever contains what the text editor owns.
      *
      * @return array<string, string>  phase => script text
      */
@@ -42,12 +45,39 @@ class DeployScriptComposer
         foreach (self::PHASES as $phase) {
             $lines = $site->deploySteps
                 ->where('phase', $phase)
+                ->where('step_type', SiteDeployStep::TYPE_CUSTOM)
                 ->sortBy('sort_order')
                 ->map(fn (SiteDeployStep $s) => $s->commandFor())
                 ->filter(fn ($c) => is_string($c) && trim($c) !== '')
                 ->values()
                 ->all();
             $out[$phase] = implode("\n", $lines);
+        }
+
+        return $out;
+    }
+
+    /**
+     * Typed (non-custom) steps per phase — the structured steps the text editor
+     * does NOT own. Shown as locked read-only rows so the run order is honest
+     * even though the textarea only edits the freeform portion. Normally empty
+     * for text-authored pipelines; populated when a pipeline was built in the
+     * visual builder.
+     *
+     * @return array<string, list<SiteDeployStep>>  phase => typed steps
+     */
+    public function lockedSteps(Site $site): array
+    {
+        $site->loadMissing('deploySteps');
+
+        $out = [];
+        foreach (self::PHASES as $phase) {
+            $out[$phase] = $site->deploySteps
+                ->where('phase', $phase)
+                ->where('step_type', '!=', SiteDeployStep::TYPE_CUSTOM)
+                ->sortBy('sort_order')
+                ->values()
+                ->all();
         }
 
         return $out;
@@ -84,10 +114,12 @@ class DeployScriptComposer
     }
 
     /**
-     * Persist the text blocks as exactly one TYPE_CUSTOM step per phase. An
-     * empty block leaves that phase with no step. Collapses any existing
-     * structured steps in these phases — lossy by design (the whole point of the
-     * simple text mode).
+     * Persist the text blocks as exactly one TYPE_CUSTOM step per phase, WITHOUT
+     * destroying structure: only the existing freeform custom step(s) in each
+     * phase are replaced — typed steps and hooks authored in the visual builder
+     * are left untouched. The custom blob sorts after any typed steps so deps
+     * install first, then your commands. An empty block clears that phase's
+     * custom step.
      *
      * @param  array<string, string>  $scripts  phase => script text
      */
@@ -96,16 +128,23 @@ class DeployScriptComposer
         $pipeline = app(SiteDeployPipelineManager::class)->ensureDefaultPipeline($site);
 
         foreach (self::PHASES as $phase) {
-            $pipeline->steps()->where('phase', $phase)->delete();
+            // Replace only the freeform portion; preserve typed steps + hooks.
+            $pipeline->steps()
+                ->where('phase', $phase)
+                ->where('step_type', SiteDeployStep::TYPE_CUSTOM)
+                ->delete();
 
             $text = trim((string) ($scripts[$phase] ?? ''));
             if ($text === '') {
                 continue;
             }
 
+            // Run the custom blob after any surviving typed steps in this phase.
+            $maxOrder = (int) $pipeline->steps()->where('phase', $phase)->max('sort_order');
+
             $pipeline->steps()->create([
                 'site_id' => $site->id,
-                'sort_order' => 0,
+                'sort_order' => $maxOrder + 1,
                 'step_type' => SiteDeployStep::TYPE_CUSTOM,
                 'phase' => $phase,
                 'custom_command' => $text,

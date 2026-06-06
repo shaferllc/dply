@@ -224,6 +224,8 @@
                 <p class="font-medium text-brand-ink">{{ __('Coming next') }}</p>
                 <p class="mt-1">{{ __('Multiple cron rules per app, with cron expression + target + timezone + retry policy + last/next run timestamps. The single-toggle scheduler above is the v1 stand-in until that ships.') }}</p>
             </section>
+
+            <x-cli-snippet class="mt-6" :command="'dply sites:schedules '.$site->slug" />
         </main>
     </div>
 

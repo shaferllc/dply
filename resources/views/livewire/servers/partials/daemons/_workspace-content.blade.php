@@ -206,9 +206,9 @@
 
 @if ($contextSiteModel)
     <x-cli-snippet :commands="[
-        ['label' => __('Add or update a process'), 'command' => 'dply:site:process-set '.$contextSiteModel->slug.' worker --type=worker --command=\'php artisan queue:work\' --scale=1'],
-        ['label' => __('Remove a process'), 'command' => 'dply:site:process-remove '.$contextSiteModel->slug.' worker'],
-        ['label' => __('Restart a process'), 'command' => 'dply:site:restart-process '.$contextSiteModel->slug.' worker'],
-        ['label' => __('Show running processes'), 'command' => 'dply:site:ps '.$contextSiteModel->slug],
+        ['label' => __('Add or update a process'), 'command' => 'dply sites:workers:set '.$contextSiteModel->slug.' worker --type=worker --command=\'php artisan queue:work\' --scale=1'],
+        ['label' => __('Remove a process'), 'command' => 'dply sites:workers:remove '.$contextSiteModel->slug.' worker'],
+        ['label' => __('Restart a process'), 'command' => 'dply sites:workers:restart '.$contextSiteModel->slug.' worker'],
+        ['label' => __('Show running processes'), 'command' => 'dply sites:workers:ps '.$contextSiteModel->slug],
     ]" />
 @endif

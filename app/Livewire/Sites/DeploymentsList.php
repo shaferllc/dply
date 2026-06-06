@@ -369,22 +369,6 @@ class DeploymentsList extends Component
     }
 
     /**
-     * Ignore missing required variables for this site WITHOUT deploying — just
-     * turns off the gate and clears the recorded block so the banners go away.
-     * The operator can re-enable later. Use deployIgnoringEnvGate() instead to
-     * skip and ship in one step.
-     */
-    public function ignoreMissingEnv(): void
-    {
-        Gate::authorize('update', $this->site);
-        $meta = is_array($this->site->meta) ? $this->site->meta : [];
-        $meta['skip_env_gate'] = true;
-        unset($meta['deploy_blocked_env']);
-        $this->site->forceFill(['meta' => $meta])->save();
-        $this->toastSuccess(__('Ignoring missing required variables for this site — deploys won\'t be blocked by them.'));
-    }
-
-    /**
      * Re-evaluate the required-env gate against the live server .env right now,
      * without deploying. Clears the "Deploy needs N variables" banner if the
      * vars are actually set — the non-destructive fix for a stale block. The
@@ -441,39 +425,8 @@ class DeploymentsList extends Component
     }
 
     /**
-     * Re-enable the required-env gate (undo deployIgnoringEnvGate / ignoreMissingEnv).
+     * Confirm-modal wrapper for deploy-and-skip in one shot.
      */
-    public function enableEnvGate(): void
-    {
-        Gate::authorize('update', $this->site);
-        $meta = is_array($this->site->meta) ? $this->site->meta : [];
-        unset($meta['skip_env_gate']);
-        $this->site->forceFill(['meta' => $meta])->save();
-        $this->toastSuccess(__('Required-env check re-enabled. Deploys stop if required variables are missing.'));
-    }
-
-    /** Whether the required-env gate is currently disabled for this site. */
-    public function envGateSkipped(): bool
-    {
-        return ($this->site->meta['skip_env_gate'] ?? false) === true;
-    }
-
-    /**
-     * Confirm-modal wrappers (so these use the app's confirm modal rather than
-     * a native browser alert). Each opens {@see ConfirmsActionWithModal} which
-     * calls the real method on confirm.
-     */
-    public function confirmIgnoreMissingEnv(): void
-    {
-        Gate::authorize('update', $this->site);
-        $this->openConfirmActionModal(
-            method: 'ignoreMissingEnv',
-            title: __('Ignore missing variables?'),
-            message: __('Stop blocking and warning on the missing required variables for this site. Deploys will proceed even if they are unset — it\'s on you if the app errors. You can re-enable this later.'),
-            confirmLabel: __('Ignore them'),
-        );
-    }
-
     public function confirmDeployIgnoringEnvGate(): void
     {
         Gate::authorize('update', $this->site);
@@ -485,93 +438,38 @@ class DeploymentsList extends Component
         );
     }
 
-    /** Confirm-modal wrapper for per-variable ignore (modal, not a browser alert). */
-    public function confirmIgnoreEnvKey(string $key): void
-    {
-        Gate::authorize('update', $this->site);
-        $key = trim($key);
-        if ($key === '') {
-            return;
-        }
-        $this->openConfirmActionModal(
-            method: 'ignoreEnvKey',
-            arguments: [$key],
-            title: __('Ignore :key?', ['key' => $key]),
-            message: __('Mark :key as intentionally unset for this site. It won\'t count as a missing required variable or block deploys. You can un-ignore it later.', ['key' => $key]),
-            confirmLabel: __('Ignore'),
-        );
-    }
-
-    /** Per-variable ignore: mark one required key as intentionally unset. */
-    public function ignoreEnvKey(string $key): void
-    {
-        Gate::authorize('update', $this->site);
-        $key = trim($key);
-        if ($key === '') {
-            return;
-        }
-        $meta = is_array($this->site->meta) ? $this->site->meta : [];
-        $ignored = array_values(array_unique([...((array) ($meta['ignored_env_keys'] ?? [])), $key]));
-        $meta['ignored_env_keys'] = $ignored;
-        // Drop it from the recorded deploy block so the banner updates.
-        if (isset($meta['deploy_blocked_env']['keys']) && is_array($meta['deploy_blocked_env']['keys'])) {
-            $meta['deploy_blocked_env']['keys'] = array_values(array_filter(
-                $meta['deploy_blocked_env']['keys'],
-                static fn ($e): bool => is_array($e) && (string) ($e['key'] ?? '') !== $key,
-            ));
-            if ($meta['deploy_blocked_env']['keys'] === []) {
-                unset($meta['deploy_blocked_env']);
-            }
-        }
-        $this->site->forceFill(['meta' => $meta])->save();
-        $this->toastSuccess(__(':key will be ignored — deploys won\'t require it.', ['key' => $key]));
-    }
-
-    /** Undo a per-variable ignore. */
-    public function unignoreEnvKey(string $key): void
-    {
-        Gate::authorize('update', $this->site);
-        $meta = is_array($this->site->meta) ? $this->site->meta : [];
-        $meta['ignored_env_keys'] = array_values(array_filter(
-            (array) ($meta['ignored_env_keys'] ?? []),
-            static fn ($k): bool => (string) $k !== trim($key),
-        ));
-        $this->site->forceFill(['meta' => $meta])->save();
-        $this->toastSuccess(__(':key is no longer ignored.', ['key' => $key]));
-    }
-
-    /**
-     * Keys the operator has individually ignored.
-     *
-     * @return list<string>
-     */
-    public function ignoredEnvKeys(): array
-    {
-        return array_values(array_map('strval', (array) ($this->site->meta['ignored_env_keys'] ?? [])));
-    }
-
     public function render(): View
     {
-        $query = SiteDeployment::query()
-            ->where('site_id', $this->site->id)
-            ->orderByDesc('started_at');
+        // The paginated list + trigger facets feed ONLY the History panel; the
+        // distinct/paginate queries are wasted on every other tab. Run them only
+        // when History is active so switching to Environment / Webhook / etc.
+        // doesn't pay for the deploy history each time.
+        $isHistory = $this->tab === self::TAB_HISTORY;
 
-        if (in_array($this->statusFilter, self::ALLOWED_STATUSES, true)) {
-            $query->where('status', $this->statusFilter);
+        $deployments = null;
+        $triggers = [];
+        if ($isHistory) {
+            $query = SiteDeployment::query()
+                ->where('site_id', $this->site->id)
+                ->orderByDesc('started_at');
+
+            if (in_array($this->statusFilter, self::ALLOWED_STATUSES, true)) {
+                $query->where('status', $this->statusFilter);
+            }
+            if ($this->triggerFilter !== '') {
+                $query->where('trigger', $this->triggerFilter);
+            }
+
+            $deployments = $query->paginate(25);
+
+            $triggers = SiteDeployment::query()
+                ->where('site_id', $this->site->id)
+                ->whereNotNull('trigger')
+                ->distinct()
+                ->orderBy('trigger')
+                ->pluck('trigger')
+                ->all();
         }
-        if ($this->triggerFilter !== '') {
-            $query->where('trigger', $this->triggerFilter);
-        }
-
-        $deployments = $query->paginate(25);
-
-        $triggers = SiteDeployment::query()
-            ->where('site_id', $this->site->id)
-            ->whereNotNull('trigger')
-            ->distinct()
-            ->orderBy('trigger')
-            ->pluck('trigger')
-            ->all();
 
         $runtimeMode = $this->site->runtimeTargetMode();
         $isVmDeployHub = $runtimeMode === 'vm'
@@ -581,12 +479,32 @@ class DeploymentsList extends Component
         $atomicReleases = $isVmDeployHub && $this->site->deploy_strategy === 'atomic';
         $latestDeployment = null;
 
+        // Eager-load only the relation the active panel actually reads: the
+        // releases list is Releases-only; the recent-deployments window (and the
+        // $latestDeployment it yields) is the Deploy panel only. The fallback
+        // tab also renders the Deploy panel, hence the in-array check. Other
+        // tabs (Environment, Webhook, Hooks, Pipeline…) load neither.
         if ($isVmDeployHub) {
-            $this->site->load([
-                'releases' => fn ($q) => $q->orderByDesc('id')->limit(30),
-                'deployments' => fn ($q) => $q->orderByDesc('started_at')->limit(5),
-            ]);
-            $latestDeployment = $this->site->deployments->first();
+            $load = [];
+            if ($this->tab === self::TAB_RELEASES) {
+                $load['releases'] = fn ($q) => $q->orderByDesc('id')->limit(30);
+            }
+
+            $deployPanelTabs = [self::TAB_OVERVIEW, self::TAB_REPOSITORY, self::TAB_ENVIRONMENT, self::TAB_COMMITS,
+                self::TAB_FILES, self::TAB_BRANCHES, self::TAB_PIPELINE, self::TAB_ROLLOUT, self::TAB_RELEASES,
+                self::TAB_HISTORY, self::TAB_WEBHOOK, self::TAB_HOOKS, self::TAB_SETTINGS];
+            $needsLatest = ! in_array($this->tab, $deployPanelTabs, true); // Deploy tab + unknown fallback
+
+            if ($needsLatest) {
+                $load['deployments'] = fn ($q) => $q->orderByDesc('started_at')->limit(5);
+            }
+
+            if ($load !== []) {
+                $this->site->load($load);
+            }
+            if ($needsLatest) {
+                $latestDeployment = $this->site->deployments->first();
+            }
         }
 
         $tabsVisible = [
@@ -613,13 +531,26 @@ class DeploymentsList extends Component
             ? $this->computeOverviewMetrics()
             : null;
 
+        // The deployment contract + preflight are display data for deploy-config
+        // surfaces. The builder eager-loads relations and runs the secret /
+        // resource-binding resolvers, and the validator adds more on top — real
+        // per-render cost. Nothing on this page's panels or chrome actually reads
+        // the keys they produce, so build them only for the deploy-config tabs
+        // (and the unknown-tab fallback, which renders the Deploy panel) and skip
+        // the work entirely on History / Webhook / Hooks / Pipeline / Releases /
+        // Overview switches.
+        $needsContract = in_array($this->tab, [self::TAB_DEPLOY, self::TAB_ENVIRONMENT], true)
+            || ! in_array($this->tab, self::TABS, true);
+        $deploymentContract = $needsContract ? app(DeploymentContractBuilder::class)->build($this->site) : null;
+        $deploymentPreflight = $needsContract ? app(DeploymentPreflightValidator::class)->validate($this->site) : [];
+
         return view('livewire.sites.deployments-list', array_merge(
             SiteSettingsViewData::for(
                 $this->server,
                 $this->site,
                 'deploy',
-                app(DeploymentContractBuilder::class)->build($this->site),
-                app(DeploymentPreflightValidator::class)->validate($this->site),
+                $deploymentContract,
+                $deploymentPreflight,
                 auth()->user(),
             ),
             [

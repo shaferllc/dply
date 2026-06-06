@@ -71,9 +71,9 @@
 
     @php
         $fleetDeploysCommand = match ($tab) {
-            'running' => 'dply:fleet:running-deploys',
-            'failed-latest' => 'dply:fleet:failed-deploys',
-            default => 'dply:fleet:stale-deploys --days='.$staleDays,
+            'running' => 'dply fleet:deploys:running',
+            'failed-latest' => 'dply fleet:deploys:failed',
+            default => 'dply fleet:deploys:stale --days='.$staleDays,
         };
     @endphp
     <x-cli-snippet class="mt-8" :command="$fleetDeploysCommand" />

@@ -67,6 +67,13 @@
                 @include('livewire.sites.partials.deployments._tabstrip')
 
                 <div wire:key="deployments-panel-{{ $tab }}">
+                    {{-- Tab switch shows the skeleton placeholder instantly
+                         (client-side via wire:loading, no spinner) and swaps the
+                         real panel in when setTab's single round-trip lands. --}}
+                    <div class="hidden" wire:loading.class.remove="hidden" wire:target="setTab">
+                        @include('livewire.sites.partials._panel-skeleton')
+                    </div>
+                    <div wire:loading.class="hidden" wire:target="setTab">
                     @if ($tab === \App\Livewire\Sites\DeploymentsList::TAB_OVERVIEW)
                         @include('livewire.sites.partials.deployments._overview-panel')
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_REPOSITORY)
@@ -98,6 +105,7 @@
                     @else
                         @include('livewire.sites.partials.deployments._deploy-panel')
                     @endif
+                    </div>
                 </div>
             @else
                 {{-- Fallback for runtimes that don't fit either bucket — just
@@ -105,7 +113,7 @@
                 @include('livewire.sites.partials.deployments._history-panel')
             @endif
 
-            <x-cli-snippet class="mt-6" :command="'dply:site:deploy-history '.$site->slug" />
+            <x-cli-snippet class="mt-6" :command="'dply sites:deployments '.$site->slug" />
             </main>
         </div>
     </div>

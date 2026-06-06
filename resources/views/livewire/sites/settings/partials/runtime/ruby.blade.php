@@ -45,6 +45,6 @@
 </section>
 
 <x-cli-snippet :commands="[
-    ['label' => __('Set Ruby version'), 'command' => 'dply:site:set-runtime '.$site->slug.' --runtime=ruby --runtime-version=3.3'],
-    ['label' => __('Set start command'), 'command' => 'dply:site:set-runtime '.$site->slug.' --start=\'bundle exec puma -C config/puma.rb\' --port=3000'],
+    ['label' => __('Set Ruby version'), 'command' => 'dply sites:runtime:set '.$site->slug.' --runtime=ruby --runtime-version=3.3'],
+    ['label' => __('Set start command'), 'command' => 'dply sites:runtime:set '.$site->slug.' --start=\'bundle exec puma -C config/puma.rb\' --port=3000'],
 ]" />

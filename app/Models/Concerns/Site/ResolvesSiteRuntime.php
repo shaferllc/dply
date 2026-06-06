@@ -460,6 +460,75 @@ trait ResolvesSiteRuntime
     }
 
     /**
+     * Whether to surface the Laravel scheduler convenience toggle (the per-minute
+     * `php artisan schedule:run` cron) AND actually install it. A single rule
+     * honoured by both the UI (visibility) and the deploy effect
+     * ({@see \App\Services\Servers\ServerCronSynchronizer}) so they can't drift.
+     *
+     * Shown for PHP sites unless we're CONFIDENT the stack can't use it: hidden
+     * only for non-PHP runtimes and for frameworks that have no `artisan`
+     * (WordPress, Symfony, Drupal…). When detection is empty / `php_generic`
+     * (e.g. a never-deployed or unrecognised PHP repo) we err toward showing it,
+     * since it could be a Laravel app whose detection hasn't run yet.
+     */
+    public function supportsLaravelScheduler(): bool
+    {
+        if ($this->runtimeKey() !== 'php') {
+            return false;
+        }
+
+        // Framework signal from runtime detection OR scaffold meta (mirrors the
+        // dual-source approach in isWordPressDetected()), so a scaffolded
+        // WordPress/Symfony site is correctly excluded before its first deploy.
+        $detected = strtolower((string) ($this->resolvedRuntimeAppDetection()['framework'] ?? ''));
+        $scaffolded = strtolower((string) ($this->meta['scaffold']['framework'] ?? ''));
+
+        $confidentlyNonLaravel = ['wordpress', 'symfony', 'drupal', 'rails'];
+
+        return ! in_array($detected, $confidentlyNonLaravel, true)
+            && ! in_array($scaffolded, $confidentlyNonLaravel, true);
+    }
+
+    /**
+     * Whether the "Restart Supervisor programs after deploy" toggle is meaningful
+     * for this site — i.e. there is at least one active Supervisor program that
+     * {@see \App\Services\Servers\SupervisorDeployRestarter} would restart
+     * (site-scoped or a server-wide program with no site_id). Sites whose workers
+     * run as systemd units (restarted automatically on the atomic release swap),
+     * or that have no workers at all, return false.
+     */
+    public function hasRestartableSupervisorPrograms(): bool
+    {
+        $serverId = $this->server_id;
+        if ($serverId === null) {
+            return false;
+        }
+
+        return \App\Models\SupervisorProgram::query()
+            ->where('server_id', $serverId)
+            ->where('is_active', true)
+            ->where(function ($q): void {
+                $q->where('site_id', $this->id)->orWhereNull('site_id');
+            })
+            ->exists();
+    }
+
+    /**
+     * Whether dply can manage per-minute crons on this site's host (mirrors
+     * {@see \App\Livewire\Servers\WorkspaceCron::siteSupportsVmManagedCron()}).
+     * Gates the "→ Cron" link shown when the Laravel scheduler toggle is hidden.
+     */
+    public function supportsVmManagedCron(): bool
+    {
+        $this->loadMissing('server');
+
+        return (bool) $this->server?->hostCapabilities()->supportsSsh()
+            && ! $this->usesFunctionsRuntime()
+            && ! $this->usesDockerRuntime()
+            && ! $this->usesKubernetesRuntime();
+    }
+
+    /**
      * Whether one-shot Laravel SSH setup from Site settings is allowed (BYO VM, SSH ready, Laravel detected).
      */
     public function canRunLaravelSshSetupActions(): bool

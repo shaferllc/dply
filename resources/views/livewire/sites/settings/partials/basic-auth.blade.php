@@ -711,5 +711,9 @@
         @endif
     @endif
 
-    <x-cli-snippet tone="stub" />
+    <x-cli-snippet :commands="[
+        ['label' => __('List users'), 'command' => 'dply sites:basic-auth:list '.$site->slug],
+        ['label' => __('Add user'), 'command' => 'dply sites:basic-auth:add '.$site->slug.' <user> <password>'],
+        ['label' => __('Remove user'), 'command' => 'dply sites:basic-auth:remove '.$site->slug.' <user>'],
+    ]" />
 </section>

@@ -124,6 +124,6 @@
             </div>
         </section>
 
-        <x-cli-snippet class="mt-10" command="dply:fleet:doctor" />
+        <x-cli-snippet class="mt-10" command="dply fleet:doctor" />
     </x-fleet-shell>
 </div>

@@ -56,6 +56,13 @@
         @php
             $entries = [
                 [
+                    'date'    => 'June 6, 2026',
+                    'tags'    => ['new'],
+                    'title'   => 'Site Database Management',
+                    'summary' => 'You can now create and link a database directly from a VM site\'s page, manage workers, schedules, and basic auth via a new site resource API.',
+                    'items'   => [],
+                ],
+                [
                     'date'    => 'June 5, 2026',
                     'tags'    => ['fixed'],
                     'title'   => 'Reliable Worker Restarts On Deploy',

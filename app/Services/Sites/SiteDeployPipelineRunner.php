@@ -70,6 +70,76 @@ class SiteDeployPipelineRunner
     }
 
     /**
+     * dply-owned managed restart, run after activation so long-running processes
+     * pick up the new release: reload PHP-FPM (or reload Octane workers, which
+     * serve the app instead of FPM), and bounce Horizon + queue workers when the
+     * app uses them. Detection is repo-driven (composer packages / octane port);
+     * each command is also guarded on the box and best-effort, so a worker that
+     * isn't running never fails an otherwise-healthy deploy. Skipped entirely
+     * when the operator disabled it (`meta.deploy.skip_managed_restart`) or for
+     * static / container sites that have nothing FPM/worker-shaped to restart.
+     *
+     * @return array{log: string, steps: list<array<string, mixed>>, ok: bool}
+     */
+    public function runManagedRestart(RemoteShell $ssh, Site $site, string $workingDirectory): array
+    {
+        if ($site->isCustom() || $site->runtimeKey() === 'static') {
+            return ['log' => '', 'steps' => [], 'ok' => true];
+        }
+
+        if ((bool) data_get($site->meta, 'deploy.skip_managed_restart', false)) {
+            return ['log' => "\n[dply] managed restart disabled for this site — skipping FPM/worker restart.\n", 'steps' => [], 'ok' => true];
+        }
+
+        $parts = [];
+        $labels = [];
+
+        if ((bool) $site->octane_port || $site->resolvedLaravelPackageFlag('octane')) {
+            // Octane serves the app itself — reload its workers onto the new release.
+            $parts[] = '{ [ -f artisan ] && php artisan list 2>/dev/null | grep -q "octane:reload" '
+                .'&& { echo "[dply] octane:reload"; php artisan octane:reload 2>&1 || echo "[dply] octane:reload skipped/failed (continuing)"; }; } || true';
+            $labels[] = 'Octane';
+        } elseif ($site->runtimeKey() === 'php') {
+            // Non-Octane PHP: reload FPM so it serves the freshly swapped `current`.
+            $parts[] = 'for svc in php8.5-fpm php8.4-fpm php8.3-fpm php-fpm; do sudo systemctl reload "$svc" 2>/dev/null && { echo "[dply] reloaded $svc"; break; }; done || true';
+            $labels[] = 'PHP-FPM';
+        }
+
+        if ($site->resolvedLaravelPackageFlag('horizon')) {
+            // horizon:terminate; its supervisor/systemd unit (Restart=always) relaunches it on the new code.
+            $parts[] = '{ [ -f artisan ] && php artisan list 2>/dev/null | grep -q "horizon:terminate" '
+                .'&& { echo "[dply] horizon:terminate"; php artisan horizon:terminate 2>&1 || echo "[dply] horizon:terminate skipped/failed (continuing)"; }; } || true';
+            $labels[] = 'Horizon';
+        }
+
+        if ($site->isLaravelFrameworkDetected()) {
+            // Signal any queue:work workers to restart gracefully after the current job.
+            $parts[] = '{ [ -f artisan ] && { echo "[dply] queue:restart"; php artisan queue:restart 2>&1 || true; }; } || true';
+            $labels[] = 'queue workers';
+        }
+
+        if ($parts === []) {
+            return ['log' => "\n[dply] managed restart: nothing to restart for this runtime.\n", 'steps' => [], 'ok' => true];
+        }
+
+        $out = $ssh->exec(sprintf('cd %s 2>/dev/null; %s', escapeshellarg($workingDirectory), implode('; ', $parts)), 120);
+
+        return [
+            'log' => sprintf("\n--- managed restart (%s) ---\n%s\n", implode(', ', $labels), $out),
+            'steps' => [[
+                'step_id' => 'managed_restart',
+                'step_type' => 'managed_restart',
+                'command' => 'dply managed restart: '.implode(', ', $labels),
+                'ok' => true,
+                'output' => $out,
+                'duration_ms' => 0,
+                'skipped' => false,
+            ]],
+            'ok' => true,
+        ];
+    }
+
+    /**
      * @return array{log: string, steps: list<array<string, mixed>>, ok: bool}
      */
     protected function runPhase(RemoteShell $ssh, Site $site, string $workingDirectory, string $phase): array

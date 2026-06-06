@@ -406,6 +406,10 @@
     @endif
 
     <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
-        <x-cli-snippet tone="stub" />
+        <x-cli-snippet :commands="[
+            ['label' => __('Check status'), 'command' => 'dply sites:ssl:status '.$site->slug],
+            ['label' => __('Issue cert'), 'command' => 'dply sites:ssl:issue '.$site->slug],
+            ['label' => __('Force renew'), 'command' => 'dply sites:ssl:renew '.$site->slug],
+        ]" />
     </div>
 </section>

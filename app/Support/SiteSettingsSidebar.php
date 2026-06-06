@@ -97,6 +97,7 @@ final class SiteSettingsSidebar
                 // SSH file browser, locked to the site's directory root. Has its
                 // own dedicated route; gated below so it's hidden on hosts without
                 // SSH (where the browser can't read anything).
+                ['id' => 'database', 'label' => __('Database'), 'icon' => 'heroicon-o-circle-stack', 'group' => 'runtime', 'route' => 'sites.database'],
                 ['id' => 'files', 'label' => __('Files'), 'icon' => 'heroicon-o-folder', 'group' => 'runtime', 'route' => 'sites.files', 'feature' => 'workspace.site_files', 'preview_feature' => 'workspace.site_files_preview'],
                 ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability', 'feature' => 'workspace.site_logs', 'preview_feature' => 'workspace.site_logs_preview'],
                 ['id' => 'notifications', 'label' => __('Notifications'), 'icon' => 'heroicon-o-bell', 'group' => 'observability', 'feature' => 'workspace.site_notifications', 'preview_feature' => 'workspace.site_notifications_preview'],

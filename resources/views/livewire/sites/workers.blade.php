@@ -332,6 +332,11 @@
                     </div>
                 @endif
             </section>
+
+            <x-cli-snippet class="mt-6" :commands="[
+                ['label' => __('List workers'), 'command' => 'dply sites:workers '.$site->slug],
+                ['label' => __('Restart all'), 'command' => 'dply sites:workers:restart '.$site->slug],
+            ]" />
         </main>
     </div>
 

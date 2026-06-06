@@ -90,8 +90,8 @@
     $envRequirements = $site->envRequirements();
     $envScannedAt = $envRequirements['scanned_at'] ?? null;
 
-    // Gate opt-out state — only the deploy-hub host component (DeploymentsList)
-    // carries the ignore/re-enable actions, so feature-detect them.
+    // Gate opt-out state — feature-detected so the partial works in all host
+    // components (Show, Settings, DeploymentsList, SiteSetup).
     $envGateOff = method_exists($this, 'envGateSkipped') && $this->envGateSkipped();
     $canIgnoreEnv = method_exists($this, 'ignoreMissingEnv');
     $ignoredEnvKeys = ($canIgnoreEnv && method_exists($this, 'ignoredEnvKeys')) ? $this->ignoredEnvKeys() : [];
@@ -109,7 +109,13 @@
             }
         }
     }
-    $envWarnings = app(\App\Services\Sites\SiteEnvValidator::class)->validate($envMapForValidation);
+    $allEnvWarnings = app(\App\Services\Sites\SiteEnvValidator::class)->validate($envMapForValidation);
+    $canIgnoreEnvWarnings = method_exists($this, 'ignoreEnvWarning');
+    $suppressedEnvWarningKeys = $canIgnoreEnvWarnings ? $this->suppressedEnvWarningKeys() : [];
+    $envWarnings = $suppressedEnvWarningKeys !== []
+        ? array_values(array_filter($allEnvWarnings, fn ($w) => empty($w['key']) || ! in_array($w['key'], $suppressedEnvWarningKeys, true)))
+        : $allEnvWarnings;
+    $suppressedEnvWarningCount = count($allEnvWarnings) - count($envWarnings);
     $envWarningsByKey = [];
     foreach ($envWarnings as $w) {
         if (! empty($w['key'])) {
@@ -328,15 +334,43 @@
                                     <span>{{ $w['message'] }}</span>
                                 </span>
                                 @if (! empty($w['key']) && $envAdvanced)
-                                    <button type="button" wire:click="openFixEnvVar(@js($w['key']))" class="shrink-0 whitespace-nowrap rounded-md border border-black/10 bg-white/60 px-2 py-0.5 text-[11px] font-semibold underline-offset-2 hover:bg-white hover:underline" title="{{ __('Fix :key', ['key' => $w['key']]) }}">
-                                        {{ __('Fix :key', ['key' => $w['key']]) }}
-                                    </button>
+                                    <span class="flex shrink-0 items-center gap-1.5">
+                                        <button type="button" wire:click="openFixEnvVar(@js($w['key']))" class="whitespace-nowrap rounded-md border border-black/10 bg-white/60 px-2 py-0.5 text-[11px] font-semibold underline-offset-2 hover:bg-white hover:underline" title="{{ __('Fix :key', ['key' => $w['key']]) }}">
+                                            {{ __('Fix :key', ['key' => $w['key']]) }}
+                                        </button>
+                                        @if ($canIgnoreEnvWarnings)
+                                            <button type="button" wire:click="ignoreEnvWarning(@js($w['key']))" class="whitespace-nowrap rounded-md border border-black/10 bg-white/60 px-2 py-0.5 text-[11px] font-semibold text-brand-mist underline-offset-2 hover:bg-white hover:underline" title="{{ __('Suppress this warning') }}">
+                                                {{ __('Ignore') }}
+                                            </button>
+                                        @endif
+                                    </span>
                                 @endif
                             </li>
                         @endforeach
                     </ul>
+                    @if ($suppressedEnvWarningCount > 0 && $canIgnoreEnvWarnings)
+                        <p class="mt-2 text-[11px] text-brand-mist">
+                            {{ trans_choice('{1} :count warning suppressed.|[2,*] :count warnings suppressed.', $suppressedEnvWarningCount, ['count' => $suppressedEnvWarningCount]) }}
+                            @foreach ($suppressedEnvWarningKeys as $sk)
+                                <button type="button" wire:click="unignoreEnvWarning(@js($sk))" class="ml-1 font-semibold hover:underline" title="{{ __('Re-enable :key warning', ['key' => $sk]) }}">{{ $sk }}</button>
+                            @endforeach
+                        </p>
+                    @endif
                 </div>
             </div>
+        </div>
+    @endif
+    @if ($envWarnings === [] && $suppressedEnvWarningCount > 0 && $canIgnoreEnvWarnings)
+        <div class="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-4 py-3 text-sm text-brand-moss">
+            <span class="inline-flex items-center gap-2">
+                <x-heroicon-o-no-symbol class="h-4 w-4 text-brand-mist" />
+                {{ trans_choice('{1} :count configuration warning is suppressed.|[2,*] :count configuration warnings are suppressed.', $suppressedEnvWarningCount, ['count' => $suppressedEnvWarningCount]) }}
+            </span>
+            <span class="flex flex-wrap gap-2">
+                @foreach ($suppressedEnvWarningKeys as $sk)
+                    <button type="button" wire:click="unignoreEnvWarning(@js($sk))" class="font-semibold text-brand-forest hover:underline">{{ $sk }}</button>
+                @endforeach
+            </span>
         </div>
     @endif
 
@@ -663,7 +697,7 @@
             <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
             <x-primary-button type="submit" form="add-env-form" wire:loading.attr="disabled" wire:target="addEnvVar">
                 <span wire:loading.remove wire:target="addEnvVar">{{ __('Add variable') }}</span>
-                <span wire:loading wire:target="addEnvVar">{{ __('Adding…') }}</span>
+                <span wire:loading wire:target="addEnvVar" class="inline-flex items-center gap-1.5"><span class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Adding…') }}</span>
             </x-primary-button>
         </div>
     </x-modal>
@@ -722,7 +756,7 @@
             <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
             <x-primary-button type="submit" form="paste-env-form" wire:loading.attr="disabled" wire:target="bulkImportEnvVars">
                 <span wire:loading.remove wire:target="bulkImportEnvVars">{{ __('Import variables') }}</span>
-                <span wire:loading wire:target="bulkImportEnvVars">{{ __('Importing…') }}</span>
+                <span wire:loading wire:target="bulkImportEnvVars" class="inline-flex items-center gap-1.5"><span class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Importing…') }}</span>
             </x-primary-button>
         </div>
     </x-modal>
@@ -787,7 +821,7 @@
             <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
             <x-primary-button type="submit" form="add-missing-env-form" wire:loading.attr="disabled" wire:target="addMissingEnvVars">
                 <span wire:loading.remove wire:target="addMissingEnvVars">{{ __('Add variables') }}</span>
-                <span wire:loading wire:target="addMissingEnvVars">{{ __('Adding…') }}</span>
+                <span wire:loading wire:target="addMissingEnvVars" class="inline-flex items-center gap-1.5"><span class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Adding…') }}</span>
             </x-primary-button>
         </div>
     </x-modal>
@@ -959,37 +993,36 @@
                                 <x-heroicon-o-arrow-down-tray class="h-4 w-4 text-brand-moss" /> {{ __('Sync from server') }}
                             </button>
                         @endif
-                        <button type="button" x-on:click="$dispatch('open-modal', 'paste-env-modal'); open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
-                            <x-heroicon-o-document-text class="h-4 w-4 text-brand-moss" /> {{ __('Paste .env') }}
-                        </button>
                         <button type="button" wire:click="$set('env_import_key', null)" x-on:click="open = false; $dispatch('open-modal', 'env-import-modal')" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
                             <x-heroicon-o-arrow-down-on-square class="h-4 w-4 text-brand-moss" /> {{ __('Import from another site') }}
                         </button>
-                        @if ($envAdvanced)
-                            <button type="button" wire:click="openEditAllEnv" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
-                                <x-heroicon-o-pencil-square class="h-4 w-4 text-brand-moss" /> {{ __('View / edit all') }}
-                            </button>
-                        @elseif ($variableCount > 0)
-                            <button type="button" x-on:click="$dispatch('open-modal', 'view-all-env-modal'); open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
-                                <x-heroicon-o-document-text class="h-4 w-4 text-brand-moss" /> {{ __('View all') }}
-                            </button>
-                        @endif
                         @if (method_exists($this, 'runRemediation'))
                             <div class="my-1 border-t border-brand-ink/10"></div>
-                            <button type="button" wire:click="runRemediation('migrate')" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40" title="{{ __('php artisan migrate --force on the server') }}">
-                                <x-heroicon-o-circle-stack class="h-4 w-4 text-brand-moss" /> {{ __('Run migrations') }}
-                            </button>
-                            <button type="button" wire:click="runRemediation('optimize_clear')" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40" title="{{ __('php artisan optimize:clear on the server') }}">
-                                <x-heroicon-o-sparkles class="h-4 w-4 text-brand-moss" /> {{ __('Clear all caches') }}
+                            <button type="button" wire:click="runRemediation('optimize_clear')" x-on:click="open = false" class="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-brand-sand/40">
+                                <x-heroicon-o-sparkles class="mt-0.5 h-4 w-4 shrink-0 text-brand-moss" />
+                                <span>
+                                    <span class="block text-xs font-semibold text-brand-ink">{{ __('Clear all caches') }}</span>
+                                    <span class="block text-[10px] text-brand-mist">{{ __('Includes config (env), route, and view caches') }}</span>
+                                </span>
                             </button>
                         @endif
                     </div>
                 </div>
 
+                @if ($envAdvanced)
+                    <button
+                        type="button"
+                        wire:click="openEditAllEnv"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 sm:ml-auto"
+                    >
+                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                        {{ __('Edit all') }}
+                    </button>
+                @endif
                 <button
                     type="button"
-                    x-on:click="$dispatch('open-modal', 'paste-env-modal')"
-                    class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90 sm:ml-auto"
+                    x-on:click="$dispatch('open-modal', 'add-env-modal')"
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90 {{ $envAdvanced ? '' : 'sm:ml-auto' }}"
                 >
                     <x-heroicon-o-plus class="h-3.5 w-3.5" />
                     {{ __('Add variable') }}
@@ -1131,7 +1164,7 @@
                                                 <x-secondary-button type="button" wire:click="cancelEditEnvVar">{{ __('Cancel') }}</x-secondary-button>
                                                 <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveEditedEnvVar">
                                                     <span wire:loading.remove wire:target="saveEditedEnvVar">{{ __('Save override') }}</span>
-                                                    <span wire:loading wire:target="saveEditedEnvVar">{{ __('Saving…') }}</span>
+                                                    <span wire:loading wire:target="saveEditedEnvVar" class="inline-flex items-center gap-1.5"><span class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
                                                 </x-primary-button>
                                             </div>
                                         </form>
@@ -1253,7 +1286,7 @@
                                     <x-secondary-button type="button" wire:click="cancelEditEnvVar">{{ __('Cancel') }}</x-secondary-button>
                                     <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveEditedEnvVar">
                                         <span wire:loading.remove wire:target="saveEditedEnvVar">{{ __('Save') }}</span>
-                                        <span wire:loading wire:target="saveEditedEnvVar">{{ __('Saving…') }}</span>
+                                        <span wire:loading wire:target="saveEditedEnvVar" class="inline-flex items-center gap-1.5"><span class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
                                     </x-primary-button>
                                 </div>
                             </form>
@@ -1345,23 +1378,23 @@
                                         type="button"
                                         wire:click="$set('env_import_key', '{{ $key }}')"
                                         x-on:click="$dispatch('open-modal', 'env-import-modal')"
-                                        class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-brand-mist hover:border-brand-ink/15 hover:bg-brand-sand/40 hover:text-brand-ink"
+                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                                         title="{{ __('Import :key from another site', ['key' => $key]) }}"
-                                        aria-label="{{ __('Import from another site') }}"
                                     >
-                                        <x-heroicon-o-arrow-down-on-square class="h-4 w-4" />
+                                        <x-heroicon-o-arrow-down-on-square class="h-3.5 w-3.5" />
+                                        {{ __('Import') }}
                                     </button>
                                     <button
                                         type="button"
                                         wire:click="confirmRemoveEnvVar('{{ $key }}')"
                                         wire:loading.attr="disabled"
                                         wire:target="confirmRemoveEnvVar('{{ $key }}')"
-                                        class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-brand-mist hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
                                         title="{{ __('Remove variable') }}"
-                                        aria-label="{{ __('Remove') }}"
                                     >
-                                        <x-heroicon-o-trash class="h-4 w-4" wire:loading.remove wire:target="confirmRemoveEnvVar('{{ $key }}')" />
+                                        <x-heroicon-o-trash class="h-3.5 w-3.5" wire:loading.remove wire:target="confirmRemoveEnvVar('{{ $key }}')" />
                                         <span wire:loading wire:target="confirmRemoveEnvVar('{{ $key }}')"><x-spinner variant="forest" size="sm" /></span>
+                                        {{ __('Remove') }}
                                     </button>
                                 </div>
                             </div>
@@ -1521,7 +1554,7 @@
             <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
             <x-primary-button type="submit" form="edit-all-env-form" wire:loading.attr="disabled" wire:target="saveAllEnv">
                 <span wire:loading.remove wire:target="saveAllEnv">{{ __('Save all') }}</span>
-                <span wire:loading wire:target="saveAllEnv">{{ __('Saving…') }}</span>
+                <span wire:loading wire:target="saveAllEnv" class="inline-flex items-center gap-1.5"><span class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
             </x-primary-button>
         </div>
     </x-modal>
@@ -1620,11 +1653,13 @@
         </div>
         <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 px-6 py-4">
             <p class="mr-auto text-xs text-brand-moss">{{ __('Saves this one variable and pushes to the server.') }}</p>
-            <x-secondary-button type="button" x-on:click="$dispatch('close')" wire:click="cancelFixEnvVar">{{ __('Cancel') }}</x-secondary-button>
-            <x-primary-button type="submit" form="fix-env-var-form" wire:loading.attr="disabled" wire:target="saveFixedEnvVar">
-                <span wire:loading.remove wire:target="saveFixedEnvVar">{{ __('Save & push') }}</span>
-                <span wire:loading wire:target="saveFixedEnvVar">{{ __('Saving…') }}</span>
-            </x-primary-button>
+            <div class="flex shrink-0 items-center gap-2">
+                <x-secondary-button type="button" x-on:click="$dispatch('close')" wire:click="cancelFixEnvVar">{{ __('Cancel') }}</x-secondary-button>
+                <x-primary-button type="submit" form="fix-env-var-form" wire:loading.attr="disabled" wire:target="saveFixedEnvVar">
+                    <span wire:loading.remove wire:target="saveFixedEnvVar">{{ __('Save & push') }}</span>
+                    <span wire:loading wire:target="saveFixedEnvVar" class="inline-flex items-center gap-1.5"><span class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
+                </x-primary-button>
+            </div>
         </div>
     </x-modal>
     @endif
@@ -1753,7 +1788,7 @@
                     </div>
                     <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveEnvFilePath">
                         <span wire:loading.remove wire:target="saveEnvFilePath">{{ __('Save path') }}</span>
-                        <span wire:loading wire:target="saveEnvFilePath">{{ __('Saving…') }}</span>
+                        <span wire:loading wire:target="saveEnvFilePath" class="inline-flex items-center gap-1.5"><span class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
                     </x-primary-button>
                 </form>
                 <p class="text-[11px] text-brand-moss">
@@ -1989,7 +2024,7 @@
             <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
             <x-primary-button type="button" wire:click="saveBinding" wire:loading.attr="disabled" wire:target="saveBinding">
                 <span wire:loading.remove wire:target="saveBinding">{{ $bindingModalMode === 'provision' ? __('Provision') : __('Attach') }}</span>
-                <span wire:loading wire:target="saveBinding">{{ __('Saving…') }}</span>
+                <span wire:loading wire:target="saveBinding" class="inline-flex items-center gap-1.5"><span class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
             </x-primary-button>
         </div>
     </x-modal>
@@ -1998,10 +2033,10 @@
     <x-cli-snippet
         :intro="__('Manage env via CLI when you have many keys at once:')"
         :commands="[
-            ['label' => __('Set one'), 'command' => 'dply:site:env-set '.$site->slug.' KEY=value'],
-            ['label' => __('Bulk import from .env'), 'command' => 'dply:site:env-import '.$site->slug.' --file=.env'],
-            ['label' => __('Export current as .env'), 'command' => 'dply:site:env-export '.$site->slug.' --to=.env'],
-            ['label' => __('Diff cache vs server'), 'command' => 'dply:site:env-diff '.$site->slug],
+            ['label' => __('Set one'), 'command' => 'dply sites:env:set '.$site->slug.' KEY=value'],
+            ['label' => __('Bulk import from .env'), 'command' => 'dply sites:env:import '.$site->slug.' --file=.env'],
+            ['label' => __('Export current as .env'), 'command' => 'dply sites:env:export '.$site->slug.' --to=.env'],
+            ['label' => __('Diff cache vs server'), 'command' => 'dply sites:env:diff '.$site->slug],
         ]"
     />
 </section>

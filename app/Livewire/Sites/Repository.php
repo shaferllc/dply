@@ -59,6 +59,25 @@ class Repository extends Component
      * Repository's chrome. */
     public string $lockedTab = '';
 
+    /**
+     * Which network-backed tab has had its remote data loaded. On the standalone
+     * page every such tab paints a skeleton first (no provider call) and streams
+     * its data in via `wire:init="loadTab(...)"`; until loadedTab matches the
+     * active tab, render() skips the provider fetch. Empty on first paint so the
+     * initial GET makes zero source-control API calls. Embedded/locked hosts
+     * (the Deployments page) bypass this and render eagerly.
+     */
+    public string $loadedTab = '';
+
+    /** Whether the Connection tab's repository list (a provider API call) has been
+     * loaded. Deferred out of mount() so opening Overview never lists repos. */
+    public bool $connectionReposPrimed = false;
+
+    /** Whether we've checked (once) that the stored deploy branch actually exists
+     * on the remote and healed it to the repo's default if not. Guards the
+     * one-shot self-heal in {@see ensureDeployBranchResolved()}. */
+    public bool $branchResolved = false;
+
     // Aliased to `repo_*` so this component plays nicely when embedded inside
     // the Deployments page (its own ?tab= owns the outer tab strip).
     #[Url(as: 'repo_tab', except: 'overview')]
@@ -108,7 +127,114 @@ class Repository extends Component
      */
     public function reloadRepository(): void
     {
-        // No state to mutate — the re-render re-runs the fetches in render().
+        // Commits + reader (files / branches / README) are cached per site under a
+        // shared version key; bump it so this re-render genuinely re-fetches from
+        // the provider instead of serving the cached error/stale page.
+        app(SourceControlRepositoryReader::class)->invalidate($this->site);
+    }
+
+    /**
+     * Mark a network-backed tab's data as ready to load. Fired by the panel's
+     * `wire:init` once its skeleton is on screen, so the provider calls happen
+     * after first paint rather than blocking it. The Connection/Webhook tabs
+     * also need the repository list, so prime it here in the same round-trip.
+     */
+    public function loadTab(string $tab): void
+    {
+        if (! in_array($tab, self::LAZY_TABS, true)) {
+            return;
+        }
+
+        // Heal a stale deploy branch before this tab's reads run, so the
+        // commits / files / README reads in this same round-trip use a branch
+        // that actually exists (no 404 → fallback dance on every tab).
+        if (in_array($tab, ['overview', 'commits', 'files', 'branches'], true)) {
+            $this->ensureDeployBranchResolved();
+        }
+
+        $this->loadedTab = $tab;
+
+        if ($tab === 'connection' || $tab === 'webhook') {
+            $this->primeConnectionRepositories();
+        }
+    }
+
+    /**
+     * One-shot deploy-branch self-heal. A site can carry a guessed default
+     * ("main") that doesn't exist on the remote (whose default is, say,
+     * "master") — every branch-scoped read then 404s and pays a
+     * fallback-lookup-retry tax. Here we list the remote's branches once (a
+     * cached read, shared with the Branches tab) and, if the configured branch
+     * isn't among them, persist the repo's real default so ALL subsequent reads
+     * (commits, files, README, deploys) resolve correctly.
+     *
+     * Scoped to never-deployed sites so we never override a branch the operator
+     * deliberately set or one a live deployment already depends on.
+     */
+    private function ensureDeployBranchResolved(): void
+    {
+        if ($this->branchResolved) {
+            return;
+        }
+        $this->branchResolved = true;
+
+        $user = auth()->user();
+        if ($user === null
+            || (string) $this->site->git_repository_url === ''
+            || $this->site->last_deploy_at !== null) {
+            return;
+        }
+
+        $reader = app(SourceControlRepositoryReader::class);
+        $result = $reader->branches($this->site, $user);
+        if (! ($result['ok'] ?? false) || $result['branches'] === []) {
+            return;
+        }
+
+        $names = array_map(static fn (array $b): string => (string) ($b['name'] ?? ''), $result['branches']);
+        $configured = (string) ($this->site->git_branch ?: 'main');
+        if (in_array($configured, $names, true)) {
+            return; // configured branch exists — nothing to heal
+        }
+
+        $default = collect($result['branches'])->firstWhere('is_default', true);
+        $target = (string) ($default['name'] ?? $names[0] ?? '');
+        if ($target === '' || strcasecmp($target, $configured) === 0) {
+            return;
+        }
+
+        $this->site->forceFill(['git_branch' => $target])->save();
+        $reader->invalidate($this->site);
+        $this->git_branch = $target;
+    }
+
+    /**
+     * Load the Connection tab's repository dropdown (a provider API call —
+     * `GET /user/repos` & friends). Deferred out of mount() so it never runs on
+     * the Overview/Commits/Files/Branches tabs, which don't show the picker.
+     * Idempotent: the network call fires at most once per component lifecycle.
+     */
+    public function primeConnectionRepositories(): void
+    {
+        if ($this->connectionReposPrimed) {
+            return;
+        }
+        $this->connectionReposPrimed = true;
+
+        if ($this->source_control_account_id === '') {
+            return;
+        }
+
+        $this->refreshRepositories(app(SourceControlRepositoryBrowser::class));
+
+        // Existing connection: now that the real list is in hand, fall back to the
+        // manual URL field if the stored repo URL isn't actually one of the
+        // account's repos (the verification mount() used to do eagerly).
+        if ($this->repo_source === 'provider' && $this->git_repository_url !== ''
+            && collect($this->availableRepositories)->firstWhere('url', $this->git_repository_url) === null) {
+            $this->repo_source = 'manual';
+            $this->repository_selection = '';
+        }
     }
 
     // Connection-tab repository picker state (repo_source, source_control_account_id,
@@ -145,12 +271,14 @@ class Repository extends Component
     }
 
     /**
-     * Seed the rich picker: load the user's linked accounts and, when one is
-     * wired, the repositories for it. Decide provider vs manual mode so an
-     * existing connection is never hidden — provider mode only when the stored
-     * URL actually matches a listed repo for the stored account (otherwise the
-     * URL shows in the manual field). A never-connected site with linked
-     * accounts defaults to the provider picker (auto-selects the first repo).
+     * Seed the rich picker WITHOUT any provider API call. Linked accounts are a
+     * local DB read (safe in mount); the repository list — `GET /user/repos` &
+     * friends, the slowest call on the page — is deferred to
+     * {@see primeConnectionRepositories()} and only loads when the Connection
+     * tab opens. Provider-vs-manual mode is decided here from the stored
+     * provider kind so an existing connection is never hidden; the exact
+     * "is the URL one of the account's repos?" verification also moves to the
+     * lazy primer.
      */
     private function primeRepositoryPicker(SourceControlRepositoryBrowser $browser): void
     {
@@ -169,28 +297,32 @@ class Repository extends Component
         }
 
         if ($this->git_repository_url === '') {
-            // No repo yet — offer the provider picker.
+            // Never connected — default to the provider picker; the repo list
+            // (and first-repo auto-select) loads lazily on the Connection tab.
             $this->repo_source = 'provider';
             if ($this->source_control_account_id === '') {
                 $this->source_control_account_id = (string) $this->linkedSourceControlAccounts[0]['id'];
             }
-            $this->refreshRepositories($browser);
 
             return;
         }
 
-        // Existing connection: pre-set the selection so refreshRepositories does
-        // not auto-pick the first repo, then only stay in provider mode if the
-        // stored URL is genuinely one of the account's repos.
+        // Existing connection: pre-set the selection and pick provider vs manual
+        // from the stored provider kind (no network). primeConnectionRepositories()
+        // refines this to 'manual' later if the URL isn't actually in the list.
         $this->repository_selection = $this->git_repository_url;
-        if ($this->source_control_account_id !== '') {
-            $this->refreshRepositories($browser);
+        $storedProvider = (string) ($this->site->repositoryMeta()['git_provider_kind'] ?? '');
+        if ($storedProvider === '') {
+            $storedProvider = $this->detectProviderKind($this->git_repository_url);
         }
-        $match = collect($this->availableRepositories)->firstWhere('url', $this->git_repository_url);
-        if ($match !== null) {
-            $this->repo_source = 'provider';
-        } else {
-            $this->repo_source = 'manual';
+        $accountProviders = array_map(
+            static fn (array $account): string => (string) ($account['provider'] ?? ''),
+            $this->linkedSourceControlAccounts,
+        );
+        $hasMatchingAccount = $this->source_control_account_id !== '' && in_array($storedProvider, $accountProviders, true);
+
+        $this->repo_source = $hasMatchingAccount ? 'provider' : 'manual';
+        if ($this->repo_source === 'manual') {
             $this->repository_selection = '';
         }
     }
@@ -289,11 +421,17 @@ class Repository extends Component
 
     /**
      * Switch the active sub-tab. Backed by a real action (rather than a bare
-     * `$set('tab', …)`) so `wire:loading wire:target="selectTab"` can scope a
-     * spinner to the switch — `$set` magic actions aren't reliably matchable
-     * as loading targets. Guarded to the tabs the unlocked view actually
-     * exposes; lockedTab embeds never render the tablist, so they can't reach
-     * this.
+     * `$set('tab', …)`) so `wire:loading wire:target="selectTab"` can scope the
+     * skeleton placeholder to the switch — `$set` magic actions aren't reliably
+     * matchable as loading targets. Guarded to the tabs the unlocked view
+     * actually exposes; lockedTab embeds never render the tablist, so they
+     * can't reach this.
+     *
+     * Loads the new tab's data in THIS same round-trip (via loadTab) instead of
+     * rendering a skeleton and waiting on a second wire:init request — one hop,
+     * not two. Reads are cached, so flipping back to an already-visited tab is a
+     * cache hit; the wire:loading skeleton still gives instant feedback while
+     * the request is in flight.
      */
     public function selectTab(string $tab): void
     {
@@ -302,6 +440,7 @@ class Repository extends Component
         }
 
         $this->tab = $tab;
+        $this->loadTab($tab);
     }
 
     /* ──────────── Files navigation ──────────── */
@@ -564,12 +703,37 @@ class Repository extends Component
             'showSetupTab' => $this->site->isInFirstDeploySetup() || $this->site->needsFirstDeploySetup(),
         ];
 
+        // Embedded/locked hosts (the Deployments page) render eagerly — they
+        // don't get the standalone page's wire:init lazy shell, so any provider
+        // data they need is primed here instead of after first paint.
+        $lazyHost = ! $this->embedded && $this->lockedTab === '';
+
         if ($payload['currentRepositoryUrl'] === '') {
+            if (! $lazyHost) {
+                $this->primeConnectionRepositories();
+            }
+
             return view('livewire.sites.repository', $payload + $this->renderConnectionPayload($browser, $user));
         }
 
         $activeTab = $this->activeTab();
         $payload['activeTab'] = $activeTab;
+
+        if (! $lazyHost && ($activeTab === 'connection' || $activeTab === 'webhook')) {
+            $this->primeConnectionRepositories();
+        }
+
+        // Lazy gate: on the standalone page a network-backed tab renders a
+        // skeleton on first paint and streams its data via wire:init → loadTab().
+        // Cheap, network-free tabs (setup / danger) never defer.
+        $deferTab = $lazyHost
+            && in_array($activeTab, self::LAZY_TABS, true)
+            && $this->loadedTab !== $activeTab;
+        $payload['tabDeferred'] = $deferTab;
+
+        if ($deferTab) {
+            return view('livewire.sites.repository', $payload);
+        }
 
         return view('livewire.sites.repository', match ($activeTab) {
             'files' => $payload + $this->renderFilesPayload($reader, $user, $branchInUse),
@@ -597,6 +761,13 @@ class Repository extends Component
      * it's only ever reachable through a locked embed.
      */
     private const UNLOCKED_TABS = ['overview', 'commits', 'files', 'branches', 'connection', 'danger', 'setup'];
+
+    /**
+     * Tabs whose render does a provider/API read and therefore lazy-loads behind
+     * a skeleton on the standalone page. 'setup' and 'danger' are excluded (no
+     * remote reads); 'webhook' is included for the locked webhook embed.
+     */
+    private const LAZY_TABS = ['overview', 'commits', 'files', 'branches', 'connection', 'webhook'];
 
     /**
      * The tab that should actually render. When the component is embedded

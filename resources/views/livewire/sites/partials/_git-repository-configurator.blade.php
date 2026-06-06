@@ -14,11 +14,14 @@
       - $idPrefix       string  unique prefix for input ids (default 'gitcfg')
       - $showConnectLink bool   render the "Connect a provider" link (default true)
       - $required       bool    mark the account/repo/URL labels required (default true)
+      - $reposLoading   bool    repo list is still being fetched — show a spinner
+                                instead of the "no repositories" message (default false)
 --}}
 @php
     $idPrefix = $idPrefix ?? 'gitcfg';
     $showConnectLink = $showConnectLink ?? true;
     $required = $required ?? true;
+    $reposLoading = $reposLoading ?? false;
 @endphp
 
 <div class="flex flex-wrap items-center justify-between gap-3">
@@ -171,6 +174,11 @@
                     </div>
                 </div>
             </div>
+        @elseif ($reposLoading)
+            <p class="mt-1.5 flex items-center gap-2 rounded-xl border border-brand-ink/10 bg-brand-cream/70 px-3 py-2.5 text-xs text-brand-moss">
+                <x-spinner size="sm" />
+                <span>{{ __('Loading repositories…') }}</span>
+            </p>
         @else
             <p class="mt-1.5 flex items-start gap-1.5 rounded-xl border border-brand-ink/10 bg-brand-cream/70 px-3 py-2.5 text-xs text-brand-moss">
                 <x-heroicon-o-information-circle class="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />

@@ -345,8 +345,8 @@
 
 {{-- 6. CLI snippets --}}
 <x-cli-snippet :commands="[
-    ['label' => __('Set runtime + version'), 'command' => 'dply:site:set-runtime '.$site->slug.' --runtime=node --runtime-version=22'],
-    ['label' => __('Set start command + port'), 'command' => 'dply:site:set-runtime '.$site->slug.' --start=\'node server.js\' --port=3000'],
+    ['label' => __('Set runtime + version'), 'command' => 'dply sites:runtime:set '.$site->slug.' --runtime=node --runtime-version=22'],
+    ['label' => __('Set start command + port'), 'command' => 'dply sites:runtime:set '.$site->slug.' --start=\'node server.js\' --port=3000'],
     ['label' => __('Auto-detect from repo'), 'command' => 'dply:detect-runtime '.$site->slug],
     ['label' => __('Show available runtimes'), 'command' => 'dply:list-runtimes --with-usage'],
     ['label' => __('Install runtime on server'), 'command' => 'dply:install-runtime '.($server->name ?? 'SERVER').' node 22'],

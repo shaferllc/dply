@@ -84,5 +84,5 @@
         @endif
     @endif
 
-    <x-cli-snippet class="mt-8" :command="'dply:site:env-diff '.$site->slug" />
+    <x-cli-snippet class="mt-8" :command="'dply sites:env:diff '.$site->slug" />
 </div>

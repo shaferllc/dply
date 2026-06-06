@@ -114,6 +114,6 @@
     </div>
 
     <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
-        <x-cli-snippet tone="stub" />
+        <x-cli-snippet :command="'dply sites:system-user '.$site->slug" />
     </div>
 </section>

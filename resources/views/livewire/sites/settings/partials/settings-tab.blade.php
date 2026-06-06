@@ -2,7 +2,7 @@
      dedicated section. Primary hostname is intentionally NOT here — it's edited
      from Routing > Domains, which triggers the rename cascade modal. --}}
 
-{{-- Site identity (display name + slug). Mirrors dply:site:rename semantics: row
+{{-- Site identity (display name + slug). Mirrors dply sites:rename semantics: row
      update only, on-disk path under /home/dply/<domain> stays put. --}}
 <section class="dply-card overflow-hidden">
     <form wire:submit="saveSiteIdentity">

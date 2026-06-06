@@ -359,7 +359,10 @@
                 <a href="{{ route('status-pages.index') }}" class="font-medium text-brand-forest hover:text-brand-sage hover:underline">{{ __('status page') }}</a>.
             </p>
 
-            <x-cli-snippet tone="stub" />
+            <x-cli-snippet :commands="[
+                ['label' => __('Check uptime'), 'command' => 'dply sites:uptime '.$site->slug],
+                ['label' => __('View history'), 'command' => 'dply sites:uptime:history '.$site->slug],
+            ]" />
             @endif
         </main>
     </div>

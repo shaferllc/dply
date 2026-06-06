@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\ServerFirewallController;
 use App\Http\Controllers\Api\ServerSharedHostController;
 use App\Http\Controllers\Api\ServerSystemUserApiController;
 use App\Http\Controllers\Api\SiteController;
+use App\Http\Controllers\Api\SiteResourceApiController;
 use App\Http\Controllers\Api\WorkerPoolJobEventController;
 use Illuminate\Support\Facades\Route;
 
@@ -162,6 +163,24 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/sites/{site}/deploy', [SiteController::class, 'deploy'])->middleware('ability:'.$apiAbilities['sites.deploy']);
         Route::get('/sites/{site}/deployments', [SiteController::class, 'deployments'])->middleware('ability:'.$apiAbilities['sites.deployments']);
         Route::get('/sites/{site}/deployments/{deployment}', [SiteController::class, 'showDeployment'])->middleware('ability:'.$apiAbilities['sites.deployment_show']);
+
+        // Extended site resource endpoints (slug-routed via Site::getRouteKeyName)
+        Route::get('/sites/{site}', [SiteResourceApiController::class, 'show'])->middleware('ability:'.$apiAbilities['sites.show']);
+        Route::patch('/sites/{site}', [SiteResourceApiController::class, 'update'])->middleware('ability:'.$apiAbilities['sites.update']);
+        Route::get('/sites/{site}/workers', [SiteResourceApiController::class, 'workers'])->middleware('ability:'.$apiAbilities['sites.workers']);
+        Route::get('/sites/{site}/schedules', [SiteResourceApiController::class, 'schedules'])->middleware('ability:'.$apiAbilities['sites.schedules']);
+        Route::get('/sites/{site}/errors', [SiteResourceApiController::class, 'errors'])->middleware('ability:'.$apiAbilities['sites.errors']);
+        Route::get('/sites/{site}/uptime', [SiteResourceApiController::class, 'uptime'])->middleware('ability:'.$apiAbilities['sites.uptime']);
+        Route::get('/sites/{site}/basic-auth', [SiteResourceApiController::class, 'basicAuth'])->middleware('ability:'.$apiAbilities['sites.basic_auth']);
+        Route::post('/sites/{site}/basic-auth', [SiteResourceApiController::class, 'addBasicAuth'])->middleware('ability:'.$apiAbilities['sites.basic_auth_write']);
+        Route::delete('/sites/{site}/basic-auth/{username}', [SiteResourceApiController::class, 'removeBasicAuth'])->middleware('ability:'.$apiAbilities['sites.basic_auth_write'])->where('username', '[a-zA-Z0-9._-]+');
+        Route::get('/sites/{site}/ssl', [SiteResourceApiController::class, 'ssl'])->middleware('ability:'.$apiAbilities['sites.ssl']);
+        Route::get('/sites/{site}/domains', [SiteResourceApiController::class, 'domains'])->middleware('ability:'.$apiAbilities['sites.domains']);
+        Route::post('/sites/{site}/domains', [SiteResourceApiController::class, 'addDomain'])->middleware('ability:'.$apiAbilities['sites.domains_write']);
+        Route::delete('/sites/{site}/domains/{hostname}', [SiteResourceApiController::class, 'removeDomain'])->middleware('ability:'.$apiAbilities['sites.domains_write'])->where('hostname', '[A-Za-z0-9.-]+');
+        Route::get('/sites/{site}/databases', [SiteResourceApiController::class, 'databases'])->middleware('ability:'.$apiAbilities['sites.databases']);
+        Route::get('/sites/{site}/commits', [SiteResourceApiController::class, 'commits'])->middleware('ability:'.$apiAbilities['sites.commits']);
+        Route::get('/sites/{site}/system-user', [SiteResourceApiController::class, 'systemUser'])->middleware('ability:'.$apiAbilities['sites.system_user']);
 
         Route::get('/insights/summary', [InsightsController::class, 'organizationSummary'])->middleware('ability:'.$apiAbilities['insights.org_summary']);
         Route::get('/servers/{server}/insights', [InsightsController::class, 'serverFindings'])->middleware('ability:'.$apiAbilities['insights.server_findings']);

@@ -135,6 +135,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Livewire\Blaze\Blaze;
 use Laravel\Cashier\Cashier;
 use Laravel\Cashier\Events\WebhookReceived;
 
@@ -294,6 +295,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Blaze::optimize()
+            ->in(resource_path('views/components/spinner.blade.php'), memo: true)
+            ->in(resource_path('views/components/application-logo.blade.php'), memo: true)
+            ->in(resource_path('views/components/input-error.blade.php'), memo: true)
+            ->in(resource_path('views/components/oauth-provider-icon.blade.php'), memo: true)
+            ->in(resource_path('views/components/credentials-provider-icon.blade.php'), memo: true);
+
         $this->registerCustomPulseCards();
 
         $this->registerEdgeR2FilesystemDisk();

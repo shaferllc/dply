@@ -162,7 +162,7 @@ class Show extends Component
 
     public bool $deploy_health_auto_rollback = false;
 
-    public string $deploy_health_path = '/health';
+    public string $deploy_health_path = '/up';
 
     public int $deploy_health_expect_status = 200;
 
@@ -391,7 +391,7 @@ class Show extends Component
         $this->ephemeral_deploy_credentials_enabled = (bool) data_get($dm, 'deploy.ephemeral_credentials', false);
         $this->deploy_health_enabled = (bool) ($dm['deploy_health_enabled'] ?? false);
         $this->deploy_health_auto_rollback = (bool) ($dm['deploy_health_auto_rollback'] ?? false);
-        $this->deploy_health_path = (string) ($dm['deploy_health_path'] ?? '/health');
+        $this->deploy_health_path = (string) ($dm['deploy_health_path'] ?? '/up');
         $this->deploy_health_expect_status = (int) ($dm['deploy_health_expect_status'] ?? 200);
         $this->deploy_health_attempts = (int) ($dm['deploy_health_attempts'] ?? 5);
         $this->deploy_health_delay_ms = (int) ($dm['deploy_health_delay_ms'] ?? 500);
@@ -1633,7 +1633,7 @@ class Show extends Component
         $meta = is_array($this->site->meta) ? $this->site->meta : [];
         $path = trim($this->deploy_health_path);
         if ($path === '') {
-            $path = '/health';
+            $path = '/up';
         }
         $meta['deploy_health_enabled'] = $this->deploy_health_enabled;
         $meta['deploy_health_auto_rollback'] = $this->deploy_health_auto_rollback;
@@ -2065,6 +2065,105 @@ class Show extends Component
         }
 
         return $keys;
+    }
+
+    /** Disable the required-env gate for this site (no-deploy variant). */
+    public function ignoreMissingEnv(): void
+    {
+        $this->authorize('update', $this->site);
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta['skip_env_gate'] = true;
+        unset($meta['deploy_blocked_env']);
+        $this->site->forceFill(['meta' => $meta])->save();
+        $this->toastSuccess(__('Ignoring missing required variables for this site — deploys won\'t be blocked by them.'));
+    }
+
+    /** Re-enable the required-env gate. */
+    public function enableEnvGate(): void
+    {
+        $this->authorize('update', $this->site);
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        unset($meta['skip_env_gate']);
+        $this->site->forceFill(['meta' => $meta])->save();
+        $this->toastSuccess(__('Required-env check re-enabled. Deploys stop if required variables are missing.'));
+    }
+
+    /** Whether the required-env gate is currently disabled. */
+    public function envGateSkipped(): bool
+    {
+        return ($this->site->meta['skip_env_gate'] ?? false) === true;
+    }
+
+    public function confirmIgnoreMissingEnv(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->openConfirmActionModal(
+            method: 'ignoreMissingEnv',
+            title: __('Ignore missing variables?'),
+            message: __('Stop blocking and warning on the missing required variables for this site. Deploys will proceed even if they are unset — it\'s on you if the app errors. You can re-enable this later.'),
+            confirmLabel: __('Ignore them'),
+        );
+    }
+
+    public function confirmIgnoreEnvKey(string $key): void
+    {
+        $this->authorize('update', $this->site);
+        $key = trim($key);
+        if ($key === '') {
+            return;
+        }
+        $this->openConfirmActionModal(
+            method: 'ignoreEnvKey',
+            arguments: [$key],
+            title: __('Ignore :key?', ['key' => $key]),
+            message: __('Mark :key as intentionally unset for this site. It won\'t count as a missing required variable or block deploys. You can un-ignore it later.', ['key' => $key]),
+            confirmLabel: __('Ignore'),
+        );
+    }
+
+    /** Per-variable ignore: mark one required key as intentionally unset. */
+    public function ignoreEnvKey(string $key): void
+    {
+        $this->authorize('update', $this->site);
+        $key = trim($key);
+        if ($key === '') {
+            return;
+        }
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $ignored = array_values(array_unique([...((array) ($meta['ignored_env_keys'] ?? [])), $key]));
+        $meta['ignored_env_keys'] = $ignored;
+        if (isset($meta['deploy_blocked_env']['keys']) && is_array($meta['deploy_blocked_env']['keys'])) {
+            $meta['deploy_blocked_env']['keys'] = array_values(array_filter(
+                $meta['deploy_blocked_env']['keys'],
+                static fn ($e): bool => is_array($e) && (string) ($e['key'] ?? '') !== $key,
+            ));
+            if ($meta['deploy_blocked_env']['keys'] === []) {
+                unset($meta['deploy_blocked_env']);
+            }
+        }
+        $this->site->forceFill(['meta' => $meta])->save();
+        $this->toastSuccess(__(':key will be ignored — deploys won\'t require it.', ['key' => $key]));
+    }
+
+    /** Undo a per-variable ignore. */
+    public function unignoreEnvKey(string $key): void
+    {
+        $this->authorize('update', $this->site);
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta['ignored_env_keys'] = array_values(array_filter(
+            (array) ($meta['ignored_env_keys'] ?? []),
+            static fn ($k): bool => (string) $k !== trim($key),
+        ));
+        $this->site->forceFill(['meta' => $meta])->save();
+        $this->toastSuccess(__(':key is no longer ignored.', ['key' => $key]));
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function ignoredEnvKeys(): array
+    {
+        return array_values(array_map('strval', (array) ($this->site->meta['ignored_env_keys'] ?? [])));
     }
 
     public function addRedirectRule(): void

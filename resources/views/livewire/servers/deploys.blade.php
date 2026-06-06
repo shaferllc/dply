@@ -100,5 +100,5 @@
         </div>
     @endif
 
-    <x-cli-snippet class="mt-8" :command="'dply:fleet:running-deploys --json | jq \'.deployments[] | select(.server_id==\"'.$server->id.'\")\''" />
+    <x-cli-snippet class="mt-8" :command="'dply fleet:deploys:running --json | jq \'.deployments[] | select(.server_id==\"'.$server->id.'\")\''" />
 </div>

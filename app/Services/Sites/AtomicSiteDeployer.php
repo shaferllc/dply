@@ -227,6 +227,23 @@ class AtomicSiteDeployer
             throw new \RuntimeException('Deploy failed during the release phase. See the deployment log for details.');
         }
 
+        // ── RESTART ── bring long-running processes onto the new release. dply's
+        // managed restart (reload FPM / Octane, bounce Horizon + queue workers it
+        // detects) runs first, then any user-authored RESTART-phase steps. Both
+        // are post-activation and best-effort — the release is already live, so a
+        // worker hiccup is logged on the timeline but doesn't roll back a healthy
+        // deploy.
+        $managedRestart = $this->pipelineRunner->runManagedRestart($ssh, $site, $newRelease);
+        $log .= $managedRestart['log'];
+
+        $userRestart = $this->pipelineRunner->runRestart($ssh, $site, $newRelease);
+        $log .= $userRestart['log'];
+
+        $restartSteps = array_merge($managedRestart['steps'], $userRestart['steps']);
+        if ($restartSteps !== []) {
+            $deployment?->recordPhaseResults('restart', $restartSteps);
+        }
+
         $log .= app(SupervisorDeployRestarter::class)->restartAfterDeployIfEnabled($site);
 
         try {

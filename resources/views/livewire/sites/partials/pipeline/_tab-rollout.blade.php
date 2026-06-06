@@ -4,6 +4,25 @@
     // The raw server-block snippet is Nginx-specific. Caddy (and other engines)
     // don't take an Nginx `location` block, so only surface it on Nginx hosts.
     $isNginx = $site->webserver() === 'nginx';
+
+    // Post-activate toggles are stack-specific: the per-minute `schedule:run`
+    // cron only applies to (likely-)Laravel PHP sites, and "restart Supervisor"
+    // only matters when the site actually has Supervisor programs. Hide what
+    // doesn't apply; when hidden, point to the dedicated workspace that does
+    // generalise it (Cron / Daemons) for VM sites.
+    $showScheduler = $site->supportsLaravelScheduler();
+    $showSupervisor = $site->hasRestartableSupervisorPrograms();
+    $vmManagedCron = $site->supportsVmManagedCron();
+    $schedulerCronLink = ! $showScheduler && $vmManagedCron;
+    $supervisorDaemonsLink = ! $showSupervisor && $vmManagedCron;
+    $showPostActivate = $showScheduler || $showSupervisor || $schedulerCronLink || $supervisorDaemonsLink;
+
+    // Header summary names only the controls actually shown for this stack.
+    $rolloutSummaryParts = [__('Release retention'), __('deploy environment group')];
+    if ($showScheduler) { $rolloutSummaryParts[] = __('scheduler'); }
+    if ($showSupervisor) { $rolloutSummaryParts[] = __('Supervisor restarts'); }
+    if ($isNginx) { $rolloutSummaryParts[] = __('optional Nginx snippets'); }
+    $rolloutSummary = collect($rolloutSummaryParts)->join(', ', __(', and ')).'. '.__('Runtime ports and users are on Settings → Runtime.');
 @endphp
 
 @if (! $functionsHost)
@@ -81,22 +100,26 @@
                         </div>
                     </div>
 
-                    <div class="space-y-5 px-6 py-6 sm:px-7">
+                    {{-- Deferred wire:model (saved via the unsaved-changes bar like every
+                         other field here); Alpine mirrors the checkbox so the dependent
+                         controls enable/disable instantly with no server round-trip — the
+                         .live round-trip used to make a toggle look like an autosave. --}}
+                    <div class="space-y-5 px-6 py-6 sm:px-7" x-data="{ healthEnabled: @js($deploy_health_enabled) }">
                         <div class="space-y-3 rounded-2xl border border-brand-ink/10 bg-brand-cream/50 p-4 sm:p-5">
                             <label class="flex items-start gap-3">
-                                <input type="checkbox" wire:model.live="deploy_health_enabled" class="mt-0.5 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest">
+                                <input type="checkbox" wire:model="deploy_health_enabled" x-on:change="healthEnabled = $event.target.checked" class="mt-0.5 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest">
                                 <span class="text-sm font-semibold text-brand-ink">{{ __('Run health check after each atomic deploy') }}</span>
                             </label>
                             <label class="flex items-start gap-3">
-                                <input type="checkbox" wire:model="deploy_health_auto_rollback" class="mt-0.5 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" @disabled(! $deploy_health_enabled)>
-                                <span class="text-sm font-semibold text-brand-ink @if (! $deploy_health_enabled) opacity-50 @endif">{{ __('Automatically roll back to the previous release if the check fails') }}</span>
+                                <input type="checkbox" wire:model="deploy_health_auto_rollback" class="mt-0.5 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" x-bind:disabled="! healthEnabled" @disabled(! $deploy_health_enabled)>
+                                <span class="text-sm font-semibold text-brand-ink" x-bind:class="{ 'opacity-50': ! healthEnabled }" @class(['opacity-50' => ! $deploy_health_enabled])>{{ __('Automatically roll back to the previous release if the check fails') }}</span>
                             </label>
                         </div>
 
-                        <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3" @class(['opacity-50 pointer-events-none' => ! $deploy_health_enabled])>
+                        <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3" x-bind:class="{ 'opacity-50 pointer-events-none': ! healthEnabled }" @class(['opacity-50 pointer-events-none' => ! $deploy_health_enabled])>
                             <div>
                                 <x-input-label for="deploy_health_scheme" :value="__('URL scheme')" />
-                                <select id="deploy_health_scheme" wire:model="deploy_health_scheme" class="mt-2 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30" @disabled(! $deploy_health_enabled)>
+                                <select id="deploy_health_scheme" wire:model="deploy_health_scheme" class="mt-2 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30" x-bind:disabled="! healthEnabled" @disabled(! $deploy_health_enabled)>
                                     <option value="http">http</option>
                                     <option value="https">https</option>
                                 </select>
@@ -104,33 +127,33 @@
                             </div>
                             <div>
                                 <x-input-label for="deploy_health_host" :value="__('Target host')" />
-                                <x-text-input id="deploy_health_host" wire:model="deploy_health_host" class="mt-2 block w-full font-mono text-sm" placeholder="127.0.0.1" :disabled="! $deploy_health_enabled" />
+                                <x-text-input id="deploy_health_host" wire:model="deploy_health_host" class="mt-2 block w-full font-mono text-sm" placeholder="127.0.0.1" x-bind:disabled="! healthEnabled" :disabled="! $deploy_health_enabled" />
                                 <x-input-error :messages="$errors->get('deploy_health_host')" class="mt-2" />
                             </div>
                             <div>
                                 <x-input-label for="deploy_health_port" :value="__('Target port (optional)')" />
-                                <x-text-input id="deploy_health_port" type="number" wire:model="deploy_health_port" class="mt-2 block w-full font-mono text-sm" placeholder="80 / 443" min="1" max="65535" :disabled="! $deploy_health_enabled" />
+                                <x-text-input id="deploy_health_port" type="number" wire:model="deploy_health_port" class="mt-2 block w-full font-mono text-sm" placeholder="80 / 443" min="1" max="65535" x-bind:disabled="! healthEnabled" :disabled="! $deploy_health_enabled" />
                                 <p class="mt-2 text-sm text-brand-moss">{{ __('Leave empty for the default port (80 or 443).') }}</p>
                                 <x-input-error :messages="$errors->get('deploy_health_port')" class="mt-2" />
                             </div>
                             <div>
                                 <x-input-label for="deploy_health_path" :value="__('Health path')" />
-                                <x-text-input id="deploy_health_path" wire:model="deploy_health_path" class="mt-2 block w-full font-mono text-sm" placeholder="/up" :disabled="! $deploy_health_enabled" />
+                                <x-text-input id="deploy_health_path" wire:model="deploy_health_path" class="mt-2 block w-full font-mono text-sm" placeholder="/up" x-bind:disabled="! healthEnabled" :disabled="! $deploy_health_enabled" />
                                 <x-input-error :messages="$errors->get('deploy_health_path')" class="mt-2" />
                             </div>
                             <div>
                                 <x-input-label for="deploy_health_expect_status" :value="__('Expected HTTP status')" />
-                                <x-text-input id="deploy_health_expect_status" type="number" wire:model="deploy_health_expect_status" class="mt-2 w-28" min="100" max="599" :disabled="! $deploy_health_enabled" />
+                                <x-text-input id="deploy_health_expect_status" type="number" wire:model="deploy_health_expect_status" class="mt-2 w-28" min="100" max="599" x-bind:disabled="! healthEnabled" :disabled="! $deploy_health_enabled" />
                                 <x-input-error :messages="$errors->get('deploy_health_expect_status')" class="mt-2" />
                             </div>
                             <div>
                                 <x-input-label for="deploy_health_attempts" :value="__('Attempts')" />
-                                <x-text-input id="deploy_health_attempts" type="number" wire:model="deploy_health_attempts" class="mt-2 w-28" min="1" max="30" :disabled="! $deploy_health_enabled" />
+                                <x-text-input id="deploy_health_attempts" type="number" wire:model="deploy_health_attempts" class="mt-2 w-28" min="1" max="30" x-bind:disabled="! healthEnabled" :disabled="! $deploy_health_enabled" />
                                 <x-input-error :messages="$errors->get('deploy_health_attempts')" class="mt-2" />
                             </div>
                             <div class="sm:col-span-2 lg:col-span-1">
                                 <x-input-label for="deploy_health_delay_ms" :value="__('Delay between attempts (ms)')" />
-                                <x-text-input id="deploy_health_delay_ms" type="number" wire:model="deploy_health_delay_ms" class="mt-2 w-32" min="0" max="10000" step="50" :disabled="! $deploy_health_enabled" />
+                                <x-text-input id="deploy_health_delay_ms" type="number" wire:model="deploy_health_delay_ms" class="mt-2 w-32" min="0" max="10000" step="50" x-bind:disabled="! healthEnabled" :disabled="! $deploy_health_enabled" />
                                 <x-input-error :messages="$errors->get('deploy_health_delay_ms')" class="mt-2" />
                             </div>
                         </div>
@@ -147,11 +170,7 @@
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Rollout') }}</p>
                             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Rollout and web server') }}</h2>
-                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                {{ $isNginx
-                                    ? __('Release retention, deploy environment group, scheduler, Supervisor restarts, and optional Nginx snippets. Runtime ports and users are on Settings → Runtime.')
-                                    : __('Release retention, deploy environment group, scheduler, and Supervisor restarts. Runtime ports and users are on Settings → Runtime.') }}
-                            </p>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ $rolloutSummary }}</p>
                             @if ($zero_downtime_enabled)
                                 <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
                                     <span class="inline-flex items-center gap-1">
@@ -180,9 +199,11 @@
                         </div>
                     </div>
 
+                    @if ($showPostActivate)
                     <div class="space-y-4 rounded-2xl border border-brand-ink/10 bg-brand-cream/50 p-4 sm:p-5">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Post-activate') }}</p>
                         <div class="space-y-4">
+                            @if ($showScheduler)
                             <div>
                                 <label class="flex items-start gap-3">
                                     <input type="checkbox" wire:model="laravel_scheduler" class="mt-0.5 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest">
@@ -194,12 +215,27 @@
                                     </span>
                                 </label>
                             </div>
+                            @elseif ($schedulerCronLink)
+                            <p class="text-sm leading-relaxed text-brand-moss">
+                                {{ __('Need a recurring task for this stack?') }}
+                                <a href="{{ route('sites.cron', [$server, $site]) }}" wire:navigate class="font-semibold text-brand-forest hover:underline">{{ __('Set one up in Cron →') }}</a>
+                            </p>
+                            @endif
+
+                            @if ($showSupervisor)
                             <label class="flex items-start gap-3">
                                 <input type="checkbox" wire:model="restart_supervisor_programs_after_deploy" class="mt-0.5 h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest">
                                 <span class="text-sm font-semibold text-brand-ink">{{ __('Restart Supervisor programs after successful deploy') }}</span>
                             </label>
+                            @elseif ($supervisorDaemonsLink)
+                            <p class="text-sm leading-relaxed text-brand-moss">
+                                {{ __('Run background workers for this site?') }}
+                                <a href="{{ route('sites.daemons', [$server, $site]) }}" wire:navigate class="font-semibold text-brand-forest hover:underline">{{ __('Manage them in Daemons →') }}</a>
+                            </p>
+                            @endif
                         </div>
                     </div>
+                    @endif
 
                     @if ($isNginx)
                     <div>

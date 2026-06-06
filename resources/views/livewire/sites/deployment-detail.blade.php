@@ -144,7 +144,7 @@
                 </section>
             @endif
 
-            <x-cli-snippet :command="'dply:site:show-deploy '.$deployment->id.' --output'" />
+            <x-cli-snippet :command="'dply sites:deployment '.$deployment->id.' --output'" />
             </main>
         </div>
     </div>

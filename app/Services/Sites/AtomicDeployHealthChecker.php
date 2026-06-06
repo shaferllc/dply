@@ -30,7 +30,7 @@ final class AtomicDeployHealthChecker
         }
 
         $hostHeader = strtolower(trim($domain->hostname));
-        $path = $this->normalizePath((string) ($meta['deploy_health_path'] ?? '/health'));
+        $path = $this->normalizePath((string) ($meta['deploy_health_path'] ?? '/up'));
         $expect = (int) ($meta['deploy_health_expect_status'] ?? 200);
         $attempts = max(1, min(30, (int) ($meta['deploy_health_attempts'] ?? 5)));
         $delayMs = max(0, min(10000, (int) ($meta['deploy_health_delay_ms'] ?? 500)));

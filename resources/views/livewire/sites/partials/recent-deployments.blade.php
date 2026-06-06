@@ -47,7 +47,7 @@
                             @endif
                         @endforeach
                     </div>
-                    <x-cli-snippet class="mt-3 text-[10px]" :command="'dply:site:show-deploy '.$deployment->id.' --output'" />
+                    <x-cli-snippet class="mt-3 text-[10px]" :command="'dply sites:deployment '.$deployment->id.' --output'" />
                 </details>
             </li>
         @endforeach

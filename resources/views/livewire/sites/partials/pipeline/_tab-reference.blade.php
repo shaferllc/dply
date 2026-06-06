@@ -31,11 +31,11 @@
     <x-cli-snippet
         :summary="__('Artisan (on the server)')"
         :commands="[
-            ['label' => __('Trigger deploy'), 'command' => 'dply:site:deploy '.$site->slug],
-            ['label' => __('Abort running deploy'), 'command' => 'dply:site:abort-deploy '.$site->slug],
-            ['label' => __('Run a single phase'), 'command' => 'dply:site:run-phase '.$site->slug.' build'],
-            ['label' => __('Recent deploy history'), 'command' => 'dply:site:deploy-history '.$site->slug],
-            ['label' => __('Inspect a deploy'), 'command' => 'dply:site:show-deploy DEPLOYMENT_ID --output'],
+            ['label' => __('Trigger deploy'), 'command' => 'dply sites:deploy '.$site->slug],
+            ['label' => __('Abort running deploy'), 'command' => 'dply sites:deploy:abort '.$site->slug],
+            ['label' => __('Run a single phase'), 'command' => 'dply sites:deploy:phase '.$site->slug.' build'],
+            ['label' => __('Recent deploy history'), 'command' => 'dply sites:deployments '.$site->slug],
+            ['label' => __('Inspect a deploy'), 'command' => 'dply sites:deployment DEPLOYMENT_ID --output'],
         ]"
     />
 </div>

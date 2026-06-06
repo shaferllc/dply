@@ -17,6 +17,7 @@ class ServerDatabase extends Model
 
     protected $fillable = [
         'server_id',
+        'site_id',
         'name',
         'engine',
         'username',
@@ -40,6 +41,15 @@ class ServerDatabase extends Model
     public function server(): BelongsTo
     {
         return $this->belongsTo(Server::class);
+    }
+
+    /**
+     * The site that owns this database, if any. Server-wide databases
+     * (created from the server-level manager) have a null site_id.
+     */
+    public function site(): BelongsTo
+    {
+        return $this->belongsTo(Site::class);
     }
 
     public function extraUsers(): HasMany

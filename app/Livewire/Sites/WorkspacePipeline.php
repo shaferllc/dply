@@ -191,15 +191,33 @@ class WorkspacePipeline extends Show
         $this->site->loadMissing(['deployHooks', 'previewDomains', 'certificates']);
         $editingPipeline = $this->editingDeployPipeline()->loadMissing(['steps', 'hooks']);
 
-        $deploymentContract = app(DeploymentContractBuilder::class)->build($this->site);
-        $deploymentPreflight = app(DeploymentPreflightValidator::class)->validate($this->site, $deploymentContract);
-        $pipelineAdvisor = app(DeployPipelineAdvisor::class)->analyze($this->site, $editingPipeline);
+        $tab = $this->pipelineTab;
+
+        // The deployment contract + preflight are display data for deploy-config
+        // surfaces and are NOT read anywhere in the pipeline view tree (verified).
+        // The builder eager-loads relations and runs the secret / resource-binding
+        // resolvers, and the validator piles on — pure waste on every sub-tab
+        // switch, so skip both. SiteSettingsViewData::for() handles the nulls.
+        $deploymentContract = null;
+        $deploymentPreflight = [];
+
+        // The advisor (DB-backed) only feeds the Overview + Pipeline (steps) tabs;
+        // Rollout / Reference never read its output. Skip it (and the actionable-
+        // check resolution it drives) on those tabs.
+        $needsAdvisor = in_array($tab, ['overview', 'steps'], true);
+        $pipelineAdvisor = $needsAdvisor
+            ? app(DeployPipelineAdvisor::class)->analyze($this->site, $editingPipeline)
+            : ['checks' => [], 'errors' => [], 'warnings' => []];
         $pipelineAdvisorChecks = collect($pipelineAdvisor['checks']);
-        $pipelineActionableChecks = DeployPipelineIssueFixResolver::actionableChecks(
-            $this->site,
-            $this->server,
-            $pipelineAdvisorChecks,
-        );
+        $pipelineActionableChecks = $needsAdvisor
+            ? DeployPipelineIssueFixResolver::actionableChecks($this->site, $this->server, $pipelineAdvisorChecks)
+            : collect();
+
+        // The bash export (DB-backed) only feeds the share modal on the Pipeline
+        // (steps) tab; no other sub-tab renders it.
+        $needsBashExport = $tab === 'steps';
+        $pipelineBashFull = $needsBashExport ? app(DeployPipelineScriptExporter::class)->toFullBash($editingPipeline) : '';
+        $pipelineBashCommands = $needsBashExport ? app(DeployPipelineScriptExporter::class)->toCommandsOnly($editingPipeline) : '';
 
         return view('livewire.sites.workspace-pipeline', array_merge(
             SiteSettingsViewData::for(
@@ -242,8 +260,8 @@ class WorkspacePipeline extends Show
                     DeployPipelineSafetyPresets::BUNDLE_LARAVEL_V1,
                 ),
                 'pipelineStarters' => app(DeployPipelineStarterCatalog::class)->startersForSite($this->site),
-                'pipelineBashFull' => app(DeployPipelineScriptExporter::class)->toFullBash($editingPipeline),
-                'pipelineBashCommands' => app(DeployPipelineScriptExporter::class)->toCommandsOnly($editingPipeline),
+                'pipelineBashFull' => $pipelineBashFull,
+                'pipelineBashCommands' => $pipelineBashCommands,
                 'pipelineOverviewStepCount' => $editingPipeline->steps->count(),
                 'pipelineOverviewHookCount' => $editingPipeline->hooks->count(),
                 'pipelineOverviewName' => $editingPipeline->name,

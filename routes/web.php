@@ -185,6 +185,7 @@ use App\Livewire\Settings\SourceControl as SettingsSourceControl;
 use App\Livewire\Settings\SshKeys as SettingsSshKeys;
 use App\Livewire\Settings\WebserverTemplates as SettingsWebserverTemplates;
 use App\Livewire\Sites\Caching;
+use App\Livewire\Sites\Database as SitesDatabase;
 use App\Livewire\Sites\Cdn;
 use App\Livewire\Sites\ChooseApp as SitesChooseApp;
 use App\Livewire\Sites\Create as SitesCreate;
@@ -746,6 +747,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     })->name('sites.source');
     Route::livewire('servers/{server}/sites/{site}/caching', Caching::class)->name('sites.caching');
     Route::livewire('servers/{server}/sites/{site}/cdn', Cdn::class)->name('sites.cdn');
+    Route::livewire('servers/{server}/sites/{site}/database', SitesDatabase::class)->name('sites.database');
     Route::livewire('servers/{server}/sites/{site}/files', Files::class)->name('sites.files');
     Route::get('servers/{server}/sites/{site}/files/download', SiteFileDownloadController::class)->name('sites.files.download');
     // Legacy redirect for the previous URL shape /sites/{site}/settings/{section}. The

@@ -404,7 +404,7 @@
                         </div>
                         <div>
                             <x-input-label for="deploy_health_path" value="{{ __('Health path') }}" />
-                            <x-text-input id="deploy_health_path" wire:model="deploy_health_path" class="font-mono text-sm" placeholder="/health" :disabled="! $deploy_health_enabled" />
+                            <x-text-input id="deploy_health_path" wire:model="deploy_health_path" class="font-mono text-sm" placeholder="/up" :disabled="! $deploy_health_enabled" />
                             <x-input-error :messages="$errors->get('deploy_health_path')" class="mt-1" />
                         </div>
                         <div>
@@ -426,9 +426,23 @@
                 </div>
             @endif
 
+            @php
+                // Stack-specific post-activate controls (see _tab-rollout): hide the
+                // Laravel scheduler cron on non-Laravel/non-PHP stacks, the Supervisor
+                // restart when the site has no Supervisor programs, and the Nginx
+                // snippet on non-Nginx engines. Header copy names only what's shown.
+                $drIsNginx = $site->webserver() === 'nginx';
+                $drShowScheduler = $site->supportsLaravelScheduler();
+                $drShowSupervisor = $site->hasRestartableSupervisorPrograms();
+                $drParts = [__('releases to keep'), __('environment group')];
+                if ($drShowScheduler) { $drParts[] = __('scheduler'); }
+                if ($drShowSupervisor) { $drParts[] = __('Supervisor'); }
+                if ($drIsNginx) { $drParts[] = __('extra Nginx directives'); }
+                $drSummary = ucfirst(collect($drParts)->join(', ', __(', and '))).'. '.__('Runtime ports and users live on Runtime / Stack / System user.');
+            @endphp
             <div>
                 <h3 class="text-base font-semibold text-brand-ink">{{ __('Rollout and web server') }}</h3>
-                <p class="mt-1 text-sm text-brand-moss">{{ __('Releases to keep, environment group, scheduler, Supervisor, and extra Nginx directives. Runtime ports and users live on Runtime / Stack / System user.') }}</p>
+                <p class="mt-1 text-sm text-brand-moss">{{ $drSummary }}</p>
             </div>
 
             <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -444,7 +458,9 @@
                 </div>
             </div>
 
+            @if ($drShowScheduler || $drShowSupervisor || $drIsNginx)
             <div class="grid gap-3">
+                @if ($drShowScheduler)
                 <div>
                     <label class="flex items-center gap-2 text-sm text-brand-ink">
                         <input type="checkbox" wire:model="laravel_scheduler" class="rounded border-brand-ink/15">
@@ -454,15 +470,21 @@
                         <p class="mt-1 pl-6 text-xs text-brand-moss">{{ $site->runtimeSchedulerCheckboxHelp() }}</p>
                     @endif
                 </div>
+                @endif
+                @if ($drShowSupervisor)
                 <label class="flex items-center gap-2 text-sm text-brand-ink">
                     <input type="checkbox" wire:model="restart_supervisor_programs_after_deploy" class="rounded border-brand-ink/15">
                     {{ __('Restart Supervisor programs after successful deploy') }}
                 </label>
+                @endif
+                @if ($drIsNginx)
                 <div>
                     <x-input-label for="nginx_extra_raw" value="Extra Nginx inside server block (advanced)" />
                     <textarea id="nginx_extra_raw" wire:model="nginx_extra_raw" rows="4" class="w-full rounded-md border-brand-ink/15 shadow-sm font-mono text-xs" placeholder="# location /foo { ... }"></textarea>
                 </div>
+                @endif
             </div>
+            @endif
 
             <x-primary-button type="submit">{{ __('Save rollout settings') }}</x-primary-button>
         </form>
@@ -501,9 +523,9 @@
 <x-cli-snippet
     :summary="__('Artisan (on the server)')"
     :commands="[
-    ['label' => __('Trigger deploy'), 'command' => 'dply:site:deploy '.$site->slug],
-    ['label' => __('Abort running deploy'), 'command' => 'dply:site:abort-deploy '.$site->slug],
-    ['label' => __('Run a single phase'), 'command' => 'dply:site:run-phase '.$site->slug.' build'],
-    ['label' => __('Recent deploy history'), 'command' => 'dply:site:deploy-history '.$site->slug],
-    ['label' => __('Inspect a deploy'), 'command' => 'dply:site:show-deploy DEPLOYMENT_ID --output'],
+    ['label' => __('Trigger deploy'), 'command' => 'dply sites:deploy '.$site->slug],
+    ['label' => __('Abort running deploy'), 'command' => 'dply sites:deploy:abort '.$site->slug],
+    ['label' => __('Run a single phase'), 'command' => 'dply sites:deploy:phase '.$site->slug.' build'],
+    ['label' => __('Recent deploy history'), 'command' => 'dply sites:deployments '.$site->slug],
+    ['label' => __('Inspect a deploy'), 'command' => 'dply sites:deployment DEPLOYMENT_ID --output'],
 ]" />

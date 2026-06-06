@@ -341,10 +341,10 @@
 @endif
 
 <x-cli-snippet :commands="[
-    ['label' => __('Print primary URL'), 'command' => 'dply:site:url '.$site->slug],
-    ['label' => __('Diagnose site'), 'command' => 'dply:site:doctor '.$site->slug],
-    ['label' => __('Rename site'), 'command' => 'dply:site:rename '.$site->slug.' --name=\'New name\' --slug=new-slug'],
-    ['label' => __('Export full config'), 'command' => 'dply:site:export-config '.$site->slug.' --to=site.json'],
-    ['label' => __('Export deploy manifest'), 'command' => 'dply:site:export-manifest '.$site->slug.' --to=manifest.json'],
-    ['label' => __('List all sites'), 'command' => 'dply:site:list'],
+    ['label' => __('Print primary URL'), 'command' => 'dply sites:url '.$site->slug],
+    ['label' => __('Diagnose site'), 'command' => 'dply sites:doctor '.$site->slug],
+    ['label' => __('Rename site'), 'command' => 'dply sites:rename '.$site->slug.' --name=\'New name\' --slug=new-slug'],
+    ['label' => __('Export full config'), 'command' => 'dply sites:export:config '.$site->slug.' --to=site.json'],
+    ['label' => __('Export deploy manifest'), 'command' => 'dply sites:export:manifest '.$site->slug.' --to=manifest.json'],
+    ['label' => __('List all sites'), 'command' => 'dply sites:list'],
 ]" />

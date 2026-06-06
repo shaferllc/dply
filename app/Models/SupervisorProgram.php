@@ -61,9 +61,17 @@ class SupervisorProgram extends Model
      */
     public function effectiveDirectory(): string
     {
-        $sitePath = $this->site?->effectiveRepositoryPath();
-        if (is_string($sitePath) && trim($sitePath) !== '') {
-            return $sitePath;
+        $site = $this->site;
+        if ($site !== null) {
+            // Atomic-deploy sites run their command from the active release
+            // symlink (…/current), exactly like the systemd worker unit — so a
+            // supervisor worker program lands on the same code after a deploy.
+            $sitePath = $site->isAtomicDeploys()
+                ? $site->effectiveEnvDirectory()
+                : $site->effectiveRepositoryPath();
+            if (is_string($sitePath) && trim($sitePath) !== '') {
+                return $sitePath;
+            }
         }
 
         return (string) $this->directory;

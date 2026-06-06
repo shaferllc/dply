@@ -9,6 +9,35 @@
         @livewire(\App\Livewire\Sites\DeployScript::class, ['server' => $server, 'site' => $site, 'embedded' => true], key('deploy-script-'.$site->id))
     </div>
 @else
+    {{-- Visual builder enabled: let the user pick the Simple text editor or the
+         Advanced visual builder. The choice is per-visit only (URL-encoded,
+         not remembered) and defaults to Simple. --}}
+    <div
+        x-data="{
+            mode: (new URLSearchParams(window.location.search).get('steps_mode') === 'advanced') ? 'advanced' : 'simple',
+            setMode(m) {
+                this.mode = m;
+                let u = new URL(window.location);
+                m === 'advanced' ? u.searchParams.set('steps_mode', 'advanced') : u.searchParams.delete('steps_mode');
+                window.history.replaceState({}, '', u);
+            }
+        }"
+        class="space-y-4"
+    >
+        <div class="inline-flex rounded-xl border border-brand-ink/15 bg-white p-1 shadow-sm">
+            <button type="button" x-on:click="setMode('simple')"
+                :class="mode === 'simple' ? 'bg-brand-ink text-brand-cream' : 'text-brand-ink hover:bg-brand-sand/40'"
+                class="rounded-lg px-3 py-1.5 text-xs font-semibold transition">{{ __('Simple') }}</button>
+            <button type="button" x-on:click="setMode('advanced')"
+                :class="mode === 'advanced' ? 'bg-brand-ink text-brand-cream' : 'text-brand-ink hover:bg-brand-sand/40'"
+                class="rounded-lg px-3 py-1.5 text-xs font-semibold transition">{{ __('Advanced') }}</button>
+        </div>
+
+        <div x-show="mode === 'simple'">
+            @livewire(\App\Livewire\Sites\DeployScript::class, ['server' => $server, 'site' => $site, 'embedded' => true], key('deploy-script-'.$site->id))
+        </div>
+
+        <div x-show="mode === 'advanced'" x-cloak>
 @php
     $functionsHost = $functionsHost ?? $server->hostCapabilities()->supportsFunctionDeploy();
     $orderedSteps = ($editingDeploySteps ?? collect())->sortBy('sort_order')->values();
@@ -564,4 +593,6 @@
 
     @include('livewire.sites.partials.pipeline._pipeline-modals')
 @endif
+        </div>{{-- mode === 'advanced' --}}
+    </div>{{-- steps mode toggle --}}
 @endif

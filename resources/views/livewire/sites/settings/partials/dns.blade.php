@@ -191,4 +191,4 @@
     </div>
 </div>
 
-<x-cli-snippet class="mt-6" tone="stub" />
+<x-cli-snippet class="mt-6" :command="'dply sites:dns '.$site->slug" />

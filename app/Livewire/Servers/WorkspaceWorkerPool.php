@@ -84,6 +84,9 @@ class WorkspaceWorkerPool extends Component
 
     public int $hz_tries = 1;
 
+    /** Process manager the pool's worker daemons run under: systemd | supervisor. */
+    public string $hz_process_manager = WorkerPool::PM_SYSTEMD;
+
     /**
      * Live per-job feed, newest first, pushed over Reverb from the worker boxes
      * (see WorkerPoolJobEvent). Capped; this is a rolling window, not history.
@@ -114,6 +117,7 @@ class WorkspaceWorkerPool extends Component
             $this->hz_memory = $hz['memory'];
             $this->hz_timeout = $hz['timeout'];
             $this->hz_tries = $hz['tries'];
+            $this->hz_process_manager = $pool->processManager();
         } else {
             $this->pool_name = $server->name.' pool';
         }
@@ -215,6 +219,11 @@ class WorkspaceWorkerPool extends Component
             return;
         }
 
+        $previousManager = $pool->processManager();
+        $newManager = in_array($this->hz_process_manager, [WorkerPool::PM_SYSTEMD, WorkerPool::PM_SUPERVISOR], true)
+            ? $this->hz_process_manager
+            : WorkerPool::PM_SYSTEMD;
+
         $meta = is_array($pool->meta) ? $pool->meta : [];
         $meta['horizon_config'] = [
             'queues' => $this->hz_queues,
@@ -225,7 +234,9 @@ class WorkspaceWorkerPool extends Component
             'timeout' => $this->hz_timeout,
             'tries' => $this->hz_tries,
         ];
+        $meta['process_manager'] = $newManager;
         $pool->forceFill(['meta' => $meta])->save();
+        $this->hz_process_manager = $newManager;
 
         // Re-read through the normaliser so the form reflects the clamped/cleaned
         // values that were actually stored (and will be pushed to the boxes).
@@ -239,6 +250,18 @@ class WorkspaceWorkerPool extends Component
         $this->hz_tries = $normalised['tries'];
 
         \App\Jobs\PushWorkerPoolHorizonConfigJob::dispatch((string) $pool->id);
+
+        // Switching process manager re-provisions every member's worker daemons
+        // under the new backend and tears down the old one (systemd⇄supervisor).
+        if ($newManager !== $previousManager) {
+            app(WorkerPoolManager::class)->ensureWorkersAcrossPool($pool->refresh(), auth()->user());
+            $this->toastSuccess(__('Switching workers to :pm — re-provisioning daemons on each member over SSH.', [
+                'pm' => $newManager === WorkerPool::PM_SUPERVISOR ? 'Supervisor' : 'systemd',
+            ]));
+
+            return;
+        }
+
         $this->toastSuccess(__('Horizon config saved — applying to workers over SSH (they restart in a few seconds).'));
     }
 

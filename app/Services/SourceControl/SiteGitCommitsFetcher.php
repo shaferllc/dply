@@ -7,6 +7,7 @@ namespace App\Services\SourceControl;
 use App\Contracts\SourceControl\GitIdentity;
 use App\Models\Site;
 use App\Models\User;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
@@ -18,6 +19,17 @@ use Illuminate\Support\Str;
 final class SiteGitCommitsFetcher
 {
     private const MAX_COMMITS = 50;
+
+    /**
+     * Short cache window for a commit page. Re-renders (any Livewire round-trip)
+     * and tab switches otherwise re-hit the provider every time — and when the
+     * configured branch is missing, every render repeats the
+     * list→404→default-branch lookup→retry dance (3 calls). The key shares the
+     * reader's per-site version (see {@see SourceControlRepositoryReader}), so a
+     * single {@see SourceControlRepositoryReader::invalidate()} on deploy /
+     * branch switch / "Refresh" drops cached commits too.
+     */
+    private const CACHE_TTL_SECONDS = 120;
 
     public function __construct(
         private ?GitIdentityResolver $resolver = null,
@@ -65,7 +77,14 @@ final class SiteGitCommitsFetcher
         $limit = max(1, min(self::MAX_COMMITS, $limit));
         $page = max(1, $page);
 
-        return match ($remote['provider']) {
+        $version = (int) Cache::get('repo:reader:v:'.$site->id, 0);
+        $cacheKey = 'repo:commits:'.$site->id.':v'.$version.':'.md5($branch.'|'.$limit.'|'.$page);
+        $cached = Cache::get($cacheKey);
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        $result = match ($remote['provider']) {
             'github' => $this->fetchGithub($remote, $site, $user, $branch, $limit, $page),
             'gitlab' => $this->fetchGitlab($remote, $site, $user, $branch, $limit, $page),
             'bitbucket' => $this->fetchBitbucket($remote, $site, $user, $branch, $limit, $page),
@@ -80,6 +99,46 @@ final class SiteGitCommitsFetcher
                 'has_more' => false,
             ],
         };
+
+        // Only cache successful payloads — never an error, so a transient 404/5xx
+        // or a token the operator just fixed isn't pinned for the full TTL.
+        if ($result['ok'] ?? false) {
+            $this->persistResolvedBranchIfStale($site, $branchOverride, $result);
+            Cache::put($cacheKey, $result, self::CACHE_TTL_SECONDS);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Self-heal a stale deploy branch. When the configured branch didn't exist
+     * and a provider fetcher fell back to the repo's real default (e.g. stored
+     * "main" but the repo is "master"), persist that default as the site's
+     * deploy branch — so future loads query the right ref directly instead of
+     * repeating the list→404→default-branch lookup→retry round-trip.
+     *
+     * Guarded tightly: only when viewing the deploy branch itself (not a
+     * transient ?repo_ref preview), only while the stored branch is exactly the
+     * missing one, and only for a never-deployed site — so we never override a
+     * ref the operator deliberately set or one a live deployment depends on.
+     */
+    private function persistResolvedBranchIfStale(Site $site, ?string $branchOverride, array $result): void
+    {
+        if ($branchOverride !== null && $branchOverride !== '') {
+            return;
+        }
+
+        $requested = (string) ($result['requested_branch'] ?? '');
+        $resolved = (string) ($result['branch'] ?? '');
+        if ($requested === '' || $resolved === '' || strcasecmp($requested, $resolved) === 0) {
+            return;
+        }
+
+        if ((string) $site->git_branch !== $requested || $site->last_deploy_at !== null) {
+            return;
+        }
+
+        $site->forceFill(['git_branch' => $resolved])->save();
     }
 
     private function parseRemoteUrl(?string $url): ?array
@@ -203,10 +262,7 @@ final class SiteGitCommitsFetcher
                 if ($retry->successful()) {
                     $response = $retry;
                     $effectiveBranch = $default;
-                    $notice = __('Branch ":requested" wasn\'t found in this repository — showing the default branch ":actual" instead. Use "Change…" to pick another branch, tag, or commit.', [
-                        'requested' => $branch,
-                        'actual' => $default,
-                    ]);
+                    $notice = $this->branchFallbackNotice($branch, $default);
                 }
             }
         }
@@ -304,6 +360,15 @@ final class SiteGitCommitsFetcher
         return null;
     }
 
+    /** Shared "we fell back to the repo's default branch" notice (all providers). */
+    private function branchFallbackNotice(string $requested, string $actual): string
+    {
+        return __('Branch ":requested" wasn\'t found in this repository — showing the default branch ":actual" instead. Use "Change…" to pick another branch, tag, or commit.', [
+            'requested' => $requested,
+            'actual' => $actual,
+        ]);
+    }
+
     private function fetchGitlab(array $remote, Site $site, User $user, string $branch, int $limit, int $page = 1): array
     {
         $identity = $this->resolver->forSite($site, $user,'gitlab');
@@ -322,13 +387,32 @@ final class SiteGitCommitsFetcher
         $apiBase = $this->gitlabApiBase($identity, $remote);
         $url = $apiBase.'/api/v4/projects/'.$encoded.'/repository/commits';
 
-        $response = Http::withToken($identity->accessToken())
+        $call = fn (string $ref) => Http::withToken($identity->accessToken())
             ->acceptJson()
             ->get($url, [
-                'ref_name' => $branch,
+                'ref_name' => $ref,
                 'per_page' => $limit,
                 'page' => $page,
             ]);
+
+        $effectiveBranch = $branch;
+        $notice = null;
+        $response = $call($branch);
+
+        // A 404 on list-commits means the configured ref doesn't exist (e.g. we
+        // stored "main" but the project's default is "master"). Fall back to the
+        // project's real default branch instead of hard-failing.
+        if (! $response->successful() && $response->status() === 404) {
+            $default = $this->gitlabDefaultBranch($identity, $apiBase, $encoded);
+            if ($default !== null && strcasecmp($default, $branch) !== 0) {
+                $retry = $call($default);
+                if ($retry->successful()) {
+                    $response = $retry;
+                    $effectiveBranch = $default;
+                    $notice = $this->branchFallbackNotice($branch, $default);
+                }
+            }
+        }
 
         if (! $response->successful()) {
             return [
@@ -336,7 +420,7 @@ final class SiteGitCommitsFetcher
                 'commits' => [],
                 'error' => $this->formatApiError($response->status(), $response->body()),
                 'provider' => 'gitlab',
-                'branch' => $branch,
+                'branch' => $effectiveBranch,
                 'remote_label' => $remote['label'],
                 'account' => $this->accountInfo($identity),
             ];
@@ -382,13 +466,38 @@ final class SiteGitCommitsFetcher
             'ok' => true,
             'commits' => $commits,
             'error' => null,
+            'notice' => $notice,
             'provider' => 'gitlab',
-            'branch' => $branch,
+            'branch' => $effectiveBranch,
+            'requested_branch' => $branch,
             'remote_label' => $remote['label'],
             'page' => $page,
             'has_more' => count($commits) >= $limit,
             'account' => $this->accountInfo($identity),
         ];
+    }
+
+    /**
+     * The project's default branch via GET /projects/{id}. Recovers from a
+     * list-commits 404 when the configured branch is stale/missing.
+     */
+    private function gitlabDefaultBranch(GitIdentity $identity, string $apiBase, string $encodedProject): ?string
+    {
+        try {
+            $r = Http::withToken($identity->accessToken())
+                ->acceptJson()
+                ->get($apiBase.'/api/v4/projects/'.$encodedProject);
+
+            if ($r->successful()) {
+                $default = $r->json('default_branch');
+
+                return is_string($default) && $default !== '' ? $default : null;
+            }
+        } catch (\Throwable) {
+            // fall through — caller keeps the original 404
+        }
+
+        return null;
     }
 
     private function fetchBitbucket(array $remote, Site $site, User $user, string $branch, int $limit, int $page = 1): array
@@ -405,11 +514,31 @@ final class SiteGitCommitsFetcher
             ];
         }
 
-        $url = $identity->apiBaseUrl().'/2.0/repositories/'.$remote['workspace'].'/'.$remote['repo'].'/commits/'.$branch;
+        $repoBase = $identity->apiBaseUrl().'/2.0/repositories/'.$remote['workspace'].'/'.$remote['repo'];
 
-        $response = Http::withToken($identity->accessToken())
+        // Bitbucket carries the ref in the URL path (.../commits/{ref}).
+        $call = fn (string $ref) => Http::withToken($identity->accessToken())
             ->acceptJson()
-            ->get($url, ['pagelen' => $limit, 'page' => $page]);
+            ->get($repoBase.'/commits/'.rawurlencode($ref), ['pagelen' => $limit, 'page' => $page]);
+
+        $effectiveBranch = $branch;
+        $notice = null;
+        $response = $call($branch);
+
+        // A 404 means the configured ref doesn't exist (e.g. stored "main" but
+        // the repo's main branch is "master"). Fall back to the repo's real
+        // default branch instead of hard-failing.
+        if (! $response->successful() && $response->status() === 404) {
+            $default = $this->bitbucketDefaultBranch($identity, $repoBase);
+            if ($default !== null && strcasecmp($default, $branch) !== 0) {
+                $retry = $call($default);
+                if ($retry->successful()) {
+                    $response = $retry;
+                    $effectiveBranch = $default;
+                    $notice = $this->branchFallbackNotice($branch, $default);
+                }
+            }
+        }
 
         if (! $response->successful()) {
             return [
@@ -417,7 +546,7 @@ final class SiteGitCommitsFetcher
                 'commits' => [],
                 'error' => $this->formatApiError($response->status(), $response->body()),
                 'provider' => 'bitbucket',
-                'branch' => $branch,
+                'branch' => $effectiveBranch,
                 'remote_label' => $remote['label'],
                 'account' => $this->accountInfo($identity),
             ];
@@ -459,13 +588,39 @@ final class SiteGitCommitsFetcher
             'ok' => true,
             'commits' => $commits,
             'error' => null,
+            'notice' => $notice,
             'provider' => 'bitbucket',
-            'branch' => $branch,
+            'branch' => $effectiveBranch,
+            'requested_branch' => $branch,
             'remote_label' => $remote['label'],
             'page' => $page,
             'has_more' => $hasMore,
             'account' => $this->accountInfo($identity),
         ];
+    }
+
+    /**
+     * The repo's default branch via GET /2.0/repositories/{ws}/{repo}
+     * (`mainbranch.name`). Recovers from a list-commits 404 when the configured
+     * branch is stale/missing.
+     */
+    private function bitbucketDefaultBranch(GitIdentity $identity, string $repoBase): ?string
+    {
+        try {
+            $r = Http::withToken($identity->accessToken())
+                ->acceptJson()
+                ->get($repoBase);
+
+            if ($r->successful()) {
+                $default = $r->json('mainbranch.name');
+
+                return is_string($default) && $default !== '' ? $default : null;
+            }
+        } catch (\Throwable) {
+            // fall through — caller keeps the original 404
+        }
+
+        return null;
     }
 
     private function gitlabApiBase(GitIdentity $identity, array $remote): string

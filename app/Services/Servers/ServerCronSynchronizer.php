@@ -256,7 +256,14 @@ class ServerCronSynchronizer
         $sites = Site::query()
             ->where('server_id', $server->id)
             ->where('laravel_scheduler', true)
-            ->get();
+            ->get()
+            // Honour the same applicability rule as the UI: a stale
+            // `laravel_scheduler = true` on a now-confidently-non-Laravel site
+            // (reclassified to WordPress/Symfony, or no longer PHP) must NOT keep
+            // installing the per-minute cron. The stored flag is left untouched
+            // so the choice returns if the stack flips back to Laravel.
+            ->filter(fn (Site $site): bool => $site->supportsLaravelScheduler())
+            ->values();
 
         if ($sites->isEmpty()) {
             return '';

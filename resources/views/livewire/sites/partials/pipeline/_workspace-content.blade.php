@@ -62,6 +62,13 @@
 @endunless
 
 <div @class(['space-y-6', 'mt-6' => ! $isLocked]) wire:key="pipeline-panel-{{ $pipelineTab }}">
+    {{-- Sub-tab switch shows the skeleton placeholder instantly (client-side via
+         wire:loading, no spinner) and swaps the real panel in when setPipelineTab's
+         single round-trip lands. --}}
+    <div class="hidden" wire:loading.class.remove="hidden" wire:target="setPipelineTab">
+        @include('livewire.sites.partials._panel-skeleton')
+    </div>
+    <div wire:loading.class="hidden" wire:target="setPipelineTab">
     @if ($pipelineTab === 'overview')
         @include('livewire.sites.partials.pipeline._tab-overview')
     @elseif ($pipelineTab === 'steps')
@@ -71,4 +78,5 @@
     @elseif ($pipelineTab === 'reference')
         @include('livewire.sites.partials.pipeline._tab-reference')
     @endif
+    </div>
 </div>

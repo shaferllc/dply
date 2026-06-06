@@ -31,6 +31,11 @@ class WorkerPool extends Model
 
     public const ROLE_REPLICA = 'replica';
 
+    /** Process manager that runs the pool's worker daemons (Horizon/scheduler). */
+    public const PM_SYSTEMD = 'systemd';
+
+    public const PM_SUPERVISOR = 'supervisor';
+
     /** Per-member sub-state stored under servers.meta['pool']['state']. */
     public const MEMBER_PROVISIONING = 'provisioning';
 
@@ -60,6 +65,24 @@ class WorkerPool extends Model
             'max_size' => 'integer',
             'meta' => 'array',
         ];
+    }
+
+    /**
+     * Which process manager the pool's worker daemons run under. Stored in
+     * meta['process_manager']; defaults to systemd (dply's canonical worker
+     * runtime). The toggle on the Horizon tab flips this, and the next
+     * "ensure workers" provisions the chosen backend and tears down the other.
+     */
+    public function processManager(): string
+    {
+        $pm = (string) ($this->meta['process_manager'] ?? self::PM_SYSTEMD);
+
+        return in_array($pm, [self::PM_SYSTEMD, self::PM_SUPERVISOR], true) ? $pm : self::PM_SYSTEMD;
+    }
+
+    public function usesSupervisor(): bool
+    {
+        return $this->processManager() === self::PM_SUPERVISOR;
     }
 
     public function organization(): BelongsTo

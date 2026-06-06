@@ -172,7 +172,7 @@
                 @endif
             </section>
 
-            <x-cli-snippet tone="stub" />
+            <x-cli-snippet :command="'dply sites:commits '.$site->slug" />
         </main>
     </div>
 </div>

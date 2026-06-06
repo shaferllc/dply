@@ -138,8 +138,8 @@
 
     <div class="border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
         <x-cli-snippet :commands="[
-            ['label' => __('Tear down systemd units'), 'command' => 'dply:site:teardown-systemd '.$site->slug],
-            ['label' => __('Re-sync systemd units'), 'command' => 'dply:site:redeploy-systemd '.$site->slug],
+            ['label' => __('Tear down systemd units'), 'command' => 'dply sites:systemd:teardown '.$site->slug],
+            ['label' => __('Re-sync systemd units'), 'command' => 'dply sites:systemd:redeploy '.$site->slug],
         ]" />
     </div>
 </section>
