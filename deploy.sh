@@ -203,100 +203,159 @@ fi
 git push "$REMOTE" "$BRANCH"
 
 # ---------------------------------------------------------------------------
-# 2. Deploy web server (assets, cache, migrations)
+# Atomic-release deploy
+#
+# Both the web host and every worker use the same immutable-release layout so a
+# deploy is an atomic symlink swap — never an in-place mutation of running code.
+# That is what fixes queued-job deserialization breaking after a deploy: a
+# long-running Horizon never half-sees new code, and a restart relaunches it
+# against a complete, self-consistent release.
+#
+#   $ROOT/repo/            persistent bare git mirror (the fetch target)
+#   $ROOT/shared/.env      the live environment — NEVER lives inside a release
+#   $ROOT/shared/storage/  persistent storage (logs, keys, uploads)
+#   $ROOT/releases/<ts>/   immutable build artifact for one deploy
+#   $ROOT/current -> releases/<ts>   the pointer nginx + supervisor read
+#
+# One-time bootstrap (seed shared/, repoint nginx + supervisor at current/):
+#   see deploy/ATOMIC_RELEASES.md
+#
+# The remote script is fed over stdin via a QUOTED heredoc, so $vars inside it
+# stay remote; the few local values are passed as positional args (no AcceptEnv
+# dependency on the servers).
+# ---------------------------------------------------------------------------
+ORIGIN_URL="$(git remote get-url "$REMOTE")"
+KEEP_RELEASES="${DEPLOY_KEEP_RELEASES:-5}"
+
+deploy_release() {
+  local HOST="$1" ROLE="$2" ROOT="$3" CMP="$4"
+  /usr/bin/ssh "$HOST" 'bash -s' -- \
+    "$ROLE" "$ROOT" "$BRANCH" "$PHP" "$CMP" "$ORIGIN_URL" "$KEEP_RELEASES" <<'REMOTE'
+set -euo pipefail
+ROLE="$1"; ROOT="$2"; BRANCH="$3"; PHP="$4"; COMPOSER="$5"; ORIGIN_URL="$6"; KEEP="$7"
+REPO="$ROOT/repo"; SHARED="$ROOT/shared"; RELEASES="$ROOT/releases"
+TS="$(date +%Y%m%d%H%M%S)"; NEW="$RELEASES/$TS"
+p() { echo "[$ROLE] $*"; }
+
+mkdir -p "$REPO" "$SHARED" "$RELEASES"
+
+# Refuse to deploy without a shared env. Shipping a release with an empty/missing
+# .env would null out APP_KEY and break decryption of every stored secret (SSH
+# keys, provider tokens) — the exact prod hazard we must never trigger silently.
+if [ ! -f "$SHARED/.env" ]; then
+  echo "[$ROLE] FATAL: $SHARED/.env missing — run the one-time bootstrap in deploy/ATOMIC_RELEASES.md first." >&2
+  exit 1
+fi
+
+p "Fetching origin/$BRANCH ..."
+if [ ! -d "$REPO/HEAD" ] && [ ! -d "$REPO/.git" ]; then
+  git clone --bare "$ORIGIN_URL" "$REPO"
+  git --git-dir="$REPO" config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*'
+fi
+git --git-dir="$REPO" fetch origin "$BRANCH" --prune
+COMMIT="$(git --git-dir="$REPO" rev-parse "refs/remotes/origin/$BRANCH")"
+
+p "Building release $TS ($COMMIT) ..."
+mkdir -p "$NEW"
+git --git-dir="$REPO" archive "$COMMIT" | tar -x -C "$NEW"
+echo "$COMMIT" > "$NEW/.release-commit"
+
+# Wire shared state into the immutable release.
+ln -sfn "$SHARED/.env" "$NEW/.env"
+rm -rf "$NEW/storage"
+ln -sfn "$SHARED/storage" "$NEW/storage"
+
+cd "$NEW"
+p "composer install ..."
+$COMPOSER install --no-interaction --no-dev --optimize-autoloader --prefer-dist
+
+if [ "$ROLE" = "web" ]; then
+  p "npm ci && npm run build ..."
+  npm ci --prefer-offline
+  npm run build
+fi
+
+p "Caching framework (config/route/event/view) ..."
+$PHP artisan config:cache
+$PHP artisan route:cache
+$PHP artisan event:cache
+$PHP artisan view:cache
+
+if [ "$ROLE" = "web" ]; then
+  # public/storage is per-release; relink it to the (shared) storage each build.
+  p "storage:link ..."
+  $PHP artisan storage:link 2>/dev/null || true
+
+  # Migrations run once, from the web release, against the shared DB before the
+  # swap so new code never serves an old schema.
+  p "migrate --force ..."
+  $PHP artisan migrate --force
+fi
+
+# Atomic pointer swap: build the new symlink under a temp name, then mv -T over
+# the live one — a single rename(2), so there is no window with a missing/half
+# 'current'.
+p "Swapping current -> releases/$TS ..."
+ln -sfn "$NEW" "$ROOT/current.tmp"
+mv -Tf "$ROOT/current.tmp" "$ROOT/current"
+
+p "Restarting daemons onto the new release ..."
+if [ "$ROLE" = "web" ]; then
+  sudo supervisorctl restart dply-reverb 2>/dev/null || true
+  sudo supervisorctl restart dply-pulse 2>/dev/null || true
+  # php-fpm caches the realpath of 'current'; reload so it serves the new target.
+  for svc in php8.5-fpm php8.4-fpm php8.3-fpm php-fpm; do
+    if sudo systemctl reload "$svc" 2>/dev/null; then p "reloaded $svc"; break; fi
+  done
+else
+  # Bounce every long-running daemon so none keep the old release in memory.
+  # SIGTERM lets Horizon drain in-flight jobs before supervisor relaunches it
+  # against current/ (where the supervisor command now points).
+  sudo supervisorctl restart dply-horizon 2>/dev/null || echo "[$ROLE] WARN: dply-horizon restart returned an error."
+  sudo supervisorctl restart dply-scheduler 2>/dev/null || true
+  sudo supervisorctl restart dply-default-worker 2>/dev/null || true
+  sleep 2
+  if sudo supervisorctl status dply-horizon 2>/dev/null | grep -q RUNNING; then
+    p "OK: dply-horizon RUNNING on releases/$TS."
+  else
+    echo "[$ROLE] ERROR: dply-horizon NOT RUNNING after restart — investigate before trusting this box." >&2
+    sudo supervisorctl status dply-horizon || true
+    exit 1
+  fi
+fi
+
+# Prune old releases (keep newest $KEEP), never deleting the live target.
+p "Pruning old releases (keep $KEEP) ..."
+LIVE="$(readlink -f "$ROOT/current")"
+ls -1dt "$RELEASES"/*/ 2>/dev/null | tail -n +"$((KEEP + 1))" | while read -r old; do
+  [ "$(readlink -f "$old")" = "$LIVE" ] && continue
+  rm -rf "$old"
+done
+
+p "Done: live on releases/$TS ($COMMIT)."
+REMOTE
+}
+
+# ---------------------------------------------------------------------------
+# 2. Deploy web server
 # ---------------------------------------------------------------------------
 hr
 log "Deploying web server ($WEB_HOST)..."
 hr
-
-/usr/bin/ssh "$WEB_HOST" "
-  set -euo pipefail
-  cd $APP_DIR
-
-  echo '[web] Pulling...'
-  git pull origin $BRANCH
-
-  echo '[web] Installing PHP dependencies...'
-  $COMPOSER install --no-interaction --no-dev --optimize-autoloader
-
-  echo '[web] Installing JS dependencies...'
-  npm ci --prefer-offline
-
-  echo '[web] Building assets...'
-  npm run build
-
-  echo '[web] Running migrations...'
-  $PHP artisan migrate --force
-
-  echo '[web] Clearing caches...'
-  $PHP artisan config:clear
-  $PHP artisan route:clear
-  $PHP artisan view:clear
-  $PHP artisan event:clear
-
-  echo '[web] Caching for production...'
-  $PHP artisan config:cache
-  $PHP artisan route:cache
-  $PHP artisan event:cache
-
-  echo '[web] Restarting Reverb...'
-  sudo supervisorctl restart dply-reverb 2>/dev/null || true
-
-  echo '[web] Done.'
-"
+deploy_release "$WEB_HOST" web "$APP_DIR" "$COMPOSER"
 
 # ---------------------------------------------------------------------------
-# 3. Deploy worker servers in parallel (pull + restart Horizon)
+# 3. Deploy worker servers in parallel
 # ---------------------------------------------------------------------------
 if [ -n "$WORKER_HOSTS" ]; then
-  deploy_worker() {
-    local HOST="$1"
-    local DIR="$2"
-    hr
-    log "Deploying worker ($HOST)..."
-    hr
-    /usr/bin/ssh "$HOST" "
-      set -euo pipefail
-      cd $DIR
-
-      echo '[worker] Pulling...'
-      git pull origin $BRANCH
-
-      echo '[worker] Installing PHP dependencies...'
-      $WORKER_COMPOSER install --no-interaction --no-dev --optimize-autoloader
-
-      echo '[worker] Caching config...'
-      $PHP artisan config:cache
-      $PHP artisan route:cache
-      $PHP artisan event:cache
-
-      echo '[worker] Restarting workers on the new release...'
-      # Bounce EVERY long-running dply daemon so none keep serving the old
-      # release's code — stale code is what breaks queued-job deserialization
-      # (a worker on an old release can't unserialize a job from a newer one).
-      # supervisorctl restart sends SIGTERM, which Horizon traps and drains
-      # gracefully (finishing in-flight jobs) before supervisor relaunches it on
-      # the freshly pulled code.
-      sudo supervisorctl restart dply-horizon || echo '[worker] WARNING: dply-horizon restart command returned an error.'
-      # dply-scheduler exists only on the primary worker; ignore on replicas.
-      sudo supervisorctl restart dply-scheduler 2>/dev/null || true
-
-      echo '[worker] Verifying Horizon came back on the new release...'
-      sleep 2
-      if sudo supervisorctl status dply-horizon | grep -q RUNNING; then
-        echo '[worker] OK: dply-horizon is RUNNING.'
-      else
-        echo '[worker] ERROR: dply-horizon is NOT RUNNING after restart — this box may still be serving stale code. Investigate before trusting it.'
-        sudo supervisorctl status dply-horizon || true
-        exit 1
-      fi
-    "
-  }
-
-  # Fan out — deploy all workers in parallel
   pids=()
   for WORKER_HOST in $WORKER_HOSTS; do
-    deploy_worker "$WORKER_HOST" "$WORKER_APP_DIR" &
+    (
+      hr
+      log "Deploying worker ($WORKER_HOST)..."
+      hr
+      deploy_release "$WORKER_HOST" worker "$WORKER_APP_DIR" "$WORKER_COMPOSER"
+    ) &
     pids+=($!)
   done
   for pid in "${pids[@]}"; do

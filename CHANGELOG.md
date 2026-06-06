@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Changed
+- Deploys now build immutable releases and flip an atomic current symlink across web and worker hosts, preventing long-running workers from serving stale code and breaking queued-job deserialization.
 ### Fixed
 - Corrected a Blade templating error that could prevent the pre-flight job console from rendering during site setup.
 ### Fixed

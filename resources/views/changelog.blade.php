@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 5, 2026',
+                    'tags'    => ['improved'],
+                    'title'   => 'Atomic Release Deploys',
+                    'summary' => 'Deploys now build immutable releases and flip an atomic current symlink across web and worker hosts, preventing long-running workers from serving stale code and breaking queued-job deserialization.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 5, 2026',
                     'tags'    => ['fixed'],
                     'title'   => 'Fix Site Setup Console Rendering',
                     'summary' => 'Corrected a Blade templating error that could prevent the pre-flight job console from rendering during site setup.',
