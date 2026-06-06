@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 6, 2026',
+                    'tags'    => ['fixed'],
+                    'title'   => 'Refresh Feature Flags On Deploy',
+                    'summary' => 'Feature flag values are now cleared on each deploy so flag changes take effect immediately after release.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
                     'tags'    => ['improved'],
                     'title'   => 'Console Preview Teaser',
                     'summary' => 'The browser-based server console is now shown as a coming-soon preview while the full console feature is gated off.',

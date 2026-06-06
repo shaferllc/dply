@@ -290,6 +290,7 @@ $PHP artisan config:cache
 $PHP artisan route:cache
 $PHP artisan event:cache
 $PHP artisan view:cache
+$PHP artisan pennant:clear
 
 if [ "$ROLE" = "web" ]; then
   # public/storage is per-release; relink it to the (shared) storage each build.
