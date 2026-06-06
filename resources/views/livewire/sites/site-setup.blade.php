@@ -109,7 +109,7 @@
                             </div>
                         @endif
 
-                        @php($scanConsole = (array) data_get($site->meta, 'setup_console', []))
+                        @php $scanConsole = (array) data_get($site->meta, 'setup_console', []); @endphp
                         @if ($scanConsole !== [])
                             {{-- Live job console: the pre-flight job streams its
                                  progress + any error here (polled with the timeline),
@@ -184,7 +184,7 @@
                             </div>
                         </div>
 
-                        @php($scanConsole = (array) data_get($site->meta, 'setup_console', []))
+                        @php $scanConsole = (array) data_get($site->meta, 'setup_console', []); @endphp
                         @if ($scanConsole !== [])
                             {{-- The pre-flight job's console — the last line is usually the
                                  exact reason it failed. --}}

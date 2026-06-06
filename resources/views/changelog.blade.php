@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 5, 2026',
                     'tags'    => ['fixed'],
+                    'title'   => 'Fix Site Setup Console Rendering',
+                    'summary' => 'Corrected a Blade templating error that could prevent the pre-flight job console from rendering during site setup.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 5, 2026',
+                    'tags'    => ['fixed'],
                     'title'   => 'Faster Repository Identity Lookups',
                     'summary' => 'Git provider identity lookups are now memoized per request, reducing duplicate database queries when rendering site source-control views.',
                     'items'   => [],
