@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 ### Fixed
+- Git provider identity lookups are now memoized per request, reducing duplicate database queries when rendering site source-control views.
+### Fixed
 - Repository and commit listings no longer error out when a stored Git token can't be decrypted, and duplicate identity lookups during a page render are now cached.
 ### Fixed
 - Fixed a crash when loading a site with a stale setup tab link after first-deploy setup had already completed.

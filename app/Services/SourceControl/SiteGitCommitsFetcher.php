@@ -22,7 +22,7 @@ final class SiteGitCommitsFetcher
     public function __construct(
         private ?GitIdentityResolver $resolver = null,
     ) {
-        $this->resolver ??= new GitIdentityResolver;
+        $this->resolver ??= app(GitIdentityResolver::class);
     }
 
     /**

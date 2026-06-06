@@ -39,7 +39,7 @@ final class SourceControlRepositoryReader
     public function __construct(
         private ?GitIdentityResolver $resolver = null,
     ) {
-        $this->resolver ??= new GitIdentityResolver;
+        $this->resolver ??= app(GitIdentityResolver::class);
     }
 
     public function branches(Site $site, User $user): array

@@ -97,6 +97,7 @@ use App\Services\Servers\ServerMetricsGuestScript;
 use App\Services\Servers\ServerMetricsRangeQuery;
 use App\Services\Servers\ServerWebserverSitesProvider;
 use App\Services\Servers\WebserverSwitchPreflight;
+use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\Sites\DockerRuntimeSiteProvisioner;
 use App\Services\Sites\KubernetesRuntimeSiteProvisioner;
 use App\Services\Sites\RepositoryWebhookProvisioner;
@@ -188,6 +189,12 @@ class AppServiceProvider extends ServiceProvider
 
             return $registry;
         });
+
+        // Scoped (reset per request/job) so its per-instance identity memo
+        // dedupes the repeated social_accounts/git_provider_tokens lookups a
+        // single site render fans out, without caching stale models across
+        // jobs in a long-lived queue worker.
+        $this->app->scoped(GitIdentityResolver::class);
 
         $this->app->singleton(ByoServerDeployEngine::class);
         $this->app->singleton(AwsLambdaGateway::class, fn () => ServerlessProvisionerFactory::defaultAwsGateway());

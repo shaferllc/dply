@@ -16,7 +16,7 @@ class RepositoryWebhookProvisioner
         private SiteDeploySyncCoordinator $syncCoordinator,
         private ?GitIdentityResolver $resolver = null,
     ) {
-        $this->resolver ??= new GitIdentityResolver;
+        $this->resolver ??= app(GitIdentityResolver::class);
     }
 
     public function canRegisterProviderHook(Site $site): bool
