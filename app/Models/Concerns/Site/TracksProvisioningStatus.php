@@ -402,6 +402,34 @@ trait TracksProvisioningStatus
         return $this->firstDeploySetupState() === 'scanning';
     }
 
+    /**
+     * The pre-flight scan looks stuck: it's still in 'scanning' but its last
+     * step heartbeat (meta.setup.scan_step_at) has gone cold past the given
+     * threshold. The job may have died mid-scan (e.g. a worker crash) leaving
+     * the wizard polling forever — the analyzing view surfaces a manual re-scan
+     * once this trips so the operator can unstick it and proceed to deploy.
+     */
+    public function isPreflightStalled(int $seconds = 45): bool
+    {
+        if (! $this->isPreflightScanning()) {
+            return false;
+        }
+
+        $at = data_get($this->meta, 'setup.scan_step_at')
+            ?? data_get($this->meta, 'setup.started_at');
+
+        // Scanning with no heartbeat at all → treat as stalled.
+        if (! is_string($at) || trim($at) === '') {
+            return true;
+        }
+
+        try {
+            return \Illuminate\Support\Carbon::parse($at)->lt(now()->subSeconds($seconds));
+        } catch (\Throwable) {
+            return true;
+        }
+    }
+
     /** The pre-flight scan failed (auth/not-found/network); the wizard fails open with a fix-it banner. */
     public function setupScanFailed(): bool
     {

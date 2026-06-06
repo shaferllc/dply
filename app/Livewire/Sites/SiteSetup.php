@@ -127,15 +127,30 @@ class SiteSetup extends Component
         }
     }
 
-    /** Re-run the pre-flight scan after a scan failure (bad URL / access fixed). */
+    /**
+     * Re-run the pre-flight scan — after a scan failure (bad URL / access
+     * fixed) OR when a scan stalls (the job died mid-run and the wizard is
+     * stuck polling). Resets the heartbeat so the analyzing timeline restarts.
+     */
     public function rescan(): void
     {
         Gate::authorize('update', $this->server);
 
         $meta = is_array($this->site->meta) ? $this->site->meta : [];
-        $meta['setup'] = ['state' => 'scanning', 'started_at' => now()->toISOString()];
+        $meta['setup'] = [
+            'state' => 'scanning',
+            'started_at' => now()->toISOString(),
+            'scan_step' => 'resolving',
+            'scan_step_at' => now()->toISOString(),
+        ];
         $this->site->forceFill(['meta' => $meta])->save();
         $this->site->refresh();
+
+        // A crashed pre-flight job can leave its ShouldBeUnique lock held, which
+        // would silently swallow this re-dispatch. Force-release it first so the
+        // re-scan always actually enqueues.
+        (new \Illuminate\Bus\UniqueLock(app(\Illuminate\Contracts\Cache\Repository::class)))
+            ->release(new PreflightSiteSetupJob($this->site->id, (string) auth()->id()));
 
         PreflightSiteSetupJob::dispatch($this->site->id, (string) auth()->id());
     }

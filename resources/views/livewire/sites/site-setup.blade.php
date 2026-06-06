@@ -93,6 +93,21 @@
                                 </li>
                             @endforeach
                         </ol>
+
+                        @if ($site->isPreflightStalled())
+                            {{-- The scan heartbeat has gone cold — the job likely
+                                 died mid-run. Offer a manual re-scan so the operator
+                                 can unstick it and proceed to deploy. --}}
+                            <div class="mt-6 flex flex-col gap-2 border-t border-brand-ink/10 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                                <p class="text-xs text-brand-moss">{{ __('This is taking longer than expected. You can re-run the scan to try again.') }}</p>
+                                <button type="button" wire:click="rescan" wire:loading.attr="disabled" wire:target="rescan"
+                                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60">
+                                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="rescan" />
+                                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5 animate-spin" wire:loading wire:target="rescan" />
+                                    {{ __('Re-scan') }}
+                                </button>
+                            </div>
+                        @endif
                     </div>
                 @else
                     @php

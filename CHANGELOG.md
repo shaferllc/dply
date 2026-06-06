@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 ### Fixed
+- A site setup pre-flight scan that stalls now shows a manual re-scan button so you can unstick the wizard and proceed to deploy.
+### Fixed
 - Server remote-access tracking no longer errors when a stale release leaves a queued job's command class unresolved.
 ### Fixed
 - Supervisor program configs now install correctly under non-root SSH users and resolve their working directory from the attached site, preventing silent install failures and stale imported paths.

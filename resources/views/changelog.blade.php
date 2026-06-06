@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 5, 2026',
                     'tags'    => ['fixed'],
+                    'title'   => 'Recover From Stalled Setup Scans',
+                    'summary' => 'A site setup pre-flight scan that stalls now shows a manual re-scan button so you can unstick the wizard and proceed to deploy.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 5, 2026',
+                    'tags'    => ['fixed'],
                     'title'   => 'Stale Job Crash Prevention',
                     'summary' => 'Server remote-access tracking no longer errors when a stale release leaves a queued job\'s command class unresolved.',
                     'items'   => [],
