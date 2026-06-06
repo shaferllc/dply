@@ -352,7 +352,12 @@ p "Pruning old releases (keep $KEEP) ..."
 LIVE="$(readlink -f "$ROOT/current")"
 ls -1dt "$RELEASES"/*/ 2>/dev/null | tail -n +"$((KEEP + 1))" | while read -r old; do
   [ "$(readlink -f "$old")" = "$LIVE" ] && continue
-  rm -rf "$old"
+  # sudo: root-running processes (certbot's acme-challenge webroot under
+  # current/public, and the privileged managed-error-page writer under
+  # current/.dply) drop root-owned files into whatever release is live at the
+  # time. A plain `rm` as the deploy user then hits "Permission denied" on
+  # prune. The path is guarded above to never be the live target.
+  sudo rm -rf "$old"
 done
 
 p "Done: live on releases/$TS ($COMMIT)."

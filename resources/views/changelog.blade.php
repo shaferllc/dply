@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 6, 2026',
                     'tags'    => ['fixed'],
+                    'title'   => 'Reliable Old Release Cleanup',
+                    'summary' => 'Deploys no longer fail to prune old releases when root-owned files (from certbot or managed error pages) are present.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
+                    'tags'    => ['fixed'],
                     'title'   => 'HTTPS Private Repo Deploy Auth',
                     'summary' => 'Deploys of private HTTPS repositories now authenticate correctly on re-deploy by passing the token-injected URL directly to git instead of relying on a stored remote, while keeping credentials out of the server\'s git config.',
                     'items'   => [],
