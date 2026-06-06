@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 ### Fixed
+- Fixed environment file pushes failing to set correct ownership due to shell quoting that corrupted the chown user argument.
+### Fixed
 - Deploys no longer fail to prune old releases when root-owned files (from certbot or managed error pages) are present.
 ### Fixed
 - Deploys of private HTTPS repositories now authenticate correctly on re-deploy by passing the token-injected URL directly to git instead of relying on a stored remote, while keeping credentials out of the server's git config.

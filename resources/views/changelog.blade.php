@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 6, 2026',
                     'tags'    => ['fixed'],
+                    'title'   => 'Reliable Env File Ownership',
+                    'summary' => 'Fixed environment file pushes failing to set correct ownership due to shell quoting that corrupted the chown user argument.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
+                    'tags'    => ['fixed'],
                     'title'   => 'Reliable Old Release Cleanup',
                     'summary' => 'Deploys no longer fail to prune old releases when root-owned files (from certbot or managed error pages) are present.',
                     'items'   => [],

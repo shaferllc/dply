@@ -129,13 +129,17 @@ class SiteEnvPusher
         if ($siteUser === '') {
             $siteUser = 'root';
         }
+        // System usernames are [a-z0-9_-] — safe to embed directly inside a
+        // double-quoted string. escapeshellarg would add single quotes that
+        // land inside the outer double quotes and corrupt the chown argument.
+        $safeUser = preg_replace('/[^a-zA-Z0-9_\-]/', '', $siteUser);
         $inner = sprintf(
             'set -e; mkdir -p %s; cp %s %s; chown "%s:$(id -gn %s)" %s; chmod 640 %s; rm -f %s',
             escapeshellarg($parent),
             escapeshellarg($tmp),
             escapeshellarg($path),
-            escapeshellarg($siteUser),
-            escapeshellarg($siteUser),
+            $safeUser,
+            $safeUser,
             escapeshellarg($path),
             escapeshellarg($path),
             escapeshellarg($tmp),
