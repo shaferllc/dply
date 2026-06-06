@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 6, 2026',
+                    'tags'    => ['improved'],
+                    'title'   => 'Site CLI Coming Soon Preview',
+                    'summary' => 'The site CLI settings tab now shows a coming-soon preview of upcoming terminal commands when the feature is not yet available for your server.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
                     'tags'    => ['new'],
                     'title'   => 'In-Browser CLI Console',
                     'summary' => 'Site settings now include an in-browser CLI console for running dply commands against your site with quick-run shortcuts for common operations.',

@@ -248,7 +248,10 @@ if [ ! -f "$SHARED/.env" ]; then
 fi
 
 p "Fetching origin/$BRANCH ..."
-if [ ! -d "$REPO/HEAD" ] && [ ! -d "$REPO/.git" ]; then
+# A bare repo keeps HEAD as a *file* (not a dir), so test -e, not -d — otherwise
+# the guard misfires on every deploy after the first and tries to re-clone over
+# a populated repo/ ("destination already exists").
+if [ ! -e "$REPO/HEAD" ] && [ ! -e "$REPO/.git" ]; then
   # Prefer the URL the server already authenticates with (e.g. an HTTPS remote
   # on the flat checkout) over the laptop's remote, which may be an SSH URL the
   # server has no key for.
