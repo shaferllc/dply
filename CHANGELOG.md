@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 ### Fixed
+- Deploy steps that run both Composer and npm now reliably find both tools instead of failing with "npm: command not found".
+### Fixed
 - Direct links with a pipeline_tab query parameter now open the correct pipeline sub-tab when the deploy pipeline is embedded in another page.
 ### Fixed
 - Fixed environment file pushes failing to set correct ownership due to shell quoting that corrupted the chown user argument.

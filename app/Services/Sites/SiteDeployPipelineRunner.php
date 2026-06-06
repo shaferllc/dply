@@ -279,50 +279,54 @@ class SiteDeployPipelineRunner
     }
 
     /**
-     * Guard prefix prepended (with `&&`) to a step that invokes Composer.
+     * Build a shell prefix that ensures every tool the step needs is available.
      *
-     * A PHP deploy can land on a box without Composer — a BYO server, a host
-     * provisioned with php=none, or one where `install_composer` was off —
-     * or with Composer installed outside the non-interactive SSH PATH. Either
-     * way the step dies with "composer: command not found" (exit 127). This
-     * puts the relevant bin dirs on PATH and installs Composer from
-     * getcomposer.org if it is still missing, so the step can self-heal
-     * instead of failing. Returns '' for non-Composer steps.
+     * Previously this returned early on the first matching tool, so a step that
+     * calls both `composer install` AND `npm run build` got the Composer prefix
+     * but never had the mise PATH set up, causing "npm: command not found".
      *
-     * Deploy steps run as the unprivileged deploy user (e.g. `dply`), which
-     * cannot write to /usr/local/bin — the official installer aborts there
-     * with "installation directory is not writable" (exit 1). So we only use
-     * /usr/local/bin when it is actually writable (root/provisioning) and
-     * otherwise install into the user-local ~/.local/bin, which we add to
-     * PATH so the freshly installed binary is found within the same step.
+     * Now we detect ALL needed tools first and emit one combined prefix that:
+     *   1. Sets a shared PATH (mise shims + ~/.local/bin + /usr/local/bin)
+     *   2. Self-heals Composer if missing (BYO server or php=none provisioning)
+     *   3. Self-heals Node/npm via mise if missing (server provisioned without
+     *      node, or mise PATH not active in the non-interactive SSH session)
+     *
+     * The node guard skips cleanly when no package.json exists so API-only apps
+     * that happen to have an npm command in a shared custom step don't fail.
      */
     protected function ensureToolingPrefix(SiteDeployStep $step, string $cmd): string
     {
         $usesComposer = $step->step_type === SiteDeployStep::TYPE_COMPOSER_INSTALL
             || preg_match('/\bcomposer\s/', $cmd) === 1;
 
+        $usesNode = in_array($step->step_type, [SiteDeployStep::TYPE_NPM_CI, SiteDeployStep::TYPE_NPM_RUN], true)
+            || preg_match('/\b(npm|npx|node|yarn|pnpm)\s/', $cmd) === 1;
+
+        if (! $usesComposer && ! $usesNode) {
+            return '';
+        }
+
+        // Shared PATH setup — always emitted when any tool guard fires.
+        $prefix = '{ export PATH="$HOME/.local/share/mise/shims:$HOME/.local/bin:/usr/local/bin:$PATH"; ';
+
         if ($usesComposer) {
-            return '{ export PATH="$HOME/.local/bin:/usr/local/bin:$PATH"; '
-                .'command -v composer >/dev/null 2>&1 || { '
+            $prefix .= 'command -v composer >/dev/null 2>&1 || { '
                 .'echo "[dply] composer not found — installing…"; '
                 .'if [ -w /usr/local/bin ]; then DPLY_COMPOSER_DIR=/usr/local/bin; '
                 .'else DPLY_COMPOSER_DIR="$HOME/.local/bin"; mkdir -p "$DPLY_COMPOSER_DIR"; fi; '
                 .'curl -fsSL https://getcomposer.org/installer | php -- --install-dir="$DPLY_COMPOSER_DIR" --filename=composer; '
-                .'}; } && ';
+                .'}; ';
         }
 
-        // npm/node steps: the base box ships with mise but no Node, so `npm ci`
-        // dies with "npm: command not found" (and a Laravel/Vite app then 500s
-        // with ViteManifestNotFoundException). Self-heal like Composer: put the
-        // mise shims on PATH, install node@lts via mise if npm is still missing.
-        // And skip cleanly on an API-only app that has no package.json.
-        $usesNode = in_array($step->step_type, [SiteDeployStep::TYPE_NPM_CI, SiteDeployStep::TYPE_NPM_RUN], true)
-            || preg_match('/\b(npm|npx|node|yarn|pnpm)\s/', $cmd) === 1;
-
         if ($usesNode) {
-            return '{ '
-                .'[ -f package.json ] || { echo "[dply] no package.json — skipping frontend build"; exit 0; }; '
-                .'export PATH="$HOME/.local/share/mise/shims:$HOME/.local/bin:$PATH"; '
+            // Node-only steps (no composer in same step): exit 0 cleanly when
+            // there is no package.json — the app is API-only and doesn't need
+            // a frontend build. When composer is also in the step we can't exit
+            // early (composer install must still run), so we guard with an if.
+            if (! $usesComposer) {
+                $prefix .= '[ -f package.json ] || { echo "[dply] no package.json — skipping frontend build"; exit 0; }; ';
+            }
+            $prefix .= 'if [ -f package.json ]; then '
                 .'command -v npm >/dev/null 2>&1 || { '
                 .'echo "[dply] node/npm not found — installing node@lts via mise…"; '
                 .'if command -v mise >/dev/null 2>&1; then '
@@ -331,9 +335,9 @@ class SiteDeployPipelineRunner
                 .'export PATH="$HOME/.local/share/mise/shims:$PATH"; '
                 .'fi; }; '
                 .'command -v npm >/dev/null 2>&1 || { echo "[dply] npm unavailable — install Node on the server, then redeploy."; exit 1; }; '
-                .'} && ';
+                .'fi; ';
         }
 
-        return '';
+        return $prefix.'} && ';
     }
 }

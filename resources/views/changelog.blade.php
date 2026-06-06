@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 6, 2026',
                     'tags'    => ['fixed'],
+                    'title'   => 'Self-Healing Multi-Tool Deploy Steps',
+                    'summary' => 'Deploy steps that run both Composer and npm now reliably find both tools instead of failing with "npm: command not found".',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
+                    'tags'    => ['fixed'],
                     'title'   => 'Pipeline Sub-Tab Deep Links',
                     'summary' => 'Direct links with a pipeline_tab query parameter now open the correct pipeline sub-tab when the deploy pipeline is embedded in another page.',
                     'items'   => [],
