@@ -97,75 +97,124 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
         }
         $branch = trim((string) $site->git_branch) !== '' ? trim((string) $site->git_branch) : 'main';
 
-        $this->markScanStep($site, 'resolving');
-        $cloneUrl = $this->resolveCloneUrl($site, $repoUrl, $resolver, $browser);
+        // Fresh console for this run.
+        $this->resetScanConsole($site);
 
-        $tmpRoot = rtrim(sys_get_temp_dir(), '/').'/dply-preflight-'.bin2hex(random_bytes(6));
-        $checkout = $tmpRoot.'/repo';
-
+        // Outer guard: ANY unexpected failure must fail OPEN (state=scan_failed)
+        // rather than leave the wizard polling 'scanning' forever — and be
+        // visible in the console. The inner try handles clone/scan classification.
         try {
-            $this->markScanStep($site, 'cloning');
-            $cloner->shallowClone($cloneUrl, $branch, $checkout);
-            $this->markScanStep($site, 'scanning');
-            $requirements = $scanner->scanLocalPath($checkout);
-            $this->markScanStep($site, 'detecting');
+            $this->scanLog($site, "Pre-flight starting for {$repoUrl} (branch {$branch}).");
+
+            $this->markScanStep($site, 'resolving');
+            $cloneUrl = $this->resolveCloneUrl($site, $repoUrl, $resolver, $browser);
+            $this->scanLog($site, 'Repository access resolved.');
+
+            $tmpRoot = rtrim(sys_get_temp_dir(), '/').'/dply-preflight-'.bin2hex(random_bytes(6));
+            $checkout = $tmpRoot.'/repo';
+
+            try {
+                $this->markScanStep($site, 'cloning');
+                $this->scanLog($site, "Cloning {$branch}…");
+                $cloner->shallowClone($cloneUrl, $branch, $checkout);
+                $this->scanLog($site, 'Clone complete.');
+
+                $this->markScanStep($site, 'scanning');
+                $requirements = $scanner->scanLocalPath($checkout);
+                $this->scanLog($site, 'Scanned '.count($requirements['keys'] ?? []).' environment key(s).');
+
+                $this->markScanStep($site, 'detecting');
+            } catch (\Throwable $e) {
+                // Fail OPEN: hold and route to setup with a classified reason.
+                Log::warning('PreflightSiteSetupJob clone/scan failed', [
+                    'site_id' => $this->siteId,
+                    'error' => $e->getMessage(),
+                ]);
+                $this->scanLog($site, 'Clone/scan failed: '.$e->getMessage());
+                $this->writeSetup($site, 'scan_failed', [
+                    'error' => $this->classifyFailure($e->getMessage()),
+                ]);
+
+                return;
+            } finally {
+                try {
+                    File::deleteDirectory($tmpRoot);
+                } catch (\Throwable) {
+                    // /tmp gets reaped by the OS; never shadow a real result.
+                }
+            }
+
+            // Seed the env cache from .env.example so the wizard opens pre-filled
+            // (only when the cache is still empty — never clobber user input).
+            $exampleValues = $this->exampleValues($requirements);
+            if (blank($site->env_file_content) && $exampleValues !== []) {
+                $site->forceFill([
+                    'env_file_content' => $envWriter->render($exampleValues),
+                ])->save();
+            }
+
+            $blocking = $this->blockingKeys($requirements);
+
+            $meta = is_array($site->meta) ? $site->meta : [];
+            $meta['env_requirements'] = $requirements;
+
+            if ($blocking === []) {
+                // CLEAN — fire the first deploy. Stay live; the deploy runs on the
+                // already-provisioned host.
+                $this->scanLog($site, 'No blocking environment variables — starting first deploy.');
+                $meta['setup'] = [
+                    'state' => 'deploying',
+                    'scanned_at' => now()->toIso8601String(),
+                ];
+                $site->forceFill(['meta' => $meta])->save();
+
+                $fresh = $site->fresh() ?? $site;
+                $pipeline->seedRuntimeDefaults($fresh, (string) $fresh->runtime ?: 'php');
+                $coordinator->dispatchManualForGroup($fresh->fresh() ?? $fresh);
+
+                return;
+            }
+
+            // HOLD — missing blocking vars. Stay live; render the setup wizard.
+            $this->scanLog($site, 'Holding for '.count($blocking).' required variable(s): '.implode(', ', $blocking));
+            $meta['setup'] = [
+                'state' => 'needs_setup',
+                'scanned_at' => now()->toIso8601String(),
+                'blocking_count' => count($blocking),
+                'blocking_keys' => $blocking,
+            ];
+            $site->forceFill(['meta' => $meta])->save();
         } catch (\Throwable $e) {
-            // Fail OPEN: hold and route to setup with a classified reason.
-            Log::warning('PreflightSiteSetupJob clone/scan failed', [
+            Log::error('PreflightSiteSetupJob failed', [
                 'site_id' => $this->siteId,
                 'error' => $e->getMessage(),
             ]);
+            $this->scanLog($site, 'Pre-flight error: '.$e->getMessage());
             $this->writeSetup($site, 'scan_failed', [
                 'error' => $this->classifyFailure($e->getMessage()),
             ]);
-
-            return;
-        } finally {
-            try {
-                File::deleteDirectory($tmpRoot);
-            } catch (\Throwable) {
-                // /tmp gets reaped by the OS; never shadow a real result.
-            }
         }
+    }
 
-        // Seed the env cache from .env.example so the wizard opens pre-filled
-        // (only when the cache is still empty — never clobber user input).
-        $exampleValues = $this->exampleValues($requirements);
-        if (blank($site->env_file_content) && $exampleValues !== []) {
-            $site->forceFill([
-                'env_file_content' => $envWriter->render($exampleValues),
-            ])->save();
-        }
-
-        $blocking = $this->blockingKeys($requirements);
-
-        $meta = is_array($site->meta) ? $site->meta : [];
-        $meta['env_requirements'] = $requirements;
-
-        if ($blocking === []) {
-            // CLEAN — fire the first deploy. Stay live; the deploy runs on the
-            // already-provisioned host.
-            $meta['setup'] = [
-                'state' => 'deploying',
-                'scanned_at' => now()->toIso8601String(),
-            ];
-            $site->forceFill(['meta' => $meta])->save();
-
-            $fresh = $site->fresh() ?? $site;
-            $pipeline->seedRuntimeDefaults($fresh, (string) $fresh->runtime ?: 'php');
-            $coordinator->dispatchManualForGroup($fresh->fresh() ?? $fresh);
-
+    /**
+     * Backstop for failures the handle() try/catch can't catch — a timeout
+     * (SIGALRM), OOM, or a throw before/around handle(). Without this, an
+     * exhausted job leaves the wizard polling 'scanning' forever.
+     */
+    public function failed(\Throwable $e): void
+    {
+        $site = Site::query()->find($this->siteId);
+        if ($site === null) {
             return;
         }
-
-        // HOLD — missing blocking vars. Stay live; render the setup wizard.
-        $meta['setup'] = [
-            'state' => 'needs_setup',
-            'scanned_at' => now()->toIso8601String(),
-            'blocking_count' => count($blocking),
-            'blocking_keys' => $blocking,
-        ];
-        $site->forceFill(['meta' => $meta])->save();
+        // Don't clobber a result the job already wrote.
+        if (data_get($site->meta, 'setup.state') !== 'scanning') {
+            return;
+        }
+        $this->scanLog($site, 'Pre-flight job failed: '.$e->getMessage());
+        $this->writeSetup($site, 'scan_failed', [
+            'error' => $this->classifyFailure($e->getMessage()),
+        ]);
     }
 
     private function resolveCloneUrl(
@@ -275,6 +324,35 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
         $setup['scan_step'] = $step;
         $setup['scan_step_at'] = now()->toIso8601String();
         $meta['setup'] = $setup;
+        $site->forceFill(['meta' => $meta])->save();
+    }
+
+    /** Max console lines retained — newest win; older lines roll off. */
+    private const SCAN_CONSOLE_MAX = 80;
+
+    /**
+     * Clear the live console at the start of a run so each (re-)scan starts
+     * fresh. Stored at meta.setup_console (a sibling of meta.setup) so it
+     * survives the setup state-machine rewrites in markScanStep/writeSetup.
+     */
+    private function resetScanConsole(Site $site): void
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta['setup_console'] = [];
+        $site->forceFill(['meta' => $meta])->save();
+    }
+
+    /**
+     * Append a line to the live setup console (meta.setup_console). The
+     * "Analyzing your repository…" view polls and renders these so an operator
+     * can watch the pre-flight job — and SEE the reason when it stalls/fails.
+     */
+    private function scanLog(Site $site, string $line): void
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $log = is_array($meta['setup_console'] ?? null) ? array_values($meta['setup_console']) : [];
+        $log[] = ['at' => now()->toIso8601String(), 'line' => $line];
+        $meta['setup_console'] = array_slice($log, -self::SCAN_CONSOLE_MAX);
         $site->forceFill(['meta' => $meta])->save();
     }
 

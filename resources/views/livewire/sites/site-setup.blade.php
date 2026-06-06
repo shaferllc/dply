@@ -108,6 +108,31 @@
                                 </button>
                             </div>
                         @endif
+
+                        @php($scanConsole = (array) data_get($site->meta, 'setup_console', []))
+                        @if ($scanConsole !== [])
+                            {{-- Live job console: the pre-flight job streams its
+                                 progress + any error here (polled with the timeline),
+                                 so you can watch what it's doing and see why it stalls. --}}
+                            <div class="mt-6 border-t border-brand-ink/10 pt-4">
+                                <div class="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-moss">
+                                    <x-heroicon-o-command-line class="h-3.5 w-3.5" aria-hidden="true" />
+                                    {{ __('Job console') }}
+                                </div>
+                                <div
+                                    class="max-h-48 overflow-y-auto rounded-xl border border-brand-ink/10 bg-brand-ink/[0.035] p-3 font-mono text-[11px] leading-relaxed text-brand-ink"
+                                    x-data
+                                    x-init="$el.scrollTop = $el.scrollHeight; new MutationObserver(() => $el.scrollTop = $el.scrollHeight).observe($el, { childList: true, subtree: true })"
+                                >
+                                    @foreach ($scanConsole as $entry)
+                                        <div class="flex gap-2">
+                                            <span class="shrink-0 text-brand-mist">{{ \Illuminate\Support\Carbon::parse($entry['at'] ?? now())->format('H:i:s') }}</span>
+                                            <span class="min-w-0 break-words">{{ $entry['line'] ?? '' }}</span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
                     </div>
                 @else
                     @php
@@ -158,6 +183,27 @@
                                 </div>
                             </div>
                         </div>
+
+                        @php($scanConsole = (array) data_get($site->meta, 'setup_console', []))
+                        @if ($scanConsole !== [])
+                            {{-- The pre-flight job's console — the last line is usually the
+                                 exact reason it failed. --}}
+                            <div class="mt-4">
+                                <div class="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-moss">
+                                    <x-heroicon-o-command-line class="h-3.5 w-3.5" aria-hidden="true" />
+                                    {{ __('Job console') }}
+                                </div>
+                                <div class="max-h-48 overflow-y-auto rounded-xl border border-brand-ink/10 bg-brand-ink/[0.035] p-3 font-mono text-[11px] leading-relaxed text-brand-ink"
+                                    x-data x-init="$el.scrollTop = $el.scrollHeight">
+                                    @foreach ($scanConsole as $entry)
+                                        <div class="flex gap-2">
+                                            <span class="shrink-0 text-brand-mist">{{ \Illuminate\Support\Carbon::parse($entry['at'] ?? now())->format('H:i:s') }}</span>
+                                            <span class="min-w-0 break-words">{{ $entry['line'] ?? '' }}</span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
                     @endif
 
                     {{-- Stepper --}}

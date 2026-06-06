@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- The site setup wizard now shows a live console streaming the pre-flight job's progress and the exact reason it stalls or fails.
 ### Changed
 - The repository picker now supports arrow-key navigation and Enter-to-select, and the ⌘K command palette is available on marketing pages while signed in.
 ### Changed
