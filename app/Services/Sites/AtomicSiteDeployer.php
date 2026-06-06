@@ -82,6 +82,20 @@ class AtomicSiteDeployer
         $log .= sprintf("\n[dply] CLONE → mkdir -p %s/releases, then clone %s\n", $base, $newRelease);
         $cloneLog = $ssh->exec("mkdir -p {$baseEsc}/releases", 60);
 
+        // Pre-clone snapshot: show server state before any git work.
+        $cloneLog .= $ssh->exec(sprintf(
+            'echo "=== [dply] PRE-CLONE SNAPSHOT ==="; '
+            .'echo "[dply] whoami=$(whoami)"; '
+            .'echo "[dply] hostname=$(hostname)"; '
+            .'echo "[dply] base=%1$s"; '
+            .'echo "[dply] new-release=%2$s"; '
+            .'echo "[dply] disk:"; df -h %1$s 2>&1; '
+            .'echo "[dply] releases-ls:"; ls -la %1$s/releases 2>&1 | head -n 20; '
+            .'echo "=== [dply] END PRE-CLONE SNAPSHOT ==="',
+            $baseEsc,
+            $newEsc
+        ), 30);
+
         $previousActiveRelease = SiteRelease::query()
             ->where('site_id', $site->id)
             ->where('is_active', true)
@@ -94,16 +108,26 @@ class AtomicSiteDeployer
         $this->hookRunner->assertHooksSucceeded($cloneLog, 'clone');
         $this->anchorRunner->assertReleaseHasGit($ssh, $newRelease);
 
-        // Post-clone diagnostic: confirm what landed on disk.
+        // Post-clone snapshot: confirm exactly what landed in the release dir.
         $cloneSha = trim($ssh->exec(sprintf('cd %s && git rev-parse HEAD 2>/dev/null', $newEsc), 15));
         $cloneLog .= $ssh->exec(sprintf(
-            'echo "[dply] clone sha: %s"; '
-            .'echo "[dply] git log:"; git -C %s log --oneline -5 2>&1; '
-            .'echo "[dply] ls:"; ls -la %s 2>&1 | head -n 40',
+            'echo "=== [dply] POST-CLONE SNAPSHOT ==="; '
+            .'echo "[dply] whoami=$(whoami)"; '
+            .'echo "[dply] sha=%1$s"; '
+            .'echo "[dply] git-log:"; git -C %2$s log --oneline -10 2>&1; '
+            .'echo "[dply] git-branch:"; git -C %2$s branch -a 2>&1; '
+            .'echo "[dply] git-remote:"; git -C %2$s remote -v 2>&1; '
+            .'echo "[dply] git-status:"; git -C %2$s status 2>&1; '
+            .'echo "[dply] composer.json=$([ -f %2$s/composer.json ] && echo PRESENT || echo MISSING)"; '
+            .'echo "[dply] package.json=$([ -f %2$s/package.json ] && echo PRESENT || echo MISSING)"; '
+            .'echo "[dply] artisan=$([ -f %2$s/artisan ] && echo PRESENT || echo MISSING)"; '
+            .'echo "[dply] .env.example=$([ -f %2$s/.env.example ] && echo PRESENT || echo MISSING)"; '
+            .'echo "[dply] disk:"; df -h %2$s 2>&1; '
+            .'echo "[dply] ls:"; ls -la %2$s 2>&1; '
+            .'echo "=== [dply] END POST-CLONE SNAPSHOT ==="',
             $cloneSha !== '' ? $cloneSha : '(none)',
-            $newEsc,
             $newEsc
-        ), 30);
+        ), 45);
 
         $cloneLog .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_CLONE, $newRelease);
         $this->hookRunner->assertHooksSucceeded($cloneLog, 'after_clone');

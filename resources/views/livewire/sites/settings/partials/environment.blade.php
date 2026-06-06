@@ -993,6 +993,18 @@
                                 <x-heroicon-o-arrow-down-tray class="h-4 w-4 text-brand-moss" /> {{ __('Sync from server') }}
                             </button>
                         @endif
+                        @if ($supportsEnvPush && method_exists($this, 'rescanEnvRequirements'))
+                            {{-- Always available (not gated on the missing-vars banner) so a
+                                 site whose env was never scanned can populate env_requirements
+                                 from .env.example + code, then "Add missing variables". --}}
+                            <button type="button" wire:click="rescanEnvRequirements" x-on:click="open = false" class="flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-brand-sand/40" title="{{ __('Scan the deployed code (.env.example + env() usage) for required variables so missing ones can be imported.') }}">
+                                <x-heroicon-o-magnifying-glass class="mt-0.5 h-4 w-4 shrink-0 text-brand-moss" />
+                                <span>
+                                    <span class="block text-xs font-semibold text-brand-ink">{{ __('Scan for required variables') }}</span>
+                                    <span class="block text-[10px] text-brand-mist">{{ $envScannedAt ? __('Last scanned :when', ['when' => \Illuminate\Support\Carbon::parse($envScannedAt)->diffForHumans()]) : __('Not scanned yet') }}</span>
+                                </span>
+                            </button>
+                        @endif
                         <button type="button" wire:click="$set('env_import_key', null)" x-on:click="open = false; $dispatch('open-modal', 'env-import-modal')" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
                             <x-heroicon-o-arrow-down-on-square class="h-4 w-4 text-brand-moss" /> {{ __('Import from another site') }}
                         </button>

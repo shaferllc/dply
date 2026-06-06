@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 6, 2026',
+                    'tags'    => ['improved'],
+                    'title'   => 'Richer Deploy Diagnostics',
+                    'summary' => 'Deploy logs now include detailed pre-clone, post-clone, and phase-probe snapshots, plus a "Scan for required variables" action in site environment settings.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
                     'tags'    => ['fixed'],
                     'title'   => 'Cleaner Server Error Badge',
                     'summary' => 'The open-error count badge no longer appears on the server Errors tab while it is still a coming-soon preview.',

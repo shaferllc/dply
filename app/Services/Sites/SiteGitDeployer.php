@@ -56,6 +56,22 @@ class SiteGitDeployer
         // ── CLONE ── mkdir + before/after-clone hooks + the git checkout.
         $cloneStart = microtime(true);
         $cloneLog = $ssh->exec(sprintf('mkdir -p %s', $pathEsc), 60);
+
+        // Pre-clone snapshot: show what's already on disk before we touch it.
+        $cloneLog .= $ssh->exec(sprintf(
+            'echo "=== [dply] PRE-CLONE SNAPSHOT ==="; '
+            .'echo "[dply] whoami=$(whoami)"; '
+            .'echo "[dply] hostname=$(hostname)"; '
+            .'echo "[dply] path=%1$s"; '
+            .'echo "[dply] has-git-dir=$([ -d %1$s/.git ] && echo yes || echo no)"; '
+            .'echo "[dply] disk:"; df -h %1$s 2>&1; '
+            .'echo "[dply] ls:"; ls -la %1$s 2>&1 | head -n 50; '
+            .'echo "[dply] git-remote:"; git -C %1$s remote -v 2>&1 || echo "(no remote)"; '
+            .'echo "[dply] git-status:"; git -C %1$s status --short 2>&1 || echo "(not a git repo)"; '
+            .'echo "=== [dply] END PRE-CLONE SNAPSHOT ==="',
+            $pathEsc
+        ), 30);
+
         $cloneLog .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_BEFORE_CLONE, $path);
         $this->hookRunner->assertHooksSucceeded($cloneLog, 'before_clone');
 
@@ -66,17 +82,23 @@ class SiteGitDeployer
 
         $sha = trim($ssh->exec(sprintf('cd %s && git rev-parse HEAD 2>/dev/null', $pathEsc), 30));
 
-        // Post-clone diagnostic: confirm what landed on disk so a missing
-        // composer.json / wrong branch / failed fetch is immediately visible
-        // in the deploy log without needing to SSH in manually.
+        // Post-clone snapshot: confirm exactly what landed on disk.
         $cloneLog .= $ssh->exec(sprintf(
-            'echo "[dply] clone sha: %s"; '
-            .'echo "[dply] git log:"; git -C %s log --oneline -5 2>&1; '
-            .'echo "[dply] ls:"; ls -la %s 2>&1 | head -n 40',
+            'echo "=== [dply] POST-CLONE SNAPSHOT ==="; '
+            .'echo "[dply] sha=%1$s"; '
+            .'echo "[dply] git-log:"; git -C %2$s log --oneline -10 2>&1; '
+            .'echo "[dply] git-branch:"; git -C %2$s branch -a 2>&1; '
+            .'echo "[dply] git-remote:"; git -C %2$s remote -v 2>&1; '
+            .'echo "[dply] git-status:"; git -C %2$s status 2>&1; '
+            .'echo "[dply] composer.json=$([ -f %2$s/composer.json ] && echo PRESENT || echo MISSING)"; '
+            .'echo "[dply] package.json=$([ -f %2$s/package.json ] && echo PRESENT || echo MISSING)"; '
+            .'echo "[dply] artisan=$([ -f %2$s/artisan ] && echo PRESENT || echo MISSING)"; '
+            .'echo "[dply] .env.example=$([ -f %2$s/.env.example ] && echo PRESENT || echo MISSING)"; '
+            .'echo "[dply] ls:"; ls -la %2$s 2>&1; '
+            .'echo "=== [dply] END POST-CLONE SNAPSHOT ==="',
             $sha !== '' ? $sha : '(none — clone failed)',
-            $pathEsc,
             $pathEsc
-        ), 30);
+        ), 45);
 
         $cloneLog .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_CLONE, $path);
         $this->hookRunner->assertHooksSucceeded($cloneLog, 'after_clone');

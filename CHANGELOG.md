@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Changed
+- Deploy logs now include detailed pre-clone, post-clone, and phase-probe snapshots, plus a "Scan for required variables" action in site environment settings.
 ### Fixed
 - The open-error count badge no longer appears on the server Errors tab while it is still a coming-soon preview.
 ### Fixed

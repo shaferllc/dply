@@ -162,13 +162,26 @@ class SiteDeployPipelineRunner
         $log .= sprintf("\n[dply] phase '%s' → working dir: %s\n", $phase, $workingDirectory);
         $log .= sprintf("[dply] %d step(s) queued: %s\n", $ordered->count(), $ordered->pluck('step_type')->implode(', ') ?: '(none)');
         $probe = $ssh->exec(sprintf(
-            'echo "[dply] pwd=$(cd %1$s 2>/dev/null && pwd || echo UNREADABLE)"; '
+            'echo "=== [dply] PHASE PROBE: %2$s ==="; '
+            .'echo "[dply] whoami=$(whoami)"; '
+            .'echo "[dply] pwd=$(cd %1$s 2>/dev/null && pwd || echo UNREADABLE)"; '
             .'echo "[dply] is-symlink=$([ -L %1$s ] && echo yes || echo no)"; '
-            .'echo "[dply] artisan=$([ -f %1$s/artisan ] && echo present || echo MISSING)"; '
-            .'echo "[dply] composer.json=$([ -f %1$s/composer.json ] && echo present || echo MISSING)"; '
-            .'echo "[dply] package.json=$([ -f %1$s/package.json ] && echo present || echo MISSING)"; '
-            .'echo "[dply] ls:"; ls -la %1$s 2>&1 | head -n 30',
-            $cwd
+            .'echo "[dply] composer.json=$([ -f %1$s/composer.json ] && echo PRESENT || echo MISSING)"; '
+            .'echo "[dply] package.json=$([ -f %1$s/package.json ] && echo PRESENT || echo MISSING)"; '
+            .'echo "[dply] artisan=$([ -f %1$s/artisan ] && echo PRESENT || echo MISSING)"; '
+            .'echo "[dply] .env=$([ -f %1$s/.env ] && echo PRESENT || echo MISSING)"; '
+            .'echo "[dply] .env.example=$([ -f %1$s/.env.example ] && echo PRESENT || echo MISSING)"; '
+            .'echo "[dply] git-sha:"; git -C %1$s rev-parse HEAD 2>&1 || echo "(n/a)"; '
+            .'echo "[dply] git-branch:"; git -C %1$s branch --show-current 2>&1 || echo "(n/a)"; '
+            .'echo "[dply] git-status:"; git -C %1$s status --short 2>&1 || echo "(n/a)"; '
+            .'echo "[dply] php:"; php --version 2>&1 | head -n 1 || echo "(php not found)"; '
+            .'echo "[dply] composer:"; composer --version 2>&1 | head -n 1 || echo "(composer not found)"; '
+            .'echo "[dply] node:"; node --version 2>&1 || echo "(node not found)"; '
+            .'echo "[dply] disk:"; df -h %1$s 2>&1; '
+            .'echo "[dply] ls:"; ls -la %1$s 2>&1; '
+            .'echo "=== [dply] END PHASE PROBE ==="',
+            $cwd,
+            $phase
         ), 30);
         $log .= $probe."\n";
 
