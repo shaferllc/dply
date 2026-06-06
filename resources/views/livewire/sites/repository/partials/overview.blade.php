@@ -51,8 +51,14 @@
 
         <div class="px-6 py-6 sm:px-7">
             @if (! ($overviewCommits['ok'] ?? false))
-                <div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900">
-                    {{ $overviewCommits['error'] ?? __('Could not load commits.') }}
+                <div class="flex flex-col gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                    <span class="min-w-0">{{ $overviewCommits['error'] ?? __('Could not load commits.') }}</span>
+                    <button type="button" wire:click="reloadRepository" wire:loading.attr="disabled" wire:target="reloadRepository"
+                        class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-rose-300 bg-white/70 px-2.5 py-1 font-medium text-rose-900 hover:bg-white disabled:opacity-60">
+                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="reloadRepository" />
+                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5 animate-spin" wire:loading wire:target="reloadRepository" />
+                        {{ __('Retry') }}
+                    </button>
                 </div>
             @elseif (empty($overviewCommits['commits']))
                 <div class="rounded-lg border border-dashed border-brand-ink/15 bg-brand-sand/20 p-6 text-center text-sm text-brand-moss">
@@ -108,8 +114,14 @@
             @if ($overviewReadme === null)
                 <div class="text-sm text-brand-moss">{{ __('Sign in to load the README.') }}</div>
             @elseif (! ($overviewReadme['ok'] ?? false))
-                <div class="rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900">
-                    {{ $overviewReadme['error'] ?? __('Could not load README.') }}
+                <div class="flex flex-col gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-900 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                    <span class="min-w-0">{{ $overviewReadme['error'] ?? __('Could not load README.') }}</span>
+                    <button type="button" wire:click="reloadRepository" wire:loading.attr="disabled" wire:target="reloadRepository"
+                        class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-rose-300 bg-white/70 px-2.5 py-1 font-medium text-rose-900 hover:bg-white disabled:opacity-60">
+                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="reloadRepository" />
+                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5 animate-spin" wire:loading wire:target="reloadRepository" />
+                        {{ __('Retry') }}
+                    </button>
                 </div>
             @elseif (($overviewReadme['content_html'] ?? '') === '')
                 <div class="rounded-lg border border-dashed border-brand-ink/15 bg-brand-sand/20 p-6 text-center text-sm text-brand-moss">

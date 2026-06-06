@@ -270,12 +270,26 @@ if [ -n "$WORKER_HOSTS" ]; then
       $PHP artisan route:cache
       $PHP artisan event:cache
 
-      echo '[worker] Restarting Horizon gracefully...'
-      $PHP artisan horizon:terminate || true
-      sudo supervisorctl restart dply-horizon || true
+      echo '[worker] Restarting workers on the new release...'
+      # Bounce EVERY long-running dply daemon so none keep serving the old
+      # release's code — stale code is what breaks queued-job deserialization
+      # (a worker on an old release can't unserialize a job from a newer one).
+      # supervisorctl restart sends SIGTERM, which Horizon traps and drains
+      # gracefully (finishing in-flight jobs) before supervisor relaunches it on
+      # the freshly pulled code.
+      sudo supervisorctl restart dply-horizon || echo '[worker] WARNING: dply-horizon restart command returned an error.'
+      # dply-scheduler exists only on the primary worker; ignore on replicas.
+      sudo supervisorctl restart dply-scheduler 2>/dev/null || true
 
-      echo '[worker] Horizon status:'
-      sudo supervisorctl status dply-horizon || true
+      echo '[worker] Verifying Horizon came back on the new release...'
+      sleep 2
+      if sudo supervisorctl status dply-horizon | grep -q RUNNING; then
+        echo '[worker] OK: dply-horizon is RUNNING.'
+      else
+        echo '[worker] ERROR: dply-horizon is NOT RUNNING after restart — this box may still be serving stale code. Investigate before trusting it.'
+        sudo supervisorctl status dply-horizon || true
+        exit 1
+      fi
     "
   }
 

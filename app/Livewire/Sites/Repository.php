@@ -95,6 +95,19 @@ class Repository extends Component
         $this->commitsPage = max(1, $this->commitsPage + $delta);
     }
 
+    /**
+     * Re-fetch the repository panels (commits / files / README) from the Git
+     * provider. render() loads that data fresh on every pass, so simply
+     * returning here triggers a Livewire re-render that re-runs the provider
+     * API calls — giving the error states a reliable "Retry" affordance after a
+     * transient provider 404/5xx or once repo access is fixed, without a full
+     * page reload.
+     */
+    public function reloadRepository(): void
+    {
+        // No state to mutate — the re-render re-runs the fetches in render().
+    }
+
     /** Connection-tab form mirrors of the equivalent fields on the Site. */
     public string $connectionRepositoryUrl = '';
 

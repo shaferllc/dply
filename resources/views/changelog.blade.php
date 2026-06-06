@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 5, 2026',
                     'tags'    => ['fixed'],
+                    'title'   => 'Repository Panel Retry Button',
+                    'summary' => 'Repository commits and README error states now offer a Retry button to re-fetch the data without reloading the page.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 5, 2026',
+                    'tags'    => ['fixed'],
                     'title'   => 'Recover From Stalled Setup Scans',
                     'summary' => 'A site setup pre-flight scan that stalls now shows a manual re-scan button so you can unstick the wizard and proceed to deploy.',
                     'items'   => [],

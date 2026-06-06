@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 ### Fixed
+- Repository commits and README error states now offer a Retry button to re-fetch the data without reloading the page.
+### Fixed
 - A site setup pre-flight scan that stalls now shows a manual re-scan button so you can unstick the wizard and proceed to deploy.
 ### Fixed
 - Server remote-access tracking no longer errors when a stale release leaves a queued job's command class unresolved.
