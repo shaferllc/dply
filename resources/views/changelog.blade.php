@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 5, 2026',
+                    'tags'    => ['improved'],
+                    'title'   => 'Refined Repository Account Selector',
+                    'summary' => 'The linked source-control account dropdown now uses the standard styled select component for a consistent appearance.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 5, 2026',
                     'tags'    => ['fixed'],
                     'title'   => 'Repository Panel Retry Button',
                     'summary' => 'Repository commits and README error states now offer a Retry button to re-fetch the data without reloading the page.',

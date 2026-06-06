@@ -19,15 +19,12 @@
                     <span class="block text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ __('Linked source-control account') }}</span>
                     <x-connect-provider-link>{{ __('Connect a provider') }} &rarr;</x-connect-provider-link>
                 </span>
-                <select
-                    wire:model.live="connectionAccountId"
-                    class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-ink focus:ring-1 focus:ring-brand-ink"
-                >
+                <x-select wire:model.live="connectionAccountId">
                     <option value="">{{ __('— Custom / no linked account —') }}</option>
                     @foreach ($connectionAccounts as $account)
                         <option value="{{ $account['id'] }}">{{ $account['label'] }} ({{ $account['provider'] }})</option>
                     @endforeach
-                </select>
+                </x-select>
             </label>
 
             <div class="grid gap-3 sm:grid-cols-2">

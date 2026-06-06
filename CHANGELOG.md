@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Changed
+- The linked source-control account dropdown now uses the standard styled select component for a consistent appearance.
 ### Fixed
 - Repository commits and README error states now offer a Retry button to re-fetch the data without reloading the page.
 ### Fixed
