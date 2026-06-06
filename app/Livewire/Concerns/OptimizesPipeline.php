@@ -99,6 +99,15 @@ trait OptimizesPipeline
         $this->clearPipelineOptimizePreview();
         $this->dispatch('close-modal', 'pipeline-optimize-preview');
 
+        // Drop the cached `deploySteps` relation so SitePipelineAdvisor recomputes
+        // against the steps we just added and the "Pipeline check" card clears on
+        // re-render. Livewire restores loaded relations from its snapshot, so the
+        // advisor's loadMissing('deploySteps') would otherwise reuse a stale
+        // collection that still flags the just-added steps as missing. The deploy
+        // hub host (DeploymentsList) has no syncEditingPipelineBranches/refresh of
+        // its own, so this unset is what actually makes its card disappear.
+        $this->site->unsetRelation('deploySteps');
+
         if (method_exists($this, 'syncEditingPipelineBranches')) {
             // Pipeline editor: refresh so the new steps render immediately.
             $this->site->refresh();

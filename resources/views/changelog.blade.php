@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 6, 2026',
                     'tags'    => ['fixed'],
+                    'title'   => 'Pipeline Optimize Feedback Fix',
+                    'summary' => 'The "Optimize pipeline" action now clears the pipeline-check warning once steps are added and shows the proposed-changes preview when the repo scan finishes, instead of appearing to do nothing.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
+                    'tags'    => ['fixed'],
                     'title'   => 'Self-Healing Multi-Tool Deploy Steps',
                     'summary' => 'Deploy steps that run both Composer and npm now reliably find both tools instead of failing with "npm: command not found".',
                     'items'   => [],

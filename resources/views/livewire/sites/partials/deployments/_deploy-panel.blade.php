@@ -25,6 +25,14 @@
 @endphp
 
 <div class="space-y-6" @if ($deployInProgress) wire:poll.5s @endif>
+    {{-- While a queued console action is being watched (e.g. "Optimize pipeline"
+         scanning the repo), poll so the deploy hub re-renders on completion: the
+         success toast fires and the proposed-changes preview modal below auto-opens
+         off the freshly-written meta. Without this the scan finishes silently and
+         the Optimize button looks like it did nothing. --}}
+    @if ($watchedConsoleRunId)
+        <div wire:poll.3s="resolveWatchedConsoleAction" class="hidden" aria-hidden="true"></div>
+    @endif
     @if ($latest && $latest->status === 'failed')
         @include('livewire.sites.partials.deployments._remediation-panel', ['deployment' => $latest])
     @endif
