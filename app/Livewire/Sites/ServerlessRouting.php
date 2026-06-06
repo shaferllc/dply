@@ -287,6 +287,16 @@ class ServerlessRouting extends Component
         $this->toastSuccess(__('CORS settings saved.'));
     }
 
+    /* ──────────── Tab navigation ──────────── */
+
+    public function setTab(string $tab): void
+    {
+        if (! in_array($tab, ['domains', 'redirects', 'headers', 'invocation'], true)) {
+            return;
+        }
+        $this->tab = $tab;
+    }
+
     /* ──────────── Render ──────────── */
 
     public function render(): View

@@ -7,7 +7,7 @@
          banner is mounted at the top level. In the deploy hub the view runs
          under section 'deploy' and renders no banner, so mount one here for the
          env run. Guarding on $section avoids a double banner on Settings. --}}
-    @if (($section ?? '') !== 'environment')
+    @if (($section ?? '') !== 'environment' && $envConsoleRun?->id !== ($this->watchedConsoleRunId ?? null))
         @if ($envConsoleRun)
             <div
                 id="site-console-action-banner"

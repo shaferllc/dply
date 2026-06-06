@@ -9,7 +9,6 @@ use App\Jobs\RecheckRequiredEnvJob;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Jobs\ViewServerEnvJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
-use App\Livewire\Concerns\DismissesConsoleActionRun;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Sites\Concerns\SurfacesDeploymentRemediation;
 use App\Livewire\Concerns\ManagesSiteBindings;
@@ -28,7 +27,6 @@ use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
 use App\Support\Sites\SiteSettingsViewData;
 use Illuminate\Contracts\View\View;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -43,7 +41,6 @@ use Livewire\WithPagination;
 class DeploymentsList extends Component
 {
     use ConfirmsActionWithModal;
-    use DismissesConsoleActionRun;
     use DispatchesToastNotifications;
     use ManagesSiteBindings;
     use ManagesSiteDeployExecution;
@@ -660,11 +657,6 @@ class DeploymentsList extends Component
             'daily' => array_values($daily),
             'top_failure_phase' => $topFailurePhase,
         ];
-    }
-
-    protected function consoleActionSubject(): Model
-    {
-        return $this->site;
     }
 
     public function activeConsoleRun(): ?ConsoleAction

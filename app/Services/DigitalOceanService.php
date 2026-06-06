@@ -1007,6 +1007,39 @@ class DigitalOceanService
         return $data;
     }
 
+    /**
+     * Create a Spaces access key via the Spaces Keys API. The secret is only
+     * ever returned at creation time, so the caller must capture it. Grants
+     * scope the key to specific buckets; an empty grants list yields a
+     * full-access key (all Spaces), matching console-created keys.
+     *
+     * @param  list<array{bucket: string, permission: string}>  $grants
+     * @return array{access_key: string, secret_key: string}
+     */
+    public function createSpacesKey(string $name, array $grants = []): array
+    {
+        $payload = array_filter([
+            'name' => $name !== '' ? $name : null,
+            'grants' => $grants !== [] ? $grants : null,
+        ], fn ($v) => $v !== null);
+
+        $response = $this->request('post', '/spaces/keys', $payload);
+        $this->assertSuccess($response, 'create Spaces key');
+
+        $key = $response->json('key');
+        if (! is_array($key)) {
+            $key = $response->json();
+        }
+
+        $accessKey = is_array($key) ? (string) ($key['access_key'] ?? '') : '';
+        $secret = is_array($key) ? (string) ($key['secret_key'] ?? '') : '';
+        if ($accessKey === '' || $secret === '') {
+            throw new \RuntimeException('DigitalOcean did not return Spaces key credentials.');
+        }
+
+        return ['access_key' => $accessKey, 'secret_key' => $secret];
+    }
+
     protected function request(string $method, string $path, array $bodyOrQuery = []): Response
     {
         $url = $this->baseUrl.$path;

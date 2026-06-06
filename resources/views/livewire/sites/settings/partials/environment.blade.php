@@ -172,6 +172,7 @@
         'redis' => __('Redis'),
         'queue' => __('Queue'),
         'cache' => __('Cache'),
+        'session' => __('Sessions'),
         'storage' => __('Object storage'),
     ];
 

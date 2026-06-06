@@ -26,6 +26,7 @@ return [
         'aws_s3' => [
             'label' => 'AWS S3',
             'endpoint_template' => '', // SDK derives the endpoint from the region.
+            'provision' => false, // Attach-only for now (CreateBucket needs LocationConstraint handling).
             'regions' => [
                 'us-east-1' => 'US East (N. Virginia) · us-east-1',
                 'us-east-2' => 'US East (Ohio) · us-east-2',
@@ -43,6 +44,12 @@ return [
         'digitalocean_spaces' => [
             'label' => 'DigitalOcean Spaces',
             'endpoint_template' => 'https://{region}.digitaloceanspaces.com',
+            'provision' => true,
+            // dply can mint the S3 (Spaces) keys via the DO API token, so it
+            // creates the keys AND the bucket with no manual key entry. The
+            // cloud-provider slug whose ProviderCredential token is used.
+            'api_managed' => true,
+            'api_provider' => 'digitalocean',
             'regions' => [
                 'nyc3' => 'New York · nyc3',
                 'sfo2' => 'San Francisco · sfo2',
@@ -58,6 +65,7 @@ return [
         'hetzner' => [
             'label' => 'Hetzner Object Storage',
             'endpoint_template' => 'https://{region}.your-objectstorage.com',
+            'provision' => true,
             'regions' => [
                 'fsn1' => 'Falkenstein, Germany · fsn1',
                 'nbg1' => 'Nuremberg, Germany · nbg1',
@@ -68,6 +76,7 @@ return [
         'custom_s3' => [
             'label' => 'Custom S3-compatible',
             'endpoint_template' => '', // Operator supplies the endpoint directly.
+            'provision' => false, // Attach-only — endpoints/quirks vary too much to create blind.
             'regions' => [],
         ],
 

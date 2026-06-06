@@ -33,16 +33,21 @@
                         id="routing-tab-{{ $entry['id'] }}"
                         :active="$tab === $entry['id']"
                         :icon="$entry['icon']"
-                        wire:click="$set('tab', '{{ $entry['id'] }}')"
+                        wire:click="setTab('{{ $entry['id'] }}')"
                     >{{ $entry['label'] }}</x-server-workspace-tab>
                 @endforeach
             </x-server-workspace-tablist>
 
             <div wire:key="routing-tab-{{ $tab }}">
-                @includeWhen($tab === 'domains',    'livewire.sites.serverless-routing.partials.custom-domains')
-                @includeWhen($tab === 'redirects',  'livewire.sites.serverless-routing.partials.redirects')
-                @includeWhen($tab === 'headers',    'livewire.sites.serverless-routing.partials.headers')
-                @includeWhen($tab === 'invocation', 'livewire.sites.serverless-routing.partials.invocation')
+                <div class="hidden" wire:loading.class.remove="hidden" wire:target="setTab">
+                    @include('livewire.sites.partials._panel-skeleton')
+                </div>
+                <div wire:loading.class="hidden" wire:target="setTab">
+                    @includeWhen($tab === 'domains',    'livewire.sites.serverless-routing.partials.custom-domains')
+                    @includeWhen($tab === 'redirects',  'livewire.sites.serverless-routing.partials.redirects')
+                    @includeWhen($tab === 'headers',    'livewire.sites.serverless-routing.partials.headers')
+                    @includeWhen($tab === 'invocation', 'livewire.sites.serverless-routing.partials.invocation')
+                </div>
             </div>
         </main>
     </div>

@@ -31,6 +31,7 @@ class SiteBinding extends Model
         'queue',
         'storage',
         'cache',
+        'session',
     ];
 
     public const STATUS_CONFIGURED = 'configured';
