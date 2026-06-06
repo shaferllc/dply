@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 ### Fixed
+- Repository and commit listings no longer error out when a stored Git token can't be decrypted, and duplicate identity lookups during a page render are now cached.
+### Fixed
 - Fixed a crash when loading a site with a stale setup tab link after first-deploy setup had already completed.
 ### Added
 - The site setup wizard now shows a live console streaming the pre-flight job's progress and the exact reason it stalls or fails.

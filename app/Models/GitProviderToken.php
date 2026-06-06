@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Contracts\SourceControl\GitIdentity;
 use App\Models\Concerns\AvoidsGitIdentityAttributeRecursion;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -50,9 +51,20 @@ class GitProviderToken extends Model implements GitIdentity
 
     public function accessToken(): string
     {
-        $token = array_key_exists('access_token', $this->attributes)
-            ? $this->castAttribute('access_token', $this->attributes['access_token'])
-            : null;
+        if (! array_key_exists('access_token', $this->attributes)) {
+            return '';
+        }
+
+        // The token is stored with the `encrypted` cast. When the ciphertext
+        // can't be decrypted with the current APP_KEY (e.g. the key drifted
+        // after a redeploy — see the prod seeding caveat), treat the identity
+        // as unusable rather than letting a DecryptException 500 the whole
+        // page that's merely listing repos/commits.
+        try {
+            $token = $this->castAttribute('access_token', $this->attributes['access_token']);
+        } catch (DecryptException) {
+            return '';
+        }
 
         return trim((string) $token);
     }

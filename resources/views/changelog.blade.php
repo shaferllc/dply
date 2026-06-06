@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 5, 2026',
                     'tags'    => ['fixed'],
+                    'title'   => 'Prevent Repo Page Crashes',
+                    'summary' => 'Repository and commit listings no longer error out when a stored Git token can\'t be decrypted, and duplicate identity lookups during a page render are now cached.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 5, 2026',
+                    'tags'    => ['fixed'],
                     'title'   => 'Fix Setup Tab Redirect Crash',
                     'summary' => 'Fixed a crash when loading a site with a stale setup tab link after first-deploy setup had already completed.',
                     'items'   => [],

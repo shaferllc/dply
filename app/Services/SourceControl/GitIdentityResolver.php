@@ -24,6 +24,18 @@ use App\Models\User;
 class GitIdentityResolver
 {
     /**
+     * Per-instance memo of resolved identities, keyed by "user:id". A single
+     * site render fans out to forSite() for multiple providers (commits
+     * fetcher + repo reader), each re-resolving the same stored account ID;
+     * caching here collapses the duplicate social_accounts/git_provider_tokens
+     * lookups. Bound as a singleton (see AppServiceProvider) so the cache is
+     * shared across the whole request.
+     *
+     * @var array<string, GitIdentity|null>
+     */
+    private array $byId = [];
+
+    /**
      * Resolve a stored identity ID to either a SocialAccount or a
      * GitProviderToken, scoped to the given user. Returns null when the ID
      * is unknown or belongs to a different user.
@@ -35,21 +47,26 @@ class GitIdentityResolver
             return null;
         }
 
+        $cacheKey = $user->getKey().':'.$id;
+        if (array_key_exists($cacheKey, $this->byId)) {
+            return $this->byId[$cacheKey];
+        }
+
         $oauth = SocialAccount::query()
             ->where('user_id', $user->getKey())
             ->find($id);
         if ($oauth instanceof GitIdentity) {
-            return $oauth;
+            return $this->byId[$cacheKey] = $oauth;
         }
 
         $pat = GitProviderToken::query()
             ->where('user_id', $user->getKey())
             ->find($id);
         if ($pat instanceof GitIdentity) {
-            return $pat;
+            return $this->byId[$cacheKey] = $pat;
         }
 
-        return null;
+        return $this->byId[$cacheKey] = null;
     }
 
     /**
