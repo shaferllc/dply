@@ -414,7 +414,6 @@
                                         {{ __('Laravel Pulse') }}
                                     </x-dropdown-link>
                                     </div>
-                                    <div class="my-2 h-px bg-brand-ink/10" role="presentation"></div>
                                 @endcan
                                 @feature('surface.status_pages')
                                     <x-dropdown-link :href="route('status-pages.index')">
@@ -440,7 +439,6 @@
                                         {{ __('Scripts') }}
                                     </x-dropdown-link>
                                 @endfeature
-                                <div class="my-2 h-px bg-brand-ink/10" role="presentation"></div>
                                 <x-dropdown-link :href="route('features')">
                                     <x-slot name="icon">
                                         <x-heroicon-o-sparkles class="{{ $hi }}" />

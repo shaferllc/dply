@@ -28,8 +28,14 @@
 
             <div class="px-2 py-2 sm:px-3">
                 @if (! ($commitsResult['ok'] ?? false))
-                    <div class="m-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
-                        {{ $commitsResult['error'] ?? __('Could not load commits.') }}
+                    <div class="m-4 flex flex-col gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                        <span class="min-w-0">{{ $commitsResult['error'] ?? __('Could not load commits.') }}</span>
+                        <button type="button" wire:click="reloadRepository" wire:loading.attr="disabled" wire:target="reloadRepository"
+                            class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-rose-300 bg-white/70 px-2.5 py-1 text-xs font-medium text-rose-900 hover:bg-white disabled:opacity-60">
+                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="reloadRepository" />
+                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5 animate-spin" wire:loading wire:target="reloadRepository" />
+                            {{ __('Retry') }}
+                        </button>
                     </div>
                 @elseif ($commitsFiltered === [])
                     <div class="px-6 py-12 text-center text-sm text-brand-moss">
@@ -99,6 +105,20 @@
                             </button>
                         </div>
                     @endif
+                @endif
+
+                @if (! empty($commitsResult['account']['label']))
+                    {{-- Which linked identity answered this read — so a wrong-token
+                         404 is self-evident instead of looking like a missing repo. --}}
+                    <p class="mt-1 flex flex-wrap items-center gap-1.5 border-t border-brand-ink/10 px-4 pt-3 pb-1 text-[11px] text-brand-moss">
+                        <x-heroicon-o-key class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
+                        <span>{{ __('Read using :label', ['label' => $commitsResult['account']['label']]) }}</span>
+                        @if (! empty($commitsResult['account']['kind']))
+                            <span class="rounded bg-brand-sand/50 px-1.5 py-0.5 font-medium uppercase tracking-wide">{{ $commitsResult['account']['kind'] }}</span>
+                        @endif
+                        <a href="{{ route('sites.repository', [$server, $site, 'repo_tab' => 'connection']) }}" wire:navigate
+                           class="font-semibold text-brand-forest hover:underline">{{ __('Change account') }}</a>
+                    </p>
                 @endif
             </div>
         </div>
