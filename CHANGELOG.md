@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 ### Fixed
+- HTTPS repository clones now authenticate correctly even when the git provider isn't explicitly set, by detecting it from the repository URL, and env files are written with the correct site-user ownership.
+### Fixed
 - Deploys from private HTTPS repositories now authenticate automatically using your stored Git provider token, with tokens redacted from deploy logs.
 ### Changed
 - Deploy logs now include detailed pre-clone, post-clone, and phase-probe snapshots, plus a "Scan for required variables" action in site environment settings.

@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 6, 2026',
                     'tags'    => ['fixed'],
+                    'title'   => 'HTTPS Repo Clone Authentication',
+                    'summary' => 'HTTPS repository clones now authenticate correctly even when the git provider isn\'t explicitly set, by detecting it from the repository URL, and env files are written with the correct site-user ownership.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
+                    'tags'    => ['fixed'],
                     'title'   => 'Private HTTPS Repo Deploys',
                     'summary' => 'Deploys from private HTTPS repositories now authenticate automatically using your stored Git provider token, with tokens redacted from deploy logs.',
                     'items'   => [],

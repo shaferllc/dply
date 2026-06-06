@@ -130,10 +130,11 @@ class SiteEnvPusher
             $siteUser = 'root';
         }
         $inner = sprintf(
-            'set -e; mkdir -p %s; cp %s %s; chown "root:$(id -gn %s)" %s; chmod 640 %s; rm -f %s',
+            'set -e; mkdir -p %s; cp %s %s; chown "%s:$(id -gn %s)" %s; chmod 640 %s; rm -f %s',
             escapeshellarg($parent),
             escapeshellarg($tmp),
             escapeshellarg($path),
+            escapeshellarg($siteUser),
             escapeshellarg($siteUser),
             escapeshellarg($path),
             escapeshellarg($path),

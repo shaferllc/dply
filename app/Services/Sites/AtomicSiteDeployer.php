@@ -53,7 +53,15 @@ class AtomicSiteDeployer
         // For HTTPS repos with no deploy key, inject the stored OAuth/PAT token.
         if (! $privateKey && $site->user !== null && str_starts_with($repo, 'http')) {
             $provider = (string) ($site->repositoryMeta()['git_provider_kind'] ?? '');
-            if ($provider !== '' && $provider !== 'custom') {
+            if ($provider === '' || $provider === 'custom') {
+                $provider = match (true) {
+                    str_contains($repo, 'github.com') => 'github',
+                    str_contains($repo, 'gitlab.com') => 'gitlab',
+                    str_contains($repo, 'bitbucket.org') => 'bitbucket',
+                    default => '',
+                };
+            }
+            if ($provider !== '') {
                 $identity = app(GitIdentityResolver::class)->forSite($site, $site->user, $provider);
                 if ($identity !== null) {
                     $repo = app(SourceControlRepositoryBrowser::class)->authenticatedCloneUrl($identity, $repo);

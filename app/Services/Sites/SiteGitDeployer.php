@@ -58,7 +58,16 @@ class SiteGitDeployer
         // is what appears everywhere else (logs, UI) to avoid leaking tokens.
         if (! $privateKey && $site->user !== null && str_starts_with($repo, 'http')) {
             $provider = (string) ($site->repositoryMeta()['git_provider_kind'] ?? '');
-            if ($provider !== '' && $provider !== 'custom') {
+            // Fall back to detecting the provider from the URL when not explicitly set.
+            if ($provider === '' || $provider === 'custom') {
+                $provider = match (true) {
+                    str_contains($repo, 'github.com') => 'github',
+                    str_contains($repo, 'gitlab.com') => 'gitlab',
+                    str_contains($repo, 'bitbucket.org') => 'bitbucket',
+                    default => '',
+                };
+            }
+            if ($provider !== '') {
                 $identity = app(GitIdentityResolver::class)->forSite($site, $site->user, $provider);
                 if ($identity !== null) {
                     $repo = app(SourceControlRepositoryBrowser::class)->authenticatedCloneUrl($identity, $repo);
