@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 6, 2026',
                     'tags'    => ['fixed'],
+                    'title'   => 'Pipeline Sub-Tab Deep Links',
+                    'summary' => 'Direct links with a pipeline_tab query parameter now open the correct pipeline sub-tab when the deploy pipeline is embedded in another page.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
+                    'tags'    => ['fixed'],
                     'title'   => 'Reliable Env File Ownership',
                     'summary' => 'Fixed environment file pushes failing to set correct ownership due to shell quoting that corrupted the chown user argument.',
                     'items'   => [],

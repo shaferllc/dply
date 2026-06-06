@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 ### Fixed
+- Direct links with a pipeline_tab query parameter now open the correct pipeline sub-tab when the deploy pipeline is embedded in another page.
+### Fixed
 - Fixed environment file pushes failing to set correct ownership due to shell quoting that corrupted the chown user argument.
 ### Fixed
 - Deploys no longer fail to prune old releases when root-owned files (from certbot or managed error pages) are present.

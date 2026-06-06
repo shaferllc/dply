@@ -57,8 +57,19 @@ class WorkspacePipeline extends Show
         $this->syncEditingPipelineBranches();
         $this->syncPipelineAnchorScriptsFromEditingPipeline();
 
-        $tab = request()->query('tab');
         $allowed = array_keys(config('site_deploy_pipeline.tabs', []));
+
+        // When embedded inside another page (e.g. DeploymentsList), Livewire's
+        // #[Url] attribute may not initialise from the request URL before mount()
+        // runs for nested components. Read pipeline_tab explicitly so a direct
+        // link like ?tab=pipeline&pipeline_tab=steps lands on the right sub-tab.
+        $pipelineTab = request()->query('pipeline_tab');
+        if (is_string($pipelineTab) && in_array($pipelineTab, $allowed, true)) {
+            $this->pipelineTab = $pipelineTab;
+        }
+
+        // Fallback: ?tab=<pipeline-subtab> (standalone page usage without pipeline_tab prefix).
+        $tab = request()->query('tab');
         if (is_string($tab) && in_array($tab, $allowed, true)) {
             $this->pipelineTab = $tab;
         }
