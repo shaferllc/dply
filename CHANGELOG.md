@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 ### Added
+- Operators can now temporarily bypass the branded error page to surface real 5xx errors when debugging a failing site.
+### Added
 - The deploy panel now shows a "scanning the repo" placeholder while a pipeline suggestion scan is running instead of flashing stale suggestions.
 ### Fixed
 - The "Optimize pipeline" action now clears the pipeline-check warning once steps are added and shows the proposed-changes preview when the repo scan finishes, instead of appearing to do nothing.

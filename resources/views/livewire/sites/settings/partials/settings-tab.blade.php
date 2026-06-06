@@ -242,6 +242,63 @@
     </form>
 </section>
 
+{{-- Server errors (operator debugging) — VM webserver sites only. By default a
+     5xx is intercepted and replaced with the branded "temporarily unavailable"
+     page; turn this on to pass the real error through (framework debug page on
+     an app 500, or the webserver's own 502/503/504 when the upstream is down)
+     so a failure can be diagnosed. Never on by default — visitors see the raw
+     error while it's enabled. --}}
+@if (! $isContainerWorkspace)
+    @php $rawServerErrors = $this->serverErrorsExposed(); @endphp
+    <section class="dply-card mt-6 overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-bug-ant class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Diagnostics') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Server errors') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                    {{ __('When the app returns a 5xx, dply shows a branded "temporarily unavailable" page. Turn this on to pass the real error through instead — the framework debug page, or the webserver\'s own 502/503/504 — so you can see what failed. Visitors see the raw error too, so turn it back off when you\'re done.') }}
+                </p>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-3 px-6 py-6 sm:px-7">
+            <span @class([
+                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold',
+                'bg-amber-100 text-amber-800 ring-1 ring-inset ring-amber-200' => $rawServerErrors,
+                'bg-brand-sand/60 text-brand-moss ring-1 ring-inset ring-brand-ink/10' => ! $rawServerErrors,
+            ])>
+                @if ($rawServerErrors)
+                    <x-heroicon-o-eye class="h-3.5 w-3.5" aria-hidden="true" /> {{ __('Showing raw errors') }}
+                @else
+                    <x-heroicon-o-shield-check class="h-3.5 w-3.5" aria-hidden="true" /> {{ __('Branded error page') }}
+                @endif
+            </span>
+
+            @if ($rawServerErrors)
+                <x-secondary-button type="button" wire:click="hideServerErrors" wire:loading.attr="disabled" wire:target="hideServerErrors">
+                    <span wire:loading.remove wire:target="hideServerErrors">{{ __('Restore branded page') }}</span>
+                    <span wire:loading wire:target="hideServerErrors">{{ __('Applying…') }}</span>
+                </x-secondary-button>
+            @else
+                <button
+                    type="button"
+                    wire:click="exposeServerErrors"
+                    wire:loading.attr="disabled"
+                    wire:target="exposeServerErrors"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 shadow-sm transition-colors hover:bg-amber-100 disabled:opacity-60"
+                >
+                    <x-heroicon-o-bug-ant class="h-4 w-4" aria-hidden="true" />
+                    <span wire:loading.remove wire:target="exposeServerErrors">{{ __('Expose raw errors') }}</span>
+                    <span wire:loading wire:target="exposeServerErrors">{{ __('Applying…') }}</span>
+                </button>
+            @endif
+        </div>
+    </section>
+@endif
+
 {{-- CLI snippet — every settings section ships one so operators always know the
      equivalent dply CLI command. This section's edits are name/slug only, both
      of which today flow through the rename cascade modal rather than a direct

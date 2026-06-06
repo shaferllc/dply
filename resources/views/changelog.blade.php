@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 6, 2026',
                     'tags'    => ['new'],
+                    'title'   => 'Expose Raw Server Errors',
+                    'summary' => 'Operators can now temporarily bypass the branded error page to surface real 5xx errors when debugging a failing site.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
+                    'tags'    => ['new'],
                     'title'   => 'Pipeline Scan Loading State',
                     'summary' => 'The deploy panel now shows a "scanning the repo" placeholder while a pipeline suggestion scan is running instead of flashing stale suggestions.',
                     'items'   => [],

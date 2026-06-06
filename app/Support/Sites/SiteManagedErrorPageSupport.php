@@ -16,6 +16,30 @@ final class SiteManagedErrorPageSupport
 
     public const ERROR_FILENAME = '500.html';
 
+    /**
+     * Site meta key for the operator-only "expose raw server errors" switch.
+     * Off by default. When set, the webserver no longer intercepts 5xx with the
+     * branded {@see \App\Services\Sites\SiteServerErrorPageBuilder} page — the
+     * real error passes through (framework debug page on an app 500, or the
+     * webserver's own 502/503/504 when the upstream is down). For debugging a
+     * failing app; visitors see the raw error while it's on.
+     */
+    public const META_EXPOSE_FLAG = 'expose_server_errors';
+
+    /**
+     * True when the operator has opted this site into raw 5xx pass-through.
+     * Unlike {@see appDebugEnabled()} (which only frees app 500s and is driven
+     * by the deployed .env), this also drops the 502/503/504 interception, so a
+     * dead upstream surfaces the webserver's real Bad Gateway page instead of
+     * the branded splash.
+     */
+    public static function serverErrorsExposed(Site $site): bool
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+
+        return (bool) ($meta[self::META_EXPOSE_FLAG] ?? false);
+    }
+
     public static function root(Site $site): string
     {
         return $site->managedErrorPagesRoot();
@@ -28,6 +52,12 @@ final class SiteManagedErrorPageSupport
 
     public static function nginxServerBlock(Site $site): string
     {
+        // Operator opted into raw errors: emit no error_page wiring so 5xx (both
+        // app responses and nginx's own 502/503/504) pass straight through.
+        if (self::serverErrorsExposed($site)) {
+            return '';
+        }
+
         $uri = self::ERROR_URI;
         $file = self::filePath($site);
 
@@ -73,6 +103,10 @@ NGINX;
 
     public static function apacheVirtualHostBlock(Site $site): string
     {
+        if (self::serverErrorsExposed($site)) {
+            return '';
+        }
+
         $uri = self::ERROR_URI;
         $file = self::filePath($site);
 
@@ -93,6 +127,10 @@ APACHE;
 
     public static function caddyBlock(Site $site): string
     {
+        if (self::serverErrorsExposed($site)) {
+            return '';
+        }
+
         $root = self::root($site);
 
         return <<<CADDY
@@ -110,6 +148,10 @@ CADDY;
 
     public static function openLiteSpeedBlock(Site $site): string
     {
+        if (self::serverErrorsExposed($site)) {
+            return '';
+        }
+
         $uri = self::ERROR_URI;
         $root = self::root($site);
 

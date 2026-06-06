@@ -47,20 +47,17 @@
             </a>
         </div>
 
-        <div class="grid gap-6 px-6 py-5 sm:grid-cols-2 sm:px-7">
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Setup') }}</p>
-                <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-3 py-2.5 text-[11px] leading-relaxed text-brand-cream"><code>curl -fsSL {{ $installUrl }} | bash -s -- --login
-dply link --byo {{ $site->id }}</code></pre>
-            </div>
-
-            <div>
-                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Common commands') }}</p>
-                <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-3 py-2.5 text-[11px] leading-relaxed text-brand-cream"><code>dply sites:show {{ $site->slug }}
-dply sites:deploy {{ $site->slug }}
-dply sites:deployments {{ $site->slug }}
-dply sites:errors {{ $site->slug }}</code></pre>
-            </div>
+        <div class="space-y-3 px-6 py-5 sm:px-7">
+            <x-cli-snippet :summary="__('Setup')" :commands="[
+                ['label' => __('Install'), 'command' => 'curl -fsSL '.$installUrl.' | bash -s -- --login'],
+                ['label' => __('Link'),    'command' => 'dply link --byo '.$site->id],
+            ]" />
+            <x-cli-snippet :summary="__('Common commands')" :commands="[
+                ['label' => __('Show'),        'command' => 'dply sites:show '.$site->slug],
+                ['label' => __('Deploy'),      'command' => 'dply sites:deploy '.$site->slug],
+                ['label' => __('Deployments'), 'command' => 'dply sites:deployments '.$site->slug],
+                ['label' => __('Errors'),      'command' => 'dply sites:errors '.$site->slug],
+            ]" />
         </div>
 
         <div class="border-t border-brand-ink/10 bg-brand-sand/10 px-6 py-3 sm:px-7">

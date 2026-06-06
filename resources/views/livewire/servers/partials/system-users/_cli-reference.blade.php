@@ -25,19 +25,17 @@
             <x-heroicon-m-arrow-up-right class="h-3 w-3" />
         </a>
     </div>
-    <div class="grid gap-4 px-6 py-5 sm:grid-cols-2 sm:px-7">
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Setup') }}</p>
-            <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-3 py-2.5 text-[11px] leading-relaxed text-brand-cream"><code>curl -fsSL {{ $installUrl }} | bash -s -- --login</code></pre>
-        </div>
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Commands for this server') }}</p>
-            <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-3 py-2.5 text-[11px] leading-relaxed text-brand-cream"><code>dply server system-users list {{ $serverFlag }}
-dply server system-users sync {{ $serverFlag }}
-dply server system-users add deployer {{ $serverFlag }} --web-group
-dply server system-users update deployer {{ $serverFlag }} --sudo
-dply server system-users remove deployer {{ $serverFlag }}</code></pre>
-        </div>
+    <div class="space-y-3 px-6 py-5 sm:px-7">
+        <x-cli-snippet :summary="__('Setup')" :commands="[
+            ['label' => __('Install'), 'command' => 'curl -fsSL '.$installUrl.' | bash -s -- --login'],
+        ]" />
+        <x-cli-snippet :summary="__('Commands for this server')" :commands="[
+            ['label' => __('List'),   'command' => 'dply server system-users list '.$serverFlag],
+            ['label' => __('Sync'),   'command' => 'dply server system-users sync '.$serverFlag],
+            ['label' => __('Add'),    'command' => 'dply server system-users add deployer '.$serverFlag.' --web-group'],
+            ['label' => __('Update'), 'command' => 'dply server system-users update deployer '.$serverFlag.' --sudo'],
+            ['label' => __('Remove'), 'command' => 'dply server system-users remove deployer '.$serverFlag],
+        ]" />
     </div>
     <div class="border-t border-brand-ink/10 bg-brand-sand/10 px-6 py-3 sm:px-7">
         <p class="text-[11px] leading-relaxed text-brand-moss">

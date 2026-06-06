@@ -2094,6 +2094,44 @@ class Show extends Component
         return ($this->site->meta['skip_env_gate'] ?? false) === true;
     }
 
+    /** True when this site is passing raw 5xx through instead of the branded page. */
+    public function serverErrorsExposed(): bool
+    {
+        return \App\Support\Sites\SiteManagedErrorPageSupport::serverErrorsExposed($this->site);
+    }
+
+    /**
+     * Operator debugging aid: stop intercepting 5xx with the branded
+     * "temporarily unavailable" page so the real error shows — the framework
+     * debug page on an app 500, or the webserver's own 502/503/504 when the
+     * upstream is down. Off by default; re-applies the managed webserver config
+     * so the change takes effect on the box.
+     */
+    public function exposeServerErrors(): void
+    {
+        $this->authorize('update', $this->site);
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta[\App\Support\Sites\SiteManagedErrorPageSupport::META_EXPOSE_FLAG] = true;
+        $this->site->forceFill(['meta' => $meta])->save();
+        $this->finalizeRoutingMutation(
+            __('Showing raw server errors for this site — visitors see the real 5xx page until you turn this back off.'),
+            __('Exposing raw server errors …'),
+        );
+    }
+
+    /** Restore the branded managed error page (hide raw 5xx errors again). */
+    public function hideServerErrors(): void
+    {
+        $this->authorize('update', $this->site);
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        unset($meta[\App\Support\Sites\SiteManagedErrorPageSupport::META_EXPOSE_FLAG]);
+        $this->site->forceFill(['meta' => $meta])->save();
+        $this->finalizeRoutingMutation(
+            __('Branded error page restored — raw server errors are hidden again.'),
+            __('Restoring branded error page …'),
+        );
+    }
+
     public function confirmIgnoreMissingEnv(): void
     {
         $this->authorize('update', $this->site);
