@@ -72,9 +72,12 @@ final class PipelineAnchorScriptRunner
         }
 
         if ($hasExistingGit) {
+            // Pass the repo URL explicitly to fetch/pull so that an
+            // authenticated URL (with an injected token) is actually used,
+            // rather than whatever `origin` has stored from a prior run.
             $log = "\n--- git fetch ---\n";
             $log .= $ssh->exec(
-                sprintf('cd %s && %s git fetch origin 2>&1', $releaseEsc, $gitSshPrefix),
+                sprintf('cd %s && %s git fetch %s 2>&1', $releaseEsc, $gitSshPrefix, $repoEsc),
                 300
             );
             $log .= "\n--- git checkout ---\n";
@@ -90,7 +93,7 @@ final class PipelineAnchorScriptRunner
             $log .= "\n--- git pull ---\n";
 
             return $log.$ssh->exec(
-                sprintf('cd %s && %s git pull origin %s 2>&1', $releaseEsc, $gitSshPrefix, $branchEsc),
+                sprintf('cd %s && %s git pull %s %s 2>&1', $releaseEsc, $gitSshPrefix, $repoEsc, $branchEsc),
                 300
             );
         }
@@ -103,29 +106,35 @@ final class PipelineAnchorScriptRunner
         // overwrites tracked files without choking on a pre-existing folder.
         $log = "\n--- git clone ---\n";
 
+        // Store the credential-stripped URL as the remote so tokens are never
+        // persisted in .git/config. The fetch command receives the (possibly
+        // authenticated) URL directly, so HTTPS private repos authenticate
+        // without a stored credential.
+        $cleanUrl = (string) preg_replace('#(https?://)[^@\s]+@#', '$1', $repoUrl);
+        $cleanEsc = escapeshellarg($cleanUrl);
         $initRemote = sprintf(
             'cd %1$s && git init -q && { git remote add origin %2$s 2>/dev/null || git remote set-url origin %2$s; } && ',
             $releaseEsc,
-            $repoEsc
+            $cleanEsc
         );
 
         if ($isCommit) {
             // Arbitrary SHAs need full history — fetch everything, then reset.
             return $log.$ssh->exec(
-                $gitSshPrefix.$initRemote.sprintf('git fetch origin 2>&1 && git reset --hard %s 2>&1', $branchEsc),
+                $gitSshPrefix.$initRemote.sprintf('git fetch %1$s 2>&1 && git reset --hard %2$s 2>&1', $repoEsc, $branchEsc),
                 600
             );
         }
 
         if ($refKind === 'tag') {
             return $log.$ssh->exec(
-                $gitSshPrefix.$initRemote.sprintf('git fetch origin %1$s 2>&1 && git reset --hard FETCH_HEAD 2>&1', $branchEsc),
+                $gitSshPrefix.$initRemote.sprintf('git fetch %1$s %2$s 2>&1 && git reset --hard FETCH_HEAD 2>&1', $repoEsc, $branchEsc),
                 600
             );
         }
 
         return $log.$ssh->exec(
-            $gitSshPrefix.$initRemote.sprintf('git fetch origin %1$s 2>&1 && git reset --hard FETCH_HEAD 2>&1 && git checkout -B %1$s FETCH_HEAD 2>&1', $branchEsc),
+            $gitSshPrefix.$initRemote.sprintf('git fetch %1$s %2$s 2>&1 && git reset --hard FETCH_HEAD 2>&1 && git checkout -B %2$s FETCH_HEAD 2>&1', $repoEsc, $branchEsc),
             600
         );
     }

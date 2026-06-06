@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 ### Fixed
+- Deploys of private HTTPS repositories now authenticate correctly on re-deploy by passing the token-injected URL directly to git instead of relying on a stored remote, while keeping credentials out of the server's git config.
+### Fixed
 - HTTPS repository clones now authenticate correctly even when the git provider isn't explicitly set, by detecting it from the repository URL, and env files are written with the correct site-user ownership.
 ### Fixed
 - Deploys from private HTTPS repositories now authenticate automatically using your stored Git provider token, with tokens redacted from deploy logs.
