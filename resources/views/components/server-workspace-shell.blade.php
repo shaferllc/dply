@@ -294,7 +294,9 @@
                                     {{ __('Soon') }}
                                 </span>
                             @endif
-                            @if ($key === 'errors')
+                            {{-- Only show the open-error count when Errors is live —
+                                 not while it's a "Soon" (preview_only) item. --}}
+                            @if ($key === 'errors' && ! ($previewOnly || $soonBadge))
                                 @php $openErrorCount = \App\Models\ErrorEvent::query()->where('server_id', $server->id)->whereNull('dismissed_at')->count(); @endphp
                                 @if ($openErrorCount > 0)
                                     <span class="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">{{ $openErrorCount > 99 ? '99+' : $openErrorCount }}</span>

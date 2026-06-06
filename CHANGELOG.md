@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 ### Fixed
+- The open-error count badge no longer appears on the server Errors tab while it is still a coming-soon preview.
+### Fixed
 - Feature flag values are now cleared on each deploy so flag changes take effect immediately after release.
 ### Changed
 - The browser-based server console is now shown as a coming-soon preview while the full console feature is gated off.

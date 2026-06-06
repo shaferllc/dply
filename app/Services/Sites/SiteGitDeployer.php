@@ -66,6 +66,18 @@ class SiteGitDeployer
 
         $sha = trim($ssh->exec(sprintf('cd %s && git rev-parse HEAD 2>/dev/null', $pathEsc), 30));
 
+        // Post-clone diagnostic: confirm what landed on disk so a missing
+        // composer.json / wrong branch / failed fetch is immediately visible
+        // in the deploy log without needing to SSH in manually.
+        $cloneLog .= $ssh->exec(sprintf(
+            'echo "[dply] clone sha: %s"; '
+            .'echo "[dply] git log:"; git -C %s log --oneline -5 2>&1; '
+            .'echo "[dply] ls:"; ls -la %s 2>&1 | head -n 40',
+            $sha !== '' ? $sha : '(none — clone failed)',
+            $pathEsc,
+            $pathEsc
+        ), 30);
+
         $cloneLog .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_CLONE, $path);
         $this->hookRunner->assertHooksSucceeded($cloneLog, 'after_clone');
 

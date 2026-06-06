@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 6, 2026',
                     'tags'    => ['fixed'],
+                    'title'   => 'Cleaner Server Error Badge',
+                    'summary' => 'The open-error count badge no longer appears on the server Errors tab while it is still a coming-soon preview.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
+                    'tags'    => ['fixed'],
                     'title'   => 'Refresh Feature Flags On Deploy',
                     'summary' => 'Feature flag values are now cleared on each deploy so flag changes take effect immediately after release.',
                     'items'   => [],

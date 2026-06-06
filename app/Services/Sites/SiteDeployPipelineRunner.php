@@ -165,6 +165,8 @@ class SiteDeployPipelineRunner
             'echo "[dply] pwd=$(cd %1$s 2>/dev/null && pwd || echo UNREADABLE)"; '
             .'echo "[dply] is-symlink=$([ -L %1$s ] && echo yes || echo no)"; '
             .'echo "[dply] artisan=$([ -f %1$s/artisan ] && echo present || echo MISSING)"; '
+            .'echo "[dply] composer.json=$([ -f %1$s/composer.json ] && echo present || echo MISSING)"; '
+            .'echo "[dply] package.json=$([ -f %1$s/package.json ] && echo present || echo MISSING)"; '
             .'echo "[dply] ls:"; ls -la %1$s 2>&1 | head -n 30',
             $cwd
         ), 30);

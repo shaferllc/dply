@@ -94,6 +94,17 @@ class AtomicSiteDeployer
         $this->hookRunner->assertHooksSucceeded($cloneLog, 'clone');
         $this->anchorRunner->assertReleaseHasGit($ssh, $newRelease);
 
+        // Post-clone diagnostic: confirm what landed on disk.
+        $cloneSha = trim($ssh->exec(sprintf('cd %s && git rev-parse HEAD 2>/dev/null', $newEsc), 15));
+        $cloneLog .= $ssh->exec(sprintf(
+            'echo "[dply] clone sha: %s"; '
+            .'echo "[dply] git log:"; git -C %s log --oneline -5 2>&1; '
+            .'echo "[dply] ls:"; ls -la %s 2>&1 | head -n 40',
+            $cloneSha !== '' ? $cloneSha : '(none)',
+            $newEsc,
+            $newEsc
+        ), 30);
+
         $cloneLog .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_CLONE, $newRelease);
         $this->hookRunner->assertHooksSucceeded($cloneLog, 'after_clone');
 
