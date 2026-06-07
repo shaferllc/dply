@@ -141,7 +141,10 @@
                 <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="site_int_evt_uptime_down" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"> {{ __('Monitor down') }}</label>
                 <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="site_int_evt_uptime_recovered" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"> {{ __('Monitor recovered') }}</label>
             </div>
-            <x-primary-button type="submit" class="!text-sm w-fit">{{ __('Add webhook destination') }}</x-primary-button>
+            <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveSiteIntegrationWebhookDestination" class="!text-sm w-fit">
+                <span wire:loading.remove wire:target="saveSiteIntegrationWebhookDestination">{{ __('Add webhook destination') }}</span>
+                <span wire:loading wire:target="saveSiteIntegrationWebhookDestination">{{ __('Adding…') }}</span>
+            </x-primary-button>
         </form>
 
         @if ($siteIntegrationWebhookDestinations->isEmpty())
@@ -189,7 +192,10 @@
             <x-input-label for="webhook_allowed_ips_text" value="{{ __('Optional IP allow list (one IPv4/IPv6 or IPv4 CIDR per line)') }}" />
             <textarea id="webhook_allowed_ips_text" wire:model="webhook_allowed_ips_text" rows="4" class="w-full rounded-md border-brand-ink/15 shadow-sm font-mono text-xs" placeholder="203.0.113.10&#10;192.0.2.0/24"></textarea>
             <x-input-error :messages="$errors->get('webhook_allowed_ips_text')" class="mt-1" />
-            <x-primary-button type="submit">{{ __('Save allow list') }}</x-primary-button>
+            <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveWebhookSecurity">
+                <span wire:loading.remove wire:target="saveWebhookSecurity">{{ __('Save allow list') }}</span>
+                <span wire:loading wire:target="saveWebhookSecurity">{{ __('Saving…') }}</span>
+            </x-primary-button>
         </form>
     </section>
 

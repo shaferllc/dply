@@ -26,9 +26,11 @@
                         @if ($site->isSuspended())
                             <p class="mt-3 text-sm font-medium text-amber-900">{{ __('This site is currently suspended.') }}</p>
                             @can('update', $site)
-                                <button type="button" wire:click="resumeSite" wire:loading.attr="disabled" class="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 shadow-sm transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60">
-                                    <x-heroicon-o-play class="h-4 w-4" aria-hidden="true" />
-                                    {{ __('Resume site') }}
+                                <button type="button" wire:click="resumeSite" wire:loading.attr="disabled" wire:target="resumeSite" class="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 shadow-sm transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60">
+                                    <x-heroicon-o-play class="h-4 w-4" wire:loading.remove wire:target="resumeSite" aria-hidden="true" />
+                                    <x-spinner wire:loading wire:target="resumeSite" variant="amber" size="sm" />
+                                    <span wire:loading.remove wire:target="resumeSite">{{ __('Resume site') }}</span>
+                                    <span wire:loading wire:target="resumeSite">{{ __('Resuming…') }}</span>
                                 </button>
                             @endcan
                         @else
@@ -40,9 +42,11 @@
                                 @enderror
                             </div>
                             @can('update', $site)
-                                <button type="button" wire:click="confirmSuspendSite" wire:loading.attr="disabled" class="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-amber-400 bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-900 shadow-sm transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60">
-                                    <x-heroicon-o-pause class="h-4 w-4" aria-hidden="true" />
-                                    {{ __('Suspend site') }}
+                                <button type="button" wire:click="confirmSuspendSite" wire:loading.attr="disabled" wire:target="confirmSuspendSite" class="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-amber-400 bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-900 shadow-sm transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60">
+                                    <x-heroicon-o-pause class="h-4 w-4" wire:loading.remove wire:target="confirmSuspendSite" aria-hidden="true" />
+                                    <x-spinner wire:loading wire:target="confirmSuspendSite" variant="amber" size="sm" />
+                                    <span wire:loading.remove wire:target="confirmSuspendSite">{{ __('Suspend site') }}</span>
+                                    <span wire:loading wire:target="confirmSuspendSite">{{ __('Suspending…') }}</span>
                                 </button>
                             @endcan
                         @endif
@@ -114,9 +118,11 @@
                                 <span class="flex-1">
                                     {{ __('Scheduled for removal at :time.', ['time' => $site->scheduled_deletion_at->copy()->timezone(config('app.timezone'))->toDayDateTimeString()]) }}
                                 </span>
-                                <button type="button" wire:click="cancelScheduledSiteRemoval" class="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-white px-2 py-1 font-semibold hover:bg-amber-100">
-                                    <x-heroicon-o-x-mark class="h-4 w-4" aria-hidden="true" />
-                                    {{ __('Cancel scheduled removal') }}
+                                <button type="button" wire:click="cancelScheduledSiteRemoval" wire:loading.attr="disabled" wire:target="cancelScheduledSiteRemoval" class="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-white px-2 py-1 font-semibold hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60">
+                                    <x-heroicon-o-x-mark class="h-4 w-4" wire:loading.remove wire:target="cancelScheduledSiteRemoval" aria-hidden="true" />
+                                    <x-spinner wire:loading wire:target="cancelScheduledSiteRemoval" variant="amber" size="sm" />
+                                    <span wire:loading.remove wire:target="cancelScheduledSiteRemoval">{{ __('Cancel scheduled removal') }}</span>
+                                    <span wire:loading wire:target="cancelScheduledSiteRemoval">{{ __('Cancelling…') }}</span>
                                 </button>
                             </div>
                         @else

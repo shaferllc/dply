@@ -65,13 +65,21 @@ for _ in \$(seq 1 80); do
   sleep 3
 done
 
-apt-get update -y >/dev/null 2>&1 || apt-get update -y >/dev/null 2>&1 || true
+if apt-get update -y >/dev/null 2>&1 || apt-get update -y >/dev/null 2>&1; then
+  _dply_hs_updated=1
+else
+  _dply_hs_updated=0
+fi
 apt-get install -y --no-install-recommends \
   ca-certificates curl git gnupg lsb-release locales software-properties-common ufw unattended-upgrades \
   >/dev/null 2>&1 || true
 
-# Let the main provision script's dply_apt_update skip a redundant refresh.
-touch {$stamp} 2>/dev/null || true
+# Only let the main provision script skip its base update if OUR update actually
+# succeeded — otherwise leave the stamp unset so the provisioner re-updates and
+# its retry resilience isn't defeated by a failed boot-time refresh.
+if [ "\$_dply_hs_updated" = "1" ]; then
+  touch {$stamp} 2>/dev/null || true
+fi
 
 echo "[dply-headstart] \$(date -Is 2>/dev/null) done"
 : > {$done}

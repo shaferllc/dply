@@ -72,14 +72,17 @@ class ProvisionHetznerServerJob implements ShouldQueue
                 return;
             }
 
-            // Image precedence (non-managed): user-chosen OS image → a pre-baked
-            // snapshot (Hetzner snapshots are global across locations, so a single
-            // id applies to every region) → stock Ubuntu. The setup script
-            // skip-fasts already-installed steps when launched from a snapshot.
+            // Image precedence: a pre-baked snapshot (Hetzner snapshots are global
+            // across locations, so a single id applies to every region) is the
+            // fast path for BOTH managed (incl. warm-pool members) and BYO; the
+            // setup script skip-fasts already-installed steps when launched from
+            // it. Managed falls back to the platform default; BYO honours a
+            // user-chosen OS image first, then stock Ubuntu.
+            $snapshot = ServerImageCatalog::bakedSnapshotForRegion('hetzner', $this->server->region);
             $image = $managed
-                ? $platform->defaultImage
+                ? ($snapshot ?? $platform->defaultImage)
                 : (ServerImageCatalog::resolveForServer($this->server, 'hetzner')
-                    ?? ServerImageCatalog::bakedSnapshotForRegion('hetzner', $this->server->region)
+                    ?? $snapshot
                     ?? config('services.hetzner.default_image', 'ubuntu-24.04'));
 
             // Ensure a dply-managed Cloud Firewall that allows SSH (and the

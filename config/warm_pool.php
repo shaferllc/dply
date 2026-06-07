@@ -42,6 +42,15 @@ return [
     // than this (seconds) — re-check or replace first.
     'health_max_age_seconds' => (int) env('DPLY_WARM_POOL_HEALTH_MAX_AGE', 900),
 
+    // A 'warming' member that never reaches ready/failed within this window is
+    // treated as wedged and marked failed so the bucket refills. 0 = never.
+    'max_warming_seconds' => (int) env('DPLY_WARM_POOL_MAX_WARMING', 1800),
+
+    // Backstop: re-dispatch personalization for a claimed member whose server
+    // hasn't finished setup after this grace window (covers a lost personalize
+    // job). 0 = disabled.
+    'personalize_backstop_seconds' => (int) env('DPLY_WARM_POOL_PERSONALIZE_BACKSTOP', 300),
+
     // Retire a ready member older than this (seconds) to bound security drift;
     // the autoscaler replaces it with a fresh (patched) one. 0 = never.
     'max_member_age_seconds' => (int) env('DPLY_WARM_POOL_MAX_AGE', 0),

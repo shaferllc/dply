@@ -56,16 +56,18 @@ return Application::configure(basePath: dirname(__DIR__))
             'feature' => EnsureFeaturesAreActive::class,
             'vm.platform' => EnsureVmPlatformEnabled::class,
         ]);
-        $middleware->preventRequestForgery(except: [
-            'hooks/*',
-            'webhook/*',
-            'webauthn/*',
-            'fn/*',
-            // Preview-comment widget API is auth'd by per-site widget
-            // token in X-Dply-Preview-Widget; called cross-origin from
-            // *.dply.host preview hostnames.
-            'api/edge/preview-comments/*',
-        ]);
+        // Machine/external callback paths come from the single canonical list
+        // (App\Support\MachineCallbackPaths) the guest gates also use, so a new
+        // webhook can't be CSRF-exempt-but-gate-blocked (or vice-versa). The `up`
+        // health route in that list is a harmless extra here (GETs aren't CSRF
+        // checked); webauthn is CSRF-specific so it's appended separately.
+        $middleware->preventRequestForgery(except: array_merge(
+            \App\Support\MachineCallbackPaths::PATTERNS,
+            [
+                // Passkey ceremony endpoints (cross-origin, token-auth'd).
+                'webauthn/*',
+            ],
+        ));
 
         // Custom-domain short-circuit MUST run before the normal web stack
         // so a request to `api.acme.com/` doesn't fall through to the

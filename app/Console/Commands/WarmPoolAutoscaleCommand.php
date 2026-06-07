@@ -48,6 +48,7 @@ class WarmPoolAutoscaleCommand extends Command
         $dry = (bool) $this->option('dry-run');
 
         $this->reconcile($dry);
+        $this->reconcileClaimed($dry);
 
         foreach ($buckets as $bucket) {
             if (! is_array($bucket)) {
@@ -91,6 +92,51 @@ class WarmPoolAutoscaleCommand extends Command
                     ]);
                 }
                 $this->line("  [ready] member {$member->id} (server {$server->id})");
+
+                continue;
+            }
+
+            // Stranded: a member whose provision silently wedged (never ERROR,
+            // never DONE — e.g. a baseline box that produced no setup, or a lost
+            // task callback) would otherwise sit in 'warming' forever, counting
+            // as available() and suppressing refill. Time-bound it to 'failed' so
+            // the bucket refills.
+            $maxWarming = (int) config('warm_pool.max_warming_seconds', 1800);
+            if ($maxWarming > 0 && $member->created_at && $member->created_at->lt(now()->subSeconds($maxWarming))) {
+                $this->transition($member, ServerPoolMember::STATUS_FAILED, $dry, "warming > {$maxWarming}s — provision wedged");
+            }
+        }
+    }
+
+    /**
+     * Backstop for a claimed member whose PersonalizeClaimedServerJob never ran
+     * (e.g. lost on a worker/Redis restart between the adopt commit and enqueue).
+     * Without this the customer's server is stuck READY+PENDING with the POOL
+     * org's SSH keys still in authorized_keys and no re-trigger. Re-dispatch
+     * personalize (idempotent — the resume-safe provision pipeline) for claimed
+     * members whose server hasn't finished setup after a grace window.
+     */
+    private function reconcileClaimed(bool $dry): void
+    {
+        $grace = (int) config('warm_pool.personalize_backstop_seconds', 300);
+        if ($grace <= 0) {
+            return;
+        }
+
+        $stuck = ServerPoolMember::query()
+            ->where('status', ServerPoolMember::STATUS_CLAIMED)
+            ->where('claimed_at', '<', now()->subSeconds($grace))
+            ->get();
+
+        foreach ($stuck as $member) {
+            $server = $member->server_id ? Server::query()->find($member->server_id) : null;
+            if (! $server || $server->setup_status === Server::SETUP_STATUS_DONE) {
+                continue;
+            }
+
+            $this->line("  [re-personalize] member {$member->id} (server {$server->id}) — setup not done after {$grace}s");
+            if (! $dry) {
+                \App\Jobs\PersonalizeClaimedServerJob::dispatch($server->id, $member->id, $member->tier);
             }
         }
     }

@@ -75,7 +75,7 @@ final class SiteSettingsSidebar
                 ['id' => 'notifications', 'label' => __('Notifications'), 'icon' => 'heroicon-o-bell', 'group' => 'observability', 'feature' => 'workspace.site_notifications', 'preview_feature' => 'workspace.site_notifications_preview'],
                 ['id' => 'monitor', 'label' => __('Monitor'), 'icon' => 'heroicon-o-chart-bar', 'group' => 'observability', 'route' => 'sites.monitor', 'feature' => 'workspace.site_monitor', 'preview_feature' => 'workspace.site_monitor_preview'],
                 ['id' => 'errors', 'label' => __('Errors'), 'icon' => 'heroicon-o-exclamation-triangle', 'group' => 'observability', 'route' => 'sites.errors', 'feature' => 'workspace.site_errors', 'preview_feature' => 'workspace.site_errors_preview'],
-                ['id' => 'cli', 'label' => __('CLI'), 'icon' => 'heroicon-o-command-line', 'group' => 'general'],
+                ['id' => 'cli', 'label' => __('CLI'), 'icon' => 'heroicon-o-command-line', 'group' => 'general', 'feature' => 'workspace.site_cli', 'preview_feature' => 'workspace.site_cli_preview'],
                 ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-archive-box', 'group' => 'danger'],
             ]
             : [
@@ -109,7 +109,7 @@ final class SiteSettingsSidebar
                 ['id' => 'monitor', 'label' => __('Monitor'), 'icon' => 'heroicon-o-chart-bar', 'group' => 'observability', 'route' => 'sites.monitor', 'feature' => 'workspace.site_monitor', 'preview_feature' => 'workspace.site_monitor_preview'],
                 ['id' => 'errors', 'label' => __('Errors'), 'icon' => 'heroicon-o-exclamation-triangle', 'group' => 'observability', 'route' => 'sites.errors', 'feature' => 'workspace.site_errors', 'preview_feature' => 'workspace.site_errors_preview'],
                 ['id' => 'basic-auth', 'label' => __('Authentication'), 'icon' => 'heroicon-o-lock-closed', 'group' => 'access'],
-                ['id' => 'cli', 'label' => __('CLI'), 'icon' => 'heroicon-o-command-line', 'group' => 'general'],
+                ['id' => 'cli', 'label' => __('CLI'), 'icon' => 'heroicon-o-command-line', 'group' => 'general', 'feature' => 'workspace.site_cli', 'preview_feature' => 'workspace.site_cli_preview'],
                 ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-archive-box', 'group' => 'danger'],
             ];
 
@@ -301,7 +301,7 @@ final class SiteSettingsSidebar
             ['id' => 'notifications', 'label' => __('Notifications'), 'icon' => 'heroicon-o-bell', 'group' => 'observability', 'feature' => 'workspace.site_notifications', 'preview_feature' => 'workspace.site_notifications_preview'],
             ['id' => 'cron', 'label' => __('Cron jobs'), 'icon' => 'heroicon-o-clock', 'group' => 'background', 'route' => 'sites.cron'],
             ['id' => 'daemons', 'label' => __('Workers'), 'icon' => 'heroicon-o-server-stack', 'group' => 'background', 'route' => 'sites.daemons'],
-            ['id' => 'cli', 'label' => __('CLI'), 'icon' => 'heroicon-o-command-line', 'group' => 'general'],
+            ['id' => 'cli', 'label' => __('CLI'), 'icon' => 'heroicon-o-command-line', 'group' => 'general', 'feature' => 'workspace.site_cli', 'preview_feature' => 'workspace.site_cli_preview'],
             ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-archive-box', 'group' => 'danger'],
         ];
 

@@ -78,6 +78,9 @@ trait GuardsSiteAccess
         $this->loadMissing(['accessGate', 'accessGatePasswords', 'basicAuthUsers']);
 
         $gate = $this->accessGate;
+        if ($gate !== null && $this->relationLoaded('accessGatePasswords')) {
+            $gate->setRelation('passwords', $this->accessGatePasswords);
+        }
         if ($gate !== null && $gate->isFormPasswordActive()) {
             return SiteAccessGate::METHOD_FORM_PASSWORD;
         }

@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Fixed
+- Warm-pool servers that silently stall during provisioning are now detected and recovered automatically, so new servers finish setup reliably.
 ### Added
 - Managed servers can now be claimed instantly from a pre-provisioned warm pool instead of waiting for a cold provision.
 ### Changed

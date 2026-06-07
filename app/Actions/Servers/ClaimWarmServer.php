@@ -127,11 +127,16 @@ class ClaimWarmServer
         return DB::transaction(function () use ($pool, $server, $member): bool {
             $meta = is_array($server->meta) ? $server->meta : [];
             $poolMeta = is_array($pool->meta) ? $pool->meta : [];
-            foreach (['provision_step_snapshots', \App\Support\Servers\InstalledStack::META_KEY] as $carry) {
-                if (isset($poolMeta[$carry])) {
-                    $meta[$carry] = $poolMeta[$carry];
-                }
+            // Carry the reconciled installed-stack snapshot (overwritten when the
+            // personalize re-provision emits a fresh one). Do NOT carry
+            // provision_step_snapshots — the journey reads those as step-completion
+            // and would render the (not-yet-personalized) server as ~100% done
+            // before authorized_keys are rewritten to the customer. (Mirrors the
+            // unset in RunSetupScriptJob::tryScheduleAutoRetry.)
+            if (isset($poolMeta[\App\Support\Servers\InstalledStack::META_KEY])) {
+                $meta[\App\Support\Servers\InstalledStack::META_KEY] = $poolMeta[\App\Support\Servers\InstalledStack::META_KEY];
             }
+            unset($meta['provision_step_snapshots']);
 
             $server->forceFill([
                 'provider_id' => $pool->provider_id,

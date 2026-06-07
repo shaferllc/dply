@@ -175,8 +175,11 @@
             <button type="button" wire:click="previewLoggingConfig" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                 <x-heroicon-o-eye class="h-4 w-4" /> {{ __('Preview generated file') }}
             </button>
-            <button type="button" wire:click="saveLoggingSpec" wire:loading.attr="disabled" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-4 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:opacity-60">
-                <x-heroicon-o-check class="h-4 w-4" /> {{ __('Save logging') }}
+            <button type="button" wire:click="saveLoggingSpec" wire:loading.attr="disabled" wire:target="saveLoggingSpec" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-4 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60">
+                <x-heroicon-o-check class="h-4 w-4" wire:loading.remove wire:target="saveLoggingSpec" />
+                <x-spinner wire:loading wire:target="saveLoggingSpec" variant="cream" size="sm" />
+                <span wire:loading.remove wire:target="saveLoggingSpec">{{ __('Save logging') }}</span>
+                <span wire:loading wire:target="saveLoggingSpec">{{ __('Saving…') }}</span>
             </button>
         </div>
 

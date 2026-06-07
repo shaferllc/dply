@@ -5,6 +5,22 @@ declare(strict_types=1);
 return [
     /*
     |--------------------------------------------------------------------------
+    | Stalled-task sweeper
+    |--------------------------------------------------------------------------
+    |
+    | Thresholds for SweepStalledTasksCommand, the backstop that fails tasks
+    | stuck in `running` (lost callback / dead box). A task is swept when it has
+    | gone `heartbeat_seconds` with no output, or run past its own timeout plus
+    | `grace_seconds`.
+    |
+    */
+    'stall' => [
+        'heartbeat_seconds' => (int) env('DPLY_TASK_STALL_HEARTBEAT_SECONDS', 600),
+        'grace_seconds' => (int) env('DPLY_TASK_STALL_GRACE_SECONDS', 120),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Temporary Directory
     |--------------------------------------------------------------------------
     |

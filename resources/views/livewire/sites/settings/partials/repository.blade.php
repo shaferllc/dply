@@ -111,13 +111,20 @@
                 <button
                     type="button"
                     wire:click="generateDeployKey"
-                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                    wire:loading.attr="disabled"
+                    wire:target="generateDeployKey"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                    <x-heroicon-o-key class="h-4 w-4" />
-                    {{ __('Generate deploy key') }}
+                    <x-heroicon-o-key class="h-4 w-4" wire:loading.remove wire:target="generateDeployKey" />
+                    <x-spinner wire:loading wire:target="generateDeployKey" size="sm" />
+                    <span wire:loading.remove wire:target="generateDeployKey">{{ __('Generate deploy key') }}</span>
+                    <span wire:loading wire:target="generateDeployKey">{{ __('Generating…') }}</span>
                 </button>
             @endif
-            <x-primary-button type="submit" form="save-repository-form">{{ __('Save repository') }}</x-primary-button>
+            <x-primary-button type="submit" form="save-repository-form" wire:loading.attr="disabled" wire:target="saveRepositoryWorkspace">
+                <span wire:loading.remove wire:target="saveRepositoryWorkspace">{{ __('Save repository') }}</span>
+                <span wire:loading wire:target="saveRepositoryWorkspace">{{ __('Saving…') }}</span>
+            </x-primary-button>
         </div>
 
         @if ($hasDeployKey)
@@ -170,19 +177,23 @@
                     <button
                         type="button"
                         wire:click="disableQuickDeploy"
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                        wire:loading.attr="disabled"
+                        wire:target="disableQuickDeploy"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                        <x-heroicon-o-power class="h-4 w-4" />
-                        {{ __('Disable Quick deploy') }}
+                        <span wire:loading.remove wire:target="disableQuickDeploy">{{ __('Disable Quick deploy') }}</span>
+                        <span wire:loading wire:target="disableQuickDeploy">{{ __('Disabling…') }}</span>
                     </button>
                 @else
                     <button
                         type="button"
                         wire:click="enableQuickDeploy"
-                        class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90"
+                        wire:loading.attr="disabled"
+                        wire:target="enableQuickDeploy"
+                        class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                        <x-heroicon-o-bolt class="h-4 w-4" />
-                        {{ __('Enable Quick deploy') }}
+                        <span wire:loading.remove wire:target="enableQuickDeploy">{{ __('Enable Quick deploy') }}</span>
+                        <span wire:loading wire:target="enableQuickDeploy">{{ __('Enabling…') }}</span>
                     </button>
                 @endif
             </div>
@@ -248,7 +259,10 @@
                             @endforeach
                         </select>
                         <x-input-error :messages="$errors->get('sync_group_add_site_id')" class="mt-1" />
-                        <x-primary-button type="submit" class="!py-2">{{ __('Add to group') }}</x-primary-button>
+                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="addSiteToDeploySyncGroup" class="!py-2">
+                            <span wire:loading.remove wire:target="addSiteToDeploySyncGroup">{{ __('Add to group') }}</span>
+                            <span wire:loading wire:target="addSiteToDeploySyncGroup">{{ __('Adding…') }}</span>
+                        </x-primary-button>
                     </form>
 
                     <form wire:submit="setDeploySyncGroupLeader" class="space-y-3 rounded-xl border border-brand-ink/10 p-4">
@@ -258,7 +272,10 @@
                                 <option value="{{ $gs->id }}">{{ $gs->name }}</option>
                             @endforeach
                         </select>
-                        <x-primary-button type="submit" class="!py-2">{{ __('Save leader') }}</x-primary-button>
+                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="setDeploySyncGroupLeader" class="!py-2">
+                            <span wire:loading.remove wire:target="setDeploySyncGroupLeader">{{ __('Save leader') }}</span>
+                            <span wire:loading wire:target="setDeploySyncGroupLeader">{{ __('Saving…') }}</span>
+                        </x-primary-button>
                     </form>
                 </div>
 
@@ -266,10 +283,14 @@
                     <button
                         type="button"
                         wire:click="leaveDeploySyncGroup"
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-transparent px-3 py-1.5 text-xs font-semibold text-rose-700 hover:border-rose-200 hover:bg-rose-50"
+                        wire:loading.attr="disabled"
+                        wire:target="leaveDeploySyncGroup"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-transparent px-3 py-1.5 text-xs font-semibold text-rose-700 hover:border-rose-200 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                        <x-heroicon-o-arrow-right-start-on-rectangle class="h-4 w-4" />
-                        {{ __('Leave group') }}
+                        <x-heroicon-o-arrow-right-start-on-rectangle class="h-4 w-4" wire:loading.remove wire:target="leaveDeploySyncGroup" />
+                        <x-spinner wire:loading wire:target="leaveDeploySyncGroup" variant="zinc" size="sm" />
+                        <span wire:loading.remove wire:target="leaveDeploySyncGroup">{{ __('Leave group') }}</span>
+                        <span wire:loading wire:target="leaveDeploySyncGroup">{{ __('Leaving…') }}</span>
                     </button>
                 </div>
             @else
@@ -279,7 +300,10 @@
                         <x-text-input id="sync_group_name_input" wire:model="sync_group_name_input" class="mt-1 block w-full" placeholder="production-fleet" />
                         <x-input-error :messages="$errors->get('sync_group_name_input')" class="mt-1" />
                     </div>
-                    <x-primary-button type="submit">{{ __('Create group') }}</x-primary-button>
+                    <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="createDeploySyncGroup">
+                        <span wire:loading.remove wire:target="createDeploySyncGroup">{{ __('Create group') }}</span>
+                        <span wire:loading wire:target="createDeploySyncGroup">{{ __('Creating…') }}</span>
+                    </x-primary-button>
                 </form>
             @endif
         </div>
@@ -359,10 +383,14 @@
                 <button
                     type="button"
                     wire:click="regenerateWebhookSecret"
-                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                    wire:loading.attr="disabled"
+                    wire:target="regenerateWebhookSecret"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                    <x-heroicon-o-arrow-path class="h-4 w-4" />
-                    {{ __('Rotate webhook secret') }}
+                    <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="regenerateWebhookSecret" />
+                    <x-spinner wire:loading wire:target="regenerateWebhookSecret" size="sm" />
+                    <span wire:loading.remove wire:target="regenerateWebhookSecret">{{ __('Rotate webhook secret') }}</span>
+                    <span wire:loading wire:target="regenerateWebhookSecret">{{ __('Rotating…') }}</span>
                 </button>
                 <a
                     href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'notifications']) }}"

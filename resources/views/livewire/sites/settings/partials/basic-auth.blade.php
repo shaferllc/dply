@@ -54,10 +54,15 @@
         </section>
     @else
         <div class="{{ $card }}">
-            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Method') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('How visitors authenticate') }}</h2>
-                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Only one method can be active. Changes apply through the webserver config job shown in the banner above.') }}</p>
+            <div class="flex min-w-0 items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <x-icon-badge>
+                    <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Method') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('How visitors authenticate') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Only one method can be active. Changes apply through the webserver config job shown in the banner above.') }}</p>
+                </div>
             </div>
             <div class="grid gap-3 p-6 sm:grid-cols-3 sm:px-7">
                 <button
@@ -69,7 +74,8 @@
                         'border-brand-ink/15 bg-white hover:bg-brand-sand/30' => $accessMethod !== 'off',
                     ])
                 >
-                    <p class="text-sm font-semibold text-brand-ink">{{ __('Off') }}</p>
+                    <x-heroicon-o-x-circle class="h-5 w-5 text-brand-mist" />
+                    <p class="mt-2 text-sm font-semibold text-brand-ink">{{ __('Off') }}</p>
                     <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('No access gate — visitors reach the app directly.') }}</p>
                 </button>
                 <button
@@ -81,7 +87,8 @@
                         'border-brand-ink/15 bg-white hover:bg-brand-sand/30' => $accessMethod !== 'basic_auth',
                     ])
                 >
-                    <p class="text-sm font-semibold text-brand-ink">{{ __('HTTP basic auth') }}</p>
+                    <x-heroicon-o-lock-closed class="h-5 w-5 text-brand-mist" />
+                    <p class="mt-2 text-sm font-semibold text-brand-ink">{{ __('HTTP basic auth') }}</p>
                     <p class="mt-1 text-xs leading-relaxed text-brand-moss">{{ __('Browser popup, multiple users, optional path prefixes.') }}</p>
                 </button>
                 <button
@@ -95,7 +102,8 @@
                         'cursor-not-allowed opacity-60' => ! $supportsFormGate,
                     ])
                 >
-                    <p class="text-sm font-semibold text-brand-ink">{{ __('Password gate') }}</p>
+                    <x-heroicon-o-key class="h-5 w-5 text-brand-mist" />
+                    <p class="mt-2 text-sm font-semibold text-brand-ink">{{ __('Password gate') }}</p>
                     <p class="mt-1 text-xs leading-relaxed text-brand-moss">
                         @if ($supportsFormGate)
                             {{ __('Styled login page + cookie — no browser basic-auth dialog.') }}
@@ -147,9 +155,14 @@
                             <button
                                 type="button"
                                 wire:click="disableFormGatePassword"
-                                class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                wire:loading.attr="disabled"
+                                wire:target="disableFormGatePassword"
+                                class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
                             >
-                                {{ __('Remove gate') }}
+                                <x-heroicon-o-x-circle class="h-4 w-4" wire:loading.remove wire:target="disableFormGatePassword" />
+                                <x-spinner wire:loading wire:target="disableFormGatePassword" size="sm" />
+                                <span wire:loading.remove wire:target="disableFormGatePassword">{{ __('Remove gate') }}</span>
+                                <span wire:loading wire:target="disableFormGatePassword">{{ __('Removing…') }}</span>
                             </button>
                         @endif
                     </div>
@@ -174,11 +187,14 @@
                                         <button
                                             type="button"
                                             wire:click="confirmRemoveFormGatePassword('{{ $gatePassword->id }}')"
-                                            class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-brand-mist hover:border-red-200 hover:bg-red-50 hover:text-red-700"
-                                            title="{{ __('Remove credential') }}"
-                                            aria-label="{{ __('Remove') }}"
+                                            wire:loading.attr="disabled"
+                                            wire:target="confirmRemoveFormGatePassword('{{ $gatePassword->id }}')"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                                         >
-                                            <x-heroicon-o-trash class="h-4 w-4" />
+                                            <x-heroicon-o-trash class="h-3.5 w-3.5" wire:loading.remove wire:target="confirmRemoveFormGatePassword('{{ $gatePassword->id }}')" />
+                                            <x-spinner wire:loading wire:target="confirmRemoveFormGatePassword('{{ $gatePassword->id }}')" size="sm" />
+                                            <span wire:loading.remove wire:target="confirmRemoveFormGatePassword('{{ $gatePassword->id }}')">{{ __('Remove') }}</span>
+                                            <span wire:loading wire:target="confirmRemoveFormGatePassword('{{ $gatePassword->id }}')">{{ __('Removing…') }}</span>
                                         </button>
                                     @endif
                                 </div>
@@ -192,39 +208,129 @@
                 @endif
             </div>
 
-            <div class="{{ $card }}" wire:init="loadFormGateLoginLog">
-                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Login log') }}</p>
-                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent gate logins') }}</h2>
-                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Successful logins are recorded on the server with the credential label, IP, and time.') }}</p>
+            <div class="{{ $card }}">
+                <div class="flex min-w-0 items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <x-icon-badge>
+                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Login log') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent gate logins') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Successful logins are recorded on the server with the credential label, IP, and time.') }}</p>
+                    </div>
                 </div>
-                <div class="px-6 py-6 sm:px-7">
-                    @if (! $form_gate_login_log_loaded)
-                        <p class="text-sm text-brand-moss">{{ __('Loading login log…') }}</p>
-                    @elseif ($form_gate_login_log === [])
+
+                @if (! $form_gate_login_log_loaded)
+                    <div wire:init="loadFormGateLoginLog" class="flex items-center justify-center gap-2 px-6 py-12 text-sm text-brand-moss">
+                        <x-spinner variant="forest" size="sm" />
+                        {{ __('Reading login log…') }}
+                    </div>
+                @elseif ($form_gate_login_log === [])
+                    <div class="px-6 py-10 text-center">
                         <p class="text-sm text-brand-moss">{{ __('No logins recorded yet.') }}</p>
-                    @else
-                        <ul class="divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10">
+                    </div>
+                @else
+                    <div x-data="{ selected: null }">
+                        <ul class="divide-y divide-brand-ink/10">
                             @foreach ($form_gate_login_log as $entry)
-                                <li class="px-4 py-3 text-sm">
-                                    <div class="flex flex-wrap items-center justify-between gap-2">
-                                        <span class="font-semibold text-brand-ink">{{ $entry['label'] }}</span>
-                                        <time class="text-xs text-brand-mist">{{ $entry['at'] }}</time>
-                                    </div>
-                                    <p class="mt-1 text-xs text-brand-moss">
-                                        @if (! empty($entry['ip']))
-                                            {{ $entry['ip'] }}
-                                        @endif
-                                        @if (! empty($entry['hostname']))
-                                            @if (! empty($entry['ip'])) · @endif
-                                            {{ $entry['hostname'] }}
-                                        @endif
-                                    </p>
+                                @php $at = \Carbon\Carbon::parse($entry['at']); @endphp
+                                <li>
+                                    <button
+                                        type="button"
+                                        @click="selected = @js(array_merge($entry, ['at_human' => $at->diffForHumans(), 'at_full' => $at->toDayDateTimeString(), 'at_iso' => $at->toIso8601String()]))"
+                                        class="flex w-full items-center justify-between gap-4 px-6 py-3 text-left hover:bg-brand-sand/20 sm:px-7"
+                                    >
+                                        <div class="min-w-0 flex-1">
+                                            <p class="text-sm font-semibold text-brand-ink">{{ $entry['label'] }}</p>
+                                            <p class="mt-0.5 text-xs text-brand-moss">
+                                                @if (! empty($entry['ip'])){{ $entry['ip'] }}@endif
+                                                @if (! empty($entry['hostname']))
+                                                    @if (! empty($entry['ip'])) · @endif
+                                                    {{ $entry['hostname'] }}
+                                                @endif
+                                            </p>
+                                            @if (! empty($entry['user_agent']))
+                                                <p class="mt-0.5 truncate text-[11px] text-brand-mist">{{ $entry['user_agent'] }}</p>
+                                            @endif
+                                        </div>
+                                        <div class="flex shrink-0 items-center gap-2">
+                                            <time
+                                                class="text-xs text-brand-mist"
+                                                datetime="{{ $at->toIso8601String() }}"
+                                                title="{{ $at->toDayDateTimeString() }}"
+                                            >{{ $at->diffForHumans() }}</time>
+                                            <x-heroicon-m-chevron-right class="h-3.5 w-3.5 text-brand-mist/50" />
+                                        </div>
+                                    </button>
                                 </li>
                             @endforeach
                         </ul>
-                    @endif
-                </div>
+
+                        {{-- Detail modal --}}
+                        <div
+                            x-show="selected"
+                            x-cloak
+                            x-on:keydown.escape.window="selected = null"
+                            class="fixed inset-0 z-50 flex items-center justify-center p-4"
+                            role="dialog"
+                            aria-modal="true"
+                        >
+                            <div class="absolute inset-0 bg-brand-ink/30" @click="selected = null" aria-hidden="true"></div>
+                            <div
+                                class="relative w-full max-w-md overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-xl"
+                                x-transition:enter="transition ease-out duration-150"
+                                x-transition:enter-start="opacity-0 scale-95"
+                                x-transition:enter-end="opacity-100 scale-100"
+                            >
+                                <div class="flex items-center justify-between border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4">
+                                    <div>
+                                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Login detail') }}</p>
+                                        <p class="mt-0.5 text-base font-semibold text-brand-ink" x-text="selected?.label"></p>
+                                    </div>
+                                    <button type="button" @click="selected = null" class="rounded-lg p-1.5 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
+                                        <x-heroicon-o-x-mark class="h-5 w-5" />
+                                    </button>
+                                </div>
+                                <dl class="divide-y divide-brand-ink/8 px-6 py-2">
+                                    <div class="flex items-start justify-between gap-4 py-3">
+                                        <dt class="shrink-0 text-xs font-medium text-brand-mist">{{ __('Time') }}</dt>
+                                        <dd class="min-w-0 text-right text-xs text-brand-ink">
+                                            <span x-text="selected?.at_human"></span>
+                                            <span class="block text-[10px] text-brand-mist" x-text="selected?.at_full"></span>
+                                        </dd>
+                                    </div>
+                                    <template x-if="selected?.ip">
+                                        <div class="flex items-center justify-between gap-4 py-3">
+                                            <dt class="shrink-0 text-xs font-medium text-brand-mist">{{ __('IP address') }}</dt>
+                                            <dd class="font-mono text-xs text-brand-ink" x-text="selected?.ip"></dd>
+                                        </div>
+                                    </template>
+                                    <template x-if="selected?.hostname">
+                                        <div class="flex items-center justify-between gap-4 py-3">
+                                            <dt class="shrink-0 text-xs font-medium text-brand-mist">{{ __('Hostname') }}</dt>
+                                            <dd class="min-w-0 break-all text-right font-mono text-xs text-brand-ink" x-text="selected?.hostname"></dd>
+                                        </div>
+                                    </template>
+                                    <template x-if="selected?.user_agent">
+                                        <div class="flex items-start justify-between gap-4 py-3">
+                                            <dt class="shrink-0 text-xs font-medium text-brand-mist">{{ __('User agent') }}</dt>
+                                            <dd class="min-w-0 break-all text-right text-xs text-brand-ink" x-text="selected?.user_agent"></dd>
+                                        </div>
+                                    </template>
+                                    <template x-if="selected?.credential_id">
+                                        <div class="flex items-center justify-between gap-4 py-3">
+                                            <dt class="shrink-0 text-xs font-medium text-brand-mist">{{ __('Credential ID') }}</dt>
+                                            <dd class="font-mono text-[10px] text-brand-mist" x-text="selected?.credential_id"></dd>
+                                        </div>
+                                    </template>
+                                </dl>
+                                <div class="border-t border-brand-ink/10 bg-brand-sand/10 px-6 py-3">
+                                    <p class="text-[11px] text-brand-moss">{{ __('Recorded on the server at the time of gate authentication.') }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endif
             </div>
 
             <x-modal name="add-form-gate-modal" maxWidth="md">
@@ -236,19 +342,47 @@
                         <x-text-input id="new_form_gate_label" wire:model="new_form_gate_label" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Sarah, Agency preview') }}" />
                         <x-input-error :messages="$errors->get('new_form_gate_label')" class="mt-1" />
                     </div>
-                    <div>
-                        <x-input-label for="form_gate_password" :value="__('Password')" />
-                        <div class="mt-1 flex gap-2">
-                            <x-text-input id="form_gate_password" wire:model="form_gate_password" type="text" class="block w-full font-mono text-sm" autocomplete="new-password" />
-                            <button type="button" wire:click="generateFormGatePassword" class="shrink-0 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
-                                {{ __('Generate') }}
-                            </button>
-                        </div>
+                    <div x-data="{
+                        showPassword: false,
+                        copied: false,
+                        async copyPassword() {
+                            const v = document.getElementById('form_gate_password')?.value || '';
+                            if (!v) return;
+                            try { await navigator.clipboard.writeText(v); this.copied = true; setTimeout(() => this.copied = false, 1800); } catch (e) {}
+                        },
+                    }">
+                        <label class="mb-1 flex items-center justify-between text-sm font-medium text-brand-ink" for="form_gate_password">
+                            <span>{{ __('Password') }}</span>
+                            <span class="flex items-center gap-3 text-xs">
+                                <button type="button" class="font-medium text-brand-sage hover:underline" @click="copyPassword()">
+                                    <span x-show="!copied">{{ __('Copy') }}</span>
+                                    <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
+                                </button>
+                                <button type="button" class="font-medium text-brand-sage hover:underline" @click="showPassword = !showPassword">
+                                    <span x-show="!showPassword">{{ __('Show') }}</span>
+                                    <span x-show="showPassword" x-cloak>{{ __('Hide') }}</span>
+                                </button>
+                                <button type="button" wire:click="generateFormGatePassword" class="font-medium text-brand-sage hover:underline">
+                                    {{ __('Generate') }}
+                                </button>
+                            </span>
+                        </label>
+                        <input
+                            id="form_gate_password"
+                            wire:model="form_gate_password"
+                            x-bind:type="showPassword ? 'text' : 'password'"
+                            autocomplete="new-password"
+                            spellcheck="false"
+                            class="block w-full rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-sm text-brand-ink"
+                        />
                         <x-input-error :messages="$errors->get('form_gate_password')" class="mt-1" />
                     </div>
                     <div class="flex justify-end gap-2">
                         <x-secondary-button type="button" x-on:click="$dispatch('close-modal', 'add-form-gate-modal')">{{ __('Cancel') }}</x-secondary-button>
-                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="addFormGatePassword">{{ __('Save password') }}</x-primary-button>
+                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="addFormGatePassword">
+                            <span wire:loading.remove wire:target="addFormGatePassword">{{ __('Save password') }}</span>
+                            <span wire:loading wire:target="addFormGatePassword">{{ __('Saving…') }}</span>
+                        </x-primary-button>
                     </div>
                 </form>
             </x-modal>

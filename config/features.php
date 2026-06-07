@@ -183,9 +183,9 @@ return [
         // exit: ship alongside console GA; teaser only when console is off
         'console_preview' => env('FEATURE_WORKSPACE_CONSOLE_PREVIEW', true),
         // exit: ship once server-scoped CLI reference + install UX are validated
-        'cli' => env('FEATURE_WORKSPACE_CLI', true),
+        'cli' => env('FEATURE_WORKSPACE_CLI', false),
         // exit: ship alongside CLI GA; teaser only when CLI is off
-        'cli_preview' => env('FEATURE_WORKSPACE_CLI_PREVIEW', false),
+        'cli_preview' => env('FEATURE_WORKSPACE_CLI_PREVIEW', true),
 
         // exit: ship once remote file-write atomic guarantees are reviewed; security surface
         'files' => env('FEATURE_WORKSPACE_FILES', false),
@@ -249,6 +249,8 @@ return [
         'site_errors_preview' => env('FEATURE_WORKSPACE_SITE_ERRORS_PREVIEW', true),
         'site_files' => env('FEATURE_WORKSPACE_SITE_FILES', false),
         'site_files_preview' => env('FEATURE_WORKSPACE_SITE_FILES_PREVIEW', true),
+        'site_cli' => env('FEATURE_WORKSPACE_SITE_CLI', false),
+        'site_cli_preview' => env('FEATURE_WORKSPACE_SITE_CLI_PREVIEW', true),
         'site_system_user' => env('FEATURE_WORKSPACE_SITE_SYSTEM_USER', false),
         'site_system_user_preview' => env('FEATURE_WORKSPACE_SITE_SYSTEM_USER_PREVIEW', true),
         // Routing sub-tabs — coming-soon teaser until each ships.

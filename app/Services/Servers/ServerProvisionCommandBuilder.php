@@ -2354,75 +2354,6 @@ APACHE,
     }
 
     /**
-     * Best-effort install of OPTIONAL packages: filter the requested list to
-     * those apt can actually resolve in the configured repos, then install only
-     * those. Unlike {@see ensurePackagesInstalled}, a package that is missing
-     * from every repo is logged and skipped rather than aborting the provision
-     * (apt-get's "E: Unable to locate package" otherwise trips the exit 100
-     * path). Use this only for extensions the app can boot without — required
-     * packages must go through the strict installer.
-     *
-     * @param  list<string>  $packages
-     * @return list<string>
-     */
-    private function ensureOptionalPackagesInstalled(array $packages, string $alreadyInstalledMessage): array
-    {
-        $packages = array_values(array_filter($packages, fn (string $package): bool => trim($package) !== ''));
-        if ($packages === []) {
-            return [];
-        }
-
-        $quoted = implode(' ', array_map(
-            fn (string $package): string => escapeshellarg($package),
-            $packages,
-        ));
-
-        // Resolve the available subset on the box (apt-cache show succeeds only
-        // when the package has a candidate in some configured source), then run
-        // the same lock-aware retry loop used for required installs. No `exit`
-        // on apt error here — optional means optional.
-        $filterAndInstall = implode("\n", [
-            '_dply_opt_avail=""',
-            'for _dply_opt_pkg in '.$quoted.'; do',
-            '  if apt-cache show "$_dply_opt_pkg" >/dev/null 2>&1; then',
-            '    _dply_opt_avail="$_dply_opt_avail $_dply_opt_pkg"',
-            '  else',
-            '    echo "[dply] optional PHP extension $_dply_opt_pkg not available in configured repos — skipping."',
-            '  fi',
-            'done',
-            'if [ -n "$_dply_opt_avail" ]; then',
-            '  dply_wait_for_apt_locks || exit 100',
-            '  for _dply_apt_attempt in 1 2 3 4 5 6; do',
-            '    dply_wait_for_apt_locks || exit 100',
-            '    _dply_apt_log=$(DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends $_dply_opt_avail 2>&1) || true',
-            '    echo "$_dply_apt_log"',
-            '    if echo "$_dply_apt_log" | grep -qE "Could not get lock|Unable to acquire the dpkg frontend lock|is held by process"; then',
-            '      echo "[dply] apt lock during optional-ext install — sleeping 15s before retry $_dply_apt_attempt/6."',
-            '      sleep 15',
-            '      continue',
-            '    fi',
-            '    break',
-            '  done',
-            'else',
-            '  echo "[dply] no optional PHP extensions available to install."',
-            'fi',
-        ]);
-
-        if ($this->forceReinstall()) {
-            return [$filterAndInstall];
-        }
-
-        $checks = array_map(
-            fn (string $package): string => 'dpkg -s '.escapeshellarg($package).' >/dev/null 2>&1',
-            $packages,
-        );
-
-        return [
-            'if '.implode(' && ', $checks).'; then echo '.escapeshellarg($alreadyInstalledMessage).'; else'."\n".$filterAndInstall."\n".'fi',
-        ];
-    }
-
-    /**
      * Install REQUIRED packages (strict — abort on any missing) and OPTIONAL
      * packages (best-effort — filtered to what apt can resolve) in a SINGLE
      * apt-get transaction. This merges what was two separate dpkg runs (e.g.
@@ -2442,9 +2373,13 @@ APACHE,
             return [];
         }
 
+        // Skip-fast only on the REQUIRED set. Optional extensions may legitimately
+        // have no package on the distro (e.g. php8.3-sodium on noble — built into
+        // core), so dpkg -s would always fail for them and the "already installed"
+        // short-circuit could never fire on a resume/baked-snapshot re-run.
         $checks = array_map(
             fn (string $p): string => 'dpkg -s '.escapeshellarg($p).' >/dev/null 2>&1',
-            array_merge($required, $optional),
+            $required,
         );
 
         $requiredList = implode(' ', $required);

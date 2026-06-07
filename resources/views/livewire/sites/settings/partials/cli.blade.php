@@ -1,25 +1,5 @@
 @if (workspace_surface_coming_soon('site_cli'))
-    <x-workspace-coming-soon
-        :server="$site->server"
-        icon="heroicon-o-command-line"
-        :title="__('CLI')"
-        :description="__('Manage this site from your terminal — deploy, inspect workers, tail logs, manage domains and basic auth, and more. Every page in the workspace maps to a dply command.')"
-        :eyebrow="__('CLI preview')"
-        :lines="[
-            ['tone' => 'cmd',   'text' => '~ $ dply sites:show '.$site->slug],
-            ['tone' => 'muted', 'text' => 'Name      '.$site->name],
-            ['tone' => 'muted', 'text' => 'Runtime   '.($site->runtime ?? 'php').' '.($site->runtime_version ?? '')],
-            ['tone' => 'ok',    'text' => 'Status    '.$site->status],
-            ['tone' => 'cmd',   'text' => '~ $ dply sites:deploy '.$site->slug],
-            ['tone' => 'ok',    'text' => 'Deploy queued.'],
-        ]"
-        :features="[
-            ['icon' => 'rocket-launch',   'title' => __('Deploy from CI'), 'body' => __('`dply sites:deploy` in any pipeline — with idempotency keys so retries never double-deploy.')],
-            ['icon' => 'command-line',    'title' => __('Every page, one command'), 'body' => __('Workers, schedules, SSL, domains, errors — each workspace tab has a matching CLI command.')],
-            ['icon' => 'key',             'title' => __('Scoped API tokens'), 'body' => __('Create tokens with exactly the abilities you need: read-only, deploy-only, or full access.')],
-            ['icon' => 'code-bracket',    'title' => __('JSON output'), 'body' => __('Pass --json to any command and pipe the raw response into jq, scripts, or your own tooling.')],
-        ]"
-    />
+    <x-cli-preview-panel :server="$site->server" />
 @else
     @php
         $installUrl = route('cli.install');
