@@ -66,6 +66,12 @@ return [
             'failed' => 'Connectivity fix could not finish — check the log.',
             'stale' => 'Connectivity fix did not finish.',
         ],
+        'mail_test' => [
+            'running' => 'Sending a test email from :host …',
+            'completed' => 'Test email sent — check the inbox.',
+            'failed' => 'The test email could not be sent — see the transport error.',
+            'stale' => 'Test email did not finish.',
+        ],
         'remediation_apply' => [
             'running' => 'Applying fix …',
             'completed' => 'Fix applied — re-run the operation to continue.',
@@ -300,7 +306,7 @@ return [
         'wordpress' => ['webserver_config'],
         'basic-auth' => ['basic_auth_sync', 'webserver_config'],
         'webserver-config' => ['webserver_config'],
-        'environment' => ['env_sync', 'env_push', 'env_scan', 'binding_connectivity_fix'],
+        'environment' => ['env_sync', 'env_push', 'env_scan', 'binding_connectivity_fix', 'mail_test'],
     ],
 
     /*

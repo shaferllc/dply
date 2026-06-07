@@ -23,16 +23,19 @@
             'cache' => __('Cache'),
             'session' => __('Sessions'),
             'storage' => __('Object storage'),
+            'logging' => __('Logging'),
+            'mail' => __('Mail'),
             'scheduler' => __('Scheduler'),
             'workers' => __('Workers'),
             'publication' => __('Publication'),
+            'broadcasting' => __('Broadcasting'),
         ];
-        // Connection resources (database, redis, queue, storage) now surface
-        // inline with the variables above as managed rows, so this card carries
-        // only the runtime resources that don't map to env vars.
+        // Connection resources (database, redis, queue, storage) and logging
+        // surface elsewhere (inline with env vars, or on the Logs tab), so this
+        // card carries only the runtime resources that don't map to env vars.
         $resourceBindings = array_values(array_filter(
             $siteBindings,
-            fn ($b) => ! in_array($b->type, ['database', 'redis', 'queue', 'cache', 'session', 'storage'], true),
+            fn ($b) => ! in_array($b->type, ['database', 'redis', 'queue', 'cache', 'session', 'storage', 'logging', 'mail', 'broadcasting'], true),
         ));
     @endphp
     @if ($resourceBindings !== [])
@@ -130,7 +133,7 @@
     <x-modal name="site-binding-modal" maxWidth="2xl" overlayClass="bg-brand-ink/40">
         @php $bindingModalLabel = $bindingTypeLabels[$bindingModalType] ?? str($bindingModalType)->replace('_', ' ')->title(); @endphp
         <div class="relative border-b border-brand-ink/10 px-6 py-5">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ $bindingModalMode === 'provision' ? __('Provision new') : __('Attach existing') }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ $bindingModalMode === 'provision' ? __('Provision new') : (in_array($bindingModalType, ['logging', 'mail', 'broadcasting']) ? __('Configure') : __('Attach existing')) }}</p>
             <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ $bindingModalLabel ?: __('Binding') }}</h2>
             <button type="button" x-on:click="$dispatch('close')" class="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist transition-colors hover:bg-brand-sand/40 hover:text-brand-ink focus:outline-none focus:ring-2 focus:ring-brand-sage/40" aria-label="{{ __('Close') }}">
                 <x-heroicon-o-x-mark class="h-5 w-5" />
@@ -152,9 +155,42 @@
                 </div>
             @endif
             @if ($bindingModalType === 'database' && $bindingModalMode === 'attach')
+                @php
+                    // Derive the selected engine from the targets list so we can gate
+                    // engine-specific advanced fields without a separate round-trip.
+                    $selectedDbTarget = collect($bindingTargets)->firstWhere('id', $bindingForm['target_id'] ?? '');
+                    $selectedDbEngine = $selectedDbTarget['engine'] ?? null;
+                    $dbIsMysql = in_array($selectedDbEngine, ['mysql', 'mariadb'], true);
+                    $dbIsPgsql = $selectedDbEngine === 'postgres';
+
+                    // Pre-open sections when re-editing a binding that already had them.
+                    $dbHasReplica = ($bindingForm['read_replica_type'] ?? '') !== '';
+                    $dbHasAdvanced =
+                        ($bindingForm['db_prefix'] ?? '') !== '' ||
+                        ($bindingForm['db_charset'] ?? '') !== '' ||
+                        ($bindingForm['db_collation'] ?? '') !== '' ||
+                        ($bindingForm['db_strict'] ?? '') !== '' ||
+                        ($bindingForm['db_engine'] ?? '') !== '' ||
+                        ($bindingForm['db_socket'] ?? '') !== '' ||
+                        ($bindingForm['db_schema'] ?? '') !== '' ||
+                        ($bindingForm['db_sslmode'] ?? '') !== '' ||
+                        ($bindingForm['db_timezone'] ?? '') !== '';
+
+                    // config/database.php snippet for read/write split wiring.
+                    $dbConnKey = $selectedDbEngine === 'postgres' ? 'pgsql' : 'mysql';
+                    $dbReadWriteSnippet = "'{$dbConnKey}' => [\n"
+                        . "    'read'   => ['host' => [env('DB_READ_HOST', env('DB_HOST'))]],\n"
+                        . "    'write'  => ['host' => [env('DB_HOST')]],\n"
+                        . "    'sticky' => env('DB_STICKY', true),\n"
+                        . "    // … keep your existing keys\n"
+                        . "],";
+                @endphp
+                <div x-data="{ replica: @js($dbHasReplica), advanced: @js($dbHasAdvanced) }" class="space-y-4">
+
+                {{-- Primary database --}}
                 <div>
                     <x-input-label for="binding_db_target" :value="__('Database')" />
-                    <select id="binding_db_target" wire:model="bindingForm.target_id" class="dply-input">
+                    <select id="binding_db_target" wire:model.live="bindingForm.target_id" class="dply-input">
                         <option value="">{{ __('Choose a database…') }}</option>
                         @foreach ($bindingTargets as $target)
                             <option value="{{ $target['id'] }}">{{ $target['label'] }}</option>
@@ -169,6 +205,159 @@
                     @else
                         <p class="mt-2 text-xs text-brand-moss">{{ __('Lists databases on this server and on peers in the same private network. Injects DATABASE_URL and DB_* at deploy — peers connect over the private IP, so the database must allow remote access from this server.') }}</p>
                     @endif
+                </div>
+
+                @if ($bindingTargets !== [])
+                {{-- Read replica --}}
+                <div class="border-t border-brand-ink/10 pt-4">
+                    <label class="flex cursor-pointer select-none items-center gap-2 text-sm">
+                        <input type="checkbox" x-model="replica"
+                            x-on:change="if (!replica) { $wire.set('bindingForm.read_replica_type', '') }"
+                            class="rounded border-brand-ink/20 text-brand-forest shadow-sm focus:ring-brand-sage/30" />
+                        <span class="font-medium text-brand-ink">{{ __('Add read replica') }}</span>
+                        <span class="text-xs text-brand-moss">{{ __('(read/write split)') }}</span>
+                    </label>
+
+                    <div x-show="replica" class="mt-4 space-y-4">
+                        <div>
+                            <x-input-label :value="__('Replica source')" />
+                            <div class="mt-1 inline-flex rounded-lg border border-brand-ink/15 bg-brand-sand/30 p-0.5 text-xs font-semibold">
+                                <button type="button" wire:click="$set('bindingForm.read_replica_type', 'managed')"
+                                    class="rounded-md px-3 py-1.5 transition-colors {{ ($bindingForm['read_replica_type'] ?? '') === 'managed' ? 'bg-white text-brand-ink shadow-sm' : 'text-brand-moss hover:text-brand-ink' }}">
+                                    {{ __('Managed database') }}
+                                </button>
+                                <button type="button" wire:click="$set('bindingForm.read_replica_type', 'manual')"
+                                    class="rounded-md px-3 py-1.5 transition-colors {{ ($bindingForm['read_replica_type'] ?? '') === 'manual' ? 'bg-white text-brand-ink shadow-sm' : 'text-brand-moss hover:text-brand-ink' }}">
+                                    {{ __('Custom host') }}
+                                </button>
+                            </div>
+                        </div>
+
+                        @if (($bindingForm['read_replica_type'] ?? '') === 'managed')
+                            <div>
+                                <x-input-label for="binding_db_replica_id" :value="__('Replica database')" />
+                                <select id="binding_db_replica_id" wire:model="bindingForm.read_replica_id" class="dply-input">
+                                    <option value="">{{ __('Choose a replica…') }}</option>
+                                    @foreach ($bindingTargets as $target)
+                                        @if ($target['id'] !== ($bindingForm['target_id'] ?? ''))
+                                            <option value="{{ $target['id'] }}">{{ $target['label'] }}</option>
+                                        @endif
+                                    @endforeach
+                                </select>
+                                <p class="mt-1.5 text-xs text-brand-moss">{{ __('dply resolves the host automatically (loopback or private IP, same as the primary). Credentials are shared unless the replica DB uses different ones.') }}</p>
+                            </div>
+                        @elseif (($bindingForm['read_replica_type'] ?? '') === 'manual')
+                            <div>
+                                <x-input-label for="binding_db_replica_host" :value="__('Replica host')" />
+                                <x-text-input id="binding_db_replica_host" wire:model="bindingForm.read_replica_host" class="mt-1 block w-full font-mono text-sm" placeholder="10.0.0.5" />
+                                <p class="mt-1.5 text-xs text-brand-moss">{{ __('The IP or hostname your app server can reach the replica at.') }}</p>
+                            </div>
+                        @endif
+
+                        @if (($bindingForm['read_replica_type'] ?? '') !== '')
+                            <div class="grid gap-4 sm:grid-cols-2">
+                                @if (($bindingForm['read_replica_type'] ?? '') === 'manual')
+                                    <div>
+                                        <x-input-label for="binding_db_replica_port" :value="__('Port (optional)')" />
+                                        <x-text-input id="binding_db_replica_port" wire:model="bindingForm.read_replica_port" class="mt-1 block w-full font-mono text-sm" placeholder="{{ __('same as primary') }}" />
+                                    </div>
+                                @endif
+                                <div>
+                                    <x-input-label for="binding_db_replica_user" :value="__('Username (optional)')" />
+                                    <x-text-input id="binding_db_replica_user" wire:model="bindingForm.read_replica_username" class="mt-1 block w-full font-mono text-sm" placeholder="{{ __('same as primary') }}" />
+                                </div>
+                                <div>
+                                    <x-input-label for="binding_db_replica_pass" :value="__('Password (optional)')" />
+                                    <x-text-input id="binding_db_replica_pass" type="password" wire:model="bindingForm.read_replica_password" class="mt-1 block w-full font-mono text-sm" placeholder="{{ __('same as primary') }}" autocomplete="new-password" />
+                                </div>
+                            </div>
+                            <div>
+                                <p class="mb-1.5 text-xs text-brand-moss">{{ __('Injects DB_READ_HOST (+ DB_READ_PORT, DB_READ_USERNAME, DB_READ_PASSWORD when they differ) and DB_STICKY=true. Wire up the split in config/database.php:') }}</p>
+                                <pre class="overflow-x-auto rounded-lg border border-brand-ink/10 bg-brand-sand/20 p-3 font-mono text-[11px] leading-relaxed text-brand-ink">{{ $dbReadWriteSnippet }}</pre>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- Advanced options --}}
+                <div class="border-t border-brand-ink/10 pt-4">
+                    <button type="button" x-on:click="advanced = !advanced"
+                        class="flex w-full items-center justify-between text-left text-sm font-medium text-brand-ink hover:text-brand-forest">
+                        <span>{{ __('Advanced options') }}</span>
+                        <x-heroicon-o-chevron-down class="h-4 w-4 transition-transform duration-150" x-bind:class="{ 'rotate-180': advanced }" />
+                    </button>
+
+                    <div x-show="advanced" class="mt-4 space-y-4">
+                        {{-- Common: prefix + timezone (all engines) --}}
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <x-input-label for="binding_db_prefix" :value="__('Table prefix (DB_PREFIX)')" />
+                                <x-text-input id="binding_db_prefix" wire:model="bindingForm.db_prefix" class="mt-1 block w-full font-mono text-sm" placeholder="{{ __('none') }}" />
+                            </div>
+                            <div>
+                                <x-input-label for="binding_db_timezone" :value="__('Timezone (DB_TIMEZONE)')" />
+                                <x-text-input id="binding_db_timezone" wire:model="bindingForm.db_timezone" class="mt-1 block w-full font-mono text-sm" placeholder="UTC" />
+                            </div>
+                        </div>
+
+                        @if ($dbIsMysql)
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <x-input-label for="binding_db_charset" :value="__('Charset (DB_CHARSET)')" />
+                                <x-text-input id="binding_db_charset" wire:model="bindingForm.db_charset" class="mt-1 block w-full font-mono text-sm" placeholder="utf8mb4" />
+                            </div>
+                            <div>
+                                <x-input-label for="binding_db_collation" :value="__('Collation (DB_COLLATION)')" />
+                                <x-text-input id="binding_db_collation" wire:model="bindingForm.db_collation" class="mt-1 block w-full font-mono text-sm" placeholder="utf8mb4_unicode_ci" />
+                            </div>
+                            <div>
+                                <x-input-label for="binding_db_strict" :value="__('Strict mode (DB_STRICT)')" />
+                                <select id="binding_db_strict" wire:model="bindingForm.db_strict" class="dply-input">
+                                    <option value="">{{ __('Use default (true)') }}</option>
+                                    <option value="true">true</option>
+                                    <option value="false">{{ __('false — legacy apps') }}</option>
+                                </select>
+                            </div>
+                            <div>
+                                <x-input-label for="binding_db_engine_type" :value="__('Storage engine (DB_ENGINE)')" />
+                                <x-text-input id="binding_db_engine_type" wire:model="bindingForm.db_engine" class="mt-1 block w-full font-mono text-sm" placeholder="InnoDB" />
+                            </div>
+                            <div class="sm:col-span-2">
+                                <x-input-label for="binding_db_socket" :value="__('Unix socket path (DB_SOCKET)')" />
+                                <x-text-input id="binding_db_socket" wire:model="bindingForm.db_socket" class="mt-1 block w-full font-mono text-sm" placeholder="{{ __('leave blank to use TCP') }}" />
+                                <p class="mt-1 text-xs text-brand-moss">{{ __('Only set when the app and database are on the same box and you want socket instead of TCP.') }}</p>
+                            </div>
+                        </div>
+                        @elseif ($dbIsPgsql)
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <x-input-label for="binding_db_charset" :value="__('Charset (DB_CHARSET)')" />
+                                <x-text-input id="binding_db_charset" wire:model="bindingForm.db_charset" class="mt-1 block w-full font-mono text-sm" placeholder="utf8" />
+                            </div>
+                            <div>
+                                <x-input-label for="binding_db_schema" :value="__('Schema (DB_SCHEMA)')" />
+                                <x-text-input id="binding_db_schema" wire:model="bindingForm.db_schema" class="mt-1 block w-full font-mono text-sm" placeholder="public" />
+                            </div>
+                            <div class="sm:col-span-2">
+                                <x-input-label for="binding_db_sslmode" :value="__('SSL mode (DB_SSLMODE)')" />
+                                <select id="binding_db_sslmode" wire:model="bindingForm.db_sslmode" class="dply-input">
+                                    <option value="">{{ __('Use default (prefer)') }}</option>
+                                    <option value="disable">disable</option>
+                                    <option value="allow">allow</option>
+                                    <option value="prefer">prefer</option>
+                                    <option value="require">require</option>
+                                    <option value="verify-ca">verify-ca</option>
+                                    <option value="verify-full">verify-full</option>
+                                </select>
+                            </div>
+                        </div>
+                        @elseif ($selectedDbEngine === null)
+                        <p class="text-xs italic text-brand-moss">{{ __('Select a database above to see engine-specific options (charset, strict mode, SSL mode, etc.).') }}</p>
+                        @endif
+                    </div>
+                </div>
+                @endif
+
                 </div>
             @elseif ($bindingModalType === 'database' && $bindingModalMode === 'provision')
                 <div class="grid gap-4 sm:grid-cols-2">
@@ -275,7 +464,7 @@
                         <x-text-input id="binding_session_domain" wire:model="bindingForm.domain" class="mt-1 block w-full font-mono text-sm" placeholder="{{ __('current host') }}" />
                     </div>
                 </div>
-                <p class="text-xs text-brand-moss">{{ __('Injects the SESSION_* keys you set; blank fields fall back to the framework default. The redis driver needs the Redis resource connected too. Changing the driver, encryption or cookie path/domain signs out active sessions on the next deploy.') }}</p>
+                <p class="text-xs text-brand-moss">{{ __('Injects the full session configuration — every SESSION_* key, using the framework default for any field left on "use default". The redis driver needs the Redis resource connected too. Changing the driver, encryption or cookie path/domain signs out active sessions on the next deploy.') }}</p>
             @elseif ($bindingModalType === 'storage' && $bindingModalMode === 'provision')
                 @php
                     $osProviders = (array) config('object_storage.providers', []);
@@ -401,6 +590,33 @@
                     <p class="text-xs text-brand-moss">{{ __('Custom S3 storage needs the endpoint of your provider (path-style or virtual-hosted).') }}</p>
                 @endif
                 <p class="text-xs text-brand-moss">{{ __('Injects FILESYSTEM_DISK=s3 and the AWS_* connection variables at deploy.') }}</p>
+            @elseif ($bindingModalType === 'logging')
+                @php $logProvider = (string) ($bindingForm['provider'] ?? 'papertrail'); @endphp
+                <div class="space-y-4">
+                    <div>
+                        <x-input-label for="binding_log_provider" :value="__('Provider')" />
+                        <select id="binding_log_provider" wire:model.live="bindingForm.provider" class="dply-input">
+                            <option value="papertrail">{{ __('Papertrail') }}</option>
+                            <option value="logtail">{{ __('Logtail / Better Stack') }}</option>
+                            <option value="syslog">{{ __('Generic syslog') }}</option>
+                            <option value="dply_realtime">{{ __('dply Realtime (managed)') }}</option>
+                        </select>
+                    </div>
+                    @if ($logProvider === 'dply_realtime')
+                        <p class="text-xs text-brand-moss">{{ __('dply provides the logging endpoint — no credentials needed. Injects LOG_CHANNEL=papertrail pointing at the dply-managed syslog endpoint.') }}</p>
+                    @else
+                        @include('livewire.sites.settings.partials.environment.log-drain-credential-fields', ['logProvider' => $logProvider])
+                        <p class="text-xs text-brand-moss">
+                            @if ($logProvider === 'papertrail')
+                                {{ __('Injects LOG_CHANNEL=papertrail and PAPERTRAIL_URL / PAPERTRAIL_PORT at deploy.') }}
+                            @elseif ($logProvider === 'logtail')
+                                {{ __('Injects LOG_CHANNEL=stack, LOG_STACK=single,logtail, and LOGTAIL_SOURCE_TOKEN at deploy.') }}
+                            @elseif ($logProvider === 'syslog')
+                                {{ __('Injects LOG_CHANNEL=syslog at deploy.') }}
+                            @endif
+                        </p>
+                    @endif
+                </div>
             @elseif ($bindingModalType === 'redis')
                 @php
                     $existingCacheService = \App\Models\ServerCacheService::query()
@@ -466,6 +682,273 @@
                         @endif
                     @endif
                 </div>
+            @elseif ($bindingModalType === 'mail')
+                @php
+                    $mailProvider = (string) ($bindingForm['provider'] ?? 'smtp');
+                    $mailIsChain = in_array($mailProvider, ['failover', 'roundrobin'], true);
+                @endphp
+                <div class="space-y-4">
+                    <div>
+                        <x-input-label for="binding_mail_provider" :value="__('Provider')" />
+                        <select id="binding_mail_provider" wire:model.live="bindingForm.provider" class="dply-input">
+                            <option value="smtp">{{ __('SMTP (any host)') }}</option>
+                            <option value="mailgun">{{ __('Mailgun') }}</option>
+                            <option value="postmark">{{ __('Postmark') }}</option>
+                            <option value="ses">{{ __('Amazon SES') }}</option>
+                            <option value="resend">{{ __('Resend') }}</option>
+                            <option value="log">{{ __('Log (no delivery — dev/staging)') }}</option>
+                            <option value="failover">{{ __('Failover (primary + backups)') }}</option>
+                            <option value="roundrobin">{{ __('Round-robin (load balance)') }}</option>
+                        </select>
+                    </div>
+
+                    @if ($mailIsChain)
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <x-input-label for="binding_mail_from" :value="__('From address')" />
+                                <x-text-input id="binding_mail_from" type="email" wire:model="bindingForm.from_address" class="mt-1 block w-full font-mono text-sm" placeholder="hello@example.com" />
+                            </div>
+                            <div>
+                                <x-input-label for="binding_mail_fromname" :value="__('From name (optional)')" />
+                                <x-text-input id="binding_mail_fromname" wire:model="bindingForm.from_name" class="mt-1 block w-full text-sm" placeholder="{{ $site->name }}" />
+                            </div>
+                        </div>
+
+                        <div>
+                            <x-input-label :value="$mailProvider === 'failover' ? __('Mailers (tried in order, top first)') : __('Mailers (load balanced)')" />
+                            <div class="mt-2 space-y-3">
+                                @foreach (($bindingForm['legs'] ?? []) as $legIndex => $leg)
+                                    @include('livewire.sites.settings.partials.environment.mail-leg-fields', ['legIndex' => $legIndex])
+                                @endforeach
+                            </div>
+                            <button type="button" wire:click="addMailLeg" class="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                <x-heroicon-o-plus class="h-3.5 w-3.5" /> {{ __('Add mailer') }}
+                            </button>
+                        </div>
+
+                        {{-- The chain ORDER can't be injected via env — it lives in
+                             config/mail.php. Show the exact snippet to paste. --}}
+                        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                            <p class="font-semibold">{{ __('One-time app change required') }}</p>
+                            <p class="mt-1">{{ __('dply injects MAIL_MAILER and every mailer\'s credentials, but the chain order must be defined in your app\'s config/mail.php. Add (or merge) this:') }}</p>
+                            <pre class="mt-2 overflow-x-auto rounded-md bg-white/70 p-3 font-mono text-[11px] leading-relaxed text-brand-ink">{{ $this->mailFailoverSnippet($mailProvider, $bindingForm['legs'] ?? []) }}</pre>
+                        </div>
+                        <p class="text-xs text-brand-moss">{{ __('Sets MAIL_MAILER=:t and injects each mailer\'s credentials + the from-address at deploy. A chain can include at most one SMTP mailer.', ['t' => $mailProvider]) }}</p>
+                    @elseif ($mailProvider !== 'log')
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <x-input-label for="binding_mail_from" :value="__('From address')" />
+                                <x-text-input id="binding_mail_from" type="email" wire:model="bindingForm.from_address" class="mt-1 block w-full font-mono text-sm" placeholder="hello@example.com" />
+                            </div>
+                            <div>
+                                <x-input-label for="binding_mail_fromname" :value="__('From name (optional)')" />
+                                <x-text-input id="binding_mail_fromname" wire:model="bindingForm.from_name" class="mt-1 block w-full text-sm" placeholder="{{ $site->name }}" />
+                            </div>
+                        </div>
+
+                        @include('livewire.sites.settings.partials.environment.mail-credential-fields', ['mailProvider' => $mailProvider])
+
+                        <p class="text-xs text-brand-moss">
+                            @if ($mailProvider === 'smtp')
+                                {{ __('Injects MAIL_MAILER=smtp, MAIL_HOST / MAIL_PORT, MAIL_USERNAME / MAIL_PASSWORD, MAIL_ENCRYPTION, and the from-address at deploy.') }}
+                            @elseif ($mailProvider === 'mailgun')
+                                {{ __('Injects MAIL_MAILER=mailgun, MAILGUN_DOMAIN / MAILGUN_SECRET / MAILGUN_ENDPOINT, and the from-address at deploy.') }}
+                            @elseif ($mailProvider === 'postmark')
+                                {{ __('Injects MAIL_MAILER=postmark, POSTMARK_TOKEN, and the from-address at deploy.') }}
+                            @elseif ($mailProvider === 'ses')
+                                {{ __('Injects MAIL_MAILER=ses, the AWS_* credentials, and the from-address at deploy.') }}
+                            @elseif ($mailProvider === 'resend')
+                                {{ __('Injects MAIL_MAILER=resend, RESEND_KEY, and the from-address at deploy.') }}
+                            @endif
+                        </p>
+                    @else
+                        <p class="text-xs text-brand-moss">{{ __('Injects MAIL_MAILER=log — mail is written to the application log instead of being delivered. Useful for dev/staging.') }}</p>
+                    @endif
+                </div>
+            @elseif ($bindingModalType === 'broadcasting')
+                @php
+                    $bcKind = (string) ($bindingForm['kind'] ?? 'managed');
+                    $bcProvision = (bool) ($bindingForm['provision'] ?? false);
+                    $bcDriver = (string) ($bindingForm['driver'] ?? 'pusher');
+                    $bcTiers = $this->broadcastingTiers();
+                    $bcTier = (string) ($bindingForm['tier'] ?? array_key_first($bcTiers));
+                    $bcTierPrice = number_format((($bcTiers[$bcTier]['price_cents'] ?? 0) / 100), 2);
+                @endphp
+                <div class="space-y-4">
+                    {{-- Managed (dply relay) vs bring-your-own. Self-hosted Reverb
+                         on the VM is orchestrated separately (coming next). --}}
+                    <div class="inline-flex rounded-lg border border-brand-ink/15 bg-brand-sand/30 p-0.5 text-xs font-semibold">
+                        <button type="button" wire:click="$set('bindingForm.kind', 'managed')" class="rounded-md px-3 py-1.5 transition-colors {{ $bcKind === 'managed' ? 'bg-white text-brand-ink shadow-sm' : 'text-brand-moss hover:text-brand-ink' }}">
+                            {{ __('dply realtime') }}
+                        </button>
+                        <button type="button" wire:click="$set('bindingForm.kind', 'byo')" class="rounded-md px-3 py-1.5 transition-colors {{ $bcKind === 'byo' ? 'bg-white text-brand-ink shadow-sm' : 'text-brand-moss hover:text-brand-ink' }}">
+                            {{ __('Bring your own') }}
+                        </button>
+                    </div>
+
+                    @if ($bcKind === 'managed')
+                        {{-- Attach an existing app (share across sites) vs provision
+                             a new, billed one. --}}
+                        <div class="inline-flex rounded-lg border border-brand-ink/15 bg-brand-sand/30 p-0.5 text-xs font-semibold">
+                            <button type="button" wire:click="$set('bindingForm.provision', false)" class="rounded-md px-3 py-1.5 transition-colors {{ ! $bcProvision ? 'bg-white text-brand-ink shadow-sm' : 'text-brand-moss hover:text-brand-ink' }}">
+                                {{ __('Attach existing') }}
+                            </button>
+                            <button type="button" wire:click="$set('bindingForm.provision', true)" class="rounded-md px-3 py-1.5 transition-colors {{ $bcProvision ? 'bg-white text-brand-ink shadow-sm' : 'text-brand-moss hover:text-brand-ink' }}">
+                                {{ __('Provision new') }}
+                            </button>
+                        </div>
+
+                        @if (! $bcProvision)
+                            <div>
+                                <x-input-label for="binding_bc_app" :value="__('Broadcasting app')" />
+                                <select id="binding_bc_app" wire:model="bindingForm.realtime_app_id" class="dply-input">
+                                    <option value="">{{ __('Choose an app…') }}</option>
+                                    @foreach ($bindingTargets as $target)
+                                        <option value="{{ $target['id'] }}">{{ $target['label'] }}</option>
+                                    @endforeach
+                                </select>
+                                @if ($bindingTargets === [])
+                                    <p class="mt-2 text-xs text-brand-moss">{{ __('No managed broadcasting apps yet — provision a new one.') }}</p>
+                                    <button type="button" wire:click="$set('bindingForm.provision', true)" class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
+                                        <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                                        {{ __('Provision new app') }}
+                                    </button>
+                                @else
+                                    <p class="mt-2 text-xs text-brand-moss">{{ __('Attaching an existing app reuses it (and its existing charge) across sites. Injects BROADCAST_CONNECTION=pusher and the PUSHER_* + VITE_PUSHER_* variables at deploy.') }}</p>
+                                @endif
+                            </div>
+                        @else
+                            <div>
+                                <x-input-label for="binding_bc_name" :value="__('App name (optional)')" />
+                                <x-text-input id="binding_bc_name" wire:model="bindingForm.app_name" class="mt-1 block w-full text-sm" placeholder="{{ $site->name }}" />
+                            </div>
+                            <div>
+                                <x-input-label :value="__('Connection tier')" />
+                                <div class="mt-1 grid gap-2 sm:grid-cols-3">
+                                    @foreach ($bcTiers as $slug => $tier)
+                                        <button type="button" wire:click="$set('bindingForm.tier', '{{ $slug }}')" class="rounded-lg border p-3 text-left transition-colors {{ $bcTier === $slug ? 'border-brand-forest bg-brand-forest/5 ring-1 ring-brand-forest/40' : 'border-brand-ink/10 hover:bg-brand-sand/30' }}">
+                                            <div class="text-sm font-semibold text-brand-ink">{{ $tier['label'] }}</div>
+                                            <div class="mt-0.5 text-[11px] text-brand-moss">{{ number_format($tier['max_connections']) }} {{ __('connections') }}</div>
+                                            <div class="mt-1 text-xs font-semibold text-brand-forest">${{ number_format($tier['price_cents'] / 100, 2) }}/{{ __('mo') }}</div>
+                                        </button>
+                                    @endforeach
+                                </div>
+                            </div>
+                            <label class="flex items-start gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2.5 text-xs text-brand-moss">
+                                <input type="checkbox" wire:model="bindingForm.confirm_charge" class="mt-0.5 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" />
+                                <span>{{ __('I understand this provisions a managed broadcasting app and adds $:price/mo to this workspace\'s bill.', ['price' => $bcTierPrice]) }}</span>
+                            </label>
+                            <p class="text-xs text-brand-moss">{{ __('dply provisions the app on the Cloudflare relay and injects BROADCAST_CONNECTION=pusher plus the PUSHER_* + VITE_PUSHER_* variables at deploy.') }}</p>
+                        @endif
+                    @else
+                        {{-- Bring your own: free-form driver + credentials. --}}
+                        <div>
+                            <x-input-label for="binding_bc_driver" :value="__('Driver')" />
+                            <select id="binding_bc_driver" wire:model.live="bindingForm.driver" class="dply-input">
+                                <option value="pusher">{{ __('Pusher (Pusher Cloud or self-hosted Reverb)') }}</option>
+                                <option value="reverb">{{ __('Reverb (native variables)') }}</option>
+                                <option value="ably">{{ __('Ably') }}</option>
+                                <option value="log">{{ __('Log (no broadcast — dev/staging)') }}</option>
+                                <option value="null">{{ __('Null (disabled)') }}</option>
+                            </select>
+                        </div>
+
+                        @if ($bcDriver === 'pusher')
+                            <div class="grid gap-4 sm:grid-cols-2">
+                                <div>
+                                    <x-input-label for="binding_bc_p_id" :value="__('App ID')" />
+                                    <x-text-input id="binding_bc_p_id" wire:model="bindingForm.pusher_app_id" class="mt-1 block w-full font-mono text-sm" />
+                                </div>
+                                <div>
+                                    <x-input-label for="binding_bc_p_key" :value="__('App key')" />
+                                    <x-text-input id="binding_bc_p_key" wire:model="bindingForm.pusher_app_key" class="mt-1 block w-full font-mono text-sm" />
+                                </div>
+                                <div>
+                                    <x-input-label for="binding_bc_p_secret" :value="__('App secret')" />
+                                    <x-text-input id="binding_bc_p_secret" type="password" wire:model="bindingForm.pusher_app_secret" class="mt-1 block w-full font-mono text-sm" />
+                                </div>
+                                <div>
+                                    <x-input-label for="binding_bc_p_cluster" :value="__('Cluster (Pusher Cloud)')" />
+                                    <x-text-input id="binding_bc_p_cluster" wire:model="bindingForm.pusher_cluster" class="mt-1 block w-full font-mono text-sm" placeholder="mt1" />
+                                </div>
+                                <div>
+                                    <x-input-label for="binding_bc_p_host" :value="__('Host (self-hosted, optional)')" />
+                                    <x-text-input id="binding_bc_p_host" wire:model="bindingForm.pusher_host" class="mt-1 block w-full font-mono text-sm" placeholder="ws.example.com" />
+                                </div>
+                                <div>
+                                    <x-input-label for="binding_bc_p_port" :value="__('Port (optional)')" />
+                                    <x-text-input id="binding_bc_p_port" wire:model="bindingForm.pusher_port" class="mt-1 block w-full font-mono text-sm" placeholder="443" />
+                                </div>
+                                <div>
+                                    <x-input-label for="binding_bc_p_scheme" :value="__('Scheme')" />
+                                    <select id="binding_bc_p_scheme" wire:model="bindingForm.pusher_scheme" class="dply-input">
+                                        <option value="https">https</option>
+                                        <option value="http">http</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <p class="text-xs text-brand-moss">{{ __('Injects BROADCAST_CONNECTION=pusher, the PUSHER_* variables, and the VITE_PUSHER_* mirror (key/host/port/scheme/cluster — never the secret) for Laravel Echo.') }}</p>
+                        @elseif ($bcDriver === 'reverb')
+                            <div class="grid gap-4 sm:grid-cols-2">
+                                <div>
+                                    <x-input-label for="binding_bc_r_id" :value="__('App ID')" />
+                                    <x-text-input id="binding_bc_r_id" wire:model="bindingForm.reverb_app_id" class="mt-1 block w-full font-mono text-sm" />
+                                </div>
+                                <div>
+                                    <x-input-label for="binding_bc_r_key" :value="__('App key')" />
+                                    <x-text-input id="binding_bc_r_key" wire:model="bindingForm.reverb_app_key" class="mt-1 block w-full font-mono text-sm" />
+                                </div>
+                                <div>
+                                    <x-input-label for="binding_bc_r_secret" :value="__('App secret')" />
+                                    <x-text-input id="binding_bc_r_secret" type="password" wire:model="bindingForm.reverb_app_secret" class="mt-1 block w-full font-mono text-sm" />
+                                </div>
+                                <div>
+                                    <x-input-label for="binding_bc_r_host" :value="__('Host')" />
+                                    <x-text-input id="binding_bc_r_host" wire:model="bindingForm.reverb_host" class="mt-1 block w-full font-mono text-sm" placeholder="ws.example.com" />
+                                </div>
+                                <div>
+                                    <x-input-label for="binding_bc_r_port" :value="__('Port (optional)')" />
+                                    <x-text-input id="binding_bc_r_port" wire:model="bindingForm.reverb_port" class="mt-1 block w-full font-mono text-sm" placeholder="443" />
+                                </div>
+                                <div>
+                                    <x-input-label for="binding_bc_r_scheme" :value="__('Scheme')" />
+                                    <select id="binding_bc_r_scheme" wire:model="bindingForm.reverb_scheme" class="dply-input">
+                                        <option value="https">https</option>
+                                        <option value="http">http</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <p class="text-xs text-brand-moss">{{ __('Injects BROADCAST_CONNECTION=reverb, the REVERB_* variables, and the VITE_REVERB_* mirror for Laravel Echo.') }}</p>
+                        @elseif ($bcDriver === 'ably')
+                            <div>
+                                <x-input-label for="binding_bc_ably" :value="__('Ably key')" />
+                                <x-text-input id="binding_bc_ably" type="password" wire:model="bindingForm.ably_key" class="mt-1 block w-full font-mono text-sm" placeholder="xVLyHw.abc123:..." />
+                            </div>
+                            <p class="text-xs text-brand-moss">{{ __('Injects BROADCAST_CONNECTION=ably and ABLY_KEY at deploy.') }}</p>
+                        @else
+                            <p class="text-xs text-brand-moss">{{ __('Sets BROADCAST_CONNECTION only — no broadcaster credentials. Use for dev/staging or to disable broadcasting.') }}</p>
+                        @endif
+                    @endif
+
+                    <details class="rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2.5">
+                        <summary class="cursor-pointer text-xs font-semibold text-brand-ink">{{ __('Using a pre-Laravel 11 app? config/broadcasting.php snippet') }}</summary>
+                        <pre class="mt-2 overflow-x-auto rounded bg-brand-ink/90 p-3 text-[11px] leading-relaxed text-brand-cream"><code>'pusher' => [
+    'driver' => 'pusher',
+    'key' => env('PUSHER_APP_KEY'),
+    'secret' => env('PUSHER_APP_SECRET'),
+    'app_id' => env('PUSHER_APP_ID'),
+    'options' => [
+        'cluster' => env('PUSHER_APP_CLUSTER'),
+        'host' => env('PUSHER_HOST'),
+        'port' => env('PUSHER_PORT'),
+        'scheme' => env('PUSHER_SCHEME'),
+        'encrypted' => true,
+        'useTLS' => true,
+    ],
+],</code></pre>
+                        <p class="mt-2 text-[11px] text-brand-moss">{{ __('Laravel 11+ already ships these host/port/scheme options — no change needed.') }}</p>
+                    </details>
+                </div>
             @else
                 <p class="text-sm text-brand-moss">{{ __('Records this binding so deploy preflight treats it as configured.') }}</p>
             @endif
@@ -474,7 +957,7 @@
         <div class="flex items-center justify-end gap-2 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
             <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
             <x-primary-button type="button" wire:click="saveBinding" wire:loading.attr="disabled" wire:target="saveBinding">
-                <span wire:loading.remove wire:target="saveBinding">{{ $bindingModalMode === 'provision' ? __('Provision') : __('Attach') }}</span>
+                <span wire:loading.remove wire:target="saveBinding">{{ $bindingModalMode === 'provision' ? __('Provision') : (in_array($bindingModalType, ['cache', 'queue', 'session', 'logging', 'mail', 'broadcasting']) ? __('Save') : __('Attach')) }}</span>
                 <span wire:loading wire:target="saveBinding" class="inline-flex items-center gap-1.5"><span class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
             </x-primary-button>
         </div>

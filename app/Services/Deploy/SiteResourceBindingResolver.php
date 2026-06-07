@@ -122,6 +122,7 @@ final class SiteResourceBindingResolver
         $bindings[] = $this->queueBinding($env);
         $bindings[] = $this->cacheBinding($env);
         $bindings[] = $this->objectStorageBinding($env);
+        $bindings[] = $this->broadcastingBinding($env);
 
         // A persisted SiteBinding (an explicit operator attach/provision) is
         // authoritative: it replaces the derived inference for its type so the
@@ -325,6 +326,25 @@ final class SiteResourceBindingResolver
             source: 'environment',
             name: null,
             config: ['reason' => $reason],
+        );
+    }
+
+    /**
+     * @param  array<string, string>  $env
+     */
+    private function broadcastingBinding(array $env): SiteResourceBinding
+    {
+        $driver = strtolower(trim((string) ($env['BROADCAST_CONNECTION'] ?? '')));
+        $configured = in_array($driver, ['pusher', 'reverb', 'ably'], true);
+
+        return new SiteResourceBinding(
+            type: 'broadcasting',
+            mode: 'attach_existing',
+            required: false,
+            status: $configured ? 'configured' : 'pending',
+            source: $driver !== '' ? 'environment' : 'deferred',
+            name: $configured ? 'broadcasting-'.$driver : null,
+            config: $driver !== '' ? ['driver' => $driver] : [],
         );
     }
 

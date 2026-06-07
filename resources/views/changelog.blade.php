@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 6, 2026',
+                    'tags'    => ['new'],
+                    'title'   => 'Mail And Log Drain Bindings',
+                    'summary' => 'Sites can now configure mail and log drain resources with per-provider credentials and server-side test email delivery, alongside tiered realtime apps.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
                     'tags'    => ['improved'],
                     'title'   => 'Streamline Site Environment Settings',
                     'summary' => 'The site environment settings page has been reorganized internally for faster loading and easier maintenance, with no change to available options.',

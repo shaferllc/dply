@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Sites can now configure mail and log drain resources with per-provider credentials and server-side test email delivery, alongside tiered realtime apps.
 ### Changed
 - The site environment settings page has been reorganized internally for faster loading and easier maintenance, with no change to available options.
 ### Added

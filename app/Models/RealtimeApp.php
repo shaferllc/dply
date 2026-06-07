@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Services\Realtime\RealtimeBackend;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -18,8 +19,8 @@ use Illuminate\Support\Str;
  * signs channel auth + REST publishes.
  *
  * Provisioning writes the credentials into the Worker's APPS KV namespace via a
- * {@see \App\Services\Realtime\RealtimeBackend}. Billed flat per active app — see
- * config('realtime.plan.price_cents').
+ * {@see RealtimeBackend}. Billed per active app by connection tier — see
+ * config('realtime.tiers') and {@see tierConfig()}.
  */
 class RealtimeApp extends Model
 {
@@ -40,6 +41,7 @@ class RealtimeApp extends Model
         'app_secret',
         'status',
         'backend',
+        'tier',
         'host',
         'max_connections',
         'peak_connections',
@@ -88,6 +90,48 @@ class RealtimeApp extends Model
     public function isBillable(): bool
     {
         return $this->status === self::STATUS_ACTIVE;
+    }
+
+    /** The app's connection tier slug, falling back to the configured default. */
+    public function tierSlug(): string
+    {
+        $tier = (string) ($this->tier ?? '');
+        $tiers = (array) config('realtime.tiers', []);
+
+        return array_key_exists($tier, $tiers)
+            ? $tier
+            : (string) config('realtime.default_tier', 'starter');
+    }
+
+    /**
+     * The resolved tier definition: ['label', 'max_connections', 'price_cents'].
+     *
+     * @return array{label: string, max_connections: int, price_cents: int}
+     */
+    public function tierConfig(): array
+    {
+        $tiers = (array) config('realtime.tiers', []);
+        $tier = (array) ($tiers[$this->tierSlug()] ?? []);
+
+        return [
+            'label' => (string) ($tier['label'] ?? ucfirst($this->tierSlug())),
+            'max_connections' => (int) ($tier['max_connections'] ?? config('realtime.plan.max_connections')),
+            'price_cents' => (int) ($tier['price_cents'] ?? config('realtime.plan.price_cents')),
+        ];
+    }
+
+    /** Hard connection cap for this app, derived from its tier. */
+    public function maxConnections(): int
+    {
+        // An explicitly-stored override wins (e.g. a comped/custom app); else the
+        // tier's cap. Keeps max_connections in sync with the tier on provision.
+        return (int) ($this->max_connections ?: $this->tierConfig()['max_connections']);
+    }
+
+    /** Monthly price in cents for this app's tier. */
+    public function priceCents(): int
+    {
+        return $this->tierConfig()['price_cents'];
     }
 
     public function host(): string
@@ -147,7 +191,7 @@ class RealtimeApp extends Model
             'key' => (string) $this->app_key,
             'secret' => (string) $this->app_secret,
             'enabled' => $this->status === self::STATUS_ACTIVE,
-            'maxConnections' => (int) ($this->max_connections ?? config('realtime.plan.max_connections')),
+            'maxConnections' => $this->maxConnections(),
         ];
     }
 }

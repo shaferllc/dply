@@ -174,7 +174,18 @@
         'cache' => __('Cache'),
         'session' => __('Sessions'),
         'storage' => __('Object storage'),
+        'mail' => __('Mail'),
     ];
+
+    // Show connected resources alphabetically by their display label (falling
+    // back to a title-cased type for ones without an explicit label, e.g.
+    // logging) instead of attach order, so the list stays predictable.
+    uasort($bindingManagedGroups, function (array $a, array $b) use ($bindingTypeLabelsInline): int {
+        $la = $bindingTypeLabelsInline[$a['type']] ?? (string) str($a['type'])->replace('_', ' ')->title();
+        $lb = $bindingTypeLabelsInline[$b['type']] ?? (string) str($b['type'])->replace('_', ' ')->title();
+
+        return strcasecmp($la, $lb);
+    });
 
     // Live search over key names + auto-derived prefix groups (APP, DB, AWS,
     // MAIL, REDIS, …) for one-click filtering.

@@ -32,6 +32,9 @@ class SiteBinding extends Model
         'storage',
         'cache',
         'session',
+        'logging',
+        'mail',
+        'broadcasting',
     ];
 
     public const STATUS_CONFIGURED = 'configured';

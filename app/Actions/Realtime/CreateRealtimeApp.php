@@ -17,11 +17,17 @@ use App\Services\Realtime\RealtimeBackendFactory;
 class CreateRealtimeApp
 {
     /**
-     * @param  array{name: string}  $data
+     * @param  array{name: string, tier?: string}  $data
      */
     public function handle(User $user, Organization $organization, array $data): RealtimeApp
     {
         $credentials = RealtimeApp::generateCredentials();
+
+        $tier = (string) ($data['tier'] ?? config('realtime.default_tier', 'starter'));
+        if (! array_key_exists($tier, (array) config('realtime.tiers', []))) {
+            $tier = (string) config('realtime.default_tier', 'starter');
+        }
+        $maxConnections = (int) config("realtime.tiers.{$tier}.max_connections", config('realtime.plan.max_connections'));
 
         $app = $organization->realtimeApps()->create([
             'name' => trim($data['name']),
@@ -29,8 +35,9 @@ class CreateRealtimeApp
             'app_secret' => $credentials['app_secret'],
             'status' => RealtimeApp::STATUS_PROVISIONING,
             'backend' => RealtimeBackendFactory::make()->providerKey(),
+            'tier' => $tier,
             'host' => (string) config('realtime.host'),
-            'max_connections' => (int) config('realtime.plan.max_connections'),
+            'max_connections' => $maxConnections,
         ]);
 
         ProvisionRealtimeAppJob::dispatch($app->id);

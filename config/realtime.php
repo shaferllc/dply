@@ -39,17 +39,32 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Plan defaults
+    | Connection tiers
     |--------------------------------------------------------------------------
-    | v1 ships a single flat tier. peak_connections is captured from day one
-    | (see the Worker's /stats endpoint) so connection-based tiers can drop in
-    | later without re-provisioning. `max_connections` is a soft guardrail
-    | surfaced in the UI; v1 does not hard-cut at the Worker.
+    | Each managed broadcasting app is billed per-tier. A tier maps a max
+    | concurrent-connection cap (enforced as a hard cap at the Worker via the
+    | KV `maxConnections` field) to a monthly price. peak_connections is still
+    | captured per window (see the Worker's /stats endpoint) so usage is visible
+    | for upgrade nudges. `default_tier` is what a freshly provisioned app gets.
+    */
+    'tiers' => [
+        'starter' => ['label' => 'Starter', 'max_connections' => 5000, 'price_cents' => 1500],
+        'growth' => ['label' => 'Growth', 'max_connections' => 25000, 'price_cents' => 4900],
+        'scale' => ['label' => 'Scale', 'max_connections' => 100000, 'price_cents' => 14900],
+    ],
+
+    'default_tier' => env('DPLY_REALTIME_DEFAULT_TIER', 'starter'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Plan defaults (legacy fallback)
+    |--------------------------------------------------------------------------
+    | Pre-tier callers still read these; they resolve to the default tier's
+    | values so a single source of truth (the tier table above) stays canonical.
     */
     'plan' => [
-        // $9.00 / app / month — see project_pricing_model + the realtime spec.
-        'price_cents' => (int) env('DPLY_REALTIME_PRICE_CENTS', 900),
-        'max_connections' => (int) env('DPLY_REALTIME_MAX_CONNECTIONS', 1000),
+        'price_cents' => (int) env('DPLY_REALTIME_PRICE_CENTS', 1500),
+        'max_connections' => (int) env('DPLY_REALTIME_MAX_CONNECTIONS', 5000),
     ],
 
 ];

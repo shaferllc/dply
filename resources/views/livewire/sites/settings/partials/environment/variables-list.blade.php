@@ -69,7 +69,7 @@
                             class="absolute left-0 z-20 mt-1 w-56 overflow-hidden rounded-xl border border-brand-ink/10 bg-white py-1 shadow-lg"
                         >
                             <button type="button" wire:click="openBindingModal('database', 'attach')" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
-                                <x-heroicon-o-circle-stack class="h-4 w-4 text-brand-moss" /> {{ __('Database') }}
+                                <x-heroicon-o-circle-stack class="h-4 w-4 text-brand-moss" /> {{ __('Connect database') }}
                             </button>
                             <button type="button" wire:click="openBindingModal('redis', 'attach')" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
                                 <x-heroicon-o-bolt class="h-4 w-4 text-brand-moss" /> {{ __('Connect Redis') }}
@@ -85,6 +85,15 @@
                             </button>
                             <button type="button" wire:click="openBindingModal('storage', 'attach')" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
                                 <x-heroicon-o-archive-box class="h-4 w-4 text-brand-moss" /> {{ __('Object storage') }}
+                            </button>
+                            <button type="button" wire:click="openBindingModal('logging', 'attach')" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
+                                <x-heroicon-o-clipboard-document-list class="h-4 w-4 text-brand-moss" /> {{ __('Configure logging') }}
+                            </button>
+                            <button type="button" wire:click="openBindingModal('mail', 'attach')" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
+                                <x-heroicon-o-envelope class="h-4 w-4 text-brand-moss" /> {{ __('Configure mail') }}
+                            </button>
+                            <button type="button" wire:click="openBindingModal('broadcasting', 'attach')" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
+                                <x-heroicon-o-signal class="h-4 w-4 text-brand-moss" /> {{ __('Configure broadcasting') }}
                             </button>
                         </div>
                     </div>
@@ -266,7 +275,7 @@
                     @php
                         $gTypeLabel = $bindingTypeLabelsInline[$group['type']] ?? (string) str($group['type'])->title();
                         $gConn = is_array($group['connectivity'] ?? null) ? $group['connectivity'] : null;
-                        $gManageable = in_array($group['type'], ['database', 'redis', 'queue', 'session', 'storage'], true);
+                        $gManageable = in_array($group['type'], ['database', 'redis', 'queue', 'session', 'storage', 'mail'], true);
                         $gGroupOverrides = $overrideGroups[(string) $gBindingId] ?? null;
                         $gHasEditing = ($editing_env_key ?? null) !== null
                             && (array_key_exists((string) $editing_env_key, $group['vars'])
@@ -305,6 +314,26 @@
                                         <x-heroicon-o-signal class="h-3 w-3" />
                                         {{ __('Verify') }}
                                     </button>
+                                @endif
+                                @if ($group['type'] === 'mail' && method_exists($this, 'sendBindingTestEmail') && method_exists($this, 'seedQueuedConsoleAction'))
+                                    {{-- Send a test email from the server using this binding's
+                                         transport. Recipient defaults to the operator's email
+                                         (left blank → the job uses it); editable in the popover. --}}
+                                    <div class="relative" x-data="{ open: false }" wire:key="mailtest-{{ md5($gBindingId) }}">
+                                        <button type="button" x-on:click="open = !open" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40" title="{{ __('Send a test email from the server using this transport.') }}">
+                                            <x-heroicon-o-paper-airplane class="h-3 w-3" />
+                                            {{ __('Send test') }}
+                                        </button>
+                                        <div x-show="open" x-cloak x-on:click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 w-72 rounded-xl border border-brand-ink/10 bg-white p-3 shadow-lg">
+                                            <x-input-label for="mailtest_to_{{ md5($gBindingId) }}" :value="__('Send test email to')" />
+                                            <input id="mailtest_to_{{ md5($gBindingId) }}" type="email" wire:model="mailTestRecipient" placeholder="{{ auth()->user()?->email }}" class="dply-input mt-1 text-sm" />
+                                            <button type="button" wire:click="sendBindingTestEmail(@js((string) $gBindingId))" wire:loading.attr="disabled" wire:target="sendBindingTestEmail" x-on:click="open = false" class="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-forest/90 disabled:opacity-60">
+                                                <x-heroicon-o-paper-airplane class="h-3.5 w-3.5" />
+                                                {{ __('Send test email') }}
+                                            </button>
+                                            <p class="mt-1.5 text-[11px] text-brand-moss">{{ __('Sent from the site\'s server. The site must be deployed.') }}</p>
+                                        </div>
+                                    </div>
                                 @endif
                                 @if ($gManageable && method_exists($this, 'openBindingModal'))
                                     <button type="button" wire:click="openBindingModal('{{ $group['type'] }}', 'attach')" wire:loading.attr="disabled" wire:target="openBindingModal" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60" title="{{ __('Re-point or refresh this resource (re-pulls its current connection values).') }}">
