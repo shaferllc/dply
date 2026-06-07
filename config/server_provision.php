@@ -33,6 +33,31 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Boot-time head start (cloud-init user_data) — opt-in, off by default
+    |--------------------------------------------------------------------------
+    | When on, freshly created servers run a small head-start script via
+    | cloud-init user_data at boot (apt update + base packages), overlapping the
+    | time the control plane spends waiting for IP + SSH. The SSH'd provision
+    | script then skip-fasts that work. SAFE TO LEAVE OFF: when off, no user_data
+    | is injected and the bootstrap's cooperative wait is a no-op. Validate on a
+    | throwaway droplet before enabling in prod (cloud-init timing is image-
+    | dependent). Wired for DigitalOcean + Hetzner.
+    */
+    'boot_head_start' => (bool) env('DPLY_BOOT_HEAD_START', false),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Defer certbot install off the provision critical path — opt-in, off
+    |--------------------------------------------------------------------------
+    | When on, provisioning does NOT install certbot up front; the cert-issuance
+    | path installs it on first use instead (the issuance builder always ensures
+    | certbot is present, so this is correctness-preserving either way). Saves a
+    | small amount of create-time. Off = current behavior (certbot at provision).
+    */
+    'defer_certbot' => (bool) env('DPLY_DEFER_CERTBOT', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Wait for SSH after cloud assigns a public IP (before stack setup)
     |--------------------------------------------------------------------------
     */

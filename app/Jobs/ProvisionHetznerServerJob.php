@@ -118,7 +118,10 @@ class ProvisionHetznerServerJob implements ShouldQueue
                 serverType: $this->server->size,
                 image: $image,
                 sshKeyIds: [$sshKeyId],
-                userData: '',
+                // Boot head-start (apt warmup at boot) when enabled; '' when off.
+                userData: \App\Support\Servers\BootHeadStartScript::enabled()
+                    ? \App\Support\Servers\BootHeadStartScript::cloudInitUserData()
+                    : '',
                 firewallIds: $firewallId !== null ? [$firewallId] : [],
                 networkId: $networkId,
             );

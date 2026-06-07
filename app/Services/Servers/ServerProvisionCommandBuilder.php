@@ -374,6 +374,14 @@ final class ServerProvisionCommandBuilder
     {
         $lines = [
             'export DEBIAN_FRONTEND=noninteractive',
+            // If a cloud-init boot head-start is mid-flight (BootHeadStartScript),
+            // wait for it to finish (bounded) before we pre-empt/kill cloud-init
+            // below — otherwise we'd cut off the apt warmup it's doing. No-op when
+            // the head-start feature is off (markers never exist).
+            'if [ -f /var/lib/dply/headstart.running ] && [ ! -f /var/lib/dply/headstart.done ]; then '
+                .'echo "[dply] boot head-start in progress — waiting up to 240s for it to finish."; '
+                .'for _ in $(seq 1 80); do [ -f /var/lib/dply/headstart.done ] && break; sleep 3; done; '
+                .'fi',
         ];
 
         // Pre-empt cloud-init's apt-daily / unattended-upgrades AND
@@ -867,9 +875,14 @@ final class ServerProvisionCommandBuilder
     private function roleLoadBalancer(array $layout): array
     {
         $lines = $this->ufwSsh();
+        // certbot deferred off the critical path when configured (issuance
+        // ensures it on first use); haproxy itself always installs here.
+        $lbPackages = (bool) config('server_provision.defer_certbot', false)
+            ? ['haproxy']
+            : ['haproxy', 'certbot'];
         $lines = array_merge($lines, $this->ensurePackagesInstalled(
-            ['haproxy', 'certbot'],
-            '[dply] haproxy and certbot already installed; skipping package install.'
+            $lbPackages,
+            '[dply] load balancer packages already installed; skipping package install.'
         ));
         $lines = array_merge($lines, $this->writeRenderedConfigs('load_balancer', 'none', 'none', $layout));
         $lines[] = 'systemctl enable --now haproxy';
@@ -1156,6 +1169,13 @@ final class ServerProvisionCommandBuilder
     /** @return list<string> */
     private function certbotForWeb(string $web): array
     {
+        // Optionally defer certbot off the provision critical path — the cert
+        // issuance builder ensures certbot is present on first use, so this is
+        // correctness-preserving. Off by default (installs here as before).
+        if ((bool) config('server_provision.defer_certbot', false)) {
+            return [];
+        }
+
         if ($web === 'nginx') {
             return $this->ensurePackagesInstalled(
                 ['certbot', 'python3-certbot-nginx'],

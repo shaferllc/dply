@@ -21,7 +21,7 @@ final class LetsEncryptCertbotCommandBuilder
         $certbot = self::certbotInvocation($site, $domains, $email);
 
         if (! self::usesWebrootPath($site)) {
-            return self::wrapNginxPreflight($site, $certbot);
+            return self::ensureCertbotInstalled($site).self::wrapNginxPreflight($site, $certbot);
         }
 
         $webroot = escapeshellarg($site->effectiveDocumentRoot());
@@ -29,7 +29,29 @@ final class LetsEncryptCertbotCommandBuilder
             ? self::acmePreflightScript($domains, $webroot)
             : '';
 
-        return "set -e\nmkdir -p {$webroot}/.well-known/acme-challenge\n{$preflight}{$certbot}";
+        return self::ensureCertbotInstalled($site)."set -e\nmkdir -p {$webroot}/.well-known/acme-challenge\n{$preflight}{$certbot}";
+    }
+
+    /**
+     * Ensure certbot (and the matching plugin) is installed before issuance.
+     * Idempotent: a no-op when certbot is already present (the default — it's
+     * installed at provision time), so this is zero behaviour change. It exists
+     * so provisioning can optionally defer certbot off its critical path
+     * (server_provision.defer_certbot) without breaking the first cert request.
+     */
+    private static function ensureCertbotInstalled(Site $site): string
+    {
+        $plugin = match ($site->webserver()) {
+            'apache' => ' python3-certbot-apache',
+            'nginx' => ' python3-certbot-nginx',
+            default => '',
+        };
+
+        return "command -v certbot >/dev/null 2>&1 || { "
+            ."echo '[dply] certbot not present — installing for cert issuance…'; "
+            .'DEBIAN_FRONTEND=noninteractive apt-get update -y >/dev/null 2>&1 || true; '
+            .'DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends certbot'.$plugin.' || true; '
+            ."}\n";
     }
 
     private static function wrapNginxPreflight(Site $site, string $certbot): string

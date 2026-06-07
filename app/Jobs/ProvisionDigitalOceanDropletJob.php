@@ -84,7 +84,13 @@ class ProvisionDigitalOceanDropletJob implements ShouldQueue
                         ? $doOpts['vpc_uuid']
                         : null,
                     'tags' => isset($doOpts['tags']) && is_array($doOpts['tags']) ? $doOpts['tags'] : [],
-                    'user_data' => isset($doOpts['user_data']) && is_string($doOpts['user_data']) ? $doOpts['user_data'] : '',
+                    // Prefer a user-supplied user_data; otherwise inject the boot
+                    // head-start (apt warmup at boot) when enabled. No-op when off.
+                    'user_data' => (isset($doOpts['user_data']) && is_string($doOpts['user_data']) && $doOpts['user_data'] !== '')
+                        ? $doOpts['user_data']
+                        : (\App\Support\Servers\BootHeadStartScript::enabled()
+                            ? \App\Support\Servers\BootHeadStartScript::cloudInitUserData()
+                            : ''),
                 ],
             );
         } catch (Throwable $e) {
