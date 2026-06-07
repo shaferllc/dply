@@ -27,10 +27,14 @@ use Illuminate\Validation\Rule;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceDaemons extends Component
 {
+    use RendersWorkspacePlaceholder;
     use ChecksSupervisorInstallStatus;
     use ConfirmsActionWithModal;
     use GuardsDisruptiveActions;

@@ -53,12 +53,16 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 use Livewire\WithFileUploads;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceDatabases extends Component
 {
+    use RendersWorkspacePlaceholder;
     use ConfirmsActionWithModal;
     use DismissesServerConsoleActionRun;
     use HandlesServerRemovalFlow;

@@ -12,14 +12,18 @@ use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 /**
  * VM server health & capacity cockpit — rolls up metrics, release pressure,
  * deploy failures, certificate expiry, and daemon drift in one view.
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceHealth extends Component
 {
+    use RendersWorkspacePlaceholder;
     use InteractsWithServerWorkspace;
     use RequiresFeature;
 

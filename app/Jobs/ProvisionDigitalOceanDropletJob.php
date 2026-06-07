@@ -60,7 +60,11 @@ class ProvisionDigitalOceanDropletJob implements ShouldQueue
                 return;
             }
 
+            // Image precedence: an explicit user-chosen OS image wins; otherwise
+            // launch from a region-matched pre-baked snapshot (fast path — stack
+            // already installed, setup script skip-fasts); otherwise stock Ubuntu.
             $image = ServerImageCatalog::resolveForServer($this->server, 'digitalocean')
+                ?? ServerImageCatalog::bakedSnapshotForRegion('digitalocean', $this->server->region)
                 ?? config('services.digitalocean.default_image', 'ubuntu-24-04-x64');
 
             $meta = $this->server->meta ?? [];
@@ -105,7 +109,10 @@ class ProvisionDigitalOceanDropletJob implements ShouldQueue
             $this->server->update(['meta' => $cleared]);
         }
 
-        PollDropletIpJob::dispatch($this->server)->delay(now()->addSeconds(15));
+        // DigitalOcean assigns a public IP within a few seconds of create;
+        // a short delay before the first poll avoids a guaranteed-empty call
+        // without adding meaningful wall-clock (the 5s backoff handles the rest).
+        PollDropletIpJob::dispatch($this->server)->delay(now()->addSeconds(5));
     }
 
     public function failed(Throwable $e): void

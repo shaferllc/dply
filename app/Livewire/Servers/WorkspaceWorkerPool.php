@@ -22,6 +22,8 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 /**
  * Server workspace page for cloning + scaling a worker server as a Worker Pool.
@@ -31,8 +33,10 @@ use Livewire\Component;
  * See doc/specs/worker-pools/02-specification.md.
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceWorkerPool extends Component
 {
+    use RendersWorkspacePlaceholder;
     use ConfirmsActionWithModal;
     use DismissesServerConsoleActionRun;
     use InteractsWithServerWorkspace;

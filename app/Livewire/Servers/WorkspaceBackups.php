@@ -32,6 +32,8 @@ use Illuminate\Support\Facades\Storage;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -44,8 +46,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * cadence edits.
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceBackups extends Component
 {
+    use RendersWorkspacePlaceholder;
     use AuthorsBackupDestinations;
     use ConfirmsActionWithModal;
     use HandlesServerRemovalFlow;

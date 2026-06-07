@@ -18,9 +18,13 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Str;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
+#[Lazy]
 class WorkspaceLoadBalancers extends Component
 {
+    use RendersWorkspacePlaceholder;
     use AuthorizesRequests;
     use ConfirmsActionWithModal;
     use HandlesServerRemovalFlow;

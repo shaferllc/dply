@@ -118,20 +118,27 @@ class SiteSetup extends Component
     /**
      * Poll target for the "analyzing" state: re-resolve where the site should
      * be once the pre-flight job finishes. Clean scan → live site; held →
-     * settle into the steps; failed → the fix-it step.
+     * drop straight into the Environment step; failed → the fix-it card.
      */
     public function pollPreflight(): void
     {
+        $wasScanning = $this->site->isPreflightScanning();
         $this->site->refresh();
 
         if (! $this->site->isInFirstDeploySetup()) {
+            // Clean scan auto-deployed: bounce to the live site.
             $this->redirectRoute('sites.show', ['server' => $this->server->id, 'site' => $this->site->id], navigate: true);
 
             return;
         }
 
-        if (! $this->site->isPreflightScanning() && $this->step === '') {
+        // Scan just finished — drop into environment configuration immediately.
+        if ($wasScanning && ! $this->site->isPreflightScanning()) {
             $this->step = 'environment';
+
+            if (! $this->site->setupScanFailed()) {
+                $this->toastSuccess(__('Repository analyzed — fill in the required variables below to deploy.'));
+            }
         }
     }
 

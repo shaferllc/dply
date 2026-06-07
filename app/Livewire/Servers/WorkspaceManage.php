@@ -40,10 +40,14 @@ use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceManage extends Component
 {
+    use RendersWorkspacePlaceholder;
     use ClonesServer;
     use ConfirmsActionWithModal;
     use DismissesConsoleActionRun;

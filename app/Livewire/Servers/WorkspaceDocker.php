@@ -27,6 +27,8 @@ use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 /**
  * Remote Docker Engine inspector over SSH — containers, images, volumes,
@@ -37,8 +39,10 @@ use Livewire\Component;
  * full workspace.
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceDocker extends Component
 {
+    use RendersWorkspacePlaceholder;
     use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.docker';

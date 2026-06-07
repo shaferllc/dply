@@ -190,14 +190,79 @@
 @else
     <div>
         <x-input-label for="{{ $idPrefix }}-url" :value="__('Repository URL')" :required="$required" />
-        <x-text-input
-            id="{{ $idPrefix }}-url"
-            type="text"
-            wire:model.live.debounce.500ms="git_repository_url"
-            autocomplete="off"
-            class="mt-1.5 font-mono"
-            placeholder="git@github.com:acme/app.git"
-        />
+        <div class="relative mt-1.5">
+            <x-text-input
+                id="{{ $idPrefix }}-url"
+                type="text"
+                wire:model.live.debounce.500ms="git_repository_url"
+                autocomplete="off"
+                class="font-mono pr-9"
+                placeholder="https://github.com/acme/app"
+            />
+            <div wire:loading wire:target="git_repository_url"
+                class="pointer-events-none absolute inset-y-0 right-3 flex items-center">
+                <x-spinner size="sm" class="text-brand-moss" />
+            </div>
+        </div>
+
+        {{-- Repo found: show metadata card + branch picker --}}
+        @if ($repoScanState === 'found' && count($scannedRepoMeta) > 0)
+            <div wire:loading.remove wire:target="git_repository_url"
+                class="mt-2 rounded-xl border border-brand-sage/30 bg-brand-cream/70 p-3">
+                <div class="flex items-start gap-2.5">
+                    <x-oauth-provider-icon
+                        :provider="$scannedRepoMeta['provider'] ?? 'github'"
+                        size="h-4 w-4"
+                        class="mt-0.5 shrink-0 text-brand-ink"
+                    />
+                    <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <span class="font-mono text-sm font-semibold text-brand-ink">{{ $scannedRepoMeta['name'] ?? '' }}</span>
+                            <span @class([
+                                'inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide',
+                                'bg-brand-sage/15 text-brand-forest' => ($scannedRepoMeta['visibility'] ?? 'public') === 'public',
+                                'bg-amber-100 text-amber-800' => ($scannedRepoMeta['visibility'] ?? 'public') !== 'public',
+                            ])>{{ ($scannedRepoMeta['visibility'] ?? 'public') === 'public' ? __('Public') : __('Private') }}</span>
+                            @if (($scannedRepoMeta['stars'] ?? 0) > 0)
+                                <span class="flex items-center gap-0.5 text-[10px] text-brand-moss">
+                                    <x-heroicon-s-star class="h-3 w-3 text-brand-gold" aria-hidden="true" />
+                                    {{ number_format((int) $scannedRepoMeta['stars']) }}
+                                </span>
+                            @endif
+                        </div>
+                        @if (!empty($scannedRepoMeta['description']))
+                            <p class="mt-0.5 text-xs leading-relaxed text-brand-moss">{{ $scannedRepoMeta['description'] }}</p>
+                        @endif
+                        @if (count($scannedBranches) > 0)
+                            <div class="mt-2 flex items-center gap-2">
+                                <span class="text-xs font-medium text-brand-ink">{{ __('Branch') }}</span>
+                                <select wire:model.live="git_branch"
+                                    class="rounded-lg border border-brand-ink/15 bg-white px-2 py-1 font-mono text-xs text-brand-ink shadow-sm focus:border-brand-ink focus:outline-none focus:ring-1 focus:ring-brand-ink">
+                                    @foreach ($scannedBranches as $branch)
+                                        <option value="{{ $branch['name'] }}" @selected($branch['name'] === $git_branch)>
+                                            {{ $branch['name'] }}{{ $branch['default'] ? ' ('.strtolower(__('default')).')' : '' }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        @elseif ($repoScanState === 'not_found')
+            <p wire:loading.remove wire:target="git_repository_url"
+                class="mt-2 flex items-center gap-1.5 text-xs text-red-600">
+                <x-heroicon-o-x-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                {{ __('Repository not found. Check the URL or try a different format.') }}
+            </p>
+        @elseif ($repoScanState === 'error')
+            <p wire:loading.remove wire:target="git_repository_url"
+                class="mt-2 flex items-center gap-1.5 text-xs text-amber-700">
+                <x-heroicon-o-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                {{ __('Could not scan repository. It may be private or temporarily unavailable.') }}
+            </p>
+        @endif
+
         <x-input-error :messages="$errors->get('git_repository_url')" class="mt-2" />
     </div>
 @endif

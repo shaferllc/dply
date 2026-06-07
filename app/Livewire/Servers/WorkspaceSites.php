@@ -26,10 +26,14 @@ use Laravel\Pennant\Feature;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceSites extends Component
 {
+    use RendersWorkspacePlaceholder;
     use DispatchesToastNotifications;
     use EnforcesSiteQuota;
     use HandlesServerRemovalFlow;

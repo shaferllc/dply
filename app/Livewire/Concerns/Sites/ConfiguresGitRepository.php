@@ -6,6 +6,7 @@ namespace App\Livewire\Concerns\Sites;
 
 use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
+use Illuminate\Support\Facades\Http;
 
 /**
  * Shared "Configure Git repository" picker state + behaviour for the surfaces
@@ -51,6 +52,26 @@ trait ConfiguresGitRepository
 
     /** Ref kind for $git_branch: 'branch' | 'tag' | 'commit' | null (≈ branch). */
     public ?string $git_ref_kind = null;
+
+    /**
+     * State of the public-repo scan in manual mode.
+     * 'idle' = no scan attempted, 'found' = success, 'not_found' | 'error' = failure.
+     */
+    public string $repoScanState = 'idle';
+
+    /**
+     * Metadata returned by the public provider API after a successful scan.
+     *
+     * @var array{provider?: string, name?: string, description?: string, visibility?: string, default_branch?: string, stars?: int}
+     */
+    public array $scannedRepoMeta = [];
+
+    /**
+     * Branch list from the public provider API (populated alongside scannedRepoMeta).
+     *
+     * @var list<array{name: string, default: bool}>
+     */
+    public array $scannedBranches = [];
 
     /**
      * Connected source-control accounts for the current user.
@@ -113,7 +134,17 @@ trait ConfiguresGitRepository
     public function updatedGitRepositoryUrl(): void
     {
         $this->git_repository_url = trim($this->git_repository_url);
+        $this->repoScanState = 'idle';
+        $this->scannedRepoMeta = [];
+        $this->scannedBranches = [];
+
+        // Notify the host first so it can reset stale ref-picker state before
+        // the scan potentially overwrites git_branch / git_ref_kind.
         $this->onManualRepoUrlChanged();
+
+        if ($this->git_repository_url !== '') {
+            $this->scanPublicRepository();
+        }
     }
 
     /**
@@ -142,6 +173,206 @@ trait ConfiguresGitRepository
             $this->onRepositoryAutoselected();
         }
     }
+
+    // -------------------------------------------------------------------------
+    // Public-repo scanning (manual / paste-URL mode)
+    // -------------------------------------------------------------------------
+
+    /**
+     * If the pasted URL looks like a GitHub / GitLab / Bitbucket URL, hit the
+     * provider's public API to fetch repo metadata + branch list. Results land
+     * in {@see $scannedRepoMeta}, {@see $scannedBranches}, and {@see $repoScanState}.
+     * The default branch is auto-applied to {@see $git_branch}.
+     *
+     * Called from {@see updatedGitRepositoryUrl()} after the host hook fires,
+     * so the hook may reset ref state without racing the scan's branch write.
+     */
+    private function scanPublicRepository(): void
+    {
+        $parsed = $this->parsePublicRepoUrl($this->git_repository_url);
+        if ($parsed === null) {
+            return; // not a recognised provider URL — leave state 'idle'
+        }
+
+        ['provider' => $provider, 'owner' => $owner, 'repo' => $repo] = $parsed;
+
+        try {
+            match ($provider) {
+                'github' => $this->scanGitHubRepo($owner, $repo),
+                'gitlab' => $this->scanGitLabRepo($owner, $repo),
+                'bitbucket' => $this->scanBitbucketRepo($owner, $repo),
+            };
+        } catch (\Throwable) {
+            $this->repoScanState = 'error';
+        }
+    }
+
+    /**
+     * Detect provider and extract owner + repo from HTTPS or SSH URLs.
+     *
+     * @return array{provider: string, owner: string, repo: string}|null
+     */
+    private function parsePublicRepoUrl(string $url): ?array
+    {
+        // Use ~ as delimiter so that # inside character classes isn't
+        // misread as the closing delimiter by PHP's pattern parser.
+
+        // GitHub HTTPS & SSH
+        if (preg_match('~^https?://github\.com/([^/]+)/([^/.?#]+?)(?:\.git)?(?:[/?#].*)?$~i', $url, $m)) {
+            return ['provider' => 'github', 'owner' => $m[1], 'repo' => $m[2]];
+        }
+        if (preg_match('~^git@github\.com:([^/]+)/([^/.?#]+?)(?:\.git)?$~i', $url, $m)) {
+            return ['provider' => 'github', 'owner' => $m[1], 'repo' => $m[2]];
+        }
+        // GitLab HTTPS & SSH (supports subgroups in owner)
+        if (preg_match('~^https?://gitlab\.com/(.+?)/([^/.?#]+?)(?:\.git)?(?:[/?#].*)?$~i', $url, $m)) {
+            return ['provider' => 'gitlab', 'owner' => $m[1], 'repo' => $m[2]];
+        }
+        if (preg_match('~^git@gitlab\.com:(.+?)/([^/.?#]+?)(?:\.git)?$~i', $url, $m)) {
+            return ['provider' => 'gitlab', 'owner' => $m[1], 'repo' => $m[2]];
+        }
+        // Bitbucket HTTPS & SSH
+        if (preg_match('~^https?://bitbucket\.org/([^/]+)/([^/.?#]+?)(?:\.git)?(?:[/?#].*)?$~i', $url, $m)) {
+            return ['provider' => 'bitbucket', 'owner' => $m[1], 'repo' => $m[2]];
+        }
+        if (preg_match('~^git@bitbucket\.org:([^/]+)/([^/.?#]+?)(?:\.git)?$~i', $url, $m)) {
+            return ['provider' => 'bitbucket', 'owner' => $m[1], 'repo' => $m[2]];
+        }
+
+        return null;
+    }
+
+    private function scanGitHubRepo(string $owner, string $repo): void
+    {
+        $headers = [
+            'Accept' => 'application/vnd.github+json',
+            'X-GitHub-Api-Version' => '2022-11-28',
+            'User-Agent' => 'dply',
+        ];
+
+        [$meta, $branches] = Http::pool(fn ($pool) => [
+            $pool->withHeaders($headers)->timeout(6)->get("https://api.github.com/repos/{$owner}/{$repo}"),
+            $pool->withHeaders($headers)->timeout(6)->get("https://api.github.com/repos/{$owner}/{$repo}/branches", ['per_page' => 100]),
+        ]);
+
+        if (! $meta->ok()) {
+            $this->repoScanState = $meta->status() === 404 ? 'not_found' : 'error';
+
+            return;
+        }
+
+        $data = $meta->json();
+        $defaultBranch = (string) ($data['default_branch'] ?? 'main');
+
+        $this->scannedRepoMeta = [
+            'provider' => 'github',
+            'name' => (string) ($data['full_name'] ?? "{$owner}/{$repo}"),
+            'description' => (string) ($data['description'] ?? ''),
+            'visibility' => (bool) ($data['private'] ?? false) ? 'private' : 'public',
+            'default_branch' => $defaultBranch,
+            'stars' => (int) ($data['stargazers_count'] ?? 0),
+        ];
+
+        $this->git_branch = $defaultBranch;
+        $this->git_ref_kind = 'branch';
+
+        if ($branches->ok()) {
+            $this->scannedBranches = collect($branches->json())
+                ->filter(fn ($b) => is_array($b) && ($b['name'] ?? '') !== '')
+                ->map(fn ($b) => ['name' => (string) $b['name'], 'default' => (string) $b['name'] === $defaultBranch])
+                ->values()
+                ->all();
+        }
+
+        $this->repoScanState = 'found';
+    }
+
+    private function scanGitLabRepo(string $owner, string $repo): void
+    {
+        $encodedPath = urlencode("{$owner}/{$repo}");
+        $headers = ['User-Agent' => 'dply'];
+
+        [$meta, $branches] = Http::pool(fn ($pool) => [
+            $pool->withHeaders($headers)->timeout(6)->get("https://gitlab.com/api/v4/projects/{$encodedPath}"),
+            $pool->withHeaders($headers)->timeout(6)->get("https://gitlab.com/api/v4/projects/{$encodedPath}/repository/branches", ['per_page' => 100]),
+        ]);
+
+        if (! $meta->ok()) {
+            $this->repoScanState = $meta->status() === 404 ? 'not_found' : 'error';
+
+            return;
+        }
+
+        $data = $meta->json();
+        $defaultBranch = (string) ($data['default_branch'] ?? 'main');
+
+        $this->scannedRepoMeta = [
+            'provider' => 'gitlab',
+            'name' => (string) ($data['path_with_namespace'] ?? "{$owner}/{$repo}"),
+            'description' => (string) ($data['description'] ?? ''),
+            'visibility' => (string) ($data['visibility'] ?? 'public'),
+            'default_branch' => $defaultBranch,
+            'stars' => (int) ($data['star_count'] ?? 0),
+        ];
+
+        $this->git_branch = $defaultBranch;
+        $this->git_ref_kind = 'branch';
+
+        if ($branches->ok()) {
+            $this->scannedBranches = collect($branches->json())
+                ->filter(fn ($b) => is_array($b) && ($b['name'] ?? '') !== '')
+                ->map(fn ($b) => ['name' => (string) $b['name'], 'default' => (string) $b['name'] === $defaultBranch])
+                ->values()
+                ->all();
+        }
+
+        $this->repoScanState = 'found';
+    }
+
+    private function scanBitbucketRepo(string $owner, string $repo): void
+    {
+        $headers = ['User-Agent' => 'dply'];
+
+        [$meta, $branches] = Http::pool(fn ($pool) => [
+            $pool->withHeaders($headers)->timeout(6)->get("https://api.bitbucket.org/2.0/repositories/{$owner}/{$repo}"),
+            $pool->withHeaders($headers)->timeout(6)->get("https://api.bitbucket.org/2.0/repositories/{$owner}/{$repo}/refs/branches", ['pagelen' => 100]),
+        ]);
+
+        if (! $meta->ok()) {
+            $this->repoScanState = $meta->status() === 404 ? 'not_found' : 'error';
+
+            return;
+        }
+
+        $data = $meta->json();
+        $defaultBranch = (string) (($data['mainbranch'] ?? [])['name'] ?? 'main');
+
+        $this->scannedRepoMeta = [
+            'provider' => 'bitbucket',
+            'name' => (string) ($data['full_name'] ?? "{$owner}/{$repo}"),
+            'description' => (string) ($data['description'] ?? ''),
+            'visibility' => (bool) ($data['is_private'] ?? false) ? 'private' : 'public',
+            'default_branch' => $defaultBranch,
+            'stars' => 0,
+        ];
+
+        $this->git_branch = $defaultBranch;
+        $this->git_ref_kind = 'branch';
+
+        if ($branches->ok()) {
+            $this->scannedBranches = collect(($branches->json())['values'] ?? [])
+                ->filter(fn ($b) => is_array($b) && ($b['name'] ?? '') !== '')
+                ->map(fn ($b) => ['name' => (string) $b['name'], 'default' => (string) $b['name'] === $defaultBranch])
+                ->values()
+                ->all();
+        }
+
+        $this->repoScanState = 'found';
+    }
+
+    // -------------------------------------------------------------------------
+    // Host hooks
+    // -------------------------------------------------------------------------
 
     /** Host hook: before the account list/selection is cleared (e.g. authorize). */
     protected function onSourceControlAccountChanging(): void {}

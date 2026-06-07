@@ -14,6 +14,8 @@ use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 /**
  * Release & disk hygiene — atomic release pressure, log sizes, failed jobs,
@@ -24,8 +26,10 @@ use Livewire\Component;
  * renders the coming-soon teaser in place of the full workspace.
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceReleaseHygiene extends Component
 {
+    use RendersWorkspacePlaceholder;
     use InteractsWithServerWorkspace;
     use ManagesReleaseHygieneLogViewer;
     use RequiresFeature;

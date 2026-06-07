@@ -12,6 +12,8 @@ use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 /**
  * Server-wide deploy deny windows, live status, and per-site coverage.
@@ -21,8 +23,10 @@ use Livewire\Component;
  * URL renders the coming-soon teaser in place of the full workspace.
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceDeployPolicy extends Component
 {
+    use RendersWorkspacePlaceholder;
     use InteractsWithServerWorkspace;
     use RequiresFeature;
 

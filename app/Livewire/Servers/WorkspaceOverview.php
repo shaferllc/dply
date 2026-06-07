@@ -36,6 +36,8 @@ use Illuminate\Support\Facades\Auth;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 /**
  * Server workspace landing page — at-a-glance dashboard.
@@ -49,8 +51,10 @@ use Livewire\Component;
  * it probably belongs on the matching workspace nav entry instead.
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceOverview extends Component
 {
+    use RendersWorkspacePlaceholder;
     use BuildsContainerLaunchSummary;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;

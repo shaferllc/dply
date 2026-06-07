@@ -13,6 +13,8 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 use Livewire\WithPagination;
 
 /**
@@ -21,8 +23,10 @@ use Livewire\WithPagination;
  * {@see ErrorEvent} table. Stream behaviour lives in {@see SurfacesErrorStream}.
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceErrors extends Component
 {
+    use RendersWorkspacePlaceholder;
     use ConfirmsActionWithModal;
     use InteractsWithServerWorkspace;
     use SurfacesErrorStream;

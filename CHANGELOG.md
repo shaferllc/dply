@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Changed
+- New servers launch from region-scoped baked snapshots when available and poll for their IP address faster, cutting provisioning time.
 ### Added
 - Wedged server provisions now surface and recover automatically when a remote task goes silent, and machine callbacks keep working during maintenance windows.
 ### Fixed

@@ -20,6 +20,8 @@ use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 /**
  * First-class scheduler control plane for a single server (per the
@@ -35,8 +37,10 @@ use Livewire\Component;
  *    land in milestone 2B.
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceSchedule extends Component
 {
+    use RendersWorkspacePlaceholder;
     use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.schedule';

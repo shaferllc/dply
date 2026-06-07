@@ -9,14 +9,18 @@ use App\Models\Server;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 /**
  * Coming-soon placeholder for the server CLI reference when
  * {@see workspace.cli_preview} is on and {@see workspace.cli} is off.
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceCliPreview extends Component
 {
+    use RendersWorkspacePlaceholder;
     use InteractsWithServerWorkspace;
 
     public Server $server;

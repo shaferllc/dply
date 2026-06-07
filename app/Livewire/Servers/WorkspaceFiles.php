@@ -18,6 +18,8 @@ use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 /**
  * Server file browser (read-only + download in v1).
@@ -27,8 +29,10 @@ use Livewire\Component;
  * on this surface entirely (sysadmin tool, not a deployer one).
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceFiles extends Component
 {
+    use RendersWorkspacePlaceholder;
     use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.files';

@@ -22,6 +22,8 @@ use App\Support\Servers\DatabaseEngineInstallScripts;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 /**
  * Server-level networking workspace: one place to see and manage every
@@ -32,8 +34,10 @@ use Livewire\Component;
  * by the database engine Networking subtab; this page is just a cross-engine
  * aggregate view so operators don't have to hop between workspaces.
  */
+#[Lazy]
 class WorkspaceNetworking extends Component
 {
+    use RendersWorkspacePlaceholder;
     use AuthorizesRequests;
     use ConfirmsActionWithModal;
     use HandlesServerRemovalFlow;

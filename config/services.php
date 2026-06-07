@@ -37,6 +37,15 @@ return [
 
     'digitalocean' => [
         'default_image' => env('DIGITALOCEAN_DEFAULT_IMAGE', 'ubuntu-24-04-x64'),
+
+        // Region → pre-baked snapshot-id map (JSON), e.g.
+        //   {"nyc1":"171234567","sfo3":"171234568"}
+        // When a new server's region has an entry, provisioning launches from
+        // that snapshot (stack preinstalled) instead of stock Ubuntu and the
+        // setup script skip-fasts. Bake with `php artisan dply:do:snapshot:bake`
+        // per region; snapshots are region-scoped on DigitalOcean. Empty = off.
+        'baked_snapshots' => env('DIGITALOCEAN_BAKED_SNAPSHOTS', ''),
+
         'ssh_user' => env('DIGITALOCEAN_SSH_USER', 'root'),
         /*
          * Optional personal access token for listing regions & sizes on the server create
@@ -84,6 +93,14 @@ return [
 
     'hetzner' => [
         'default_image' => env('HETZNER_DEFAULT_IMAGE', 'ubuntu-24.04'),
+
+        // Pre-baked snapshot for the fast path. Hetzner Cloud snapshots are
+        // GLOBAL across locations, so this is a single snapshot id (not a
+        // per-region map like DigitalOcean), e.g. HETZNER_BAKED_SNAPSHOT=171234567.
+        // New non-managed servers then launch from it and skip-fast the setup
+        // script. A JSON region→id map is also accepted if you ever want it.
+        'baked_snapshots' => env('HETZNER_BAKED_SNAPSHOT', ''),
+
         'ssh_user' => env('HETZNER_SSH_USER', 'root'),
         // Create + attach a dply-managed Cloud Firewall at provision time so SSH
         // (and service ports) are reachable at Hetzner's edge. Disable to rely on

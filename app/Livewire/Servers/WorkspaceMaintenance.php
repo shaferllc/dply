@@ -15,6 +15,8 @@ use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 /**
  * Server-level maintenance window — suspend all eligible VM sites with one
@@ -26,8 +28,10 @@ use Livewire\Component;
  * workspace.
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceMaintenance extends Component
 {
+    use RendersWorkspacePlaceholder;
     use InteractsWithServerWorkspace;
     use RequiresFeature;
 

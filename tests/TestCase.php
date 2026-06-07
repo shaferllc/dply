@@ -34,6 +34,19 @@ abstract class TestCase extends BaseTestCase
         // Avoid blocking Livewire tests on SSH; tests that assert queued manage jobs opt in explicitly.
         config(['server_manage.queue_remote_tasks' => false]);
 
+        // Server workspace tabs are #[Lazy]: the first request returns a skeleton
+        // placeholder, then a follow-up request hydrates the real body. Feature
+        // tests GET these routes and assert on the hydrated content, so disable
+        // lazy loading for the whole test process. withoutLazyLoading() resets on
+        // each flush-state (per request), so re-arm it once via a flush-state
+        // listener — keeps multi-request tests eager too. Production is unaffected.
+        \Livewire\Livewire::withoutLazyLoading();
+        static $reArmLazyDisable = false;
+        if (! $reArmLazyDisable) {
+            $reArmLazyDisable = true;
+            \Livewire\on('flush-state', static fn () => \Livewire\Livewire::withoutLazyLoading());
+        }
+
         foreach (class_uses_recursive(static::class) as $trait) {
             $hook = 'setUp'.class_basename($trait);
             if (method_exists($this, $hook)) {

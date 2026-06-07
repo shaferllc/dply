@@ -559,7 +559,17 @@ trait TracksProvisioningStatus
             return false;
         }
         if (is_string($this->git_repository_url) && trim($this->git_repository_url) !== '') {
-            return false;
+            // The choose-app picker writes the URL mid-flow (via syncRepoUrlToSite)
+            // so the ref picker can resolve branches before the form is submitted.
+            // Don't count that as "installed" — require a completed choice or a
+            // deploy. Legacy sites with no choose_app meta are pre-flow and their
+            // URL is real evidence of an installed app.
+            $midFlow = $this->isAwaitingApp()
+                || (data_get($this->meta, 'choose_app') !== null
+                    && data_get($this->meta, 'choose_app.chosen_kind') === null);
+            if (! $midFlow) {
+                return false;
+            }
         }
         if ($this->last_deploy_at !== null) {
             return false;

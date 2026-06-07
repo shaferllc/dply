@@ -10,10 +10,14 @@ use App\Models\Server;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceCli extends Component
 {
+    use RendersWorkspacePlaceholder;
     use InteractsWithServerWorkspace;
     use RequiresFeature;
 

@@ -25,14 +25,18 @@ use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 /**
  * Unified server configuration editor — allowlisted paths across webserver,
  * PHP, Redis/DB, system, and supervisor with CodeMirror editing.
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceConfiguration extends Component
 {
+    use RendersWorkspacePlaceholder;
     use ClonesServer;
     use ConfirmsActionWithModal;
     use DismissesServerConsoleActionRun;

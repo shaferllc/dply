@@ -455,7 +455,11 @@ final class ServerProvisionCommandBuilder
             // v4 globally via apt.conf.d sidesteps both issues for
             // every subsequent apt-get call (no per-call flag thread).
             'mkdir -p /etc/apt/apt.conf.d',
-            'printf \'Acquire::ForceIPv4 "true";\nAcquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n\' > /etc/apt/apt.conf.d/99dply',
+            // --force-unsafe-io skips the per-file fsync dpkg does during unpack
+            // — safe on a fresh throwaway-until-ready provision and a meaningful
+            // speedup on package-heavy installs (mysql/php). Install-Suggests off
+            // avoids pulling optional suggested packages we never asked for.
+            'printf \'Acquire::ForceIPv4 "true";\nAcquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAPT::Install-Suggests "false";\nDpkg::Options:: "--force-unsafe-io";\n\' > /etc/apt/apt.conf.d/99dply',
             // Silence needrestart. On Ubuntu 24.04 (noble) it's enabled
             // by default and runs after every dpkg install. Its
             // service-restart probe occasionally fails on non-interactive
@@ -627,7 +631,7 @@ final class ServerProvisionCommandBuilder
             // Now that locale + mysqld runtime dir are set up, the
             // repair has a chance of actually succeeding.
             'dply_repair_dpkg_state',
-            'apt-get update -y',
+            'dply_apt_update',
             $this->stepMarker('Installing base packages'),
             'dply_wait_for_apt_locks',
             ...$this->ensurePackagesInstalled(
@@ -1032,7 +1036,7 @@ final class ServerProvisionCommandBuilder
                 'if dpkg -s keydb-server >/dev/null 2>&1 || dpkg -s keydb >/dev/null 2>&1; then echo "[dply] keydb already installed; skipping repository + package install."; else '
                     .'apt-get install -y --no-install-recommends software-properties-common ca-certificates && '
                     .'add-apt-repository -y ppa:eq-alpha/keydb 2>/dev/null || true; '
-                    .'apt-get update -y && '
+                    .'dply_apt_update && '
                     .'apt-get install -y --no-install-recommends keydb-server keydb-tools; fi',
                 $this->writeFileWithRollback('/etc/keydb/keydb.conf', $keydbConf),
                 'systemctl enable keydb-server 2>/dev/null || systemctl enable keydb 2>/dev/null || true',
@@ -1066,7 +1070,7 @@ final class ServerProvisionCommandBuilder
                 .'chmod 0644 /etc/apt/keyrings/dragonfly.gpg && '
                 .'. /etc/os-release && '
                 .'echo "deb [signed-by=/etc/apt/keyrings/dragonfly.gpg] https://packages.dragonflydb.io/dragonfly/ubuntu ${VERSION_CODENAME:-jammy} main" > /etc/apt/sources.list.d/dragonfly.list && '
-                .'apt-get update -y && '
+                .'dply_apt_update && '
                 .'apt-get install -y --no-install-recommends dragonfly; fi',
             // Dragonfly ships its own systemd unit; just ensure it's enabled.
             'systemctl enable --now dragonfly 2>/dev/null || true',
@@ -1105,8 +1109,11 @@ final class ServerProvisionCommandBuilder
         } elseif ($web === 'openlitespeed') {
             $lines[] = $this->stepMarker('Installing webserver');
             $lines[] = 'wget -qO - https://repo.litespeed.sh | bash';
-            $lines[] = 'apt-get update -y';
-            $lines[] = 'apt-get install -y --no-install-recommends openlitespeed';
+            $lines[] = 'dply_apt_update';
+            $lines = array_merge($lines, $this->ensurePackagesInstalled(
+                ['openlitespeed'],
+                '[dply] openlitespeed already installed; skipping package install.'
+            ));
             $lines[] = 'ufw allow 80/tcp';
             $lines[] = 'ufw allow 443/tcp';
             $lines[] = '/usr/local/lsws/bin/lswsctrl start || true';
@@ -1115,14 +1122,20 @@ final class ServerProvisionCommandBuilder
             $lines[] = 'install -d /usr/share/keyrings';
             $lines[] = 'curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key | gpg --batch --yes --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg';
             $lines[] = 'curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt | tee /etc/apt/sources.list.d/caddy-stable.list';
-            $lines[] = 'apt-get update -y';
-            $lines[] = 'apt-get install -y --no-install-recommends caddy';
+            $lines[] = 'dply_apt_update';
+            $lines = array_merge($lines, $this->ensurePackagesInstalled(
+                ['caddy'],
+                '[dply] caddy already installed; skipping package install.'
+            ));
             $lines[] = 'ufw allow 80/tcp';
             $lines[] = 'ufw allow 443/tcp';
             $lines[] = 'systemctl enable --now caddy';
         } elseif ($web === 'traefik') {
             $lines[] = $this->stepMarker('Installing webserver');
-            $lines[] = 'apt-get install -y --no-install-recommends traefik caddy';
+            $lines = array_merge($lines, $this->ensurePackagesInstalled(
+                ['traefik', 'caddy'],
+                '[dply] traefik + caddy already installed; skipping package install.'
+            ));
             $lines[] = 'install -d -m 0755 /etc/traefik/dynamic /etc/caddy/sites-enabled /var/log/traefik';
             $lines[] = $this->writeFileWithRollback('/etc/traefik/traefik.yml', "entryPoints:\n  web:\n    address: \":80\"\nproviders:\n  file:\n    directory: \"/etc/traefik/dynamic\"\n    watch: true\nlog:\n  filePath: \"/var/log/traefik/traefik.log\"\naccessLog:\n  filePath: \"/var/log/traefik/access.log\"\n");
             $lines[] = 'ufw allow 80/tcp';
@@ -1163,9 +1176,26 @@ final class ServerProvisionCommandBuilder
         }
 
         $stem = $this->phpStem($php);
+
+        // Only set up the ondrej/sury PPA when the distro repo can't already
+        // provide the requested PHP. Ubuntu 24.04 ships php8.3 natively, so for
+        // the default version this skips the upstream probe + keyring + an extra
+        // apt-get update (~90s) entirely. Gated at runtime on `apt-cache show`
+        // (after the base update) rather than a hardcoded codename→version map,
+        // so it stays correct as newer Ubuntu releases ship newer PHP. When the
+        // requested version isn't in the distro repo (e.g. 8.4 on noble), the
+        // PPA is added as before.
+        $cliPkg = $stem.'-cli';
         $lines = [
             $this->stepMarker('Installing PHP '.$php),
-            ...$this->ensureOndrejPhpRepository(),
+            implode("\n", [
+                'if apt-cache show '.escapeshellarg($cliPkg).' >/dev/null 2>&1; then',
+                '  echo "[dply] '.$cliPkg.' is available from the distro repository — skipping ondrej/sury PPA setup."',
+                'else',
+                '  echo "[dply] '.$cliPkg.' not in the distro repository — adding ondrej/sury PPA."',
+                implode("\n", $this->ensureOndrejPhpRepository()),
+                'fi',
+            ]),
         ];
 
         // Core PHP packages — the runtime, the FPM unit, the shared module
@@ -1266,7 +1296,10 @@ final class ServerProvisionCommandBuilder
             $stem = $this->phpStem($php);
 
             return [
-                'apt-get install -y --no-install-recommends libapache2-mod-'.$stem,
+                ...$this->ensurePackagesInstalled(
+                    ['libapache2-mod-'.$stem],
+                    '[dply] apache PHP module already installed; skipping package install.'
+                ),
                 'a2enmod '.$stem,
                 'systemctl reload apache2',
             ];
@@ -1583,7 +1616,7 @@ final class ServerProvisionCommandBuilder
             'curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc',
             'chmod 644 /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc',
             '. /etc/os-release && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" > /etc/apt/sources.list.d/pgdg.list',
-            'apt-get update -y',
+            'dply_apt_update',
             ...$this->ensurePackagesInstalled(
                 ['postgresql-'.$ver],
                 '[dply] postgresql-'.$ver.' already installed; skipping package install.'

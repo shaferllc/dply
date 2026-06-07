@@ -42,7 +42,9 @@
                         </div>
                         <div class="sm:col-span-2">
                             <x-input-label for="settings-tags" value="{{ __('Tags') }}" />
-                            @php($tagsDisabled = ! $this->canEditServerSettings)
+                            @php
+                                $tagsDisabled = ! $this->canEditServerSettings;
+                            @endphp
                             <div
                                 x-data="{
                                     raw: @entangle('settingsTags'),

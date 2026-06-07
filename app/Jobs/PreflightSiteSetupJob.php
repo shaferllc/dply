@@ -7,9 +7,7 @@ namespace App\Jobs;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\Deploy\RuntimeDetection\GitCloner;
-use App\Services\Deploy\SiteDeployPipelineManager;
 use App\Services\Sites\DotEnvFileWriter;
-use App\Services\Sites\SiteDeploySyncCoordinator;
 use App\Services\Sites\SiteEnvRequirementScanner;
 use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
@@ -35,9 +33,9 @@ use Illuminate\Support\Facades\Log;
  *   3. Seeds the encrypted env cache from .env.example so the wizard's
  *      Environment step opens pre-filled with the author's contract.
  *   4. Decides:
- *        - CLEAN  (no blocking required vars): auto-deploy immediately.
- *        - HOLD   (blocking vars missing): stay live, mark needs_setup; the
- *          site renders the setup wizard / "finish setup" card.
+ *        - HOLD   (always): stay live, mark needs_setup; the wizard walks the
+ *          operator through environment variables, resource bindings, and
+ *          review before they trigger the first deploy themselves.
  *        - FAILED (clone/scan error): fail OPEN — stay live, mark scan_failed
  *          with a classified reason so the wizard can guide the fix (re-scan,
  *          fix repo access). Never blind-deploys on an unread repo.
@@ -78,8 +76,6 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
         GitIdentityResolver $resolver,
         SourceControlRepositoryBrowser $browser,
         DotEnvFileWriter $envWriter,
-        SiteDeployPipelineManager $pipeline,
-        SiteDeploySyncCoordinator $coordinator,
     ): void {
         $site = Site::query()->with('server')->find($this->siteId);
         if ($site === null || $site->server === null) {
@@ -106,24 +102,66 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
         try {
             $this->scanLog($site, "Pre-flight starting for {$repoUrl} (branch {$branch}).");
 
+            // ── Step 1: Resolve access ─────────────────────────────────────────
             $this->markScanStep($site, 'resolving');
+            $this->scanLog($site, 'Resolving repository access…');
+
+            $accountId = data_get($site->meta, 'repository.git_source_control_account_id');
+            $hasConnectedAccount = is_string($accountId) && trim($accountId) !== '' && $this->userId !== null;
+            if ($hasConnectedAccount) {
+                $this->scanLog($site, 'Connected provider account found — requesting authenticated clone URL.');
+            } else {
+                $this->scanLog($site, 'No connected provider account — using URL as-is (public repo or SSH key).');
+            }
+
             $cloneUrl = $this->resolveCloneUrl($site, $repoUrl, $resolver, $browser);
+
+            if ($hasConnectedAccount && $cloneUrl !== $repoUrl) {
+                $this->scanLog($site, 'Authenticated clone URL obtained.');
+            }
             $this->scanLog($site, 'Repository access resolved.');
 
             $tmpRoot = rtrim(sys_get_temp_dir(), '/').'/dply-preflight-'.bin2hex(random_bytes(6));
             $checkout = $tmpRoot.'/repo';
 
             try {
+                // ── Step 2: Clone ──────────────────────────────────────────────
                 $this->markScanStep($site, 'cloning');
-                $this->scanLog($site, "Cloning {$branch}…");
+                $this->scanLog($site, "Fetching branch '{$branch}' (shallow clone, depth 1)…");
+
+                $cloneStart = microtime(true);
                 $cloner->shallowClone($cloneUrl, $branch, $checkout);
-                $this->scanLog($site, 'Clone complete.');
+                $cloneSecs = round(microtime(true) - $cloneStart, 1);
+                $this->scanLog($site, "Clone complete in {$cloneSecs}s.");
 
+                // ── Step 3: Scan ───────────────────────────────────────────────
                 $this->markScanStep($site, 'scanning');
-                $requirements = $scanner->scanLocalPath($checkout);
-                $this->scanLog($site, 'Scanned '.count($requirements['keys'] ?? []).' environment key(s).');
+                $this->scanLog($site, 'Looking for .env.example, .env.local.example, or .env.dist…');
 
+                $requirements = $scanner->scanLocalPath($checkout);
+                $allKeys = $requirements['keys'] ?? [];
+
+                $examplePath = $requirements['example_path'] ?? null;
+                if ($examplePath !== null) {
+                    $exampleFile = basename($examplePath);
+                    $exampleCount = count(array_filter($allKeys, fn ($k) => in_array('example', $k['sources'] ?? [], true)));
+                    $this->scanLog($site, "Found {$exampleFile} ({$exampleCount} declared key(s)).");
+                } else {
+                    $this->scanLog($site, 'No .env.example found — inferring required keys from code and config.');
+                }
+
+                $requiredCount = count(array_filter($allKeys, fn ($k) => (bool) ($k['required'] ?? false)));
+                $optionalCount = count($allKeys) - $requiredCount;
+                $codeCount = count(array_filter($allKeys, fn ($k) => in_array('code', $k['sources'] ?? [], true)));
+                $configCount = count(array_filter($allKeys, fn ($k) => in_array('config', $k['sources'] ?? [], true)));
+                $this->scanLog($site, sprintf(
+                    'Scanned %d key(s) total: %d required, %d optional (%d from code, %d from config).',
+                    count($allKeys), $requiredCount, $optionalCount, $codeCount, $configCount,
+                ));
+
+                // ── Step 4: Detect ─────────────────────────────────────────────
                 $this->markScanStep($site, 'detecting');
+                $this->scanLog($site, 'Identifying boot-critical environment requirements…');
             } catch (\Throwable $e) {
                 // Fail OPEN: hold and route to setup with a classified reason.
                 Log::warning('PreflightSiteSetupJob clone/scan failed', [
@@ -144,16 +182,30 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
                 }
             }
 
-            // Seed the env cache from .env.example so the wizard opens pre-filled
-            // (only when the cache is still empty — never clobber user input).
+            // ── Env cache pre-fill ─────────────────────────────────────────────
             $exampleValues = $this->exampleValues($requirements);
             if (blank($site->env_file_content) && $exampleValues !== []) {
+                $this->scanLog($site, 'Pre-filling environment from .env.example defaults ('.count($exampleValues).' key(s)).');
                 $site->forceFill([
                     'env_file_content' => $envWriter->render($exampleValues),
                 ])->save();
+            } elseif ($exampleValues === []) {
+                $this->scanLog($site, 'No .env.example defaults to pre-fill.');
+            } else {
+                $this->scanLog($site, 'Environment already has values — skipping .env.example pre-fill.');
             }
 
+            // ── Decision ──────────────────────────────────────────────────────
             $blocking = $this->blockingKeys($requirements);
+
+            if ($blocking !== []) {
+                $this->scanLog($site, count($blocking).' boot-critical variable(s) have no default and must be set before deploy:');
+                foreach ($blocking as $key) {
+                    $this->scanLog($site, "  → {$key}");
+                }
+            } else {
+                $this->scanLog($site, 'All boot-critical variables have defaults or are auto-managed.');
+            }
 
             $meta = is_array($site->meta) ? $site->meta : [];
             $meta['env_requirements'] = $requirements;
@@ -161,22 +213,24 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
             if ($blocking === []) {
                 // CLEAN — fire the first deploy. Stay live; the deploy runs on the
                 // already-provisioned host.
-                $this->scanLog($site, 'No blocking environment variables — starting first deploy.');
+                $this->scanLog($site, 'No blocking variables — starting first deploy now.');
                 $meta['setup'] = [
                     'state' => 'deploying',
                     'scanned_at' => now()->toIso8601String(),
                 ];
                 $site->forceFill(['meta' => $meta])->save();
 
+                $this->scanLog($site, 'Dispatching deploy pipeline…');
                 $fresh = $site->fresh() ?? $site;
                 $pipeline->seedRuntimeDefaults($fresh, (string) $fresh->runtime ?: 'php');
                 $coordinator->dispatchManualForGroup($fresh->fresh() ?? $fresh);
+                $this->scanLog($site, 'Deploy queued. Watch the Deployments tab for progress.');
 
                 return;
             }
 
             // HOLD — missing blocking vars. Stay live; render the setup wizard.
-            $this->scanLog($site, 'Holding for '.count($blocking).' required variable(s): '.implode(', ', $blocking));
+            $this->scanLog($site, 'Setup wizard ready. Fill the required variable(s) above, then deploy.');
             $meta['setup'] = [
                 'state' => 'needs_setup',
                 'scanned_at' => now()->toIso8601String(),

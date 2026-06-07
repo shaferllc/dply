@@ -10,10 +10,14 @@ use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceSharedHostPreview extends Component
 {
+    use RendersWorkspacePlaceholder;
     use InteractsWithServerWorkspace;
 
     public function mount(Server $server): void

@@ -15,6 +15,8 @@ use App\Support\Console\ConsoleCatalog;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 /**
  * Basic SSH console — terminal-style surface for one-off shell commands.
@@ -26,8 +28,10 @@ use Livewire\Component;
  * after the next submit.
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceConsole extends Component
 {
+    use RendersWorkspacePlaceholder;
     use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.console';

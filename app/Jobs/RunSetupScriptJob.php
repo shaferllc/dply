@@ -1179,6 +1179,45 @@ dply_repair_dpkg_state() {
   fi
 }
 
+# Lock-aware `apt-get update` with retry. A bare `apt-get update -y` under
+# `set -e` aborts the whole provision on a transient mirror/lock blip — and a
+# third-party repo (caddy/keydb/dragonfly/pgdg) that's briefly slow is exactly
+# that. Retries on lock contention and on E:/Err: output, then returns success
+# regardless so the following install step (which has its own retry and fails
+# hard on genuinely-missing packages) decides the real outcome.
+dply_apt_update() {
+  local attempt log marker=/var/lib/dply/apt-updated.stamp
+  # Skip the network round-trip when no apt source has changed since the last
+  # successful update. apt-get update re-fetches EVERY configured source each
+  # call, so 5-7 sequential updates (one per third-party repo) re-download the
+  # same indexes. With this guard, the common stack (all packages from the
+  # distro repo) does exactly one update, and a stack that adds N third-party
+  # repos updates only when a new .list/keyring actually appears.
+  if [ -f "\${marker}" ] \\
+     && [ -z "\$(find /etc/apt/sources.list /etc/apt/sources.list.d /etc/apt/keyrings -newer "\${marker}" 2>/dev/null | head -n1)" ]; then
+    echo "[dply] apt sources unchanged since last update — skipping apt-get update."
+    return 0
+  fi
+  for attempt in 1 2 3 4; do
+    dply_wait_for_apt_locks || return 1
+    log=\$(apt-get update -y 2>&1) || true
+    echo "\${log}"
+    if echo "\${log}" | grep -qE "Could not get lock|Unable to acquire the dpkg frontend lock|is held by process"; then
+      echo "[dply] apt-get update hit a lock (attempt \${attempt}/4) — retrying in 10s."
+      sleep 10
+      continue
+    fi
+    if ! echo "\${log}" | grep -qE "^(E:|Err:)"; then
+      mkdir -p /var/lib/dply && touch "\${marker}"
+      return 0
+    fi
+    echo "[dply] apt-get update reported errors (attempt \${attempt}/4) — retrying in 10s."
+    sleep 10
+  done
+  echo "[dply] WARNING: apt-get update still failing after retries; continuing — package installs will retry or fail explicitly." >&2
+  return 0
+}
+
 BASH;
     }
 }

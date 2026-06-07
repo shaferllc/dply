@@ -60,6 +60,15 @@ class HetznerService
     }
 
     /**
+     * Delete an SSH key by ID (used to clean up a temp key after a snapshot bake).
+     */
+    public function deleteSshKey(int $id): void
+    {
+        $response = $this->request('delete', "/ssh_keys/{$id}");
+        $this->assertSuccess($response, 'delete SSH key');
+    }
+
+    /**
      * Create a new server (instance) and return its ID.
      *
      * @param  array<int|string>  $sshKeyIds  Hetzner SSH key IDs or names
@@ -311,6 +320,112 @@ class HetznerService
     {
         $response = $this->request('delete', "/servers/{$id}");
         $this->assertSuccess($response, 'delete server');
+    }
+
+    // ─── Server actions (snapshot bake) ─────────────────────────────────────────
+
+    /**
+     * Power a server off (hard stop). Returns the action object so the caller
+     * can poll {@see waitForAction}. A powered-off server yields a
+     * crash-consistent snapshot.
+     *
+     * @return array<string, mixed>
+     */
+    public function powerOffServer(int $id): array
+    {
+        $response = $this->request('post', "/servers/{$id}/actions/poweroff");
+        $this->assertSuccess($response, 'power off server');
+
+        $action = $response->json()['action'] ?? null;
+        if (! is_array($action) || ! isset($action['id'])) {
+            throw new \RuntimeException('Hetzner API did not return a power-off action.');
+        }
+
+        return $action;
+    }
+
+    /**
+     * Create a snapshot image from a server. Hetzner snapshots are GLOBAL across
+     * locations (usable to create servers in any region). Returns
+     * ['action' => <action>, 'image_id' => <int>].
+     *
+     * @param  array<string, string>  $labels
+     * @return array{action: array<string, mixed>, image_id: int}
+     */
+    public function createImageFromServer(int $id, string $description, array $labels = []): array
+    {
+        $body = [
+            'type' => 'snapshot',
+            'description' => $description,
+        ];
+        if ($labels !== []) {
+            $body['labels'] = $labels;
+        }
+
+        $response = $this->request('post', "/servers/{$id}/actions/create_image", $body);
+        $this->assertSuccess($response, 'create image from server');
+
+        $data = $response->json();
+        $action = $data['action'] ?? null;
+        $imageId = (int) ($data['image']['id'] ?? 0);
+        if (! is_array($action) || ! isset($action['id']) || $imageId <= 0) {
+            throw new \RuntimeException('Hetzner API did not return a create_image action + image id.');
+        }
+
+        return ['action' => $action, 'image_id' => $imageId];
+    }
+
+    /**
+     * Fetch a single action by ID from the global actions endpoint.
+     *
+     * @return array<string, mixed>
+     */
+    public function getAction(int $actionId): array
+    {
+        $response = $this->request('get', "/actions/{$actionId}");
+        $this->assertSuccess($response, 'get action');
+
+        $action = $response->json()['action'] ?? null;
+        if (! is_array($action)) {
+            throw new \RuntimeException('Hetzner API did not return an action.');
+        }
+
+        return $action;
+    }
+
+    /**
+     * Poll an action until it reaches a terminal state. Throws on `error` or
+     * timeout. $onTick receives each polled action snapshot.
+     *
+     * @param  callable(array<string, mixed>):void|null  $onTick
+     */
+    public function waitForAction(int $actionId, int $timeoutSeconds = 2400, int $pollSeconds = 10, ?callable $onTick = null): void
+    {
+        $deadline = time() + max(1, $timeoutSeconds);
+
+        while (time() < $deadline) {
+            $action = $this->getAction($actionId);
+            $status = (string) ($action['status'] ?? '');
+
+            if ($onTick !== null) {
+                $onTick($action);
+            }
+
+            if ($status === 'success') {
+                return;
+            }
+
+            if ($status === 'error') {
+                $message = is_array($action['error'] ?? null)
+                    ? (string) ($action['error']['message'] ?? 'unknown error')
+                    : 'unknown error';
+                throw new \RuntimeException("Hetzner action {$actionId} failed: {$message}");
+            }
+
+            sleep(max(1, $pollSeconds));
+        }
+
+        throw new \RuntimeException("Hetzner action {$actionId} did not finish within {$timeoutSeconds}s.");
     }
 
     // ─── Load Balancers ───────────────────────────────────────────────────────

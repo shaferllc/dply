@@ -135,6 +135,58 @@ final class ServerImageCatalog
     }
 
     /**
+     * Resolve a pre-baked snapshot/image ID for a region from the provider's
+     * `services.<provider>.baked_snapshots` config. Returns null when none is
+     * configured — provisioning then falls back to the stock distro image.
+     *
+     * Two config shapes are supported, because providers differ:
+     *   - A JSON region→id map, e.g. {"nyc1":"123","sfo3":"456"} — for providers
+     *     whose snapshots are REGION-SCOPED (DigitalOcean): the snapshot must
+     *     match the droplet's region.
+     *   - A bare id string (or int), e.g. "171234567" — for providers whose
+     *     snapshots are GLOBAL across locations (Hetzner Cloud): the same image
+     *     applies to every region.
+     *
+     * When a snapshot is used, the on-box setup script still runs but skip-fasts
+     * every already-installed step (dpkg -s + /var/lib/dply/steps markers),
+     * collapsing minutes of apt into seconds.
+     */
+    public static function bakedSnapshotForRegion(string $provider, ?string $region): ?string
+    {
+        $value = config("services.{$provider}.baked_snapshots");
+
+        if (is_string($value)) {
+            $trimmed = trim($value);
+            if ($trimmed === '') {
+                return null;
+            }
+            $decoded = json_decode($trimmed, true);
+            if (is_array($decoded)) {
+                $value = $decoded; // region→id map
+            } else {
+                return $trimmed; // bare global id (e.g. Hetzner) — applies to all regions
+            }
+        }
+
+        // Non-array, non-string scalar (e.g. an int id straight from config) → global.
+        if (! is_array($value)) {
+            return $value === null ? null : (string) $value;
+        }
+
+        $region = trim((string) $region);
+        if ($region === '') {
+            return null;
+        }
+
+        $id = $value[$region] ?? null;
+        if (is_int($id)) {
+            return (string) $id;
+        }
+
+        return is_string($id) && trim($id) !== '' ? trim($id) : null;
+    }
+
+    /**
      * Human label for an image key (for review/summary screens), or null when
      * the key is blank/unknown.
      */

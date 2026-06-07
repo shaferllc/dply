@@ -15,6 +15,8 @@ use App\Services\DigitalOceanService;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 use Throwable;
 
 /**
@@ -28,8 +30,10 @@ use Throwable;
  * reflects the latest job-written state without the user reloading.
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceCluster extends Component
 {
+    use RendersWorkspacePlaceholder;
     use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.cluster';

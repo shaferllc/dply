@@ -22,9 +22,12 @@ return [
     | Wait for SSH after cloud assigns a public IP (before stack setup)
     |--------------------------------------------------------------------------
     */
-    'ssh_ready_max_attempts' => max(5, (int) env('DPLY_SSH_READY_MAX_ATTEMPTS', 45)),
+    // Tighter cadence (4s) so the setup script starts within a couple of probes
+    // of sshd coming up, with the attempt count raised to preserve the same
+    // ~360s worst-case window (90 × 4s).
+    'ssh_ready_max_attempts' => max(5, (int) env('DPLY_SSH_READY_MAX_ATTEMPTS', 90)),
 
-    'ssh_ready_retry_seconds' => max(3, (int) env('DPLY_SSH_READY_RETRY_SECONDS', 8)),
+    'ssh_ready_retry_seconds' => max(3, (int) env('DPLY_SSH_READY_RETRY_SECONDS', 4)),
 
     /*
     | Log SSH readiness polling at info level every N attempts (1 = every attempt).

@@ -16,14 +16,18 @@ use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 /**
  * OS patch workspace — inventory probe rollup plus apt actions, unattended-upgrades
  * controls, and reboot guidance (formerly split across Manage → Updates).
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspacePatchAdvisor extends Component
 {
+    use RendersWorkspacePlaceholder;
     use ConfirmsActionWithModal;
     use InteractsWithServerWorkspace;
     use RequiresFeature;

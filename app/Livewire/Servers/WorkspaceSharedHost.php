@@ -20,13 +20,17 @@ use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 /**
  * Per-site resource attribution, shared stack map, and contention timeline for multi-site VMs.
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceSharedHost extends Component
 {
+    use RendersWorkspacePlaceholder;
     use DispatchesToastNotifications;
     use InteractsWithServerWorkspace;
     use RequiresFeature;

@@ -19,6 +19,8 @@ use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 /**
  * Run page — the merged surface for executing things on a server.
@@ -35,8 +37,10 @@ use Livewire\Component;
  * deploys live on each site's own page.
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceRun extends Component
 {
+    use RendersWorkspacePlaceholder;
     use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.run';

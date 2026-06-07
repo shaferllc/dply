@@ -37,10 +37,14 @@ use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceMonitor extends Component
 {
+    use RendersWorkspacePlaceholder;
     use ConfirmsServerMonitoringInstall;
     use CreatesNotificationChannelInline;
     use InteractsWithServerWorkspace;

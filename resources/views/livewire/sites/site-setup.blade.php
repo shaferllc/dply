@@ -38,10 +38,10 @@
                          PreflightSiteSetupJob::markScanStep). --}}
                     @php
                         $scanSteps = [
-                            'resolving' => ['label' => __('Resolving repository access'), 'desc' => __('Authenticating with your git provider.')],
-                            'cloning' => ['label' => __('Cloning the repository'), 'desc' => __('Pulling a shallow copy of your branch.')],
-                            'scanning' => ['label' => __('Scanning for configuration'), 'desc' => __('Reading .env.example and code for the variables it needs.')],
-                            'detecting' => ['label' => __('Detecting resources'), 'desc' => __('Working out the databases, cache and queues to offer.')],
+                            'resolving' => ['label' => __('Resolving repository access'), 'desc' => __('Verifying credentials and obtaining an authenticated clone URL.')],
+                            'cloning' => ['label' => __('Cloning the repository'), 'desc' => __('Fetching a shallow copy of your branch (depth 1).')],
+                            'scanning' => ['label' => __('Scanning for configuration'), 'desc' => __('Reading .env.example, app code, and config for every env() reference.')],
+                            'detecting' => ['label' => __('Detecting resources'), 'desc' => __('Checking which boot-critical variables need values before the first deploy.')],
                         ];
                         $stepKeys = array_keys($scanSteps);
                         $currentStep = (string) data_get($site->meta, 'setup.scan_step', '');
@@ -120,14 +120,15 @@
                                     {{ __('Job console') }}
                                 </div>
                                 <div
-                                    class="max-h-48 overflow-y-auto rounded-xl border border-brand-ink/10 bg-brand-ink/[0.035] p-3 font-mono text-[11px] leading-relaxed text-brand-ink"
+                                    class="max-h-72 overflow-y-auto rounded-xl border border-brand-ink/10 bg-brand-ink/[0.035] p-3 font-mono text-[11px] leading-relaxed text-brand-ink"
                                     x-data
                                     x-init="$el.scrollTop = $el.scrollHeight; new MutationObserver(() => $el.scrollTop = $el.scrollHeight).observe($el, { childList: true, subtree: true })"
                                 >
                                     @foreach ($scanConsole as $entry)
+                                        @php $line = $entry['line'] ?? ''; $isIndent = str_starts_with($line, '  →'); @endphp
                                         <div class="flex gap-2">
                                             <span class="shrink-0 text-brand-mist">{{ \Illuminate\Support\Carbon::parse($entry['at'] ?? now())->format('H:i:s') }}</span>
-                                            <span class="min-w-0 break-words">{{ $entry['line'] ?? '' }}</span>
+                                            <span class="{{ $isIndent ? 'text-brand-rust' : '' }} min-w-0 break-words">{{ $line }}</span>
                                         </div>
                                     @endforeach
                                 </div>
@@ -193,12 +194,13 @@
                                     <x-heroicon-o-command-line class="h-4 w-4" aria-hidden="true" />
                                     {{ __('Job console') }}
                                 </div>
-                                <div class="max-h-48 overflow-y-auto rounded-xl border border-brand-ink/10 bg-brand-ink/[0.035] p-3 font-mono text-[11px] leading-relaxed text-brand-ink"
+                                <div class="max-h-72 overflow-y-auto rounded-xl border border-brand-ink/10 bg-brand-ink/[0.035] p-3 font-mono text-[11px] leading-relaxed text-brand-ink"
                                     x-data x-init="$el.scrollTop = $el.scrollHeight">
                                     @foreach ($scanConsole as $entry)
+                                        @php $line = $entry['line'] ?? ''; $isIndent = str_starts_with($line, '  →'); @endphp
                                         <div class="flex gap-2">
                                             <span class="shrink-0 text-brand-mist">{{ \Illuminate\Support\Carbon::parse($entry['at'] ?? now())->format('H:i:s') }}</span>
-                                            <span class="min-w-0 break-words">{{ $entry['line'] ?? '' }}</span>
+                                            <span class="{{ $isIndent ? 'text-brand-rust' : '' }} min-w-0 break-words">{{ $line }}</span>
                                         </div>
                                     @endforeach
                                 </div>

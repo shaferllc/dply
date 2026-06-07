@@ -17,9 +17,9 @@ class PollOracleIpJob implements ShouldQueue
     use HandlesFakeCloudPoll;
     use Queueable;
 
-    public int $tries = 60;
+    public int $tries = 180;
 
-    public int $backoff = 15;
+    public int $backoff = 5;
 
     public function __construct(
         public Server $server

@@ -15,6 +15,8 @@ use App\Models\ServerCronJob;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 /**
  * Snapshots surface for dedicated cache servers (server_role redis/valkey). Run-now
@@ -26,8 +28,10 @@ use Livewire\Component;
  * Operators can manually `scp` an RDB from S3 onto the box meanwhile.
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceRedisSnapshots extends Component
 {
+    use RendersWorkspacePlaceholder;
     use InteractsWithServerWorkspace;
 
     /** Form: existing BackupConfiguration to use for the run-now snapshot. */

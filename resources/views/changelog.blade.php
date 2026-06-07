@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 6, 2026',
+                    'tags'    => ['improved'],
+                    'title'   => 'Faster Server Provisioning',
+                    'summary' => 'New servers launch from region-scoped baked snapshots when available and poll for their IP address faster, cutting provisioning time.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
                     'tags'    => ['new'],
                     'title'   => 'Automatic Recovery For Stalled Provisions',
                     'summary' => 'Wedged server provisions now surface and recover automatically when a remote task goes silent, and machine callbacks keep working during maintenance windows.',

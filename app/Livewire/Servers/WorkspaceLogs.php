@@ -13,10 +13,14 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceLogs extends Component
 {
+    use RendersWorkspacePlaceholder;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use ManagesServerSystemLogs;

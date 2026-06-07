@@ -14,6 +14,8 @@ use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 /**
  * SSH auth failure volume, fail2ban jails, host firewall posture, and sshd
@@ -25,8 +27,10 @@ use Livewire\Component;
  * workspace.
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceSecurityDigest extends Component
 {
+    use RendersWorkspacePlaceholder;
     use InteractsWithServerWorkspace;
     use RequiresFeature;
     use RunsServerSecurityDigestScan;

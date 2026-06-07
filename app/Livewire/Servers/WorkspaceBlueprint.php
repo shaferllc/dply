@@ -16,13 +16,17 @@ use Illuminate\Validation\Rule;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 /**
  * Capture this VM as an org golden-server blueprint and manage saved snapshots.
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceBlueprint extends Component
 {
+    use RendersWorkspacePlaceholder;
     use InteractsWithServerWorkspace;
     use RequiresFeature;
 

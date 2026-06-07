@@ -9,14 +9,18 @@ use App\Models\Server;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 /**
  * Coming-soon placeholder for the browser SSH console when
  * {@see workspace.console_preview} is on and {@see workspace.console} is off.
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceConsolePreview extends Component
 {
+    use RendersWorkspacePlaceholder;
     use InteractsWithServerWorkspace;
 
     public Server $server;
