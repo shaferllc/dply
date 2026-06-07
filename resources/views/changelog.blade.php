@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 7, 2026',
+                    'tags'    => ['fixed'],
+                    'title'   => 'Log Agent Install Reliability',
+                    'summary' => 'Log agent installs no longer get stuck on "installing" and now report a clear failure when the server isn\'t a reachable VM host.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 7, 2026',
                     'tags'    => ['new'],
                     'title'   => 'Server Logs Add-On',
                     'summary' => 'Servers can now ship all host logs to a managed ClickHouse store via an installable Vector agent with a native log explorer, plus scheduler runs capture and retain their output history.',

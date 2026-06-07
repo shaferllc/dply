@@ -47,13 +47,20 @@ class InstallLogAgentJob implements ShouldBeUnique, ShouldQueue
         ExecuteRemoteTaskOnServer $executor,
         VectorLogAgentInstallScripts $scripts,
     ): void {
-        if (! (bool) config('server_logs.enabled', false)) {
-            return;
-        }
-
+        // NOTE: intentionally NOT re-checking config('server_logs.enabled') here.
+        // The enable action already gates on it; re-checking inside a long-running
+        // queue worker is fragile to config drift (a worker booted before the
+        // config existed sees it false and silently no-ops, stranding the row at
+        // "installing" forever). Reaching this job means enablement was intended.
         /** @var ServerLogAgent|null $agent */
         $agent = ServerLogAgent::query()->with('server')->find($this->serverLogAgentId);
         if ($agent === null || $agent->server === null || ! $agent->server->isVmHost()) {
+            // Can't proceed — don't leave the UI stuck on "installing".
+            $agent?->update([
+                'status' => ServerLogAgent::STATUS_FAILED,
+                'error_message' => 'Server is not a reachable VM host.',
+            ]);
+
             return;
         }
 
