@@ -148,7 +148,14 @@
                     @elseif ($section === 'environment')
                         @include('livewire.sites.settings.partials.environment')
                     @elseif ($section === 'resources')
-                        @include('livewire.sites.settings.partials.resource-map')
+                        @if ($isContainerWorkspace)
+                            {{-- Container/Cloud sites keep their managed Cloud resources
+                                 panel (CloudDatabase/CloudWorker), now embedded in the
+                                 workspace chrome. VM sites use the bindings hub. --}}
+                            @livewire(\App\Livewire\Sites\Resources::class, ['server' => $server, 'site' => $site], key('cloud-resources-'.$site->id))
+                        @else
+                            @include('livewire.sites.settings.partials.resource-map')
+                        @endif
                     @elseif ($section === 'logs')
                         @if (workspace_surface_coming_soon('site_logs'))
                             <x-workspace-coming-soon

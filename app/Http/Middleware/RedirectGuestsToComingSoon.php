@@ -41,7 +41,32 @@ class RedirectGuestsToComingSoon
             return $next($request);
         }
 
+        // Machine-to-machine callbacks must never be redirected to the
+        // coming-soon teaser. Provisioned servers POST task lifecycle
+        // results to /webhook/task/* (update-output, mark-as-failed, …) and
+        // deploy/git callbacks land on /hooks/*; the uptime probe hits /up.
+        // These have their own auth (signed URLs / webhook secrets / throttle)
+        // and carry no session, so a 302 here silently swallows the POST —
+        // which is exactly what wedged server provisioning during the beta:
+        // every mark-as-failed callback bounced to /coming-soon, so tasks
+        // stayed "running" forever and the provision journey spun with no
+        // error. Let them through regardless of the gate.
+        if ($this->isMachineCallback($request)) {
+            return $next($request);
+        }
+
         return redirect()->route('coming-soon');
+    }
+
+    /**
+     * Unauthenticated machine callbacks that must bypass the coming-soon gate:
+     * task lifecycle webhooks, deploy/git hooks, and the health probe. Each has
+     * its own request authentication, so skipping the gate is safe.
+     */
+    private function isMachineCallback(Request $request): bool
+    {
+        return $request->is('webhook/*', 'hooks/*', 'up')
+            || $request->routeIs('webhook.*');
     }
 
     private function isLocalDevelopmentRequest(Request $request): bool

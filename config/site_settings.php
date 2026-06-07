@@ -21,6 +21,7 @@ return [
         'rails-stack' => ['label' => 'Rails'],
         'wordpress' => ['label' => 'WordPress'],
         'environment' => ['label' => 'Environment'],
+        'resources' => ['label' => 'Resources'],
         'logs' => ['label' => 'Logs'],
         'platform' => ['label' => 'Platform'],
         'notifications' => ['label' => 'Notifications'],

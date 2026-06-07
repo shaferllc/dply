@@ -112,7 +112,7 @@
                                 'organization' => ['organization' => $site->organization_id ?? auth()->user()?->currentOrganization()?->id],
                                 default => ['server' => $server, 'site' => $site],
                             };
-                            $href = route($item['route'], $routeArgs);
+                            $href = route($item['route'], $routeArgs + ($item['route_query'] ?? []));
                         } else {
                             $href = route('sites.show', array_merge([
                                 'server' => $server,

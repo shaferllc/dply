@@ -1166,62 +1166,25 @@ final class ServerProvisionCommandBuilder
             ...$this->ensureOndrejPhpRepository(),
         ];
 
-        $pkgs = [
+        // Core PHP packages — the runtime, the FPM unit, the shared module
+        // bundle, the must-have string/markup/HTTP extensions, the selected DB
+        // driver, and SQLite for the test suite. These all exist in both
+        // Ubuntu's stock repo and ondrej/sury, so a missing one here is a
+        // genuine failure that SHOULD abort the provision (strict install).
+        $requiredPkgs = [
             $stem.'-cli',
             $stem.'-fpm',
             $stem.'-common',
             $stem.'-mbstring',
             $stem.'-xml',
             $stem.'-curl',
-            $stem.'-zip',
-            $stem.'-intl',
-            $stem.'-bcmath',
-            // phpredis client extension. Provisioning installs the Redis *daemon*
-            // (see roleCacheHost/roleRedis) but the PHP client was missing, so a
-            // Laravel app — which defaults to REDIS_CLIENT=phpredis — boots straight
-            // into `Class "Redis" not found` for cache/session/queue/Horizon. The
-            // baked DO snapshot and the manual setup-script presets already ship it;
-            // this aligns the core apt path so fresh servers match.
-            $stem.'-redis',
-            // GD image library — needed by spatie/media-library, intervention/image,
-            // QR-code generators, avatar packages, and many other ecosystem packages.
-            // Shipped by the DO snapshot bake and both setup-script presets but was
-            // missing here, so fresh apt-provisioned servers broke on first image op.
-            $stem.'-gd',
-            // Sodium cryptography — Laravel 9+ prefers ext-sodium for encryption
-            // (falls back to openssl) and several packages declare it as a hard
-            // requirement. Included in the setup-script presets; aligning here.
-            $stem.'-sodium',
-            // GNU Multiple Precision — suggested/required by ramsey/uuid (which
-            // Laravel depends on), moneyphp/money, league/uri, and several
-            // web-auth / CBOR libs. No system-level dep; pure PHP extension.
-            $stem.'-gmp',
-            // APCu in-memory user cache — suggested by laravel/framework for the
-            // `apcu` cache driver. Small package, zero external deps, and a useful
-            // local-memory cache for things like permission/config micro-caching.
-            $stem.'-apcu',
-            // igbinary serializer — pairs with ext-redis: phpredis can use igbinary
-            // instead of PHP's native serialize, producing ~40% smaller payloads and
-            // faster (de)serialization for cache/session/queue values. No downside
-            // to having it installed alongside ext-redis even if not configured yet.
-            $stem.'-igbinary',
         ];
 
-        // OPcache is a standalone phpX.Y-opcache package up to 8.4; from 8.5 it
-        // ships bundled with the core build (no separate package in ondrej/php),
-        // so requesting it aborts the apt install with "Unable to locate package".
-        if (version_compare($php, '8.5', '<')) {
-            $pkgs[] = $stem.'-opcache';
-        }
-
         if (str_starts_with($database, 'postgres')) {
-            $pkgs[] = $stem.'-pgsql';
-        } elseif (in_array($database, ['mysql84', 'mysql80', 'mysql57', 'mariadb114', 'mariadb11', 'mariadb1011'], true)) {
-            $pkgs[] = $stem.'-mysql';
+            $requiredPkgs[] = $stem.'-pgsql';
         } else {
-            // Default / unrecognised → install MySQL driver. SQLite is always
-            // included unconditionally below so it doesn't need a branch here.
-            $pkgs[] = $stem.'-mysql';
+            // Default / MySQL / MariaDB / unrecognised → MySQL driver.
+            $requiredPkgs[] = $stem.'-mysql';
         }
 
         // SQLite is always installed regardless of the chosen primary database:
@@ -1229,11 +1192,53 @@ final class ServerProvisionCommandBuilder
         // with :memory: or a tmp file), even when production runs MySQL or Postgres.
         // The setup-script presets already bundle it unconditionally; this aligns
         // the apt-provisioned path so `php artisan test` works out of the box.
-        $pkgs[] = $stem.'-sqlite3';
+        $requiredPkgs[] = $stem.'-sqlite3';
+
+        // Optional extensions — these improve compatibility/performance but a
+        // Laravel app boots fine without any of them, and crucially NOT every
+        // one is packaged in every repo. Ubuntu noble ships php8.3 but builds
+        // sodium into the core (there is no separate php8.3-sodium package), and
+        // ondrej/sury can be briefly unreachable from a fresh droplet. Installed
+        // best-effort (any package apt can't see is skipped with a log line) so
+        // a single unavailable extension can't abort the whole provision — which
+        // is exactly what wedged servers on `E: Unable to locate package
+        // php8.3-sodium`.
+        $optionalPkgs = [
+            // phpredis client extension. Provisioning installs the Redis *daemon*
+            // (see roleCacheHost/roleRedis); the PHP client default is phpredis,
+            // so without it a Laravel app hits `Class "Redis" not found`.
+            $stem.'-redis',
+            // GD image library — spatie/media-library, intervention/image, QR/avatar libs.
+            $stem.'-gd',
+            // Sodium cryptography — Laravel prefers ext-sodium (falls back to openssl).
+            $stem.'-sodium',
+            // GNU Multiple Precision — ramsey/uuid, moneyphp/money, league/uri, web-auth.
+            $stem.'-gmp',
+            // APCu in-memory user cache — the `apcu` cache driver.
+            $stem.'-apcu',
+            // igbinary serializer — compact payloads for phpredis cache/session/queue.
+            $stem.'-igbinary',
+            // Archive handling (Composer), i18n formatting, arbitrary-precision math.
+            $stem.'-zip',
+            $stem.'-intl',
+            $stem.'-bcmath',
+        ];
+
+        // OPcache is a standalone phpX.Y-opcache package up to 8.4; from 8.5 it
+        // ships bundled with the core build (no separate package), so on 8.5+
+        // the best-effort filter below simply skips it.
+        if (version_compare($php, '8.5', '<')) {
+            $optionalPkgs[] = $stem.'-opcache';
+        }
 
         $lines = array_merge($lines, $this->ensurePackagesInstalled(
-            $pkgs,
-            '[dply] PHP packages already installed; skipping package install.'
+            $requiredPkgs,
+            '[dply] core PHP packages already installed; skipping package install.'
+        ));
+
+        $lines = array_merge($lines, $this->ensureOptionalPackagesInstalled(
+            $optionalPkgs,
+            '[dply] optional PHP extensions already installed; skipping.'
         ));
 
         // apt-get respects /usr/sbin/policy-rc.d during install (returns 101 → don't start services),
@@ -2148,6 +2153,75 @@ APACHE,
 
         return [
             'if '.implode(' && ', $checks).'; then echo '.escapeshellarg($alreadyInstalledMessage).'; else '.$installBlock.'; fi',
+        ];
+    }
+
+    /**
+     * Best-effort install of OPTIONAL packages: filter the requested list to
+     * those apt can actually resolve in the configured repos, then install only
+     * those. Unlike {@see ensurePackagesInstalled}, a package that is missing
+     * from every repo is logged and skipped rather than aborting the provision
+     * (apt-get's "E: Unable to locate package" otherwise trips the exit 100
+     * path). Use this only for extensions the app can boot without — required
+     * packages must go through the strict installer.
+     *
+     * @param  list<string>  $packages
+     * @return list<string>
+     */
+    private function ensureOptionalPackagesInstalled(array $packages, string $alreadyInstalledMessage): array
+    {
+        $packages = array_values(array_filter($packages, fn (string $package): bool => trim($package) !== ''));
+        if ($packages === []) {
+            return [];
+        }
+
+        $quoted = implode(' ', array_map(
+            fn (string $package): string => escapeshellarg($package),
+            $packages,
+        ));
+
+        // Resolve the available subset on the box (apt-cache show succeeds only
+        // when the package has a candidate in some configured source), then run
+        // the same lock-aware retry loop used for required installs. No `exit`
+        // on apt error here — optional means optional.
+        $filterAndInstall = implode("\n", [
+            '_dply_opt_avail=""',
+            'for _dply_opt_pkg in '.$quoted.'; do',
+            '  if apt-cache show "$_dply_opt_pkg" >/dev/null 2>&1; then',
+            '    _dply_opt_avail="$_dply_opt_avail $_dply_opt_pkg"',
+            '  else',
+            '    echo "[dply] optional PHP extension $_dply_opt_pkg not available in configured repos — skipping."',
+            '  fi',
+            'done',
+            'if [ -n "$_dply_opt_avail" ]; then',
+            '  dply_wait_for_apt_locks || exit 100',
+            '  for _dply_apt_attempt in 1 2 3 4 5 6; do',
+            '    dply_wait_for_apt_locks || exit 100',
+            '    _dply_apt_log=$(DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends $_dply_opt_avail 2>&1) || true',
+            '    echo "$_dply_apt_log"',
+            '    if echo "$_dply_apt_log" | grep -qE "Could not get lock|Unable to acquire the dpkg frontend lock|is held by process"; then',
+            '      echo "[dply] apt lock during optional-ext install — sleeping 15s before retry $_dply_apt_attempt/6."',
+            '      sleep 15',
+            '      continue',
+            '    fi',
+            '    break',
+            '  done',
+            'else',
+            '  echo "[dply] no optional PHP extensions available to install."',
+            'fi',
+        ]);
+
+        if ($this->forceReinstall()) {
+            return [$filterAndInstall];
+        }
+
+        $checks = array_map(
+            fn (string $package): string => 'dpkg -s '.escapeshellarg($package).' >/dev/null 2>&1',
+            $packages,
+        );
+
+        return [
+            'if '.implode(' && ', $checks).'; then echo '.escapeshellarg($alreadyInstalledMessage).'; else'."\n".$filterAndInstall."\n".'fi',
         ];
     }
 

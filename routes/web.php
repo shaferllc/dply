@@ -203,7 +203,6 @@ use App\Livewire\Sites\Files;
 use App\Livewire\Sites\Index as SitesIndex;
 use App\Livewire\Sites\Monitor as SitesMonitor;
 use App\Livewire\Sites\Repository;
-use App\Livewire\Sites\Resources;
 use App\Livewire\Sites\ScaffoldJourney;
 use App\Livewire\Sites\Schedule;
 use App\Livewire\Sites\ServerlessRouting;
@@ -713,7 +712,14 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // future iterations).
     Route::livewire('servers/{server}/sites/{site}/schedule', Schedule::class)->name('sites.schedule');
     Route::livewire('servers/{server}/sites/{site}/workers', Workers::class)->name('sites.workers');
-    Route::livewire('servers/{server}/sites/{site}/resources', Resources::class)->name('sites.resources');
+    // Unified Resources surface. Routes through the site workspace controller
+    // (same chrome + Settings/EdgeSettings dispatch as sites.show) on the
+    // `resources` section: VM sites render the new bindings hub, container sites
+    // render the Cloud resources panel — both inside the normal workspace, at
+    // one canonical /resources URL. (Was a standalone Cloud-only component.)
+    Route::get('servers/{server}/sites/{site}/resources', SiteWorkspaceController::class)
+        ->defaults('section', 'resources')
+        ->name('sites.resources');
     // NETWORKING group for serverless / container workspaces — manages the dply
     // edge proxy (hostname/DNS, custom domains, redirects, headers + CORS,
     // invocation URLs). MUST live on its own path: the generic VM routing surface

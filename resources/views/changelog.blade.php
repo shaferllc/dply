@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 6, 2026',
+                    'tags'    => ['fixed'],
+                    'title'   => 'Reliable Server Provisioning',
+                    'summary' => 'Server provisioning no longer stalls when machine callbacks hit the coming-soon gate or when an optional PHP extension is unavailable in the configured apt repositories.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
                     'tags'    => ['improved'],
                     'title'   => 'Unified Button Styling
 Unified Button And Binding UI',

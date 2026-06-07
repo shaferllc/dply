@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Fixed
+- Server provisioning no longer stalls when machine callbacks hit the coming-soon gate or when an optional PHP extension is unavailable in the configured apt repositories.
 ### Changed
 - Standardized button and icon styling across the dashboard and added a site binding catalog powering site settings navigation.
 ### Changed
