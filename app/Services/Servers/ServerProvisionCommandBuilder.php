@@ -92,6 +92,7 @@ final class ServerProvisionCommandBuilder
 
         $lines = array_merge($lines, $this->dplyDeployUserBootstrap($server));
         $lines = array_merge($lines, $this->bootstrap());
+        $lines = array_merge($lines, $this->prefetchPackages($web, $php, $database, $cache));
         $lines = array_merge($lines, $this->createDeployLayout($layout));
         $lines = array_merge($lines, match ($role) {
             'application' => $this->roleApplication($web, $php, $database, $cache, $layout),
@@ -105,6 +106,9 @@ final class ServerProvisionCommandBuilder
             default => [],
         });
 
+        // Join any background runtime installs (parallel_runtimes) before we
+        // verify — node/etc. must be present for verification + first deploy.
+        $lines = array_merge($lines, $this->waitForBackgroundRuntimes());
         $lines = array_merge($lines, $this->metricsAgent($server));
         $lines = array_merge($lines, $this->verificationCommands($role, $web, $php, $database, $cache));
         $lines = array_merge($lines, $this->deployGitIdentity($server));
@@ -743,14 +747,24 @@ final class ServerProvisionCommandBuilder
      */
     private function roleApplication(string $web, string $php, string $database, string $cache, array $layout): array
     {
+        $miseParallel = (bool) config('server_provision.parallel_runtimes', false);
+
         $lines = [];
         $lines = array_merge($lines, $this->ufwSsh());
         $lines = array_merge($lines, $this->installWebserver($web));
+        // Parallel mode: launch mise + its (lock-free) runtime downloads BEFORE
+        // the apt-heavy PHP/DB/cache steps so they overlap. Sequential mode keeps
+        // mise in its original late position (no behaviour change).
+        if ($miseParallel) {
+            $lines = array_merge($lines, $this->maybeInstallMise());
+        }
         $lines = array_merge($lines, $this->installPhpIfNeeded($web, $php, $database));
         $lines = array_merge($lines, $this->installDatabaseIfNeeded($database));
         $lines = array_merge($lines, $this->installAppCache($cache));
         $lines = array_merge($lines, $this->maybeInstallSupervisor());
-        $lines = array_merge($lines, $this->maybeInstallMise());
+        if (! $miseParallel) {
+            $lines = array_merge($lines, $this->maybeInstallMise());
+        }
         $lines = array_merge($lines, $this->writeRenderedConfigs('application', $web, $php, $layout));
         $lines = array_merge($lines, $this->installComposerIfNeeded($php));
 
@@ -806,13 +820,20 @@ final class ServerProvisionCommandBuilder
         // vhost-and-FPM pipeline as application hosts. The server-default
         // Caddyfile is a placeholder catch-all — per-site vhosts under
         // /etc/caddy/sites-enabled/ take over for real hostnames.
+        $miseParallel = (bool) config('server_provision.parallel_runtimes', false);
+
         $lines = [];
         $lines = array_merge($lines, $this->ufwSsh());
         $lines = array_merge($lines, $this->installWebserver($web));
+        if ($miseParallel) {
+            $lines = array_merge($lines, $this->maybeInstallMise());
+        }
         $lines = array_merge($lines, $this->installPhpIfNeeded($web, $php, $database));
         $lines = array_merge($lines, $this->installDatabaseIfNeeded($database));
         $lines = array_merge($lines, $this->maybeInstallSupervisor());
-        $lines = array_merge($lines, $this->maybeInstallMise());
+        if (! $miseParallel) {
+            $lines = array_merge($lines, $this->maybeInstallMise());
+        }
         $lines = array_merge($lines, $this->writeRenderedConfigs('worker', $web, $php, $layout));
         $lines = array_merge($lines, $this->installComposerIfNeeded($php));
 
@@ -947,21 +968,136 @@ final class ServerProvisionCommandBuilder
         $mise = app(MiseInstallScriptBuilder::class);
         $deployUser = (string) config('server_provision.deploy_ssh_user', 'dply');
 
+        // mise itself installs via apt (must be sequential — holds the dpkg
+        // lock). The per-runtime installs below (`mise use …`) download
+        // language binaries from github/nodejs.org and DON'T touch the dpkg
+        // lock, so they can run concurrently with the apt-heavy PHP/MySQL steps.
         $lines = array_merge(
             [$this->stepMarker('Installing mise (Node / Python / Ruby / Go manager)')],
             $mise->installLines($this->forceReinstall()),
             $mise->activateForUserLines($deployUser),
         );
 
+        $runtimeLines = [];
         $defaults = $this->serverRuntimeDefaults();
         foreach ($defaults as $runtime => $version) {
-            $lines = array_merge(
-                $lines,
+            $runtimeLines = array_merge(
+                $runtimeLines,
                 $mise->installRuntimeForUserLines($deployUser, $runtime, $version),
             );
         }
 
+        if ($runtimeLines === []) {
+            return $lines;
+        }
+
+        // Sequential (default): install runtimes inline.
+        if (! (bool) config('server_provision.parallel_runtimes', false)) {
+            return array_merge($lines, $runtimeLines);
+        }
+
+        // Parallel (opt-in): run the runtime downloads in a background subshell
+        // and record its PID so waitForBackgroundRuntimes() (emitted before
+        // verification) can join + report. Best-effort: a runtime failure warns
+        // rather than aborting the whole provision.
+        $bg = implode("\n", $runtimeLines);
+        $lines[] = 'mkdir -p /var/lib/dply';
+        $lines[] = "(\n".$bg."\n) > /var/lib/dply/mise-runtimes.log 2>&1 &";
+        $lines[] = 'echo $! > /var/lib/dply/mise-runtimes.pid';
+        $lines[] = 'echo "[dply] runtime installs (node/python/…) running in background to overlap apt steps."';
+
         return $lines;
+    }
+
+    /**
+     * Join background runtime installs started by maybeInstallMise() under the
+     * parallel_runtimes flag. No-op when nothing ran in the background (the PID
+     * file only exists when the flag is on and runtimes were queued). A failed
+     * background install warns (with its log) rather than aborting — the runtime
+     * can be reinstalled via the workspace later.
+     *
+     * @return list<string>
+     */
+    private function waitForBackgroundRuntimes(): array
+    {
+        return [
+            'if [ -f /var/lib/dply/mise-runtimes.pid ]; then '
+                .'_dply_rt_pid=$(cat /var/lib/dply/mise-runtimes.pid 2>/dev/null || echo ""); '
+                .'echo "[dply] waiting for background runtime installs (pid ${_dply_rt_pid})…"; '
+                .'if [ -n "${_dply_rt_pid}" ] && wait "${_dply_rt_pid}"; then '
+                    .'echo "[dply] background runtime installs finished."; '
+                .'else '
+                    .'echo "[dply] WARNING: background runtime install reported a failure — see log:" >&2; '
+                    .'cat /var/lib/dply/mise-runtimes.log >&2 2>/dev/null || true; '
+                .'fi; '
+                .'rm -f /var/lib/dply/mise-runtimes.pid; '
+            .'fi',
+        ];
+    }
+
+    /**
+     * Combined parallel download (prefetch_packages flag): pre-download the
+     * stack's stock-repo packages in ONE apt transaction after the base update,
+     * so apt fetches them in parallel and the per-component installs are
+     * disk-only. Runtime-filtered to packages apt can actually resolve at this
+     * point (third-party repos like pgdg/ondrej may not be added yet), and
+     * fully best-effort — anything not prefetched simply downloads at install
+     * time as before. No-op when the flag is off.
+     *
+     * @return list<string>
+     */
+    private function prefetchPackages(string $web, string $php, string $database, string $cache): array
+    {
+        if (! (bool) config('server_provision.prefetch_packages', false)) {
+            return [];
+        }
+
+        $candidates = [];
+
+        if ($php !== 'none') {
+            $stem = $this->phpStem($php);
+            foreach (['-cli', '-fpm', '-common', '-mbstring', '-xml', '-curl', '-mysql', '-pgsql', '-sqlite3', '-redis', '-gd', '-bcmath', '-intl', '-zip', '-opcache'] as $ext) {
+                $candidates[] = $stem.$ext;
+            }
+        }
+
+        if (in_array($database, ['mysql84', 'mysql80', 'mysql57', 'mariadb114', 'mariadb11', 'mariadb1011'], true)) {
+            $candidates[] = 'mysql-server';
+        }
+
+        $candidates[] = match ($cache) {
+            'redis' => 'redis-server',
+            'valkey' => 'valkey-server',
+            default => '',
+        };
+
+        $candidates[] = match ($web) {
+            'nginx' => 'nginx',
+            'apache' => 'apache2',
+            default => '',
+        };
+
+        $candidates = array_values(array_filter($candidates, fn (string $p): bool => $p !== ''));
+        if ($candidates === []) {
+            return [];
+        }
+
+        $list = implode(' ', $candidates);
+
+        return [
+            implode("\n", [
+                'echo "[dply] prefetching stock packages (one parallel download pass)…"',
+                '_dply_prefetch=""',
+                'for _dply_pf in '.$list.'; do',
+                '  if apt-cache show "$_dply_pf" >/dev/null 2>&1; then _dply_prefetch="$_dply_prefetch $_dply_pf"; fi',
+                'done',
+                'if [ -n "$_dply_prefetch" ]; then',
+                '  dply_wait_for_apt_locks || true',
+                '  DEBIAN_FRONTEND=noninteractive apt-get install -y --download-only --no-install-recommends $_dply_prefetch >/dev/null 2>&1 || true',
+                '  echo "[dply] prefetch complete:$_dply_prefetch"',
+                'fi',
+            ]),
+        ];
     }
 
     /**

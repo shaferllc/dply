@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 ### Changed
+- Server provisioning can now download language runtimes in the background and prefetch stock packages in parallel to shorten setup time, and the server-removal flow no longer flashes a spurious 404 modal.
+### Changed
 - Server provisioning jobs now run on a dedicated priority queue and MySQL readiness is detected faster, so new servers come online sooner.
 ### Changed
 - Servers can warm up apt packages at boot and defer certbot off the provisioning critical path, with too-small sizing now a warning instead of a hard block.

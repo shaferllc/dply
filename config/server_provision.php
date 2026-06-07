@@ -70,6 +70,28 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Parallel runtime installs — opt-in, off by default
+    |--------------------------------------------------------------------------
+    | mise runtime downloads (Node/Python/… — github/nodejs.org, NOT apt, so no
+    | dpkg-lock contention) run in the background and overlap the apt-heavy steps
+    | (PHP/MySQL). A single wait near the end joins them. Off = sequential (today).
+    | Validate on a throwaway droplet before enabling.
+    */
+    'parallel_runtimes' => (bool) env('DPLY_PARALLEL_RUNTIMES', false),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Package prefetch (combined parallel download) — opt-in, off by default
+    |--------------------------------------------------------------------------
+    | After the base apt update, pre-download the stack's stock-repo packages in
+    | one apt transaction (apt fetches them in parallel) so the per-component
+    | installs are disk-only. Additive + safe: anything not prefetched just
+    | downloads at install time as before. Off = current behavior.
+    */
+    'prefetch_packages' => (bool) env('DPLY_PREFETCH_PACKAGES', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Wait for SSH after cloud assigns a public IP (before stack setup)
     |--------------------------------------------------------------------------
     */

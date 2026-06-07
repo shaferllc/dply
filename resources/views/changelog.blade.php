@@ -59,6 +59,13 @@
                     'date'    => 'June 6, 2026',
                     'tags'    => ['improved'],
                     'title'   => 'Faster Server Provisioning',
+                    'summary' => 'Server provisioning can now download language runtimes in the background and prefetch stock packages in parallel to shorten setup time, and the server-removal flow no longer flashes a spurious 404 modal.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
+                    'tags'    => ['improved'],
+                    'title'   => 'Faster Server Provisioning',
                     'summary' => 'Server provisioning jobs now run on a dedicated priority queue and MySQL readiness is detected faster, so new servers come online sooner.',
                     'items'   => [],
                 ],
