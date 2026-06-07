@@ -89,7 +89,7 @@
                             wire:click="dismiss('{{ $run->id }}')"
                             class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-current/20 bg-white px-2.5 py-1.5 text-xs font-medium shadow-sm hover:bg-white/80"
                         >
-                            <x-heroicon-o-x-mark class="h-3.5 w-3.5" />
+                            <x-heroicon-o-x-mark class="h-4 w-4" />
                             {{ __('Dismiss') }}
                         </button>
                     @endif

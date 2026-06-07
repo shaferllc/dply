@@ -158,7 +158,7 @@
                                                         href="{{ $entryDownloadUrl }}"
                                                         class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-forest shadow-sm transition-colors hover:bg-brand-sand/40"
                                                     >
-                                                        <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5" />
+                                                        <x-heroicon-o-arrow-down-tray class="h-4 w-4" />
                                                         {{ __('Download') }}
                                                     </a>
                                                 @endif

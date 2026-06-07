@@ -72,7 +72,7 @@
                 @if ($hasFilters)
                     <button type="button" wire:click="clearFilters"
                         class="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                        <x-heroicon-o-x-mark class="h-3.5 w-3.5" />
+                        <x-heroicon-o-x-mark class="h-4 w-4" />
                         {{ __('Clear filters') }}
                     </button>
                 @endif
@@ -109,9 +109,9 @@
         >
             <div class="{{ $card }}">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Feed') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent activity') }}</h2>
@@ -158,7 +158,7 @@
                                             'mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full ring-1 ring-brand-ink/10 text-white',
                                             $categoryColor[$cat] ?? 'bg-zinc-400',
                                         ])>
-                                            <x-heroicon-m-bolt class="h-3.5 w-3.5" aria-hidden="true" />
+                                            <x-heroicon-m-bolt class="h-4 w-4" aria-hidden="true" />
                                         </span>
                                         <div class="min-w-0 flex-1">
                                             <div class="flex flex-wrap items-center gap-2">
@@ -207,7 +207,7 @@
 
                                                 <div class="hidden md:flex items-center justify-center px-1">
                                                     <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-white text-brand-moss ring-1 ring-brand-ink/10 shadow-sm">
-                                                        <x-heroicon-m-arrow-long-right class="h-3.5 w-3.5" aria-hidden="true" />
+                                                        <x-heroicon-m-arrow-long-right class="h-4 w-4" aria-hidden="true" />
                                                     </span>
                                                 </div>
 
@@ -252,9 +252,9 @@
         >
             <div class="{{ $card }}">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Trends') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Events per day') }}</h2>

@@ -16,9 +16,9 @@
         @if (! $hasOrganization)
             <section class="dply-card overflow-hidden border-amber-200 mb-6">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+                        <x-icon-badge tone="amber">
                             <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Organization required') }}</h3>

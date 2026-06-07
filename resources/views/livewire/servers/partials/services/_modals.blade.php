@@ -243,7 +243,7 @@
                                     wire:loading.attr="disabled"
                                     class="{{ $confirmBtn }}"
                                 >
-                                    <x-dynamic-component :component="$config['icon']" class="h-3.5 w-3.5 shrink-0" aria-hidden="true" wire:loading.remove wire:target="confirmSystemdAction" />
+                                    <x-dynamic-component :component="$config['icon']" class="h-4 w-4 shrink-0" aria-hidden="true" wire:loading.remove wire:target="confirmSystemdAction" />
                                     <span wire:loading wire:target="confirmSystemdAction" class="inline-flex h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-current/40 border-t-current" aria-hidden="true"></span>
                                     <span wire:loading.remove wire:target="confirmSystemdAction">{{ $config['confirm'] }}</span>
                                     <span wire:loading wire:target="confirmSystemdAction">{{ __('Working…') }}</span>
@@ -355,7 +355,7 @@
                                     @disabled(! $opsReady || ($deployerSystemdLocked ?? true) || $systemdStatusModalLoading)
                                     class="!inline-flex !items-center !gap-1.5 !py-2 !text-[11px]"
                                 >
-                                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0 text-brand-ink/80" wire:loading.class="animate-spin" wire:target="fetchSystemdModalStatus" />
+                                    <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0 text-brand-ink/80" wire:loading.class="animate-spin" wire:target="fetchSystemdModalStatus" />
                                     <span wire:loading.remove wire:target="fetchSystemdModalStatus">{{ __('Refresh') }}</span>
                                     <span wire:loading wire:target="fetchSystemdModalStatus">{{ __('Working…') }}</span>
                                 </x-secondary-button>

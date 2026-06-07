@@ -60,9 +60,9 @@
     @if ($opsReady && ! $isDeployer)
         <div class="{{ $card }}">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Apt') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Apt actions') }}</h3>
@@ -104,9 +104,9 @@
         >
             <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Packages') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Outdated packages') }}</h3>
@@ -178,9 +178,9 @@
     @endphp
     <div id="manage-os-updates" class="{{ $card }} scroll-mt-24">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Auto-updates') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Unattended-upgrades') }}</h3>
@@ -243,9 +243,9 @@
             <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+                        <x-icon-badge tone="amber">
                             <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Warning') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Reboot is pending on this server') }}</h3>

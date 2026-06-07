@@ -10,19 +10,19 @@
         <div class="flex flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end">
             @if ($manageUrl)
                 <x-secondary-button size="sm" href="{{ $manageUrl }}" wire:navigate>
-                    <x-heroicon-o-adjustments-horizontal class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <x-heroicon-o-adjustments-horizontal class="h-4 w-4 shrink-0" aria-hidden="true" />
                     {{ __('Manage routing') }}
                 </x-secondary-button>
             @endif
             @if ($tablesReady)
                 <x-secondary-button size="sm" href="{{ route('notifications.index') }}" wire:navigate>
-                    <x-heroicon-o-inbox class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <x-heroicon-o-inbox class="h-4 w-4 shrink-0" aria-hidden="true" />
                     {{ __('Open inbox') }}
                 </x-secondary-button>
             @endif
             @if ($items->isNotEmpty())
                 <button type="button" wire:click="openClearConfirm" class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-red-700 shadow-sm transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50">
-                    <x-heroicon-o-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
                     {{ __('Clear all') }}
                 </button>
             @endif

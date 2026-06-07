@@ -81,9 +81,9 @@
                     <form wire:submit="run">
                         <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-md shadow-brand-ink/5">
                             <div class="flex items-center gap-3 rounded-t-2xl border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-4">
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-icon-badge>
                                     <x-dynamic-component :component="$selectedTile['icon']" class="h-5 w-5" aria-hidden="true" />
-                                </span>
+                                </x-icon-badge>
                                 <div class="min-w-0">
                                     <h2 class="text-sm font-semibold text-brand-ink">{{ __('Configure :app', ['app' => $selectedTile['label']]) }}</h2>
                                     <p class="text-xs text-brand-moss">{{ $selectedTile['description'] }}</p>
@@ -156,7 +156,7 @@
                                                 wire:loading.attr="disabled" wire:target="openRefPicker,setRepoRefTab,updatedRepoRefSearch"
                                                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-progress disabled:opacity-60">
                                                 <span wire:loading.remove wire:target="openRefPicker" class="inline-flex items-center gap-1.5">
-                                                    <x-heroicon-o-arrows-right-left class="h-3.5 w-3.5" aria-hidden="true" />
+                                                    <x-heroicon-o-arrows-right-left class="h-4 w-4" aria-hidden="true" />
                                                     {{ __('Change…') }}
                                                 </span>
                                                 <span wire:loading wire:target="openRefPicker" class="inline-flex items-center gap-1.5">

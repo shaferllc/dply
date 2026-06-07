@@ -2,9 +2,9 @@
     <section class="dply-card overflow-hidden">
         <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-bell-alert class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Alerts') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deploy and uptime notifications') }}</h2>
@@ -19,7 +19,7 @@
                     wire:navigate
                     class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                 >
-                    <x-heroicon-o-bell class="h-3.5 w-3.5 shrink-0" />
+                    <x-heroicon-o-bell class="h-4 w-4 shrink-0" />
                     {{ __('My channels') }}
                 </a>
                 @if ($site->organization_id)
@@ -28,7 +28,7 @@
                         wire:navigate
                         class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                     >
-                        <x-heroicon-o-building-office-2 class="h-3.5 w-3.5 shrink-0" />
+                        <x-heroicon-o-building-office-2 class="h-4 w-4 shrink-0" />
                         {{ __('Organization channels') }}
                     </a>
                     <a
@@ -36,7 +36,7 @@
                         wire:navigate
                         class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                     >
-                        <x-heroicon-o-adjustments-horizontal class="h-3.5 w-3.5 shrink-0" />
+                        <x-heroicon-o-adjustments-horizontal class="h-4 w-4 shrink-0" />
                         {{ __('Advanced assignment') }}
                     </a>
                 @endif
@@ -106,9 +106,9 @@
 
     <section class="dply-card overflow-hidden">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-arrow-up-right class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Outbound') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Integration webhooks') }}</h2>
@@ -174,9 +174,9 @@
 
     <section class="dply-card overflow-hidden">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-arrow-down-on-square class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Inbound') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deploy webhook') }}</h2>

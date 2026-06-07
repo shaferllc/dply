@@ -25,9 +25,9 @@
                 <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
                     <div class="lg:col-span-7">
                         <div class="flex items-start gap-3">
-                            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge size="md">
                                 <x-heroicon-o-bolt class="h-6 w-6" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0">
                                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Organization') }}</p>
                                 <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Automation & API') }}</h2>
@@ -113,9 +113,9 @@
                 <section class="dply-card overflow-hidden" id="notifications">
                     @php $h = $sectionHeader(__('Notifications'), __('Email defaults'), __('What dply emails about for sites and servers in this organization. Notification routing for channels lives on a separate page.'), 'heroicon-o-bell', 'sage'); @endphp
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-dynamic-component :component="$h['icon']" class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $h['eyebrow'] }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $h['title'] }}</h3>
@@ -151,9 +151,9 @@
                 <section class="dply-card overflow-hidden" id="alerts">
                     @php $h = $sectionHeader(__('Cloud alerts'), __('Alert destinations'), __('Where dply sends deploy-failed, restart, CPU, and memory alerts for Cloud apps. Org owners are always notified on their login emails — these fields add extra recipients.'), 'heroicon-o-exclamation-triangle', 'amber'); @endphp
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+                        <x-icon-badge tone="amber">
                             <x-dynamic-component :component="$h['icon']" class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ $h['eyebrow'] }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $h['title'] }}</h3>
@@ -189,9 +189,9 @@
                 <section class="dply-card overflow-hidden" id="data-region">
                     @php $h = $sectionHeader(__('Data residency'), __('Edge data region'), __('Preferred Cloudflare R2 region for buckets created on behalf of this organization. Existing buckets stay where they are — the setting only applies to future Edge bootstraps.'), 'heroicon-o-globe-europe-africa', 'sky'); @endphp
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-dynamic-component :component="$h['icon']" class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $h['eyebrow'] }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $h['title'] }}</h3>
@@ -217,9 +217,9 @@
                 <section class="dply-card overflow-hidden" id="api-tokens">
                     @php $h = $sectionHeader(__('Automation'), __('API tokens'), __('Scoped tokens for CI/CD and automation. The secret is shown once after creation — copy it into your secrets store immediately.'), 'heroicon-o-key', 'sage'); @endphp
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-dynamic-component :component="$h['icon']" class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $h['eyebrow'] }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $h['title'] }}</h3>
@@ -339,9 +339,9 @@
                 <section class="dply-card overflow-hidden" id="webhooks">
                     @php $h = $sectionHeader(__('Outbound'), __('Webhook destinations'), __('Push deploy and monitoring events to Slack, Discord, or Microsoft Teams. Scope to one site or fire for every site in this organization.'), 'heroicon-o-link', 'violet'); @endphp
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-dynamic-component :component="$h['icon']" class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $h['eyebrow'] }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $h['title'] }}</h3>
@@ -383,22 +383,22 @@
                                 <div>
                                     <p class="text-[11px] font-medium text-brand-moss">{{ __('Deploys') }}</p>
                                     <div class="mt-1.5 space-y-1.5 text-sm text-brand-ink">
-                                        <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_success" class="h-3.5 w-3.5 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Success') }}</label>
-                                        <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_failed" class="h-3.5 w-3.5 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Failed') }}</label>
-                                        <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_skipped" class="h-3.5 w-3.5 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Skipped') }}</label>
-                                        <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_deploy_started" class="h-3.5 w-3.5 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Started') }}</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_success" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Success') }}</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_failed" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Failed') }}</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_skipped" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Skipped') }}</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_deploy_started" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Started') }}</label>
                                     </div>
                                 </div>
                                 <div>
                                     <p class="text-[11px] font-medium text-brand-moss">{{ __('Uptime') }}</p>
                                     <div class="mt-1.5 space-y-1.5 text-sm text-brand-ink">
-                                        <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_uptime_down" class="h-3.5 w-3.5 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Monitor down') }}</label>
-                                        <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_uptime_recovered" class="h-3.5 w-3.5 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Monitor recovered') }}</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_uptime_down" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Monitor down') }}</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_uptime_recovered" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Monitor recovered') }}</label>
                                     </div>
                                     <p class="mt-3 text-[11px] font-medium text-brand-moss">{{ __('Insights') }} <span class="text-brand-mist">{{ __('(org-wide only)') }}</span></p>
                                     <div class="mt-1.5 space-y-1.5 text-sm text-brand-ink">
-                                        <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_insight_opened" class="h-3.5 w-3.5 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Opened') }}</label>
-                                        <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_insight_resolved" class="h-3.5 w-3.5 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Resolved') }}</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_insight_opened" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Opened') }}</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_insight_resolved" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Resolved') }}</label>
                                     </div>
                                 </div>
                             </div>

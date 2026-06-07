@@ -49,8 +49,8 @@
                             class="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-900 shadow-sm hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
                             title="{{ __('Re-scan the deployed code for required variables.') }}"
                         >
-                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="rescanEnvRequirements" />
-                            <span wire:loading wire:target="rescanEnvRequirements" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
+                            <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="rescanEnvRequirements" />
+                            <span wire:loading wire:target="rescanEnvRequirements" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
                             {{ __('Re-scan') }}
                         </button>
                         <button
@@ -58,7 +58,7 @@
                             wire:click="openMissingEnvModal"
                             class="inline-flex items-center gap-1.5 rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-rose-800"
                         >
-                            <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                            <x-heroicon-o-plus class="h-4 w-4" />
                             {{ __('Add missing variables') }}
                         </button>
                         @if ($canIgnoreEnv)
@@ -68,7 +68,7 @@
                                 class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
                                 title="{{ __('Stop warning/blocking on missing required variables for this site.') }}"
                             >
-                                <x-heroicon-o-no-symbol class="h-3.5 w-3.5" />
+                                <x-heroicon-o-no-symbol class="h-4 w-4" />
                                 {{ __('Ignore all') }}
                             </button>
                         @endif

@@ -200,9 +200,9 @@
 
                         {{-- Header --}}
                         <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge>
                                 <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0 flex-1">
                                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Credentials') }}</p>
                                 <h2 id="db-credentials-title" class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Database credentials') }}</h2>
@@ -308,7 +308,7 @@
                                         </div>
                                         @if ($remoteEnabled)
                                             <button type="button" onclick="window.location.href={{ json_encode($privateUrl) }}" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">
-                                                <x-heroicon-o-table-cells class="h-3.5 w-3.5" />
+                                                <x-heroicon-o-table-cells class="h-4 w-4" />
                                                 {{ __('Open in TablePlus') }}
                                             </button>
                                         @endif
@@ -341,7 +341,7 @@
                                             </button>
                                         </div>
                                         <button type="button" onclick="window.location.href={{ json_encode($publicUrl) }}" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">
-                                            <x-heroicon-o-table-cells class="h-3.5 w-3.5" />
+                                            <x-heroicon-o-table-cells class="h-4 w-4" />
                                             {{ __('Open in TablePlus') }}
                                         </button>
                                     </div>
@@ -352,7 +352,7 @@
                                         {{ __('Remote access is disabled for this database. Enable it from the Networking tab to connect from outside this server.') }}
                                     </p>
                                     <a href="{{ route('servers.networking', $server) }}" wire:navigate class="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-brand-sage hover:underline">
-                                        <x-heroicon-o-share class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-share class="h-4 w-4" />
                                         {{ __('Go to Networking') }}
                                     </a>
                                 </div>
@@ -378,7 +378,7 @@
                                     @click="copy(@js($localUrl), 'footer_local')"
                                     class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                                 >
-                                    <x-heroicon-m-clipboard-document class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    <x-heroicon-m-clipboard-document class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     <span x-show="copiedKey !== 'footer_local'">{{ __('Copy local URL') }}</span>
                                     <span x-show="copiedKey === 'footer_local'" x-cloak class="text-brand-forest">{{ __('Copied') }}</span>
                                 </button>
@@ -403,9 +403,9 @@
                 <div class="relative z-10 flex min-h-full justify-center px-4 py-10 sm:px-6 sm:py-14">
                     <div class="my-auto flex w-full max-w-2xl flex-col dply-modal-panel overflow-hidden shadow-xl" @click.stop>
                         <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge>
                                 <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0">
                                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Share') }}</p>
                                 <h2 id="db-share-link-title" class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Share link created') }}</h2>
@@ -430,7 +430,7 @@
                                 @click="navigator.clipboard.writeText(@js($share_link_modal_url)); ok = true; setTimeout(() => ok = false, 2000)"
                                 class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                             >
-                                <x-heroicon-m-clipboard-document class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-m-clipboard-document class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 <span x-show="!ok">{{ __('Copy link') }}</span>
                                 <span x-show="ok" x-cloak class="text-brand-forest">{{ __('Copied') }}</span>
                             </button>
@@ -453,9 +453,9 @@
                 <div class="relative z-10 flex min-h-full justify-center px-4 py-10 sm:px-6 sm:py-14">
                     <div class="my-auto flex w-full max-w-2xl flex-col dply-modal-panel overflow-hidden shadow-xl" @click.stop>
                         <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge>
                                 <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0">
                                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Connection') }}</p>
                                 <h2 id="db-connection-url-title" class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Connection URL') }}</h2>
@@ -475,7 +475,7 @@
                                 @click="navigator.clipboard.writeText(@js($connectionUrlModalDatabase->connectionUrl())); ok = true; setTimeout(() => ok = false, 2000)"
                                 class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                             >
-                                <x-heroicon-m-clipboard-document class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-m-clipboard-document class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 <span x-show="!ok">{{ __('Copy') }}</span>
                                 <span x-show="ok" x-cloak class="text-brand-forest">{{ __('Copied') }}</span>
                             </button>
@@ -497,9 +497,9 @@
             >
                 <form wire:submit="saveDatabaseEdit" class="flex min-h-0 flex-1 flex-col">
                     <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-pencil-square class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Edit') }}</p>
                             <h2 class="mt-1 text-lg font-semibold text-brand-ink">{{ $editing_db_name }}</h2>
@@ -594,9 +594,9 @@
             >
                 <form wire:submit="runSqliteSql" class="flex min-h-0 flex-1 flex-col">
                     <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('SQL console') }}</p>
                             <h2 class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Run SQL against this database') }}</h2>
@@ -716,9 +716,9 @@
                 >
                     {{-- Header --}}
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0 flex-1">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Database created') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':name credentials', ['name' => $credDb]) }}</h3>
@@ -793,7 +793,7 @@
                                         </button>
                                     </div>
                                     <button type="button" onclick="window.location.href={{ json_encode($localConnStr) }}" class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                        <x-heroicon-o-table-cells class="h-3.5 w-3.5" aria-hidden="true" />
+                                        <x-heroicon-o-table-cells class="h-4 w-4" aria-hidden="true" />
                                         {{ __('Open in TablePlus') }}
                                     </button>
                                 </div>
@@ -839,7 +839,7 @@
                                     </div>
                                     @if ($tpRemoteUrl)
                                         <button type="button" onclick="window.location.href={{ json_encode($remoteConnStr) }}" class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                            <x-heroicon-o-table-cells class="h-3.5 w-3.5" aria-hidden="true" />
+                                            <x-heroicon-o-table-cells class="h-4 w-4" aria-hidden="true" />
                                             {{ __('Open in TablePlus (remote)') }}
                                         </button>
                                     @endif

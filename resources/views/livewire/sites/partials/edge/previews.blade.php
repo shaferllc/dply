@@ -4,9 +4,9 @@
 
 <section class="dply-card overflow-hidden">
     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+        <x-icon-badge>
             <x-heroicon-o-eye class="h-5 w-5" aria-hidden="true" />
-        </span>
+        </x-icon-badge>
         <div class="min-w-0">
             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Previews') }}</p>
             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Branch previews') }}</h3>
@@ -50,7 +50,7 @@
                                     @disabled($adhocPending)
                                     class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/60 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
-                                    <x-heroicon-o-magnifying-glass class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-magnifying-glass class="h-4 w-4" />
                                     {{ __('Browse') }}
                                 </button>
                             </div>
@@ -287,7 +287,7 @@
                                     wire:navigate
                                     class="inline-flex items-center gap-1 text-xs font-medium text-brand-moss hover:text-brand-ink"
                                 >
-                                    <x-heroicon-o-chat-bubble-left-right class="h-3.5 w-3.5" aria-hidden="true" />
+                                    <x-heroicon-o-chat-bubble-left-right class="h-4 w-4" aria-hidden="true" />
                                     {{ __('Review') }}
                                 </a>
                                 @if ($previewIsLive)
@@ -299,7 +299,7 @@
                                         class="inline-flex items-center gap-1 text-xs font-medium text-brand-forest hover:text-brand-ink disabled:cursor-wait disabled:opacity-60 dark:text-brand-sage"
                                         title="{{ __('Copy this preview\'s artifacts into a new production deployment and flip the host map. The preview keeps running.') }}"
                                     >
-                                        <x-heroicon-o-arrow-up-tray class="h-3.5 w-3.5" aria-hidden="true" />
+                                        <x-heroicon-o-arrow-up-tray class="h-4 w-4" aria-hidden="true" />
                                         {{ __('Promote to prod') }}
                                     </button>
                                 @endif

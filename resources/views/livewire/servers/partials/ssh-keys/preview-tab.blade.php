@@ -11,7 +11,7 @@
                             title="{{ $syncBusy ? __('A sync is already running.') : ($driftBusy ? __('A drift preview is running — wait for it to finish.') : __('Apply the pending changes by writing authorized_keys on the server.')) }}"
                             class="inline-flex items-center gap-1.5 rounded-lg border border-brand-forest/30 bg-brand-forest/10 px-3 py-1.5 text-xs font-semibold text-brand-forest shadow-sm hover:bg-brand-forest/15 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            <x-heroicon-o-arrow-up-tray class="h-3.5 w-3.5" />
+                            <x-heroicon-o-arrow-up-tray class="h-4 w-4" />
                             <span wire:loading.remove wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys">{{ __('Sync now') }}</span>
                             <span wire:loading wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys">{{ __('Syncing…') }}</span>
                         </button>
@@ -24,8 +24,8 @@
                             title="{{ $syncBusy ? __('A sync is in flight — wait for it to finish before refreshing the drift preview.') : ($driftBusy ? __('A drift preview is already running. Wait for it to finish.') : '') }}"
                             class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="previewDiff" />
-                            <span wire:loading wire:target="previewDiff" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                            <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="previewDiff" />
+                            <span wire:loading wire:target="previewDiff" class="inline-flex h-4 w-4 items-center justify-center">
                                 <x-spinner variant="forest" size="sm" />
                             </span>
                             <span wire:loading.remove wire:target="previewDiff">{{ __('Refresh preview') }}</span>
@@ -107,7 +107,7 @@
                                 <div class="flex flex-wrap items-center justify-between gap-2 border-b border-brand-ink/8 bg-brand-sand/20 px-4 py-3 sm:px-5">
                                     <div class="flex items-center gap-2">
                                         <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white text-brand-forest ring-1 ring-brand-ink/10">
-                                            <x-heroicon-m-user class="h-3.5 w-3.5" />
+                                            <x-heroicon-m-user class="h-4 w-4" />
                                         </span>
                                         <h3 class="font-mono text-sm font-semibold text-brand-ink">{{ $user }}</h3>
                                         @if ($user === $server->ssh_user)

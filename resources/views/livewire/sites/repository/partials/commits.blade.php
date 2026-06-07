@@ -4,9 +4,9 @@
         <div class="dply-card overflow-hidden">
             <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-7">
                 <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Commit history') }}</h2>
@@ -40,8 +40,8 @@
                         <span class="min-w-0">{{ $commitsResult['error'] ?? __('Could not load commits.') }}</span>
                         <button type="button" wire:click="reloadRepository" wire:loading.attr="disabled" wire:target="reloadRepository"
                             class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-rose-300 bg-white/70 px-2.5 py-1 text-xs font-medium text-rose-900 hover:bg-white disabled:opacity-60">
-                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="reloadRepository" />
-                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5 animate-spin" wire:loading wire:target="reloadRepository" />
+                            <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="reloadRepository" />
+                            <x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" wire:loading wire:target="reloadRepository" />
                             {{ __('Retry') }}
                         </button>
                     </div>
@@ -79,7 +79,7 @@
                                 @if (! empty($commit['html_url']))
                                     <a href="{{ $commit['html_url'] }}" target="_blank" rel="noopener noreferrer"
                                         class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                        <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5" aria-hidden="true" />
+                                        <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" aria-hidden="true" />
                                     </a>
                                 @endif
                             </li>

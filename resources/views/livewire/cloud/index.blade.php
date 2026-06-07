@@ -208,7 +208,7 @@
                             </div>
                             @if ($displayUrl)
                                 <div class="flex items-center gap-1.5 text-sm text-brand-sage">
-                                    <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden="true" />
+                                    <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0 opacity-80" aria-hidden="true" />
                                     <span class="truncate font-mono text-xs">{{ $displayUrl }}</span>
                                 </div>
                             @else

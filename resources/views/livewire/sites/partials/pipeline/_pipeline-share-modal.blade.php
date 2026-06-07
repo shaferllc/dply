@@ -6,9 +6,9 @@
 <x-modal name="pipeline-share" maxWidth="2xl" focusable>
     <div class="p-6 sm:p-7">
         <div class="flex items-start gap-3">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <h2 class="text-lg font-semibold text-brand-ink">{{ __('Share pipeline') }}</h2>
                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">
@@ -24,7 +24,7 @@
                 x-on:click="navigator.clipboard.writeText(@js($bashFull)).then(() => { copied = true; setTimeout(() => copied = false, 2000); })"
                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/50"
             >
-                <x-heroicon-m-clipboard class="h-3.5 w-3.5" />
+                <x-heroicon-m-clipboard class="h-4 w-4" />
                 <span x-text="copied ? @js(__('Copied')) : @js(__('Copy full script'))"></span>
             </button>
             <button
@@ -33,7 +33,7 @@
                 x-on:click="navigator.clipboard.writeText(@js($bashCommands)).then(() => { copied = true; setTimeout(() => copied = false, 2000); })"
                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/50"
             >
-                <x-heroicon-m-clipboard-document-list class="h-3.5 w-3.5" />
+                <x-heroicon-m-clipboard-document-list class="h-4 w-4" />
                 <span x-text="copied ? @js(__('Copied')) : @js(__('Copy commands only'))"></span>
             </button>
             <x-secondary-button type="button" wire:click="downloadPipelineBashFull">

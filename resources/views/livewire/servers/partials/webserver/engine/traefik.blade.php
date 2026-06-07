@@ -165,7 +165,7 @@
                                 class="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-forest hover:text-brand-ink"
                             >
                                 {{ __('Open public dashboard') }}
-                                <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0" aria-hidden="true" />
                             </a>
                             <code class="mt-2 block break-all rounded-lg bg-white/80 px-3 py-2 font-mono text-[11px] text-brand-ink ring-1 ring-amber-200">{{ $traefikPublicDashboardUrl }}</code>
                         </div>
@@ -276,7 +276,7 @@
                                     {{ __('Settings in /etc/traefik/traefik.yml — entry points, providers, API, logging, ACME, and global options per the Traefik static configuration reference.') }}
                                 </p>
                                 <p class="mt-2 inline-flex items-center gap-1.5 rounded-md bg-amber-50/70 px-2.5 py-1 text-[11px] font-medium text-amber-900 ring-1 ring-amber-200">
-                                    <x-heroicon-o-exclamation-triangle class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-exclamation-triangle class="h-4 w-4" />
                                     {{ __('Static config requires a Traefik RESTART (not reload). Edge briefly drops connections on save.') }}
                                 </p>
                             </span>
@@ -290,10 +290,10 @@
                             class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
                         >
                             <span wire:loading.remove wire:target="loadTraefikStaticConfig" class="inline-flex">
-                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                                <x-heroicon-o-arrow-path class="h-4 w-4" />
                             </span>
                             <span wire:loading wire:target="loadTraefikStaticConfig" class="inline-flex">
-                                <x-spinner class="h-3.5 w-3.5" />
+                                <x-spinner class="h-4 w-4" />
                             </span>
                             {{ __('Reload from server') }}
                         </button>
@@ -312,7 +312,7 @@
                         @if (! $traefik_static_loaded)
                             <p class="mt-5 text-sm text-brand-moss">
                                 <span wire:loading wire:target="loadTraefikStaticConfig" class="inline-flex items-center gap-2">
-                                    <x-spinner class="h-3.5 w-3.5" /> {{ __('Reading traefik.yml…') }}
+                                    <x-spinner class="h-4 w-4" /> {{ __('Reading traefik.yml…') }}
                                 </span>
                                 <span wire:loading.remove wire:target="loadTraefikStaticConfig">
                                     {{ __('Click "Reload from server" to fetch current values.') }}
@@ -399,10 +399,10 @@
                             class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
                         >
                             <span wire:loading.remove wire:target="loadTraefikDynamicConfigs" class="inline-flex">
-                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                                <x-heroicon-o-arrow-path class="h-4 w-4" />
                             </span>
                             <span wire:loading wire:target="loadTraefikDynamicConfigs" class="inline-flex">
-                                <x-spinner class="h-3.5 w-3.5" />
+                                <x-spinner class="h-4 w-4" />
                             </span>
                             {{ __('Refresh list') }}
                         </button>
@@ -415,7 +415,7 @@
                     @if (! $traefik_dynamic_loaded)
                         <p class="mt-5 text-sm text-brand-moss">
                             <span wire:loading wire:target="loadTraefikDynamicConfigs" class="inline-flex items-center gap-2">
-                                <x-spinner class="h-3.5 w-3.5" /> {{ __('Listing dynamic files…') }}
+                                <x-spinner class="h-4 w-4" /> {{ __('Listing dynamic files…') }}
                             </span>
                         </p>
                     @elseif ($traefik_dynamic_files === [])

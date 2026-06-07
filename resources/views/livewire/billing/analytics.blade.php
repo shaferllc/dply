@@ -118,9 +118,9 @@
                 <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
                     <div class="lg:col-span-7">
                         <div class="flex items-start gap-3">
-                            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge size="md">
                                 <x-heroicon-o-chart-bar class="h-6 w-6" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0">
                                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Billing') }}</p>
                                 <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Billing analytics') }}</h2>
@@ -190,9 +190,9 @@
                 @endphp
                 <section class="mt-6 dply-card overflow-hidden">
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-banknotes class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Observatory') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Transparent cost observatory') }}</h3>
@@ -314,9 +314,9 @@
                      set instead of stacked next to operational KPIs. --}}
                 <section class="dply-card overflow-hidden">
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-arrow-trending-up class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Forecast') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recurring revenue') }}</h3>
@@ -357,9 +357,9 @@
                 {{-- Spend trend --}}
                 <section class="dply-card overflow-hidden">
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-presentation-chart-line class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Trend') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Historical spend') }}</h3>
@@ -422,9 +422,9 @@
                 {{-- Spend by category --}}
                 <section class="dply-card overflow-hidden">
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-chart-pie class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Breakdown') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Spend by category') }}</h3>
@@ -495,9 +495,9 @@
                 {{-- Edge sites --}}
                 <section class="dply-card overflow-hidden">
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Delivery') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Edge sites') }}</h3>
@@ -544,9 +544,9 @@
                 {{-- Managed products --}}
                 <section class="dply-card overflow-hidden">
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Catalog') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Managed products') }}</h3>
@@ -594,9 +594,9 @@
                 {{-- BYO fleet --}}
                 <section class="dply-card overflow-hidden">
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Compute') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('BYO server fleet') }}</h3>
@@ -642,9 +642,9 @@
                 {{-- Stripe sync events --}}
                 <section class="dply-card overflow-hidden">
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Audit') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Stripe sync events') }}</h3>
@@ -704,9 +704,9 @@
                 {{-- Invoice history --}}
                 <section class="dply-card overflow-hidden">
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-document class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0 flex-1">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Invoice history') }}</h3>

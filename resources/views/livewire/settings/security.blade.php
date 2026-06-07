@@ -65,9 +65,9 @@
         <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
             <div class="lg:col-span-7">
                 <div class="flex items-start gap-3">
-                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge size="md">
                         <x-heroicon-o-shield-check class="h-6 w-6" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Account') }}</p>
                         <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Security') }}</h2>
@@ -130,9 +130,9 @@
         {{-- Password --}}
         <section class="dply-card overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0 flex-1">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Credential') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Password') }}</h3>
@@ -191,9 +191,9 @@
         {{-- Passkeys --}}
         <section class="dply-card overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-finger-print class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0 flex-1">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Passwordless') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Passkeys') }}</h3>
@@ -269,7 +269,7 @@
                                 wire:click="openConfirmActionModal('removePasskey', @js([(string) $cred->getKey()]), @js(__('Remove passkey')), @js(__('Remove this passkey? You\'ll need another way to sign in if it was your only method.')), @js(__('Remove')), true)"
                                 class="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700 hover:underline"
                             >
-                                <x-heroicon-o-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Remove') }}
                             </button>
                         </li>
@@ -282,9 +282,9 @@
         @if (! empty($oauthProviders))
             <section class="dply-card overflow-hidden">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-arrow-top-right-on-square class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0 flex-1">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Single sign-on') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('OAuth sign-in') }}</h3>
@@ -316,7 +316,7 @@
                                     href="{{ route('oauth.redirect', ['provider' => $p['id'], 'return' => 'security']) }}"
                                     class="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-sage hover:text-brand-ink"
                                 >
-                                    <x-heroicon-o-link class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    <x-heroicon-o-link class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     {{ __('Link account') }}
                                 </a>
                             </div>
@@ -332,7 +332,7 @@
                                                 wire:click="openConfirmActionModal('unlinkOAuthAccount', [{{ $account->id }}], @js(__('Unlink account')), @js(__('Unlink this account? You can link it again later from this page.')), @js(__('Unlink')), true)"
                                                 class="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700 hover:underline"
                                             >
-                                                <x-heroicon-o-link-slash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                <x-heroicon-o-link-slash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                                 {{ __('Unlink') }}
                                             </button>
                                         </li>
@@ -348,9 +348,9 @@
         {{-- Two-factor authentication --}}
         <section class="dply-card overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-device-phone-mobile class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0 flex-1">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Step-up') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Two-factor authentication') }}</h3>
@@ -390,7 +390,7 @@
                             {{ __('Two-factor authentication is enabled.') }}
                         </p>
                         <a href="{{ route('two-factor.setup') }}" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                            <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            <x-heroicon-o-cog-6-tooth class="h-4 w-4 shrink-0" aria-hidden="true" />
                             {{ __('Manage or disable') }}
                         </a>
                     </div>

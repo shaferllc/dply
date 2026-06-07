@@ -7,9 +7,9 @@
 <section class="dply-card overflow-hidden">
     <form wire:submit="saveSiteIdentity">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-identification class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Identity') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Site identity') }}</h2>
@@ -53,9 +53,9 @@
 <section class="dply-card mt-6 overflow-hidden">
     <form wire:submit="saveWebDirectory">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-folder class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Path') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $documentRootLabel }}</h2>
@@ -97,9 +97,9 @@
 <section class="dply-card mt-6 overflow-hidden">
     <form wire:submit="saveWorkerMode">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Serving mode') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Worker mode') }}</h2>
@@ -156,9 +156,9 @@
 <section class="dply-card mt-6 overflow-hidden">
     <form wire:submit="saveProjectSettings">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-folder-open class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Project') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $projectSettingsTitle }}</h2>
@@ -213,9 +213,9 @@
 <section class="dply-card mt-6 overflow-hidden">
     <form wire:submit="saveSiteNotes">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-pencil-square class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Notes') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Site notes') }}</h2>
@@ -252,9 +252,9 @@
     @php $rawServerErrors = $this->serverErrorsExposed(); @endphp
     <section class="dply-card mt-6 overflow-hidden">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-bug-ant class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Diagnostics') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Server errors') }}</h2>
@@ -271,9 +271,9 @@
                 'bg-brand-sand/60 text-brand-moss ring-1 ring-inset ring-brand-ink/10' => ! $rawServerErrors,
             ])>
                 @if ($rawServerErrors)
-                    <x-heroicon-o-eye class="h-3.5 w-3.5" aria-hidden="true" /> {{ __('Showing raw errors') }}
+                    <x-heroicon-o-eye class="h-4 w-4" aria-hidden="true" /> {{ __('Showing raw errors') }}
                 @else
-                    <x-heroicon-o-shield-check class="h-3.5 w-3.5" aria-hidden="true" /> {{ __('Branded error page') }}
+                    <x-heroicon-o-shield-check class="h-4 w-4" aria-hidden="true" /> {{ __('Branded error page') }}
                 @endif
             </span>
 

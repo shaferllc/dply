@@ -9,7 +9,7 @@
         </div>
         @if ($row ?? null)
             <span class="inline-flex h-fit items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">
-                <x-heroicon-o-check-circle class="h-3.5 w-3.5" />
+                <x-heroicon-o-check-circle class="h-4 w-4" />
                 {{ __('Installed on this server') }}
             </span>
         @endif
@@ -46,12 +46,12 @@
 
     <div class="mt-4 flex flex-wrap items-center gap-2">
         <a href="{{ $info['homepage_url'] }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40">
-            <x-heroicon-o-globe-alt class="h-3.5 w-3.5" />
+            <x-heroicon-o-globe-alt class="h-4 w-4" />
             {{ __('Homepage') }}
             <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3 text-brand-mist" />
         </a>
         <a href="{{ $info['docs_url'] }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40">
-            <x-heroicon-o-book-open class="h-3.5 w-3.5" />
+            <x-heroicon-o-book-open class="h-4 w-4" />
             {{ __('Documentation') }}
             <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3 text-brand-mist" />
         </a>

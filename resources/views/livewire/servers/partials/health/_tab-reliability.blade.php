@@ -1,9 +1,9 @@
 <div class="grid gap-6 lg:grid-cols-2">
     <section class="dply-card overflow-hidden">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Deploys') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Failed deploys') }}</h3>
@@ -29,9 +29,9 @@
 
     <section class="dply-card overflow-hidden">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('TLS') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Certificates') }}</h3>
@@ -65,9 +65,9 @@
 
 <section class="dply-card overflow-hidden">
     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+        <x-icon-badge>
             <x-heroicon-o-cpu-chip class="h-5 w-5" aria-hidden="true" />
-        </span>
+        </x-icon-badge>
         <div class="min-w-0">
             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Workers') }}</p>
             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Workers') }}</h3>

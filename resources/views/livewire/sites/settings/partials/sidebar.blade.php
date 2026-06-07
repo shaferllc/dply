@@ -23,7 +23,7 @@
         <div class="border-b border-brand-ink/10 p-4 sm:p-5">
             <a href="{{ route('servers.sites', $server) }}" wire:navigate
                 class="-ms-1 mb-3 inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium text-brand-moss transition-colors hover:bg-brand-sand/50 hover:text-brand-ink">
-                <x-heroicon-o-arrow-left class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" aria-hidden="true" />
                 {{ __('Back to sites') }}
             </a>
             <div class="flex items-start gap-3">
@@ -59,7 +59,7 @@
                         title="{{ __('Copy URL') }}"
                         @click="navigator.clipboard.writeText(@js($sidebarDisplayUrl)); copiedUrl = true; setTimeout(() => copiedUrl = false, 2000)"
                     >
-                        <x-heroicon-o-clipboard class="h-3.5 w-3.5" />
+                        <x-heroicon-o-clipboard class="h-4 w-4" />
                     </button>
                     @if ($sidebarVisitUrl)
                         <a
@@ -69,7 +69,7 @@
                             title="{{ __('Open site') }}"
                             class="rounded-md p-1 text-brand-mist hover:bg-brand-sand/50 hover:text-brand-ink"
                         >
-                            <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5" />
+                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" />
                         </a>
                     @endif
                     <span x-show="copiedUrl" x-cloak class="text-[10px] font-medium text-brand-forest">{{ __('Copied') }}</span>

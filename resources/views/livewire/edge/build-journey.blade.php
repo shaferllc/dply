@@ -71,7 +71,7 @@
                         <div class="flex items-start gap-3">
                             <div class="flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold {{ $isCurrent ? ($journey['hasFailed'] ? 'bg-red-600 text-white' : 'bg-brand-forest text-white ring-4 ring-brand-sage/30') : ($isDone ? 'bg-emerald-600 text-white' : 'bg-white text-brand-mist ring-1 ring-brand-ink/10') }}">
                                 @if ($isDone)
-                                    <x-heroicon-s-check class="h-3.5 w-3.5" />
+                                    <x-heroicon-s-check class="h-4 w-4" />
                                 @elseif ($isCurrent && ! $journey['hasFailed'])
                                     <span class="inline-flex h-2.5 w-2.5 animate-pulse rounded-full bg-white"></span>
                                 @else
@@ -162,7 +162,7 @@
                         wire:click="confirmRestartFrozenBuild"
                         class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 hover:text-amber-900 hover:underline"
                     >
-                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                        <x-heroicon-o-arrow-path class="h-4 w-4" />
                         {{ __('Restart build') }}
                     </button>
                 @else

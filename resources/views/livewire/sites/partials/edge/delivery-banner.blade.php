@@ -29,8 +29,8 @@
                 class="shrink-0 inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wide {{ $copyButtonClass }}"
                 :title="copied ? '{{ __('Copied') }}' : '{{ __('Copy message') }}'"
             >
-                <x-heroicon-o-clipboard x-show="!copied" class="h-3.5 w-3.5" />
-                <x-heroicon-s-check x-show="copied" x-cloak class="h-3.5 w-3.5" />
+                <x-heroicon-o-clipboard x-show="!copied" class="h-4 w-4" />
+                <x-heroicon-s-check x-show="copied" x-cloak class="h-4 w-4" />
                 <span x-show="!copied">{{ __('Copy') }}</span>
                 <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
             </button>

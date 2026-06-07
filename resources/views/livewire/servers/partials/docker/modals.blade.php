@@ -127,7 +127,7 @@
                     >
                         <code class="min-w-0 flex-1 break-all rounded-lg bg-brand-ink px-3 py-2 font-mono text-[11px] text-brand-cream">{{ $shellSshCommand }}</code>
                         <button type="button" x-on:click="copy()" class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">
-                            <x-heroicon-o-clipboard class="h-3.5 w-3.5" aria-hidden="true" />
+                            <x-heroicon-o-clipboard class="h-4 w-4" aria-hidden="true" />
                             <span x-show="!copied">{{ __('Copy SSH command') }}</span>
                             <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
                         </button>
@@ -140,7 +140,7 @@
                                 class="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-forest hover:underline"
                             >
                                 {{ __('Open in Run workspace') }}
-                                <x-heroicon-o-arrow-right class="h-3.5 w-3.5" aria-hidden="true" />
+                                <x-heroicon-o-arrow-right class="h-4 w-4" aria-hidden="true" />
                             </a>
                         </div>
                     @endfeature

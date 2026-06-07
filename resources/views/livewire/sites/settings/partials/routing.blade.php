@@ -25,9 +25,9 @@
 <section class="{{ $card }}">
     <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
         <div class="flex min-w-0 items-start gap-3">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $site->usesDockerRuntime() ? __('Networking') : __('Routing') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $site->usesDockerRuntime() ? __('Inbound + outbound traffic') : __('Domains, DNS, aliases & redirects') }}</h2>
@@ -69,9 +69,9 @@
     <div class="{{ $card }} mt-6">
         <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Domains') }}</h2>
@@ -86,7 +86,7 @@
             </div>
             <div class="flex shrink-0 flex-wrap items-center gap-2">
                 <button type="button" x-on:click="$dispatch('open-modal', 'add-domain-modal')" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90">
-                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                    <x-heroicon-o-plus class="h-4 w-4" />
                     {{ __('Add domain') }}
                 </button>
             </div>
@@ -216,12 +216,12 @@
                                 <div class="flex flex-wrap items-center gap-2">
                                     @if (! $hasSsl)
                                         <button type="button" wire:click="openQuickDomainSslModal('{{ $domain->hostname }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                            <x-heroicon-o-lock-closed class="h-3.5 w-3.5" />
+                                            <x-heroicon-o-lock-closed class="h-4 w-4" />
                                             {{ __('Add SSL') }}
                                         </button>
                                     @endif
                                     <button type="button" wire:click="editDomain('{{ $domain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-pencil-square class="h-4 w-4" />
                                         {{ __('Edit') }}
                                     </button>
                                     @if (! $domain->is_primary)
@@ -274,9 +274,9 @@
     <div class="{{ $card }} mt-6">
         <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Domain aliases') }}</h2>
@@ -291,7 +291,7 @@
             </div>
             <div class="flex shrink-0 flex-wrap items-center gap-2">
                 <button type="button" x-on:click="$dispatch('open-modal', 'add-alias-modal')" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90">
-                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                    <x-heroicon-o-plus class="h-4 w-4" />
                     {{ __('Add alias') }}
                 </button>
             </div>
@@ -442,12 +442,12 @@
                                 <div class="flex flex-wrap items-center gap-2">
                                     @if (! $hasSsl)
                                         <button type="button" wire:click="openQuickDomainSslModal('{{ $alias->hostname }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                            <x-heroicon-o-lock-closed class="h-3.5 w-3.5" />
+                                            <x-heroicon-o-lock-closed class="h-4 w-4" />
                                             {{ __('Add SSL') }}
                                         </button>
                                     @endif
                                     <button type="button" wire:click="editAlias('{{ $alias->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-pencil-square class="h-4 w-4" />
                                         {{ __('Edit') }}
                                     </button>
                                     <button type="button" wire:click="confirmRemoveAlias('{{ $alias->id }}')" class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-brand-mist hover:border-red-200 hover:bg-red-50 hover:text-red-700" title="{{ __('Remove') }}" aria-label="{{ __('Remove') }}">
@@ -494,9 +494,9 @@
     <div class="{{ $card }} mt-6">
         <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-arrow-uturn-right class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Redirects') }}</h2>
@@ -511,7 +511,7 @@
             </div>
             <div class="flex shrink-0 flex-wrap items-center gap-2">
                 <button type="button" x-on:click="$dispatch('open-modal', 'add-redirect-modal')" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90">
-                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                    <x-heroicon-o-plus class="h-4 w-4" />
                     {{ __('Add redirect') }}
                 </button>
             </div>
@@ -751,7 +751,7 @@
                                 </div>
                                 <div class="flex flex-wrap items-center gap-2">
                                     <button type="button" wire:click="editRedirect('{{ $redirect->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-pencil-square class="h-4 w-4" />
                                         {{ __('Edit') }}
                                     </button>
                                     <button type="button" wire:click="confirmRemoveRedirect({{ $redirect->id }})" class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-brand-mist hover:border-red-200 hover:bg-red-50 hover:text-red-700" title="{{ __('Remove') }}" aria-label="{{ __('Remove') }}">
@@ -800,9 +800,9 @@
     <div class="{{ $card }} mt-6">
         <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-eye class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Previews') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Preview domains') }}</h2>
@@ -908,9 +908,9 @@
     <div class="{{ $card }} mt-6">
         <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-building-office-2 class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Tenants') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Tenant domains') }}</h2>
@@ -925,7 +925,7 @@
             </div>
             <div class="flex shrink-0 flex-wrap items-center gap-2">
                 <button type="button" x-on:click="$dispatch('open-modal', 'add-tenant-modal')" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90">
-                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                    <x-heroicon-o-plus class="h-4 w-4" />
                     {{ __('Add tenant') }}
                 </button>
             </div>
@@ -1094,17 +1094,17 @@
                                 <div class="flex flex-wrap items-center gap-2">
                                     @if ($tenantDomain->testingHostname())
                                         <button type="button" wire:click="removeTenantTestingHostname('{{ $tenantDomain->id }}')" wire:loading.attr="disabled" wire:target="removeTenantTestingHostname('{{ $tenantDomain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-moss shadow-sm hover:bg-brand-sand/40" title="{{ __('Delete the managed testing hostname for this tenant') }}">
-                                            <x-heroicon-o-beaker class="h-3.5 w-3.5" />
+                                            <x-heroicon-o-beaker class="h-4 w-4" />
                                             {{ __('Remove testing URL') }}
                                         </button>
                                     @else
                                         <button type="button" wire:click="provisionTenantTestingHostname('{{ $tenantDomain->id }}')" wire:loading.attr="disabled" wire:target="provisionTenantTestingHostname('{{ $tenantDomain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-forest/30 bg-brand-forest/5 px-2.5 py-1 text-[11px] font-semibold text-brand-forest shadow-sm hover:bg-brand-forest/10" title="{{ __('Provision a dply testing-domain hostname pointed at this app for this tenant') }}">
-                                            <x-heroicon-o-beaker class="h-3.5 w-3.5" />
+                                            <x-heroicon-o-beaker class="h-4 w-4" />
                                             {{ __('Create testing URL') }}
                                         </button>
                                     @endif
                                     <button type="button" wire:click="editTenantDomain('{{ $tenantDomain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-pencil-square class="h-4 w-4" />
                                         {{ __('Edit') }}
                                     </button>
                                     <button type="button" wire:click="confirmRemoveTenantDomain('{{ $tenantDomain->id }}')" class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-brand-mist hover:border-red-200 hover:bg-red-50 hover:text-red-700" title="{{ __('Remove') }}" aria-label="{{ __('Remove') }}">
@@ -1186,7 +1186,7 @@
             @if (! empty($rename_plan['manual']))
                 <div class="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3">
                     <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-900">
-                        <x-heroicon-m-information-circle class="h-3.5 w-3.5" />
+                        <x-heroicon-m-information-circle class="h-4 w-4" />
                         {{ __('Cannot be fixed from here') }}
                     </p>
                     <ul class="mt-2 space-y-1 text-sm text-amber-900">

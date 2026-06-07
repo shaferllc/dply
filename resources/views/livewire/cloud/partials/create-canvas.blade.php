@@ -325,9 +325,9 @@
         <div class="flex items-center gap-2 text-sm">
             <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-brand-ink text-brand-cream">
                 @if ($mode === 'source')
-                    <x-heroicon-o-code-bracket class="h-3.5 w-3.5" aria-hidden="true" />
+                    <x-heroicon-o-code-bracket class="h-4 w-4" aria-hidden="true" />
                 @else
-                    <x-heroicon-o-cube class="h-3.5 w-3.5" aria-hidden="true" />
+                    <x-heroicon-o-cube class="h-4 w-4" aria-hidden="true" />
                 @endif
             </span>
             <span class="font-mono text-sm font-semibold text-brand-ink dark:text-brand-cream">{{ $sourceLabel }}</span>
@@ -345,7 +345,7 @@
                 x-on:click="relayout()"
                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink transition hover:bg-brand-cream/40 dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream"
             >
-                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
                 {{ __('Reset layout') }}
             </button>
         </div>
@@ -522,7 +522,7 @@
                                 class="dply-input min-w-[10rem] flex-1 font-mono text-xs"
                             />
                             <button type="button" wire:click="addDomain" class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream">
-                                <x-heroicon-o-plus class="h-3.5 w-3.5" aria-hidden="true" />
+                                <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
                                 {{ __('Add') }}
                             </button>
                         </div>
@@ -581,7 +581,7 @@
                         <div class="space-y-2 px-3 pt-2 pb-3">
                             <div class="flex items-center justify-between gap-3 rounded-lg border border-brand-ink/8 bg-white px-3 py-2 dark:border-brand-mist/15 dark:bg-zinc-900">
                                 <span class="inline-flex items-center gap-2 text-xs text-brand-moss">
-                                    <x-heroicon-o-cpu-chip class="h-3.5 w-3.5" aria-hidden="true" />
+                                    <x-heroicon-o-cpu-chip class="h-4 w-4" aria-hidden="true" />
                                     {{ __('Size') }}
                                 </span>
                                 <span class="font-mono text-xs font-semibold text-brand-ink dark:text-brand-cream">{{ $sizeLabel }}</span>
@@ -589,7 +589,7 @@
                             @if ($autoscaling_enabled)
                                 <div class="flex items-center justify-between gap-3 rounded-lg border border-brand-sage/25 bg-brand-sage/8 px-3 py-2 dark:border-brand-sage/30 dark:bg-brand-sage/10">
                                     <span class="inline-flex items-center gap-2 text-xs text-brand-forest dark:text-brand-sage">
-                                        <x-heroicon-o-arrows-up-down class="h-3.5 w-3.5" aria-hidden="true" />
+                                        <x-heroicon-o-arrows-up-down class="h-4 w-4" aria-hidden="true" />
                                         {{ __('Autoscaling') }}
                                     </span>
                                     <span class="font-mono text-xs font-semibold text-brand-ink dark:text-brand-cream">{{ $autoscaling_min }}–{{ $autoscaling_max }} · {{ $autoscaling_cpu_percent }}%</span>
@@ -597,7 +597,7 @@
                             @else
                                 <div class="flex items-center justify-between gap-3 rounded-lg border border-brand-ink/8 bg-white px-3 py-2 dark:border-brand-mist/15 dark:bg-zinc-900">
                                     <span class="inline-flex items-center gap-2 text-xs text-brand-moss">
-                                        <x-heroicon-o-square-3-stack-3d class="h-3.5 w-3.5" aria-hidden="true" />
+                                        <x-heroicon-o-square-3-stack-3d class="h-4 w-4" aria-hidden="true" />
                                         {{ __('Instances') }}
                                     </span>
                                     <span class="font-mono text-xs font-semibold text-brand-ink dark:text-brand-cream">{{ $instances }}× fixed</span>
@@ -606,7 +606,7 @@
                             @if ($mode === 'source')
                                 <div class="flex items-center justify-between gap-3 rounded-lg border border-brand-ink/8 bg-white px-3 py-2 dark:border-brand-mist/15 dark:bg-zinc-900">
                                     <span class="inline-flex items-center gap-2 text-xs text-brand-moss">
-                                        <x-heroicon-o-bolt class="h-3.5 w-3.5" aria-hidden="true" />
+                                        <x-heroicon-o-bolt class="h-4 w-4" aria-hidden="true" />
                                         {{ __('Auto-deploy') }}
                                     </span>
                                     <span class="text-xs font-semibold {{ $deploy_on_push ? 'text-brand-forest dark:text-brand-sage' : 'text-brand-mist' }}">
@@ -1254,7 +1254,7 @@
                                     wire:target="detectFromRepository"
                                     class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest disabled:opacity-60"
                                 >
-                                    <x-heroicon-o-sparkles wire:loading.remove wire:target="detectFromRepository" class="h-3.5 w-3.5" aria-hidden="true" />
+                                    <x-heroicon-o-sparkles wire:loading.remove wire:target="detectFromRepository" class="h-4 w-4" aria-hidden="true" />
                                     <x-spinner wire:loading wire:target="detectFromRepository" size="sm" variant="cream" />
                                     <span wire:loading.remove wire:target="detectFromRepository">{{ __('Detect runtime') }}</span>
                                     <span wire:loading wire:target="detectFromRepository">{{ __('Detecting…') }}</span>

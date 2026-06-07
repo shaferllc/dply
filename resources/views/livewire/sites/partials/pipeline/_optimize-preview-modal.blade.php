@@ -23,9 +23,9 @@
         focusable
     >
         <div class="flex items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200">
+            <x-icon-badge tone="indigo">
                 <x-heroicon-o-sparkles class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-indigo-700">{{ __('Optimize pipeline') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Review proposed changes') }}</h3>
@@ -65,7 +65,7 @@
                 wire:target="applyPipelineOptimization"
                 class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-4 py-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:opacity-60"
             >
-                <x-heroicon-o-check class="h-3.5 w-3.5" aria-hidden="true" />
+                <x-heroicon-o-check class="h-4 w-4" aria-hidden="true" />
                 {{ trans_choice('{1} Apply :count change|[2,*] Apply :count changes', count($optPreview['steps']), ['count' => count($optPreview['steps'])]) }}
             </button>
         </div>

@@ -74,7 +74,7 @@
             wire:target="recomputeCostPreview"
             class="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-cream/40 disabled:opacity-50 dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream dark:hover:bg-zinc-700"
         >
-            <x-heroicon-o-calculator class="h-3.5 w-3.5" aria-hidden="true" />
+            <x-heroicon-o-calculator class="h-4 w-4" aria-hidden="true" />
             <span wire:loading.remove wire:target="recomputeCostPreview">{{ __('Re-estimate cost') }}</span>
             <span wire:loading wire:target="recomputeCostPreview">{{ __('Calling cloud…') }}</span>
         </button>

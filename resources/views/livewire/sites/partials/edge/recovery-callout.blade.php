@@ -97,7 +97,7 @@
                             wire:target="redeployEdge"
                             class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:opacity-60"
                         >
-                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                            <x-heroicon-o-arrow-path class="h-4 w-4" />
                             {{ __('Retry deploy') }}
                         </button>
                         <a
@@ -105,7 +105,7 @@
                             wire:navigate
                             class="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-800 hover:bg-rose-50"
                         >
-                            <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" />
+                            <x-heroicon-o-wrench-screwdriver class="h-4 w-4" />
                             {{ __('Edit build settings') }}
                         </a>
                     </div>

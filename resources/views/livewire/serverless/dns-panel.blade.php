@@ -15,9 +15,9 @@
 
 <section class="dply-card overflow-hidden">
     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+        <x-icon-badge>
             <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
-        </span>
+        </x-icon-badge>
         <div class="min-w-0">
             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('DNS & hostname') }}</p>
             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $host ?: __('No hostname yet') }}</h2>
@@ -35,7 +35,7 @@
                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-wait disabled:opacity-60"
                 title="{{ __('Re-run the DNS provisioner against this site. Idempotent — creates the record if missing, refreshes it otherwise.') }}"
             >
-                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" wire:target="provisionNow" />
+                <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.class="animate-spin" wire:target="provisionNow" />
                 <span wire:loading.remove wire:target="provisionNow">{{ __('Provision DNS now') }}</span>
                 <span wire:loading wire:target="provisionNow">{{ __('Provisioning…') }}</span>
             </button>
@@ -109,7 +109,7 @@
                         wire:confirm="{{ __('This will permanently delete every DNS record at this exact name in DigitalOcean, then re-run the provisioner. Continue?') }}"
                         class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-rose-900 px-3 py-1.5 text-xs font-semibold text-rose-50 shadow-sm hover:bg-rose-950 disabled:cursor-wait disabled:opacity-60"
                     >
-                        <x-heroicon-o-trash class="h-3.5 w-3.5" wire:loading.class="animate-pulse" wire:target="forcePurgeAndProvision" />
+                        <x-heroicon-o-trash class="h-4 w-4" wire:loading.class="animate-pulse" wire:target="forcePurgeAndProvision" />
                         <span wire:loading.remove wire:target="forcePurgeAndProvision">{{ __('Force-purge & retry') }}</span>
                         <span wire:loading wire:target="forcePurgeAndProvision">{{ __('Purging…') }}</span>
                     </button>

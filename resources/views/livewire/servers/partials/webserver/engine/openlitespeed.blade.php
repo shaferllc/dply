@@ -9,7 +9,7 @@
                                     {{ __('Per-vhost tunables in /usr/local/lsws/conf/vhosts/<name>/vhconf.conf. Each vhost maps to one Site — adds/removes happen in the Sites workspace.') }}
                                 </p>
                                 <p class="mt-2 inline-flex items-center gap-1.5 rounded-md bg-amber-50/70 px-2.5 py-1 text-[11px] font-medium text-amber-900 ring-1 ring-amber-200">
-                                    <x-heroicon-o-exclamation-triangle class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-exclamation-triangle class="h-4 w-4" />
                                     {{ __('Edits here are overwritten the next time you Apply the matching Site (or switch webserver). Use the Site workspace for durable changes.') }}
                                 </p>
                             </div>
@@ -21,10 +21,10 @@
                                 class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
                             >
                                 <span wire:loading.remove wire:target="loadOlsVhostsConfig" class="inline-flex">
-                                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-arrow-path class="h-4 w-4" />
                                 </span>
                                 <span wire:loading wire:target="loadOlsVhostsConfig" class="inline-flex">
-                                    <x-spinner class="h-3.5 w-3.5" />
+                                    <x-spinner class="h-4 w-4" />
                                 </span>
                                 {{ __('Reload from server') }}
                             </button>
@@ -42,7 +42,7 @@
                         @if (! $ols_vhosts_loaded)
                             <p class="mt-5 text-sm text-brand-moss">
                                 <span wire:loading wire:target="loadOlsVhostsConfig" class="inline-flex items-center gap-2">
-                                    <x-spinner class="h-3.5 w-3.5" /> {{ __('Reading config…') }}
+                                    <x-spinner class="h-4 w-4" /> {{ __('Reading config…') }}
                                 </span>
                                 <span wire:loading.remove wire:target="loadOlsVhostsConfig">
                                     {{ __('Click "Reload from server" to fetch current values.') }}
@@ -217,7 +217,7 @@
                                     @disabled($isDeployer || $actionInFlight)
                                     class="inline-flex items-center gap-1.5 rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
-                                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-plus class="h-4 w-4" />
                                     {{ __('Add listener') }}
                                 </button>
                                 <button
@@ -228,10 +228,10 @@
                                     class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
                                 >
                                     <span wire:loading.remove wire:target="loadOlsListenersConfig" class="inline-flex">
-                                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-arrow-path class="h-4 w-4" />
                                     </span>
                                     <span wire:loading wire:target="loadOlsListenersConfig" class="inline-flex">
-                                        <x-spinner class="h-3.5 w-3.5" />
+                                        <x-spinner class="h-4 w-4" />
                                     </span>
                                     {{ __('Reload from server') }}
                                 </button>
@@ -328,10 +328,10 @@
                                         class="inline-flex items-center gap-2 rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
                                         <span wire:loading.remove wire:target="submitAddOlsListener" class="inline-flex">
-                                            <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                                            <x-heroicon-o-plus class="h-4 w-4" />
                                         </span>
                                         <span wire:loading wire:target="submitAddOlsListener" class="inline-flex">
-                                            <x-spinner variant="cream" class="h-3.5 w-3.5" />
+                                            <x-spinner variant="cream" class="h-4 w-4" />
                                         </span>
                                         {{ __('Create and reload') }}
                                     </button>
@@ -342,7 +342,7 @@
                         @if (! $ols_listeners_loaded)
                             <p class="mt-5 text-sm text-brand-moss">
                                 <span wire:loading wire:target="loadOlsListenersConfig" class="inline-flex items-center gap-2">
-                                    <x-spinner class="h-3.5 w-3.5" /> {{ __('Reading config…') }}
+                                    <x-spinner class="h-4 w-4" /> {{ __('Reading config…') }}
                                 </span>
                                 <span wire:loading.remove wire:target="loadOlsListenersConfig">
                                     {{ __('Click "Reload from server" to fetch current values.') }}
@@ -419,7 +419,7 @@
                                                     @disabled($isDeployer || $actionInFlight)
                                                     class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-[11px] font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                                                 >
-                                                    <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                                                    <x-heroicon-o-trash class="h-4 w-4" />
                                                     {{ __('Remove') }}
                                                 </button>
                                             </div>
@@ -530,7 +530,7 @@
                                     @disabled($isDeployer || $actionInFlight)
                                     class="inline-flex items-center gap-1.5 rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
-                                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-plus class="h-4 w-4" />
                                     {{ __('Add ExtApp') }}
                                 </button>
                                 <button
@@ -541,10 +541,10 @@
                                     class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
                                 >
                                     <span wire:loading.remove wire:target="loadOlsExtAppsConfig" class="inline-flex">
-                                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-arrow-path class="h-4 w-4" />
                                     </span>
                                     <span wire:loading wire:target="loadOlsExtAppsConfig" class="inline-flex">
-                                        <x-spinner class="h-3.5 w-3.5" />
+                                        <x-spinner class="h-4 w-4" />
                                     </span>
                                     {{ __('Reload from server') }}
                                 </button>
@@ -621,10 +621,10 @@
                                         class="inline-flex items-center gap-2 rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
                                         <span wire:loading.remove wire:target="submitAddOlsExtApp" class="inline-flex">
-                                            <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                                            <x-heroicon-o-plus class="h-4 w-4" />
                                         </span>
                                         <span wire:loading wire:target="submitAddOlsExtApp" class="inline-flex">
-                                            <x-spinner variant="cream" class="h-3.5 w-3.5" />
+                                            <x-spinner variant="cream" class="h-4 w-4" />
                                         </span>
                                         {{ __('Create and reload') }}
                                     </button>
@@ -644,7 +644,7 @@
                         @if (! $ols_extapps_loaded)
                             <p class="mt-5 text-sm text-brand-moss">
                                 <span wire:loading wire:target="loadOlsExtAppsConfig" class="inline-flex items-center gap-2">
-                                    <x-spinner class="h-3.5 w-3.5" /> {{ __('Reading config…') }}
+                                    <x-spinner class="h-4 w-4" /> {{ __('Reading config…') }}
                                 </span>
                                 <span wire:loading.remove wire:target="loadOlsExtAppsConfig">
                                     {{ __('Click "Reload from server" to fetch current values.') }}
@@ -716,7 +716,7 @@
                                                     @disabled($isDeployer || $actionInFlight)
                                                     class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-[11px] font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                                                 >
-                                                    <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                                                    <x-heroicon-o-trash class="h-4 w-4" />
                                                     {{ __('Remove') }}
                                                 </button>
                                             </div>
@@ -813,9 +813,9 @@
                 <div class="space-y-4 mb-6" wire:key="ols-modules-config">
                     <div class="{{ $card }}">
                         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge>
                                 <x-heroicon-o-puzzle-piece class="h-5 w-5" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0 flex-1">
                                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Modules') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('OpenLiteSpeed modules') }}</h3>
@@ -831,10 +831,10 @@
                                 class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
                             >
                                 <span wire:loading.remove wire:target="loadOlsModulesConfig" class="inline-flex">
-                                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-arrow-path class="h-4 w-4" />
                                 </span>
                                 <span wire:loading wire:target="loadOlsModulesConfig" class="inline-flex">
-                                    <x-spinner class="h-3.5 w-3.5" />
+                                    <x-spinner class="h-4 w-4" />
                                 </span>
                                 {{ __('Reload from server') }}
                             </button>
@@ -1037,10 +1037,10 @@
                             class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
                         >
                             <span wire:loading.remove wire:target="loadOlsCacheConfig" class="inline-flex">
-                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                                <x-heroicon-o-arrow-path class="h-4 w-4" />
                             </span>
                             <span wire:loading wire:target="loadOlsCacheConfig" class="inline-flex">
-                                <x-spinner class="h-3.5 w-3.5" />
+                                <x-spinner class="h-4 w-4" />
                             </span>
                             {{ __('Reload from server') }}
                         </button>
@@ -1053,7 +1053,7 @@
                             @disabled($isDeployer || $actionInFlight || ! $opsReady)
                             class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-800 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                            <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                            <x-heroicon-o-trash class="h-4 w-4" />
                             {{ __('Purge all LSCache') }}
                         </button>
                     </div>
@@ -1073,7 +1073,7 @@
                     @if (! $ols_cache_loaded)
                         <p class="mt-5 text-sm text-brand-moss">
                             <span wire:loading wire:target="loadOlsCacheConfig" class="inline-flex items-center gap-2">
-                                <x-spinner class="h-3.5 w-3.5" /> {{ __('Reading config…') }}
+                                <x-spinner class="h-4 w-4" /> {{ __('Reading config…') }}
                             </span>
                             <span wire:loading.remove wire:target="loadOlsCacheConfig">
                                 {{ __('Click "Reload from server" to fetch current values.') }}

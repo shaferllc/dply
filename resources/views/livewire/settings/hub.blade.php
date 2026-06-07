@@ -38,9 +38,9 @@
         <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
             <div class="lg:col-span-7">
                 <div class="flex items-start gap-3">
-                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge size="md">
                         <x-heroicon-o-cog-6-tooth class="h-6 w-6" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Settings') }}</p>
                         <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Profile') }}</h2>
@@ -114,7 +114,7 @@
                     'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => ! request()->routeIs('settings.profile'),
                 ])
             >
-                <x-heroicon-o-user-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <x-heroicon-o-user-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
                 {{ __('Profile') }}
             </a>
             <a
@@ -126,7 +126,7 @@
                     'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => ! request()->routeIs('settings.servers'),
                 ])
             >
-                <x-heroicon-o-server class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <x-heroicon-o-server class="h-4 w-4 shrink-0" aria-hidden="true" />
                 {{ __('Servers & Sites') }}
             </a>
         </nav>
@@ -149,9 +149,9 @@
                  is the single personal-settings surface. --}}
             <section class="dply-card overflow-hidden">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-user-circle class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0 flex-1">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Identity') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Your details') }}</h3>
@@ -194,7 +194,7 @@
                                     </button>
                                     @if ($verificationLinkSent)
                                         <p class="mt-2 inline-flex items-center gap-1 font-semibold text-emerald-800">
-                                            <x-heroicon-m-check-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            <x-heroicon-m-check-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Verification link sent.') }}
                                         </p>
                                     @endif
@@ -237,9 +237,9 @@
 
             <section class="dply-card overflow-hidden">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-adjustments-horizontal class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Personal') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Your preferences') }}</h3>
@@ -286,13 +286,13 @@
                                     ])
                                 >
                                     @if ($opt === 'light')
-                                        <x-heroicon-o-sun class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        <x-heroicon-o-sun class="h-4 w-4 shrink-0" aria-hidden="true" />
                                         {{ __('Light') }}
                                     @elseif ($opt === 'dark')
-                                        <x-heroicon-o-moon class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        <x-heroicon-o-moon class="h-4 w-4 shrink-0" aria-hidden="true" />
                                         {{ __('Dark') }}
                                     @else
-                                        <x-heroicon-o-computer-desktop class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        <x-heroicon-o-computer-desktop class="h-4 w-4 shrink-0" aria-hidden="true" />
                                         {{ __('System') }}
                                     @endif
                                 </button>
@@ -319,10 +319,10 @@
                                     ])
                                 >
                                     @if ($opt === 'sidebar')
-                                        <x-heroicon-o-squares-2x2 class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        <x-heroicon-o-squares-2x2 class="h-4 w-4 shrink-0" aria-hidden="true" />
                                         {{ __('Sidebar') }}
                                     @else
-                                        <x-heroicon-o-bars-3 class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        <x-heroicon-o-bars-3 class="h-4 w-4 shrink-0" aria-hidden="true" />
                                         {{ __('Top') }}
                                     @endif
                                 </button>
@@ -365,9 +365,9 @@
             {{-- Active sessions --}}
             <section class="dply-card overflow-hidden">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-device-phone-mobile class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0 flex-1">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Devices') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Active sessions') }}</h3>
@@ -375,7 +375,7 @@
                     </div>
                     @if ($otherSessions > 0)
                         <button type="button" wire:click="openConfirmActionModal('revokeOtherSessions', [], @js(__('Revoke all other sessions')), @js(__('Revoke all other sessions? You will stay logged in on this device only.')), @js(__('Revoke sessions')), true)" class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 shadow-sm transition hover:bg-red-100">
-                            <x-heroicon-o-x-mark class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            <x-heroicon-o-x-mark class="h-4 w-4 shrink-0" aria-hidden="true" />
                             {{ __('Revoke other devices') }}
                         </button>
                     @endif
@@ -420,7 +420,7 @@
                                             wire:click="openConfirmActionModal('revokeSession', ['{{ $session['id'] }}'], @js(__('Revoke session')), @js(__('Revoke this session? That device will be logged out on its next request.')), @js(__('Revoke')), true)"
                                             class="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700 hover:underline"
                                         >
-                                            <x-heroicon-o-x-mark class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            <x-heroicon-o-x-mark class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Revoke') }}
                                         </button>
                                     @endif
@@ -436,9 +436,9 @@
                 <p class="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-red-600/80">{{ __('Danger zone') }}</p>
                 <div class="dply-card overflow-hidden border-rose-200">
                     <div class="flex items-start gap-3 border-b border-rose-200/60 bg-rose-50/60 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-rose-50 text-rose-700 ring-1 ring-rose-200">
+                        <x-icon-badge tone="danger">
                             <x-heroicon-o-trash class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Permanent') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Delete account') }}</h3>
@@ -483,9 +483,9 @@
             {{-- Your timezone --}}
             <section class="dply-card overflow-hidden">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Time') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Your timezone') }}</h3>
@@ -520,9 +520,9 @@
             {{-- Organization defaults --}}
             <section class="dply-card overflow-hidden">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-building-office-2 class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0 flex-1">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Org-wide') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Organization defaults') }}</h3>
@@ -566,9 +566,9 @@
             {{-- Insights preferences --}}
             <section class="dply-card overflow-hidden">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-light-bulb class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Alerts') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Insights preferences') }}</h3>
@@ -657,9 +657,9 @@
             {{-- Team defaults --}}
             <section class="dply-card overflow-hidden">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-rectangle-group class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Per-team') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Team defaults') }}</h3>

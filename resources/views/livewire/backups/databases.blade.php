@@ -99,7 +99,7 @@
                     <p class="mt-1 text-xs text-brand-mist">{{ __('Add schedules from a server Backups workspace.') }}</p>
                     <a href="{{ route('servers.index') }}" wire:navigate class="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-brand-sage hover:text-brand-ink">
                         {{ __('Go to servers') }}
-                        <x-heroicon-m-arrow-right class="h-3.5 w-3.5" aria-hidden="true" />
+                        <x-heroicon-m-arrow-right class="h-4 w-4" aria-hidden="true" />
                     </a>
                 </div>
             @else
@@ -168,7 +168,7 @@
                                                     class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-wait disabled:opacity-60"
                                                     title="{{ __('Run now') }}"
                                                 >
-                                                    <x-heroicon-o-play class="h-3.5 w-3.5" aria-hidden="true" />
+                                                    <x-heroicon-o-play class="h-4 w-4" aria-hidden="true" />
                                                     {{ __('Run') }}
                                                 </button>
                                                 <button
@@ -179,9 +179,9 @@
                                                     title="{{ $schedule->is_active ? __('Pause') : __('Resume') }}"
                                                 >
                                                     @if ($schedule->is_active)
-                                                        <x-heroicon-o-pause class="h-3.5 w-3.5" aria-hidden="true" />
+                                                        <x-heroicon-o-pause class="h-4 w-4" aria-hidden="true" />
                                                     @else
-                                                        <x-heroicon-o-play-pause class="h-3.5 w-3.5" aria-hidden="true" />
+                                                        <x-heroicon-o-play-pause class="h-4 w-4" aria-hidden="true" />
                                                     @endif
                                                 </button>
                                                 <a
@@ -190,7 +190,7 @@
                                                     class="inline-flex items-center justify-center h-7 w-7 rounded-lg border border-brand-ink/10 bg-white text-brand-mist shadow-sm transition hover:text-brand-ink hover:bg-brand-sand/40"
                                                     title="{{ __('Open on server') }}"
                                                 >
-                                                    <x-heroicon-m-arrow-top-right-on-square class="h-3.5 w-3.5" aria-hidden="true" />
+                                                    <x-heroicon-m-arrow-top-right-on-square class="h-4 w-4" aria-hidden="true" />
                                                 </a>
                                             </div>
                                         </td>
@@ -302,7 +302,7 @@
                         class="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-brand-sage hover:text-brand-ink"
                     >
                         {{ __('Add your first destination') }}
-                        <x-heroicon-m-arrow-right class="h-3.5 w-3.5" aria-hidden="true" />
+                        <x-heroicon-m-arrow-right class="h-4 w-4" aria-hidden="true" />
                     </a>
                 </div>
             @else

@@ -21,7 +21,7 @@
             title="{{ $item['key'] === 'clone' ? __('Edit clone script') : __('Edit activate script') }}"
             data-pipeline-no-drag
         >
-            <x-heroicon-m-pencil-square class="h-3.5 w-3.5" />
+            <x-heroicon-m-pencil-square class="h-4 w-4" />
         </button>
     </div>
     @include('livewire.sites.partials.pipeline._timeline-flow-connector')

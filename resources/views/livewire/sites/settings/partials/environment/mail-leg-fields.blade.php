@@ -21,7 +21,7 @@
         </div>
         @if ($legCanRemove)
             <button type="button" wire:click="removeMailLeg({{ $legIndex }})" class="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-white px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50">
-                <x-heroicon-o-x-mark class="h-3.5 w-3.5" /> {{ __('Remove') }}
+                <x-heroicon-o-x-mark class="h-4 w-4" /> {{ __('Remove') }}
             </button>
         @endif
     </div>

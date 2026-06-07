@@ -275,9 +275,9 @@
                     <aside class="w-full space-y-6 self-start lg:col-start-2 lg:row-start-1 lg:sticky lg:top-24 lg:max-w-none">
                         <section class="dply-card overflow-hidden">
                             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-icon-badge>
                                     <x-heroicon-o-clipboard-document-list class="h-5 w-5" aria-hidden="true" />
-                                </span>
+                                </x-icon-badge>
                                 <div class="min-w-0">
                                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Summary') }}</p>
                                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Site summary') }}</h3>
@@ -352,7 +352,7 @@
                                             title="{{ __('Open URL') }}"
                                             class="shrink-0 text-emerald-950/70 hover:text-emerald-700"
                                         >
-                                            <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5" aria-hidden="true" />
+                                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" aria-hidden="true" />
                                         </a>
                                         <button
                                             type="button"
@@ -360,7 +360,7 @@
                                             :title="copied ? '{{ __('Copied') }}' : '{{ __('Copy URL') }}'"
                                             class="shrink-0 text-emerald-950/70 hover:text-emerald-700"
                                         >
-                                            <x-heroicon-o-clipboard x-show="!copied" class="h-3.5 w-3.5" aria-hidden="true" />
+                                            <x-heroicon-o-clipboard x-show="!copied" class="h-4 w-4" aria-hidden="true" />
                                             <x-heroicon-s-check x-show="copied" x-cloak class="h-3.5 w-3.5 text-emerald-600" aria-hidden="true" />
                                         </button>
                                     </div>
@@ -376,9 +376,9 @@
 
                         <section class="dply-card overflow-hidden">
                             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-icon-badge>
                                     <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
-                                </span>
+                                </x-icon-badge>
                                 <div class="min-w-0">
                                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('DNS readiness') }}</p>
                                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Either URL can finish setup') }}</h3>

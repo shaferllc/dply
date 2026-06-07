@@ -39,7 +39,7 @@
                 @elseif ($switch_plan['blocker'] !== null)
                     <div class="rounded-xl border border-rose-200 bg-rose-50/70 px-4 py-3">
                         <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-900">
-                            <x-heroicon-m-no-symbol class="h-3.5 w-3.5" />
+                            <x-heroicon-m-no-symbol class="h-4 w-4" />
                             {{ __('Cannot switch') }}
                         </p>
                         <p class="mt-2 text-sm leading-relaxed text-rose-900">{{ $switch_plan['blocker']['label'] }}</p>
@@ -107,7 +107,7 @@
                     @if (! empty($switch_plan['manual']))
                         <div class="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3">
                             <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-900">
-                                <x-heroicon-m-information-circle class="h-3.5 w-3.5" />
+                                <x-heroicon-m-information-circle class="h-4 w-4" />
                                 {{ __('Cannot be fixed from here') }}
                             </p>
                             <ul class="mt-2 space-y-1 text-sm text-amber-900">

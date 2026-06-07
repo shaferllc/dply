@@ -79,9 +79,9 @@
                     {{-- Master toggle --}}
                     <section class="{{ $card }}">
                         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge>
                                 <x-heroicon-o-power class="h-5 w-5" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0">
                                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Master switch') }}</p>
                                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Enable caching') }}</h2>
@@ -102,9 +102,9 @@
                     {{-- Methods --}}
                     <section class="{{ $card }}">
                         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge>
                                 <x-heroicon-o-squares-2x2 class="h-5 w-5" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0">
                                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Layers') }}</p>
                                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Methods') }}</h2>
@@ -140,9 +140,9 @@
                     @if (in_array('nginx_http', $methods, true))
                         <section class="{{ $card }}">
                             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-icon-badge>
                                     <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-                                </span>
+                                </x-icon-badge>
                                 <div class="min-w-0">
                                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Nginx') }}</p>
                                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('HTTP cache settings') }}</h2>
@@ -187,9 +187,9 @@
                     @if (in_array('lscache', $methods, true))
                         <section class="{{ $card }}">
                             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-icon-badge>
                                     <x-heroicon-o-rocket-launch class="h-5 w-5" aria-hidden="true" />
-                                </span>
+                                </x-icon-badge>
                                 <div class="min-w-0">
                                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('LSCache') }}</p>
                                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('LiteSpeed cache settings') }}</h2>
@@ -214,9 +214,9 @@
                     @if (in_array('varnish', $methods, true))
                         <section class="{{ $card }}">
                             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-icon-badge>
                                     <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                                </span>
+                                </x-icon-badge>
                                 <div class="min-w-0">
                                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Varnish') }}</p>
                                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Front cache settings') }}</h2>
@@ -241,9 +241,9 @@
                     @if (in_array('opcache', $methods, true))
                         <section class="{{ $card }}">
                             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-icon-badge>
                                     <x-heroicon-o-cpu-chip class="h-5 w-5" aria-hidden="true" />
-                                </span>
+                                </x-icon-badge>
                                 <div class="min-w-0">
                                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('OPcache') }}</p>
                                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('PHP opcode cache') }}</h2>

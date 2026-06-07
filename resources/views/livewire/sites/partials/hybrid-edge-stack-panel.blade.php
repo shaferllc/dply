@@ -40,17 +40,17 @@
             </div>
             @if ($stackStatus === 'awaiting_origin' || $stackStatus === 'edge_provisioning')
                 <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-800 dark:bg-sky-900/50 dark:text-sky-200">
-                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                    <x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" aria-hidden="true" />
                     {{ __('In progress') }}
                 </span>
             @elseif ($stackStatus === 'complete')
                 <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
-                    <x-heroicon-s-check class="h-3.5 w-3.5" aria-hidden="true" />
+                    <x-heroicon-s-check class="h-4 w-4" aria-hidden="true" />
                     {{ __('Complete') }}
                 </span>
             @elseif ($stackStatus === 'failed')
                 <span class="inline-flex items-center gap-1.5 rounded-full bg-rose-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-800 dark:bg-rose-900/40 dark:text-rose-200">
-                    <x-heroicon-s-x-mark class="h-3.5 w-3.5" aria-hidden="true" />
+                    <x-heroicon-s-x-mark class="h-4 w-4" aria-hidden="true" />
                     {{ __('Failed') }}
                 </span>
             @endif

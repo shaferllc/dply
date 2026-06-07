@@ -43,7 +43,7 @@
     >
         <span class="inline-flex items-center gap-1.5" wire:loading.remove wire:target="{{ $loadingTargets }}">
             <x-dynamic-component :component="$iconForAction($actionKey)" @class([
-                'h-3.5 w-3.5',
+                'h-4 w-4',
                 'opacity-80' => $variant !== 'tools',
                 'text-brand-moss' => $variant === 'tools',
             ]) aria-hidden="true" />

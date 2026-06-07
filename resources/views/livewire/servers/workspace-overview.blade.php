@@ -135,7 +135,7 @@
                             wire:target="retryClusterPolling"
                             class="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-700 disabled:cursor-wait disabled:opacity-60"
                         >
-                            <x-heroicon-o-arrow-path wire:loading.remove wire:target="retryClusterPolling" class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            <x-heroicon-o-arrow-path wire:loading.remove wire:target="retryClusterPolling" class="h-4 w-4 shrink-0" aria-hidden="true" />
                             <x-spinner wire:loading wire:target="retryClusterPolling" variant="white" size="sm" />
                             {{ __('Re-check now') }}
                         </button>
@@ -146,7 +146,7 @@
                         @endfeature
                         <a href="{{ $kubernetesError['provider_console_url'] }}" target="_blank" rel="noopener" class="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
                             {{ __('Open in :provider', ['provider' => $kubernetesError['provider_label']]) }}
-                            <x-heroicon-m-arrow-top-right-on-square class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            <x-heroicon-m-arrow-top-right-on-square class="h-4 w-4 shrink-0" aria-hidden="true" />
                         </a>
                     </div>
                 </div>
@@ -158,9 +158,9 @@
             @feature('surface.projects')
                 <section class="dply-card overflow-hidden">
                     <div class="flex items-start gap-3 px-6 pt-5 pb-4 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $server->workspace->name }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">
@@ -168,11 +168,11 @@
                             </p>
                             <div class="mt-3 flex flex-wrap gap-2">
                                 <a href="{{ route('projects.overview', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                                    <x-heroicon-m-eye class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    <x-heroicon-m-eye class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     {{ __('Project overview') }}
                                 </a>
                                 <a href="{{ route('projects.operations', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                                    <x-heroicon-m-bolt class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    <x-heroicon-m-bolt class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     {{ __('Project operations') }}
                                 </a>
                             </div>
@@ -283,9 +283,9 @@
                 <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
                     <div class="lg:col-span-7">
                         <div class="flex items-start gap-3">
-                            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge size="md">
                                 <x-heroicon-o-server-stack class="h-6 w-6" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0">
                                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Server') }}</p>
                                 <h1 class="mt-1 truncate text-xl font-semibold tracking-tight text-brand-ink">{{ $server->name }}</h1>
@@ -358,9 +358,9 @@
                             x-on:click="open = ! open"
                             class="flex w-full items-start gap-3 text-left"
                         >
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge>
                                 <x-heroicon-o-rocket-launch class="h-5 w-5" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0 flex-1">
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
                                     {{ trans_choice('{1} :n step left to make this server useful|[2,*] :n steps left to make this server useful', $onboardingTotal - $onboardingDone, ['n' => $onboardingTotal - $onboardingDone]) }}
@@ -383,7 +383,7 @@
                                 <div class="flex min-w-0 items-start gap-3">
                                     @if ($step['done'])
                                         <span class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
-                                            <x-heroicon-m-check class="h-3.5 w-3.5" />
+                                            <x-heroicon-m-check class="h-4 w-4" />
                                         </span>
                                     @else
                                         <span class="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-sky-300 bg-white"></span>
@@ -398,7 +398,7 @@
                                 @if (! $step['done'])
                                     <a href="{{ $step['cta_route'] }}" wire:navigate class="shrink-0 inline-flex items-center gap-1 whitespace-nowrap rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-sky-700">
                                         {{ $step['cta_label'] }}
-                                        <x-heroicon-m-arrow-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        <x-heroicon-m-arrow-right class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     </a>
                                 @endif
                             </li>
@@ -413,9 +413,9 @@
                     <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div class="flex items-start gap-3">
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+                                <x-icon-badge tone="amber">
                                     <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
-                                </span>
+                                </x-icon-badge>
                                 <div class="min-w-0">
                                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Access') }}</p>
                                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Add your personal SSH key before you need this server') }}</h3>
@@ -431,7 +431,7 @@
                             <div class="flex shrink-0 flex-wrap gap-2">
                                 @if (! $hasProfileSshKeys)
                                     <a href="{{ route('profile.ssh-keys') }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest">
-                                        <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        <x-heroicon-m-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
                                         {{ __('Add a profile key') }}
                                     </a>
                                 @endif
@@ -454,9 +454,9 @@
                     <div class="px-6 pt-5 pb-4 sm:px-7">
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div class="flex items-start gap-3">
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-icon-badge>
                                     <x-heroicon-o-cube-transparent class="h-5 w-5" aria-hidden="true" />
-                                </span>
+                                </x-icon-badge>
                                 <div class="min-w-0">
                                     @if ($isContainerHost)
                                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Add your first container app') }}</h3>
@@ -468,7 +468,7 @@
                                 </div>
                             </div>
                             <a href="{{ route('sites.create', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-sky-700">
-                                <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-m-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ $isContainerHost ? __('Add container app') : __('Add site') }}
                             </a>
                         </div>
@@ -503,9 +503,9 @@
             <section class="dply-card overflow-hidden">
                 <div class="px-6 pt-5 pb-4 sm:px-7">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-squares-2x2 class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Workspace summary') }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Each tile drops you onto its full workspace page.') }}</p>
@@ -632,9 +632,9 @@
             <section class="dply-card overflow-hidden">
                 <div class="px-6 pt-5 pb-4 sm:px-7">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0 flex-1">
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('System load right now') }}</h3>
                             @if ($metricCapturedAt)
@@ -647,7 +647,7 @@
                             @endif
                         </div>
                         <a href="{{ route('servers.monitor', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                            <x-heroicon-m-chart-bar class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            <x-heroicon-m-chart-bar class="h-4 w-4 shrink-0" aria-hidden="true" />
                             {{ __('Open Monitor') }}
                         </a>
                     </div>
@@ -718,9 +718,9 @@
                 <section class="dply-card overflow-hidden">
                     <div class="px-6 pt-5 pb-4 sm:px-7">
                         <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge>
                                 <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0 flex-1">
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine workspace', ['engine' => $engineLabel]) }}</h3>
                                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Live values pulled from INFO. Each tile drops you onto the full Caches workspace.') }}</p>
@@ -863,9 +863,9 @@
                 <section class="dply-card overflow-hidden">
                     <div class="px-6 pt-5 pb-4 sm:px-7">
                         <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge>
                                 <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0 flex-1">
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine workspace', ['engine' => $engineLabel]) }}</h3>
                                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Engine status and databases on this host. Each tile drops you onto the full Database workspace.') }}</p>
@@ -909,9 +909,9 @@
                 <section class="dply-card overflow-hidden">
                     <div class="px-6 pt-5 pb-4 sm:px-7">
                         <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge>
                                 <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0 flex-1">
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent activity') }}</h3>
                                 <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Top sites by last-touched, with each site\'s most recent deploy.') }}</p>
@@ -921,7 +921,7 @@
                                     <span class="rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ $siteCount }}</span>
                                 @endif
                                 <a href="{{ route('servers.sites', $server) }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                                    <x-heroicon-m-rectangle-stack class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    <x-heroicon-m-rectangle-stack class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     {{ __('Open Sites') }}
                                 </a>
                             </div>
@@ -990,16 +990,16 @@
             <section class="dply-card overflow-hidden">
                 <div class="px-6 pt-5 pb-4 sm:px-7">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-cpu-chip class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0 flex-1">
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Installed runtime') }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Database engine, language runtime, webserver, cache.') }}</p>
                         </div>
                         @feature('workspace.services')
                             <a href="{{ route('servers.services', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                                <x-heroicon-m-cpu-chip class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-m-cpu-chip class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Open Services') }}
                             </a>
                         @endfeature
@@ -1029,7 +1029,7 @@
                         @endif
                         @if ($installedStack->lowMemoryMode)
                             <span class="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800" title="{{ __('Provisioned in low-memory mode — substituted lighter services where possible.') }}">
-                                <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-m-exclamation-triangle class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Low-memory mode') }}
                             </span>
                         @endif
@@ -1095,7 +1095,7 @@
                             </div>
                             <a href="{{ route('servers.health', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
                                 {{ __('Open Health') }}
-                                <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-m-arrow-up-right class="h-4 w-4 shrink-0" aria-hidden="true" />
                             </a>
                         </div>
                     </div>
@@ -1142,7 +1142,7 @@
                             </div>
                             <a href="{{ route('servers.settings', ['server' => $server, 'section' => 'governance']) }}#settings-cost-estimate" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
                                 {{ __('Open Cost') }}
-                                <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-m-arrow-up-right class="h-4 w-4 shrink-0" aria-hidden="true" />
                             </a>
                         </div>
                     </div>
@@ -1198,7 +1198,7 @@
                             </div>
                             <a href="{{ route('servers.patches', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
                                 {{ __('Open Patches') }}
-                                <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-m-arrow-up-right class="h-4 w-4 shrink-0" aria-hidden="true" />
                             </a>
                         </div>
                     </div>
@@ -1246,7 +1246,7 @@
                             </div>
                             <a href="{{ route('servers.hygiene', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
                                 {{ __('Open Hygiene') }}
-                                <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-m-arrow-up-right class="h-4 w-4 shrink-0" aria-hidden="true" />
                             </a>
                         </div>
                     </div>
@@ -1297,7 +1297,7 @@
                             </div>
                             <a href="{{ route('servers.shared-host', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
                                 {{ $sharedHostPreview ? __('Preview radar') : __('Open radar') }}
-                                <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-m-arrow-up-right class="h-4 w-4 shrink-0" aria-hidden="true" />
                             </a>
                         </div>
                     </div>
@@ -1330,7 +1330,7 @@
                             </div>
                             <a href="{{ route('servers.insights', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold {{ $insightsCritical ? 'text-red-700 hover:text-red-900' : 'text-amber-800 hover:text-amber-900' }} shadow-sm transition hover:bg-brand-sand/40">
                                 {{ __('Open Insights') }}
-                                <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-m-arrow-up-right class="h-4 w-4 shrink-0" aria-hidden="true" />
                             </a>
                         </div>
                     </div>
@@ -1343,9 +1343,9 @@
                 <section class="dply-card overflow-hidden">
                     <div class="px-6 pt-5 pb-4 sm:px-7">
                         <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge>
                                 <x-heroicon-o-bell-alert class="h-5 w-5" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0 flex-1">
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
                                     @if ($notificationSummary['channel_count'] > 0)
@@ -1363,7 +1363,7 @@
                                 </p>
                             </div>
                             <a href="{{ $notificationSummary['manage_url'] }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                                <x-heroicon-m-cog-6-tooth class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-m-cog-6-tooth class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Manage') }}
                             </a>
                         </div>
@@ -1380,9 +1380,9 @@
                     <div class="border-b border-rose-200 bg-rose-50/60 px-6 py-5 sm:px-7">
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div class="flex items-start gap-3">
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-rose-50 text-rose-700 ring-1 ring-rose-200">
+                                <x-icon-badge tone="danger">
                                     <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
-                                </span>
+                                </x-icon-badge>
                                 <div class="min-w-0">
                                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Danger zone') }}</p>
                                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Remove this server') }}</h3>

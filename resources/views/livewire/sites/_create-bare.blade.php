@@ -36,9 +36,9 @@
         <form wire:submit="storeBare" class="lg:col-span-7">
             <div class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-md shadow-brand-ink/5">
                 <div class="flex items-center gap-3 border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-4">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <h2 class="text-sm font-semibold text-brand-ink">{{ __('Site details') }}</h2>
                         <p class="text-xs text-brand-moss">{{ __('The essentials — everything else comes next.') }}</p>

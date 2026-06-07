@@ -16,9 +16,9 @@
 
         <section class="dply-card overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0 flex-1">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Workspace servers') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Server network map') }}</h3>
@@ -225,9 +225,9 @@
         {{-- ─── ATTACHED RESOURCES: remote DBs/caches this server reaches ──── --}}
         <section class="dply-card overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-arrows-right-left class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0 flex-1">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Attached resources') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Resources on other servers') }}</h3>
@@ -277,12 +277,12 @@
                                     <td class="px-6 py-3">
                                         @if ($res['reachable'] === true)
                                             <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-600/20">
-                                                <x-heroicon-s-check-circle class="h-3.5 w-3.5" aria-hidden="true" /> {{ __('Reachable') }}
+                                                <x-heroicon-s-check-circle class="h-4 w-4" aria-hidden="true" /> {{ __('Reachable') }}
                                             </span>
                                         @elseif ($res['reachable'] === false)
                                             <div class="space-y-1.5">
                                                 <span class="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700 ring-1 ring-red-600/20">
-                                                    <x-heroicon-s-x-circle class="h-3.5 w-3.5" aria-hidden="true" /> {{ __('Unreachable') }}
+                                                    <x-heroicon-s-x-circle class="h-4 w-4" aria-hidden="true" /> {{ __('Unreachable') }}
                                                 </span>
                                                 @if (! empty($res['detail']))
                                                     <p class="max-w-md text-xs leading-relaxed text-brand-mist">{{ $res['detail'] }}</p>
@@ -313,9 +313,9 @@
         @if ($databaseEngines->isNotEmpty())
             <section class="dply-card overflow-hidden">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('This server') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Per-database remote access') }}</h3>
@@ -371,7 +371,7 @@
                                             wire:target="toggleDatabaseNetworking('{{ $db->id }}', false)"
                                             class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:opacity-50"
                                         >
-                                            <x-heroicon-o-lock-closed class="h-3.5 w-3.5" />
+                                            <x-heroicon-o-lock-closed class="h-4 w-4" />
                                             <span wire:loading.remove wire:target="toggleDatabaseNetworking('{{ $db->id }}', false)">{{ __('Disable') }}</span>
                                             <span wire:loading wire:target="toggleDatabaseNetworking('{{ $db->id }}', false)">{{ __('Working…') }}</span>
                                         </button>
@@ -393,7 +393,7 @@
                                                 wire:target="toggleDatabaseNetworking('{{ $db->id }}', true)"
                                                 class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-brand-forest/90 disabled:opacity-50"
                                             >
-                                                <x-heroicon-o-globe-alt class="h-3.5 w-3.5" />
+                                                <x-heroicon-o-globe-alt class="h-4 w-4" />
                                                 <span wire:loading.remove wire:target="toggleDatabaseNetworking('{{ $db->id }}', true)">{{ __('Expose') }}</span>
                                                 <span wire:loading wire:target="toggleDatabaseNetworking('{{ $db->id }}', true)">{{ __('…') }}</span>
                                             </button>
@@ -477,9 +477,9 @@
         @if ($cacheServices->isNotEmpty())
             <section class="dply-card overflow-hidden">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('This server') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Cache remote access') }}</h3>
@@ -524,7 +524,7 @@
                                     wire:click="openConfirmActionModal('lockdownCache', ['{{ $cache->id }}'], @js(__('Lock down :engine?', ['engine' => $cacheLabel])), @js(__('The bind will revert to 127.0.0.1 and the firewall rule will be removed.')), @js(__('Lock down')), true)"
                                     class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100"
                                 >
-                                    <x-heroicon-o-lock-closed class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-lock-closed class="h-4 w-4" />
                                     {{ __('Lock down') }}
                                 </button>
                             @else
@@ -545,7 +545,7 @@
                                         wire:target="exposeCacheToNetwork('{{ $cache->id }}')"
                                         class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-brand-forest/90 disabled:opacity-50"
                                     >
-                                        <x-heroicon-o-globe-alt class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-globe-alt class="h-4 w-4" />
                                         <span wire:loading.remove wire:target="exposeCacheToNetwork('{{ $cache->id }}')">{{ __('Expose') }}</span>
                                         <span wire:loading wire:target="exposeCacheToNetwork('{{ $cache->id }}')">{{ __('…') }}</span>
                                     </button>
@@ -567,9 +567,9 @@
             <section class="dply-card overflow-hidden">
                 <div class="flex flex-wrap items-start justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <div class="flex items-center gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-map class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Network routes') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
@@ -695,9 +695,9 @@
     <x-modal name="create-network-modal" max-width="lg" focusable>
         <div class="bg-white">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0 flex-1">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Hetzner') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Create private network') }}</h3>

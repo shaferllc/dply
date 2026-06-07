@@ -12,9 +12,9 @@
 @endphp
 <div class="{{ $card ?? 'dply-card overflow-hidden' }} overflow-hidden">
     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+        <x-icon-badge>
             <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
-        </span>
+        </x-icon-badge>
         <div class="min-w-0">
             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Used by') }}</p>
             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Attached sites') }}</h2>
@@ -66,12 +66,12 @@
                                 <td class="px-4 py-3">
                                     @if ($row['reachable'] === true)
                                         <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-600/20">
-                                            <x-heroicon-s-check-circle class="h-3.5 w-3.5" aria-hidden="true" /> {{ __('Reachable') }}
+                                            <x-heroicon-s-check-circle class="h-4 w-4" aria-hidden="true" /> {{ __('Reachable') }}
                                         </span>
                                     @elseif ($row['reachable'] === false)
                                         <div class="space-y-1.5">
                                             <span class="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700 ring-1 ring-red-600/20">
-                                                <x-heroicon-s-x-circle class="h-3.5 w-3.5" aria-hidden="true" /> {{ __('Unreachable') }}
+                                                <x-heroicon-s-x-circle class="h-4 w-4" aria-hidden="true" /> {{ __('Unreachable') }}
                                             </span>
                                             @if (! empty($row['detail']))
                                                 <p class="max-w-md text-xs leading-relaxed text-brand-mist">{{ $row['detail'] }}</p>

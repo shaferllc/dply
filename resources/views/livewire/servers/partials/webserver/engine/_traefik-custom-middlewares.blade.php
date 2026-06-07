@@ -9,7 +9,7 @@
                 <div class="flex flex-wrap gap-2">
                     <button type="button" wire:click="openAddTraefikCustomMiddlewareForm" @disabled($isDeployer || $actionInFlight)
                         class="inline-flex items-center gap-1.5 rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream">
-                        <x-heroicon-o-plus class="h-3.5 w-3.5" /> {{ __('Add middleware') }}
+                        <x-heroicon-o-plus class="h-4 w-4" /> {{ __('Add middleware') }}
                     </button>
                     <button type="button" wire:click="loadTraefikCustomMiddlewaresConfig" wire:loading.attr="disabled" wire:target="loadTraefikCustomMiddlewaresConfig"
                         class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium hover:bg-brand-sand/40">

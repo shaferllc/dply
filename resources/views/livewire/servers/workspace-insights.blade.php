@@ -24,9 +24,9 @@
         @feature('surface.projects')
             <section class="dply-card overflow-hidden">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Project') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Project insight context') }}</h3>
@@ -36,11 +36,11 @@
                 <div class="px-6 py-6 sm:px-7">
                     <div class="flex flex-wrap gap-2">
                         <a href="{{ route('projects.operations', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                            <x-heroicon-m-bolt class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            <x-heroicon-m-bolt class="h-4 w-4 shrink-0" aria-hidden="true" />
                             {{ __('Open project operations') }}
                         </a>
                         <a href="{{ route('projects.access', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                            <x-heroicon-m-shield-check class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            <x-heroicon-m-shield-check class="h-4 w-4 shrink-0" aria-hidden="true" />
                             {{ __('Open project access') }}
                         </a>
                     </div>
@@ -237,9 +237,9 @@
     @if ($tab === 'overview')
         <div class="dply-card overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-list-bullet class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Findings') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Open findings') }}</h2>
@@ -356,12 +356,12 @@
                                         <div class="mt-3">
                                             @if ($fixInFlight)
                                                 <span class="pointer-events-auto relative z-10 inline-flex items-center justify-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-amber-900">
-                                                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden="true" />
+                                                    <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0 animate-spin" aria-hidden="true" />
                                                     {{ __('Fix queued…') }}
                                                 </span>
                                             @else
                                                 <x-secondary-button size="sm" type="button" wire:click="openApplyFixModal({{ $f->id }})" class="pointer-events-auto relative z-10">
-                                                    <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                    <x-heroicon-o-wrench-screwdriver class="h-4 w-4 shrink-0" aria-hidden="true" />
                                                     {{ __('Apply fix') }}
                                                 </x-secondary-button>
                                             @endif
@@ -378,9 +378,9 @@
         @if ($suggestionFindings->isNotEmpty())
             <div class="dply-card overflow-hidden">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-light-bulb class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Suggestions') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recommendations') }}</h2>
@@ -418,12 +418,12 @@
                                         <div class="mt-3 flex flex-wrap gap-2">
                                             @if ($sCanFix)
                                                 <x-secondary-button size="sm" type="button" wire:click="openApplyFixModal({{ $f->id }})" class="pointer-events-auto relative z-10">
-                                                    <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                    <x-heroicon-o-wrench-screwdriver class="h-4 w-4 shrink-0" aria-hidden="true" />
                                                     {{ __('Apply fix') }}
                                                 </x-secondary-button>
                                             @endif
                                             <x-secondary-button size="sm" type="button" wire:click="ignoreFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="ignoreFinding({{ $f->id }})" class="pointer-events-auto relative z-10">
-                                                <x-heroicon-o-eye-slash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                <x-heroicon-o-eye-slash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                                 {{ __('Ignore') }}
                                             </button>
                                         </div>
@@ -448,9 +448,9 @@
         @if ($recentlyAppliedFindings->isNotEmpty())
             <div class="dply-card overflow-hidden">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-arrow-uturn-left class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recently applied fixes') }}</h2>
@@ -490,7 +490,7 @@
                                 wire:confirm="{{ __('Restore the previous configuration from backup and reload the affected service?') }}"
                                 class="shrink-0"
                             >
-                                <x-heroicon-o-arrow-uturn-left class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-o-arrow-uturn-left class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Revert') }}
                             </x-secondary-button>
                         </li>
@@ -504,9 +504,9 @@
         @if ($dismissedFindings->isNotEmpty())
             <div class="dply-card overflow-hidden">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-eye-slash class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Dismissed') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Dismissed findings') }}</h2>
@@ -565,9 +565,9 @@
         @if ($ignoredSuggestions->isNotEmpty())
             <div class="dply-card overflow-hidden">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-light-bulb class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Ignored') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Ignored recommendations') }}</h2>

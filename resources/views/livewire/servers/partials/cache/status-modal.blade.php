@@ -37,7 +37,7 @@
                                     @disabled($cacheStatusModalLoading)
                                     class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-2 text-[11px] font-medium text-brand-moss hover:bg-brand-sand/40 disabled:opacity-50"
                                 >
-                                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0 text-brand-ink/80" wire:loading.class="animate-spin" wire:target="refreshCacheStatusModal,setCacheStatusModalView" />
+                                    <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0 text-brand-ink/80" wire:loading.class="animate-spin" wire:target="refreshCacheStatusModal,setCacheStatusModalView" />
                                     <span wire:loading.remove wire:target="refreshCacheStatusModal,setCacheStatusModalView">{{ __('Refresh') }}</span>
                                     <span wire:loading wire:target="refreshCacheStatusModal,setCacheStatusModalView">{{ __('Working…') }}</span>
                                 </button>

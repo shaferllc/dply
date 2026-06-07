@@ -33,10 +33,10 @@
             class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
         >
             <span wire:loading.remove wire:target="refreshLiveCerts,loadLiveCerts" class="inline-flex">
-                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
             </span>
             <span wire:loading wire:target="refreshLiveCerts,loadLiveCerts" class="inline-flex">
-                <x-spinner class="h-3.5 w-3.5" />
+                <x-spinner class="h-4 w-4" />
             </span>
             {{ __('Rescan') }}
         </button>
@@ -60,7 +60,7 @@
                 wire:target="refreshLiveCerts"
                 class="mt-4 inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
             >
-                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
                 {{ __('Retry scan') }}
             </button>
         </div>
@@ -70,7 +70,7 @@
              timed-out state above), so the panel never spins indefinitely. --}}
         <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7" @if ($liveCertsScanning) wire:poll.{{ $this->liveCertsPollInterval() }}s="pollLiveCerts" @endif>
             <span class="inline-flex items-center gap-2">
-                <x-spinner class="h-3.5 w-3.5" /> {{ __('Scanning certificates on the server…') }}
+                <x-spinner class="h-4 w-4" /> {{ __('Scanning certificates on the server…') }}
             </span>
         </div>
     @elseif ($liveCertsUnreadable)

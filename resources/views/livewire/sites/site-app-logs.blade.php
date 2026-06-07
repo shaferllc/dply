@@ -26,7 +26,7 @@
                 @endforeach
             </select>
             <button type="button" wire:click="refresh" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" wire:target="refresh" /> {{ __('Refresh') }}
+                <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.class="animate-spin" wire:target="refresh" /> {{ __('Refresh') }}
             </button>
         </div>
     </div>

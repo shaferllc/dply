@@ -6,7 +6,7 @@
             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Deploy, view history, and roll back releases from the Deployments workspace.') }}</p>
         </div>
         <a href="{{ route('sites.deployments.index', [$server, $site]) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
-            <x-heroicon-o-code-bracket-square class="h-3.5 w-3.5" />
+            <x-heroicon-o-code-bracket-square class="h-4 w-4" />
             {{ __('Open Deployments') }}
         </a>
     </div>

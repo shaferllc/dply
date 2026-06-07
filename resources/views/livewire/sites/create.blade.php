@@ -62,7 +62,7 @@
                             class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-forest/90"
                         >
                             {{ __('Open Docker workspace') }}
-                            <x-heroicon-o-arrow-right class="h-3.5 w-3.5" aria-hidden="true" />
+                            <x-heroicon-o-arrow-right class="h-4 w-4" aria-hidden="true" />
                         </a>
                     </div>
                 </div>

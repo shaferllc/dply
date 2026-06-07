@@ -118,11 +118,11 @@
                             class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             @if ($deployInProgress)
-                                <span class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="white" size="sm" /></span>
+                                <span class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="white" size="sm" /></span>
                                 <span>{{ __('Deploying…') }}</span>
                             @else
-                                <x-heroicon-o-rocket-launch class="h-3.5 w-3.5" wire:loading.remove wire:target="deployNow" />
-                                <span wire:loading wire:target="deployNow" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="white" size="sm" /></span>
+                                <x-heroicon-o-rocket-launch class="h-4 w-4" wire:loading.remove wire:target="deployNow" />
+                                <span wire:loading wire:target="deployNow" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="white" size="sm" /></span>
                                 <span wire:loading.remove wire:target="deployNow">{{ __('Deploy') }}</span>
                                 <span wire:loading wire:target="deployNow">{{ __('Deploying…') }}</span>
                             @endif
@@ -136,13 +136,13 @@
                                 title="{{ __('Also deploys :count linked site(s) in this deploy sync group.', ['count' => $this->deploySyncPeerCount]) }}"
                                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                <x-heroicon-o-queue-list class="h-3.5 w-3.5" />
+                                <x-heroicon-o-queue-list class="h-4 w-4" />
                                 {{ __('Deploy linked sites') }}
                             </button>
                         @endif
                         <span class="hidden h-5 w-px bg-brand-ink/10 sm:block" aria-hidden="true"></span>
                         <a href="{{ route('sites.settings', ['server' => $server, 'site' => $site, 'section' => $site->usesDockerRuntime() ? 'runtime' : 'general']) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                            <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" />
+                            <x-heroicon-o-cog-6-tooth class="h-4 w-4" />
                             {{ __('Settings') }}
                         </a>
                     </div>

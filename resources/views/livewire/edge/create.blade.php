@@ -12,7 +12,7 @@
         <div class="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div class="max-w-2xl">
                 <div class="inline-flex items-center gap-2 rounded-full border border-brand-sage/25 bg-brand-sage/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-forest dark:border-brand-sage/30 dark:bg-brand-sage/15 dark:text-brand-sage">
-                    <x-heroicon-o-globe-alt class="h-3.5 w-3.5" aria-hidden="true" />
+                    <x-heroicon-o-globe-alt class="h-4 w-4" aria-hidden="true" />
                     {{ __('dply Edge') }}
                 </div>
                 <h1 class="mt-4 text-3xl font-semibold tracking-tight text-brand-ink sm:text-4xl">{{ __('Deploy an edge app') }}</h1>
@@ -22,7 +22,7 @@
             </div>
             <div class="flex shrink-0 flex-wrap gap-3 text-xs text-brand-moss">
                 <span class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 bg-white/80 px-3 py-1.5 dark:border-brand-mist/25 dark:bg-zinc-800/80">
-                    <x-heroicon-o-bolt class="h-3.5 w-3.5 text-brand-gold" aria-hidden="true" />
+                    <x-heroicon-o-bolt class="h-4 w-4 text-brand-gold" aria-hidden="true" />
                     {{ __('Instant HTTPS') }}
                 </span>
                 <span class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 bg-white/80 px-3 py-1.5 dark:border-brand-mist/25 dark:bg-zinc-800/80">
@@ -74,7 +74,7 @@
                                             'text-brand-moss hover:text-brand-ink' => $repo_source !== 'connected',
                                         ])
                                     >
-                                        <x-heroicon-m-link class="h-3.5 w-3.5" aria-hidden="true" />
+                                        <x-heroicon-m-link class="h-4 w-4" aria-hidden="true" />
                                         {{ __('Pick from connected account') }}
                                     </button>
                                     <button
@@ -88,7 +88,7 @@
                                             'text-brand-moss hover:text-brand-ink' => $repo_source !== 'manual',
                                         ])
                                     >
-                                        <x-heroicon-m-pencil-square class="h-3.5 w-3.5" aria-hidden="true" />
+                                        <x-heroicon-m-pencil-square class="h-4 w-4" aria-hidden="true" />
                                         {{ __('Enter manually') }}
                                     </button>
                                 </div>
@@ -177,7 +177,7 @@
                                             class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40"
                                             title="{{ __('Browse branches, tags, and commits from the repo.') }}"
                                         >
-                                            <x-heroicon-o-magnifying-glass class="h-3.5 w-3.5" />
+                                            <x-heroicon-o-magnifying-glass class="h-4 w-4" />
                                             {{ $refPickerOpen ? __('Hide picker') : __('Change') }}
                                         </button>
                                     </div>
@@ -209,7 +209,7 @@
                                             <div class="border-b border-brand-ink/10 px-3 py-2">
                                                 <div class="relative">
                                                     <span class="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-2.5 text-brand-mist" aria-hidden="true">
-                                                        <x-heroicon-o-magnifying-glass class="h-3.5 w-3.5" />
+                                                        <x-heroicon-o-magnifying-glass class="h-4 w-4" />
                                                     </span>
                                                     <x-text-input
                                                         wire:model.live.debounce.300ms="refPickerSearch"
@@ -250,11 +250,11 @@
                                                                 >
                                                                     <div class="mt-0.5 shrink-0 text-brand-mist">
                                                                         @if ($kindForRow === 'branch')
-                                                                            <x-heroicon-o-arrow-trending-up class="h-3.5 w-3.5" />
+                                                                            <x-heroicon-o-arrow-trending-up class="h-4 w-4" />
                                                                         @elseif ($kindForRow === 'tag')
-                                                                            <x-heroicon-o-tag class="h-3.5 w-3.5" />
+                                                                            <x-heroicon-o-tag class="h-4 w-4" />
                                                                         @else
-                                                                            <x-heroicon-o-code-bracket-square class="h-3.5 w-3.5" />
+                                                                            <x-heroicon-o-code-bracket-square class="h-4 w-4" />
                                                                         @endif
                                                                     </div>
                                                                     <div class="min-w-0 flex-1">
@@ -547,7 +547,7 @@
                                         <x-text-input id="origin_url" wire:model.live="form.origin_url" type="url" class="mt-2 block w-full font-mono text-sm" placeholder="https://my-app.ondigitalocean.app" required />
                                         @if ($suggestedHybridOriginUrl !== '' && $form->origin_url === $suggestedHybridOriginUrl)
                                             <p class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-brand-sage/10 px-2.5 py-1 text-[11px] font-medium text-brand-forest dark:text-brand-sage">
-                                                <x-heroicon-o-sparkles class="h-3.5 w-3.5" />
+                                                <x-heroicon-o-sparkles class="h-4 w-4" />
                                                 {{ __('Auto-filled from Cloud app') }}
                                             </p>
                                         @endif

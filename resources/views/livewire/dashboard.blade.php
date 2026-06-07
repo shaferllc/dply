@@ -90,9 +90,9 @@
             <div class="mb-6 overflow-hidden rounded-2xl border border-rose-200 bg-rose-50 shadow-sm" role="alert">
                 <div class="flex flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-rose-100 text-rose-700 ring-1 ring-rose-200">
+                        <x-icon-badge tone="rose">
                             <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Attention') }}</p>
                             <p class="mt-0.5 text-sm font-semibold text-rose-900">{{ __('Fleet needs attention') }}</p>
@@ -112,7 +112,7 @@
                     @feature('surface.fleet')
                         <a href="{{ route('fleet.health') }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 self-start whitespace-nowrap rounded-xl bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-rose-800 sm:self-auto">
                             {{ __('View fleet health') }}
-                            <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
+                            <x-heroicon-m-arrow-up-right class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                         </a>
                     @endfeature
                 </div>
@@ -124,9 +124,9 @@
             <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
                 <div class="lg:col-span-7">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge size="md">
                             <x-heroicon-o-squares-2x2 class="h-6 w-6" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Workspace') }}</p>
                             <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">
@@ -225,9 +225,9 @@
                     <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div class="flex items-start gap-3">
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+                                <x-icon-badge tone="amber">
                                     <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
-                                </span>
+                                </x-icon-badge>
                                 <div class="min-w-0">
                                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
                                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Add provider credentials before you provision') }}</h3>
@@ -240,7 +240,7 @@
                                     wire:navigate
                                     class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest"
                                 >
-                                    <x-heroicon-m-key class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    <x-heroicon-m-key class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     {{ __('Connect provider') }}
                                 </a>
                                 <a
@@ -248,7 +248,7 @@
                                     wire:navigate
                                     class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                                 >
-                                    <x-heroicon-m-document-text class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    <x-heroicon-m-document-text class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     {{ __('Setup guide') }}
                                 </a>
                             </div>
@@ -261,9 +261,9 @@
             <div class="grid gap-6 xl:grid-cols-[1.7fr_1fr]">
                 <section class="dply-card overflow-hidden">
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0 flex-1">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Platform') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Operate from one place') }}</h3>
@@ -275,7 +275,7 @@
                                     wire:navigate
                                     class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                                 >
-                                    <x-heroicon-m-rectangle-stack class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    <x-heroicon-m-rectangle-stack class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     {{ __('Marketplace') }}
                                 </a>
                             @endfeature
@@ -319,9 +319,9 @@
 
                 <section class="dply-card overflow-hidden">
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Shortcuts') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Keep the workspace ready') }}</h3>
@@ -377,9 +377,9 @@
                 @if ($hasWorkspaceInsights)
                 <section class="dply-card overflow-hidden">
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0 flex-1">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Insights') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('What needs attention first') }}</h3>
@@ -390,7 +390,7 @@
                             wire:navigate
                             class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                         >
-                            <x-heroicon-m-server-stack class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            <x-heroicon-m-server-stack class="h-4 w-4 shrink-0" aria-hidden="true" />
                             {{ __('Open servers') }}
                         </a>
                     </div>
@@ -474,7 +474,7 @@
                                     wire:navigate
                                     class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                                 >
-                                    <x-heroicon-m-key class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    <x-heroicon-m-key class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     {{ __('Connect providers') }}
                                 </a>
                                 <x-docs-link doc-route="docs.connect-provider">
@@ -489,9 +489,9 @@
 
                 <section class="dply-card overflow-hidden">
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0 flex-1">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Activity') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent servers') }}</h3>

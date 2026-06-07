@@ -116,9 +116,9 @@
             <div class="{{ $card }}">
                 <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
                     <div class="flex min-w-0 items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Password gate') }}</p>
                             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Named gate passwords') }}</h2>
@@ -140,7 +140,7 @@
                             x-on:click.prevent="$dispatch('open-modal', 'add-form-gate-modal')"
                             class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-sage"
                         >
-                            <x-heroicon-m-plus class="h-3.5 w-3.5" />
+                            <x-heroicon-m-plus class="h-4 w-4" />
                             {{ __('Add password') }}
                         </button>
                         @if ($gatePasswordCount > 0)
@@ -259,9 +259,9 @@
         <div class="{{ $card }}">
             <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
                 <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Access') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('HTTP basic authentication') }}</h2>
@@ -301,8 +301,8 @@
                         class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
                         title="{{ __('Scan the server for .htpasswd files inside this site\'s repo and import any users we don\'t already track.') }}"
                     >
-                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="syncBasicAuthFromServer" />
-                        <span wire:loading wire:target="syncBasicAuthFromServer" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                        <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="syncBasicAuthFromServer" />
+                        <span wire:loading wire:target="syncBasicAuthFromServer" class="inline-flex h-4 w-4 items-center justify-center">
                             <x-spinner variant="forest" size="sm" />
                         </span>
                         <span wire:loading.remove wire:target="syncBasicAuthFromServer">{{ __('Sync from server') }}</span>
@@ -313,7 +313,7 @@
                         x-on:click="$dispatch('open-modal', 'add-basic-auth-modal')"
                         class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90"
                     >
-                        <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                        <x-heroicon-o-plus class="h-4 w-4" />
                         {{ __('Add credential') }}
                     </button>
                 </div>
@@ -680,7 +680,7 @@
                                                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                                                 title="{{ __('Generate a new password and reveal it once') }}"
                                             >
-                                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                                                <x-heroicon-o-arrow-path class="h-4 w-4" />
                                                 {{ __('Rotate') }}
                                             </button>
                                             @if (! $pending)

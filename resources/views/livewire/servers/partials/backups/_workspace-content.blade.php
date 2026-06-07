@@ -6,9 +6,9 @@
             <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-funnel class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Filter') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Filtered to :site', ['site' => $contextSite->name]) }}</h3>
@@ -18,7 +18,7 @@
                         </div>
                     </div>
                     <a href="{{ route('servers.backups', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1.5 self-start whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                        <x-heroicon-m-x-mark class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        <x-heroicon-m-x-mark class="h-4 w-4 shrink-0" aria-hidden="true" />
                         {{ __('Clear filter') }}
                     </a>
                 </div>
@@ -46,9 +46,9 @@
     <section class="dply-card overflow-hidden">
         <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <div class="flex items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-archive-box class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Recent activity') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Backups at a glance') }}</h3>
@@ -145,9 +145,9 @@
     <section class="dply-card overflow-hidden">
         <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <div class="flex items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Storage') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Where database backups are kept') }}</h3>
@@ -200,9 +200,9 @@
         <section class="dply-card overflow-hidden">
             <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('On demand') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Run database backup') }}</h3>
@@ -245,9 +245,9 @@
         <section class="dply-card overflow-hidden">
             <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-folder class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('On demand') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Run site files backup') }}</h3>
@@ -289,9 +289,9 @@
     <section class="dply-card overflow-hidden">
         <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <div class="flex items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-calendar-days class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0 flex-1">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Schedule') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recurring schedules') }}</h3>
@@ -366,7 +366,7 @@
                             wire:click="openDestinationModal"
                             class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                         >
-                            <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            <x-heroicon-m-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
                             {{ __('Add destination') }}
                         </button>
                     </div>
@@ -462,7 +462,7 @@
                                 <div class="flex shrink-0 flex-wrap items-center gap-1.5">
                                     @if ($isEditing)
                                         <button type="button" wire:click="saveScheduleCadence('{{ $schedule->id }}')" class="{{ $btnPrimary }}">
-                                            <x-heroicon-m-check class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            <x-heroicon-m-check class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Save') }}
                                         </button>
                                         <button type="button" wire:click="cancelEditSchedule('{{ $schedule->id }}')" class="{{ $btnOutline }}">
@@ -470,28 +470,28 @@
                                         </button>
                                     @else
                                         <button type="button" wire:click="runScheduleNow('{{ $schedule->id }}')" wire:loading.attr="disabled" wire:target="runScheduleNow" class="{{ $btnOutline }}">
-                                            <x-heroicon-m-play class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            <x-heroicon-m-play class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Run now') }}
                                         </button>
                                         <button type="button" @click="historyOpen = !historyOpen" class="{{ $btnOutline }}">
-                                            <x-heroicon-m-clock class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            <x-heroicon-m-clock class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             <span x-text="historyOpen ? '{{ __('Hide history') }}' : '{{ __('History') }}'"></span>
                                         </button>
                                         <button type="button" wire:click="startEditSchedule('{{ $schedule->id }}')" class="{{ $btnOutline }}">
-                                            <x-heroicon-m-pencil-square class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            <x-heroicon-m-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Edit') }}
                                         </button>
                                         <button type="button" wire:click="toggleSchedule('{{ $schedule->id }}')" class="{{ $btnOutline }}">
                                             @if ($schedule->is_active)
-                                                <x-heroicon-m-pause class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                <x-heroicon-m-pause class="h-4 w-4 shrink-0" aria-hidden="true" />
                                                 {{ __('Pause') }}
                                             @else
-                                                <x-heroicon-m-play class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                <x-heroicon-m-play class="h-4 w-4 shrink-0" aria-hidden="true" />
                                                 {{ __('Resume') }}
                                             @endif
                                         </button>
                                         <button type="button" wire:click="deleteSchedule('{{ $schedule->id }}')" wire:confirm="{{ __('Remove this backup schedule?') }}" class="{{ $btnDanger }}">
-                                            <x-heroicon-m-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            <x-heroicon-m-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Remove') }}
                                         </button>
                                     @endif
@@ -535,9 +535,9 @@
         <section class="dply-card overflow-hidden">
             <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0 flex-1">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent database backups') }}</h3>
@@ -578,7 +578,7 @@
                             <div class="flex shrink-0 items-center gap-1.5">
                                 @if ($backup->isDownloadable())
                                     <button type="button" wire:click="downloadDatabaseBackup('{{ $backup->id }}')" class="{{ $btnOutline }}">
-                                        <x-heroicon-m-arrow-down-tray class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        <x-heroicon-m-arrow-down-tray class="h-4 w-4 shrink-0" aria-hidden="true" />
                                         {{ __('Download') }}
                                     </button>
                                 @endif
@@ -587,7 +587,7 @@
                                     wire:click="openConfirmActionModal('deleteDatabaseBackup', [@js($backup->id)], @js(__('Delete backup')), @js(__('Permanently remove this backup record and delete the file from storage. This cannot be undone.')), @js(__('Delete')), true)"
                                     class="{{ $btnDanger }}"
                                 >
-                                    <x-heroicon-m-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    <x-heroicon-m-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     {{ __('Delete') }}
                                 </button>
                             </div>
@@ -600,9 +600,9 @@
         <section class="dply-card overflow-hidden">
             <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-folder class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0 flex-1">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent site file backups') }}</h3>
@@ -643,7 +643,7 @@
                             <div class="flex shrink-0 items-center gap-1.5">
                                 @if ($backup->status === 'completed' && ! empty($backup->disk_path))
                                     <button type="button" wire:click="downloadFileBackup('{{ $backup->id }}')" class="{{ $btnOutline }}">
-                                        <x-heroicon-m-arrow-down-tray class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        <x-heroicon-m-arrow-down-tray class="h-4 w-4 shrink-0" aria-hidden="true" />
                                         {{ __('Download') }}
                                     </button>
                                 @endif
@@ -652,7 +652,7 @@
                                     wire:click="openConfirmActionModal('deleteFileBackup', [@js($backup->id)], @js(__('Delete backup')), @js(__('Permanently remove this backup record and delete the archive from storage. This cannot be undone.')), @js(__('Delete')), true)"
                                     class="{{ $btnDanger }}"
                                 >
-                                    <x-heroicon-m-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    <x-heroicon-m-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     {{ __('Delete') }}
                                 </button>
                             </div>
@@ -693,9 +693,9 @@
             <div class="relative z-10 flex min-h-full justify-center px-4 py-10 sm:px-6 sm:py-14">
                 <div class="my-auto flex w-full max-w-2xl flex-col dply-modal-panel overflow-hidden shadow-xl" @click.stop>
                     <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-cloud-arrow-up class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0 flex-1">
                             <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Storage') }}</p>
                             <h2 id="add-destination-title" class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Add backup destination') }}</h2>

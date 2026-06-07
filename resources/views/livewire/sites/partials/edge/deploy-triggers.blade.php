@@ -1,9 +1,9 @@
 @if (! $site->isEdgePreview())
     <section class="dply-card overflow-hidden">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Hooks') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deploy hooks') }}</h3>
@@ -75,9 +75,9 @@
 @if (! $edgeIsPreviewChild)
     <section class="dply-card overflow-hidden">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Auto-deploy') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('GitHub auto-deploy') }}</h3>
@@ -119,7 +119,7 @@
                             wire:target="disableEdgeGithubWebhook"
                             class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-900 shadow-sm hover:bg-rose-50 dark:border-rose-900/40 dark:bg-zinc-900 dark:text-rose-300"
                         >
-                            <x-heroicon-o-x-mark class="h-3.5 w-3.5" />
+                            <x-heroicon-o-x-mark class="h-4 w-4" />
                             {{ __('Disable') }}
                         </button>
                     @else
@@ -130,7 +130,7 @@
                             wire:target="enableEdgeGithubWebhook"
                             class="inline-flex items-center gap-2 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90 disabled:cursor-wait disabled:opacity-60"
                         >
-                            <x-heroicon-o-bolt class="h-3.5 w-3.5" />
+                            <x-heroicon-o-bolt class="h-4 w-4" />
                             {{ __('Enable auto-deploy') }}
                         </button>
                     @endif
@@ -179,9 +179,9 @@
 
     <section class="dply-card overflow-hidden">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-bell class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0 flex-1">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Notifications') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deploy notifications') }}</h3>

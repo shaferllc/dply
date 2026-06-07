@@ -14,9 +14,9 @@
 @if (! $isPhpSite && ! $showPhpStackDetails)
     <section class="dply-card overflow-hidden">
         <div class="flex items-start gap-3 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-information-circle class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Runtime') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Not a PHP site') }}</h2>
@@ -30,9 +30,9 @@
     <section class="dply-card overflow-hidden">
         <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('PHP') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('PHP workspace') }}</h2>
@@ -141,9 +141,9 @@
 @if ($showPhpStackDetails)
     <section class="dply-card overflow-hidden mt-6">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-cog-6-tooth class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Process') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $site->runtimePhpProcessSectionTitle() }}</h2>

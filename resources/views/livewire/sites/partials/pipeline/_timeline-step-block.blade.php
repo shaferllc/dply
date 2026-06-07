@@ -20,10 +20,10 @@
         <span class="truncate text-xs font-semibold text-brand-ink max-w-[10rem]" title="{{ $step->pillLabel() }}">{{ $step->pillLabel() }}</span>
         <span class="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase {{ $step->phaseBadgeClass() }}">{{ $step->phase ?? 'build' }}</span>
         <button type="button" wire:click="openEditPipelineStep('{{ $step->id }}')" class="inline-flex h-6 w-6 items-center justify-center rounded-full text-brand-mist hover:bg-brand-sand/60 hover:text-brand-ink" title="{{ __('Edit step') }}" data-pipeline-no-drag>
-            <x-heroicon-m-pencil-square class="h-3.5 w-3.5" />
+            <x-heroicon-m-pencil-square class="h-4 w-4" />
         </button>
         <button type="button" wire:click="deleteDeployPipelineStep('{{ $step->id }}')" class="inline-flex h-6 w-6 items-center justify-center rounded-full text-brand-mist hover:bg-red-50 hover:text-red-700" data-pipeline-no-drag>
-            <x-heroicon-m-x-mark class="h-3.5 w-3.5" />
+            <x-heroicon-m-x-mark class="h-4 w-4" />
         </button>
     </div>
     @if ($showAfterStepHookZone)

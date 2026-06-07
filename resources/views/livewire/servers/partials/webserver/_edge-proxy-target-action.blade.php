@@ -40,7 +40,7 @@
         class="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60"
     >
         <span wire:loading.remove wire:target="openConfirmActionModal,removeEdgeProxy,confirmActionModal" class="inline-flex items-center gap-1.5">
-            <x-heroicon-o-trash class="h-3.5 w-3.5" />
+            <x-heroicon-o-trash class="h-4 w-4" />
             {{ __('Remove :name', ['name' => $info['label']]) }}
         </span>
         <span wire:loading wire:target="openConfirmActionModal,removeEdgeProxy,confirmActionModal" class="inline-flex items-center gap-1.5">
@@ -68,7 +68,7 @@
         class="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition hover:bg-brand-forest/90 disabled:opacity-60"
     >
         <span wire:loading.remove wire:target="{{ $edgeProxyLoadingTargets }}" class="inline-flex items-center gap-1.5">
-            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+            <x-heroicon-o-arrow-path class="h-4 w-4" />
             {{ __('Switch to :name', ['name' => $info['label']]) }}
         </span>
         <span wire:loading wire:target="{{ $edgeProxyLoadingTargets }}" class="inline-flex items-center gap-1.5">
@@ -84,7 +84,7 @@
 @elseif ($isComingSoon)
     <div class="mt-3 flex flex-col gap-2">
         <div class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-brand-ink/10 bg-brand-sand/35 px-3 py-1.5 text-xs font-semibold text-brand-moss">
-            <x-heroicon-o-clock class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <x-heroicon-o-clock class="h-4 w-4 shrink-0" aria-hidden="true" />
             <span>{{ __('Coming soon') }}</span>
         </div>
         <button
@@ -92,7 +92,7 @@
             wire:click="setWorkspaceTab('{{ $key }}')"
             class="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40"
         >
-            <x-heroicon-o-eye class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <x-heroicon-o-eye class="h-4 w-4 shrink-0" aria-hidden="true" />
             {{ __('Preview') }}
         </button>
     </div>
@@ -106,7 +106,7 @@
         class="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition hover:bg-brand-forest/90 disabled:opacity-60"
     >
         <span wire:loading.remove wire:target="{{ $edgeProxyLoadingTargets }}" class="inline-flex items-center gap-1.5">
-            <x-heroicon-o-arrow-up-tray class="h-3.5 w-3.5" />
+            <x-heroicon-o-arrow-up-tray class="h-4 w-4" />
             {{ __('Add :name', ['name' => $info['label']]) }}
         </span>
         <span wire:loading wire:target="{{ $edgeProxyLoadingTargets }}" class="inline-flex items-center gap-1.5">

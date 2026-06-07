@@ -23,9 +23,9 @@
 <div class="{{ $card }}">
     <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
         <div class="flex min-w-0 items-start gap-3">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('DNS') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('DNS automation') }}</h2>
@@ -66,7 +66,7 @@
                 wire:navigate
                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
             >
-                <x-heroicon-o-key class="h-3.5 w-3.5" />
+                <x-heroicon-o-key class="h-4 w-4" />
                 {{ __('Manage DNS providers') }}
             </a>
         </div>
@@ -86,7 +86,7 @@
                     </div>
                 </div>
                 <a href="{{ route('credentials.index', ['tab' => 'dns']) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 shadow-sm hover:bg-amber-100">
-                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                    <x-heroicon-o-plus class="h-4 w-4" />
                     {{ __('Add DNS provider') }}
                 </a>
             </div>
@@ -99,9 +99,9 @@
 <div class="{{ $card }} mt-6">
     <form wire:submit="saveDnsSettings">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-cog-6-tooth class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Settings') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Provider & zone') }}</h2>
@@ -164,7 +164,7 @@
     <div class="border-b border-brand-ink/10 bg-brand-ink/95 px-6 py-3 sm:px-8">
         <div class="flex items-center justify-between gap-3">
             <p class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-brand-cream/80">
-                <x-heroicon-o-command-line class="h-3.5 w-3.5" />
+                <x-heroicon-o-command-line class="h-4 w-4" />
                 {{ __('Resolved DNS configuration') }}
             </p>
             <span class="text-[10px] font-medium uppercase tracking-wide text-brand-cream/50">{{ __('read-only') }}</span>

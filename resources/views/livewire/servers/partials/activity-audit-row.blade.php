@@ -16,7 +16,7 @@
 @endphp
 <div class="flex flex-wrap items-start gap-x-3 gap-y-1 rounded-lg border border-brand-ink/8 bg-white px-3 py-2 text-sm">
     <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-sand/40 text-brand-moss ring-1 ring-brand-ink/10">
-        <x-heroicon-o-bolt class="h-3.5 w-3.5" aria-hidden="true" />
+        <x-heroicon-o-bolt class="h-4 w-4" aria-hidden="true" />
     </span>
     <div class="min-w-0 flex-1">
         <div class="flex flex-wrap items-center gap-2">

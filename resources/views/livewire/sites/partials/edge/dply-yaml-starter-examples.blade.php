@@ -59,7 +59,7 @@ YAML;
                     class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 dark:border-brand-mist/20 dark:bg-zinc-900"
                     @click="navigator.clipboard.writeText(@js(trim($dplyRoutingYamlExample))); copied = true; setTimeout(() => copied = false, 2000)"
                 >
-                    <x-heroicon-o-clipboard class="h-3.5 w-3.5" />
+                    <x-heroicon-o-clipboard class="h-4 w-4" />
                     <span x-show="!copied">{{ __('Copy') }}</span>
                     <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
                 </button>
@@ -78,7 +78,7 @@ YAML;
                     class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 dark:border-brand-mist/20 dark:bg-zinc-900"
                     @click="navigator.clipboard.writeText(@js(trim($dplyFullYamlExample))); copied = true; setTimeout(() => copied = false, 2000)"
                 >
-                    <x-heroicon-o-clipboard class="h-3.5 w-3.5" />
+                    <x-heroicon-o-clipboard class="h-4 w-4" />
                     <span x-show="!copied">{{ __('Copy') }}</span>
                     <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
                 </button>

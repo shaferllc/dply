@@ -24,7 +24,7 @@
             <div class="max-w-2xl space-y-4">
                 <div class="flex flex-wrap items-center gap-3">
                     <span class="inline-flex items-center gap-1.5 rounded-full bg-[#0080FF]/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0066CC] ring-1 ring-[#0080FF]/20">
-                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                        <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
                         {{ __('Recover servers') }}
                     </span>
                     <x-provider-badge provider="digitalocean" :label="__('DigitalOcean')" />
@@ -115,9 +115,9 @@
             {{-- Step 1: credentials --}}
             <section class="dply-card overflow-hidden">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-cloud class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0 flex-1">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Account') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('DigitalOcean account') }}</h2>
@@ -127,7 +127,7 @@
                     </div>
                     @if ($hasCredentials)
                         <x-add-provider-credential-link provider="digitalocean" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-1.5 text-xs font-semibold text-brand-ink no-underline hover:bg-brand-sand/40">
-                            <x-heroicon-o-plus class="h-3.5 w-3.5" aria-hidden="true" />
+                            <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
                             {{ __('Add account') }}
                         </x-add-provider-credential-link>
                     @endif
@@ -228,9 +228,9 @@
                 >
                     <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-7">
                         <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge>
                                 <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0">
                                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Droplets') }}</p>
                                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Droplets in account') }}</h2>

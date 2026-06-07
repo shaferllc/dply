@@ -1,8 +1,8 @@
 <div id="settings-danger" class="{{ $card }} scroll-mt-24 border-rose-200">
     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-rose-50/60 px-6 py-5 sm:px-7">
-        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-rose-50 text-rose-700 ring-1 ring-rose-200">
+        <x-icon-badge tone="danger">
             <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
-        </span>
+        </x-icon-badge>
         <div class="min-w-0">
             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Danger') }}</p>
             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Danger zone') }}</h2>

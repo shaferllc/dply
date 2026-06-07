@@ -60,7 +60,7 @@
                     </x-docs-link>
                     <a href="{{ route('docs.markdown', ['slug' => 'org-roles-and-limits']) }}" wire:navigate class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-sage underline decoration-brand-sage/35 underline-offset-2 transition hover:text-brand-ink hover:decoration-brand-ink/30">
                         {{ __('Roles & limits') }}
-                        <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden="true" />
+                        <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0 opacity-80" aria-hidden="true" />
                     </a>
                 </div>
             </div>
@@ -107,7 +107,7 @@
                         'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $tab !== $tabItem['id'],
                     ])
                 >
-                    <x-dynamic-component :component="$tabItem['icon']" class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <x-dynamic-component :component="$tabItem['icon']" class="h-4 w-4 shrink-0" aria-hidden="true" />
                     {{ $tabItem['label'] }}
                 </button>
             @endforeach
@@ -257,10 +257,10 @@
                                     <span class="mt-auto inline-flex w-full items-center justify-between gap-2 rounded-lg border border-brand-ink/10 bg-brand-cream/40 px-2.5 py-1.5 text-[11px] font-semibold text-brand-ink transition group-hover:border-brand-sage/35 group-hover:bg-brand-sage/8 group-hover:text-brand-forest">
                                         <span class="inline-flex items-center gap-1.5">
                                             @if ($count > 0)
-                                                <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                <x-heroicon-o-cog-6-tooth class="h-4 w-4 shrink-0" aria-hidden="true" />
                                                 {{ __('Manage') }}
                                             @else
-                                                <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
                                                 {{ __('Add new') }}
                                             @endif
                                         </span>

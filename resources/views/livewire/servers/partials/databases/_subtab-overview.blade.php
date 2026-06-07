@@ -14,9 +14,9 @@
     <div class="{{ $card }} overflow-hidden">
         <div class="flex flex-wrap items-center justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
             <div class="flex items-center gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-dynamic-component :component="$engineIcon" class="h-5 w-5 text-brand-forest" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Engine') }}</p>
                     <h3 class="text-lg font-semibold text-brand-ink">{{ $dbEngineInfoForTab['label'] }}</h3>
@@ -119,7 +119,7 @@
                         wire:click="openConfirmActionModal('stopAndRevertDatabaseEngineInstall', ['{{ $engine }}'], @js(__('Stop and revert :engine install?', ['engine' => $dbEngineInfoForTab['label']])), @js(__('Marks the install as failed and runs apt purge on the server to clean up any partial state. Use this when the install has stalled.')), @js(__('Stop & revert')), true)"
                         class="inline-flex items-center gap-1.5 rounded-md border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-800 shadow-sm hover:bg-rose-50"
                     >
-                        <x-heroicon-o-arrow-uturn-left class="h-3.5 w-3.5" />
+                        <x-heroicon-o-arrow-uturn-left class="h-4 w-4" />
                         {{ __('Stop & revert') }}
                     </button>
                 </div>

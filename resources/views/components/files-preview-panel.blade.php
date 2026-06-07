@@ -24,9 +24,7 @@
 
         <div class="relative flex items-start justify-between gap-3">
             <div class="flex items-center gap-2">
-                <span class="inline-flex h-2.5 w-2.5 rounded-full bg-red-400/80" aria-hidden="true"></span>
-                <span class="inline-flex h-2.5 w-2.5 rounded-full bg-amber-300/80" aria-hidden="true"></span>
-                <span class="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400/80" aria-hidden="true"></span>
+                <x-mac-window-dots />
             </div>
             <span class="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-200/90">
                 <span class="relative flex h-1.5 w-1.5">

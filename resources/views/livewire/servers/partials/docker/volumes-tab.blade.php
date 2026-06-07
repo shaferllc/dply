@@ -3,7 +3,7 @@
         <h2 class="text-base font-semibold text-brand-ink">{{ __('Volumes') }}</h2>
         <button type="button" wire:click="loadVolumes" wire:loading.attr="disabled" wire:target="loadVolumes" class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
             <span wire:loading.remove wire:target="loadVolumes" class="inline-flex items-center gap-1.5">
-                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
                 {{ __('Refresh') }}
             </span>
             <span wire:loading wire:target="loadVolumes" class="inline-flex items-center gap-1.5">

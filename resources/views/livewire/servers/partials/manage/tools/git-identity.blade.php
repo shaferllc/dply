@@ -83,7 +83,7 @@
                     class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     <span wire:loading.remove wire:target="saveDeployGitIdentity,applyDefaultDeployGitIdentity" class="inline-flex items-center gap-2">
-                        <x-heroicon-o-check class="h-3.5 w-3.5" aria-hidden="true" />
+                        <x-heroicon-o-check class="h-4 w-4" aria-hidden="true" />
                         {{ __('Save identity') }}
                     </span>
                     <span wire:loading wire:target="saveDeployGitIdentity,applyDefaultDeployGitIdentity" class="inline-flex items-center gap-2">

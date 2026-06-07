@@ -45,7 +45,7 @@
                 x-on:click="$wire.cancelEdit(); $dispatch('open-modal', 'add-cron-job-modal')"
                 class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90"
             >
-                <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                <x-heroicon-o-plus class="h-4 w-4" />
                 {{ __('Add cron job') }}
             </button>
             <span class="hidden h-5 w-px bg-brand-ink/10 sm:block" aria-hidden="true"></span>
@@ -56,8 +56,8 @@
                 wire:target="syncCronJobs"
                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
             >
-                <x-heroicon-o-arrow-path wire:loading.remove wire:target="syncCronJobs" class="h-3.5 w-3.5" />
-                <span wire:loading wire:target="syncCronJobs" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                <x-heroicon-o-arrow-path wire:loading.remove wire:target="syncCronJobs" class="h-4 w-4" />
+                <span wire:loading wire:target="syncCronJobs" class="inline-flex h-4 w-4 items-center justify-center">
                     <x-spinner variant="forest" size="sm" />
                 </span>
                 <span wire:loading.remove wire:target="syncCronJobs">{{ __('Sync crontab') }}</span>

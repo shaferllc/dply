@@ -125,8 +125,8 @@
                         class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 shadow-sm transition-colors hover:bg-indigo-100 disabled:opacity-60"
                         title="{{ __('Read package.json / composer.json on the server and add every deploy step the repo needs.') }}"
                     >
-                        <x-heroicon-o-sparkles class="h-3.5 w-3.5" wire:loading.remove wire:target="optimizePipeline" />
-                        <span wire:loading wire:target="optimizePipeline" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
+                        <x-heroicon-o-sparkles class="h-4 w-4" wire:loading.remove wire:target="optimizePipeline" />
+                        <span wire:loading wire:target="optimizePipeline" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
                         <span wire:loading.remove wire:target="optimizePipeline">{{ __('Optimize pipeline') }}</span>
                         <span wire:loading wire:target="optimizePipeline">{{ __('Scanning…') }}</span>
                     </button>
@@ -137,7 +137,7 @@
                     class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
                     title="{{ __('Export or import this pipeline') }}"
                 >
-                    <x-heroicon-o-share class="h-3.5 w-3.5" aria-hidden="true" />
+                    <x-heroicon-o-share class="h-4 w-4" aria-hidden="true" />
                     {{ __('Share') }}
                 </button>
             </div>
@@ -190,7 +190,7 @@
                     wire:click="openCreatePipelineForm"
                     class="inline-flex items-center gap-1 rounded-full border border-dashed border-brand-sage/50 px-3 py-1.5 text-xs font-semibold text-brand-forest hover:bg-brand-sage/5"
                 >
-                    <x-heroicon-m-plus class="h-3.5 w-3.5" />
+                    <x-heroicon-m-plus class="h-4 w-4" />
                     {{ __('New pipeline') }}
                 </button>
             </div>
@@ -227,7 +227,7 @@
                         wire:click="activateEditingDeployPipeline"
                         class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-forest"
                     >
-                        <x-heroicon-m-rocket-launch class="h-3.5 w-3.5" />
+                        <x-heroicon-m-rocket-launch class="h-4 w-4" />
                         {{ __('Use for deploys') }}
                     </button>
                 @else
@@ -273,7 +273,7 @@
                             title="{{ $starter['description'] }}"
                             class="inline-flex items-center gap-1.5 rounded-full border border-brand-sage/40 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:border-brand-forest/40 hover:bg-brand-sage/10"
                         >
-                            <x-dynamic-component :component="$starter['icon']" class="h-3.5 w-3.5 text-brand-forest" />
+                            <x-dynamic-component :component="$starter['icon']" class="h-4 w-4 text-brand-forest" />
                             {{ $starter['label'] }}
                         </button>
                     @endforeach
@@ -294,8 +294,8 @@
                         wire:target="applyLaravelSafetyPresetBundle"
                         class="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100"
                     >
-                        <x-heroicon-m-shield-check class="h-3.5 w-3.5" wire:loading.remove wire:target="applyLaravelSafetyPresetBundle" />
-                        <x-heroicon-m-arrow-path class="h-3.5 w-3.5 animate-spin" wire:loading wire:target="applyLaravelSafetyPresetBundle" />
+                        <x-heroicon-m-shield-check class="h-4 w-4" wire:loading.remove wire:target="applyLaravelSafetyPresetBundle" />
+                        <x-heroicon-m-arrow-path class="h-4 w-4 animate-spin" wire:loading wire:target="applyLaravelSafetyPresetBundle" />
                         <span wire:loading.remove wire:target="applyLaravelSafetyPresetBundle">{{ $safetyBundle['label'] }}</span>
                         <span wire:loading wire:target="applyLaravelSafetyPresetBundle">{{ __('Applying…') }}</span>
                     </button>
@@ -321,7 +321,7 @@
                             title="{{ $template['description'] }}"
                             class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:border-brand-sage/40 hover:bg-brand-sage/5"
                         >
-                            <x-heroicon-m-document-duplicate class="h-3.5 w-3.5 text-brand-forest" />
+                            <x-heroicon-m-document-duplicate class="h-4 w-4 text-brand-forest" />
                             {{ $template['label'] }}
                         </button>
                     @endforeach
@@ -511,7 +511,7 @@
                             wire:click="openAddPipelineStepForm"
                             class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                         >
-                            <x-heroicon-m-plus class="h-3.5 w-3.5" />
+                            <x-heroicon-m-plus class="h-4 w-4" />
                             {{ __('Add step') }}
                         </button>
                         <button
@@ -519,7 +519,7 @@
                             wire:click="openAddPipelineStepForm('custom', 'build')"
                             class="inline-flex items-center gap-1.5 rounded-full border border-dashed border-brand-sage/50 px-3 py-1.5 text-xs font-semibold text-brand-forest hover:bg-brand-sage/5"
                         >
-                            <x-heroicon-m-code-bracket class="h-3.5 w-3.5" />
+                            <x-heroicon-m-code-bracket class="h-4 w-4" />
                             {{ __('Custom command') }}
                         </button>
                         <button
@@ -527,7 +527,7 @@
                             wire:click="setPipelineTab('reference')"
                             class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40"
                         >
-                            <x-heroicon-o-book-open class="h-3.5 w-3.5" />
+                            <x-heroicon-o-book-open class="h-4 w-4" />
                             {{ __('Browse all steps') }}
                         </button>
                     </div>
@@ -575,7 +575,7 @@
                                         wire:click="addDeployPipelineHookFromPreset(@js($preset))"
                                         class="inline-flex items-center gap-1.5 rounded-full border border-amber-200/80 bg-amber-50/80 px-3 py-1.5 text-xs font-semibold text-amber-950 shadow-sm hover:bg-amber-100/80"
                                     >
-                                        <x-dynamic-component :component="$preset['icon'] ?? 'heroicon-o-bolt'" class="h-3.5 w-3.5 shrink-0" />
+                                        <x-dynamic-component :component="$preset['icon'] ?? 'heroicon-o-bolt'" class="h-4 w-4 shrink-0" />
                                         {{ __($preset['label']) }}
                                     </button>
                                 @endforeach

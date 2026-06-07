@@ -44,9 +44,9 @@
 <section class="dply-card overflow-hidden">
     <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
         <div class="flex min-w-0 items-start gap-3">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-cube-transparent class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Runtime') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $runtimeDisplay !== __('Not set') ? $runtimeDisplay : __('Language & version') }}</h2>
@@ -95,9 +95,9 @@
 {{-- 2. Detection panel --}}
 <section class="mt-6 dply-card overflow-hidden">
     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+        <x-icon-badge>
             <x-heroicon-o-magnifying-glass-circle class="h-5 w-5" aria-hidden="true" />
-        </span>
+        </x-icon-badge>
         <div class="min-w-0">
             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Detection') }}</p>
             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Repository detection') }}</h2>
@@ -176,9 +176,9 @@
 @if ($site->type !== \App\Enums\SiteType::Static)
 <section class="mt-6 dply-card overflow-hidden">
     <div class="flex items-start gap-3 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+        <x-icon-badge>
             <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
-        </span>
+        </x-icon-badge>
         <div class="min-w-0">
             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Background') }}</p>
             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Workers & schedulers') }}</h2>
@@ -215,9 +215,9 @@
         <section class="mt-6 dply-card overflow-hidden">
             <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Container') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Docker discovery') }}</h2>
@@ -288,9 +288,9 @@
     @if ($site->usesLocalDockerHostRuntime())
         <section class="mt-6 dply-card overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-arrows-pointing-out class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Lifecycle') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Container lifecycle') }}</h2>
@@ -332,9 +332,9 @@
 {{-- 5. Working directory footer --}}
 <div class="mt-6 dply-card overflow-hidden">
     <div class="flex items-start gap-3 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+        <x-icon-badge>
             <x-heroicon-o-folder class="h-5 w-5" aria-hidden="true" />
-        </span>
+        </x-icon-badge>
         <div class="min-w-0">
             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Path') }}</p>
             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Working directory') }}</h3>

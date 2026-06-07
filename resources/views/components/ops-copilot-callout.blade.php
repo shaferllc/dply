@@ -42,9 +42,9 @@
             <section {{ $attributes->class(['scroll-mt-24 overflow-hidden rounded-2xl border border-violet-200 bg-gradient-to-b from-violet-50/90 to-white shadow-sm']) }}>
                 <div class="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-7">
                     <div class="flex min-w-0 items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-700 ring-1 ring-violet-200">
+                        <x-icon-badge tone="violet">
                             <x-heroicon-o-sparkles class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-violet-800">{{ __('Ops Copilot') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Explain this deploy failure') }}</h3>

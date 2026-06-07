@@ -69,9 +69,9 @@
             <section class="dply-card overflow-hidden border-amber-200">
                 <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+                        <x-icon-badge tone="amber">
                             <x-heroicon-o-eye class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Read-only') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deployer role') }}</h3>
@@ -123,7 +123,7 @@
                             wire:target="refreshSecurityDigestScan"
                             class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                         >
-                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" wire:target="refreshSecurityDigestScan" aria-hidden="true" />
+                            <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.class="animate-spin" wire:target="refreshSecurityDigestScan" aria-hidden="true" />
                             <span wire:loading.remove wire:target="refreshSecurityDigestScan">{{ __('Refresh digest') }}</span>
                             <span wire:loading wire:target="refreshSecurityDigestScan">{{ __('Scanning…') }}</span>
                         </button>
@@ -193,9 +193,9 @@
             <section class="dply-card overflow-hidden">
                 <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div>
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Auth log breakdown') }}</p>
                             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Brute-force indicators') }}</h2>
@@ -247,9 +247,9 @@
             <section class="dply-card overflow-hidden">
                 <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div>
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('SSH hardening') }}</p>
                             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Effective sshd settings') }}</h2>
@@ -366,9 +366,9 @@
                 <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge>
                                 <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div>
                                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Access graph rollup') }}</p>
                                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">

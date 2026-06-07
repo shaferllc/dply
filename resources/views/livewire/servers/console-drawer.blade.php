@@ -31,7 +31,7 @@
                             class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-1.5 text-[11px] font-medium text-brand-moss shadow-sm hover:bg-brand-sand/40 hover:text-brand-ink"
                             title="{{ __('Refresh server list') }}"
                         >
-                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                            <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
                             {{ __('Refresh') }}
                         </button>
                     </div>

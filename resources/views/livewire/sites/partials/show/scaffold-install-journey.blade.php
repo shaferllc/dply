@@ -14,9 +14,9 @@
     {{-- Step list --}}
     <section class="dply-card overflow-hidden">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-queue-list class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Pipeline') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Install steps') }}</h2>
@@ -57,9 +57,9 @@
     @if ($isFailed)
         <section class="dply-card overflow-hidden border-rose-200">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-rose-50/60 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-rose-50 text-rose-700 ring-1 ring-rose-200">
+                <x-icon-badge tone="danger">
                     <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Failed') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Install failed') }}</h2>
@@ -96,9 +96,9 @@
     @if ($isCompleted)
         <section class="dply-card overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-sparkles class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Complete') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Install complete') }}</h2>
@@ -121,7 +121,7 @@
                                         wire:click="revealScaffoldPassword"
                                         class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                                     >
-                                        <x-heroicon-o-eye class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-eye class="h-4 w-4" />
                                         {{ __('Reveal password') }}
                                     </button>
                                     <span class="ml-2 text-xs text-brand-mist">{{ __('Admin/owner only.') }}</span>

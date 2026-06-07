@@ -7,9 +7,9 @@
     <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div class="flex items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $contextSiteModel && $schedulers_list_scope === 'site' ? __('Schedulers for this site') : __('Schedulers on this server') }}</h3>
@@ -25,7 +25,7 @@
                     wire:click="setScheduleWorkspaceTab('enable')"
                     class="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
                 >
-                    <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <x-heroicon-m-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
                     {{ __('Enable scheduler') }}
                 </button>
             </div>

@@ -65,7 +65,7 @@
                             'border-brand-ink/15 bg-white text-brand-moss hover:border-brand-ink/30 hover:text-brand-ink' => $family !== '',
                         ])
                     >
-                        <x-heroicon-o-squares-2x2 class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        <x-heroicon-o-squares-2x2 class="h-4 w-4 shrink-0" aria-hidden="true" />
                         {{ __('All') }}
                         <span @class([
                             'ms-1 rounded-full px-1.5 py-0.5 text-[10px] tabular-nums',
@@ -86,7 +86,7 @@
                                 'border-brand-ink/10 bg-white text-brand-mist cursor-not-allowed opacity-60' => $count === 0 && $family !== $f['id'],
                             ])
                         >
-                            <x-dynamic-component :component="$f['icon']" class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            <x-dynamic-component :component="$f['icon']" class="h-4 w-4 shrink-0" aria-hidden="true" />
                             {{ $f['label'] }}
                             <span @class([
                                 'ms-1 rounded-full px-1.5 py-0.5 text-[10px] tabular-nums',
@@ -174,7 +174,7 @@
                                                 </span>
                                             @else
                                                 <span class="inline-flex items-center gap-1 text-brand-mist">
-                                                    <x-heroicon-m-bolt class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                    <x-heroicon-m-bolt class="h-4 w-4 shrink-0" aria-hidden="true" />
                                                     {{ __('System') }}
                                                 </span>
                                             @endif

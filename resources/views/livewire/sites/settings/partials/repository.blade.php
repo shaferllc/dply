@@ -16,9 +16,9 @@
     <section class="{{ $card }}">
         <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-code-bracket-square class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Repository') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Repository') }}</h2>
@@ -113,7 +113,7 @@
                     wire:click="generateDeployKey"
                     class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                 >
-                    <x-heroicon-o-key class="h-3.5 w-3.5" />
+                    <x-heroicon-o-key class="h-4 w-4" />
                     {{ __('Generate deploy key') }}
                 </button>
             @endif
@@ -141,9 +141,9 @@
     <section class="{{ $card }}">
         <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Quick deploy') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Quick deploy') }}</h2>
@@ -172,7 +172,7 @@
                         wire:click="disableQuickDeploy"
                         class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                     >
-                        <x-heroicon-o-power class="h-3.5 w-3.5" />
+                        <x-heroicon-o-power class="h-4 w-4" />
                         {{ __('Disable Quick deploy') }}
                     </button>
                 @else
@@ -181,7 +181,7 @@
                         wire:click="enableQuickDeploy"
                         class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90"
                     >
-                        <x-heroicon-o-bolt class="h-3.5 w-3.5" />
+                        <x-heroicon-o-bolt class="h-4 w-4" />
                         {{ __('Enable Quick deploy') }}
                     </button>
                 @endif
@@ -193,9 +193,9 @@
     <section class="{{ $card }}">
         <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Sync group') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Synchronized deployments') }}</h2>
@@ -268,7 +268,7 @@
                         wire:click="leaveDeploySyncGroup"
                         class="inline-flex items-center gap-1.5 rounded-lg border border-transparent px-3 py-1.5 text-xs font-semibold text-rose-700 hover:border-rose-200 hover:bg-rose-50"
                     >
-                        <x-heroicon-o-arrow-right-start-on-rectangle class="h-3.5 w-3.5" />
+                        <x-heroicon-o-arrow-right-start-on-rectangle class="h-4 w-4" />
                         {{ __('Leave group') }}
                     </button>
                 </div>
@@ -289,9 +289,9 @@
     <section class="{{ $card }}">
         <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Health') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('After deploy health') }}</h2>
@@ -305,7 +305,7 @@
                 wire:navigate
                 class="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
             >
-                <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5" />
+                <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" />
                 {{ __('Configure in Deploy') }}
             </a>
         </div>
@@ -315,9 +315,9 @@
     <section class="{{ $card }}">
         <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-arrow-down-on-square class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Webhook') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Inbound deploy webhook') }}</h2>
@@ -339,7 +339,7 @@
                         x-on:click="navigator.clipboard.writeText(@js($deployHookUrl)); copied = true; setTimeout(() => copied = false, 2000)"
                         class="inline-flex shrink-0 items-center gap-1 border-l border-brand-ink/10 bg-brand-sand/15 px-3 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40"
                     >
-                        <x-heroicon-m-clipboard-document class="h-3.5 w-3.5" />
+                        <x-heroicon-m-clipboard-document class="h-4 w-4" />
                         <span x-show="!copied">{{ __('Copy') }}</span>
                         <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
                     </button>
@@ -361,7 +361,7 @@
                     wire:click="regenerateWebhookSecret"
                     class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                 >
-                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                    <x-heroicon-o-arrow-path class="h-4 w-4" />
                     {{ __('Rotate webhook secret') }}
                 </button>
                 <a
@@ -379,9 +379,9 @@
     <section class="dply-card overflow-hidden border-rose-200">
         <div class="flex flex-col gap-4 border-b border-rose-200 bg-rose-50/60 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-rose-50 text-rose-700 ring-1 ring-rose-200">
+                <x-icon-badge tone="danger">
                     <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Destructive') }}</p>
                     <h2 class="mt-0.5 text-lg font-semibold text-rose-900">{{ __('Danger zone') }}</h2>
@@ -395,7 +395,7 @@
                 wire:click="openConfirmActionModal('queueRemoveRemoteRepository', [], @js(__('Remove repository files?')), @js(__('This queues a job to delete the repository directory on the server. It does not delete the site record.')), @js(__('Remove repository')), true)"
                 class="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-800 shadow-sm hover:bg-rose-100"
             >
-                <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                <x-heroicon-o-trash class="h-4 w-4" />
                 {{ __('Remove repository from server') }}
             </button>
         </div>

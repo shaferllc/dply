@@ -100,9 +100,9 @@
                 <div class="relative z-10 flex min-h-full justify-center px-4 py-10 sm:px-6 sm:py-14">
                     <div class="my-auto flex w-full max-w-2xl flex-col dply-modal-panel overflow-hidden shadow-xl" @click.stop>
                         <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge>
                                 <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0">
                                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Apply preview') }}</p>
                                 <h2 id="firewall-apply-preview-title" class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Review the ufw commands') }}</h2>
@@ -141,7 +141,7 @@
 
                         <div class="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
                             <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand-mist">
-                                <x-heroicon-m-command-line class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-m-command-line class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 <span class="font-mono tabular-nums text-brand-moss">{{ count($apply_preview_lines) }}</span>
                                 {{ trans_choice('command|commands', count($apply_preview_lines)) }}
                             </p>

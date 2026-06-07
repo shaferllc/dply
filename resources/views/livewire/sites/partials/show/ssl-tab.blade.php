@@ -1,8 +1,8 @@
                     <section class="dply-card overflow-hidden">
                         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge>
                                 <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0">
                                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('SSL') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Preview & SSL') }}</h3>
@@ -69,7 +69,7 @@
                                         wire:target="repairCertificate('{{ $latestCertificate->id }}')"
                                         class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:opacity-50"
                                     >
-                                        <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" wire:loading.remove wire:target="repairCertificate('{{ $latestCertificate->id }}')" />
+                                        <x-heroicon-o-wrench-screwdriver class="h-4 w-4" wire:loading.remove wire:target="repairCertificate('{{ $latestCertificate->id }}')" />
                                         <span wire:loading.remove wire:target="repairCertificate('{{ $latestCertificate->id }}')">{{ __('Repair certificate') }}</span>
                                         <span wire:loading wire:target="repairCertificate('{{ $latestCertificate->id }}')">{{ __('Repairing…') }}</span>
                                     </button>

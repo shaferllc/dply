@@ -54,7 +54,7 @@
                             </button>
                             <a href="https://cloud.digitalocean.com/kubernetes/clusters" target="_blank" rel="noopener" class="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-800 transition-colors hover:bg-rose-100">
                                 {{ __('Open in DigitalOcean') }}
-                                <x-heroicon-m-arrow-top-right-on-square class="h-3.5 w-3.5" />
+                                <x-heroicon-m-arrow-top-right-on-square class="h-4 w-4" />
                             </a>
                         </div>
                     </div>
@@ -246,9 +246,9 @@
             {{-- Kubeconfig panel --}}
             <section class="{{ $card }}">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Access') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Kubeconfig') }}</h3>
@@ -275,9 +275,9 @@
             {{-- Workloads (sites) --}}
             <section class="{{ $card }}">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-rocket-launch class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Workloads') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Workloads') }}</h3>
@@ -290,7 +290,7 @@
                         <p>{{ __('No workloads yet.') }}</p>
                         <a href="{{ route('sites.create', $server) }}" wire:navigate class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-brand-sage px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-forest">
                             {{ __('Add a container site') }}
-                            <x-heroicon-m-arrow-right class="h-3.5 w-3.5" />
+                            <x-heroicon-m-arrow-right class="h-4 w-4" />
                         </a>
                     </div>
                 @else

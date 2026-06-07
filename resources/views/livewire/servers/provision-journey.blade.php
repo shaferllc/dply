@@ -224,7 +224,15 @@
                                 $autoRetryAttempt = $server->meta['auto_retry_attempt'] ?? null;
                                 $autoRetryMax = $server->meta['auto_retry_max'] ?? null;
                                 $autoRetryPending = $autoRetryAt && $autoRetryAt->isFuture();
-                                $journeyHasFailed = $server->setup_status === \App\Models\Server::SETUP_STATUS_FAILED || $server->status === \App\Models\Server::STATUS_ERROR;
+                                // Key the failed banner/headline off the resolved failed step too,
+                                // not just the server-status flags — the journey now detects a
+                                // terminally-failed provision task even when those flags were never
+                                // updated (dead setup job / missing callback). Without this the
+                                // header would still read "updating automatically" while the red
+                                // failed-step banner shows below.
+                                $journeyHasFailed = $server->setup_status === \App\Models\Server::SETUP_STATUS_FAILED
+                                    || $server->status === \App\Models\Server::STATUS_ERROR
+                                    || $failedStep !== null;
                                 $journeyIsDone = $server->status === \App\Models\Server::STATUS_READY && $server->setup_status === \App\Models\Server::SETUP_STATUS_DONE;
                             @endphp
                             <div class="flex flex-wrap items-center gap-2">
@@ -294,7 +302,11 @@
                             </p>
                         </div>
                         <div class="flex shrink-0 flex-wrap gap-2 sm:justify-end">
-                        @if ($canCancelProvision)
+                        {{-- Suppress the cancel button once a failure has been
+                             detected — there's no active task left to cancel
+                             (clicking it would just toast "nothing to cancel"),
+                             and Resume install is the relevant action instead. --}}
+                        @if ($canCancelProvision && ! $failedStep)
                             <button
                                 type="button"
                                 wire:click="openCancelProvisionModal"
@@ -313,7 +325,7 @@
                              render alongside Open server workspace on a
                              healthy completed server. Gating on FAILED
                              specifically is the actual intent. --}}
-                        @if ($server->setup_status === \App\Models\Server::SETUP_STATUS_FAILED && \App\Jobs\RunSetupScriptJob::shouldDispatch($server))
+                        @if (($server->setup_status === \App\Models\Server::SETUP_STATUS_FAILED || $failedStep !== null) && \App\Jobs\RunSetupScriptJob::shouldDispatch($server))
                             <button
                                 type="button"
                                 wire:click="openResumeInstallModal"
@@ -524,7 +536,7 @@
                                                 </div>
                                                 @if ($rollbackSummary['triggered'])
                                                     <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-200">
-                                                        <x-heroicon-m-check-circle class="h-3.5 w-3.5" />
+                                                        <x-heroicon-m-check-circle class="h-4 w-4" />
                                                         {{ __('Restored') }}
                                                     </span>
                                                 @endif
@@ -1185,7 +1197,7 @@
                                             class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/30"
                                             @click="navigator.clipboard.writeText(@js($hints['ssh'])); copied = 'ssh'; clearTimeout(window._dplyJourneyCopyT); window._dplyJourneyCopyT = setTimeout(() => copied = null, 2000)"
                                         >
-                                            <x-heroicon-o-clipboard class="h-3.5 w-3.5" />
+                                            <x-heroicon-o-clipboard class="h-4 w-4" />
                                             <span x-show="copied !== 'ssh'">{{ __('Copy') }}</span>
                                             <span x-cloak x-show="copied === 'ssh'" class="text-emerald-700">{{ __('Copied') }}</span>
                                         </button>
@@ -1203,7 +1215,7 @@
                                         class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/30"
                                         @click="navigator.clipboard.writeText(@js($hints['docker_exec'])); copied = 'docker'; clearTimeout(window._dplyJourneyCopyT); window._dplyJourneyCopyT = setTimeout(() => copied = null, 2000)"
                                     >
-                                        <x-heroicon-o-clipboard class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-clipboard class="h-4 w-4" />
                                         <span x-show="copied !== 'docker'">{{ __('Copy') }}</span>
                                         <span x-cloak x-show="copied === 'docker'" class="text-emerald-700">{{ __('Copied') }}</span>
                                     </button>

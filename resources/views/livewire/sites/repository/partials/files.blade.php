@@ -2,9 +2,9 @@
     <div class="dply-card overflow-hidden">
         <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-folder class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Browse') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Files') }}</h2>
@@ -90,7 +90,7 @@
                     @if (! empty($filesView['html_url']))
                         <a href="{{ $filesView['html_url'] }}" target="_blank" rel="noopener noreferrer"
                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                            <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5" />
+                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" />
                             {{ __('Open on provider') }}
                         </a>
                     @endif

@@ -51,7 +51,7 @@
                             <span class="mx-2 hidden h-5 w-px bg-brand-ink/10 sm:inline-block" aria-hidden="true"></span>
 
                             <button type="button" wire:click="refreshWebserverLog" class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">
-                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                                <x-heroicon-o-arrow-path class="h-4 w-4" />
                                 {{ __('Refresh') }}
                             </button>
                             <button type="button" wire:click="toggleWebserverLogLive" @class([
@@ -63,7 +63,7 @@
                                     <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-600" aria-hidden="true"></span>
                                     {{ __('Live') }}
                                 @else
-                                    <x-heroicon-o-play class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-play class="h-4 w-4" />
                                     {{ __('Live') }}
                                 @endif
                             </button>
@@ -74,7 +74,7 @@
                                     'border-brand-forest bg-brand-forest text-brand-cream' => $log_raw,
                                     'border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => ! $log_raw,
                                 ])>
-                                    <x-heroicon-o-code-bracket class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-code-bracket class="h-4 w-4" />
                                     {{ __('Raw') }}
                                 </button>
                             @endif

@@ -27,7 +27,7 @@
                             <p class="mt-3 text-sm font-medium text-amber-900">{{ __('This site is currently suspended.') }}</p>
                             @can('update', $site)
                                 <button type="button" wire:click="resumeSite" wire:loading.attr="disabled" class="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 shadow-sm transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60">
-                                    <x-heroicon-o-play class="h-3.5 w-3.5" aria-hidden="true" />
+                                    <x-heroicon-o-play class="h-4 w-4" aria-hidden="true" />
                                     {{ __('Resume site') }}
                                 </button>
                             @endcan
@@ -41,7 +41,7 @@
                             </div>
                             @can('update', $site)
                                 <button type="button" wire:click="confirmSuspendSite" wire:loading.attr="disabled" class="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-amber-400 bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-900 shadow-sm transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60">
-                                    <x-heroicon-o-pause class="h-3.5 w-3.5" aria-hidden="true" />
+                                    <x-heroicon-o-pause class="h-4 w-4" aria-hidden="true" />
                                     {{ __('Suspend site') }}
                                 </button>
                             @endcan
@@ -67,7 +67,7 @@
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Clone site') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Create a copy on another server in your organization with a new domain. Databases, SSL certificates, environment files, and custom Nginx extra snippets are not copied.') }}</p>
                         <a href="{{ route('sites.clone', [$server, $site]) }}" wire:navigate class="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                            <x-heroicon-o-document-duplicate class="h-3.5 w-3.5" aria-hidden="true" />
+                            <x-heroicon-o-document-duplicate class="h-4 w-4" aria-hidden="true" />
                             {{ __('Clone site') }}
                         </a>
                     </div>
@@ -86,7 +86,7 @@
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Promote to another server') }}</h3>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Copy to a standby server on a preview hostname first — smoke-test deploys, copy env vars, then cut over production DNS using the in-app playbook.') }}</p>
                             <a href="{{ route('sites.promote', [$server, $site]) }}" wire:navigate class="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-brand-sage/30 bg-white px-3 py-1.5 text-xs font-semibold text-brand-forest shadow-sm transition hover:bg-brand-sage/10">
-                                <x-heroicon-o-arrow-right-circle class="h-3.5 w-3.5" aria-hidden="true" />
+                                <x-heroicon-o-arrow-right-circle class="h-4 w-4" aria-hidden="true" />
                                 {{ __('Promote to server') }}
                             </a>
                         </div>
@@ -115,13 +115,13 @@
                                     {{ __('Scheduled for removal at :time.', ['time' => $site->scheduled_deletion_at->copy()->timezone(config('app.timezone'))->toDayDateTimeString()]) }}
                                 </span>
                                 <button type="button" wire:click="cancelScheduledSiteRemoval" class="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-white px-2 py-1 font-semibold hover:bg-amber-100">
-                                    <x-heroicon-o-x-mark class="h-3.5 w-3.5" aria-hidden="true" />
+                                    <x-heroicon-o-x-mark class="h-4 w-4" aria-hidden="true" />
                                     {{ __('Cancel scheduled removal') }}
                                 </button>
                             </div>
                         @else
                             <button type="button" wire:click="openRemoveSiteModal" class="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-800 shadow-sm transition hover:bg-rose-100">
-                                <x-heroicon-o-trash class="h-3.5 w-3.5" aria-hidden="true" />
+                                <x-heroicon-o-trash class="h-4 w-4" aria-hidden="true" />
                                 {{ __('Delete site') }}
                             </button>
                         @endif

@@ -61,7 +61,7 @@
                     title="{{ __('Open full page') }}"
                     class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white/80 px-2.5 py-1 text-xs font-medium text-brand-forest shadow-sm transition-colors hover:bg-white hover:text-brand-ink dark:border-brand-mist/20 dark:bg-zinc-900/80 dark:text-brand-sage dark:hover:bg-zinc-800"
                 >
-                    <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0" aria-hidden="true" />
                     <span class="hidden sm:inline">{{ __('Open full page') }}</span>
                 </a>
             @endif

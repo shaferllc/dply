@@ -173,7 +173,7 @@
                                                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
                                             >
                                                 <span wire:loading.remove wire:target="loadMiseAvailableVersions('{{ $runtime }}')" class="inline-flex items-center gap-1.5">
-                                                    <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5" aria-hidden="true" />
+                                                    <x-heroicon-o-arrow-down-tray class="h-4 w-4" aria-hidden="true" />
                                                     {{ __('Load versions') }}
                                                 </span>
                                                 <span wire:loading wire:target="loadMiseAvailableVersions('{{ $runtime }}')" class="inline-flex items-center gap-1.5">
@@ -292,7 +292,7 @@
                                                     x-on:click="if (uv !== '' && uv !== @js($active)) { $wire.promptMiseUninstallRuntime(@js($runtime), uv); }"
                                                     class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-medium text-rose-800 hover:bg-rose-100 disabled:opacity-50"
                                                 >
-                                                    <x-heroicon-o-trash class="h-3.5 w-3.5" aria-hidden="true" />
+                                                    <x-heroicon-o-trash class="h-4 w-4" aria-hidden="true" />
                                                     {{ __('Uninstall') }}
                                                 </button>
                                                 @if ($active !== null)

@@ -25,7 +25,7 @@
                     wire:target="redeployEdge"
                     class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40"
                 >
-                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="redeployEdge" />
+                    <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="redeployEdge" />
                     {{ __('Redeploy now') }}
                 </button>
             @endcan
@@ -60,7 +60,7 @@
                                         wire:click="openEdgeDeployRefPicker"
                                         class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/60"
                                     >
-                                        <x-heroicon-o-magnifying-glass class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-magnifying-glass class="h-4 w-4" />
                                         {{ __('Browse') }}
                                     </button>
                                 </div>

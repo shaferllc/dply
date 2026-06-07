@@ -15,7 +15,7 @@
                 <p class="break-all font-mono text-xs text-brand-moss">{{ $config_selected_path }}</p>
                 @if ($this->configFileContentLoading())
                     <p class="mt-1 inline-flex items-center gap-1.5 text-[11px] text-brand-moss">
-                        <x-spinner variant="forest" class="h-3.5 w-3.5" />
+                        <x-spinner variant="forest" class="h-4 w-4" />
                         {{ $configCatalogLoading ? __('Discovering files, then loading contents…') : __('Loading file from server…') }}
                     </p>
                 @elseif ($config_loaded_from_cache)

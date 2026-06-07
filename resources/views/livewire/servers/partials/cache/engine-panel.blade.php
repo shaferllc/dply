@@ -374,7 +374,7 @@
                                 <div class="{{ $groupButtons }}">
                                     <button type="button" wire:click="recheckCacheServiceInstance('{{ $engine }}')" wire:loading.attr="disabled" wire:target="recheckCacheServiceInstance" class="{{ $btnDiagnose }}" title="{{ __('Re-run the reachability probe against this instance\'s port') }}">
                                         <span wire:loading.remove wire:target="recheckCacheServiceInstance" class="inline-flex items-center gap-1.5">
-                                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                                            <x-heroicon-o-arrow-path class="h-4 w-4" />
                                             {{ __('Recheck') }}
                                         </span>
                                         <span wire:loading wire:target="recheckCacheServiceInstance" class="inline-flex items-center gap-1.5">
@@ -385,7 +385,7 @@
                                     @if (! $probeRunning)
                                         <button type="button" wire:click="debugCacheServiceInstance('{{ $engine }}')" wire:loading.attr="disabled" wire:target="debugCacheServiceInstance" class="{{ $btnDebug }}" title="{{ __('Run systemctl status + port-listener + ping diagnostics and surface the output below') }}">
                                             <span wire:loading.remove wire:target="debugCacheServiceInstance" class="inline-flex items-center gap-1.5">
-                                                <x-heroicon-o-bug-ant class="h-3.5 w-3.5" />
+                                                <x-heroicon-o-bug-ant class="h-4 w-4" />
                                                 {{ __('Debug') }}
                                             </span>
                                             <span wire:loading wire:target="debugCacheServiceInstance" class="inline-flex items-center gap-1.5">
@@ -395,11 +395,11 @@
                                         </button>
                                     @endif
                                     <button type="button" wire:click="showCacheInstanceStatus('{{ $engine }}')" wire:loading.attr="disabled" wire:target="showCacheInstanceStatus,showCacheInstanceLogs" class="{{ $btnDiagnose }}" title="{{ __('Open systemctl status for this instance') }}">
-                                        <x-heroicon-o-information-circle class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-information-circle class="h-4 w-4" />
                                         {{ __('Status') }}
                                     </button>
                                     <button type="button" wire:click="showCacheInstanceLogs('{{ $engine }}')" wire:loading.attr="disabled" wire:target="showCacheInstanceStatus,showCacheInstanceLogs" class="{{ $btnDiagnose }}" title="{{ __('Open journalctl tail for this instance') }}">
-                                        <x-heroicon-o-document-text class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-document-text class="h-4 w-4" />
                                         {{ __('Logs') }}
                                     </button>
                                 </div>
@@ -410,13 +410,13 @@
                                 <div class="{{ $groupButtons }}">
                                     @if ($lifecycleAvailable)
                                         <button type="button" wire:click="restartCacheService('{{ $engine }}')" wire:loading.attr="disabled" wire:target="restartCacheService" class="{{ $btnLifecycle }}">
-                                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                                            <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
                                             <span wire:loading.remove wire:target="restartCacheService">{{ __('Restart') }}</span>
                                             <span wire:loading wire:target="restartCacheService">{{ __('Restarting…') }}</span>
                                         </button>
                                         @if ($row->status !== \App\Models\ServerCacheService::STATUS_STOPPED)
                                             <button type="button" wire:click="stopCacheService('{{ $engine }}')" wire:loading.attr="disabled" wire:target="stopCacheService" class="{{ $btnLifecycle }}" title="{{ __('Stop the daemon now. Boot-time auto-start is unchanged — it will come back on reboot.') }}">
-                                                <x-heroicon-o-stop-circle class="h-3.5 w-3.5" aria-hidden="true" />
+                                                <x-heroicon-o-stop-circle class="h-4 w-4" aria-hidden="true" />
                                                 {{ __('Stop') }}
                                             </button>
                                             {{-- Disable: stronger than Stop. `systemctl disable --now`
@@ -425,27 +425,27 @@
                                                  operator wants the service off for the long haul
                                                  without uninstalling. --}}
                                             <button type="button" wire:click="disableCacheService('{{ $engine }}')" wire:loading.attr="disabled" wire:target="disableCacheService" class="{{ $btnLifecycle }}" title="{{ __('Stop the daemon AND prevent it from starting at boot. Package + data dirs stay; re-enable later when you need it back.') }}">
-                                                <x-heroicon-o-no-symbol class="h-3.5 w-3.5" aria-hidden="true" />
+                                                <x-heroicon-o-no-symbol class="h-4 w-4" aria-hidden="true" />
                                                 <span wire:loading.remove wire:target="disableCacheService">{{ __('Disable') }}</span>
                                                 <span wire:loading wire:target="disableCacheService">{{ __('Disabling…') }}</span>
                                             </button>
                                         @else
                                             <button type="button" wire:click="startCacheService('{{ $engine }}')" wire:loading.attr="disabled" wire:target="startCacheService" class="{{ $btnLifecycle }}" title="{{ __('Start the daemon now. Boot-time enablement is unchanged.') }}">
-                                                <x-heroicon-o-play-circle class="h-3.5 w-3.5" aria-hidden="true" />
+                                                <x-heroicon-o-play-circle class="h-4 w-4" aria-hidden="true" />
                                                 {{ __('Start') }}
                                             </button>
                                             {{-- Enable: counterpart to Disable. `systemctl enable --now`
                                                  re-arms boot auto-start AND starts the daemon
                                                  immediately, so one click instead of two. --}}
                                             <button type="button" wire:click="enableCacheService('{{ $engine }}')" wire:loading.attr="disabled" wire:target="enableCacheService" class="{{ $btnLifecycle }}" title="{{ __('Start the daemon AND re-arm boot-time auto-start. Use this when bringing the service back after a Disable.') }}">
-                                                <x-heroicon-o-check-circle class="h-3.5 w-3.5" aria-hidden="true" />
+                                                <x-heroicon-o-check-circle class="h-4 w-4" aria-hidden="true" />
                                                 <span wire:loading.remove wire:target="enableCacheService">{{ __('Enable') }}</span>
                                                 <span wire:loading wire:target="enableCacheService">{{ __('Enabling…') }}</span>
                                             </button>
                                         @endif
                                         @if ($row->status === \App\Models\ServerCacheService::STATUS_RUNNING)
                                             <button type="button" wire:click="openConfirmActionModal('flushCacheService', ['{{ $engine }}'], @js(__('Flush all keys')), @js(__('Drop every key in :engine. App sessions, queued tags, and rate-limit counters in this engine will all be reset. Cannot be undone.', ['engine' => $engineLabels[$engine]])), @js(__('Flush all keys')), true)" class="{{ $btnDanger }}">
-                                                <x-heroicon-o-trash class="h-3.5 w-3.5" aria-hidden="true" />
+                                                <x-heroicon-o-trash class="h-4 w-4" aria-hidden="true" />
                                                 {{ __('Flush all keys') }}
                                             </button>
                                         @endif
@@ -467,7 +467,7 @@
                                             class="{{ $btnDanger }}"
                                             title="{{ $isLastInstanceOfEngine ? __('apt purge — removes the package') : __('Removes this instance only — package stays for the other instances') }}"
                                         >
-                                            <x-heroicon-o-x-mark class="h-3.5 w-3.5" aria-hidden="true" />
+                                            <x-heroicon-o-x-mark class="h-4 w-4" aria-hidden="true" />
                                             {{ $uninstallLabel }}
                                         </button>
                                     @endif
@@ -477,7 +477,7 @@
                                         class="{{ $btnMuted }}"
                                         title="{{ __('Delete this row from dply without touching the server. Use when uninstall is stuck or the install never landed.') }}"
                                     >
-                                        <x-heroicon-o-trash class="h-3.5 w-3.5" aria-hidden="true" />
+                                        <x-heroicon-o-trash class="h-4 w-4" aria-hidden="true" />
                                         {{ __('Force remove row') }}
                                     </button>
                                 </div>
@@ -722,7 +722,7 @@
                                         wire:click="openConfirmActionModal('lockdownCacheToLoopback', [], @js(__('Lock down to loopback?')), @js(__('Rebind :engine to 127.0.0.1, remove the firewall rule, and reapply UFW. Existing remote clients will be cut off as soon as the apply completes.', ['engine' => $engineLabels[$engine]])), @js(__('Lock down')), true)"
                                         class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                                     >
-                                        <x-heroicon-o-lock-closed class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-lock-closed class="h-4 w-4" />
                                         {{ __('Lock down to loopback') }}
                                     </button>
                                     <button
@@ -730,7 +730,7 @@
                                         x-on:click="$dispatch('open-modal', 'expose-cache-modal-{{ $engine }}')"
                                         class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                                     >
-                                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-pencil-square class="h-4 w-4" />
                                         {{ __('Change source CIDR') }}
                                     </button>
                                 </div>
@@ -742,7 +742,7 @@
                                         x-on:click="$dispatch('open-modal', 'expose-cache-modal-{{ $engine }}')"
                                         class="inline-flex items-center gap-1.5 rounded-lg border border-brand-forest/30 bg-brand-forest/10 px-3 py-1.5 text-xs font-semibold text-brand-forest shadow-sm hover:bg-brand-forest/15 disabled:cursor-not-allowed disabled:opacity-50"
                                     >
-                                        <x-heroicon-o-globe-alt class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-globe-alt class="h-4 w-4" />
                                         {{ __('Expose to network…') }}
                                     </button>
                                 </div>
@@ -802,10 +802,10 @@
                                 <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
                                     <button type="button" wire:click="loadCacheMemorySettings" wire:loading.attr="disabled" wire:target="loadCacheMemorySettings" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
                                         @if ($cacheMemoryLoaded)
-                                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                                            <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
                                             <span wire:loading.remove wire:target="loadCacheMemorySettings">{{ __('Reload') }}</span>
                                         @else
-                                            <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5" aria-hidden="true" />
+                                            <x-heroicon-o-arrow-down-tray class="h-4 w-4" aria-hidden="true" />
                                             <span wire:loading.remove wire:target="loadCacheMemorySettings">{{ __('Load current settings') }}</span>
                                         @endif
                                         <span wire:loading wire:target="loadCacheMemorySettings">{{ __('Loading…') }}</span>
@@ -1019,9 +1019,9 @@
                         @if ($activeSubtab === 'stats')
                         <div class="{{ $card }}">
                             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-icon-badge>
                                     <x-heroicon-o-users class="h-5 w-5" aria-hidden="true" />
-                                </span>
+                                </x-icon-badge>
                                 <div class="min-w-0 flex-1">
                                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Clients') }}</p>
                                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine — connected clients', ['engine' => $engineLabels[$engine]]) }}</h3>
@@ -1030,13 +1030,13 @@
                                 <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
                                     @if ($cacheClients === null && $cacheClientsError === null)
                                         <button type="button" wire:click="loadCacheClients" wire:loading.attr="disabled" wire:target="loadCacheClients" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
-                                            <x-heroicon-o-users class="h-3.5 w-3.5" aria-hidden="true" />
+                                            <x-heroicon-o-users class="h-4 w-4" aria-hidden="true" />
                                             <span wire:loading.remove wire:target="loadCacheClients">{{ __('Load clients') }}</span>
                                             <span wire:loading wire:target="loadCacheClients">{{ __('Loading…') }}</span>
                                         </button>
                                     @else
                                         <button type="button" wire:click="loadCacheClients" wire:loading.attr="disabled" wire:target="loadCacheClients" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
-                                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                                            <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
                                             {{ __('Refresh') }}
                                         </button>
                                     @endif
@@ -1332,7 +1332,7 @@
                                     x-on:click="$dispatch('open-modal', @js($configModalName))"
                                     class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
                                 >
-                                    <x-heroicon-o-document-text class="h-3.5 w-3.5" aria-hidden="true" />
+                                    <x-heroicon-o-document-text class="h-4 w-4" aria-hidden="true" />
                                     <span wire:loading.remove wire:target="loadCacheConfig">@if ($cacheConfigContent !== null){{ __('Reopen viewer') }}@else{{ __('View config') }}@endif</span>
                                     <span wire:loading wire:target="loadCacheConfig">{{ __('Loading…') }}</span>
                                 </button>
@@ -1393,7 +1393,7 @@
                                 <p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-800">{{ $cacheConfigError }}</p>
                             @else
                                 <p class="mt-4 flex items-center gap-2 text-xs text-brand-moss">
-                                    <x-heroicon-o-check-circle class="h-3.5 w-3.5 text-brand-forest" aria-hidden="true" />
+                                    <x-heroicon-o-check-circle class="h-4 w-4 text-brand-forest" aria-hidden="true" />
                                     {{ __('Config loaded — click') }} <strong>{{ __('Reopen viewer') }}</strong> {{ __('above to inspect or edit.') }}
                                 </p>
                             @endif
@@ -1420,13 +1420,13 @@
                                 <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
                                     @if (! $cacheConfigEditing)
                                         <button type="button" wire:click="loadCacheConfig" wire:loading.attr="disabled" wire:target="loadCacheConfig" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
-                                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                                            <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
                                             <span wire:loading.remove wire:target="loadCacheConfig">{{ __('Refresh') }}</span>
                                             <span wire:loading wire:target="loadCacheConfig">{{ __('Loading…') }}</span>
                                         </button>
                                         @if ($cacheConfigContent !== null)
                                             <button type="button" wire:click="startEditingCacheConfig" wire:loading.attr="disabled" wire:target="startEditingCacheConfig" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-forest/30 bg-brand-forest/10 px-3 py-1.5 text-sm font-medium text-brand-forest hover:bg-brand-forest/15">
-                                                <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                                                <x-heroicon-o-pencil-square class="h-4 w-4" />
                                                 {{ __('Edit') }}
                                             </button>
                                         @endif

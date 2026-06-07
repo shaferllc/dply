@@ -55,9 +55,9 @@
     @if ($core_changed_warning)
         <div class="mb-6 dply-card overflow-hidden">
             <div class="flex items-start gap-3 bg-amber-50/60 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+                <x-icon-badge tone="amber">
                     <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Out of sync') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-amber-950">{{ __('Managed core changed') }}</h2>
@@ -70,9 +70,9 @@
     @if ($health_hint)
         <div class="mb-6 dply-card overflow-hidden">
             <div class="flex items-start gap-3 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-information-circle class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Health') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Webserver status') }}</h2>
@@ -169,7 +169,7 @@
                                     <kbd class="rounded border border-brand-ink/15 bg-white px-1 font-mono text-[10px]">⇧+Z</kbd> {{ __('redo') }}
                                 </p>
                                 <button type="button" x-on:click="$dispatch('open-modal', 'webserver-snippet-modal')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                    <x-heroicon-o-puzzle-piece class="h-3.5 w-3.5" aria-hidden="true" />
+                                    <x-heroicon-o-puzzle-piece class="h-4 w-4" aria-hidden="true" />
                                     {{ __('Insert snippet') }}
                                 </button>
                             </div>
@@ -235,9 +235,9 @@
 
             <div class="dply-card overflow-hidden">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-check-badge class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Release') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Check & publish') }}</h2>
@@ -454,9 +454,9 @@
         <div class="flex flex-col" style="max-height: 80vh;">
             <div class="flex items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5">
                 <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-puzzle-piece class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Config snippets') }}</p>
                         <div class="mt-0.5 flex items-center gap-2">
@@ -519,7 +519,7 @@
                                     x-on:click="$dispatch('insert-snippet-text', { text: @js($snippet['content']), block: true }); $dispatch('close-modal', 'webserver-snippet-modal')"
                                     class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                                 >
-                                    <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5" aria-hidden="true" />
+                                    <x-heroicon-o-arrow-down-tray class="h-4 w-4" aria-hidden="true" />
                                     {{ __('Insert at cursor') }}
                                 </button>
                             </li>

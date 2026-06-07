@@ -59,8 +59,8 @@
                     <x-spinner variant="white" size="sm" />
                     <span>{{ __('Deploying…') }}</span>
                 @else
-                    <x-heroicon-o-rocket-launch class="h-3.5 w-3.5" wire:loading.remove wire:target="deploy" />
-                    <span wire:loading wire:target="deploy" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="white" size="sm" /></span>
+                    <x-heroicon-o-rocket-launch class="h-4 w-4" wire:loading.remove wire:target="deploy" />
+                    <span wire:loading wire:target="deploy" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="white" size="sm" /></span>
                     <span>{{ __('Deploy') }}</span>
                 @endif
             </button>
@@ -71,7 +71,7 @@
                 x-on:click="open = ! open"
                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
             >
-                <x-heroicon-o-command-line class="h-3.5 w-3.5" />
+                <x-heroicon-o-command-line class="h-4 w-4" />
                 {{ __('Console') }}
                 @if ($inProgress)
                     <span class="relative flex h-2 w-2">
@@ -108,7 +108,7 @@
                                 @if ($inProgress)
                                     <x-spinner variant="white" size="sm" /> {{ __('Deploying…') }}
                                 @else
-                                    <x-heroicon-o-rocket-launch class="h-3.5 w-3.5" /> {{ __('Deploy now') }}
+                                    <x-heroicon-o-rocket-launch class="h-4 w-4" /> {{ __('Deploy now') }}
                                 @endif
                             </button>
                             <button type="button" x-on:click="open = false" class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
@@ -139,7 +139,7 @@
                                 ])>{{ $latest->status }}</span>
                                 <a href="{{ route('sites.deployments.show', ['server' => $server, 'site' => $site, 'deployment' => $latest]) }}" wire:navigate class="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-forest hover:underline">
                                     {{ __('Full log') }}
-                                    <x-heroicon-m-arrow-top-right-on-square class="h-3.5 w-3.5" />
+                                    <x-heroicon-m-arrow-top-right-on-square class="h-4 w-4" />
                                 </a>
                             </div>
 
@@ -203,7 +203,7 @@
                             @if ($deployFixers !== [])
                                 <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
                                     <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">
-                                        <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-wrench-screwdriver class="h-4 w-4" />
                                         {{ trans_choice('{1} Suggested fix|[2,*] Suggested fixes', count($deployFixers)) }}
                                     </p>
                                     <ul class="mt-2 space-y-2">
@@ -222,7 +222,7 @@
                                                     @if ($thisRunning)
                                                         <x-spinner variant="white" size="sm" /> {{ __('Processing…') }}
                                                     @else
-                                                        <x-heroicon-o-play class="h-3.5 w-3.5" /> {{ $fx['label'] }}
+                                                        <x-heroicon-o-play class="h-4 w-4" /> {{ $fx['label'] }}
                                                     @endif
                                                 </button>
                                             </li>

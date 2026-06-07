@@ -1,9 +1,9 @@
 <section class="space-y-6">
     <div class="dply-card overflow-hidden border-red-200">
         <div class="flex items-start gap-3 border-b border-red-200 bg-red-50/60 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-red-100 text-red-700 ring-1 ring-red-200">
+            <x-icon-badge tone="red">
                 <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-red-700">{{ __('Danger zone') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Reset this site') }}</h2>
@@ -31,7 +31,7 @@
                                 <template x-if="!confirming">
                                     <button type="button" x-on:click="confirming = true"
                                         class="inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 py-2 text-xs font-semibold text-red-800 shadow-sm transition hover:bg-red-100">
-                                        <x-heroicon-o-trash class="h-3.5 w-3.5" aria-hidden="true" />
+                                        <x-heroicon-o-trash class="h-4 w-4" aria-hidden="true" />
                                         {{ __('Disconnect & start over') }}
                                     </button>
                                 </template>
@@ -43,7 +43,7 @@
                                             wire:loading.attr="disabled" wire:target="disconnectAndStartOver"
                                             class="inline-flex items-center gap-1.5 rounded-lg bg-red-700 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-red-800 disabled:cursor-progress disabled:opacity-60">
                                             <span wire:loading.remove wire:target="disconnectAndStartOver" class="inline-flex items-center gap-1.5">
-                                                <x-heroicon-o-trash class="h-3.5 w-3.5" aria-hidden="true" />
+                                                <x-heroicon-o-trash class="h-4 w-4" aria-hidden="true" />
                                                 {{ __('Yes, wipe & reset') }}
                                             </span>
                                             <span wire:loading wire:target="disconnectAndStartOver" class="inline-flex items-center gap-1.5">

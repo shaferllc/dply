@@ -111,7 +111,7 @@
                                 x-on:click="$wire.cancelEditRule(); $dispatch('open-modal', 'add-firewall-rule-modal')"
                                 class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90"
                             >
-                                <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                                <x-heroicon-o-plus class="h-4 w-4" />
                                 {{ __('Add a rule') }}
                             </button>
                             <span class="hidden h-5 w-px bg-brand-ink/10 sm:block" aria-hidden="true"></span>
@@ -124,8 +124,8 @@
                                 title="{{ $applyBusy ? __('A firewall apply is already running. Wait for it to finish.') : __('Preview the ufw commands, then confirm to queue the apply.') }}"
                                 class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                <x-heroicon-o-bolt wire:loading.remove wire:target="previewApplyFirewall,applyFirewall" class="h-3.5 w-3.5" />
-                                <span wire:loading wire:target="previewApplyFirewall,applyFirewall" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                <x-heroicon-o-bolt wire:loading.remove wire:target="previewApplyFirewall,applyFirewall" class="h-4 w-4" />
+                                <span wire:loading wire:target="previewApplyFirewall,applyFirewall" class="inline-flex h-4 w-4 items-center justify-center">
                                     <x-spinner variant="forest" size="sm" />
                                 </span>
                                 <span wire:loading.remove wire:target="previewApplyFirewall,applyFirewall">{{ $applyBusy ? __('Applying…') : __('Apply rules…') }}</span>
@@ -153,7 +153,7 @@
                                     >
                                         <span class="inline-flex items-center gap-2">
                                             <x-heroicon-o-arrow-path wire:loading.remove wire:target="refreshUfwStatus" class="h-3.5 w-3.5 text-brand-moss" />
-                                            <span wire:loading wire:target="refreshUfwStatus" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                            <span wire:loading wire:target="refreshUfwStatus" class="inline-flex h-4 w-4 items-center justify-center">
                                                 <x-spinner variant="forest" size="sm" />
                                             </span>
                                             <span wire:loading.remove wire:target="refreshUfwStatus">{{ __('Refresh status') }}</span>
@@ -170,7 +170,7 @@
                                     >
                                         <span class="inline-flex items-center gap-2">
                                             <x-heroicon-o-command-line wire:loading.remove wire:target="runFirewallDiagnostics" class="h-3.5 w-3.5 text-brand-moss" />
-                                            <span wire:loading wire:target="runFirewallDiagnostics" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                            <span wire:loading wire:target="runFirewallDiagnostics" class="inline-flex h-4 w-4 items-center justify-center">
                                                 <x-spinner variant="forest" size="sm" />
                                             </span>
                                             <span wire:loading.remove wire:target="runFirewallDiagnostics">{{ __('Diagnostics') }}</span>
@@ -188,7 +188,7 @@
                                     >
                                         <span class="inline-flex items-center gap-2">
                                             <x-heroicon-o-arrow-down-tray wire:loading.remove wire:target="previewImportHostRules" class="h-3.5 w-3.5 text-brand-moss" />
-                                            <span wire:loading wire:target="previewImportHostRules" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                            <span wire:loading wire:target="previewImportHostRules" class="inline-flex h-4 w-4 items-center justify-center">
                                                 <x-spinner variant="forest" size="sm" />
                                             </span>
                                             <span wire:loading.remove wire:target="previewImportHostRules">{{ __('Import from host') }}</span>
@@ -237,8 +237,8 @@
                                             wire:target="ensureSshAllowRule"
                                             class="inline-flex items-center gap-1.5 rounded-lg border border-amber-400 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 shadow-sm hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-50"
                                         >
-                                            <x-heroicon-o-shield-check wire:loading.remove wire:target="ensureSshAllowRule" class="h-3.5 w-3.5" />
-                                            <span wire:loading wire:target="ensureSshAllowRule" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                            <x-heroicon-o-shield-check wire:loading.remove wire:target="ensureSshAllowRule" class="h-4 w-4" />
+                                            <span wire:loading wire:target="ensureSshAllowRule" class="inline-flex h-4 w-4 items-center justify-center">
                                                 <x-spinner variant="forest" size="sm" />
                                             </span>
                                             <span wire:loading.remove wire:target="ensureSshAllowRule">{{ __('Add SSH allow rule') }}</span>
@@ -289,7 +289,7 @@
                                     class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/50"
                                 >
                                     <x-heroicon-o-check-circle wire:loading.remove wire:target="selectAllFirewallRules" class="h-3.5 w-3.5 text-brand-moss" />
-                                    <span wire:loading wire:target="selectAllFirewallRules" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                    <span wire:loading wire:target="selectAllFirewallRules" class="inline-flex h-4 w-4 items-center justify-center">
                                         <x-spinner variant="forest" size="sm" />
                                     </span>
                                     <span wire:loading.remove wire:target="selectAllFirewallRules">{{ __('Select all') }}</span>
@@ -301,8 +301,8 @@
                                     wire:loading.attr="disabled"
                                     class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white px-3 py-1.5 text-xs font-medium text-brand-moss hover:bg-brand-sand/30"
                                 >
-                                    <x-heroicon-o-x-circle wire:loading.remove wire:target="clearFirewallBulkSelection" class="h-3.5 w-3.5" />
-                                    <span wire:loading wire:target="clearFirewallBulkSelection" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                    <x-heroicon-o-x-circle wire:loading.remove wire:target="clearFirewallBulkSelection" class="h-4 w-4" />
+                                    <span wire:loading wire:target="clearFirewallBulkSelection" class="inline-flex h-4 w-4 items-center justify-center">
                                         <x-spinner variant="forest" size="sm" />
                                     </span>
                                     <span wire:loading.remove wire:target="clearFirewallBulkSelection">{{ __('Clear') }}</span>
@@ -314,8 +314,8 @@
                                     wire:loading.attr="disabled"
                                     class="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50/80 px-3 py-1.5 text-xs font-medium text-emerald-900 hover:bg-emerald-100/80"
                                 >
-                                    <x-heroicon-o-check wire:loading.remove wire:target="bulkEnableFirewallRules" class="h-3.5 w-3.5" />
-                                    <span wire:loading wire:target="bulkEnableFirewallRules" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                    <x-heroicon-o-check wire:loading.remove wire:target="bulkEnableFirewallRules" class="h-4 w-4" />
+                                    <span wire:loading wire:target="bulkEnableFirewallRules" class="inline-flex h-4 w-4 items-center justify-center">
                                         <x-spinner variant="forest" size="sm" />
                                     </span>
                                     <span wire:loading.remove wire:target="bulkEnableFirewallRules">{{ __('Enable selected') }}</span>
@@ -328,7 +328,7 @@
                                     class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
                                 >
                                     <x-heroicon-o-no-symbol wire:loading.remove wire:target="bulkDisableFirewallRules" class="h-3.5 w-3.5 text-brand-moss" />
-                                    <span wire:loading wire:target="bulkDisableFirewallRules" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                    <span wire:loading wire:target="bulkDisableFirewallRules" class="inline-flex h-4 w-4 items-center justify-center">
                                         <x-spinner variant="forest" size="sm" />
                                     </span>
                                     <span wire:loading.remove wire:target="bulkDisableFirewallRules">{{ __('Disable selected') }}</span>
@@ -340,8 +340,8 @@
                                     wire:loading.attr="disabled"
                                     class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50/80 px-3 py-1.5 text-xs font-medium text-red-800 hover:bg-red-100/80"
                                 >
-                                    <x-heroicon-o-trash wire:loading.remove wire:target="bulkDeleteFirewallRules" class="h-3.5 w-3.5" />
-                                    <span wire:loading wire:target="bulkDeleteFirewallRules" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                    <x-heroicon-o-trash wire:loading.remove wire:target="bulkDeleteFirewallRules" class="h-4 w-4" />
+                                    <span wire:loading wire:target="bulkDeleteFirewallRules" class="inline-flex h-4 w-4 items-center justify-center">
                                         <x-spinner variant="forest" size="sm" />
                                     </span>
                                     <span wire:loading.remove wire:target="bulkDeleteFirewallRules">{{ __('Delete selected') }}</span>
@@ -354,7 +354,7 @@
                                     class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/10 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40"
                                 >
                                     <x-heroicon-o-scissors wire:loading.remove wire:target="trimDuplicateFirewallRules" class="h-3.5 w-3.5 text-brand-moss" />
-                                    <span wire:loading wire:target="trimDuplicateFirewallRules" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                    <span wire:loading wire:target="trimDuplicateFirewallRules" class="inline-flex h-4 w-4 items-center justify-center">
                                         <x-spinner variant="forest" size="sm" />
                                     </span>
                                     <span wire:loading.remove wire:target="trimDuplicateFirewallRules">{{ __('Trim duplicates') }}</span>
@@ -398,7 +398,7 @@
                             </div>
                             @if ($hasActiveFilter)
                                 <button type="button" wire:click="clearRuleFilter" class="inline-flex items-center gap-1 text-[11px] font-medium text-brand-forest hover:underline">
-                                    <x-heroicon-o-x-circle class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-x-circle class="h-4 w-4" />
                                     {{ __('Clear · :n / :m matching', ['n' => $filteredCount, 'm' => $server->firewallRules->count()]) }}
                                 </button>
                             @endif
@@ -532,7 +532,7 @@
                                                         title="{{ __('Edit') }}"
                                                         aria-label="{{ __('Edit rule') }}"
                                                     >
-                                                        <span wire:loading.remove wire:target="startEditRule('{{ $fr->id }}')"><x-heroicon-m-pencil-square class="h-3.5 w-3.5" /></span>
+                                                        <span wire:loading.remove wire:target="startEditRule('{{ $fr->id }}')"><x-heroicon-m-pencil-square class="h-4 w-4" /></span>
                                                         <span wire:loading wire:target="startEditRule('{{ $fr->id }}')"><x-spinner variant="forest" size="sm" /></span>
                                                     </button>
                                                     <button
@@ -543,7 +543,7 @@
                                                         title="{{ __('Remove') }}"
                                                         aria-label="{{ __('Remove rule') }}"
                                                     >
-                                                        <span wire:loading.remove wire:target="deleteFirewallRule('{{ $fr->id }}')"><x-heroicon-m-trash class="h-3.5 w-3.5" /></span>
+                                                        <span wire:loading.remove wire:target="deleteFirewallRule('{{ $fr->id }}')"><x-heroicon-m-trash class="h-4 w-4" /></span>
                                                         <span wire:loading wire:target="deleteFirewallRule('{{ $fr->id }}')"><x-spinner variant="forest" size="sm" /></span>
                                                     </button>
                                                 </div>

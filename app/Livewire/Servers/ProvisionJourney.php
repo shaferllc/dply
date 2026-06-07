@@ -601,8 +601,38 @@ class ProvisionJourney extends Component
         $scriptStepKeys = array_column($scriptSteps, 'key');
         $lastSeenScriptKey = $this->lastSeenScriptStepKey($task, $scriptSteps);
 
-        if ($server->status === Server::STATUS_ERROR || $server->setup_status === Server::SETUP_STATUS_FAILED) {
-            $activeKey = $server->setup_status === Server::SETUP_STATUS_FAILED
+        // A provision/setup task can reach a terminal *failed* state
+        // (failed / timeout / connection_failed / upload_failed) without
+        // anything having flipped the server's own status flags — e.g. the
+        // setup job died mid-run, or the result callback from the box never
+        // landed. When that happens the branches below compute an active step
+        // from the now-stale server status and the view renders a spinner
+        // forever; stallState() also bails because the task is no longer
+        // active, so the operator never sees the actual error. Treat a
+        // terminally-failed task as a journey failure too, so the failed-step
+        // banner (with the captured output / failure reason) surfaces. We
+        // skip this while an auto-retry is still pending — that state owns its
+        // own "Retrying" UI — and once the server is genuinely done.
+        $autoRetryAt = isset($server->meta['auto_retry_at'])
+            ? \Illuminate\Support\Carbon::parse((string) $server->meta['auto_retry_at'])
+            : null;
+        $autoRetryPending = $autoRetryAt !== null && $autoRetryAt->isFuture();
+        $serverReady = $server->status === Server::STATUS_READY
+            && $server->setup_status === Server::SETUP_STATUS_DONE;
+        $taskFailed = $task !== null
+            && $task->status->isFailed()
+            && ! $serverReady
+            && ! $autoRetryPending;
+
+        // The task drives the *setup* phase (it's only dispatched once SSH is
+        // up), so a failed task is a setup-side failure and maps to a script
+        // step — same as setup_status === FAILED. A pure cloud-side error
+        // (server ERROR, setup never started, no task) still maps to
+        // 'provisioning'.
+        $failedDuringSetup = $server->setup_status === Server::SETUP_STATUS_FAILED || $taskFailed;
+
+        if ($server->status === Server::STATUS_ERROR || $failedDuringSetup) {
+            $activeKey = $failedDuringSetup
                 ? ($lastSeenScriptKey ?? ($scriptStepKeys[0] ?? 'setup'))
                 : 'provisioning';
             $failedKey = $activeKey;

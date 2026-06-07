@@ -48,13 +48,13 @@
                                         @if ($isCached)
                                             <x-heroicon-o-bolt class="h-4 w-4 text-sky-600" title="{{ __('Cached on this server') }}" />
                                         @elseif ($isLoading)
-                                            <x-spinner variant="forest" class="h-3.5 w-3.5" />
+                                            <x-spinner variant="forest" class="h-4 w-4" />
                                         @else
                                             <span wire:loading.remove wire:target="loadConfigFile(@js($f['path']))" class="inline-flex">
                                                 <x-heroicon-o-document class="h-4 w-4 text-brand-moss" />
                                             </span>
                                             <span wire:loading wire:target="loadConfigFile(@js($f['path']))" class="inline-flex">
-                                                <x-spinner variant="forest" class="h-3.5 w-3.5" />
+                                                <x-spinner variant="forest" class="h-4 w-4" />
                                             </span>
                                         @endif
                                     </span>

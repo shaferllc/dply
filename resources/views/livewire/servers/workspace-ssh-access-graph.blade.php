@@ -12,9 +12,9 @@
     <div class="space-y-6">
         <section class="dply-card overflow-hidden">
             <div class="flex flex-wrap items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0 flex-1">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Access over time') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Active SSH access') }}</h2>
@@ -120,7 +120,7 @@
         </section>
         <section class="dply-card overflow-hidden">
             <div class="flex flex-wrap items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25"><x-heroicon-o-key class="h-5 w-5" /></span>
+                <x-icon-badge><x-heroicon-o-key class="h-5 w-5" /></x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Access') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ trans_choice(':count authorized key|:count authorized keys', $report['summary']['total'], ['count' => $report['summary']['total']]) }}</h2>
@@ -175,9 +175,9 @@
         @if ($sessionsEnabled && count($report['sessions']) > 0)
             <section class="dply-card overflow-hidden">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Sessions') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ trans_choice(':count active contractor session|:count active contractor sessions', $report['summary']['active_sessions'], ['count' => $report['summary']['active_sessions']]) }}</h2>

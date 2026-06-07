@@ -25,13 +25,13 @@
                 <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
                     <div class="lg:col-span-7">
                         <div class="flex items-start gap-3">
-                            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge size="md">
                                 @if ($isProvider)
                                     <x-heroicon-o-cloud-arrow-up class="h-6 w-6" aria-hidden="true" />
                                 @else
                                     <x-heroicon-o-server-stack class="h-6 w-6" aria-hidden="true" />
                                 @endif
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0">
                                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Step :n of :total', ['n' => 2, 'total' => $totalSteps]) }}</p>
                                 <h1 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">
@@ -86,9 +86,9 @@
                 {{-- Provider host kind --}}
                 <section class="dply-card overflow-hidden">
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0 flex-1">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Host') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Host kind') }}</h3>
@@ -155,9 +155,9 @@
                 {{-- Provider tile picker --}}
                 <section class="dply-card overflow-hidden">
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-cloud class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0 flex-1">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Provider') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $form->provider_host_kind === 'kubernetes' ? __('Cluster provider') : __('Cloud provider') }}</h3>
@@ -166,7 +166,7 @@
                         <x-add-provider-credential-link
                             class="!inline-flex !items-center !gap-1.5 !rounded-lg !border !border-brand-ink/15 !bg-white !px-3 !py-1.5 !text-xs !font-semibold !text-brand-ink !shadow-sm !transition hover:!bg-brand-sand/40 hover:!underline-offset-0 hover:!no-underline whitespace-nowrap shrink-0"
                         >
-                            <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            <x-heroicon-m-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
                             {{ __('Connect provider') }}
                         </x-add-provider-credential-link>
                     </div>
@@ -211,11 +211,11 @@
                                         <div class="mt-3 flex flex-col gap-2 border-t border-brand-ink/8 pt-3 text-[11px] text-brand-moss">
                                             <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
                                                 <span class="inline-flex items-center gap-1">
-                                                    <x-heroicon-o-server-stack class="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden="true" />
+                                                    <x-heroicon-o-server-stack class="h-4 w-4 shrink-0 opacity-80" aria-hidden="true" />
                                                     {{ trans_choice(':count server|:count servers', $card['server_count'], ['count' => $card['server_count']]) }}
                                                 </span>
                                                 <span class="inline-flex items-center gap-1">
-                                                    <x-heroicon-o-globe-alt class="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden="true" />
+                                                    <x-heroicon-o-globe-alt class="h-4 w-4 shrink-0 opacity-80" aria-hidden="true" />
                                                     {{ trans_choice(':count site|:count sites', $card['site_count'], ['count' => $card['site_count']]) }}
                                                 </span>
                                             </div>
@@ -272,9 +272,9 @@
                 {{-- Account / credential picker --}}
                 <section class="dply-card overflow-hidden">
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0 flex-1">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Account') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Use which API credential?') }}</h3>
@@ -286,7 +286,7 @@
                                 :provider="$credentialProvider"
                                 class="!inline-flex !items-center !gap-1.5 !whitespace-nowrap !rounded-lg !border !border-brand-ink/15 !bg-white !px-3 !py-1.5 !text-xs !font-semibold !text-brand-ink !shadow-sm !transition hover:!bg-brand-sand/40 hover:!no-underline shrink-0"
                             >
-                                <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-m-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Add new') }}
                             </x-add-provider-credential-link>
                         @endif
@@ -308,7 +308,7 @@
                                             :provider="$credentialProvider"
                                             class="!mt-3 !inline-flex !items-center !gap-2 !whitespace-nowrap !rounded-xl !bg-brand-ink !px-3 !py-1.5 !text-xs !font-semibold !text-brand-cream !shadow-sm !transition hover:!bg-brand-forest hover:!no-underline"
                                         >
-                                            <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            <x-heroicon-m-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Connect account') }}
                                         </x-add-provider-credential-link>
                                     </div>
@@ -346,9 +346,9 @@
                 @if ($form->provider_credential_id !== '' && $form->provider_host_kind !== 'kubernetes')
                     <section class="dply-card overflow-hidden">
                         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge>
                                 <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0">
                                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Placement') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Region & size') }}</h3>
@@ -375,9 +375,9 @@
                 @if ($form->provider_credential_id !== '' && $form->provider_host_kind !== 'kubernetes' && in_array($form->type, ['digitalocean', 'hetzner'], true))
                     <section class="dply-card overflow-hidden">
                         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge>
                                 <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0 flex-1">
                                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Networking') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Private network') }}</h3>
@@ -481,9 +481,9 @@
                     @php $k8sProviderLabel = $form->type === 'aws_kubernetes' ? __('AWS EKS') : __('DigitalOcean DOKS'); @endphp
                     <section class="dply-card overflow-hidden">
                         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge>
                                 <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0">
                                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cluster') }}</p>
                                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Pick a cluster on the next step') }}</h3>
@@ -498,9 +498,9 @@
                 {{-- Custom (BYO) host kind --}}
                 <section class="dply-card overflow-hidden">
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0 flex-1">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Host') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Host kind') }}</h3>
@@ -560,9 +560,9 @@
                 {{-- SSH connection --}}
                 <section class="dply-card overflow-hidden">
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0 flex-1">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Connection') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('SSH connection') }}</h3>
@@ -630,11 +630,11 @@
                                     'border-red-200 bg-red-50 text-red-700' => $customConnectionTestState === 'error',
                                 ])>
                                     @if ($customConnectionTestState === 'success')
-                                        <x-heroicon-m-check-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        <x-heroicon-m-check-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     @elseif ($customConnectionTestState === 'warning')
-                                        <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        <x-heroicon-m-exclamation-triangle class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     @else
-                                        <x-heroicon-m-x-circle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                        <x-heroicon-m-x-circle class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     @endif
                                     {{ $customConnectionTestMessage }}
                                 </span>

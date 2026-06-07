@@ -29,9 +29,9 @@
         <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
             <div class="lg:col-span-7">
                 <div class="flex items-start gap-3">
-                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge size="md">
                         <x-heroicon-o-code-bracket-square class="h-6 w-6" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Git') }}</p>
                         <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Source control') }}</h2>
@@ -116,9 +116,9 @@
                      for visual consistency with the rest of the family,
                      while OAuth/PAT counts show as a quick-read chip. --}}
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-oauth-provider-icon :provider="$provider['id']" size="h-5 w-5" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0 flex-1">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Provider') }}</p>
                         <h3 id="sc-heading-{{ $provider['id'] }}" class="mt-0.5 text-base font-semibold text-brand-ink">{{ $provider['name'] }}</h3>
@@ -139,7 +139,7 @@
                             href="{{ route('oauth.redirect', ['provider' => $provider['id']]) }}"
                             class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
                         >
-                            <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0" aria-hidden="true" />
                             {{ __('Link :name', ['name' => $provider['name']]) }}
                         </a>
                     @endif
@@ -148,7 +148,7 @@
                         wire:click="startAddPat('{{ $provider['id'] }}')"
                         class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
                     >
-                        <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
                         {{ __('Add personal access token') }}
                     </button>
                 </div>
@@ -199,7 +199,7 @@
                         <div class="flex flex-wrap justify-end gap-2 border-t border-brand-ink/10 pt-3">
                             <button type="button" wire:click="cancelAddPat" class="text-xs font-medium text-brand-moss hover:text-brand-ink">{{ __('Cancel') }}</button>
                             <button type="button" wire:click="savePat" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest">
-                                <x-heroicon-o-check class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Validate and save') }}
                             </button>
                         </div>
@@ -240,17 +240,17 @@
                                 <div class="flex flex-wrap items-center justify-end gap-3">
                                     @if ($editingId === (string) $account->id)
                                         <button type="button" wire:click="saveEdit" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                            <x-heroicon-o-check class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Save') }}
                                         </button>
                                         <button type="button" wire:click="cancelEdit" class="text-xs font-medium text-brand-moss hover:text-brand-ink">{{ __('Cancel') }}</button>
                                     @else
                                         <button type="button" wire:click="startEdit('{{ $account->id }}')" class="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-ink hover:text-brand-sage">
-                                            <x-heroicon-o-pencil-square class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            <x-heroicon-o-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Edit') }}
                                         </button>
                                         <button type="button" wire:click="openConfirmActionModal('unlinkAccount', ['{{ $account->id }}'], @js(__('Unlink account')), @js(__('Unlink this account? Deploy keys and webhooks for sites using this identity are unchanged.')), @js(__('Unlink')), true)" class="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700 hover:underline">
-                                            <x-heroicon-o-link-slash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            <x-heroicon-o-link-slash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Unlink') }}
                                         </button>
                                     @endif
@@ -281,17 +281,17 @@
                                 <div class="flex flex-wrap items-center justify-end gap-3">
                                     @if ($editingPatId === (string) $pat->id)
                                         <button type="button" wire:click="saveEditPat" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                            <x-heroicon-o-check class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Save') }}
                                         </button>
                                         <button type="button" wire:click="cancelEditPat" class="text-xs font-medium text-brand-moss hover:text-brand-ink">{{ __('Cancel') }}</button>
                                     @else
                                         <button type="button" wire:click="startEditPat('{{ $pat->id }}')" class="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-ink hover:text-brand-sage">
-                                            <x-heroicon-o-pencil-square class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            <x-heroicon-o-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Edit') }}
                                         </button>
                                         <button type="button" wire:click="openConfirmActionModal('unlinkPat', ['{{ $pat->id }}'], @js(__('Remove token')), @js(__('Remove this personal access token? Sites using this token will lose access until re-pointed.')), @js(__('Remove')), true)" class="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700 hover:underline">
-                                            <x-heroicon-o-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Remove') }}
                                         </button>
                                     @endif

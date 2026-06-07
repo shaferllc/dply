@@ -17,7 +17,7 @@
         </div>
         <div class="flex items-center gap-2">
             <button type="button" wire:click="refreshDeployment" wire:loading.attr="disabled" wire:target="refreshDeployment" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-medium text-brand-ink transition hover:bg-brand-cream/40">
-                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
                 <span wire:loading.remove wire:target="refreshDeployment">{{ __('Refresh') }}</span>
                 <span wire:loading wire:target="refreshDeployment">{{ __('Refreshing…') }}</span>
             </button>
@@ -26,7 +26,7 @@
             @endphp
             @if ($inProgress)
                 <button type="button" wire:click="cancelDeploy" wire:loading.attr="disabled" wire:target="cancelDeploy" wire:confirm="{{ __('Cancel this in-progress deploy?') }}" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800 transition hover:bg-rose-100">
-                    <x-heroicon-o-x-circle class="h-3.5 w-3.5" aria-hidden="true" />
+                    <x-heroicon-o-x-circle class="h-4 w-4" aria-hidden="true" />
                     <span wire:loading.remove wire:target="cancelDeploy">{{ __('Cancel deploy') }}</span>
                     <span wire:loading wire:target="cancelDeploy">{{ __('Canceling…') }}</span>
                 </button>

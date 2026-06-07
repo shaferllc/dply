@@ -21,7 +21,7 @@
                 wire:click="openConfirmActionModal('stopAndRevertWebserverSwitch', ['{{ $webserverSwitchRun->id }}'], @js($revertConfirmTitle), @js($revertConfirmBody), @js($revertConfirmCta), true)"
                 class="inline-flex items-center gap-1.5 rounded-md border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-800 shadow-sm hover:bg-rose-50"
             >
-                <x-heroicon-o-arrow-uturn-left class="h-3.5 w-3.5" />
+                <x-heroicon-o-arrow-uturn-left class="h-4 w-4" />
                 {{ __('Stop & revert') }}
             </button>
         </div>
@@ -37,7 +37,7 @@
                 wire:click="openConfirmActionModal('cleanupFailedWebserverSwitch', ['{{ $webserverSwitchRun->id }}'], @js($cleanupConfirmTitle), @js($cleanupConfirmBody), @js($cleanupConfirmCta), true)"
                 class="inline-flex items-center gap-1.5 rounded-md border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-800 shadow-sm hover:bg-rose-50"
             >
-                <x-heroicon-o-arrow-uturn-left class="h-3.5 w-3.5" />
+                <x-heroicon-o-arrow-uturn-left class="h-4 w-4" />
                 {{ __('Clean up & restore') }}
             </button>
         </div>

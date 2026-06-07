@@ -70,7 +70,7 @@
         <div class="border-t border-brand-ink/10 px-4 py-3 sm:px-5">
             <a href="{{ $site['workspace_url'] }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-medium text-brand-forest hover:underline dark:text-brand-sage">
                 {{ __('Open site workspace') }}
-                <x-heroicon-o-arrow-right class="h-3.5 w-3.5" />
+                <x-heroicon-o-arrow-right class="h-4 w-4" />
             </a>
         </div>
     @endif

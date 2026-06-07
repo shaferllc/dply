@@ -31,7 +31,7 @@
                                 wire:target="redeployEdge"
                                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-brand-ink px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm hover:bg-brand-ink/90 disabled:cursor-wait disabled:opacity-60"
                             >
-                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="redeployEdge" />
+                                <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="redeployEdge" />
                                 <span wire:loading.remove wire:target="redeployEdge">{{ __('Deploy') }}</span>
                                 <span wire:loading wire:target="redeployEdge">{{ __('Queuing…') }}</span>
                             </button>

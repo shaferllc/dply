@@ -27,9 +27,9 @@
 <section id="settings-group-inventory" class="space-y-4" aria-labelledby="settings-group-inventory-title">
     <div id="settings-updates" class="{{ $card }} scroll-mt-24 overflow-hidden">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-clipboard-document-list class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Inventory') }}</p>
                 <h2 id="settings-group-inventory-title" class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Inventory & provider snapshot') }}</h2>
@@ -178,7 +178,7 @@
                             class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                         >
                             {{ __('Open Patches') }}
-                            <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            <x-heroicon-m-arrow-up-right class="h-4 w-4 shrink-0" aria-hidden="true" />
                         </a>
                     @else
                         <a
@@ -187,7 +187,7 @@
                             class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                         >
                             {{ __('Manage → Updates') }}
-                            <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            <x-heroicon-m-arrow-up-right class="h-4 w-4 shrink-0" aria-hidden="true" />
                         </a>
                     @endfeature
                 </div>

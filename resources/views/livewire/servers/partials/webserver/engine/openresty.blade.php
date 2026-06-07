@@ -67,7 +67,7 @@
                         </div>
                         <button type="button" wire:click="loadOpenRestyStaticConfig" wire:loading.attr="disabled" wire:target="loadOpenRestyStaticConfig"
                             class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium">
-                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" /> {{ __('Reload from server') }}
+                            <x-heroicon-o-arrow-path class="h-4 w-4" /> {{ __('Reload from server') }}
                         </button>
                     </div>
                     @if ($openresty_static_flash)
@@ -115,7 +115,7 @@
                                 <p class="mt-1 text-sm text-brand-moss">{{ __('Extra upstream pools for non-Caddy targets. Site upstreams (`bk_*`) regenerate automatically.') }}</p>
                             </div>
                             <div class="flex gap-2">
-                                <button type="button" wire:click="openAddOpenRestyUpstreamForm" @disabled($isDeployer || $actionInFlight) class="rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream"><x-heroicon-o-plus class="inline h-3.5 w-3.5" /> {{ __('Add upstream') }}</button>
+                                <button type="button" wire:click="openAddOpenRestyUpstreamForm" @disabled($isDeployer || $actionInFlight) class="rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream"><x-heroicon-o-plus class="inline h-4 w-4" /> {{ __('Add upstream') }}</button>
                                 <button type="button" wire:click="loadOpenRestyUpstreamsConfig" class="rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs">{{ __('Reload') }}</button>
                             </div>
                         </div>
@@ -159,7 +159,7 @@
                                 <p class="mt-1 text-sm text-brand-moss">{{ __('Extra Host → upstream routes merged before the catch-all. Reference custom upstreams or dply site pools (`bk_*`).') }}</p>
                             </div>
                             <div class="flex gap-2">
-                                <button type="button" wire:click="openAddOpenRestyServerForm" @disabled($isDeployer || $actionInFlight) class="rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream"><x-heroicon-o-plus class="inline h-3.5 w-3.5" /> {{ __('Add server block') }}</button>
+                                <button type="button" wire:click="openAddOpenRestyServerForm" @disabled($isDeployer || $actionInFlight) class="rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream"><x-heroicon-o-plus class="inline h-4 w-4" /> {{ __('Add server block') }}</button>
                                 <button type="button" wire:click="loadOpenRestyServersConfig" class="rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs">{{ __('Reload') }}</button>
                             </div>
                         </div>

@@ -77,13 +77,13 @@
                         </p>
                         @if (! empty($binding->config['source_server_id']))
                             <p class="mt-1 inline-flex items-center gap-1 text-xs text-brand-moss">
-                                <x-heroicon-o-globe-alt class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-o-globe-alt class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Connects over the private network to a database on another server.') }}
                             </p>
                         @endif
                         @if (! empty($binding->config['needs_remote_access']))
                             <p class="mt-1 inline-flex items-center gap-1 text-xs text-amber-700">
-                                <x-heroicon-o-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-o-exclamation-triangle class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Remote access is off on the source database — enable it (and allow this server\'s private IP) in the server Databases workspace or the deploy will fail to connect.') }}
                             </p>
                         @endif
@@ -97,22 +97,22 @@
                         </span>
                         @if ($binding->bindingId)
                             <button type="button" wire:click="openConfirmActionModal('detachBinding', @js([(string) $binding->bindingId]), @js(__('Detach binding?')), @js(__('Detach this :type binding? Its connection variables stop being injected at deploy.', ['type' => $binding->type])), @js(__('Detach')), true)" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                <x-heroicon-o-x-mark class="h-3.5 w-3.5" />
+                                <x-heroicon-o-x-mark class="h-4 w-4" />
                                 {{ __('Detach') }}
                             </button>
                         @elseif ($binding->manageable)
                             @if ($binding->type === 'database')
                                 <button type="button" wire:click="openBindingModal('database', 'attach')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                    <x-heroicon-o-link class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-link class="h-4 w-4" />
                                     {{ __('Attach existing') }}
                                 </button>
                                 <button type="button" wire:click="openBindingModal('database', 'provision')" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-2.5 py-1 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
-                                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-plus class="h-4 w-4" />
                                     {{ __('Provision new') }}
                                 </button>
                             @else
                                 <button type="button" wire:click="openBindingModal('{{ $binding->type }}', 'attach')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                    <x-heroicon-o-link class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-link class="h-4 w-4" />
                                     {{ __('Configure') }}
                                 </button>
                             @endif
@@ -202,7 +202,7 @@
                     @if ($bindingTargets === [])
                         <p class="mt-2 text-xs text-brand-moss">{{ __('No reachable databases yet. Create one on this server, or add a server to this private network.') }}</p>
                         <button type="button" wire:click="openBindingModal('database', 'provision')" class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
-                            <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                            <x-heroicon-o-plus class="h-4 w-4" />
                             {{ __('Provision new database') }}
                         </button>
                     @else
@@ -642,12 +642,12 @@
                             {{-- Nothing installed — offer to install. --}}
                             <div class="mt-3 flex flex-wrap gap-2">
                                 <button type="button" wire:click="installCacheOnServer('redis')" wire:loading.attr="disabled" wire:target="installCacheOnServer" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:opacity-60">
-                                    <x-heroicon-o-bolt class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-bolt class="h-4 w-4" />
                                     {{ __('Install Redis') }}
                                 </button>
                                 @if ($valkeyAvailable)
                                     <button type="button" wire:click="installCacheOnServer('valkey')" wire:loading.attr="disabled" wire:target="installCacheOnServer" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
-                                        <x-heroicon-o-bolt class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-bolt class="h-4 w-4" />
                                         {{ __('Install Valkey') }}
                                     </button>
                                 @endif
@@ -659,7 +659,7 @@
                                 @foreach (['redis', 'valkey'] as $altEngine)
                                     @if ($altEngine !== $existingCacheService->engine && ($altEngine === 'redis' || $valkeyAvailable))
                                         <button type="button" wire:click="switchCacheOnServer('{{ $altEngine }}')" wire:loading.attr="disabled" wire:target="switchCacheOnServer" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
-                                            <x-heroicon-o-arrows-right-left class="h-3.5 w-3.5" />
+                                            <x-heroicon-o-arrows-right-left class="h-4 w-4" />
                                             {{ __('Switch to :engine', ['engine' => ucfirst($altEngine)]) }}
                                         </button>
                                     @endif
@@ -675,7 +675,7 @@
                                     @foreach (['redis', 'valkey'] as $altEngine)
                                         @if ($altEngine !== $existingCacheService->engine && ($altEngine === 'redis' || $valkeyAvailable))
                                             <button type="button" wire:click="switchCacheOnServer('{{ $altEngine }}')" wire:loading.attr="disabled" wire:target="switchCacheOnServer" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
-                                                <x-heroicon-o-arrows-right-left class="h-3.5 w-3.5" />
+                                                <x-heroicon-o-arrows-right-left class="h-4 w-4" />
                                                 {{ __('Switch to :engine', ['engine' => ucfirst($altEngine)]) }}
                                             </button>
                                         @endif
@@ -725,7 +725,7 @@
                                 @endforeach
                             </div>
                             <button type="button" wire:click="addMailLeg" class="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                <x-heroicon-o-plus class="h-3.5 w-3.5" /> {{ __('Add mailer') }}
+                                <x-heroicon-o-plus class="h-4 w-4" /> {{ __('Add mailer') }}
                             </button>
                         </div>
 
@@ -813,7 +813,7 @@
                                 @if ($bindingTargets === [])
                                     <p class="mt-2 text-xs text-brand-moss">{{ __('No managed broadcasting apps yet — provision a new one.') }}</p>
                                     <button type="button" wire:click="$set('bindingForm.provision', true)" class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
-                                        <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-plus class="h-4 w-4" />
                                         {{ __('Provision new app') }}
                                     </button>
                                 @else
@@ -961,7 +961,7 @@
             <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
             <x-primary-button type="button" wire:click="saveBinding" wire:loading.attr="disabled" wire:target="saveBinding">
                 <span wire:loading.remove wire:target="saveBinding">{{ $bindingModalMode === 'provision' ? __('Provision') : (in_array($bindingModalType, ['cache', 'queue', 'session', 'logging', 'mail', 'broadcasting']) ? __('Save') : __('Attach')) }}</span>
-                <span wire:loading wire:target="saveBinding" class="inline-flex items-center gap-1.5"><span class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
+                <span wire:loading wire:target="saveBinding" class="inline-flex items-center gap-1.5"><span class="inline-flex h-4 w-4 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
             </x-primary-button>
         </div>
     </x-modal>

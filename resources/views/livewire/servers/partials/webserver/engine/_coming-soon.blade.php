@@ -74,9 +74,9 @@
         {{-- Header — engine icon + name + Coming soon badge --}}
         <div class="flex flex-wrap items-center justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
             <div class="flex items-center gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-dynamic-component :component="$info['icon']" class="h-5 w-5 text-brand-forest" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $isEdgeProxyPreview ? __('Edge proxy') : __('Engine') }}</p>
                     <h3 class="text-lg font-semibold text-brand-ink">{{ $info['label'] }}</h3>
@@ -84,7 +84,7 @@
                 </div>
             </div>
             <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-brand-sand/70 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
-                <x-heroicon-o-clock class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <x-heroicon-o-clock class="h-4 w-4 shrink-0" aria-hidden="true" />
                 {{ __('Coming soon') }}
             </span>
         </div>
@@ -119,7 +119,7 @@
                     @endif
                 </p>
                 <span class="inline-flex items-center justify-center gap-1.5 rounded-full bg-brand-ink/[0.04] px-3 py-1.5 text-xs font-medium text-brand-mist">
-                    <x-heroicon-o-clock class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <x-heroicon-o-clock class="h-4 w-4 shrink-0" aria-hidden="true" />
                     {{ __('In development') }}
                 </span>
             </div>

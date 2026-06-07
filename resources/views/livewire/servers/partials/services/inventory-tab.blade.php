@@ -321,7 +321,7 @@
                                             @disabled(! $opsReady || $otherBusy || $rowPending)
                                             class="!inline-flex !items-center !gap-1.5 !shrink-0 !py-2 !text-[11px]"
                                         >
-                                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0 text-brand-ink/80" aria-hidden="true" />
+                                            <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0 text-brand-ink/80" aria-hidden="true" />
                                             {{ __('Restart') }}
                                         </x-secondary-button>
                                     @else
@@ -333,7 +333,7 @@
                                             @disabled(! $opsReady || ($deployerSystemdLocked ?? true) || $otherBusy)
                                             class="!inline-flex !items-center !gap-1.5 !shrink-0 !py-2 !text-[11px]"
                                         >
-                                            <x-heroicon-o-eye class="h-3.5 w-3.5 shrink-0 text-brand-ink/80" aria-hidden="true" />
+                                            <x-heroicon-o-eye class="h-4 w-4 shrink-0 text-brand-ink/80" aria-hidden="true" />
                                             {{ __('Status') }}
                                         </x-secondary-button>
                                     @endif

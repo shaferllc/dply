@@ -19,13 +19,13 @@
             <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
                 <div class="lg:col-span-7">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge size="md">
                             @if ($isKubernetes)
                                 <x-heroicon-o-server-stack class="h-6 w-6" aria-hidden="true" />
                             @else
                                 <x-heroicon-o-puzzle-piece class="h-6 w-6" aria-hidden="true" />
                             @endif
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Step :n of :total', ['n' => 3, 'total' => $totalSteps]) }}</p>
                             @if ($isKubernetes)
@@ -94,9 +94,9 @@
             {{-- K8s host: pick an existing cluster OR have dply create one. --}}
             <section class="dply-card overflow-hidden">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0 flex-1">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cluster') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $isCreatingNew ? __('Create a new Kubernetes cluster') : __('Pick a Kubernetes cluster') }}</h3>
@@ -320,9 +320,9 @@
         {{-- 1. THE CHOICE: stack template (was "preset"). --}}
         <section class="dply-card overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-cube class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0 flex-1">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Stack') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Pick a stack template') }}</h3>
@@ -455,9 +455,9 @@
         @if ($selectedPreset !== '')
             <section class="dply-card overflow-hidden">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-sparkles class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0 flex-1">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Filled in') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Template filled in') }}</h3>
@@ -535,9 +535,9 @@
         @if ($showOsImagePicker)
         <section class="dply-card overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0 flex-1">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Operating system') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Choose an OS image') }}</h3>
@@ -572,9 +572,9 @@
                     x-on:click.prevent="open = ! open"
                     class="flex cursor-pointer list-none items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7"
                 >
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-adjustments-horizontal class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0 flex-1">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Overrides') }}</p>
                         <div class="flex items-baseline justify-between gap-3">
@@ -800,7 +800,7 @@
         @if ($isKubernetes)
             <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
                 <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">
-                    <x-heroicon-m-academic-cap class="h-3.5 w-3.5" />
+                    <x-heroicon-m-academic-cap class="h-4 w-4" />
                     {{ __('Cluster + namespace') }}
                 </p>
                 <dl class="mt-3 space-y-3 text-sm">
@@ -818,7 +818,7 @@
             @if ($isDedicatedServerPurpose ?? false)
                 <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
                     <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">
-                        <x-heroicon-m-academic-cap class="h-3.5 w-3.5" />
+                        <x-heroicon-m-academic-cap class="h-4 w-4" />
                         {{ __('Dedicated server') }}
                     </p>
                     <p class="mt-3 text-xs leading-5 text-brand-moss">
@@ -828,7 +828,7 @@
             @else
             <div class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
                 <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.22em] text-brand-sage">
-                    <x-heroicon-m-academic-cap class="h-3.5 w-3.5" />
+                    <x-heroicon-m-academic-cap class="h-4 w-4" />
                     {{ __('How these fit together') }}
                 </p>
                 <dl class="mt-3 space-y-3 text-sm">

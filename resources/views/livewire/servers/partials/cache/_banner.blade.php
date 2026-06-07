@@ -32,7 +32,7 @@
                     class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-rose-300/70 bg-white px-2.5 py-1.5 text-xs font-medium text-rose-700 shadow-sm hover:bg-rose-50 disabled:opacity-50"
                     title="{{ __('The job has not started apt yet — safe to cancel.') }}"
                 >
-                    <x-heroicon-o-x-mark class="h-3.5 w-3.5" />
+                    <x-heroicon-o-x-mark class="h-4 w-4" />
                     <span wire:loading.remove wire:target="cancelCacheServiceChange">{{ __('Cancel') }}</span>
                     <span wire:loading wire:target="cancelCacheServiceChange">{{ __('Cancelling…') }}</span>
                 </button>
@@ -53,7 +53,7 @@
                     class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-rose-300/70 bg-white px-2.5 py-1.5 text-xs font-medium text-rose-700 shadow-sm hover:bg-rose-50"
                     title="{{ __('Stop the install and revert this instance.') }}"
                 >
-                    <x-heroicon-o-arrow-uturn-left class="h-3.5 w-3.5" />
+                    <x-heroicon-o-arrow-uturn-left class="h-4 w-4" />
                     {{ __('Stop & revert') }}
                 </button>
             @elseif (($busyService->status === \App\Models\ServerCacheService::STATUS_INSTALLING && $busyService->cancel_requested_at !== null) || $busyService->status === \App\Models\ServerCacheService::STATUS_UNINSTALLING)
@@ -79,7 +79,7 @@
                         class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-rose-400 bg-rose-100 px-2.5 py-1.5 text-xs font-semibold text-rose-900 shadow-sm hover:bg-rose-200"
                         title="{{ __('No progress observed for over 60s — remove the row and clean up the server manually.') }}"
                     >
-                        <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                        <x-heroicon-o-trash class="h-4 w-4" />
                         {{ __('Force remove') }}
                     </button>
                 @endif

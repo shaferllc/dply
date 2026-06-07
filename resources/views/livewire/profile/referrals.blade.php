@@ -22,9 +22,9 @@
         <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
             <div class="lg:col-span-7">
                 <div class="flex items-start gap-3">
-                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge size="md">
                         <x-heroicon-o-gift class="h-6 w-6" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Rewards') }}</p>
                         <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Referrals') }}</h2>
@@ -103,9 +103,9 @@
         {{-- Referral link --}}
         <section class="dply-card overflow-hidden" id="referral-link">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Share') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Your referral link') }}</h3>
@@ -144,9 +144,9 @@
         {{-- Referred users --}}
         <section class="dply-card overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-user-group class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0 flex-1">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Directory') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Referred users') }}</h3>

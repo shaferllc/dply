@@ -93,7 +93,7 @@
                                 wire:target="confirmActionModal"
                                 @class([$actionPrimary])
                             >
-                                <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-o-arrow-down-tray class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ $tool['action']['label'] }}
                             </button>
                         @elseif (! $opsReady)

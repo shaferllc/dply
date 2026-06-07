@@ -13,7 +13,7 @@
             </p>
         </div>
         <a href="{{ route('edge.import') }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 dark:border-brand-mist/20 dark:bg-zinc-900">
-            <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5" aria-hidden="true" />
+            <x-heroicon-o-arrow-down-tray class="h-4 w-4" aria-hidden="true" />
             {{ __('Already deploying elsewhere? Import →') }}
         </a>
     </header>

@@ -71,9 +71,9 @@
             <div class="{{ $card }}">
                 <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-7">
                     <div class="flex min-w-0 items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
                             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Library on this server') }}</h2>
@@ -93,7 +93,7 @@
                             wire:click="openLibrary"
                             class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90 focus:outline-none focus:ring-2 focus:ring-brand-sage/40"
                         >
-                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <rect x="3" y="3" width="14" height="14" rx="2"/>
                                 <path d="M3 8h14"/>
                                 <path d="M8 3v14"/>
@@ -108,7 +108,7 @@
                             wire:click="startNewRecipe"
                             class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                         >
-                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <path d="M10 4v12"/>
                                 <path d="M4 10h12"/>
                             </svg>
@@ -150,7 +150,7 @@
                                         class="inline-flex items-center gap-1.5 rounded-lg border border-brand-sage/40 bg-brand-sage/10 px-2.5 py-1 text-brand-sage hover:bg-brand-sage/20 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
                                         <span wire:loading.remove wire:target="runRecipe('{{ $rec->id }}')" class="inline-flex items-center gap-1">
-                                            <x-heroicon-o-bolt class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            <x-heroicon-o-bolt class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Run') }}
                                         </span>
                                         <span wire:loading wire:target="runRecipe('{{ $rec->id }}')" class="inline-flex items-center gap-1.5">
@@ -167,7 +167,7 @@
                                         class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-brand-ink hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
                                         <span wire:loading.remove wire:target="editRecipe('{{ $rec->id }}')" class="inline-flex items-center gap-1">
-                                            <x-heroicon-o-pencil-square class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            <x-heroicon-o-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Edit') }}
                                         </span>
                                         <span wire:loading wire:target="editRecipe('{{ $rec->id }}')" class="inline-flex items-center gap-1.5">
@@ -184,7 +184,7 @@
                                         class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2.5 py-1 text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
                                         <span wire:loading.remove wire:target="{{ $deleteCall }}" class="inline-flex items-center gap-1">
-                                            <x-heroicon-o-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Delete') }}
                                         </span>
                                         <span wire:loading wire:target="{{ $deleteCall }}" class="inline-flex items-center gap-1.5">
@@ -204,9 +204,9 @@
                 <div class="{{ $card }}">
                     <div class="flex flex-col gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-7">
                         <div class="flex min-w-0 items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge>
                                 <x-heroicon-o-pencil-square class="h-5 w-5" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0">
                                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Saved command') }}</p>
                                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">
@@ -269,9 +269,9 @@
                  trait — same plumbing the recipe runner uses. --}}
             <div class="{{ $card }}">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('One-off') }}</p>
                         <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Run a one-off command') }}</h2>
@@ -312,9 +312,9 @@
     @else
         <section class="dply-card overflow-hidden border-amber-200">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+                <x-icon-badge tone="amber">
                     <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Waiting on provisioning') }}</h3>

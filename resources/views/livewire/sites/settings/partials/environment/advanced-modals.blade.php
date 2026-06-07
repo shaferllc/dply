@@ -40,7 +40,7 @@
             <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
             <x-primary-button type="submit" form="edit-all-env-form" wire:loading.attr="disabled" wire:target="saveAllEnv">
                 <span wire:loading.remove wire:target="saveAllEnv">{{ __('Save all') }}</span>
-                <span wire:loading wire:target="saveAllEnv" class="inline-flex items-center gap-1.5"><span class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
+                <span wire:loading wire:target="saveAllEnv" class="inline-flex items-center gap-1.5"><span class="inline-flex h-4 w-4 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
             </x-primary-button>
         </div>
     </x-modal>
@@ -114,7 +114,7 @@
                 </div>
                 @if ($fixSuggestion !== null)
                     <button type="button" wire:click="applySuggestedEnvFix" class="inline-flex items-center gap-1 text-xs font-semibold text-brand-sage hover:underline">
-                        <x-heroicon-o-sparkles class="h-3.5 w-3.5" />
+                        <x-heroicon-o-sparkles class="h-4 w-4" />
                         {{ __('Use suggested: :value', ['value' => $fixSuggestion]) }}
                     </button>
                 @endif
@@ -143,7 +143,7 @@
                 <x-secondary-button type="button" x-on:click="$dispatch('close')" wire:click="cancelFixEnvVar">{{ __('Cancel') }}</x-secondary-button>
                 <x-primary-button type="submit" form="fix-env-var-form" wire:loading.attr="disabled" wire:target="saveFixedEnvVar">
                     <span wire:loading.remove wire:target="saveFixedEnvVar">{{ __('Save & push') }}</span>
-                    <span wire:loading wire:target="saveFixedEnvVar" class="inline-flex items-center gap-1.5"><span class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
+                    <span wire:loading wire:target="saveFixedEnvVar" class="inline-flex items-center gap-1.5"><span class="inline-flex h-4 w-4 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
                 </x-primary-button>
             </div>
         </div>

@@ -34,7 +34,7 @@
                     'bg-white text-brand-ink shadow-sm' => $repo_source === 'provider',
                     'text-brand-moss hover:text-brand-ink' => $repo_source !== 'provider',
                 ])>
-                <x-heroicon-o-link class="h-3.5 w-3.5" aria-hidden="true" />
+                <x-heroicon-o-link class="h-4 w-4" aria-hidden="true" />
                 {{ __('Connected provider') }}
             </button>
             <button type="button" wire:click="$set('repo_source', 'manual')"
@@ -43,7 +43,7 @@
                     'bg-white text-brand-ink shadow-sm' => $repo_source === 'manual',
                     'text-brand-moss hover:text-brand-ink' => $repo_source !== 'manual',
                 ])>
-                <x-heroicon-o-pencil-square class="h-3.5 w-3.5" aria-hidden="true" />
+                <x-heroicon-o-pencil-square class="h-4 w-4" aria-hidden="true" />
                 {{ __('Paste a URL') }}
             </button>
         </div>

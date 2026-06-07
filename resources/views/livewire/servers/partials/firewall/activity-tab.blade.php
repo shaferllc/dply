@@ -97,8 +97,8 @@
                                     wire:target="loadMoreFirewallActivity"
                                     class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
-                                    <x-heroicon-o-arrow-down class="h-3.5 w-3.5" wire:loading.remove wire:target="loadMoreFirewallActivity" />
-                                    <span wire:loading wire:target="loadMoreFirewallActivity" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                    <x-heroicon-o-arrow-down class="h-4 w-4" wire:loading.remove wire:target="loadMoreFirewallActivity" />
+                                    <span wire:loading wire:target="loadMoreFirewallActivity" class="inline-flex h-4 w-4 items-center justify-center">
                                         <x-spinner variant="forest" size="sm" />
                                     </span>
                                     <span wire:loading.remove wire:target="loadMoreFirewallActivity">{{ __('Load older activity') }}</span>

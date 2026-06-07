@@ -147,6 +147,8 @@
                         @livewire('sites.wordpress.wordpress-section', ['site' => $site], key('wordpress-section-'.$site->id))
                     @elseif ($section === 'environment')
                         @include('livewire.sites.settings.partials.environment')
+                    @elseif ($section === 'resources')
+                        @include('livewire.sites.settings.partials.resource-map')
                     @elseif ($section === 'logs')
                         @if (workspace_surface_coming_soon('site_logs'))
                             <x-workspace-coming-soon
@@ -252,7 +254,7 @@
                             @endif
                         </div>
                         <button type="button" wire:click="recheckQuickDomainSslReachability" wire:loading.attr="disabled" wire:target="recheckQuickDomainSslReachability" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" wire:target="recheckQuickDomainSslReachability" aria-hidden="true" />
+                            <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.class="animate-spin" wire:target="recheckQuickDomainSslReachability" aria-hidden="true" />
                             {{ __('Re-check') }}
                         </button>
                     </div>

@@ -14,7 +14,7 @@
                 wire:click="openAddScheduleForm"
                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
             >
-                <x-heroicon-o-clock class="h-3.5 w-3.5" />
+                <x-heroicon-o-clock class="h-4 w-4" />
                 {{ __('Add schedule') }}
             </button>
         @endunless
@@ -41,14 +41,14 @@
                     </div>
                     <div class="flex shrink-0 items-center gap-1.5">
                         <button type="button" wire:click="runDeploymentScheduleNow('{{ $schedule->id }}')" class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40" title="{{ __('Run this deploy now') }}">
-                            <x-heroicon-o-rocket-launch class="h-3.5 w-3.5" />
+                            <x-heroicon-o-rocket-launch class="h-4 w-4" />
                             {{ __('Run now') }}
                         </button>
                         <button type="button" wire:click="toggleDeploymentSchedule('{{ $schedule->id }}')" class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40">
                             {{ $schedule->is_active ? __('Pause') : __('Resume') }}
                         </button>
                         <button type="button" wire:click="deleteDeploymentSchedule('{{ $schedule->id }}')" class="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-white px-2 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50" title="{{ __('Remove schedule') }}">
-                            <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                            <x-heroicon-o-trash class="h-4 w-4" />
                         </button>
                     </div>
                 </li>

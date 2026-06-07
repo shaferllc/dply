@@ -72,7 +72,7 @@
                                     <label class="flex-1 cursor-pointer">
                                         <input type="radio" wire:model.live="removeSiteMode" value="{{ $modeValue }}" class="peer sr-only" />
                                         <span class="flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 font-semibold text-brand-moss transition peer-checked:bg-red-600 peer-checked:text-white peer-focus-visible:ring-2 peer-focus-visible:ring-red-500/40 hover:text-brand-ink peer-checked:hover:text-white">
-                                            <x-dynamic-component :component="$modeMeta['icon']" class="h-3.5 w-3.5" aria-hidden="true" />
+                                            <x-dynamic-component :component="$modeMeta['icon']" class="h-4 w-4" aria-hidden="true" />
                                             {{ $modeMeta['label'] }}
                                         </span>
                                     </label>

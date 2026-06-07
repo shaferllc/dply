@@ -43,7 +43,7 @@
                         wire:navigate
                         class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40"
                     >
-                        <x-heroicon-o-arrow-left class="h-3.5 w-3.5" />
+                        <x-heroicon-o-arrow-left class="h-4 w-4" />
                         {{ __('All deploys') }}
                     </a>
                     @if (! $isActiveDeployment && in_array($deployment->status, [\App\Models\EdgeDeployment::STATUS_LIVE, \App\Models\EdgeDeployment::STATUS_SUPERSEDED], true) && $deployment->storage_prefix !== null)
@@ -53,7 +53,7 @@
                                 wire:click="confirmRollbackEdgeDeployment('{{ $deployment->id }}')"
                                 class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90"
                             >
-                                <x-heroicon-o-arrow-uturn-left class="h-3.5 w-3.5" />
+                                <x-heroicon-o-arrow-uturn-left class="h-4 w-4" />
                                 {{ __('Roll back') }}
                             </button>
                         @endcan
@@ -93,9 +93,9 @@
 
                     <section class="dply-card overflow-hidden">
                         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge>
                                 <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0">
                                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Details') }}</p>
                                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deployment details') }}</h2>
@@ -134,9 +134,9 @@
                     @if ($deploymentAliases !== [])
                         <section class="dply-card overflow-hidden">
                             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-icon-badge>
                                     <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
-                                </span>
+                                </x-icon-badge>
                                 <div class="min-w-0">
                                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Aliases') }}</p>
                                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Stable aliases') }}</h2>
@@ -170,9 +170,9 @@
                 @elseif ($tab === 'aliases')
                     <section class="dply-card overflow-hidden">
                         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge>
                                 <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0">
                                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Aliases') }}</p>
                                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Stable per-deploy aliases') }}</h2>
@@ -201,7 +201,7 @@
                                                     class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/10 bg-white px-2.5 py-1.5 text-[11px] font-medium text-brand-moss hover:bg-brand-sand/40"
                                                     @click="navigator.clipboard.writeText(@js('https://'.$alias)); copied = true; setTimeout(() => copied = false, 2000)"
                                                 >
-                                                    <x-heroicon-o-clipboard class="h-3.5 w-3.5" />
+                                                    <x-heroicon-o-clipboard class="h-4 w-4" />
                                                     <span x-show="!copied">{{ __('Copy URL') }}</span>
                                                     <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
                                                 </button>
@@ -243,9 +243,9 @@
 
                     <section class="dply-card overflow-hidden">
                         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge>
                                 <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0">
                                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Build log') }}</p>
                                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">
@@ -270,9 +270,9 @@
                     @if (! empty($recentDeployments))
                         <section class="dply-card overflow-hidden">
                             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                <x-icon-badge>
                                     <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                                </span>
+                                </x-icon-badge>
                                 <div class="min-w-0">
                                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
                                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent deployments') }}</h2>

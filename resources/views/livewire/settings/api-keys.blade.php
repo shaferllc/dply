@@ -28,9 +28,9 @@
         <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
             <div class="lg:col-span-7">
                 <div class="flex items-start gap-3">
-                    <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge size="md">
                         <x-heroicon-o-bolt class="h-6 w-6" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Automation') }}</p>
                         <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('API keys') }}</h2>
@@ -143,11 +143,11 @@
                             class="shrink-0 inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-3 py-2 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest"
                         >
                             <span x-show="!copied" class="inline-flex items-center gap-1.5">
-                                <x-heroicon-o-clipboard-document class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-o-clipboard-document class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Copy') }}
                             </span>
                             <span x-show="copied" x-cloak class="inline-flex items-center gap-1.5">
-                                <x-heroicon-o-check class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Copied') }}
                             </span>
                         </button>
@@ -162,9 +162,9 @@
         <div class="mt-6 space-y-6">
             <section class="dply-card overflow-hidden">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0 flex-1">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Directory') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Your tokens') }}</h3>
@@ -177,7 +177,7 @@
                             @disabled($requiresPaidPlan && $organization && ! $orgHasProPlan)
                             class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                            <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
                             {{ __('Add token') }}
                         </button>
                     @endif
@@ -296,7 +296,7 @@
                                     wire:click="openConfirmActionModal('revokeToken', [{{ $t->id }}], @js(__('Revoke token')), @js(__('Revoke this token? It will stop working immediately.')), @js(__('Revoke')), true)"
                                     class="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700 hover:underline"
                                 >
-                                    <x-heroicon-o-no-symbol class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    <x-heroicon-o-no-symbol class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     {{ __('Revoke') }}
                                 </button>
                             </li>
@@ -316,9 +316,9 @@
         >
             <form wire:submit="createToken" class="flex min-h-0 flex-1 flex-col">
                 <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Personal access token') }}</p>
                         <h2 class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Create token') }}</h2>
@@ -387,7 +387,7 @@
                                 wire:click="toggleAllPermissions"
                                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                             >
-                                <x-heroicon-o-arrows-right-left class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-o-arrows-right-left class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Toggle all') }}
                             </button>
                         </div>

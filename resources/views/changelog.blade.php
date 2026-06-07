@@ -58,6 +58,14 @@
                 [
                     'date'    => 'June 6, 2026',
                     'tags'    => ['improved'],
+                    'title'   => 'Unified Button Styling
+Unified Button And Binding UI',
+                    'summary' => 'Standardized button and icon styling across the dashboard and added a site binding catalog powering site settings navigation.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
+                    'tags'    => ['improved'],
                     'title'   => 'Smarter Buttons And Driver Guards',
                     'summary' => 'Button components now render as links when given an href, and attaching a redis-driver queue, cache, or session binding now requires a Redis resource first.',
                     'items'   => [],

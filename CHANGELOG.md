@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 ### Changed
+- Standardized button and icon styling across the dashboard and added a site binding catalog powering site settings navigation.
+### Changed
 - Button components now render as links when given an href, and attaching a redis-driver queue, cache, or session binding now requires a Redis resource first.
 ### Changed
 - Server schedule and services screens now use shared button components for consistent styling across actions.

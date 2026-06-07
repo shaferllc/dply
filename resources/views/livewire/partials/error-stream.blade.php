@@ -93,13 +93,13 @@
                                 ]))"
                                 class="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2.5 py-1 text-xs font-semibold text-white shadow-sm hover:bg-amber-600 disabled:opacity-60"
                                 title="{{ $rem['title'] }}">
-                                <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" aria-hidden="true" /> {{ __('Fix') }}
+                                <x-heroicon-o-wrench-screwdriver class="h-4 w-4" aria-hidden="true" /> {{ __('Fix') }}
                             </button>
                         @endif
                         @if ($event->isRetryable() && ! $event->dismissed_at)
                             <button type="button" wire:click="retry('{{ $event->id }}')" wire:loading.attr="disabled" wire:target="retry('{{ $event->id }}')"
                                 class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60">
-                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" /> {{ __('Retry') }}
+                                <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" /> {{ __('Retry') }}
                             </button>
                         @endif
                         @if ($event->link_url)
@@ -109,7 +109,7 @@
                         @endif
                         @if ($event->dismissed_at)
                             <button type="button" wire:click="restore('{{ $event->id }}')" class="rounded-lg px-2 py-1 text-xs font-medium text-brand-mist hover:text-brand-ink" title="{{ __('Restore') }}">
-                                <x-heroicon-o-arrow-uturn-left class="h-3.5 w-3.5" aria-hidden="true" />
+                                <x-heroicon-o-arrow-uturn-left class="h-4 w-4" aria-hidden="true" />
                             </button>
                         @else
                             <button type="button" wire:click="dismiss('{{ $event->id }}')" class="rounded-lg px-2 py-1 text-xs font-medium text-brand-mist hover:text-brand-ink" title="{{ __('Dismiss') }}">

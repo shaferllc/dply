@@ -18,7 +18,7 @@
         </div>
         <x-secondary-button size="sm" href="{{ route('servers.settings', ['server' => $server, 'section' => 'alerts']) }}" wire:navigate>
             {{ __('Manage in Settings') }}
-            <x-heroicon-o-arrow-right class="h-3.5 w-3.5" aria-hidden="true" />
+            <x-heroicon-o-arrow-right class="h-4 w-4" aria-hidden="true" />
         </x-secondary-button>
     </div>
 
@@ -96,7 +96,7 @@
                                 wire:click="openCreateChannelModal"
                                 class="inline-flex items-center gap-1.5 text-xs font-medium text-brand-ink hover:text-brand-sage"
                             >
-                                <x-heroicon-o-plus-circle class="h-3.5 w-3.5" aria-hidden="true" />
+                                <x-heroicon-o-plus-circle class="h-4 w-4" aria-hidden="true" />
                                 {{ __('Create new channel') }}
                             </button>
                             <span class="text-[10px] text-brand-mist">·</span>

@@ -37,9 +37,9 @@
     >
         <div class="{{ $card }}">
             <div class="flex flex-wrap items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-puzzle-piece class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0 flex-1">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Modules') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Caddy modules') }}</h3>
@@ -67,7 +67,7 @@
                         @disabled($isDeployer || $actionInFlight)
                         class="inline-flex items-center gap-1.5 rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                        <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                        <x-heroicon-o-plus class="h-4 w-4" />
                         {{ __('Add plugin') }}
                     </button>
                     <button
@@ -78,10 +78,10 @@
                         class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
                     >
                         <span wire:loading.remove wire:target="{{ $caddyModulesBusyTargets }}" class="inline-flex">
-                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                            <x-heroicon-o-arrow-path class="h-4 w-4" />
                         </span>
                         <span wire:loading wire:target="{{ $caddyModulesBusyTargets }}" class="inline-flex">
-                            <x-spinner class="h-3.5 w-3.5" />
+                            <x-spinner class="h-4 w-4" />
                         </span>
                         <span wire:loading wire:target="{{ $caddyModulesBusyTargets }}">{{ __('Refreshing…') }}</span>
                         <span wire:loading.remove wire:target="{{ $caddyModulesBusyTargets }}">{{ __('Refresh inventory') }}</span>
@@ -160,14 +160,14 @@
                                 class="inline-flex items-center gap-1.5 rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 @if ($caddyModulesBuilding && $caddyModulesBuildingMode === 'rebuild')
-                                    <x-spinner variant="cream" class="h-3.5 w-3.5" />
+                                    <x-spinner variant="cream" class="h-4 w-4" />
                                     {{ __('Building…') }}
                                 @else
                                     <span wire:loading.remove wire:target="queueCaddyModulesRebuild" class="inline-flex">
-                                        <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-wrench-screwdriver class="h-4 w-4" />
                                     </span>
                                     <span wire:loading wire:target="queueCaddyModulesRebuild" class="inline-flex">
-                                        <x-spinner variant="cream" class="h-3.5 w-3.5" />
+                                        <x-spinner variant="cream" class="h-4 w-4" />
                                     </span>
                                     <span wire:loading wire:target="queueCaddyModulesRebuild">{{ __('Rebuilding…') }}</span>
                                     <span wire:loading.remove wire:target="queueCaddyModulesRebuild">{{ __('Rebuild Caddy') }}</span>
@@ -225,13 +225,13 @@
                                                 <div class="mt-2 flex flex-wrap items-center gap-3 text-[11px]">
                                                     @if (($plugin['repo'] ?? '') !== '')
                                                         <a href="{{ $plugin['repo'] }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 font-medium text-brand-forest underline-offset-2 hover:underline">
-                                                            <x-heroicon-o-code-bracket-square class="h-3.5 w-3.5" aria-hidden="true" />
+                                                            <x-heroicon-o-code-bracket-square class="h-4 w-4" aria-hidden="true" />
                                                             {{ __('Repository') }}
                                                         </a>
                                                     @endif
                                                     @if (($plugin['docs_url'] ?? '') !== '')
                                                         <a href="{{ $plugin['docs_url'] }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 font-medium text-brand-forest underline-offset-2 hover:underline">
-                                                            <x-heroicon-o-book-open class="h-3.5 w-3.5" aria-hidden="true" />
+                                                            <x-heroicon-o-book-open class="h-4 w-4" aria-hidden="true" />
                                                             {{ __('Documentation') }}
                                                         </a>
                                                     @endif
@@ -246,7 +246,7 @@
                                             @disabled($isDeployer || $actionInFlight || $caddyModulesBuilding)
                                             class="inline-flex shrink-0 items-center gap-1 rounded-md border border-rose-200 bg-rose-50/40 px-2.5 py-1 text-[11px] font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                                         >
-                                            <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                                            <x-heroicon-o-trash class="h-4 w-4" />
                                             {{ __('Remove') }}
                                         </button>
                                     </div>
@@ -284,8 +284,8 @@
                         <div class="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 pt-3">
                             <button type="button" wire:click="cancelAddCaddyModuleForm" class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Cancel') }}</button>
                             <button type="submit" wire:loading.attr="disabled" wire:target="{{ $caddyModulesBusyTargets }}" @disabled($actionInFlight) class="inline-flex items-center gap-2 rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60">
-                                <span wire:loading.remove wire:target="requestAddCaddyModule,confirmActionModal" class="inline-flex"><x-heroicon-o-plus class="h-3.5 w-3.5" /></span>
-                                <span wire:loading wire:target="requestAddCaddyModule,confirmActionModal" class="inline-flex"><x-spinner variant="cream" class="h-3.5 w-3.5" /></span>
+                                <span wire:loading.remove wire:target="requestAddCaddyModule,confirmActionModal" class="inline-flex"><x-heroicon-o-plus class="h-4 w-4" /></span>
+                                <span wire:loading wire:target="requestAddCaddyModule,confirmActionModal" class="inline-flex"><x-spinner variant="cream" class="h-4 w-4" /></span>
                                 <span wire:loading wire:target="requestAddCaddyModule,confirmActionModal">{{ __('Reviewing…') }}</span>
                                 <span wire:loading.remove wire:target="requestAddCaddyModule,confirmActionModal">{{ __('Review & add') }}</span>
                             </button>
@@ -337,7 +337,7 @@
                                 @disabled($isDeployer || $actionInFlight || $caddyModulesBuilding)
                                 class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
                             >
-                                <x-heroicon-o-magnifying-glass class="h-3.5 w-3.5" />
+                                <x-heroicon-o-magnifying-glass class="h-4 w-4" />
                                 {{ __('Browse all modules') }}
                             </button>
                         @else
@@ -368,7 +368,7 @@
 
                             <div wire:loading wire:target="caddy_modules_browse_search,openCaddyModuleBrowse,loadCaddyModulesInventory" class="text-xs text-brand-moss">
                                 <span class="inline-flex items-center gap-2">
-                                    <x-spinner class="h-3.5 w-3.5" />
+                                    <x-spinner class="h-4 w-4" />
                                     {{ __('Loading module registry…') }}
                                 </span>
                             </div>
@@ -437,7 +437,7 @@
                     @if (! $caddy_modules_loaded)
                         <p class="mt-4 text-sm text-brand-moss">
                             <span wire:loading wire:target="{{ $caddyModulesBusyTargets }}" class="inline-flex items-center gap-2">
-                                <x-spinner class="h-3.5 w-3.5" /> {{ __('Reading module inventory…') }}
+                                <x-spinner class="h-4 w-4" /> {{ __('Reading module inventory…') }}
                             </span>
                             <span wire:loading.remove wire:target="{{ $caddyModulesBusyTargets }}">
                                 {{ __('Open this tab or click Refresh to probe the server.') }}
@@ -511,7 +511,7 @@
                                             wire:click="resetCaddyModulesCompiledFilters"
                                             class="mt-4 inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
                                         >
-                                            <x-heroicon-o-x-mark class="h-3.5 w-3.5" aria-hidden="true" />
+                                            <x-heroicon-o-x-mark class="h-4 w-4" aria-hidden="true" />
                                             {{ __('Clear filters') }}
                                         </button>
                                     @endif

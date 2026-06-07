@@ -21,9 +21,9 @@
 
     <div id="settings-cost" class="{{ $card }} scroll-mt-24">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-currency-dollar class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cost') }}</p>
                 <h2 id="settings-group-governance-title" class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Cost, environment & backups') }}</h2>
@@ -53,13 +53,13 @@
                                 ? __('Fetch the current catalog price for this server\'s plan from the provider. The value lands in the box below; nothing is saved until you click Save cost notes.')
                                 : __('Pulling cost from this provider is not yet supported, or this server has no linked credential / size on file.') }}"
                         >
-                            <svg class="h-3.5 w-3.5" wire:loading.remove wire:target="pullCostFromProvider" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <svg class="h-4 w-4" wire:loading.remove wire:target="pullCostFromProvider" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <path d="M4 4v5h5" />
                                 <path d="M16 16v-5h-5" />
                                 <path d="M5.5 9a6 6 0 0 1 10.4-2.5" />
                                 <path d="M14.5 11a6 6 0 0 1-10.4 2.5" />
                             </svg>
-                            <svg class="h-3.5 w-3.5 animate-spin" wire:loading wire:target="pullCostFromProvider" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                            <svg class="h-4 w-4 animate-spin" wire:loading wire:target="pullCostFromProvider" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                 <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity="0.25" stroke-width="3"/>
                                 <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
                             </svg>
@@ -159,9 +159,9 @@
 
     <div id="settings-compliance" class="{{ $card }} scroll-mt-24">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Compliance') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Environment & compliance') }}</h3>
@@ -242,9 +242,9 @@
 
     <div id="settings-backup" class="{{ $card }} scroll-mt-24">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-lifebuoy class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Recovery') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Backup & disaster recovery') }}</h3>

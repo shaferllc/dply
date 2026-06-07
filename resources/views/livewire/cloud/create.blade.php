@@ -16,7 +16,7 @@
         <div class="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
             <div class="max-w-2xl">
                 <div class="inline-flex items-center gap-2 rounded-full border border-brand-sage/25 bg-brand-sage/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-forest dark:border-brand-sage/30 dark:bg-brand-sage/15 dark:text-brand-sage">
-                    <x-heroicon-o-cloud class="h-3.5 w-3.5" aria-hidden="true" />
+                    <x-heroicon-o-cloud class="h-4 w-4" aria-hidden="true" />
                     {{ __('dply Cloud') }}
                 </div>
                 <h1 class="mt-4 text-3xl font-semibold tracking-tight text-brand-ink sm:text-4xl">{{ __('Deploy an app') }}</h1>
@@ -35,7 +35,7 @@
                         class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition"
                         title="{{ __('Form view') }}"
                     >
-                        <x-heroicon-o-bars-3-bottom-left class="h-3.5 w-3.5" aria-hidden="true" />
+                        <x-heroicon-o-bars-3-bottom-left class="h-4 w-4" aria-hidden="true" />
                         {{ __('Form') }}
                     </button>
                     <button
@@ -47,7 +47,7 @@
                         class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition"
                         title="{{ __('Canvas view') }}"
                     >
-                        <x-heroicon-o-squares-2x2 class="h-3.5 w-3.5" aria-hidden="true" />
+                        <x-heroicon-o-squares-2x2 class="h-4 w-4" aria-hidden="true" />
                         {{ __('Canvas') }}
                     </button>
                 </div>
@@ -61,7 +61,7 @@
                         {{ __('Autoscaling') }}
                     </span>
                     <span class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 bg-white/80 px-3 py-1.5 dark:border-brand-mist/25 dark:bg-zinc-800/80">
-                        <x-heroicon-o-cloud-arrow-up class="h-3.5 w-3.5 text-brand-gold" aria-hidden="true" />
+                        <x-heroicon-o-cloud-arrow-up class="h-4 w-4 text-brand-gold" aria-hidden="true" />
                         {{ __('Deploy on push') }}
                     </span>
                 </div>
@@ -74,9 +74,9 @@
             <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div class="flex items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+                        <x-icon-badge tone="amber">
                             <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Connect a cloud account to deploy') }}</h3>
@@ -165,7 +165,7 @@
                                                 'bg-white text-brand-ink shadow-sm dark:bg-zinc-700' => $repo_source === 'connected',
                                                 'text-brand-moss hover:text-brand-ink' => $repo_source !== 'connected',
                                             ])>
-                                            <x-heroicon-m-link class="h-3.5 w-3.5" aria-hidden="true" />
+                                            <x-heroicon-m-link class="h-4 w-4" aria-hidden="true" />
                                             {{ __('Pick from connected account') }}
                                         </button>
                                         <button type="button" role="radio" aria-checked="{{ $repo_source === 'manual' ? 'true' : 'false' }}" wire:click="$set('repo_source', 'manual')"
@@ -174,7 +174,7 @@
                                                 'bg-white text-brand-ink shadow-sm dark:bg-zinc-700' => $repo_source === 'manual',
                                                 'text-brand-moss hover:text-brand-ink' => $repo_source !== 'manual',
                                             ])>
-                                            <x-heroicon-m-pencil-square class="h-3.5 w-3.5" aria-hidden="true" />
+                                            <x-heroicon-m-pencil-square class="h-4 w-4" aria-hidden="true" />
                                             {{ __('Enter manually') }}
                                         </button>
                                     </div>
@@ -472,15 +472,15 @@
 
                         <div class="flex flex-wrap gap-2">
                             <button type="button" wire:click="addDatabase('postgres')" class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-cream/40 dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream">
-                                <x-heroicon-o-plus class="h-3.5 w-3.5" aria-hidden="true" />
+                                <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
                                 {{ __('Add Postgres') }}
                             </button>
                             <button type="button" wire:click="addDatabase('mysql')" class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-cream/40 dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream">
-                                <x-heroicon-o-plus class="h-3.5 w-3.5" aria-hidden="true" />
+                                <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
                                 {{ __('Add MySQL') }}
                             </button>
                             <button type="button" wire:click="addDatabase('redis')" class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-cream/40 dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream">
-                                <x-heroicon-o-plus class="h-3.5 w-3.5" aria-hidden="true" />
+                                <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
                                 {{ __('Add Redis') }}
                             </button>
                         </div>
@@ -550,7 +550,7 @@
 
                         <div class="flex flex-wrap gap-2">
                             <button type="button" wire:click="addBucket" class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-cream/40 dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream">
-                                <x-heroicon-o-plus class="h-3.5 w-3.5" aria-hidden="true" />
+                                <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
                                 {{ __('Add bucket') }}
                             </button>
                         </div>
@@ -582,7 +582,7 @@
                         <div class="flex flex-wrap gap-2">
                             <input type="text" wire:model="new_domain" wire:keydown.enter.prevent="addDomain" placeholder="app.acme.com" class="dply-input min-w-[12rem] flex-1 font-mono text-sm">
                             <button type="button" wire:click="addDomain" class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-cream/40 dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream dark:hover:bg-zinc-700">
-                                <x-heroicon-o-plus class="h-3.5 w-3.5" aria-hidden="true" />
+                                <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
                                 {{ __('Add domain') }}
                             </button>
                         </div>
@@ -650,11 +650,11 @@
                             @endif
                             <div class="flex flex-wrap gap-2">
                                 <button type="button" wire:click="addWorker('worker')" class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-cream/40 dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream dark:hover:bg-zinc-700">
-                                    <x-heroicon-o-plus class="h-3.5 w-3.5" aria-hidden="true" />
+                                    <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
                                     {{ __('Queue worker') }}
                                 </button>
                                 <button type="button" wire:click="addWorker('scheduler')" class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-cream/40 disabled:opacity-50 dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream dark:hover:bg-zinc-700" @disabled($this->hasScheduler())>
-                                    <x-heroicon-o-clock class="h-3.5 w-3.5" aria-hidden="true" />
+                                    <x-heroicon-o-clock class="h-4 w-4" aria-hidden="true" />
                                     {{ __('Scheduler') }}
                                 </button>
                             </div>
@@ -748,15 +748,15 @@
 
                             <div class="flex flex-wrap gap-2">
                                 <button type="button" wire:click="addDeployTask('pre_deploy')" class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-cream/40 dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream dark:hover:bg-zinc-700">
-                                    <x-heroicon-o-plus class="h-3.5 w-3.5" aria-hidden="true" />
+                                    <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
                                     {{ __('Pre-deploy task') }}
                                 </button>
                                 <button type="button" wire:click="addDeployTask('post_deploy')" class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-cream/40 dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream dark:hover:bg-zinc-700">
-                                    <x-heroicon-o-plus class="h-3.5 w-3.5" aria-hidden="true" />
+                                    <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
                                     {{ __('Post-deploy task') }}
                                 </button>
                                 <button type="button" wire:click="addDeployTask('manual')" class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink transition hover:bg-brand-cream/40 dark:border-brand-mist/25 dark:bg-zinc-800 dark:text-brand-cream dark:hover:bg-zinc-700">
-                                    <x-heroicon-o-plus class="h-3.5 w-3.5" aria-hidden="true" />
+                                    <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
                                     {{ __('Manual task') }}
                                 </button>
                             </div>

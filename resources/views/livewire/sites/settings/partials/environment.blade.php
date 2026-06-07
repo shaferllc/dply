@@ -290,7 +290,10 @@
 
     @include('livewire.sites.settings.partials.environment.advanced-path')
 
-    @include('livewire.sites.settings.partials.environment.resources')
+    {{-- Resource management moved to the Resources tab. Keep the binding modal
+         in the DOM (modal-only) so the inline binding-group actions in the
+         variables list still function; the visible binding card is suppressed. --}}
+    @include('livewire.sites.settings.partials.environment.resources', ['bindingModalOnly' => true])
 
     <x-cli-snippet
         :intro="__('Manage env via CLI when you have many keys at once:')"

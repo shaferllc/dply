@@ -35,9 +35,9 @@
                 <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
                     <div class="lg:col-span-7">
                         <div class="flex items-start gap-3">
-                            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-icon-badge size="md">
                                 <x-heroicon-o-server class="h-6 w-6" aria-hidden="true" />
-                            </span>
+                            </x-icon-badge>
                             <div class="min-w-0">
                                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Templates') }}</p>
                                 <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Webserver templates') }}</h2>
@@ -112,9 +112,9 @@
                 {{-- Editor section --}}
                 <section class="dply-card overflow-hidden">
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-pencil-square class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $editingId ? __('Edit') : __('New') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">
@@ -317,9 +317,9 @@
                 {{-- Saved templates list --}}
                 <section class="dply-card overflow-hidden">
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0 flex-1">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Saved templates') }}</h3>
@@ -375,7 +375,7 @@
                                             class="inline-flex min-w-[6.5rem] items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-50"
                                         >
                                             <span wire:loading.remove wire:target="testSaved" class="inline-flex items-center gap-1.5">
-                                                <x-heroicon-o-beaker class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                <x-heroicon-o-beaker class="h-4 w-4 shrink-0" aria-hidden="true" />
                                                 {{ __('Test') }}
                                             </span>
                                             <span wire:loading wire:target="testSaved" class="inline-flex items-center gap-1.5">
@@ -389,7 +389,7 @@
                                                 wire:click="startEdit({{ $template->id }})"
                                                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                                             >
-                                                <x-heroicon-o-pencil-square class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                <x-heroicon-o-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
                                                 {{ __('Edit') }}
                                             </button>
                                             <button
@@ -397,7 +397,7 @@
                                                 wire:click="openConfirmActionModal('delete', [{{ $template->id }}], @js(__('Delete template')), @js(__('Delete this template?')), @js(__('Delete')), true)"
                                                 class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
                                             >
-                                                <x-heroicon-o-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                                 {{ __('Delete') }}
                                             </button>
                                         @endif

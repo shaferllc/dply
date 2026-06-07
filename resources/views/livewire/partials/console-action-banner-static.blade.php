@@ -161,7 +161,7 @@
                                     x-on:click.stop="$dispatch('open-modal', @js($errorModalName))"
                                     class="mt-1 inline-flex items-center gap-1 text-xs font-medium underline-offset-2 hover:underline"
                                 >
-                                    <x-heroicon-o-document-text class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-document-text class="h-4 w-4" />
                                     {{ __('Show details') }}
                                 </button>
                             @endif
@@ -181,7 +181,7 @@
                             wire:click="dismissConsoleActionRun('{{ $run->id }}')"
                             class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-current/20 bg-white px-2.5 py-1.5 text-xs font-medium shadow-sm hover:bg-white/80"
                         >
-                            <x-heroicon-o-x-mark class="h-3.5 w-3.5" />
+                            <x-heroicon-o-x-mark class="h-4 w-4" />
                             {{ __('Dismiss') }}
                         </button>
                     @endif
@@ -196,7 +196,7 @@
                             class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-current/20 bg-white px-2.5 py-1.5 text-xs font-medium shadow-sm hover:bg-white/80"
                             title="{{ __('Open output in a modal') }}"
                         >
-                            <x-heroicon-o-arrows-pointing-out class="h-3.5 w-3.5" />
+                            <x-heroicon-o-arrows-pointing-out class="h-4 w-4" />
                             {{ __('Open') }}
                         </button>
                     @endif

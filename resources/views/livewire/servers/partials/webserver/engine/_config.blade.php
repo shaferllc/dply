@@ -49,13 +49,13 @@
                                                 >
                                                     <span class="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center">
                                                         @if ($isLoading)
-                                                            <x-spinner variant="forest" class="h-3.5 w-3.5" />
+                                                            <x-spinner variant="forest" class="h-4 w-4" />
                                                         @else
                                                             <span wire:loading.remove wire:target="loadWebserverConfig(@js($f['path']))" class="inline-flex">
                                                                 <x-heroicon-o-document class="h-4 w-4 text-brand-moss" />
                                                             </span>
                                                             <span wire:loading wire:target="loadWebserverConfig(@js($f['path']))" class="inline-flex">
-                                                                <x-spinner variant="forest" class="h-3.5 w-3.5" />
+                                                                <x-spinner variant="forest" class="h-4 w-4" />
                                                             </span>
                                                         @endif
                                                     </span>

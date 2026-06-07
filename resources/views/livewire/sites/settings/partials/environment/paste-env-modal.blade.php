@@ -52,7 +52,7 @@
             <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
             <x-primary-button type="submit" form="paste-env-form" wire:loading.attr="disabled" wire:target="bulkImportEnvVars">
                 <span wire:loading.remove wire:target="bulkImportEnvVars">{{ __('Import variables') }}</span>
-                <span wire:loading wire:target="bulkImportEnvVars" class="inline-flex items-center gap-1.5"><span class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Importing…') }}</span>
+                <span wire:loading wire:target="bulkImportEnvVars" class="inline-flex items-center gap-1.5"><span class="inline-flex h-4 w-4 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Importing…') }}</span>
             </x-primary-button>
         </div>
     </x-modal>

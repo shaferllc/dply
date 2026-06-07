@@ -55,7 +55,7 @@
                                 x-on:click="$dispatch('open-modal', 'add-ssh-key-modal')"
                                 class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
                             >
-                                <x-heroicon-m-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-m-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Add a key') }}
                             </button>
                             <button
@@ -67,15 +67,15 @@
                                 title="{{ $syncBusy ? __('A sync is already running. Wait for it to finish.') : '' }}"
                                 class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                <x-heroicon-m-arrow-path class="h-3.5 w-3.5 shrink-0" wire:loading.remove wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys" aria-hidden="true" />
-                                <span wire:loading wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                <x-heroicon-m-arrow-path class="h-4 w-4 shrink-0" wire:loading.remove wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys" aria-hidden="true" />
+                                <span wire:loading wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys" class="inline-flex h-4 w-4 items-center justify-center">
                                     <x-spinner variant="forest" size="sm" />
                                 </span>
                                 <span wire:loading.remove wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys">{{ __('Sync now') }}</span>
                                 <span wire:loading wire:target="requestSyncAuthorizedKeys,syncAuthorizedKeys">{{ __('Syncing…') }}</span>
                             </button>
                             <button type="button" wire:click="setSshWorkspaceTab('preview')" class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                                <x-heroicon-m-magnifying-glass class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-m-magnifying-glass class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Review drift') }}
                             </button>
                         </div>
@@ -90,7 +90,7 @@
                         </p>
                         @if ($profileKeys->isEmpty())
                             <button type="button" x-on:click="$dispatch('open-modal', 'personal-ssh-key-modal')" class="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100">
-                                <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                                <x-heroicon-o-plus class="h-4 w-4" />
                                 {{ __('Add profile key') }}
                             </button>
                         @endif
@@ -189,7 +189,7 @@
                                         @endforeach
                                     </select>
                                     <button type="button" wire:click="loadSystemUsers" wire:loading.attr="disabled" wire:target="loadSystemUsers" title="{{ __('Reload /etc/passwd users over SSH') }}" class="inline-flex shrink-0 items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-2.5 text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
-                                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-arrow-path class="h-4 w-4" />
                                     </button>
                                 </div>
                                 <x-input-error :messages="$errors->get('new_target_linux_user')" class="mt-1" />

@@ -92,7 +92,7 @@
                     wire:click="openBlockedEnvModal"
                     class="inline-flex items-center gap-1.5 rounded-lg bg-rose-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-rose-800"
                 >
-                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                    <x-heroicon-o-plus class="h-4 w-4" />
                     {{ __('Add variables') }}
                 </button>
                 <button
@@ -100,7 +100,7 @@
                     wire:click="setTab('environment')"
                     class="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-900 shadow-sm transition-colors hover:bg-rose-100"
                 >
-                    <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                    <x-heroicon-o-pencil-square class="h-4 w-4" />
                     {{ __('Edit all variables') }}
                 </button>
 
@@ -113,8 +113,8 @@
                         class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-800 shadow-sm transition-colors hover:bg-rose-100 disabled:opacity-60"
                         title="{{ __('Re-read the server .env and clear this if the variables are actually set — no deploy needed.') }}"
                     >
-                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="recheckBlockedEnv" />
-                        <span wire:loading wire:target="recheckBlockedEnv" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
+                        <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="recheckBlockedEnv" />
+                        <span wire:loading wire:target="recheckBlockedEnv" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
                         {{ __('Re-check') }}
                     </button>
                     <button
@@ -125,8 +125,8 @@
                         class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-800 shadow-sm transition-colors hover:bg-rose-100 disabled:opacity-60"
                         title="{{ __('See which variables are set on the server right now — read-only, nothing is overwritten.') }}"
                     >
-                        <x-heroicon-o-eye class="h-3.5 w-3.5" wire:loading.remove wire:target="viewServerEnv" />
-                        <span wire:loading wire:target="viewServerEnv" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
+                        <x-heroicon-o-eye class="h-4 w-4" wire:loading.remove wire:target="viewServerEnv" />
+                        <span wire:loading wire:target="viewServerEnv" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
                         {{ __('View server .env') }}
                     </button>
                     <button
@@ -135,7 +135,7 @@
                         class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-800 shadow-sm transition-colors hover:bg-rose-100"
                         title="{{ __('Ignore the required-env check and deploy anyway.') }}"
                     >
-                        <x-heroicon-o-rocket-launch class="h-3.5 w-3.5" />
+                        <x-heroicon-o-rocket-launch class="h-4 w-4" />
                         {{ __('Deploy anyway') }}
                     </button>
                     <button
@@ -144,7 +144,7 @@
                         class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white/70 px-3 py-1.5 text-xs font-semibold text-rose-800 shadow-sm transition-colors hover:bg-rose-100"
                         title="{{ __('Stop blocking deploys on missing required variables.') }}"
                     >
-                        <x-heroicon-o-no-symbol class="h-3.5 w-3.5" />
+                        <x-heroicon-o-no-symbol class="h-4 w-4" />
                         {{ __('Ignore all') }}
                     </button>
                 </div>
@@ -195,7 +195,7 @@
             </div>
             <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 px-6 py-4">
                 <button type="button" wire:click="setTab('environment')" class="mr-auto inline-flex items-center gap-1 text-xs font-semibold text-brand-forest hover:underline">
-                    <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                    <x-heroicon-o-pencil-square class="h-4 w-4" />
                     {{ __('Edit all variables') }}
                 </button>
                 <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
@@ -243,8 +243,8 @@
                         </div>
                         @if (method_exists($this, 'optimizePipeline'))
                             <button type="button" wire:click="optimizePipeline" wire:loading.attr="disabled" wire:target="optimizePipeline" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-700 shadow-sm hover:bg-indigo-50 disabled:opacity-60" title="{{ __('Read package.json / composer.json on the server and add every step the repo needs.') }}">
-                                <x-heroicon-o-sparkles class="h-3.5 w-3.5" wire:loading.remove wire:target="optimizePipeline" />
-                                <span wire:loading wire:target="optimizePipeline" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
+                                <x-heroicon-o-sparkles class="h-4 w-4" wire:loading.remove wire:target="optimizePipeline" />
+                                <span wire:loading wire:target="optimizePipeline" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
                                 <span wire:loading.remove wire:target="optimizePipeline">{{ __('Optimize pipeline') }}</span>
                                 <span wire:loading wire:target="optimizePipeline">{{ __('Scanning…') }}</span>
                             </button>
@@ -271,7 +271,7 @@
                                         wire:loading.attr="disabled"
                                         class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:opacity-60"
                                     >
-                                        <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-plus class="h-4 w-4" />
                                         {{ __('Add to pipeline') }}
                                     </button>
                                 @endif
@@ -291,9 +291,9 @@
 
     <section class="dply-card overflow-hidden">
         <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:px-8">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-rocket-launch class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0 flex-1">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Deploy') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Ship the current branch') }}</h2>
@@ -319,7 +319,7 @@
                         <x-spinner variant="white" size="sm" />
                         <span>{{ __('Deploying…') }}</span>
                     @else
-                        <x-heroicon-o-rocket-launch class="h-3.5 w-3.5" wire:loading.remove wire:target="deployNow" />
+                        <x-heroicon-o-rocket-launch class="h-4 w-4" wire:loading.remove wire:target="deployNow" />
                         <span wire:loading wire:target="deployNow"><x-spinner variant="white" size="sm" /></span>
                         <span wire:loading.remove wire:target="deployNow">{{ __('Deploy') }}</span>
                         <span wire:loading wire:target="deployNow">{{ __('Deploying…') }}</span>
@@ -327,12 +327,12 @@
                 </button>
                 @if ($this->deploySyncPeerCount > 0)
                     <button type="button" wire:click="queueDeploy" wire:loading.attr="disabled" wire:target="queueDeploy" title="{{ __('Also deploys :count linked site(s) in this deploy sync group.', ['count' => $this->deploySyncPeerCount]) }}" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 disabled:opacity-50">
-                        <x-heroicon-o-queue-list class="h-3.5 w-3.5" />
+                        <x-heroicon-o-queue-list class="h-4 w-4" />
                         {{ __('Deploy linked sites') }}
                     </button>
                 @endif
                 <a href="{{ route('deploy-sync.index') }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-brand-moss transition-colors hover:text-brand-ink" title="{{ __('Manage which sites deploy together.') }}">
-                    <x-heroicon-o-arrows-right-left class="h-3.5 w-3.5" />
+                    <x-heroicon-o-arrows-right-left class="h-4 w-4" />
                     {{ __('Sync groups') }}
                 </a>
             </div>
@@ -420,7 +420,7 @@
                         class="inline-flex items-center gap-1 text-xs font-semibold text-brand-forest hover:text-brand-sage hover:underline"
                     >
                         {{ __('View full log') }}
-                        <x-heroicon-m-arrow-top-right-on-square class="h-3.5 w-3.5" aria-hidden="true" />
+                        <x-heroicon-m-arrow-top-right-on-square class="h-4 w-4" aria-hidden="true" />
                     </a>
                 </div>
 

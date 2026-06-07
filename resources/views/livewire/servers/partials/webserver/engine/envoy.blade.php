@@ -196,7 +196,7 @@
                                 {{ __('Operator-tunable fields in /etc/envoy/envoy.yaml. Site routing blocks are regenerated when you apply edge backends or provision sites.') }}
                             </p>
                             <p class="mt-2 inline-flex items-center gap-1.5 rounded-md bg-amber-50/70 px-2.5 py-1 text-[11px] font-medium text-amber-900 ring-1 ring-amber-200">
-                                <x-heroicon-o-exclamation-triangle class="h-3.5 w-3.5" />
+                                <x-heroicon-o-exclamation-triangle class="h-4 w-4" />
                                 {{ __('Saving restarts Envoy — edge briefly drops connections.') }}
                             </p>
                         </div>
@@ -208,10 +208,10 @@
                             class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
                         >
                             <span wire:loading.remove wire:target="loadEnvoyStaticConfig" class="inline-flex">
-                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                                <x-heroicon-o-arrow-path class="h-4 w-4" />
                             </span>
                             <span wire:loading wire:target="loadEnvoyStaticConfig" class="inline-flex">
-                                <x-spinner class="h-3.5 w-3.5" />
+                                <x-spinner class="h-4 w-4" />
                             </span>
                             {{ __('Reload from server') }}
                         </button>
@@ -229,7 +229,7 @@
                     @if (! $envoy_static_loaded)
                         <p class="mt-5 text-sm text-brand-moss">
                             <span wire:loading wire:target="loadEnvoyStaticConfig" class="inline-flex items-center gap-2">
-                                <x-spinner class="h-3.5 w-3.5" /> {{ __('Reading envoy.yaml…') }}
+                                <x-spinner class="h-4 w-4" /> {{ __('Reading envoy.yaml…') }}
                             </span>
                             <span wire:loading.remove wire:target="loadEnvoyStaticConfig">
                                 {{ __('Click "Reload from server" to fetch current values.') }}
@@ -292,13 +292,13 @@
                             <div class="flex flex-wrap items-center gap-2">
                                 <button type="button" wire:click="openAddEnvoyClusterForm" @disabled($isDeployer || $actionInFlight)
                                     class="inline-flex items-center gap-1.5 rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-forest/90 disabled:opacity-60">
-                                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-plus class="h-4 w-4" />
                                     {{ __('Add cluster') }}
                                 </button>
                                 <button type="button" wire:click="loadEnvoyClustersConfig" wire:loading.attr="disabled" wire:target="loadEnvoyClustersConfig"
                                     class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60">
-                                    <span wire:loading.remove wire:target="loadEnvoyClustersConfig"><x-heroicon-o-arrow-path class="h-3.5 w-3.5" /></span>
-                                    <span wire:loading wire:target="loadEnvoyClustersConfig"><x-spinner class="h-3.5 w-3.5" /></span>
+                                    <span wire:loading.remove wire:target="loadEnvoyClustersConfig"><x-heroicon-o-arrow-path class="h-4 w-4" /></span>
+                                    <span wire:loading wire:target="loadEnvoyClustersConfig"><x-spinner class="h-4 w-4" /></span>
                                     {{ __('Reload from server') }}
                                 </button>
                             </div>
@@ -357,7 +357,7 @@
                                             wire:click="openConfirmActionModal('removeEnvoyCluster', ['{{ $clusterName }}'], @js(__('Remove cluster: :name', ['name' => $clusterName])), @js(__('Remove `:name` from persisted custom clusters and regenerate edge routing?', ['name' => $clusterName])), @js(__('Remove')), true)"
                                             @disabled($isDeployer || $actionInFlight)
                                             class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-[11px] font-medium text-rose-800">
-                                            <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                                            <x-heroicon-o-trash class="h-4 w-4" />
                                             {{ __('Remove') }}
                                         </button>
                                     </div>
@@ -402,13 +402,13 @@
                             <div class="flex flex-wrap items-center gap-2">
                                 <button type="button" wire:click="openAddEnvoyVirtualHostForm" @disabled($isDeployer || $actionInFlight)
                                     class="inline-flex items-center gap-1.5 rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-forest/90 disabled:opacity-60">
-                                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-plus class="h-4 w-4" />
                                     {{ __('Add virtual host') }}
                                 </button>
                                 <button type="button" wire:click="loadEnvoyVirtualHostsConfig" wire:loading.attr="disabled" wire:target="loadEnvoyVirtualHostsConfig"
                                     class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60">
-                                    <span wire:loading.remove wire:target="loadEnvoyVirtualHostsConfig"><x-heroicon-o-arrow-path class="h-3.5 w-3.5" /></span>
-                                    <span wire:loading wire:target="loadEnvoyVirtualHostsConfig"><x-spinner class="h-3.5 w-3.5" /></span>
+                                    <span wire:loading.remove wire:target="loadEnvoyVirtualHostsConfig"><x-heroicon-o-arrow-path class="h-4 w-4" /></span>
+                                    <span wire:loading wire:target="loadEnvoyVirtualHostsConfig"><x-spinner class="h-4 w-4" /></span>
                                     {{ __('Reload from server') }}
                                 </button>
                             </div>
@@ -465,7 +465,7 @@
                                             wire:click="openConfirmActionModal('removeEnvoyVirtualHost', ['{{ $vhostName }}'], @js(__('Remove virtual host: :name', ['name' => $vhostName])), @js(__('Remove `:name` from persisted custom virtual hosts and regenerate edge routing?', ['name' => $vhostName])), @js(__('Remove')), true)"
                                             @disabled($isDeployer || $actionInFlight)
                                             class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-[11px] font-medium text-rose-800">
-                                            <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                                            <x-heroicon-o-trash class="h-4 w-4" />
                                             {{ __('Remove') }}
                                         </button>
                                     </div>
@@ -505,13 +505,13 @@
                             <div class="flex flex-wrap items-center gap-2">
                                 <button type="button" wire:click="openAddEnvoyListenerForm" @disabled($isDeployer || $actionInFlight)
                                     class="inline-flex items-center gap-1.5 rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-forest/90 disabled:opacity-60">
-                                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-plus class="h-4 w-4" />
                                     {{ __('Add listener') }}
                                 </button>
                                 <button type="button" wire:click="loadEnvoyListenersConfig" wire:loading.attr="disabled" wire:target="loadEnvoyListenersConfig"
                                     class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60">
-                                    <span wire:loading.remove wire:target="loadEnvoyListenersConfig"><x-heroicon-o-arrow-path class="h-3.5 w-3.5" /></span>
-                                    <span wire:loading wire:target="loadEnvoyListenersConfig"><x-spinner class="h-3.5 w-3.5" /></span>
+                                    <span wire:loading.remove wire:target="loadEnvoyListenersConfig"><x-heroicon-o-arrow-path class="h-4 w-4" /></span>
+                                    <span wire:loading wire:target="loadEnvoyListenersConfig"><x-spinner class="h-4 w-4" /></span>
                                     {{ __('Reload from server') }}
                                 </button>
                             </div>
@@ -581,7 +581,7 @@
                                             wire:click="openConfirmActionModal('removeEnvoyListener', ['{{ $listenerName }}'], @js(__('Remove listener: :name', ['name' => $listenerName])), @js(__('Remove `:name` from persisted custom listeners and regenerate edge routing?', ['name' => $listenerName])), @js(__('Remove')), true)"
                                             @disabled($isDeployer || $actionInFlight)
                                             class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-[11px] font-medium text-rose-800">
-                                            <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                                            <x-heroicon-o-trash class="h-4 w-4" />
                                             {{ __('Remove') }}
                                         </button>
                                     </div>

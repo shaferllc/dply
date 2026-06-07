@@ -46,9 +46,9 @@
     {{-- PHP runtime: hero card with eyebrow + title + summary stat tiles. --}}
     <section class="dply-card overflow-hidden">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                         <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0 flex-1">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Runtime') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('PHP runtime') }}</h3>
@@ -66,8 +66,8 @@
                                 wire:target="refreshPhpInventory"
                                 class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
                             >
-                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0" wire:loading.remove wire:target="refreshPhpInventory" aria-hidden="true" />
-                                <span wire:loading wire:target="refreshPhpInventory" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0" wire:loading.remove wire:target="refreshPhpInventory" aria-hidden="true" />
+                                <span wire:loading wire:target="refreshPhpInventory" class="inline-flex h-4 w-4 items-center justify-center">
                                     <x-spinner variant="forest" size="sm" />
                                 </span>
                                 <span wire:loading.remove wire:target="refreshPhpInventory">{{ __('Refresh inventory') }}</span>
@@ -172,9 +172,9 @@
     @if ($opsReady && ! $sshUnavailable && ! $phpInventoryNeverRun)
         <section class="dply-card overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0 flex-1">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Versions on this server') }}</h3>
@@ -298,8 +298,8 @@
                                                 wire:target="{{ $actionTarget('install') }}"
                                                 class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                                             >
-                                                <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5" wire:loading.remove wire:target="{{ $actionTarget('install') }}" />
-                                                <span wire:loading wire:target="{{ $actionTarget('install') }}" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                                <x-heroicon-o-arrow-down-tray class="h-4 w-4" wire:loading.remove wire:target="{{ $actionTarget('install') }}" />
+                                                <span wire:loading wire:target="{{ $actionTarget('install') }}" class="inline-flex h-4 w-4 items-center justify-center">
                                                     <x-spinner variant="cream" size="sm" />
                                                 </span>
                                                 <span wire:loading.remove wire:target="{{ $actionTarget('install') }}">{{ __('Install') }}</span>
@@ -313,8 +313,8 @@
                                                 wire:target="{{ $actionTarget('patch') }}"
                                                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                                             >
-                                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="{{ $actionTarget('patch') }}" />
-                                                <span wire:loading wire:target="{{ $actionTarget('patch') }}" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                                <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="{{ $actionTarget('patch') }}" />
+                                                <span wire:loading wire:target="{{ $actionTarget('patch') }}" class="inline-flex h-4 w-4 items-center justify-center">
                                                     <x-spinner variant="forest" size="sm" />
                                                 </span>
                                                 <span wire:loading.remove wire:target="{{ $actionTarget('patch') }}">{{ __('Patch') }}</span>
@@ -409,7 +409,7 @@
                                                         aria-label="{{ __('Edit config') }}"
                                                         aria-haspopup="true"
                                                     >
-                                                        <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" />
+                                                        <x-heroicon-o-cog-6-tooth class="h-4 w-4" />
                                                         {{ __('Config') }}
                                                         <x-heroicon-o-chevron-down class="h-3.5 w-3.5 text-brand-ink/70" />
                                                     </button>
@@ -482,9 +482,9 @@
                         <div class="border-b border-brand-ink/10 px-6 py-5 sm:px-7">
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div class="flex min-w-0 items-start gap-3">
-                                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                                    <x-icon-badge>
                                         <x-heroicon-o-cog-6-tooth class="h-5 w-5" aria-hidden="true" />
-                                    </span>
+                                    </x-icon-badge>
                                     <div class="min-w-0">
                                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('PHP') }} {{ $phpConfigEditorVersion }}</p>
                                         <h2 id="php-config-editor-title" class="mt-1 text-lg font-semibold text-brand-ink">

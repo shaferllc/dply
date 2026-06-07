@@ -40,7 +40,7 @@
     <div class="space-y-2">
         <div class="flex flex-wrap items-center gap-2">
             <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset {{ $severityChipClass }}">
-                <x-dynamic-component :component="$severityIcon" class="h-3.5 w-3.5" aria-hidden="true" />
+                <x-dynamic-component :component="$severityIcon" class="h-4 w-4" aria-hidden="true" />
                 {{ $severityLabel }}
             </span>
             <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 ring-inset {{ $kindChipClass }}">
@@ -164,7 +164,7 @@
             <div class="flex items-center justify-between gap-2">
                 <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Fix run') }}</p>
                 <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset {{ $runChip }}">
-                    <x-dynamic-component :component="$runIcon" class="h-3.5 w-3.5 {{ $fixHistory['run_status'] === 'queued' ? 'animate-spin' : '' }}" aria-hidden="true" />
+                    <x-dynamic-component :component="$runIcon" class="h-4 w-4 {{ $fixHistory['run_status'] === 'queued' ? 'animate-spin' : '' }}" aria-hidden="true" />
                     {{ $runLabel }}
                 </span>
             </div>

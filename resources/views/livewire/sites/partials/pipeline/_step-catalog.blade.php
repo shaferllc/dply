@@ -71,7 +71,7 @@
                                     wire:click="addDeployPipelineStepFromPalette(@js($entry['type']), null, @js($phase), @js(filled($entry['custom_command'] ?? null) ? $entry['custom_command'] : null))"
                                     class="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink shadow-sm hover:border-brand-sage hover:text-brand-sage"
                                 >
-                                    <x-heroicon-o-plus class="h-3.5 w-3.5" aria-hidden="true" />
+                                    <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
                                     {{ __('Add to pipeline') }}
                                 </button>
                             </li>
@@ -129,7 +129,7 @@
         <ul class="mt-2 flex flex-wrap gap-2">
             @foreach ($hookCatalog['types'] ?? [] as $hookType)
                 <li class="inline-flex items-center gap-1.5 rounded-full border border-amber-200/80 bg-amber-50/80 px-3 py-1.5 text-xs font-semibold text-amber-950">
-                    <x-dynamic-component :component="$hookType['icon'] ?? 'heroicon-o-bolt'" class="h-3.5 w-3.5" />
+                    <x-dynamic-component :component="$hookType['icon'] ?? 'heroicon-o-bolt'" class="h-4 w-4" />
                     {{ __($hookType['label'] ?? '') }}
                 </li>
             @endforeach
@@ -169,7 +169,7 @@
                             wire:click="addDeployPipelineHookFromPreset(@js($preset))"
                             class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-200/80 bg-white px-3 py-2 text-xs font-semibold text-amber-950 hover:bg-amber-50"
                         >
-                            <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                            <x-heroicon-o-plus class="h-4 w-4" />
                             {{ __('Add hook') }}
                         </button>
                     </li>

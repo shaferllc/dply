@@ -10,8 +10,8 @@
                 </div>
                 <button type="button" wire:click="loadTraefikProvidersConfig" wire:loading.attr="disabled" wire:target="loadTraefikProvidersConfig"
                     class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">
-                    <span wire:loading.remove wire:target="loadTraefikProvidersConfig"><x-heroicon-o-arrow-path class="h-3.5 w-3.5" /></span>
-                    <span wire:loading wire:target="loadTraefikProvidersConfig"><x-spinner class="h-3.5 w-3.5" /></span>
+                    <span wire:loading.remove wire:target="loadTraefikProvidersConfig"><x-heroicon-o-arrow-path class="h-4 w-4" /></span>
+                    <span wire:loading wire:target="loadTraefikProvidersConfig"><x-spinner class="h-4 w-4" /></span>
                     {{ __('Reload') }}
                 </button>
             </div>

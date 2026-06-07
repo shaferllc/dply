@@ -28,9 +28,9 @@
     @if (! $opsReady)
         <section class="dply-card overflow-hidden border-amber-200">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+                <x-icon-badge tone="amber">
                     <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Waiting on provisioning') }}</h3>
@@ -50,9 +50,9 @@
             <section class="{{ $card }} overflow-hidden">
                 <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
                     <div class="flex min-w-0 items-start gap-3">
-                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                        <x-icon-badge>
                             <x-heroicon-o-users class="h-5 w-5" aria-hidden="true" />
-                        </span>
+                        </x-icon-badge>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Accounts') }}</p>
                             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Accounts on this server') }}</h2>
@@ -80,7 +80,7 @@
                             wire:click="openCreateModal"
                             class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90"
                         >
-                            <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                            <x-heroicon-o-plus class="h-4 w-4" />
                             {{ __('Add a user') }}
                         </button>
                         <span class="hidden h-5 w-px bg-brand-ink/10 sm:block" aria-hidden="true"></span>
@@ -91,8 +91,8 @@
                             wire:target="loadUsers"
                             class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="loadUsers" />
-                            <span wire:loading wire:target="loadUsers" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                            <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="loadUsers" />
+                            <span wire:loading wire:target="loadUsers" class="inline-flex h-4 w-4 items-center justify-center">
                                 <x-spinner variant="forest" size="sm" />
                             </span>
                             <span wire:loading.remove wire:target="loadUsers">{{ __('Sync now') }}</span>
@@ -118,7 +118,7 @@
                             wire:target="openRemoveOrphansConfirm,queueRemoveOrphans"
                             class="inline-flex h-8 shrink-0 items-center gap-1.5 self-start rounded-lg border border-red-200 bg-white px-3 text-xs font-semibold text-red-800 shadow-sm hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 sm:self-center"
                         >
-                            <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                            <x-heroicon-o-trash class="h-4 w-4" />
                             {{ __('Remove all orphans') }}
                         </button>
                     </div>
@@ -259,7 +259,7 @@
                                                 <x-spinner variant="forest" size="sm" />
                                                 {{ __('Removing…') }}
                                             @else
-                                                <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                                                <x-heroicon-o-trash class="h-4 w-4" />
                                                 {{ __('Remove') }}
                                             @endif
                                         </button>

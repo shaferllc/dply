@@ -5,9 +5,9 @@
          "Hostname & DNS" tab, now the top of this merged Domains tab. --}}
     <div class="dply-card overflow-hidden">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Primary endpoint') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Edge hostname & DNS') }}</h2>
@@ -22,9 +22,9 @@
 
     <div class="dply-card overflow-hidden">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Domain') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Attach a custom domain') }}</h2>
@@ -61,9 +61,9 @@
 
     <div class="dply-card overflow-hidden">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Domains') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Attached domains') }}</h2>
@@ -123,7 +123,7 @@
                                         wire:target="verifyCustomDomain('{{ $domain['hostname'] }}')"
                                         class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-wait disabled:opacity-60"
                                     >
-                                        <x-heroicon-o-check-badge class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-check-badge class="h-4 w-4" />
                                         {{ __('Verify') }}
                                     </button>
                                 @endif
@@ -134,7 +134,7 @@
                                     wire:target="reprovisionCustomDomain('{{ $domain['hostname'] }}')"
                                     class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-wait disabled:opacity-60"
                                 >
-                                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-arrow-path class="h-4 w-4" />
                                     {{ __('Re-provision') }}
                                 </button>
                                 <button
@@ -143,7 +143,7 @@
                                     wire:confirm="{{ __('Detach :host? Auto-mode DNS records will be removed automatically.', ['host' => $domain['hostname']]) }}"
                                     class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-900 shadow-sm hover:bg-rose-50"
                                 >
-                                    <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-trash class="h-4 w-4" />
                                     {{ __('Detach') }}
                                 </button>
                             </div>

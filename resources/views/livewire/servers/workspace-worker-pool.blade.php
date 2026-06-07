@@ -9,9 +9,9 @@
         {{-- No pool yet: offer to create one from this worker. --}}
         <section class="dply-card overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Scaling') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Create a worker pool') }}</h2>
@@ -106,7 +106,7 @@
                         <h2 class="text-base font-semibold text-brand-ink">{{ __('Pool status') }}</h2>
                         <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ring-1 {{ $toneClasses }}">
                             @if ($effectiveStatus === 'scaling')
-                                <span class="inline-flex h-3.5 w-3.5"><x-spinner variant="forest" size="sm" /></span>
+                                <span class="inline-flex h-4 w-4"><x-spinner variant="forest" size="sm" /></span>
                             @endif
                             {{ $statusMeta['label'] }}
                         </span>
@@ -129,7 +129,7 @@
                             class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
                             title="{{ __('Re-run the reconciler to advance stuck members and re-check pending deploys.') }}"
                         >
-                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                            <x-heroicon-o-arrow-path class="h-4 w-4" />
                             {{ __('Reconcile now') }}
                         </button>
                         <button
@@ -137,7 +137,7 @@
                             wire:click="openConfirmActionModal('tearDownPool', [], @js(__('Tear down pool')), @js(__('This drains and DESTROYS all :n replica(s). :primary stays as a standalone worker. This cannot be undone.', ['n' => max(0, $members->count() - 1), 'primary' => $pool->primaryServer?->name ?? $server->name])), @js(__('Tear down pool')), true)"
                             class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 shadow-sm transition-colors hover:bg-rose-50"
                         >
-                            <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                            <x-heroicon-o-trash class="h-4 w-4" />
                             {{ __('Tear down pool') }}
                         </button>
                     </div>
@@ -245,9 +245,9 @@
         {{-- Scale control --}}
         <section class="dply-card mt-6 overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-arrows-pointing-out class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0 flex-1">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $pool->name }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Scale workers') }}</h2>
@@ -290,9 +290,9 @@
         {{-- Autoscaling --}}
         <section class="dply-card mt-6 overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-chart-bar class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Autoscaling') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Scale by queue backlog') }}</h2>
@@ -371,9 +371,9 @@
         {{-- Add a worker in another region/provider (Phase 2). --}}
         <section class="dply-card mt-6 overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cross-region') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Add a worker in another region') }}</h2>
@@ -598,7 +598,7 @@
                         <span>{{ $hzAt ? __('collected :ago', ['ago' => $hzAt->diffForHumans()]) : __('no data yet') }}</span>
                         @if ($hzError)
                             <span class="inline-flex max-w-xs items-center gap-1 text-right font-medium text-rose-600" title="{{ $hzError }}">
-                                <x-heroicon-o-exclamation-triangle class="h-3.5 w-3.5 shrink-0" />
+                                <x-heroicon-o-exclamation-triangle class="h-4 w-4 shrink-0" />
                                 {{ __('last refresh failed :ago', ['ago' => $hzAttemptAt?->diffForHumans() ?? __('just now')]) }}
                             </span>
                         @elseif ($hzAttemptAt && (! $hzAt || $hzAttemptAt->gt($hzAt)))
@@ -614,14 +614,14 @@
                             <button type="button" wire:click="runHorizonTestJobs" wire:loading.attr="disabled" wire:target="runHorizonTestJobs"
                                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 disabled:opacity-60"
                                 title="{{ __('Dispatch 5 throwaway test jobs onto the queue, then re-pull the snapshot to confirm Horizon picked them up.') }}">
-                                <x-heroicon-o-beaker class="h-3.5 w-3.5" wire:loading.remove wire:target="runHorizonTestJobs" />
-                                <span wire:loading wire:target="runHorizonTestJobs" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner size="sm" /></span>
+                                <x-heroicon-o-beaker class="h-4 w-4" wire:loading.remove wire:target="runHorizonTestJobs" />
+                                <span wire:loading wire:target="runHorizonTestJobs" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner size="sm" /></span>
                                 {{ __('Test jobs') }}
                             </button>
                             <button type="button" wire:click="refreshHorizon" wire:loading.attr="disabled" wire:target="refreshHorizon"
                                 class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:opacity-60">
-                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="refreshHorizon" />
-                                <span wire:loading wire:target="refreshHorizon" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="white" size="sm" /></span>
+                                <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="refreshHorizon" />
+                                <span wire:loading wire:target="refreshHorizon" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="white" size="sm" /></span>
                                 {{ __('Refresh Horizon') }}
                             </button>
                         </div>
@@ -933,8 +933,8 @@
                                     @if (! empty($fj['exception_full']))
                                         <div x-show="open" x-cloak class="relative mt-2" x-data="{ copied: false, copyTrace() { navigator.clipboard.writeText(@js($fj['exception_full'])).then(() => { this.copied = true; setTimeout(() => this.copied = false, 1500); }); } }">
                                             <button type="button" x-on:click="copyTrace()" class="absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-md bg-white/10 px-2 py-1 text-[11px] font-medium text-rose-100/90 backdrop-blur transition hover:bg-white/20" :title="copied ? @js(__('Copied!')) : @js(__('Copy stack trace'))">
-                                                <x-heroicon-o-clipboard class="h-3.5 w-3.5" x-show="! copied" />
-                                                <x-heroicon-o-check class="h-3.5 w-3.5" x-show="copied" x-cloak />
+                                                <x-heroicon-o-clipboard class="h-4 w-4" x-show="! copied" />
+                                                <x-heroicon-o-check class="h-4 w-4" x-show="copied" x-cloak />
                                                 <span x-text="copied ? @js(__('Copied')) : @js(__('Copy'))"></span>
                                             </button>
                                             <pre class="max-h-96 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-brand-ink/95 p-3 pr-20 font-mono text-[11px] leading-relaxed text-rose-100">{{ $fj['exception_full'] }}</pre>
@@ -968,21 +968,21 @@
                         <button type="button" wire:click="ensureWorkers" wire:loading.attr="disabled" wire:target="ensureWorkers"
                             class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:opacity-60"
                             title="{{ __('Define the queue daemon (Horizon if installed, else queue:work) on every member and start it via systemd.') }}">
-                            <x-heroicon-o-bolt class="h-3.5 w-3.5" wire:loading.remove wire:target="ensureWorkers" />
-                            <span wire:loading wire:target="ensureWorkers" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="white" size="sm" /></span>
+                            <x-heroicon-o-bolt class="h-4 w-4" wire:loading.remove wire:target="ensureWorkers" />
+                            <span wire:loading wire:target="ensureWorkers" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="white" size="sm" /></span>
                             {{ __('Ensure workers everywhere') }}
                         </button>
                         <button type="button" wire:click="runTestJobs" wire:loading.attr="disabled" wire:target="runTestJobs"
                             class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
                             title="{{ __('Dispatch 5 throwaway jobs onto the queue and confirm the workers process them.') }}">
-                            <x-heroicon-o-beaker class="h-3.5 w-3.5" wire:loading.remove wire:target="runTestJobs" />
-                            <span wire:loading wire:target="runTestJobs" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
+                            <x-heroicon-o-beaker class="h-4 w-4" wire:loading.remove wire:target="runTestJobs" />
+                            <span wire:loading wire:target="runTestJobs" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
                             {{ __('Run test jobs') }}
                         </button>
                         <button type="button" wire:click="collectStats" wire:loading.attr="disabled" wire:target="collectStats"
                             class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
-                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="collectStats" />
-                            <span wire:loading wire:target="collectStats" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
+                            <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="collectStats" />
+                            <span wire:loading wire:target="collectStats" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
                             {{ __('Refresh stats') }}
                         </button>
                     </div>

@@ -86,6 +86,11 @@ final class SiteSettingsHeader
                 'description' => __('Environment variables and secrets injected when this :resource builds and runs.', ['resource' => $resourceNoun]),
                 'icon' => 'heroicon-o-command-line',
             ],
+            'resources' => [
+                'title' => __('Resources'),
+                'description' => __('A visual map of this :resource and the resources wired to it — attach a database, cache, queue, storage, mail and more.', ['resource' => $resourceNoun]),
+                'icon' => 'heroicon-o-puzzle-piece',
+            ],
             'logs' => [
                 'title' => __('Logs'),
                 'description' => __('Deploy logs, runtime logs, and per-:resource log shortcuts.', ['resource' => $resourceNoun]),

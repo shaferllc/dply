@@ -55,10 +55,10 @@
                         >
                             <span wire:loading.remove wire:target="applyCronBundle('{{ $bundleKey }}')" class="inline-flex items-center gap-1.5">
                                 @if ($bundle['applied'])
-                                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-arrow-path class="h-4 w-4" />
                                     {{ __('Add again') }}
                                 @else
-                                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-plus class="h-4 w-4" />
                                     {{ __('Add to panel') }}
                                 @endif
                             </span>
@@ -124,7 +124,7 @@
                             wire:click="applyOrgCronTemplate('{{ $tpl->id }}')"
                             class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90"
                         >
-                            <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5" />
+                            <x-heroicon-o-arrow-down-tray class="h-4 w-4" />
                             {{ __('Apply') }}
                         </button>
                         @if ($canUpdateOrg)
@@ -133,7 +133,7 @@
                                 wire:click="openConfirmActionModal('deleteOrgCronTemplate', ['{{ $tpl->id }}'], @js(__('Delete template')), @js(__('Delete this organization template? Existing jobs created from it are unaffected.')), @js(__('Delete template')), true)"
                                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-rose-700 shadow-sm hover:bg-rose-50"
                             >
-                                <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                                <x-heroicon-o-trash class="h-4 w-4" />
                                 {{ __('Delete') }}
                             </button>
                         @endif

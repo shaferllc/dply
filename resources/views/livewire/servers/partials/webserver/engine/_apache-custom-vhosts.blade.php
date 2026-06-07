@@ -19,7 +19,7 @@
                                     @disabled($isDeployer || $actionInFlight)
                                     class="inline-flex items-center gap-1.5 rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                                 >
-                                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-plus class="h-4 w-4" />
                                     {{ __('Add vhost') }}
                                 </button>
                                 <button
@@ -30,10 +30,10 @@
                                     class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
                                 >
                                     <span wire:loading.remove wire:target="loadApacheCustomVhostsConfig" class="inline-flex">
-                                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-arrow-path class="h-4 w-4" />
                                     </span>
                                     <span wire:loading wire:target="loadApacheCustomVhostsConfig" class="inline-flex">
-                                        <x-spinner class="h-3.5 w-3.5" />
+                                        <x-spinner class="h-4 w-4" />
                                     </span>
                                     {{ __('Reload from server') }}
                                 </button>
@@ -81,8 +81,8 @@
                                 <div class="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 pt-3">
                                     <button type="button" wire:click="cancelAddApacheCustomVhostForm" class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Cancel') }}</button>
                                     <button type="submit" wire:loading.attr="disabled" wire:target="submitAddApacheCustomVhost" @disabled($actionInFlight) class="inline-flex items-center gap-2 rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60">
-                                        <span wire:loading.remove wire:target="submitAddApacheCustomVhost" class="inline-flex"><x-heroicon-o-plus class="h-3.5 w-3.5" /></span>
-                                        <span wire:loading wire:target="submitAddApacheCustomVhost" class="inline-flex"><x-spinner variant="cream" class="h-3.5 w-3.5" /></span>
+                                        <span wire:loading.remove wire:target="submitAddApacheCustomVhost" class="inline-flex"><x-heroicon-o-plus class="h-4 w-4" /></span>
+                                        <span wire:loading wire:target="submitAddApacheCustomVhost" class="inline-flex"><x-spinner variant="cream" class="h-4 w-4" /></span>
                                         {{ __('Create and reload') }}
                                     </button>
                                 </div>
@@ -92,7 +92,7 @@
                         @if (! $apache_custom_vhosts_loaded)
                             <p class="mt-5 text-sm text-brand-moss">
                                 <span wire:loading wire:target="loadApacheCustomVhostsConfig" class="inline-flex items-center gap-2">
-                                    <x-spinner class="h-3.5 w-3.5" /> {{ __('Reading custom vhost files…') }}
+                                    <x-spinner class="h-4 w-4" /> {{ __('Reading custom vhost files…') }}
                                 </span>
                                 <span wire:loading.remove wire:target="loadApacheCustomVhostsConfig">
                                     {{ __('Click "Reload from server" to fetch custom vhosts, or add one above.') }}
@@ -118,7 +118,7 @@
                                             @disabled($isDeployer || $actionInFlight)
                                             class="inline-flex items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50/30 px-2.5 py-1 text-[11px] font-medium text-rose-800 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                                         >
-                                            <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                                            <x-heroicon-o-trash class="h-4 w-4" />
                                             {{ __('Remove') }}
                                         </button>
                                     </div>

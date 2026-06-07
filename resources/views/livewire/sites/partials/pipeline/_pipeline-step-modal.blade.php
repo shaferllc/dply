@@ -12,9 +12,9 @@
 >
     <form wire:submit="saveDeployPipelineStep" class="flex min-h-0 flex-1 flex-col">
         <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-queue-list class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ $isEditing ? __('Edit') : __('New') }}</p>
                 <h2 class="mt-1 text-lg font-semibold text-brand-ink">

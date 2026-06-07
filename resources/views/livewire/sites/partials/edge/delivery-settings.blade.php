@@ -1,8 +1,8 @@
 <section id="edge-delivery-backend" class="scroll-mt-24 dply-card overflow-hidden">
     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+        <x-icon-badge>
             <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
-        </span>
+        </x-icon-badge>
         <div class="min-w-0">
             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Delivery') }}</p>
             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Edge delivery') }}</h3>
@@ -39,9 +39,9 @@
     @can('update', $site)
         <section class="dply-card overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Hybrid') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Convert to hybrid SSR') }}</h3>
@@ -83,9 +83,9 @@
 @if (($edgeRuntimeMode ?? 'static') === 'hybrid' && is_array($edgeOrigin ?? null))
     <section class="dply-card overflow-hidden">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Origin') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('SSR origin (hybrid)') }}</h3>
@@ -185,7 +185,7 @@
                             wire:target="purgeEdgeCacheByTag"
                             class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:cursor-wait disabled:opacity-60"
                         >
-                            <x-heroicon-o-trash class="h-3.5 w-3.5" wire:loading.remove wire:target="purgeEdgeCacheByTag" />
+                            <x-heroicon-o-trash class="h-4 w-4" wire:loading.remove wire:target="purgeEdgeCacheByTag" />
                             <x-spinner variant="ink" size="sm" wire:loading wire:target="purgeEdgeCacheByTag" />
                             <span wire:loading.remove wire:target="purgeEdgeCacheByTag">{{ __('Purge') }}</span>
                             <span wire:loading wire:target="purgeEdgeCacheByTag">{{ __('Purging…') }}</span>
@@ -226,7 +226,7 @@
                             wire:confirm="{{ __('Rotate the origin auth secret? Requests using the old value will fail at the origin until you update it there.') }}"
                             class="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-900 shadow-sm hover:bg-rose-50 dark:border-rose-900/40 dark:bg-zinc-900 dark:text-rose-300"
                         >
-                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                            <x-heroicon-o-arrow-path class="h-4 w-4" />
                             {{ __('Rotate') }}
                         </button>
                     </div>
@@ -256,9 +256,9 @@
     @endphp
     <section class="dply-card overflow-hidden">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-photo class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Images') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Image optimization') }}</h3>
@@ -330,7 +330,7 @@
                         wire:confirm="{{ __('Rotate the signing secret? Any pre-signed image URLs you have already rendered will return 403 until re-signed.') }}"
                         class="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-900 shadow-sm hover:bg-rose-50 dark:border-rose-900/40 dark:bg-zinc-900 dark:text-rose-300"
                     >
-                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                        <x-heroicon-o-arrow-path class="h-4 w-4" />
                         {{ __('Rotate') }}
                     </button>
                 </div>

@@ -173,7 +173,7 @@
                             :class="{ 'bg-brand-sage/15 border-brand-sage/40': open }"
                             title="{{ __('Toggle help sidebar') }}"
                         >
-                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <circle cx="10" cy="10" r="7.5"/>
                                 <path d="M8 7.5a2 2 0 1 1 3 1.7c-.7.4-1 .8-1 1.5V11"/>
                                 <circle cx="10" cy="13.5" r="0.5" fill="currentColor"/>
@@ -362,7 +362,7 @@
                             class="rounded p-1 text-brand-moss hover:bg-white/60 hover:text-brand-ink"
                             title="{{ __('Hide help') }}"
                         >
-                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <path d="M5 5l10 10"/><path d="M15 5L5 15"/>
                             </svg>
                         </button>
@@ -416,9 +416,9 @@
     @else
         <section class="dply-card overflow-hidden border-amber-200">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 ring-1 ring-amber-200">
+                    <x-icon-badge tone="amber">
                         <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
                         <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Waiting on provisioning') }}</h3>

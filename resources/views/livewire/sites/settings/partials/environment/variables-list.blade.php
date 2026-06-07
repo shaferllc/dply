@@ -10,9 +10,9 @@
              variables action on the right (Sync, Paste, View/edit all, Add). --}}
         <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Configuration') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Environment variables') }}</h2>
@@ -43,61 +43,7 @@
                  anchored right, and the occasional server / bulk-edit tools
                  tucked into a "More" menu so the bar stays tidy as it grows. --}}
             <div class="flex flex-wrap items-center gap-2 border-t border-brand-ink/10 pt-4">
-                @if (method_exists($this, 'openBindingModal'))
-                    {{-- Connect a managed resource (database, redis, queue,
-                         storage); its connection variables then surface inline
-                         in the list below as managed rows. --}}
-                    <div x-data="{ open: false }" class="relative">
-                        <button
-                            type="button"
-                            x-on:click="open = ! open"
-                            x-on:click.outside="open = false"
-                            wire:loading.attr="disabled"
-                            wire:target="openBindingModal"
-                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 disabled:opacity-60"
-                        >
-                            <x-heroicon-o-link class="h-3.5 w-3.5" wire:loading.remove wire:target="openBindingModal" />
-                            <span wire:loading wire:target="openBindingModal" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
-                            <span wire:loading.remove wire:target="openBindingModal">{{ __('Connect resource') }}</span>
-                            <span wire:loading wire:target="openBindingModal">{{ __('Loading…') }}</span>
-                            <x-heroicon-m-chevron-down class="h-3.5 w-3.5 text-brand-mist" wire:loading.remove wire:target="openBindingModal" />
-                        </button>
-                        <div
-                            x-show="open"
-                            x-cloak
-                            x-transition
-                            class="absolute left-0 z-20 mt-1 w-56 overflow-hidden rounded-xl border border-brand-ink/10 bg-white py-1 shadow-lg"
-                        >
-                            <button type="button" wire:click="openBindingModal('database', 'attach')" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
-                                <x-heroicon-o-circle-stack class="h-4 w-4 text-brand-moss" /> {{ __('Connect database') }}
-                            </button>
-                            <button type="button" wire:click="openBindingModal('redis', 'attach')" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
-                                <x-heroicon-o-bolt class="h-4 w-4 text-brand-moss" /> {{ __('Connect Redis') }}
-                            </button>
-                            <button type="button" wire:click="openBindingModal('queue', 'attach')" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
-                                <x-heroicon-o-queue-list class="h-4 w-4 text-brand-moss" /> {{ __('Configure queue') }}
-                            </button>
-                            <button type="button" wire:click="openBindingModal('cache', 'attach')" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
-                                <x-heroicon-o-cpu-chip class="h-4 w-4 text-brand-moss" /> {{ __('Configure cache') }}
-                            </button>
-                            <button type="button" wire:click="openBindingModal('session', 'attach')" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
-                                <x-heroicon-o-finger-print class="h-4 w-4 text-brand-moss" /> {{ __('Configure sessions') }}
-                            </button>
-                            <button type="button" wire:click="openBindingModal('storage', 'attach')" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
-                                <x-heroicon-o-archive-box class="h-4 w-4 text-brand-moss" /> {{ __('Object storage') }}
-                            </button>
-                            <button type="button" wire:click="openBindingModal('logging', 'attach')" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
-                                <x-heroicon-o-clipboard-document-list class="h-4 w-4 text-brand-moss" /> {{ __('Configure logging') }}
-                            </button>
-                            <button type="button" wire:click="openBindingModal('mail', 'attach')" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
-                                <x-heroicon-o-envelope class="h-4 w-4 text-brand-moss" /> {{ __('Configure mail') }}
-                            </button>
-                            <button type="button" wire:click="openBindingModal('broadcasting', 'attach')" x-on:click="open = false" class="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
-                                <x-heroicon-o-signal class="h-4 w-4 text-brand-moss" /> {{ __('Configure broadcasting') }}
-                            </button>
-                        </div>
-                    </div>
-                @endif
+                {{-- Resource attach/configure lives on the Resources tab now. --}}
 
                 @if (method_exists($this, 'testSiteLoads'))
                     {{-- End-to-end check: actually request the site and report
@@ -110,8 +56,8 @@
                         class="inline-flex items-center gap-1.5 rounded-lg border border-brand-forest/30 bg-brand-forest/5 px-3 py-1.5 text-xs font-semibold text-brand-forest shadow-sm transition-colors hover:bg-brand-forest/10 disabled:opacity-60"
                         title="{{ __('Request the live site and confirm it loads (HTTP check + server log on failure).') }}"
                     >
-                        <x-heroicon-o-beaker class="h-3.5 w-3.5" wire:loading.remove wire:target="testSiteLoads" />
-                        <span wire:loading wire:target="testSiteLoads" class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
+                        <x-heroicon-o-beaker class="h-4 w-4" wire:loading.remove wire:target="testSiteLoads" />
+                        <span wire:loading wire:target="testSiteLoads" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
                         <span wire:loading.remove wire:target="testSiteLoads">{{ __('Test site') }}</span>
                         <span wire:loading wire:target="testSiteLoads">{{ __('Testing…') }}</span>
                     </button>
@@ -179,7 +125,7 @@
                         wire:click="openEditAllEnv"
                         class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 sm:ml-auto"
                     >
-                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                        <x-heroicon-o-pencil-square class="h-4 w-4" />
                         {{ __('Edit all') }}
                     </button>
                 @endif
@@ -188,7 +134,7 @@
                     x-on:click="$dispatch('open-modal', 'add-env-modal')"
                     class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90 {{ $envAdvanced ? '' : 'sm:ml-auto' }}"
                 >
-                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                    <x-heroicon-o-plus class="h-4 w-4" />
                     {{ __('Add variable') }}
                 </button>
             </div>
@@ -286,7 +232,7 @@
                             <button type="button" x-on:click="expanded = ! expanded" class="flex min-w-0 flex-1 items-center gap-2 text-left">
                                 <x-heroicon-m-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform" x-bind:class="expanded && 'rotate-90'" />
                                 <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-700 ring-1 ring-inset ring-sky-200/70">
-                                    <x-heroicon-o-link class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-link class="h-4 w-4" />
                                 </span>
                                 <span class="text-sm font-semibold text-brand-ink">{{ $gTypeLabel }}</span>
                                 @if ($group['name'])
@@ -328,7 +274,7 @@
                                             <x-input-label for="mailtest_to_{{ md5($gBindingId) }}" :value="__('Send test email to')" />
                                             <input id="mailtest_to_{{ md5($gBindingId) }}" type="email" wire:model="mailTestRecipient" placeholder="{{ auth()->user()?->email }}" class="dply-input mt-1 text-sm" />
                                             <button type="button" wire:click="sendBindingTestEmail(@js((string) $gBindingId))" wire:loading.attr="disabled" wire:target="sendBindingTestEmail" x-on:click="open = false" class="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-forest/90 disabled:opacity-60">
-                                                <x-heroicon-o-paper-airplane class="h-3.5 w-3.5" />
+                                                <x-heroicon-o-paper-airplane class="h-4 w-4" />
                                                 {{ __('Send test email') }}
                                             </button>
                                             <p class="mt-1.5 text-[11px] text-brand-moss">{{ __('Sent from the site\'s server. The site must be deployed.') }}</p>
@@ -382,7 +328,7 @@
                                                 <x-secondary-button type="button" wire:click="cancelEditEnvVar">{{ __('Cancel') }}</x-secondary-button>
                                                 <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveEditedEnvVar">
                                                     <span wire:loading.remove wire:target="saveEditedEnvVar">{{ __('Save override') }}</span>
-                                                    <span wire:loading wire:target="saveEditedEnvVar" class="inline-flex items-center gap-1.5"><span class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
+                                                    <span wire:loading wire:target="saveEditedEnvVar" class="inline-flex items-center gap-1.5"><span class="inline-flex h-4 w-4 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
                                                 </x-primary-button>
                                             </div>
                                         </form>
@@ -462,7 +408,7 @@
                                                     <x-secondary-button type="button" wire:click="cancelEditEnvVar">{{ __('Cancel') }}</x-secondary-button>
                                                     <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveEditedEnvVar">
                                                         <span wire:loading.remove wire:target="saveEditedEnvVar">{{ __('Save') }}</span>
-                                                        <span wire:loading wire:target="saveEditedEnvVar" class="inline-flex items-center gap-1.5"><span class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
+                                                        <span wire:loading wire:target="saveEditedEnvVar" class="inline-flex items-center gap-1.5"><span class="inline-flex h-4 w-4 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
                                                     </x-primary-button>
                                                 </div>
                                             </form>
@@ -487,15 +433,15 @@
                                                 </div>
                                                 <div class="flex flex-wrap items-center gap-2">
                                                     <button type="button" wire:click="toggleRevealEnvVar('{{ $oKey }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40" title="{{ $oIsRevealed ? __('Hide value') : __('Reveal value') }}">
-                                                        @if ($oIsRevealed) <x-heroicon-o-eye-slash class="h-3.5 w-3.5" /> {{ __('Hide') }}
-                                                        @else <x-heroicon-o-eye class="h-3.5 w-3.5" /> {{ __('Show') }}
+                                                        @if ($oIsRevealed) <x-heroicon-o-eye-slash class="h-4 w-4" /> {{ __('Hide') }}
+                                                        @else <x-heroicon-o-eye class="h-4 w-4" /> {{ __('Show') }}
                                                         @endif
                                                     </button>
                                                     <button type="button" wire:click="editEnvVar('{{ $oKey }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40" title="{{ __('Edit value') }}">
-                                                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5" /> {{ __('Edit') }}
+                                                        <x-heroicon-o-pencil-square class="h-4 w-4" /> {{ __('Edit') }}
                                                     </button>
                                                     <button type="button" wire:click="confirmRemoveEnvVar('{{ $oKey }}')" wire:loading.attr="disabled" wire:target="confirmRemoveEnvVar('{{ $oKey }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40" title="{{ __('Remove override') }}">
-                                                        <x-heroicon-o-trash class="h-3.5 w-3.5" wire:loading.remove wire:target="confirmRemoveEnvVar('{{ $oKey }}')" />
+                                                        <x-heroicon-o-trash class="h-4 w-4" wire:loading.remove wire:target="confirmRemoveEnvVar('{{ $oKey }}')" />
                                                         <span wire:loading wire:target="confirmRemoveEnvVar('{{ $oKey }}')"><x-spinner variant="forest" size="sm" /></span>
                                                         {{ __('Remove') }}
                                                     </button>
@@ -523,7 +469,7 @@
                             <button type="button" x-on:click="expanded = ! expanded" class="flex min-w-0 flex-1 items-center gap-2 text-left">
                                 <x-heroicon-m-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform" x-bind:class="expanded && 'rotate-90'" />
                                 <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-700 ring-1 ring-inset ring-sky-200/70">
-                                    <x-heroicon-o-link class="h-3.5 w-3.5" />
+                                    <x-heroicon-o-link class="h-4 w-4" />
                                 </span>
                                 <span class="text-sm font-semibold text-brand-ink">{{ $ogTypeLabel }}</span>
                                 @if ($ogGroup['name'])
@@ -576,7 +522,7 @@
                                                 <x-secondary-button type="button" wire:click="cancelEditEnvVar">{{ __('Cancel') }}</x-secondary-button>
                                                 <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveEditedEnvVar">
                                                     <span wire:loading.remove wire:target="saveEditedEnvVar">{{ __('Save') }}</span>
-                                                    <span wire:loading wire:target="saveEditedEnvVar" class="inline-flex items-center gap-1.5"><span class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
+                                                    <span wire:loading wire:target="saveEditedEnvVar" class="inline-flex items-center gap-1.5"><span class="inline-flex h-4 w-4 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
                                                 </x-primary-button>
                                             </div>
                                         </form>
@@ -604,15 +550,15 @@
                                             </div>
                                             <div class="flex flex-wrap items-center gap-2">
                                                 <button type="button" wire:click="toggleRevealEnvVar('{{ $oKey }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40" title="{{ $oIsRevealed ? __('Hide value') : __('Reveal value') }}">
-                                                    @if ($oIsRevealed) <x-heroicon-o-eye-slash class="h-3.5 w-3.5" /> {{ __('Hide') }}
-                                                    @else <x-heroicon-o-eye class="h-3.5 w-3.5" /> {{ __('Show') }}
+                                                    @if ($oIsRevealed) <x-heroicon-o-eye-slash class="h-4 w-4" /> {{ __('Hide') }}
+                                                    @else <x-heroicon-o-eye class="h-4 w-4" /> {{ __('Show') }}
                                                     @endif
                                                 </button>
                                                 <button type="button" wire:click="editEnvVar('{{ $oKey }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40" title="{{ __('Edit value') }}">
-                                                    <x-heroicon-o-pencil-square class="h-3.5 w-3.5" /> {{ __('Edit') }}
+                                                    <x-heroicon-o-pencil-square class="h-4 w-4" /> {{ __('Edit') }}
                                                 </button>
                                                 <button type="button" wire:click="confirmRemoveEnvVar('{{ $oKey }}')" wire:loading.attr="disabled" wire:target="confirmRemoveEnvVar('{{ $oKey }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40" title="{{ __('Remove override') }}">
-                                                    <x-heroicon-o-trash class="h-3.5 w-3.5" wire:loading.remove wire:target="confirmRemoveEnvVar('{{ $oKey }}')" />
+                                                    <x-heroicon-o-trash class="h-4 w-4" wire:loading.remove wire:target="confirmRemoveEnvVar('{{ $oKey }}')" />
                                                     <span wire:loading wire:target="confirmRemoveEnvVar('{{ $oKey }}')"><x-spinner variant="forest" size="sm" /></span>
                                                     {{ __('Remove') }}
                                                 </button>
@@ -717,7 +663,7 @@
                                     <x-secondary-button type="button" wire:click="cancelEditEnvVar">{{ __('Cancel') }}</x-secondary-button>
                                     <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveEditedEnvVar">
                                         <span wire:loading.remove wire:target="saveEditedEnvVar">{{ __('Save') }}</span>
-                                        <span wire:loading wire:target="saveEditedEnvVar" class="inline-flex items-center gap-1.5"><span class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
+                                        <span wire:loading wire:target="saveEditedEnvVar" class="inline-flex items-center gap-1.5"><span class="inline-flex h-4 w-4 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
                                     </x-primary-button>
                                 </div>
                             </form>
@@ -789,10 +735,10 @@
                                         title="{{ $isRevealed ? __('Hide value') : __('Reveal value') }}"
                                     >
                                         @if ($isRevealed)
-                                            <x-heroicon-o-eye-slash class="h-3.5 w-3.5" />
+                                            <x-heroicon-o-eye-slash class="h-4 w-4" />
                                             {{ __('Hide') }}
                                         @else
-                                            <x-heroicon-o-eye class="h-3.5 w-3.5" />
+                                            <x-heroicon-o-eye class="h-4 w-4" />
                                             {{ __('Show') }}
                                         @endif
                                     </button>
@@ -802,7 +748,7 @@
                                         class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                                         title="{{ __('Edit value') }}"
                                     >
-                                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-pencil-square class="h-4 w-4" />
                                         {{ __('Edit') }}
                                     </button>
                                     <button
@@ -812,7 +758,7 @@
                                         class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                                         title="{{ __('Import :key from another site', ['key' => $key]) }}"
                                     >
-                                        <x-heroicon-o-arrow-down-on-square class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-arrow-down-on-square class="h-4 w-4" />
                                         {{ __('Import') }}
                                     </button>
                                     <button
@@ -823,7 +769,7 @@
                                         class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
                                         title="{{ __('Remove variable') }}"
                                     >
-                                        <x-heroicon-o-trash class="h-3.5 w-3.5" wire:loading.remove wire:target="confirmRemoveEnvVar('{{ $key }}')" />
+                                        <x-heroicon-o-trash class="h-4 w-4" wire:loading.remove wire:target="confirmRemoveEnvVar('{{ $key }}')" />
                                         <span wire:loading wire:target="confirmRemoveEnvVar('{{ $key }}')"><x-spinner variant="forest" size="sm" /></span>
                                         {{ __('Remove') }}
                                     </button>

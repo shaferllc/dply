@@ -34,9 +34,9 @@
     <div class="{{ $card }} overflow-hidden p-0">
         <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-calculator class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Estimate') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Stack estimate') }}</h3>
@@ -48,7 +48,7 @@
             @if ($observatoryActive && $org)
                 <a href="{{ route('billing.analytics', $org) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                     {{ __('Org observatory') }}
-                    <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    <x-heroicon-m-arrow-up-right class="h-4 w-4 shrink-0" aria-hidden="true" />
                 </a>
             @endif
         </div>

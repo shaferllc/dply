@@ -7,9 +7,9 @@
 <section id="settings-group-ops" class="space-y-6" aria-labelledby="settings-group-ops-title">
     <div id="settings-notifications" class="{{ $card }} scroll-mt-24">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-chat-bubble-left-right class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Routing') }}</p>
                 <h2 id="settings-group-ops-title" class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Notification routing') }}</h2>
@@ -85,7 +85,7 @@
                                 wire:click="openCreateChannelModal"
                                 class="inline-flex items-center gap-1.5 text-xs font-medium text-brand-ink hover:text-brand-sage"
                             >
-                                <x-heroicon-o-plus-circle class="h-3.5 w-3.5" aria-hidden="true" />
+                                <x-heroicon-o-plus-circle class="h-4 w-4" aria-hidden="true" />
                                 {{ __('Create new channel') }}
                             </button>
                             <span class="text-[10px] text-brand-mist">·</span>

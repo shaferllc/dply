@@ -21,7 +21,7 @@
                     class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 shadow-sm hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
                     title="{{ __('Move .env to /etc/dply/:slug.env (root:site-user 640) and push.', ['slug' => $site->slug]) }}"
                 >
-                    <x-heroicon-o-arrow-up-on-square class="h-3.5 w-3.5" />
+                    <x-heroicon-o-arrow-up-on-square class="h-4 w-4" />
                     {{ __('Move outside docroot') }}
                 </button>
             </div>

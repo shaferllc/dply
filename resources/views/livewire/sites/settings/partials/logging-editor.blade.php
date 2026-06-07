@@ -35,7 +35,7 @@
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Channels') }}</p>
                 <div x-data="{ open: false }" class="relative">
                     <button type="button" x-on:click="open = !open" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
-                        <x-heroicon-o-plus class="h-3.5 w-3.5" /> {{ __('Add channel') }}
+                        <x-heroicon-o-plus class="h-4 w-4" /> {{ __('Add channel') }}
                     </button>
                     <div x-show="open" x-on:click.outside="open = false" x-transition class="absolute right-0 z-10 mt-1 w-56 overflow-hidden rounded-lg border border-brand-ink/10 bg-white py-1 shadow-lg" style="display:none">
                         @foreach ($typeOptions as $opt)
@@ -138,7 +138,7 @@
                             <span class="text-brand-moss">{{ __('In stack') }}</span>
                         </label>
                         <button type="button" wire:click="testLoggingChannel('{{ $name }}')" class="ml-auto inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 font-semibold text-brand-ink hover:bg-brand-sand/40" title="{{ __('Emit a test record (uses the last deployed config)') }}">
-                            <x-heroicon-o-paper-airplane class="h-3.5 w-3.5" /> {{ __('Test') }}
+                            <x-heroicon-o-paper-airplane class="h-4 w-4" /> {{ __('Test') }}
                         </button>
                     </div>
                 </div>
@@ -173,10 +173,10 @@
         {{-- Actions --}}
         <div class="flex items-center justify-between gap-3">
             <button type="button" wire:click="previewLoggingConfig" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                <x-heroicon-o-eye class="h-3.5 w-3.5" /> {{ __('Preview generated file') }}
+                <x-heroicon-o-eye class="h-4 w-4" /> {{ __('Preview generated file') }}
             </button>
             <button type="button" wire:click="saveLoggingSpec" wire:loading.attr="disabled" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-4 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90 disabled:opacity-60">
-                <x-heroicon-o-check class="h-3.5 w-3.5" /> {{ __('Save logging') }}
+                <x-heroicon-o-check class="h-4 w-4" /> {{ __('Save logging') }}
             </button>
         </div>
 

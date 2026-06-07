@@ -91,7 +91,7 @@
                         @if ($alert->isOpen())
                             <button type="button" wire:click="dismiss('{{ $alert->id }}')"
                                 class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                <x-heroicon-o-x-mark class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-o-x-mark class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Dismiss') }}
                             </button>
                         @endif

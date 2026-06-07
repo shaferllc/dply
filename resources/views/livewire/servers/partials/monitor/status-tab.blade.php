@@ -38,13 +38,13 @@
         @if (! $isDeployer)
             <div class="flex shrink-0 flex-wrap items-center gap-2">
                 <x-secondary-button size="sm" type="button" wire:click="queueMonitoringProbe" wire:loading.attr="disabled" wire:target="queueMonitoringProbe">
-                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0" wire:loading.class="animate-spin" wire:target="queueMonitoringProbe" aria-hidden="true" />
+                    <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0" wire:loading.class="animate-spin" wire:target="queueMonitoringProbe" aria-hidden="true" />
                     <span wire:loading.remove wire:target="queueMonitoringProbe">{{ __('Recheck status') }}</span>
                     <span wire:loading wire:target="queueMonitoringProbe">{{ __('Queueing…') }}</span>
                 </x-secondary-button>
                 @if (! $monitorHealthy)
                     <x-secondary-button size="sm" type="button" wire:click="setMonitorWorkspaceTab('diagnostics')">
-                        <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        <x-heroicon-o-wrench-screwdriver class="h-4 w-4 shrink-0" aria-hidden="true" />
                         {{ __('Open Diagnostics') }}
                     </x-secondary-button>
                 @endif
@@ -90,7 +90,7 @@
                     wire:click="setMonitorWorkspaceTab('notifications')"
                     class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors"
                 >
-                    <x-heroicon-o-plus class="h-3.5 w-3.5" aria-hidden="true" />
+                    <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
                     {{ __('Add route') }}
                 </button>
                 <a
@@ -218,7 +218,7 @@
         <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div class="flex items-center gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-3 py-2.5">
                 <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-brand-mist ring-1 ring-brand-ink/10">
-                    <x-heroicon-o-clock class="h-3.5 w-3.5" aria-hidden="true" />
+                    <x-heroicon-o-clock class="h-4 w-4" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
                     <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Uptime') }}</p>
@@ -227,7 +227,7 @@
             </div>
             <div class="flex items-center gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-3 py-2.5">
                 <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-sky-700 ring-1 ring-sky-200">
-                    <x-heroicon-o-arrow-down class="h-3.5 w-3.5" aria-hidden="true" />
+                    <x-heroicon-o-arrow-down class="h-4 w-4" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
                     <p class="text-[10px] font-semibold uppercase tracking-wide text-sky-700">{{ __('Inbound') }}</p>
@@ -236,7 +236,7 @@
             </div>
             <div class="flex items-center gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-3 py-2.5">
                 <span class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-violet-700 ring-1 ring-violet-200">
-                    <x-heroicon-o-arrow-up class="h-3.5 w-3.5" aria-hidden="true" />
+                    <x-heroicon-o-arrow-up class="h-4 w-4" aria-hidden="true" />
                 </span>
                 <div class="min-w-0">
                     <p class="text-[10px] font-semibold uppercase tracking-wide text-violet-700">{{ __('Outbound') }}</p>
@@ -251,9 +251,9 @@
         <div class="{{ $card }}" x-data="{ editing: @js($editingThresholds) }" x-init="$watch('editing', value => { if (!value) $wire.editingThresholds = false; })">
             <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-8">
                 <div class="flex min-w-0 items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                    <x-icon-badge>
                         <x-heroicon-o-adjustments-horizontal class="h-5 w-5" aria-hidden="true" />
-                    </span>
+                    </x-icon-badge>
                     <div class="min-w-0">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Thresholds') }}</p>
                         <h2 class="mt-0.5 text-lg font-semibold text-brand-ink">{{ __('Alert thresholds') }}</h2>
@@ -286,7 +286,7 @@
                             type="button"
                             wire:click="startEditingThresholds"
                         >
-                            <x-heroicon-o-pencil class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            <x-heroicon-o-pencil class="h-4 w-4 shrink-0" aria-hidden="true" />
                             {{ __('Edit thresholds') }}
                         </x-secondary-button>
                         @if ($thresholds['cpu'] !== (float) config('insights.thresholds.cpu_warn_pct', 85) ||
@@ -386,7 +386,7 @@
                       $thresholds['mem'] !== (float) config('insights.thresholds.mem_warn_pct', 85) ||
                       $thresholds['load'] !== (float) config('insights.thresholds.load_warn', 4.0))
                     <p class="mt-4 text-xs text-brand-sage">
-                        <x-heroicon-o-information-circle class="inline h-3.5 w-3.5" aria-hidden="true" />
+                        <x-heroicon-o-information-circle class="inline h-4 w-4" aria-hidden="true" />
                         {{ __('Using custom server thresholds. Organization defaults shown in help text.') }}
                     </p>
                 @endif

@@ -32,7 +32,7 @@
                     </div>
                     <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveEnvFilePath">
                         <span wire:loading.remove wire:target="saveEnvFilePath">{{ __('Save path') }}</span>
-                        <span wire:loading wire:target="saveEnvFilePath" class="inline-flex items-center gap-1.5"><span class="inline-flex h-3.5 w-3.5 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
+                        <span wire:loading wire:target="saveEnvFilePath" class="inline-flex items-center gap-1.5"><span class="inline-flex h-4 w-4 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
                     </x-primary-button>
                 </form>
                 <p class="text-[11px] text-brand-moss">

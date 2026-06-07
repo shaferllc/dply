@@ -9,7 +9,7 @@
                 <div class="flex gap-2">
                     <button type="button" wire:click="openAddTraefikTcpRouteForm" @disabled($isDeployer || $actionInFlight)
                         class="inline-flex items-center gap-1.5 rounded-md bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream">
-                        <x-heroicon-o-plus class="h-3.5 w-3.5" /> {{ __('Add TCP route') }}
+                        <x-heroicon-o-plus class="h-4 w-4" /> {{ __('Add TCP route') }}
                     </button>
                     <button type="button" wire:click="loadTraefikTcpRoutesConfig" class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium hover:bg-brand-sand/40">{{ __('Reload') }}</button>
                 </div>

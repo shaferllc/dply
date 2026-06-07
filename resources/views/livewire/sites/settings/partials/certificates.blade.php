@@ -56,9 +56,9 @@
     <section class="{{ $card }} mb-6 overflow-hidden" wire:init="loadCaddyManagedCerts">
         <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-icon-badge>
                     <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
-                </span>
+                </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Managed by Caddy') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Automatic HTTPS') }}</h2>
@@ -77,8 +77,8 @@
                 wire:target="refreshCaddyManagedCerts,loadCaddyManagedCerts"
                 class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
             >
-                <span wire:loading.remove wire:target="refreshCaddyManagedCerts,loadCaddyManagedCerts" class="inline-flex"><x-heroicon-o-arrow-path class="h-3.5 w-3.5" /></span>
-                <span wire:loading wire:target="refreshCaddyManagedCerts,loadCaddyManagedCerts" class="inline-flex"><x-heroicon-o-arrow-path class="h-3.5 w-3.5 animate-spin" /></span>
+                <span wire:loading.remove wire:target="refreshCaddyManagedCerts,loadCaddyManagedCerts" class="inline-flex"><x-heroicon-o-arrow-path class="h-4 w-4" /></span>
+                <span wire:loading wire:target="refreshCaddyManagedCerts,loadCaddyManagedCerts" class="inline-flex"><x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" /></span>
                 {{ __('Rescan') }}
             </button>
         </div>
@@ -89,7 +89,7 @@
 
         @if (! $caddy_managed_certs_loaded)
             <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7" @if ($caddy_managed_certs_scanning) wire:poll.2s="pollCaddyManagedCerts" @endif>
-                <span class="inline-flex items-center gap-2"><x-heroicon-o-arrow-path class="h-3.5 w-3.5 animate-spin" /> {{ __('Reading Caddy certificate…') }}</span>
+                <span class="inline-flex items-center gap-2"><x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" /> {{ __('Reading Caddy certificate…') }}</span>
             </div>
         @elseif ($caddy_managed_certs_unreadable)
             <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7">
@@ -153,9 +153,9 @@
 <section class="{{ $card }}">
     <form wire:submit="createCertificateRequest">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('SSL') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Request or install certificates') }}</h2>
@@ -286,9 +286,9 @@
 <section class="{{ $card }} mt-6">
     <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
         <div class="flex min-w-0 items-start gap-3">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Existing certificates') }}</h2>
@@ -384,8 +384,8 @@
                                     class="inline-flex items-center gap-1.5 rounded-lg border border-brand-forest/30 bg-brand-forest/5 px-2.5 py-1.5 text-xs font-semibold text-brand-forest shadow-sm hover:bg-brand-forest/10 disabled:opacity-60"
                                     title="{{ __('Re-apply webserver routing and retry Let\'s Encrypt for this certificate') }}"
                                 >
-                                    <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" wire:loading.remove wire:target="repairCertificate('{{ $certificate->id }}')" />
-                                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5 animate-spin" wire:loading wire:target="repairCertificate('{{ $certificate->id }}')" />
+                                    <x-heroicon-o-wrench-screwdriver class="h-4 w-4" wire:loading.remove wire:target="repairCertificate('{{ $certificate->id }}')" />
+                                    <x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" wire:loading wire:target="repairCertificate('{{ $certificate->id }}')" />
                                     <span wire:loading wire:target="repairCertificate('{{ $certificate->id }}')">{{ __('Repairing…') }}</span>
                                     <span wire:loading.remove wire:target="repairCertificate('{{ $certificate->id }}')">{{ __('Repair') }}</span>
                                 </button>

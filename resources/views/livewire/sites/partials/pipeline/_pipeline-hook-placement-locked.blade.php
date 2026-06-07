@@ -25,7 +25,7 @@
     </p>
     <div class="mt-3 flex flex-wrap items-center gap-2">
         <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ring-1 {{ $kindTone }}">
-            <x-dynamic-component :component="$kindIcon" class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            <x-dynamic-component :component="$kindIcon" class="h-4 w-4 shrink-0" aria-hidden="true" />
             {{ $kindLabel }}
         </span>
         <x-heroicon-m-chevron-right class="h-4 w-4 shrink-0 text-brand-mist" aria-hidden="true" />
@@ -35,7 +35,7 @@
         @if ($afterStep)
             <x-heroicon-m-chevron-right class="h-4 w-4 shrink-0 text-brand-mist" aria-hidden="true" />
             <span class="inline-flex items-center gap-1.5 rounded-full border border-sky-200/80 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-900 ring-1 ring-sky-200/50">
-                <x-heroicon-m-queue-list class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <x-heroicon-m-queue-list class="h-4 w-4 shrink-0" aria-hidden="true" />
                 {{ $afterStep->pillLabel() }}
             </span>
         @endif

@@ -22,7 +22,7 @@
                 x-on:click="navigator.clipboard.writeText(@js($bashFull)).then(() => { copied = true; setTimeout(() => copied = false, 2000); })"
                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/50"
             >
-                <x-heroicon-m-clipboard class="h-3.5 w-3.5" />
+                <x-heroicon-m-clipboard class="h-4 w-4" />
                 <span x-text="copied ? @js(__('Copied')) : @js(__('Copy full script'))"></span>
             </button>
             <button
@@ -31,7 +31,7 @@
                 x-on:click="navigator.clipboard.writeText(@js($bashCommands)).then(() => { copied = true; setTimeout(() => copied = false, 2000); })"
                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/50"
             >
-                <x-heroicon-m-clipboard-document-list class="h-3.5 w-3.5" />
+                <x-heroicon-m-clipboard-document-list class="h-4 w-4" />
                 <span x-text="copied ? @js(__('Copied')) : @js(__('Copy commands only'))"></span>
             </button>
             <x-secondary-button type="button" wire:click="downloadPipelineBashFull">

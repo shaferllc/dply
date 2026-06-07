@@ -77,7 +77,7 @@
                                         'bg-brand-ink/[0.06] text-brand-mist' => ! $isDone && ! $isActive,
                                     ])>
                                         @if ($isDone)
-                                            <x-heroicon-s-check class="h-3.5 w-3.5" />
+                                            <x-heroicon-s-check class="h-4 w-4" />
                                         @elseif ($isActive)
                                             <span class="h-2 w-2 animate-pulse rounded-full bg-brand-forest"></span>
                                         @else
@@ -102,8 +102,8 @@
                                 <p class="text-xs text-brand-moss">{{ __('This is taking longer than expected. You can re-run the scan to try again.') }}</p>
                                 <button type="button" wire:click="rescan" wire:loading.attr="disabled" wire:target="rescan"
                                     class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60">
-                                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="rescan" />
-                                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5 animate-spin" wire:loading wire:target="rescan" />
+                                    <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="rescan" />
+                                    <x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" wire:loading wire:target="rescan" />
                                     {{ __('Re-scan') }}
                                 </button>
                             </div>
@@ -116,7 +116,7 @@
                                  so you can watch what it's doing and see why it stalls. --}}
                             <div class="mt-6 border-t border-brand-ink/10 pt-4">
                                 <div class="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-moss">
-                                    <x-heroicon-o-command-line class="h-3.5 w-3.5" aria-hidden="true" />
+                                    <x-heroicon-o-command-line class="h-4 w-4" aria-hidden="true" />
                                     {{ __('Job console') }}
                                 </div>
                                 <div
@@ -173,7 +173,7 @@
                                     <div class="mt-3 flex flex-wrap gap-2">
                                         <button type="button" wire:click="rescan"
                                             class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-medium text-brand-cream hover:bg-brand-forest">
-                                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" /> {{ __('Re-scan') }}
+                                            <x-heroicon-o-arrow-path class="h-4 w-4" /> {{ __('Re-scan') }}
                                         </button>
                                         <a href="{{ route('sites.repository', [$server, $site]) }}" wire:navigate
                                             class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">
@@ -190,7 +190,7 @@
                                  exact reason it failed. --}}
                             <div class="mt-4">
                                 <div class="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-moss">
-                                    <x-heroicon-o-command-line class="h-3.5 w-3.5" aria-hidden="true" />
+                                    <x-heroicon-o-command-line class="h-4 w-4" aria-hidden="true" />
                                     {{ __('Job console') }}
                                 </div>
                                 <div class="max-h-48 overflow-y-auto rounded-xl border border-brand-ink/10 bg-brand-ink/[0.035] p-3 font-mono text-[11px] leading-relaxed text-brand-ink"

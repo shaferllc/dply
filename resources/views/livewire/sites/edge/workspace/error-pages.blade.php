@@ -2,9 +2,9 @@
     {{-- dply.yaml integration banner (same pattern as Firewall / Crons / Origin) --}}
     <section class="dply-card overflow-hidden">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Error pages') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Error pages + maintenance') }}</h3>
@@ -67,9 +67,9 @@ maintenance:
     {{-- Maintenance --}}
     <section class="dply-card overflow-hidden" x-data="{ tpl: 'minimal' }">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-wrench class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Maintenance') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Maintenance mode') }}</h3>
@@ -115,9 +115,9 @@ maintenance:
     {{-- Custom 404 / 500 --}}
     <section class="dply-card overflow-hidden">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+            <x-icon-badge>
                 <x-heroicon-o-exclamation-circle class="h-5 w-5" aria-hidden="true" />
-            </span>
+            </x-icon-badge>
             <div class="min-w-0">
                 <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Error pages') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Custom error pages') }}</h3>

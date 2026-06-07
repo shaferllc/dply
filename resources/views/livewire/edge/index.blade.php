@@ -21,15 +21,15 @@
         @if ($edgeEnabled)
             <x-slot name="actions">
                 <a href="{{ route('edge.usage') }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
-                    <x-heroicon-o-chart-bar class="h-3.5 w-3.5" aria-hidden="true" />
+                    <x-heroicon-o-chart-bar class="h-4 w-4" aria-hidden="true" />
                     {{ __('Usage') }}
                 </a>
                 <a href="{{ route('edge.templates') }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
-                    <x-heroicon-o-rectangle-stack class="h-3.5 w-3.5" aria-hidden="true" />
+                    <x-heroicon-o-rectangle-stack class="h-4 w-4" aria-hidden="true" />
                     {{ __('Templates') }}
                 </a>
                 <a href="{{ route('edge.import') }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40">
-                    <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5" aria-hidden="true" />
+                    <x-heroicon-o-arrow-down-tray class="h-4 w-4" aria-hidden="true" />
                     {{ __('Import') }}
                 </a>
                 <a href="{{ route('edge.create') }}" wire:navigate class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest">
@@ -199,16 +199,16 @@
                                 wire:click="openQuickLookModal('{{ $site->id }}')"
                                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40"
                             >
-                                <x-heroicon-o-bolt class="h-3.5 w-3.5" aria-hidden="true" />
+                                <x-heroicon-o-bolt class="h-4 w-4" aria-hidden="true" />
                                 {{ __('Status') }}
                             </button>
                             <a href="{{ route('sites.show', ['server' => $site->server, 'site' => $site]) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40">
-                                <x-heroicon-o-eye class="h-3.5 w-3.5" aria-hidden="true" />
+                                <x-heroicon-o-eye class="h-4 w-4" aria-hidden="true" />
                                 {{ __('Open') }}
                             </a>
                             @can('delete', $site)
                                 <button type="button" wire:click="openDeleteSiteModal('{{ $site->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-800 transition hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300 dark:hover:bg-rose-950/50">
-                                    <x-heroicon-o-trash class="h-3.5 w-3.5" aria-hidden="true" />
+                                    <x-heroicon-o-trash class="h-4 w-4" aria-hidden="true" />
                                     {{ __('Delete') }}
                                 </button>
                             @endcan
@@ -311,16 +311,16 @@
                                             class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40"
                                             title="{{ __('Peek at the live build/provisioning status without leaving this list.') }}"
                                         >
-                                            <x-heroicon-o-eye class="h-3.5 w-3.5" aria-hidden="true" />
+                                            <x-heroicon-o-eye class="h-4 w-4" aria-hidden="true" />
                                             {{ __('Status') }}
                                         </button>
                                         <a href="{{ route('sites.show', ['server' => $site->server, 'site' => $site]) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink transition hover:bg-brand-sand/40">
-                                            <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5" aria-hidden="true" />
+                                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" aria-hidden="true" />
                                             {{ __('Open') }}
                                         </a>
                                         @can('delete', $site)
                                             <button type="button" wire:click="openDeleteSiteModal('{{ $site->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-800 transition hover:bg-rose-100 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-300 dark:hover:bg-rose-950/50">
-                                                <x-heroicon-o-trash class="h-3.5 w-3.5" aria-hidden="true" />
+                                                <x-heroicon-o-trash class="h-4 w-4" aria-hidden="true" />
                                                 {{ __('Delete') }}
                                             </button>
                                         @endcan
