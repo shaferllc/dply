@@ -85,10 +85,31 @@ class RunWebserverConfigOpJob implements ShouldQueue
         // Livewire component can pick it up on its next poll-driven
         // render and drop it into the editor buffer.
         if ($this->op === 'read') {
+            // Fold the backups listing into this same worker job so the Livewire
+            // pickup is a pure cache read. Previously refreshConfigBackups() ran
+            // a second, inline SSH call inside the render() pickup — a whole
+            // extra connection of latency on every load, and on the HTTP path
+            // (against the queue-all-SSH rule). Non-fatal: backups are an aux
+            // panel, so a listing failure must not sink the read itself.
+            try {
+                $result['backups'] = $service->listBackups($server, $this->engine, $this->path);
+            } catch (\Throwable) {
+                $result['backups'] = [];
+            }
             Cache::put(
                 self::readResultCacheKey($this->consoleActionId),
                 $result,
                 now()->addMinutes(5),
+            );
+            // Per-path content cache: lets a later click on the same file skip
+            // the queue + SSH round-trip entirely and hydrate the editor inline
+            // (see WorkspaceWebserver::loadWebserverConfig). Stamped so the UI
+            // can show "from cache" and offer a re-read. Invalidated on the next
+            // write/restore below so an edit never serves stale bytes.
+            Cache::put(
+                self::fileContentCacheKey($this->serverId, $this->engine, $this->path),
+                $result + ['cached_at' => now()->toIso8601String()],
+                now()->addMinutes(10),
             );
             $this->markConsole(ConsoleAction::STATUS_COMPLETED, error: null);
 
@@ -100,6 +121,12 @@ class RunWebserverConfigOpJob implements ShouldQueue
         // the success check + error message across both shapes.
         $ok = (bool) ($result['ok'] ?? $result['validate_ok'] ?? false);
         $errBlob = $ok ? null : (string) ($result['output'] ?? $result['validate_output'] ?? '');
+
+        // A successful write/restore changes the live file, so drop the per-path
+        // content cache — the next load re-reads fresh bytes (and re-caches).
+        if ($ok && in_array($this->op, ['write', 'restore'], true)) {
+            Cache::forget(self::fileContentCacheKey($this->serverId, $this->engine, $this->path));
+        }
 
         if ($ok && $this->op === 'write' && $this->recordRevision) {
             app(ServerWebserverConfigEditor::class)->recordWrite(
@@ -135,6 +162,17 @@ class RunWebserverConfigOpJob implements ShouldQueue
     public static function readResultCacheKey(string $consoleActionId): string
     {
         return 'dply.webserver-config-read:'.$consoleActionId;
+    }
+
+    /**
+     * Per-(server, engine, path) cache of a file's contents + backups, so a
+     * repeat load hydrates the editor inline without a queue + SSH round-trip.
+     * Keyed by a hash of the path so it stays a safe cache key regardless of
+     * slashes/length.
+     */
+    public static function fileContentCacheKey(string $serverId, string $engine, string $path): string
+    {
+        return 'dply.webserver-config-content:'.$serverId.':'.$engine.':'.sha1($path);
     }
 
     public static function writeResultCacheKey(string $consoleActionId): string

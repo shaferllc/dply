@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Models\SchedulerTickOutput;
 use App\Models\Server;
 use App\Models\ServerSchedulerHeartbeat;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
@@ -12,6 +13,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -46,10 +48,18 @@ class RunSchedulerNowJob implements ShouldQueue
         public string $serverId,
         public string $heartbeatId,
         public ?string $userId = null,
+        public ?string $runId = null,
     ) {}
+
+    public static function cacheKey(string $runId): string
+    {
+        return 'scheduler_run:'.$runId;
+    }
 
     public function handle(ExecuteRemoteTaskOnServer $remote): void
     {
+        $this->store('running', '');
+
         $server = Server::query()->find($this->serverId);
         $heartbeat = ServerSchedulerHeartbeat::query()
             ->where('server_id', $this->serverId)
@@ -57,9 +67,13 @@ class RunSchedulerNowJob implements ShouldQueue
             ->first();
 
         if ($server === null || $heartbeat === null || $heartbeat->site_id === null) {
+            $this->store('failed', 'Scheduler or server not found.');
+
             return;
         }
         if (! $server->isReady() || blank($server->ip_address)) {
+            $this->store('failed', 'Server is not ready for SSH.');
+
             return;
         }
         $organization = $server->organization;
@@ -69,6 +83,7 @@ class RunSchedulerNowJob implements ShouldQueue
                 'organization_id' => $organization->id,
                 'trial_state' => $organization->trialState()->value,
             ]);
+            $this->store('failed', 'Scheduler run is paused for this organization (trial state).');
 
             return;
         }
@@ -77,12 +92,16 @@ class RunSchedulerNowJob implements ShouldQueue
         // The site relationship gives us the path; missing site = nothing to do.
         $site = $heartbeat->site;
         if ($site === null) {
+            $this->store('failed', 'Site not found for this scheduler.');
+
             return;
         }
 
         $directory = rtrim($site->effectiveRepositoryPath(), '/').'/current';
         $command = $this->commandFor($heartbeat->scheduler_kind, $directory);
         if ($command === null) {
+            $this->store('failed', 'No canonical run command for this scheduler kind. Use a long-running worker instead.');
+
             return;
         }
 
@@ -99,12 +118,29 @@ class RunSchedulerNowJob implements ShouldQueue
 
         try {
             $out = $remote->runInlineBash($server, 'scheduler-run-now', $wrapperCmd, $this->timeout, false);
+            $exit = $out->getExitCode();
+            $body = trim((string) $out->getBuffer());
             Log::info('scheduler.run_now.completed', [
                 'server_id' => $this->serverId,
                 'heartbeat_id' => $this->heartbeatId,
                 'user_id' => $this->userId,
-                'exit_code' => $out->getExitCode(),
+                'exit_code' => $exit,
             ]);
+            $this->store(
+                $exit === 0 ? 'done' : 'failed',
+                $body !== '' ? $body : ($exit === 0 ? '(no output)' : 'Exited with code '.$exit),
+            );
+
+            // Record a manual run in the tick-output history (Q7: trigger=manual).
+            // runInlineBash combines stdout+stderr into one buffer; store under
+            // whichever stream matches the outcome so the Logs UI tints it right.
+            SchedulerTickOutput::record(
+                heartbeatId: $heartbeat->id,
+                trigger: SchedulerTickOutput::TRIGGER_MANUAL,
+                exitCode: $exit,
+                stdout: $exit === 0 ? ($body !== '' ? $body : '(no output)') : null,
+                stderr: $exit !== 0 ? ($body !== '' ? $body : 'Exited with code '.$exit) : null,
+            );
         } catch (\Throwable $e) {
             Log::warning('scheduler.run_now.failed', [
                 'server_id' => $this->serverId,
@@ -112,7 +148,21 @@ class RunSchedulerNowJob implements ShouldQueue
                 'user_id' => $this->userId,
                 'error' => $e->getMessage(),
             ]);
+            $this->store('failed', $e->getMessage());
         }
+    }
+
+    public function failed(?\Throwable $exception): void
+    {
+        $this->store('failed', $exception?->getMessage() ?? 'The scheduler run job failed.');
+    }
+
+    private function store(string $status, string $output): void
+    {
+        if ($this->runId === null) {
+            return;
+        }
+        Cache::put(self::cacheKey($this->runId), compact('status', 'output'), now()->addMinutes(10));
     }
 
     private function commandFor(string $kind, string $directory): ?string

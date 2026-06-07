@@ -191,15 +191,19 @@
                                             @endif
                                         </p>
 
-                                        <details class="mt-2 group">
-                                            <summary class="cursor-pointer list-none text-[11px] font-medium uppercase tracking-wide text-brand-mist hover:text-brand-ink">
-                                                <span class="inline-flex items-center gap-1">
-                                                    <x-heroicon-o-chevron-down class="h-3 w-3 transition-transform group-open:rotate-180" />
-                                                    <span class="group-open:hidden">{{ __('Show details') }}</span>
-                                                    <span class="hidden group-open:inline">{{ __('Hide details') }}</span>
-                                                </span>
-                                            </summary>
-                                            <div class="mt-2 space-y-3 rounded-lg bg-brand-sand/15 px-4 py-3">
+                                        {{-- Alpine toggle (not native <details>): the open state lives in
+                                             Alpine so Livewire's banner self-poll morph doesn't collapse it. --}}
+                                        <div class="mt-2" x-data="{ open: false }">
+                                            <button
+                                                type="button"
+                                                x-on:click="open = ! open"
+                                                class="inline-flex cursor-pointer items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-brand-mist hover:text-brand-ink"
+                                            >
+                                                <x-heroicon-o-chevron-down class="h-3 w-3 transition-transform" x-bind:class="open ? 'rotate-180' : ''" />
+                                                <span x-show="! open">{{ __('Show details') }}</span>
+                                                <span x-show="open" x-cloak>{{ __('Hide details') }}</span>
+                                            </button>
+                                            <div x-show="open" x-collapse x-cloak class="mt-2 space-y-3 rounded-lg bg-brand-sand/15 px-4 py-3">
                                                 <dl class="grid gap-x-6 gap-y-3 sm:grid-cols-2">
                                                     <div>
                                                         <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('UID') }}</dt>
@@ -244,7 +248,7 @@
                                                     </div>
                                                 </dl>
                                             </div>
-                                        </details>
+                                        </div>
                                     </div>
 
                                     <div class="flex flex-wrap items-center gap-2 self-start sm:self-center">

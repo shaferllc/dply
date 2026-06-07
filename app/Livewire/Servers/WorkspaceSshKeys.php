@@ -251,7 +251,7 @@ class WorkspaceSshKeys extends Component
         $this->saveAdvancedSettings();
     }
 
-    public function saveAdvancedSettings(): void
+    public function saveAdvancedSettings(ServerAuthorizedKeysAuditLogger $audit): void
     {
         $this->authorize('update', $this->server);
         $this->validate([
@@ -270,6 +270,18 @@ class WorkspaceSshKeys extends Component
         $this->server->fresh()->update(['meta' => $meta]);
         $this->server->refresh();
         $this->hydrateAdvancedFromServer();
+
+        $audit->record(
+            $this->server,
+            ServerSshKeyAuditEvent::EVENT_SETTINGS_UPDATED,
+            [
+                'disable_sync' => (bool) $this->advanced_disable_sync,
+                'health_check' => (bool) $this->advanced_health_check,
+                'label_template' => trim($this->advanced_label_template) !== '' ? $this->advanced_label_template : null,
+            ],
+            Auth::user(),
+        );
+
         $this->toastSuccess(__('SSH key settings saved.'));
     }
 

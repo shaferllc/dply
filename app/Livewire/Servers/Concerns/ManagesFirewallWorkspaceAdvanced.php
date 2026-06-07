@@ -252,6 +252,7 @@ trait ManagesFirewallWorkspaceAdvanced
 
         $this->new_saved_template_name = '';
         $this->new_saved_template_description = null;
+        $this->dispatch('close-modal', 'save-firewall-template-modal');
         $this->toastSuccess(__('Template saved.'));
     }
 }

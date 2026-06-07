@@ -1,0 +1,33 @@
+[Unit]
+Description=dply Logs shipper (Vector)
+Documentation=https://dply.io/docs/logs
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+ExecStart=/usr/local/bin/dply-vector --config /etc/dply-logship/vector.toml
+ExecReload=/usr/local/bin/dply-vector validate /etc/dply-logship/vector.toml && /bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+# Vector reads journald + root-owned files under /var/log (auth.log is root:adm),
+# so it runs as root in Phase 1. Hardening below limits blast radius; resource
+# ceilings guarantee the customer's own app always wins over log shipping.
+User=root
+
+# --- Resource ceilings (the customer's box — app health > log completeness) ---
+CPUQuota=__CPU_QUOTA__
+MemoryMax=__MEMORY_MAX__
+TasksMax=64
+
+# --- Hardening ---
+NoNewPrivileges=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+# Vector needs to write only its own state/buffer dir.
+ReadWritePaths=/var/lib/dply-logship
+
+[Install]
+WantedBy=multi-user.target

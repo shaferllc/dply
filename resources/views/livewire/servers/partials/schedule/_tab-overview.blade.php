@@ -99,38 +99,3 @@
         </div>
     @endif
 </section>
-
-<section class="dply-card overflow-hidden">
-    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <x-icon-badge>
-            <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
-        </x-icon-badge>
-        <div>
-            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Related') }}</p>
-            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Background jobs on this server') }}</h3>
-        </div>
-    </div>
-    <ul class="divide-y divide-brand-ink/10 text-sm">
-        <li class="flex flex-wrap items-center justify-between gap-3 px-6 py-4 sm:px-7">
-            <div>
-                <p class="font-semibold text-brand-ink">{{ __('Cron jobs') }}</p>
-                <p class="mt-0.5 text-xs text-brand-moss">{{ __('Server and site crontab entries in the dply-managed block.') }}</p>
-            </div>
-            <a href="{{ route('servers.cron', $server) }}" wire:navigate class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Open cron jobs') }}</a>
-        </li>
-        <li class="flex flex-wrap items-center justify-between gap-3 px-6 py-4 sm:px-7">
-            <div>
-                <p class="font-semibold text-brand-ink">{{ __('Workers') }}</p>
-                <p class="mt-0.5 text-xs text-brand-moss">{{ __('Supervisor programs including schedule:work daemons.') }}</p>
-            </div>
-            <a href="{{ route('servers.workers', $server) }}" wire:navigate class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Open workers') }}</a>
-        </li>
-        <li class="flex flex-wrap items-center justify-between gap-3 px-6 py-4 sm:px-7">
-            <div>
-                <p class="font-semibold text-brand-ink">{{ __('Activity') }}</p>
-                <p class="mt-0.5 text-xs text-brand-moss">{{ __('Run-now output and background job history.') }}</p>
-            </div>
-            <a href="{{ route('servers.activity', $server) }}?category=background" wire:navigate class="text-xs font-semibold text-brand-forest hover:underline">{{ __('View activity') }}</a>
-        </li>
-    </ul>
-</section>

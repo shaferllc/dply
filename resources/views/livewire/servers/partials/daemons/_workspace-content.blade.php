@@ -140,7 +140,12 @@
             </x-server-workspace-tab>
         </x-server-workspace-tablist>
 
-        <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="setDaemonsWorkspaceTab">
+        {{-- Skeleton placeholder shown while the incoming tab loads. --}}
+        <div wire:loading.block wire:target="setDaemonsWorkspaceTab">
+            @include('livewire.servers.partials._skeleton-cards')
+        </div>
+
+        <div wire:loading.remove wire:target="setDaemonsWorkspaceTab">
 
         @if ($daemons_workspace_tab === 'programs')
             <x-server-workspace-tab-panel

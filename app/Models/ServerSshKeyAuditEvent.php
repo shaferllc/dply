@@ -26,6 +26,8 @@ class ServerSshKeyAuditEvent extends Model
 
     public const EVENT_TEAM_KEY_DEPLOYED = 'team_key_deployed';
 
+    public const EVENT_SETTINGS_UPDATED = 'settings_updated';
+
     protected $fillable = [
         'server_id',
         'user_id',

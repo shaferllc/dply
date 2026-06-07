@@ -55,6 +55,10 @@
         'showRailsSchedulerEnable',
         'showCustomSchedulerEnable',
         'preflight_results',
+        'auditLogs',
+        'logSchedulers',
+        'logSelectedHeartbeat',
+        'logTickOutputs',
     );
 @endphp
 
@@ -137,16 +141,28 @@
 
 @if ($opsReady)
     {{-- Console banner for scheduler actions (enable, pause, run-now, cadence save) --}}
-    <div wire:loading wire:target="enableScheduler,togglePause,saveCadence,runNow" class="mb-4">
+    <div wire:loading wire:target="enableSchedulerForSite,togglePause,saveCadence,runNow" class="mb-4">
         <x-workspace-console-banner status="running" :message="__('Applying scheduler change…')" :busy="true" />
     </div>
     @if ($panel_event_message !== '')
-        <div wire:loading.remove wire:target="enableScheduler,togglePause,saveCadence,runNow" class="mb-4">
+        <div wire:loading.remove wire:target="enableSchedulerForSite,togglePause,saveCadence,runNow,pollSchedulerRun" class="mb-4">
             <x-workspace-console-banner
                 :status="$panel_event_status"
                 :message="$panel_event_message"
                 :output="$panel_event_lines"
                 dismiss-action="dismissPanelBanner"
+            />
+        </div>
+    @endif
+
+    {{-- Run-now live streaming — poll the job's cached output until it finishes --}}
+    @if ($scheduler_run_busy)
+        <div class="mb-4" wire:poll.1s="pollSchedulerRun">
+            <x-workspace-console-banner
+                :status="$panel_event_status"
+                :message="$panel_event_message ?: __('Run now queued…')"
+                :output="$panel_event_lines"
+                :busy="true"
             />
         </div>
     @endif
@@ -164,12 +180,20 @@
                 <span class="inline-flex shrink-0 items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-amber-900">{{ number_format($scheduleStats['attention']) }}</span>
             @endif
         </x-server-workspace-tab>
-        <x-server-workspace-tab id="schedule-tab-enable" icon="heroicon-o-plus-circle" :active="$schedule_workspace_tab === 'enable'" wire:click="setScheduleWorkspaceTab('enable')">
-            {{ __('Enable') }}
+        <x-server-workspace-tab id="schedule-tab-logs" icon="heroicon-o-document-text" :active="$schedule_workspace_tab === 'logs'" wire:click="setScheduleWorkspaceTab('logs')">
+            {{ __('Logs') }}
+        </x-server-workspace-tab>
+        <x-server-workspace-tab id="schedule-tab-activity" icon="heroicon-o-clipboard-document-list" :active="$schedule_workspace_tab === 'activity'" wire:click="setScheduleWorkspaceTab('activity')">
+            {{ __('Activity') }}
         </x-server-workspace-tab>
     </x-server-workspace-tablist>
 
-    <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="setScheduleWorkspaceTab">
+    {{-- Skeleton placeholder shown while the incoming tab loads. --}}
+    <div wire:loading.block wire:target="setScheduleWorkspaceTab">
+        @include('livewire.servers.partials._skeleton-cards')
+    </div>
+
+    <div wire:loading.remove wire:target="setScheduleWorkspaceTab">
 
         @if ($schedule_workspace_tab === 'overview')
             <x-server-workspace-tab-panel id="schedule-panel-overview" labelled-by="schedule-tab-overview" panel-class="space-y-8">
@@ -183,13 +207,24 @@
             </x-server-workspace-tab-panel>
         @endif
 
-        @if ($schedule_workspace_tab === 'enable')
-            <x-server-workspace-tab-panel id="schedule-panel-enable" labelled-by="schedule-tab-enable" panel-class="space-y-8">
-                @include('livewire.servers.partials.schedule._tab-enable', $scheduleTabContext)
+        @if ($schedule_workspace_tab === 'logs')
+            <x-server-workspace-tab-panel id="schedule-panel-logs" labelled-by="schedule-tab-logs" panel-class="space-y-8">
+                @include('livewire.servers.partials.schedule._tab-logs', $scheduleTabContext)
+            </x-server-workspace-tab-panel>
+        @endif
+
+        @if ($schedule_workspace_tab === 'activity')
+            <x-server-workspace-tab-panel id="schedule-panel-activity" labelled-by="schedule-tab-activity" panel-class="space-y-8">
+                @include('livewire.servers.partials.schedule._tab-activity', $scheduleTabContext)
             </x-server-workspace-tab-panel>
         @endif
 
     </div>
+
+    {{-- Enable scheduler modal (replaces the old Enable tab; opened from the Schedulers header). --}}
+    <x-modal name="schedule-enable" maxWidth="2xl">
+        @include('livewire.servers.partials.schedule._enable-modal-body', $scheduleTabContext)
+    </x-modal>
 @else
     @include('livewire.servers.partials.workspace-ops-not-ready')
 @endif

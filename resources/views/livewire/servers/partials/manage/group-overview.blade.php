@@ -83,6 +83,62 @@
     $rootDiskPct = ($rootDiskLine && count($rootDiskLine) >= 5) ? $rootDiskLine[4] : '—';
     $rootDiskUse = ($rootDiskLine && count($rootDiskLine) >= 3) ? $rootDiskLine[2].' / '.$rootDiskLine[1] : null;
     $memUsed = ($memLine && count($memLine) >= 4) ? $memLine[2].' / '.$memLine[1] : '—';
+
+    // Numeric root-disk % for threshold coloring (e.g. "6%" -> 6).
+    $rootPctNum = is_numeric(rtrim((string) $rootDiskPct, '%')) ? (int) rtrim((string) $rootDiskPct, '%') : null;
+
+    // Per-metric status cards: tone drives the card color, sub is the small footnote.
+    $statCardTones = [
+        'emerald' => 'border-emerald-200 bg-emerald-50/60',
+        'amber' => 'border-amber-200 bg-amber-50/60',
+        'rose' => 'border-rose-200 bg-rose-50/60',
+        'neutral' => 'border-brand-ink/10 bg-white',
+    ];
+
+    $overviewStats = [
+        [
+            'label' => __('Services running'),
+            'value' => $hasAnyData ? $servicesRunning.' / '.$servicesTotal : '—',
+            'sub' => $servicesFailed > 0 ? trans_choice(':n failed|:n failed', $servicesFailed, ['n' => $servicesFailed]) : ($hasAnyData ? __('All active') : __('No data')),
+            'tone' => $servicesFailed > 0 ? 'rose' : ($hasAnyData && $servicesTotal > 0 ? 'emerald' : 'neutral'),
+            'subTone' => $servicesFailed > 0 ? 'text-red-700 font-medium' : 'text-brand-mist',
+        ],
+        [
+            'label' => __('Root disk'),
+            'value' => $rootDiskPct,
+            'sub' => $rootDiskUse ?: __('No data'),
+            'tone' => $rootPctNum === null ? 'neutral' : ($rootPctNum >= 90 ? 'rose' : ($rootPctNum >= 80 ? 'amber' : 'emerald')),
+            'subTone' => 'text-brand-mist',
+        ],
+        [
+            'label' => __('Memory'),
+            'value' => $memUsed,
+            'sub' => $hasAnyData ? __('used / total') : __('No data'),
+            'tone' => 'neutral',
+            'subTone' => 'text-brand-mist',
+        ],
+        [
+            'label' => __('Upgradable'),
+            'value' => $hasAnyData ? (string) ($upgrades ?? '0') : '—',
+            'sub' => __('packages'),
+            'tone' => ! $hasAnyData ? 'neutral' : (((int) ($upgrades ?? 0)) > 0 ? 'amber' : 'emerald'),
+            'subTone' => 'text-brand-mist',
+        ],
+        [
+            'label' => __('Security updates'),
+            'value' => $hasAnyData ? (string) $securityCount : '—',
+            'sub' => $securityCount > 0 ? __('need attention') : ($hasAnyData ? __('up to date') : __('No data')),
+            'tone' => ! $hasAnyData ? 'neutral' : ($securityCount > 0 ? 'rose' : 'emerald'),
+            'subTone' => $securityCount > 0 ? 'text-red-700 font-medium' : 'text-brand-mist',
+        ],
+        [
+            'label' => __('Reboot'),
+            'value' => $reboot === true ? __('Pending') : ($reboot === false ? __('No') : '—'),
+            'sub' => $reboot === true ? __('restart required') : ($reboot === false ? __('not required') : __('No data')),
+            'tone' => $reboot === true ? 'amber' : ($reboot === false ? 'emerald' : 'neutral'),
+            'subTone' => $reboot === true ? 'text-amber-800 font-medium' : 'text-brand-mist',
+        ],
+    ];
 @endphp
 
 <section class="space-y-6" aria-labelledby="manage-overview-title">
@@ -154,26 +210,12 @@
             </div>
         </div>
 
-        <div class="grid gap-px bg-brand-ink/10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            @foreach ([
-                ['label' => __('Services running'), 'value' => $hasAnyData ? $servicesRunning.' / '.$servicesTotal : '—'],
-                ['label' => __('Root disk'), 'value' => $rootDiskPct],
-                ['label' => __('Memory'), 'value' => $memUsed],
-                ['label' => __('Upgradable'), 'value' => $hasAnyData ? (string) ($upgrades ?? '0') : '—'],
-                ['label' => __('Security updates'), 'value' => $hasAnyData ? (string) $securityCount : '—'],
-                ['label' => __('Reboot'), 'value' => $reboot === true ? __('Pending') : ($reboot === false ? __('No') : '—')],
-            ] as $stat)
-                <div class="bg-white px-4 py-3.5">
+        <div class="grid grid-cols-2 gap-3 p-6 sm:grid-cols-3 sm:p-7 xl:grid-cols-6">
+            @foreach ($overviewStats as $stat)
+                <div @class(['rounded-2xl border px-4 py-3 shadow-sm', $statCardTones[$stat['tone']]])>
                     <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $stat['label'] }}</p>
-                    <p class="mt-1 font-mono text-lg font-semibold tabular-nums text-brand-ink">{{ $stat['value'] }}</p>
-                    @if ($stat['label'] === __('Root disk') && $rootDiskUse)
-                        <p class="mt-0.5 text-[11px] text-brand-moss">{{ $rootDiskUse }}</p>
-                    @endif
-                    @if ($stat['label'] === __('Services running') && $servicesFailed > 0)
-                        <p class="mt-0.5 text-[11px] font-medium text-red-700">
-                            {{ trans_choice(':n failed|:n failed', $servicesFailed, ['n' => $servicesFailed]) }}
-                        </p>
-                    @endif
+                    <p class="mt-1 font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $stat['value'] }}</p>
+                    <p class="mt-1 truncate text-[11px] {{ $stat['subTone'] }}" title="{{ $stat['sub'] }}">{{ $stat['sub'] }}</p>
                 </div>
             @endforeach
         </div>
@@ -213,19 +255,40 @@
 
     {{-- Related workspaces --}}
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <a href="{{ route('servers.services', $server) }}" wire:navigate class="dply-card block overflow-hidden p-5 transition hover:border-brand-sage/40 hover:bg-brand-sand/10">
-            <h3 class="text-sm font-semibold text-brand-ink">{{ __('Services') }}</h3>
-            <p class="mt-1 text-xs text-brand-moss">{{ __('systemd inventory, restart/stop/start') }}</p>
+        <a href="{{ route('servers.services', $server) }}" wire:navigate class="dply-card block overflow-hidden transition hover:border-brand-sage/40 hover:bg-brand-sand/10">
+            <div class="flex items-start gap-3 px-5 py-4">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['sage'] }}">
+                    <x-heroicon-o-rectangle-stack class="h-4 w-4" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Services') }}</h3>
+                    <p class="mt-0.5 text-xs text-brand-moss">{{ __('systemd inventory, restart/stop/start') }}</p>
+                </div>
+            </div>
         </a>
         @feature('workspace.patch_advisor')
-            <a href="{{ route('servers.patches', $server) }}" wire:navigate class="dply-card block overflow-hidden p-5 transition hover:border-brand-sage/40 hover:bg-brand-sand/10">
-                <h3 class="text-sm font-semibold text-brand-ink">{{ __('Patches') }}</h3>
-                <p class="mt-1 text-xs text-brand-moss">{{ __('Security and package patch advisor') }}</p>
+            <a href="{{ route('servers.patches', $server) }}" wire:navigate class="dply-card block overflow-hidden transition hover:border-brand-sage/40 hover:bg-brand-sand/10">
+                <div class="flex items-start gap-3 px-5 py-4">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['amber'] }}">
+                        <x-heroicon-o-shield-check class="h-4 w-4" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <h3 class="text-sm font-semibold text-brand-ink">{{ __('Patches') }}</h3>
+                        <p class="mt-0.5 text-xs text-brand-moss">{{ __('Security and package patch advisor') }}</p>
+                    </div>
+                </div>
             </a>
         @endfeature
-        <a href="{{ route('servers.webserver', $server) }}" wire:navigate class="dply-card block overflow-hidden p-5 transition hover:border-brand-sage/40 hover:bg-brand-sand/10">
-            <h3 class="text-sm font-semibold text-brand-ink">{{ __('Webserver') }}</h3>
-            <p class="mt-1 text-xs text-brand-moss">{{ __('Nginx/Caddy/Apache engine workspace') }}</p>
+        <a href="{{ route('servers.webserver', $server) }}" wire:navigate class="dply-card block overflow-hidden transition hover:border-brand-sage/40 hover:bg-brand-sand/10">
+            <div class="flex items-start gap-3 px-5 py-4">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 {{ $tonePalette['mist'] }}">
+                    <x-heroicon-o-globe-alt class="h-4 w-4" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <h3 class="text-sm font-semibold text-brand-ink">{{ __('Webserver') }}</h3>
+                    <p class="mt-0.5 text-xs text-brand-moss">{{ __('Nginx/Caddy/Apache engine workspace') }}</p>
+                </div>
+            </div>
         </a>
     </div>
 

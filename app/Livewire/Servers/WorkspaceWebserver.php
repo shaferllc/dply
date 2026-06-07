@@ -163,6 +163,12 @@ class WorkspaceWebserver extends WorkspaceManage
     /** Cached backup listing for the loaded file (path => row). */
     public array $config_backups = [];
 
+    /** True when the loaded buffer came from the per-path content cache (instant, no SSH). */
+    public bool $config_loaded_from_cache = false;
+
+    /** ISO-8601 timestamp the cached buffer was read from the server, when loaded from cache. */
+    public ?string $config_content_cached_at = null;
+
     // ---- Log viewer state --------------------------------------------
 
     /** Which log to read: 'access', 'error', or 'journal'. */
@@ -945,12 +951,6 @@ class WorkspaceWebserver extends WorkspaceManage
 
     public function mount(Server $server, ?string $section = null): void
     {
-        if ($this->engine_subtab === 'config' && in_array($this->workspace_tab, WorkspaceConfiguration::webserverConfigurationScopes(), true)) {
-            $this->redirect($this->configurationUrlForEngineTab($this->workspace_tab), navigate: true);
-
-            return;
-        }
-
         // Force the inherited 'web' section state — the parent's render share
         // and any internal asserts on $section still resolve correctly without
         // requiring the operator to type `?section=web` on the URL.
@@ -1006,12 +1006,6 @@ class WorkspaceWebserver extends WorkspaceManage
 
     public function setEngineSubtab(string $subtab): void
     {
-        if ($subtab === 'config' && in_array($this->workspace_tab, WorkspaceConfiguration::webserverConfigurationScopes(), true)) {
-            $this->redirect($this->configurationUrlForEngineTab($this->workspace_tab), navigate: true);
-
-            return;
-        }
-
         $this->engine_subtab = $subtab;
     }
 
@@ -1039,12 +1033,6 @@ class WorkspaceWebserver extends WorkspaceManage
 
         if ($this->engine_subtab === 'tools') {
             $this->engine_subtab = 'overview';
-        }
-
-        if ($this->engine_subtab === 'config' && in_array($this->workspace_tab, WorkspaceConfiguration::webserverConfigurationScopes(), true)) {
-            $this->redirect($this->configurationUrlForEngineTab($this->workspace_tab), navigate: true);
-
-            return;
         }
 
         if (! in_array($this->engine_subtab, $allowed, true)) {
@@ -7201,30 +7189,6 @@ class WorkspaceWebserver extends WorkspaceManage
      * probe isn't built yet (anything other than OLS in v1). Each
      * subsequent engine wires in here as its probe lands.
      */
-    /**
-     * Configuration workspace URL when leaving the in-panel Config sub-tab.
-     * Preserves engine scope and a safe return sub-tab for the back link.
-     */
-    protected function configurationFromContext(): string
-    {
-        return 'webserver';
-    }
-
-    protected function configurationUrlForEngineTab(string $engine, ?string $returnSub = null): string
-    {
-        $sub = $returnSub ?? $this->engine_subtab;
-        if ($sub === '' || $sub === 'config') {
-            $sub = 'overview';
-        }
-
-        return route('servers.configuration', [
-            'server' => $this->server,
-            'scope' => $engine,
-            'from' => $this->configurationFromContext(),
-            'return_sub' => $sub,
-        ]);
-    }
-
     private function resolveLiveStateProbe(string $engine): ?EngineLiveStateProbe
     {
         return match ($engine) {
@@ -7245,7 +7209,7 @@ class WorkspaceWebserver extends WorkspaceManage
      * to the service — this method only routes the result and surfaces errors
      * via the toast/banner channel.
      */
-    public function loadWebserverConfig(string $path): void
+    public function loadWebserverConfig(string $path, bool $forceRefresh = false): void
     {
         if (! $this->guardConfigAction()) {
             return;
@@ -7254,6 +7218,37 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->toastError(__('No config editor for this engine.'));
 
             return;
+        }
+
+        // Fast path: a recent read of this exact file is still cached, so hydrate
+        // the editor inline — no queue, no SSH, no poll wait. "Reload" passes
+        // $forceRefresh to bypass this and re-read from the server. The cache is
+        // dropped on every write/restore (see RunWebserverConfigOpJob), so this
+        // never serves bytes that are stale relative to an edit made through dply.
+        if (! $forceRefresh) {
+            $cached = Cache::get(
+                RunWebserverConfigOpJob::fileContentCacheKey($this->server->id, $this->workspace_tab, $path),
+            );
+            if (is_array($cached) && array_key_exists('contents', $cached)) {
+                $this->config_selected_path = $path;
+                $this->config_contents = (string) $cached['contents'];
+                $this->config_original_contents = $this->config_contents;
+                $this->config_truncated_on_load = (bool) ($cached['truncated'] ?? false);
+                $this->config_backups = is_array($cached['backups'] ?? null) ? $cached['backups'] : [];
+                $this->config_loaded_from_cache = true;
+                $this->config_content_cached_at = is_string($cached['cached_at'] ?? null) ? $cached['cached_at'] : null;
+                // Clear any in-flight load + transient validate/diff state.
+                $this->pending_load_console_id = null;
+                $this->pending_load_path = null;
+                $this->config_validate_output = null;
+                $this->config_validate_ok = null;
+                $this->config_last_backup = null;
+                $this->webserverConfigSaveDiffOpen = false;
+                $this->closeWebserverConfigRevisionDiff();
+                $this->refreshWebserverConfigRevisionState();
+
+                return;
+            }
         }
 
         // Queue the load so the banner shows queued→running→completed
@@ -7271,6 +7266,8 @@ class WorkspaceWebserver extends WorkspaceManage
         // previous file while the new one loads on the worker.
         $this->config_selected_path = null;
         $this->config_contents = '';
+        $this->config_loaded_from_cache = false;
+        $this->config_content_cached_at = null;
         $this->config_truncated_on_load = false;
         $this->config_validate_output = null;
         $this->config_validate_ok = null;
@@ -7319,10 +7316,23 @@ class WorkspaceWebserver extends WorkspaceManage
                 $this->config_contents = (string) ($cached['contents'] ?? '');
                 $this->config_original_contents = $this->config_contents;
                 $this->config_truncated_on_load = (bool) ($cached['truncated'] ?? false);
+                // This is a fresh server read (the worker just ran it), not a
+                // hydrate from the per-path content cache.
+                $this->config_loaded_from_cache = false;
+                $this->config_content_cached_at = null;
                 // Bust the cached picker listing so the next render reflects
                 // the freshly-read file size + mtime accurately.
                 Cache::forget('dply.webserver-config-files:'.$this->server->id.':'.$this->workspace_tab);
-                $this->refreshConfigBackups();
+                // Backups were gathered by the same worker job (see
+                // RunWebserverConfigOpJob's read op) and ride along in the cached
+                // payload, so the pickup stays a pure cache read — no inline SSH
+                // on the render path. Fall back to the inline fetch only for an
+                // older job that stashed a payload before backups were folded in.
+                if (array_key_exists('backups', $cached)) {
+                    $this->config_backups = is_array($cached['backups']) ? $cached['backups'] : [];
+                } else {
+                    $this->refreshConfigBackups();
+                }
                 $this->refreshWebserverConfigRevisionState();
             }
         }
@@ -7660,6 +7670,7 @@ class WorkspaceWebserver extends WorkspaceManage
             } catch (\Throwable) {
                 $configFiles = [];
             }
+            $configFiles = $this->annotateCachedConfigFiles($configFiles);
         }
 
         return view('livewire.servers.workspace-webserver', array_merge(
@@ -7687,6 +7698,27 @@ class WorkspaceWebserver extends WorkspaceManage
     protected function engineSupportsConfig(string $engine): bool
     {
         return in_array($engine, ['nginx', 'caddy', 'apache', 'openlitespeed', 'traefik', 'haproxy', 'envoy', 'openresty'], true);
+    }
+
+    /**
+     * Tag each picker row with whether its contents are in the per-path content
+     * cache, so the file list can show a "loads instantly" hint. Cheap: a cache
+     * key existence check per file, evaluated live each render (not folded into
+     * the 10s listing cache) so it tracks loads/saves as they happen.
+     *
+     * @param  array<int, array<string, mixed>>  $files
+     * @return array<int, array<string, mixed>>
+     */
+    protected function annotateCachedConfigFiles(array $files): array
+    {
+        foreach ($files as $i => $f) {
+            $path = (string) ($f['path'] ?? '');
+            $files[$i]['cached'] = $path !== '' && Cache::has(
+                RunWebserverConfigOpJob::fileContentCacheKey($this->server->id, $this->workspace_tab, $path),
+            );
+        }
+
+        return $files;
     }
 
     /**
@@ -7737,6 +7769,8 @@ class WorkspaceWebserver extends WorkspaceManage
         $this->config_truncated_on_load = false;
         $this->config_last_backup = null;
         $this->config_backups = [];
+        $this->config_loaded_from_cache = false;
+        $this->config_content_cached_at = null;
     }
 
     protected function resetLogViewerState(): void

@@ -170,7 +170,12 @@
             @endif
         </x-server-workspace-tablist>
 
-        <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="setCronWorkspaceTab">
+        {{-- Skeleton placeholder shown while the incoming tab loads. --}}
+        <div wire:loading.block wire:target="setCronWorkspaceTab">
+            @include('livewire.servers.partials._skeleton-cards')
+        </div>
+
+        <div wire:loading.remove wire:target="setCronWorkspaceTab">
 
         @if ($cron_workspace_tab === 'jobs')
             <x-server-workspace-tab-panel

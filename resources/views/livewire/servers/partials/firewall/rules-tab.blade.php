@@ -198,6 +198,18 @@
                                     <div class="my-1 border-t border-brand-ink/10" role="presentation"></div>
                                     <button
                                         type="button"
+                                        x-on:click="$dispatch('open-modal', 'save-firewall-template-modal')"
+                                        title="{{ __('Save the current panel rules as a reusable template you can apply to other servers.') }}"
+                                        class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50"
+                                    >
+                                        <span class="inline-flex items-center gap-2">
+                                            <x-heroicon-o-document-duplicate class="h-3.5 w-3.5 text-brand-moss" />
+                                            {{ __('Save as template') }}
+                                        </span>
+                                    </button>
+                                    <div class="my-1 border-t border-brand-ink/10" role="presentation"></div>
+                                    <button
+                                        type="button"
                                         wire:click="exportFirewallRulesJson"
                                         title="{{ __('Download all rules as JSON (round-trippable — re-import as a template later).') }}"
                                         class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50"

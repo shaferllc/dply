@@ -323,14 +323,22 @@ class ServerSystemLogReader
         ?int $sinceMinutes = null,
     ): array {
         $qPath = escapeshellarg($path);
+        // Read directly when the SSH user can; otherwise fall back to passwordless
+        // sudo (the dply model: deploy user + sudo, root login disabled). Many
+        // system logs (e.g. /var/log/nginx/error.log) are root/adm-owned and only
+        // reachable via sudo.
         $script = "if [ -r {$qPath} ]; then tail -n {$lines} {$qPath} 2>&1; ".
-            "elif [ -f {$qPath} ]; then echo '[dply] File exists but is not readable as this SSH user.'; ".
+            "elif sudo -n test -r {$qPath} 2>/dev/null; then sudo -n tail -n {$lines} {$qPath} 2>&1; ".
+            "elif [ -f {$qPath} ]; then echo '[dply] File exists but is not readable as this SSH user, and passwordless sudo is unavailable.'; ".
             "else echo '[dply] File not found or path is not a regular file.'; fi";
         $cmd = '/bin/sh -c '.escapeshellarg($script);
         $budget = (int) config('server_system_logs.request_time_budget_seconds', 90);
         $sshTimeout = $budget > 0 ? max(15, min(60, $budget - 5)) : 60;
 
-        $candidates = $this->sshLoginCandidatesForLogPath($path, $server);
+        // The tail script sudo-escalates for root-owned logs, so the deploy user
+        // can read them on its own — log in as deploy first (root SSH is disabled
+        // on dply hosts), keeping root only as a last-resort fallback.
+        $candidates = $this->fileTailLoginCandidates($server);
         $lastError = null;
         $fallback = (bool) config('server_system_logs.fallback_to_deploy_user_for_logs', true);
 
@@ -352,7 +360,7 @@ class ServerSystemLogReader
                 }
                 $ssh->disconnect();
 
-                $unreadable = str_contains($output, '[dply] File exists but is not readable as this SSH user.');
+                $unreadable = str_contains($output, '[dply] File exists but is not readable');
                 if ($unreadable && $fallback && $i < count($candidates) - 1) {
                     continue;
                 }
@@ -535,6 +543,25 @@ class ServerSystemLogReader
         $suffix = $which === 'access' ? '-access.log' : '-error.log';
 
         return $site->webserverLogDirectory().'/'.$basename.$suffix;
+    }
+
+    /**
+     * Login candidates for tailing a file. The tail command escalates with
+     * `sudo -n` for root-owned logs, so the deploy user can read them directly —
+     * try it first (dply hosts disable root SSH login), with root as fallback.
+     *
+     * @return list<string>
+     */
+    private function fileTailLoginCandidates(Server $server): array
+    {
+        $deploy = trim((string) $server->ssh_user) ?: 'root';
+        if ($deploy === 'root') {
+            return ['root'];
+        }
+
+        return (bool) config('server_system_logs.fallback_to_deploy_user_for_logs', true)
+            ? [$deploy, 'root']
+            : [$deploy];
     }
 
     /**

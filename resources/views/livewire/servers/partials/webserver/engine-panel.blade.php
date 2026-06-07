@@ -38,6 +38,17 @@
     // preview teaser instead of the actionable switch / lifecycle panels.
     $isComingSoon = ! $isActive && ! empty($info['coming_soon']);
 
+    // nginx live-state sub-tabs (Hosts / Upstreams / Certs / Modules / Cache /
+    // Workers) are still being finished — show the shared coming-soon teaser in
+    // place of their real config panels + live-state table. Overview / Logs /
+    // Config / Info stay fully functional. The tabs remain clickable so the
+    // roadmap stays discoverable. Listed explicitly (not via $isLiveStateView)
+    // because the live-state dispatch map above omits nginx's `cache` tab.
+    $nginxComingSoonSubtabs = ['hosts', 'upstreams', 'certs', 'modules', 'cache', 'workers'];
+    $nginxLiveStateComingSoon = $key === 'nginx'
+        && ($isActive || $isEdgeProxyPanel)
+        && in_array($engine_subtab, $nginxComingSoonSubtabs, true);
+
     // Instant sub-tab paint: entangle engine_subtab client-side, defer SSH via wire:init.
     $optimisticEngineSubtabs = ($isActive || $isEdgeProxyPanel) && ! $isComingSoon;
     $liveStateTabKeys = $liveStateTabsByEngine[$key] ?? [];
@@ -61,33 +72,37 @@
     @include('livewire.servers.partials.webserver.engine._overview')
     @include('livewire.servers.partials.webserver.engine._logs')
     @include('livewire.servers.partials.webserver.engine._config')
-    @switch($key)
-        @case('caddy')
-            @include('livewire.servers.partials.webserver.engine.caddy')
-            @break
-        @case('haproxy')
-            @include('livewire.servers.partials.webserver.engine.haproxy')
-            @break
-        @case('envoy')
-            @include('livewire.servers.partials.webserver.engine.envoy')
-            @break
-        @case('openresty')
-            @include('livewire.servers.partials.webserver.engine.openresty')
-            @break
-        @case('traefik')
-            @include('livewire.servers.partials.webserver.engine.traefik')
-            @break
-        @case('apache')
-            @include('livewire.servers.partials.webserver.engine.apache')
-            @break
-        @case('nginx')
-            @include('livewire.servers.partials.webserver.engine.nginx')
-            @break
-        @case('openlitespeed')
-            @include('livewire.servers.partials.webserver.engine.openlitespeed')
-            @break
-    @endswitch
-    @include('livewire.servers.partials.webserver.engine._live-state-table')
+    @if ($nginxLiveStateComingSoon)
+        @include('livewire.servers.partials.webserver.engine._nginx-live-state-coming-soon')
+    @else
+        @switch($key)
+            @case('caddy')
+                @include('livewire.servers.partials.webserver.engine.caddy')
+                @break
+            @case('haproxy')
+                @include('livewire.servers.partials.webserver.engine.haproxy')
+                @break
+            @case('envoy')
+                @include('livewire.servers.partials.webserver.engine.envoy')
+                @break
+            @case('openresty')
+                @include('livewire.servers.partials.webserver.engine.openresty')
+                @break
+            @case('traefik')
+                @include('livewire.servers.partials.webserver.engine.traefik')
+                @break
+            @case('apache')
+                @include('livewire.servers.partials.webserver.engine.apache')
+                @break
+            @case('nginx')
+                @include('livewire.servers.partials.webserver.engine.nginx')
+                @break
+            @case('openlitespeed')
+                @include('livewire.servers.partials.webserver.engine.openlitespeed')
+                @break
+        @endswitch
+        @include('livewire.servers.partials.webserver.engine._live-state-table')
+    @endif
     @include('livewire.servers.partials.webserver.engine._info')
 @endif
 @if ($optimisticEngineSubtabs ?? false)

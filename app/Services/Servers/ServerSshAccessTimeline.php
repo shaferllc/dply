@@ -302,6 +302,8 @@ final class ServerSshAccessTimeline
                     ServerSshKeyAuditEvent::EVENT_SYNC_BLOCKED => __('Sync blocked'),
                     ServerSshKeyAuditEvent::EVENT_ORG_KEY_DEPLOYED => __('Org key deployed'),
                     ServerSshKeyAuditEvent::EVENT_TEAM_KEY_DEPLOYED => __('Team key deployed'),
+                    ServerSshKeyAuditEvent::EVENT_BULK_IMPORTED => __('Keys bulk-imported'),
+                    ServerSshKeyAuditEvent::EVENT_SETTINGS_UPDATED => __('Settings updated'),
                     default => (string) $event->event,
                 };
 

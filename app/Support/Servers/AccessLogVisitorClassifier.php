@@ -41,6 +41,13 @@ final class AccessLogVisitorClassifier
                 continue;
             }
 
+            // Skip dply's own injected status lines (e.g. "[dply] Read using SSH
+            // user …", "[dply] File exists but is not readable …") — they are not
+            // access-log traffic and must not be counted as real visitors.
+            if (self::isDplyNoiseLine($line)) {
+                continue;
+            }
+
             $bucket = self::classifyLine($line);
             $counts[$bucket]++;
         }
@@ -58,11 +65,23 @@ final class AccessLogVisitorClassifier
         return self::classifyUserAgent($userAgent);
     }
 
+    /** dply's own injected status lines, not access-log traffic. */
+    public static function isDplyNoiseLine(string $line): bool
+    {
+        return str_starts_with(ltrim($line), '[dply]');
+    }
+
     public static function lineMatchesFilter(string $line, string $filter): bool
     {
         $filter = self::normalizeFilter($filter);
         if ($filter === 'all') {
             return true;
+        }
+
+        // dply status lines are never visitor traffic — hide them under any
+        // specific traffic filter (they still show under "all").
+        if (self::isDplyNoiseLine($line)) {
+            return false;
         }
 
         $bucket = self::classifyLine($line);

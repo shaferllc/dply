@@ -67,6 +67,16 @@ class RemoteProcessRunner
      */
     public function sshOptions(): array
     {
+        return array_merge($this->baseSshOptions(), $this->multiplexingClientOptions());
+    }
+
+    /**
+     * The always-on SSH options shared by every ssh/scp invocation.
+     *
+     * @return array<int, string>
+     */
+    private function baseSshOptions(): array
+    {
         $options = [
             // ERROR silences the "Warning: Permanently added <host> ... to
             // the list of known hosts" message that ssh emits at WARNING
@@ -89,6 +99,123 @@ class RemoteProcessRunner
         }
 
         return $options;
+    }
+
+    /**
+     * Client-side multiplexing options for command ssh/scp. Critically uses
+     * ControlMaster=no: these invocations ATTACH to an out-of-band master when
+     * one exists (skipping the TCP + auth handshake), but never *create* a
+     * persistent master themselves. That distinction matters — a command that
+     * becomes the persistent master leaks its stdout/stderr into the daemonised
+     * master, so the PHP Symfony Process never sees EOF and blocks until the
+     * request hits max_execution_time. Establishing the master separately (see
+     * ensureMasterConnection) keeps the command path hang-proof: worst case it
+     * falls back to a normal direct connection.
+     *
+     * @return array<int, string>
+     */
+    private function multiplexingClientOptions(): array
+    {
+        if (! $this->multiplexingEnabled()) {
+            return [];
+        }
+
+        $path = $this->controlPath();
+        if ($path === null) {
+            return [];
+        }
+
+        return [
+            '-o ControlPath='.$path,
+            '-o ControlMaster=no',
+        ];
+    }
+
+    private function multiplexingEnabled(): bool
+    {
+        return (bool) config('task-runner.ssh_multiplexing', false);
+    }
+
+    /**
+     * Deterministic per-(host, port, user, jump) control-socket path so that
+     * separate processes (web request, queue worker) converge on the same
+     * master. Self-hashed (not ssh's %C token) so the jump host is part of the
+     * key and the path stays well under the ~104-char unix-socket limit. Null
+     * if the private socket directory can't be prepared, in which case
+     * multiplexing is silently skipped.
+     */
+    private function controlPath(): ?string
+    {
+        $uid = function_exists('posix_getuid') ? posix_getuid() : @getmyuid();
+        $dir = '/tmp/dply-ssh-'.(is_int($uid) ? $uid : 'shared');
+
+        if (! is_dir($dir) && ! @mkdir($dir, 0700, true) && ! is_dir($dir)) {
+            return null;
+        }
+        @chmod($dir, 0700);
+
+        $token = substr(sha1(implode('|', [
+            $this->connection->host,
+            $this->connection->port,
+            $this->connection->username,
+            $this->connection->proxyJump ?? '',
+        ])), 0, 16);
+
+        return $dir.'/'.$token;
+    }
+
+    /**
+     * Best-effort: make sure a persistent control master exists for this server
+     * so the following command can attach to it. Fast-checks the socket first
+     * and only opens a master when none is live. The master is launched
+     * detached (-f -N) with its stdio redirected to /dev/null via the shell, so
+     * — unlike a command that becomes the master — nothing it inherits can block
+     * the PHP Process. Any failure here is swallowed: command ssh uses
+     * ControlMaster=no and simply connects directly when there's no master.
+     */
+    private function ensureMasterConnection(): void
+    {
+        if (! $this->multiplexingEnabled()) {
+            return;
+        }
+        $path = $this->controlPath();
+        if ($path === null) {
+            return;
+        }
+
+        $target = "{$this->connection->username}@{$this->connection->host}";
+
+        try {
+            // Quick local check — exits 0 when a master is already running.
+            $check = FacadesProcess::timeout(5)->run(implode(' ', [
+                'ssh', '-O', 'check',
+                '-o', 'ControlPath='.$path,
+                '-p', (string) $this->connection->port,
+                $target,
+            ]).' >/dev/null 2>&1');
+
+            if ($check->successful()) {
+                return;
+            }
+
+            // No live master — open one in the background. The shell redirect is
+            // what makes this safe: the daemonised master has no inherited pipe
+            // for Process to wait on.
+            $persist = (string) config('task-runner.ssh_control_persist', '60s');
+            FacadesProcess::timeout(20)->run(implode(' ', array_merge(
+                ['ssh', '-f', '-N'],
+                $this->baseSshOptions(),
+                [
+                    '-o ControlMaster=auto',
+                    '-o ControlPath='.$path,
+                    '-o ControlPersist='.$persist,
+                    "-p {$this->connection->port}",
+                    $target,
+                ],
+            )).' >/dev/null 2>&1');
+        } catch (\Throwable) {
+            // Multiplexing is an optimisation; never let it break the real call.
+        }
     }
 
     /**
@@ -122,6 +249,8 @@ class RemoteProcessRunner
      */
     public function run(string $script, int $timeout = 0): ProcessOutput
     {
+        $this->ensureMasterConnection();
+
         $command = implode(' ', [
             'ssh',
             ...$this->sshOptions(),
@@ -162,6 +291,8 @@ class RemoteProcessRunner
     {
         $localPath = Helper::temporaryDirectoryPath($filename);
         file_put_contents($localPath, $contents);
+
+        $this->ensureMasterConnection();
 
         $command = implode(' ', [
             'scp',

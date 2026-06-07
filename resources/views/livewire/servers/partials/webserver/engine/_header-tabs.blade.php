@@ -33,16 +33,14 @@
                     >
                         {{ __('Logs') }}
                     </x-server-workspace-tab>
-                    @php
-                        $configReturnSub = ($engine_subtab === 'config' || $engine_subtab === '') ? 'overview' : $engine_subtab;
-                        $configFrom = ! empty($isEdgeProxyPanel) ? 'edge-proxy' : 'webserver';
-                    @endphp
+                    {{-- Config editor lives inline in each engine's own tab
+                         (reuses the shared _config.blade.php panel) rather than
+                         navigating out to the standalone configuration page. --}}
                     <x-server-workspace-tab
-                        as="a"
                         :id="'ws-subtab-'.$key.'-config'"
-                        :active="false"
-                        href="{{ route('servers.configuration', ['server' => $server, 'scope' => $key, 'from' => $configFrom, 'return_sub' => $configReturnSub]) }}"
-                        wire:navigate
+                        :active="$engine_subtab === 'config'"
+                        :subtab-key="($optimisticEngineSubtabs ?? false) ? 'config' : null"
+                        :wire-click="($optimisticEngineSubtabs ?? false) ? null : 'setEngineSubtab(\'config\')'"
                         icon="heroicon-o-pencil-square"
                     >
                         {{ __('Config') }}

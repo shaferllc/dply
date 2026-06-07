@@ -316,6 +316,15 @@ class Server extends Model
         return $this->hasOne(ServerDatabaseAdminCredential::class);
     }
 
+    /**
+     * The dply Logs add-on agent for this server (at most one — the add-on is a
+     * per-server resource). See {@see \App\Models\ServerLogAgent}.
+     */
+    public function logAgent(): HasOne
+    {
+        return $this->hasOne(ServerLogAgent::class);
+    }
+
     public function databaseAuditEvents(): HasMany
     {
         return $this->hasMany(ServerDatabaseAuditEvent::class)->orderByDesc('created_at');

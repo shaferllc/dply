@@ -88,6 +88,17 @@
                 @endif
             </x-server-workspace-tab>
             <x-server-workspace-tab
+                id="logs-tab-shipping"
+                icon="heroicon-o-paper-airplane"
+                :active="$logsTab === 'shipping'"
+                wire:click="setLogsWorkspaceTab('shipping')"
+            >
+                {{ __('Shipping') }}
+                @if ($server->logAgent?->isRunning())
+                    <span class="ml-1 inline-block h-2 w-2 rounded-full bg-emerald-500" title="{{ __('Log agent running') }}"></span>
+                @endif
+            </x-server-workspace-tab>
+            <x-server-workspace-tab
                 id="logs-tab-related"
                 icon="heroicon-o-link"
                 :active="$logsTab === 'related'"
@@ -114,6 +125,14 @@
                 'report' => $report,
                 'tonePalette' => $tonePalette,
                 'server' => $server,
+            ])
+        @endif
+
+        @if ($logsTab === 'shipping')
+            @include('livewire.servers.partials.logs._tab-shipping', [
+                'server' => $server,
+                'agent' => $server->logAgent,
+                'logExplorer' => $logExplorer,
             ])
         @endif
 

@@ -63,32 +63,25 @@ test('manage configuration section redirects to configuration workspace', functi
         ->assertRedirect(route('servers.configuration', $server));
 });
 
-test('webserver config subtab redirects to scoped configuration workspace', function (): void {
+test('webserver config subtab renders the editor inline without redirecting', function (): void {
     [$user, $server] = configurationWorkspaceUserWithServer();
 
     Livewire::actingAs($user)
         ->withQueryParams(['tab' => 'nginx', 'sub' => 'config'])
         ->test(WorkspaceWebserver::class, ['server' => $server])
-        ->assertRedirect(route('servers.configuration', [
-            'server' => $server,
-            'scope' => 'nginx',
-            'from' => 'webserver',
-            'return_sub' => 'overview',
-        ]));
+        ->assertNoRedirect()
+        ->assertSet('engine_subtab', 'config')
+        ->assertSee(__(':engine config editor', ['engine' => 'nginx']));
 });
 
-test('edge proxy config subtab redirects to scoped configuration with edge-proxy from', function (): void {
+test('edge proxy config subtab no longer redirects to the standalone configuration workspace', function (): void {
     [$user, $server] = configurationWorkspaceUserWithServer();
 
     Livewire::actingAs($user)
         ->withQueryParams(['tab' => 'traefik', 'sub' => 'config'])
         ->test(WorkspaceEdgeProxy::class, ['server' => $server])
-        ->assertRedirect(route('servers.configuration', [
-            'server' => $server,
-            'scope' => 'traefik',
-            'from' => 'edge-proxy',
-            'return_sub' => 'overview',
-        ]));
+        ->assertNoRedirect()
+        ->assertSet('engine_subtab', 'config');
 });
 
 test('configuration workspace shows back link when opened from edge proxy with legacy webserver from', function (): void {

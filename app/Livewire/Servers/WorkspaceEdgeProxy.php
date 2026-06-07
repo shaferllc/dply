@@ -27,18 +27,7 @@ class WorkspaceEdgeProxy extends WorkspaceWebserver
 
     public function mount(Server $server, ?string $section = null): void
     {
-        if ($this->engine_subtab === 'config' && in_array($this->workspace_tab, ['traefik', 'haproxy'], true)) {
-            $this->redirect($this->configurationUrlForEngineTab($this->workspace_tab), navigate: true);
-
-            return;
-        }
-
         parent::mount($server, 'web');
-    }
-
-    protected function configurationFromContext(): string
-    {
-        return 'edge-proxy';
     }
 
     public function setWorkspaceTab(string $tab): void
@@ -83,6 +72,7 @@ class WorkspaceEdgeProxy extends WorkspaceWebserver
             } catch (\Throwable) {
                 $configFiles = [];
             }
+            $configFiles = $this->annotateCachedConfigFiles($configFiles);
         }
 
         return view('livewire.servers.workspace-edge-proxy', array_merge(

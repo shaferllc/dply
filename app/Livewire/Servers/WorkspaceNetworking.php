@@ -21,6 +21,7 @@ use App\Support\Servers\CacheServiceNetworkExposure;
 use App\Support\Servers\DatabaseEngineInstallScripts;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use Livewire\Attributes\Lazy;
@@ -45,6 +46,13 @@ class WorkspaceNetworking extends Component
     use SurfacesBindingConsumers;
 
     public Server $server;
+
+    /** @var list<string> */
+    public const NETWORKING_TABS = ['servers', 'access', 'attached', 'routes'];
+
+    /** @var 'servers'|'access'|'attached'|'routes' */
+    #[Url(as: 'tab', except: 'servers', history: true)]
+    public string $networking_tab = 'servers';
 
     /** CIDR inputs keyed by database ID. */
     public array $db_networking_allowed_from = [];
@@ -82,6 +90,15 @@ class WorkspaceNetworking extends Component
     public function mount(Server $server): void
     {
         $this->server = $server;
+
+        if (! in_array($this->networking_tab, self::NETWORKING_TABS, true)) {
+            $this->networking_tab = 'servers';
+        }
+    }
+
+    public function setNetworkingTab(string $tab): void
+    {
+        $this->networking_tab = in_array($tab, self::NETWORKING_TABS, true) ? $tab : 'servers';
     }
 
     public function loadHetznerNetworks(): void

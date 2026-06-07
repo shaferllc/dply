@@ -7,13 +7,41 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <div class="space-y-6">
+    @php
+        $allServers = $peerServers->prepend($server);
+        $showRoutesTab = $networkId > 0 && $server->provider->value === 'hetzner';
+        $hasAccessControls = $databaseEngines->isNotEmpty() || $databasesByEngine->flatten()->isNotEmpty() || $cacheServices->isNotEmpty();
+    @endphp
 
-        {{-- ─── ALL SERVERS OVERVIEW ──────────────────────────────────────── --}}
-        @php
-            $allServers = $peerServers->prepend($server);
-        @endphp
+    <x-server-workspace-tablist :aria-label="__('Networking sections')">
+        <x-server-workspace-tab id="net-tab-servers" icon="heroicon-o-share" :active="$networking_tab === 'servers'" wire:click="setNetworkingTab('servers')">
+            {{ __('Servers') }}
+        </x-server-workspace-tab>
+        <x-server-workspace-tab id="net-tab-access" icon="heroicon-o-lock-closed" :active="$networking_tab === 'access'" wire:click="setNetworkingTab('access')">
+            {{ __('Access') }}
+        </x-server-workspace-tab>
+        <x-server-workspace-tab id="net-tab-attached" icon="heroicon-o-arrows-right-left" :active="$networking_tab === 'attached'" wire:click="setNetworkingTab('attached')">
+            {{ __('Attached') }}
+            @if (count($attachedRemoteResources) > 0)
+                <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-brand-moss">{{ count($attachedRemoteResources) }}</span>
+            @endif
+        </x-server-workspace-tab>
+        @if ($showRoutesTab)
+            <x-server-workspace-tab id="net-tab-routes" icon="heroicon-o-map" :active="$networking_tab === 'routes'" wire:click="setNetworkingTab('routes')">
+                {{ __('Routes') }}
+            </x-server-workspace-tab>
+        @endif
+    </x-server-workspace-tablist>
 
+    {{-- Skeleton placeholder shown while the incoming tab loads. --}}
+    <div wire:loading.block wire:target="setNetworkingTab">
+        @include('livewire.servers.partials._skeleton-cards')
+    </div>
+
+    <div class="space-y-6" wire:loading.remove wire:target="setNetworkingTab">
+
+        {{-- ─── SERVERS: ALL SERVERS OVERVIEW ─────────────────────────────── --}}
+        @if ($networking_tab === 'servers')
         <section class="dply-card overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <x-icon-badge>
@@ -221,8 +249,10 @@
                 @endforeach
             </div>
         </section>
+        @endif {{-- /servers tab --}}
 
         {{-- ─── ATTACHED RESOURCES: remote DBs/caches this server reaches ──── --}}
+        @if ($networking_tab === 'attached')
         <section class="dply-card overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <x-icon-badge>
@@ -308,9 +338,25 @@
                 </div>
             @endif
         </section>
+        @endif {{-- /attached tab --}}
+
+        {{-- ─── ACCESS: PER-DATABASE + CACHE REMOTE ACCESS CONTROLS ────────── --}}
+        @if ($networking_tab === 'access')
+        @if (! $hasAccessControls)
+            <section class="dply-card overflow-hidden">
+                <div class="px-6 py-6 sm:px-7">
+                    <x-empty-state
+                        icon="heroicon-o-lock-closed"
+                        tone="sage"
+                        :title="__('No databases or caches on this server')"
+                        :description="__('Remote-access controls appear here once this server runs a database engine or a Redis-family cache. Create them from the Databases or Caches workspace.')"
+                    />
+                </div>
+            </section>
+        @endif
 
         {{-- ─── THIS SERVER: PER-DATABASE ACCESS CONTROLS ─────────────────── --}}
-        @if ($databaseEngines->isNotEmpty())
+        @if ($databaseEngines->isNotEmpty() || $databasesByEngine->flatten()->isNotEmpty())
             <section class="dply-card overflow-hidden">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <x-icon-badge>
@@ -325,14 +371,25 @@
                     </div>
                 </div>
 
-                @foreach ($databaseEngines as $engineRow)
+                {{-- Iterate by the databases' own engine so a row whose engine
+                     doesn't match a running engine (e.g. a mis-tagged or orphaned
+                     database) still renders instead of silently vanishing. --}}
+                @foreach ($databasesByEngine as $groupEngine => $dbs)
                     @php
-                        $dbs = $databasesByEngine->get($engineRow->engine, collect());
-                        $engineLabel = \App\Support\Servers\DatabaseEngineInfo::for($engineRow->engine)['label'] ?? ucfirst($engineRow->engine);
+                        $engineRow = $databaseEngines->firstWhere('engine', $groupEngine);
+                        $enginePort = $engineRow?->port ?? \App\Models\ServerDatabaseEngine::defaultPortFor($groupEngine);
+                        $engineRunning = $engineRow !== null;
+                        $engineLabel = \App\Support\Servers\DatabaseEngineInfo::for($groupEngine)['label'] ?? ucfirst($groupEngine);
                     @endphp
                     @if ($dbs->isNotEmpty())
-                        <div class="border-b border-brand-ink/5 px-6 py-3 sm:px-7">
-                            <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ $engineLabel }} · {{ __('port :port', ['port' => $engineRow->port]) }}</p>
+                        <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/5 px-6 py-3 sm:px-7">
+                            <p class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ $engineLabel }} · {{ __('port :port', ['port' => $enginePort]) }}</p>
+                            @unless ($engineRunning)
+                                <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 ring-1 ring-amber-200" title="{{ __('No running :engine engine on this server — the database record may be mis-tagged.', ['engine' => $engineLabel]) }}">
+                                    <x-heroicon-m-exclamation-triangle class="h-3 w-3" aria-hidden="true" />
+                                    {{ __('engine not running') }}
+                                </span>
+                            @endunless
                         </div>
                         <div class="divide-y divide-brand-ink/5">
                             @foreach ($dbs as $db)
@@ -412,7 +469,7 @@
                                         }
                                         $accessRows = [];
                                         if ($selectedJump) {
-                                            $jumpCmds = \App\Support\Servers\DatabaseJumpHostAccess::commandsFor($db, $server, $selectedJump, (int) $engineRow->port, $jumpLocalPort);
+                                            $jumpCmds = \App\Support\Servers\DatabaseJumpHostAccess::commandsFor($db, $server, $selectedJump, (int) $enginePort, $jumpLocalPort);
                                             $accessRows[] = ['label' => __('Tunnel'), 'command' => $jumpCmds['tunnel']];
                                             $accessRows[] = ['label' => __('Then connect'), 'command' => $jumpCmds['connect']];
                                         }
@@ -465,7 +522,7 @@
                     @endif
                 @endforeach
 
-                @if ($databaseEngines->isNotEmpty() && $databasesByEngine->flatten()->isEmpty())
+                @if ($databasesByEngine->flatten()->isEmpty())
                     <div class="px-6 py-5 sm:px-7">
                         <p class="text-sm text-brand-moss">{{ __('No databases yet. Create one from the Databases workspace.') }}</p>
                     </div>
@@ -561,9 +618,10 @@
                 </div>
             </section>
         @endif
+        @endif {{-- /access tab --}}
 
         {{-- ─── NETWORK ROUTES ─────────────────────────────────────────────── --}}
-        @if ($networkId > 0 && $server->provider->value === 'hetzner')
+        @if ($networking_tab === 'routes' && $networkId > 0 && $server->provider->value === 'hetzner')
             <section class="dply-card overflow-hidden">
                 <div class="flex flex-wrap items-start justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <div class="flex items-center gap-3">

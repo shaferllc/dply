@@ -253,3 +253,49 @@
                                 </div>
                             </div>
                         </x-modal>
+
+                    {{-- Save-as-template modal. Captures the current panel rules into a reusable
+                         FirewallRuleTemplate (org- or server-scoped). Lives on the Rules tab because
+                         that's where the "current rules" it snapshots are managed; the Templates tab
+                         is for applying templates, not creating them. saveCurrentRulesAsTemplate
+                         dispatches close-modal on success. --}}
+                    <x-modal name="save-firewall-template-modal" maxWidth="lg" overlayClass="bg-brand-ink/40">
+                        <div class="border-b border-brand-ink/10 px-6 py-5">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Templates') }}</p>
+                            <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Save current rules as template') }}</h2>
+                            <p class="mt-2 text-sm leading-6 text-brand-moss">
+                                {{ __('Snapshot every rule currently in the panel into a reusable template you can apply to this or other servers later.') }}
+                            </p>
+                        </div>
+
+                        <div class="px-6 py-6">
+                            <form wire:submit="saveCurrentRulesAsTemplate" id="save-firewall-template-form" class="space-y-4">
+                                <div>
+                                    <x-input-label for="tpl-name" :value="__('Name')" />
+                                    <x-text-input id="tpl-name" type="text" class="mt-1 block w-full" wire:model="new_saved_template_name" />
+                                    <x-input-error :messages="$errors->get('new_saved_template_name')" class="mt-2" />
+                                </div>
+                                <div>
+                                    <x-input-label for="tpl-desc" :value="__('Description (optional)')" />
+                                    <x-text-input id="tpl-desc" type="text" class="mt-1 block w-full" wire:model="new_saved_template_description" />
+                                    <x-input-error :messages="$errors->get('new_saved_template_description')" class="mt-2" />
+                                </div>
+                                <div>
+                                    <x-input-label for="tpl-scope" :value="__('Scope')" />
+                                    <select id="tpl-scope" wire:model="new_saved_template_scope" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm">
+                                        <option value="org">{{ __('Whole organization') }}</option>
+                                        <option value="server">{{ __('This server only') }}</option>
+                                    </select>
+                                    <x-input-error :messages="$errors->get('new_saved_template_scope')" class="mt-2" />
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 px-6 py-4">
+                            <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
+                            <x-primary-button type="submit" form="save-firewall-template-form" wire:loading.attr="disabled" wire:target="saveCurrentRulesAsTemplate">
+                                <span wire:loading.remove wire:target="saveCurrentRulesAsTemplate">{{ __('Save template') }}</span>
+                                <span wire:loading wire:target="saveCurrentRulesAsTemplate">{{ __('Saving…') }}</span>
+                            </x-primary-button>
+                        </div>
+                    </x-modal>

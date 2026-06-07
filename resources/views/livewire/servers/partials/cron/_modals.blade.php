@@ -55,8 +55,9 @@
                     <button
                         type="button"
                         wire:click="fillLaravelSchedulerCommand"
-                        class="mt-3 inline-flex rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/50"
+                        class="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/50"
                     >
+                        <x-heroicon-o-sparkles class="h-4 w-4" aria-hidden="true" />
                         {{ __('Use Laravel scheduler for this site (schedule:run)') }}
                     </button>
                 @endif
@@ -72,7 +73,10 @@
                         wire:loading.attr="disabled"
                         class="shrink-0 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-50"
                     >
-                        <span wire:loading.remove wire:target="refreshRunAsUserChoices">{{ __('Refresh list') }}</span>
+                        <span wire:loading.remove wire:target="refreshRunAsUserChoices" class="inline-flex items-center gap-1.5">
+                            <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
+                            {{ __('Refresh list') }}
+                        </span>
                         <span wire:loading wire:target="refreshRunAsUserChoices" class="inline-flex items-center gap-1.5">
                             <x-spinner variant="forest" size="sm" />
                             {{ __('Refreshing…') }}
@@ -228,10 +232,14 @@
                         <x-text-input id="new_maintenance_tag" wire:model="new_maintenance_tag" class="mt-1 block w-full text-sm" />
                     </div>
                     <div class="flex flex-wrap gap-2">
-                        <button type="button" wire:click="validateCronExpressionField" class="rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                        <button type="button" wire:click="validateCronExpressionField" wire:loading.attr="disabled" wire:target="validateCronExpressionField" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-50">
+                            <x-heroicon-o-check-circle class="h-4 w-4" wire:loading.remove wire:target="validateCronExpressionField" aria-hidden="true" />
+                            <x-spinner wire:loading wire:target="validateCronExpressionField" variant="forest" size="sm" />
                             {{ __('Validate expression') }}
                         </button>
-                        <button type="button" wire:click="dryRunFormCommand" class="rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                        <button type="button" wire:click="dryRunFormCommand" wire:loading.attr="disabled" wire:target="dryRunFormCommand" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-50">
+                            <x-heroicon-o-play class="h-4 w-4" wire:loading.remove wire:target="dryRunFormCommand" aria-hidden="true" />
+                            <x-spinner wire:loading wire:target="dryRunFormCommand" variant="forest" size="sm" />
                             {{ __('Dry run (preview shell)') }}
                         </button>
                     </div>

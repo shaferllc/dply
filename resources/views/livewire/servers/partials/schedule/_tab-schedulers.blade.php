@@ -22,7 +22,7 @@
                 @endif
                 <button
                     type="button"
-                    wire:click="setScheduleWorkspaceTab('enable')"
+                    wire:click="openEnableSchedulerModal"
                     class="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
                 >
                     <x-heroicon-m-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -68,7 +68,7 @@
                 {{ __('Enable monitoring to wrap schedule:run in a heartbeat script and track tick health.') }}
             </p>
             @if ($sites->isNotEmpty())
-                <button type="button" wire:click="setScheduleWorkspaceTab('enable')" class="mt-5 inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest">
+                <button type="button" wire:click="openEnableSchedulerModal" class="mt-5 inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest">
                     <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
                     {{ __('Enable scheduler') }}
                 </button>
@@ -192,7 +192,7 @@
                         @elseif ($state === 'detected_unmonitored' || $state === 'no_scheduler')
                             <button
                                 type="button"
-                                wire:click="setScheduleWorkspaceTab('enable')"
+                                wire:click="openEnableSchedulerModal"
                                 class="rounded-lg p-2 text-brand-forest hover:bg-emerald-50"
                                 title="{{ __('Enable scheduler') }}"
                             >

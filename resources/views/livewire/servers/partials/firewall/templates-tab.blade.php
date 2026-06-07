@@ -121,25 +121,9 @@
                     @endif
 
                     <div class="border-t border-brand-ink/10 pt-6">
-                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Save current rules as template') }}</h2>
-                        <form wire:submit="saveCurrentRulesAsTemplate" class="mt-4 grid gap-3 sm:max-w-lg">
-                            <div>
-                                <x-input-label for="tpl-name" :value="__('Name')" />
-                                <x-text-input id="tpl-name" type="text" class="mt-1 block w-full" wire:model="new_saved_template_name" />
-                                <x-input-error :messages="$errors->get('new_saved_template_name')" class="mt-2" />
-                            </div>
-                            <div>
-                                <x-input-label for="tpl-desc" :value="__('Description (optional)')" />
-                                <x-text-input id="tpl-desc" type="text" class="mt-1 block w-full" wire:model="new_saved_template_description" />
-                            </div>
-                            <div>
-                                <x-input-label for="tpl-scope" :value="__('Scope')" />
-                                <select id="tpl-scope" wire:model="new_saved_template_scope" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm">
-                                    <option value="org">{{ __('Whole organization') }}</option>
-                                    <option value="server">{{ __('This server only') }}</option>
-                                </select>
-                            </div>
-                            <x-primary-button type="submit" class="!py-2 w-fit">{{ __('Save template') }}</x-primary-button>
-                        </form>
+                        <p class="inline-flex items-center gap-1.5 text-xs text-brand-moss">
+                            <x-heroicon-o-information-circle class="h-4 w-4 shrink-0 text-brand-mist" />
+                            {{ __('To save the rules currently in the panel as a reusable template, use the “More → Save as template” menu on the Rules tab.') }}
+                        </p>
                     </div>
                 </div>

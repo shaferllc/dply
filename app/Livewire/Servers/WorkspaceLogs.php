@@ -2,8 +2,11 @@
 
 namespace App\Livewire\Servers;
 
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\ManagesServerLogExplorer;
+use App\Livewire\Servers\Concerns\ManagesServerLogShipping;
 use App\Livewire\Servers\Concerns\ManagesServerSystemLogs;
 use App\Models\Server;
 use App\Services\Servers\ServerRemovalAdvisor;
@@ -20,13 +23,16 @@ use Livewire\Attributes\Lazy;
 #[Lazy]
 class WorkspaceLogs extends Component
 {
-    use RendersWorkspacePlaceholder;
+    use DispatchesToastNotifications;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use ManagesServerLogExplorer;
+    use ManagesServerLogShipping;
     use ManagesServerSystemLogs;
+    use RendersWorkspacePlaceholder;
 
     /** @var list<string> */
-    public const LOGS_TABS = ['viewer', 'overview', 'sources', 'related'];
+    public const LOGS_TABS = ['viewer', 'overview', 'sources', 'shipping', 'related'];
 
     #[Url(as: 'tab', except: 'viewer')]
     public string $logsTab = 'viewer';
@@ -106,8 +112,9 @@ class WorkspaceLogs extends Component
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
-        $this->server->loadMissing(['organization', 'sites']);
+        $this->server->loadMissing(['organization', 'sites', 'logAgent']);
         $this->bootServerLogs();
+        $this->bootLogShipping();
         $this->logsTab = in_array($this->logsTab, self::LOGS_TABS, true) ? $this->logsTab : 'viewer';
     }
 
@@ -123,6 +130,7 @@ class WorkspaceLogs extends Component
     {
         $logSources = $this->availableLogSources();
         $this->server->loadMissing('organization');
+        $this->server->load('logAgent');
 
         return view('livewire.servers.workspace-logs', [
             'logSources' => $logSources,
@@ -143,6 +151,8 @@ class WorkspaceLogs extends Component
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
+            // Only query ClickHouse when the Shipping tab is actually open.
+            'logExplorer' => $this->logsTab === 'shipping' ? $this->loadLogExplorer() : null,
         ]);
     }
 }

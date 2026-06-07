@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Servers can now ship all host logs to a managed ClickHouse store via an installable Vector agent with a native log explorer, plus scheduler runs capture and retain their output history.
 ### Changed
 - Supervisor install, sync, and restart now run as background jobs with directory pre-flight checks, a worker backend status check, and paginated cron/daemon history.
 ### Fixed

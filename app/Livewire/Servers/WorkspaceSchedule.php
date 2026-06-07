@@ -7,10 +7,14 @@ use App\Livewire\Concerns\EmitsPanelEvent;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Models\AuditLog;
 use App\Models\Server;
 use App\Models\ServerCronJob;
 use App\Models\ServerSchedulerHeartbeat;
 use App\Models\Site;
+use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use Illuminate\Support\Facades\Cache;
+use Livewire\WithPagination;
 use App\Services\Servers\CronExpressionValidator;
 use App\Services\Servers\PreflightSchedulerOnSite;
 use App\Services\Servers\SchedulerCardsBuilder;
@@ -44,6 +48,7 @@ class WorkspaceSchedule extends Component
     use RendersWorkspacePlaceholder;
     use RequiresFeature;
     use EmitsPanelEvent;
+    use WithPagination;
 
     protected string $requiredFeature = 'workspace.schedule';
 
@@ -51,7 +56,7 @@ class WorkspaceSchedule extends Component
     use InteractsWithServerWorkspace;
 
     /** @var list<string> */
-    public const SCHEDULE_TABS = ['schedulers', 'overview', 'enable'];
+    public const SCHEDULE_TABS = ['schedulers', 'overview', 'logs', 'activity'];
 
     /** @var 'schedulers'|'overview'|'enable' */
     #[Url(as: 'tab', except: 'schedulers', history: true)]
@@ -96,6 +101,29 @@ class WorkspaceSchedule extends Component
 
     public ?string $disableMonitoringHeartbeatId = null;
 
+    /** Enable-scheduler modal name (event-driven open/close, like daemons' Add program modal). */
+    public const ENABLE_MODAL = 'schedule-enable';
+
+    /** Live streaming for queued SSH ops (run-now, capture toggle) — cache-backed poll. */
+    public ?string $scheduler_run_id = null;
+
+    public bool $scheduler_run_busy = false;
+
+    /** Cache key of the in-flight op so the poll can read whichever job is running. */
+    public ?string $scheduler_run_cache_key = null;
+
+    /** Cron daemon log tail (Logs tab). null = not loaded. */
+    public ?string $cron_daemon_log_body = null;
+
+    /** Logs tab — selected scheduler (heartbeat id) whose output history is shown. */
+    public ?string $log_scheduler_id = null;
+
+    public function openEnableSchedulerModal(): void
+    {
+        $this->resetValidation();
+        $this->dispatch('open-modal', self::ENABLE_MODAL);
+    }
+
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
@@ -113,8 +141,10 @@ class WorkspaceSchedule extends Component
             }
         }
 
+        // Old ?tab=enable bookmarks (the Enable tab is now a modal) and any
+        // unknown value fall back to the Schedulers list home.
         if (! in_array($this->schedule_workspace_tab, self::SCHEDULE_TABS, true)) {
-            $this->schedule_workspace_tab = 'overview';
+            $this->schedule_workspace_tab = 'schedulers';
         }
 
         $this->syncEnableFormToSiteFramework();
@@ -202,7 +232,7 @@ class WorkspaceSchedule extends Component
 
     public function setScheduleWorkspaceTab(string $tab): void
     {
-        $this->schedule_workspace_tab = in_array($tab, self::SCHEDULE_TABS, true) ? $tab : 'overview';
+        $this->schedule_workspace_tab = in_array($tab, self::SCHEDULE_TABS, true) ? $tab : 'schedulers';
     }
 
     /**
@@ -244,7 +274,7 @@ class WorkspaceSchedule extends Component
 
         $failures = $preflight->structuralFailures($results, $kind);
         if ($results === [] || $failures !== []) {
-            $this->schedule_workspace_tab = 'enable';
+            // Keep the modal open; $preflight_results renders inside it.
             $this->toastError($results === []
                 ? __('Preflight could not run over SSH — the structured results below tell you why.')
                 : __('Preflight blocked Enable — fix the structural issues below before retrying.'));
@@ -254,7 +284,6 @@ class WorkspaceSchedule extends Component
 
         $bareCommand = $this->resolveBareSchedulerCommand($site, $kind);
         if ($bareCommand === null) {
-            $this->schedule_workspace_tab = 'enable';
             $this->toastError($kind === ServerSchedulerHeartbeat::KIND_GENERIC
                 ? __('Enter a scheduler command.')
                 : __('Could not build scheduler command for this site.'));
@@ -313,6 +342,7 @@ class WorkspaceSchedule extends Component
         $this->reset(['enable_site_id', 'enable_framework', 'enable_custom_command']);
         $this->enable_cron_expression = '* * * * *';
         $this->schedule_workspace_tab = 'schedulers';
+        $this->dispatch('close-modal', self::ENABLE_MODAL);
         $this->emitPanelEvent(
             __('Scheduler enabled for :site.', ['site' => $site->name]),
             [__('Waiting for the first tick — the chip will turn green within ~60-90 seconds.')],
@@ -553,17 +583,134 @@ class WorkspaceSchedule extends Component
             ],
         );
 
+        $runId = (string) \Illuminate\Support\Str::ulid();
+        $this->scheduler_run_id = $runId;
+        $this->scheduler_run_busy = true;
+        $this->scheduler_run_cache_key = RunSchedulerNowJob::cacheKey($runId);
+
         RunSchedulerNowJob::dispatch(
             $this->server->id,
             $heartbeat->id,
             (string) auth()->id(),
+            $runId,
         );
 
         $this->emitPanelEvent(
             __('Run now queued for :site scheduler.', ['site' => $heartbeat->site?->name ?? $heartbeatId]),
-            [__('Output streams to the activity tab. Timeout: 5 minutes.')],
+            [__('Running schedule:run on the server… (5-minute timeout)')],
             'running',
         );
+    }
+
+    /**
+     * Poll the cached output of the in-flight Run-now job (mirrors
+     * WorkspaceDaemons::pollDaemonOperation). Wired to wire:poll while busy.
+     */
+    public function pollSchedulerRun(): void
+    {
+        if ($this->scheduler_run_cache_key === null || ! $this->scheduler_run_busy) {
+            return;
+        }
+
+        $payload = Cache::get($this->scheduler_run_cache_key);
+        if (! is_array($payload)) {
+            return;
+        }
+
+        $status = (string) ($payload['status'] ?? 'running');
+        if (! in_array($status, ['done', 'failed'], true)) {
+            return;
+        }
+
+        $output = (string) ($payload['output'] ?? '');
+        $lines = array_values(array_filter(explode("\n", $output)));
+        $this->scheduler_run_busy = false;
+        $this->scheduler_run_id = null;
+        $this->scheduler_run_cache_key = null;
+        $this->run_now_in_flight = [];
+
+        $this->emitPanelEvent(
+            $status === 'done' ? __('Done.') : __('Operation failed.'),
+            $lines,
+            $status === 'done' ? 'completed' : 'failed',
+        );
+    }
+
+    /**
+     * Per-scheduler output capture toggle (PR2). Flips the DB column optimistically
+     * and queues an SSH job to touch/remove the on-box control file (and lazily
+     * re-push a capture-capable wrapper when enabling).
+     */
+    public function toggleOutputCapture(string $heartbeatId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $heartbeat = ServerSchedulerHeartbeat::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($heartbeatId)
+            ->first();
+        if ($heartbeat === null) {
+            $this->toastError(__('Scheduler not found.'));
+
+            return;
+        }
+
+        $enabled = ! $heartbeat->output_capture_enabled;
+        $heartbeat->forceFill(['output_capture_enabled' => $enabled])->save();
+
+        $runId = (string) \Illuminate\Support\Str::ulid();
+        $this->scheduler_run_id = $runId;
+        $this->scheduler_run_busy = true;
+        $this->scheduler_run_cache_key = \App\Jobs\SetSchedulerOutputCaptureJob::cacheKey($runId);
+
+        \App\Jobs\SetSchedulerOutputCaptureJob::dispatch($this->server->id, $heartbeat->id, $enabled, $runId);
+
+        audit_log(
+            $this->server->organization,
+            auth()->user(),
+            'server.scheduler.capture_'.($enabled ? 'enabled' : 'disabled'),
+            $this->server,
+            null,
+            ['heartbeat_id' => $heartbeat->id, 'site_id' => $heartbeat->site_id],
+        );
+
+        $this->emitPanelEvent(
+            $enabled
+                ? __('Enabling output capture — pushing control file to the server…')
+                : __('Disabling output capture — removing control file…'),
+            [],
+            'running',
+        );
+    }
+
+    /**
+     * Logs tab — tail the system cron daemon log. Analog to the daemons
+     * "supervisord daemon log" card; proves cron itself is firing entries.
+     * Distros differ, so try journalctl (cron, then crond) then syslog.
+     */
+    public function loadCronDaemonLog(ExecuteRemoteTaskOnServer $exec): void
+    {
+        $this->authorize('view', $this->server);
+        $this->cron_daemon_log_body = null;
+
+        if (! $this->serverOpsReady()) {
+            $this->cron_daemon_log_body = __('Server is not ready for SSH.');
+
+            return;
+        }
+
+        $cmd = 'journalctl -u cron --no-pager -n 200 2>/dev/null'
+            .' || journalctl -u crond --no-pager -n 200 2>/dev/null'
+            .' || grep -iE "CRON|cron" /var/log/syslog 2>/dev/null | tail -n 200'
+            .' || echo "No cron daemon log available."';
+
+        try {
+            $out = $exec->runInlineBash($this->server->fresh(), 'scheduler-cron-log', $cmd, timeoutSeconds: 20, asRoot: false);
+            $body = trim((string) $out->buffer);
+            $this->cron_daemon_log_body = $body !== '' ? $body : __('(cron daemon log is empty)');
+        } catch (\Throwable $e) {
+            $this->cron_daemon_log_body = $e->getMessage();
+        }
     }
 
     /**
@@ -643,7 +790,45 @@ class WorkspaceSchedule extends Component
 
         $enableTargetSite = $this->resolveEnableTargetSite() ?? $contextSite;
 
+        // Activity tab — scheduler audit events for this server. Backed by the
+        // generic audit log filtered to server.scheduler.* (UX-identical to the
+        // daemons Activity list, no dedicated table).
+        $auditLogs = $this->schedule_workspace_tab === 'activity'
+            ? AuditLog::query()
+                ->where('subject_type', Server::class)
+                ->where('subject_id', $this->server->id)
+                ->where('action', 'like', 'server.scheduler.%')
+                ->with('user')
+                ->latest('created_at')
+                ->paginate(20)
+            : collect();
+
+        // Logs tab — schedulers with a heartbeat row (for the selector) and the
+        // selected scheduler's recent captured output history.
+        $logSchedulers = collect();
+        $logSelectedHeartbeat = null;
+        $logTickOutputs = collect();
+        if ($this->schedule_workspace_tab === 'logs') {
+            $logSchedulers = ServerSchedulerHeartbeat::query()
+                ->where('server_id', $this->server->id)
+                ->with('site:id,name')
+                ->get();
+
+            if ($this->log_scheduler_id !== null) {
+                $logSelectedHeartbeat = $logSchedulers->firstWhere('id', $this->log_scheduler_id);
+            }
+            $logSelectedHeartbeat ??= $logSchedulers->first();
+
+            if ($logSelectedHeartbeat !== null) {
+                $logTickOutputs = $logSelectedHeartbeat->tickOutputs()->limit(50)->get();
+            }
+        }
+
         return view('livewire.servers.workspace-schedule', [
+            'auditLogs' => $auditLogs,
+            'logSchedulers' => $logSchedulers,
+            'logSelectedHeartbeat' => $logSelectedHeartbeat,
+            'logTickOutputs' => $logTickOutputs,
             'opsReady' => $this->serverOpsReady(),
             'contextSite' => $contextSite,
             'contextSiteModel' => $contextSite,

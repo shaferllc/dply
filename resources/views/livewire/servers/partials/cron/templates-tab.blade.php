@@ -10,17 +10,16 @@
 
 @if (! empty($bundledCronJobs))
     <div class="{{ $card }}">
-        <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-6 py-5 sm:px-8">
-            <div class="flex min-w-0 items-start gap-3">
-                <span class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sand/60 text-brand-forest ring-1 ring-brand-ink/10">
-                    <x-heroicon-o-sparkles class="h-5 w-5" />
-                </span>
-                <div class="min-w-0">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Built-in bundles') }}</h2>
-                    <p class="mt-0.5 text-sm text-brand-moss leading-relaxed">
-                        {{ __('One-click starters for things people normally schedule. Each adds rows to the Jobs tab — review and edit (paths/domains), then sync the crontab.') }}
-                    </p>
-                </div>
+        <div class="flex min-w-0 items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
+            <x-icon-badge>
+                <x-heroicon-o-sparkles class="h-5 w-5" aria-hidden="true" />
+            </x-icon-badge>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Templates') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Built-in bundles') }}</h2>
+                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                    {{ __('One-click starters for things people normally schedule. Each adds rows to the Jobs tab — review and edit (paths/domains), then sync the crontab.') }}
+                </p>
             </div>
         </div>
         <div class="grid gap-3 px-6 py-5 sm:grid-cols-2 sm:px-8 lg:grid-cols-3">
@@ -75,17 +74,16 @@
 @endif
 
 <div class="{{ $card }}">
-    <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-6 py-5 sm:px-8">
-        <div class="flex min-w-0 items-start gap-3">
-            <span class="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/30">
-                <x-heroicon-o-document-duplicate class="h-5 w-5" />
-            </span>
-            <div class="min-w-0">
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Organization templates') }}</h2>
-                <p class="mt-0.5 text-sm text-brand-moss leading-relaxed">
-                    {{ __('Reusable cron recipes saved for your team. Click Apply to load one into the Add Cron Job form on the Jobs tab — review and save to install it on this server.') }}
-                </p>
-            </div>
+    <div class="flex min-w-0 items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
+        <x-icon-badge>
+            <x-heroicon-o-document-duplicate class="h-5 w-5" aria-hidden="true" />
+        </x-icon-badge>
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Templates') }}</p>
+            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Organization templates') }}</h2>
+            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                {{ __('Reusable cron recipes saved for your team. Click Apply to load one into the Add Cron Job form on the Jobs tab — review and save to install it on this server.') }}
+            </p>
         </div>
     </div>
 

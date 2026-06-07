@@ -1126,9 +1126,20 @@ class WorkspaceCron extends Component
             ->all();
     }
 
+    public function updatedInspectCrontabUser(): void
+    {
+        // Auto-reload the crontab when the operator picks a different user from
+        // the dropdown — no separate Reload click needed.
+        if (trim($this->inspect_crontab_user) !== '') {
+            $this->loadInspectCrontab(app(ServerCrontabReader::class));
+        }
+    }
+
     public function loadInspectCrontab(ServerCrontabReader $reader): void
     {
-        $this->authorize('update', $this->server);
+        // Read-only (crontab -l) — mirrors the daemons/schedule read actions and
+        // lets the Inspect tab auto-load for view-only users without a 403.
+        $this->authorize('view', $this->server);
         $this->inspect_crontab_body = null;
         $this->inspect_crontab_exit_code = null;
 

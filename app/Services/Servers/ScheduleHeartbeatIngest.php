@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
+use App\Models\SchedulerTickOutput;
 use App\Models\Server;
 use App\Models\ServerSchedulerHeartbeat;
 use App\Models\Site;
@@ -25,8 +26,8 @@ use Illuminate\Support\Facades\Log;
  */
 class ScheduleHeartbeatIngest
 {
-    /** Wrapper payload version we understand. */
-    private const SUPPORTED_VERSION = 1;
+    /** Wrapper payload versions we understand. v2 adds stdout_excerpt + capture_enabled. */
+    private const SUPPORTED_VERSIONS = [1, 2];
 
     /**
      * @param  array<int, mixed>  $heartbeats  Raw `scheduler_heartbeats` array from the push payload.
@@ -37,11 +38,9 @@ class ScheduleHeartbeatIngest
             return;
         }
 
-        $orgCaptureEnabled = $this->orgCaptureEnabled($server);
-
         foreach ($heartbeats as $index => $raw) {
             try {
-                $this->ingestOne($server, $raw, $orgCaptureEnabled);
+                $this->ingestOne($server, $raw);
             } catch (\Throwable $e) {
                 Log::warning('scheduler_heartbeat.ingest_failed', [
                     'server_id' => $server->id,
@@ -55,14 +54,14 @@ class ScheduleHeartbeatIngest
     /**
      * @param  mixed  $raw
      */
-    private function ingestOne(Server $server, $raw, bool $orgCaptureEnabled): void
+    private function ingestOne(Server $server, $raw): void
     {
         if (! is_array($raw)) {
             throw new \InvalidArgumentException('heartbeat entry is not an object');
         }
 
-        $version = (int) ($raw['v'] ?? self::SUPPORTED_VERSION);
-        if ($version !== self::SUPPORTED_VERSION) {
+        $version = (int) ($raw['v'] ?? 1);
+        if (! in_array($version, self::SUPPORTED_VERSIONS, true)) {
             // Future-version sidecars from a newer wrapper than this dply
             // understands — log so we know to ship parser updates, then skip.
             Log::info('scheduler_heartbeat.unsupported_version', [
@@ -105,15 +104,18 @@ class ScheduleHeartbeatIngest
         }
 
         $lastTickAt = $this->parseTimestamp($raw['last_tick_at'] ?? $raw['finished_at'] ?? null);
+        $exitCode = $this->intOrNull($raw['last_exit_code'] ?? $raw['exit_code'] ?? null);
 
+        // output_capture_enabled is per-scheduler operator state, controlled by
+        // the capture toggle (which also writes the on-box control file). The
+        // ingest path must NOT clobber it — only set it on create (opt-in off).
         $payload = [
             'cron_expression' => $cronExpression,
             'last_tick_at' => $lastTickAt,
-            'last_exit_code' => $this->intOrNull($raw['last_exit_code'] ?? $raw['exit_code'] ?? null),
+            'last_exit_code' => $exitCode,
             'last_duration_ms' => $this->intOrNull($raw['last_duration_ms'] ?? $raw['duration_ms'] ?? null),
             'last_memory_peak_kb' => $this->intOrNull($raw['last_memory_peak_kb'] ?? $raw['memory_peak_kb'] ?? null),
             'circuit_open' => (bool) ($raw['circuit_open'] ?? false),
-            'output_capture_enabled' => $orgCaptureEnabled,
         ];
 
         // Upsert: keep existing row's first_seen_at + consecutive_misses if we
@@ -126,13 +128,16 @@ class ScheduleHeartbeatIngest
             ->first();
 
         if ($existing === null) {
-            ServerSchedulerHeartbeat::query()->create(array_merge($payload, [
+            $heartbeat = ServerSchedulerHeartbeat::query()->create(array_merge($payload, [
                 'server_id' => $server->id,
                 'site_id' => $site->id,
                 'scheduler_kind' => $kind,
                 'consecutive_misses' => 0,
                 'first_seen_at' => now(),
+                'output_capture_enabled' => false, // opt-in; the toggle turns it on.
             ]));
+
+            $this->recordTickOutputIfAny($heartbeat, $raw, $exitCode, $lastTickAt);
 
             return;
         }
@@ -150,22 +155,55 @@ class ScheduleHeartbeatIngest
         // out of that math to keep the two paths independently testable.
 
         $existing->fill($payload)->save();
+
+        // Record output only once per actual tick (the agent re-pushes the same
+        // sidecar until a new tick overwrites it).
+        if ($tickIsFresh) {
+            $this->recordTickOutputIfAny($existing, $raw, $exitCode, $lastTickAt);
+        }
     }
 
-    private function orgCaptureEnabled(Server $server): bool
+    /**
+     * Persist a scheduler_tick_outputs row when the sidecar carries output to
+     * keep: failures are always recorded; successful-run output only when the
+     * wrapper captured it (per-scheduler opt-in). Excerpt fields absent + a
+     * zero exit code = nothing worth a row.
+     *
+     * @param  array<string, mixed>  $raw
+     */
+    private function recordTickOutputIfAny(
+        ServerSchedulerHeartbeat $heartbeat,
+        array $raw,
+        ?int $exitCode,
+        ?\Carbon\Carbon $ranAt,
+    ): void {
+        $stderr = $this->stringOrNull($raw['stderr_excerpt'] ?? null);
+        $stdout = $this->stringOrNull($raw['stdout_excerpt'] ?? null);
+        $failed = $exitCode !== null && $exitCode !== 0;
+
+        if (! $failed && $stderr === null && $stdout === null) {
+            return; // clean run, capture off — nothing to store.
+        }
+
+        SchedulerTickOutput::record(
+            heartbeatId: $heartbeat->id,
+            trigger: SchedulerTickOutput::TRIGGER_CRON,
+            exitCode: $exitCode,
+            stdout: $stdout,
+            stderr: $stderr,
+            ranAt: $ranAt,
+            durationMs: $this->intOrNull($raw['last_duration_ms'] ?? $raw['duration_ms'] ?? null),
+        );
+    }
+
+    private function stringOrNull(mixed $raw): ?string
     {
-        $org = $server->organization;
-        if ($org === null) {
-            return true; // safe default — schema column also defaults true
+        if (! is_string($raw)) {
+            return null;
         }
+        $raw = trim($raw);
 
-        // Column added in a later migration (org-level toggle); guard with
-        // property-exists so this works before that migration lands.
-        if (! isset($org->scheduler_capture_output)) {
-            return true;
-        }
-
-        return (bool) $org->scheduler_capture_output;
+        return $raw === '' ? null : $raw;
     }
 
     private function normalizeSiteId(mixed $raw): ?string
