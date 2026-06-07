@@ -269,6 +269,40 @@ class WorkspaceWorkerPool extends Component
         $this->toastSuccess(__('Horizon config saved — applying to workers over SSH (they restart in a few seconds).'));
     }
 
+    public function saveProcessManager(WorkerPoolManager $manager): void
+    {
+        Gate::authorize('update', $this->server);
+
+        $pool = $this->pool();
+        if (! $pool) {
+            $this->toastError(__('No pool.'));
+
+            return;
+        }
+
+        $previousManager = $pool->processManager();
+        $newManager = in_array($this->hz_process_manager, [WorkerPool::PM_SYSTEMD, WorkerPool::PM_SUPERVISOR], true)
+            ? $this->hz_process_manager
+            : WorkerPool::PM_SYSTEMD;
+
+        if ($newManager === $previousManager) {
+            $this->toastError(__('Already using :pm.', ['pm' => $newManager]));
+
+            return;
+        }
+
+        $meta = is_array($pool->meta) ? $pool->meta : [];
+        $meta['process_manager'] = $newManager;
+        $pool->forceFill(['meta' => $meta])->save();
+        $this->hz_process_manager = $newManager;
+
+        $manager->ensureWorkersAcrossPool($pool->refresh(), auth()->user());
+
+        $this->toastSuccess(__('Switching all members to :pm — re-provisioning worker daemons over SSH.', [
+            'pm' => $newManager === WorkerPool::PM_SUPERVISOR ? 'Supervisor' : 'systemd',
+        ]));
+    }
+
     public function pool(): ?WorkerPool
     {
         $id = $this->server->worker_pool_id;
@@ -374,7 +408,7 @@ class WorkspaceWorkerPool extends Component
     {
         Gate::authorize('update', $this->server);
 
-        $allowed = ['ensure', 'start', 'stop', 'restart', 'horizon:pause', 'horizon:continue', 'horizon:terminate', 'horizon:snapshot', 'horizon:status'];
+        $allowed = ['ensure', 'start', 'stop', 'restart', 'check', 'horizon:pause', 'horizon:continue', 'horizon:terminate', 'horizon:snapshot', 'horizon:status'];
         $action = in_array($action, $allowed, true) ? $action : 'restart';
 
         $pool = $this->pool();
@@ -401,8 +435,9 @@ class WorkspaceWorkerPool extends Component
             'horizon:terminate' => __('Restarting Horizon'),
             'horizon:snapshot' => __('Snapshotting Horizon metrics'),
             'horizon:status' => __('Checking Horizon status'),
+            'check' => __('Checking worker backend'),
         ][$action] ?? __('Updating workers');
-        $this->toastSuccess(__(':verb on :name — watch its systemd console for output.', ['verb' => $verb, 'name' => $member->name]));
+        $this->toastSuccess(__(':verb on :name — watch the console banner below for output.', ['verb' => $verb, 'name' => $member->name]));
     }
 
     /**

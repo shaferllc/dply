@@ -3,6 +3,7 @@
 namespace App\Livewire\Servers;
 
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\EmitsPanelEvent;
 use App\Livewire\Servers\Concerns\ChecksSupervisorInstallStatus;
 use App\Livewire\Servers\Concerns\GuardsDisruptiveActions;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
@@ -21,12 +22,16 @@ use App\Services\Servers\SupervisorProvisioner;
 use App\Support\Servers\DaemonWorkspaceViewData;
 use App\Support\SupervisorEnvFormatter;
 use Illuminate\Contracts\View\View;
+use App\Jobs\RunSupervisorOperationJob;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use Livewire\Attributes\Lazy;
 
@@ -37,6 +42,8 @@ class WorkspaceDaemons extends Component
     use RendersWorkspacePlaceholder;
     use ChecksSupervisorInstallStatus;
     use ConfirmsActionWithModal;
+    use EmitsPanelEvent;
+    use WithPagination;
     use GuardsDisruptiveActions;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
@@ -49,12 +56,25 @@ class WorkspaceDaemons extends Component
     public bool $siteContextUnavailable = false;
 
     /** @var 'programs'|'service'|'sync'|'logs'|'inspect'|'activity' */
+    #[Url(as: 'tab', keep: false)]
     public string $daemons_workspace_tab = 'programs';
 
     /** @var 'preview'|'drift'|'output' */
+    #[Url(as: 'subtab', keep: false)]
     public string $daemons_sync_subtab = 'preview';
 
     public string $supervisor_service_output = '';
+
+    /** Run ID of the active background supervisor operation (sync/install/restart). */
+    public ?string $daemon_op_run_id = null;
+
+    public bool $daemon_op_busy = false;
+
+    /** null = unknown, 'active' = running, 'inactive' = stopped */
+    public ?string $supervisor_service_state = null;
+
+    /** null = unknown, 'enabled' = starts on boot, 'disabled' = does not */
+    public ?string $supervisor_boot_state = null;
 
     public ?string $inspect_supervisor_body = null;
 
@@ -150,9 +170,24 @@ class WorkspaceDaemons extends Component
             }
         }
 
+        // #[Url] may not have initialised before mount() — honour the raw query param too.
         $tab = request()->query('tab');
         if (is_string($tab) && $tab !== '') {
             $this->setDaemonsWorkspaceTab($tab);
+        }
+
+        if ($this->daemons_workspace_tab === 'service' && $this->supervisor_installed === true) {
+            try {
+                $provisioner = app(SupervisorProvisioner::class);
+                $activeOut = $provisioner->manageSupervisorService($server, 'is-active');
+                $this->supervisor_service_state = (str_contains(strtolower(trim($activeOut)), 'active') && ! str_contains(strtolower(trim($activeOut)), 'inactive'))
+                    ? 'active'
+                    : 'inactive';
+                $enabledOut = $provisioner->manageSupervisorService($server, 'is-enabled');
+                $this->supervisor_boot_state = str_contains(strtolower(trim($enabledOut)), 'enabled') ? 'enabled' : 'disabled';
+            } catch (\Throwable) {
+                // Non-fatal — leave state as null
+            }
         }
     }
 
@@ -178,6 +213,85 @@ class WorkspaceDaemons extends Component
         if ($value !== 'logs') {
             $this->log_follow_enabled = false;
         }
+
+        if ($value === 'service') {
+            $this->loadSupervisorServiceStates(app(SupervisorProvisioner::class));
+        }
+    }
+
+    public function loadSupervisorServiceStates(SupervisorProvisioner $provisioner): void
+    {
+        $this->authorize('view', $this->server);
+
+        if ($this->supervisor_installed !== true) {
+            return;
+        }
+
+        try {
+            $server = $this->server->fresh();
+            $activeOut = $provisioner->manageSupervisorService($server, 'is-active');
+            $this->supervisor_service_state = (str_contains(strtolower(trim($activeOut)), 'active') && ! str_contains(strtolower(trim($activeOut)), 'inactive'))
+                ? 'active'
+                : 'inactive';
+
+            $enabledOut = $provisioner->manageSupervisorService($server, 'is-enabled');
+            $this->supervisor_boot_state = str_contains(strtolower(trim($enabledOut)), 'enabled') ? 'enabled' : 'disabled';
+        } catch (\Throwable) {
+            // Non-fatal — buttons stay in default state
+        }
+    }
+
+    public function pollDaemonOperation(): void
+    {
+        if ($this->daemon_op_run_id === null || ! $this->daemon_op_busy) {
+            return;
+        }
+
+        $payload = Cache::get(RunSupervisorOperationJob::cacheKey($this->daemon_op_run_id));
+        if (! is_array($payload)) {
+            return;
+        }
+
+        $status = (string) ($payload['status'] ?? 'running');
+        $output = (string) ($payload['output'] ?? '');
+
+        if (! in_array($status, ['done', 'failed'], true)) {
+            return;
+        }
+
+        $lines = array_values(array_filter(explode("\n", $output)));
+        $this->daemon_op_busy = false;
+        $this->daemon_op_run_id = null;
+
+        if ($status === 'done') {
+            $this->last_supervisor_sync_output = $output;
+            $this->emitPanelEvent(__('Operation completed.'), $lines, 'completed');
+            // Install/sync may have changed the package state — re-check so the
+            // "not installed" banner clears and the tabs become usable.
+            $this->server->refresh();
+            $this->supervisor_installed = $this->server->supervisor_package_status === Server::SUPERVISOR_PACKAGE_INSTALLED;
+            $this->refreshProgramStatusMap();
+        } else {
+            $this->emitPanelEvent($output ?: __('Operation failed.'), $lines, 'failed');
+        }
+    }
+
+    protected function dispatchDaemonOperation(string $operation): void
+    {
+        $this->authorize('update', $this->server);
+        $runId = (string) \Illuminate\Support\Str::ulid();
+        $this->daemon_op_run_id = $runId;
+        $this->daemon_op_busy = true;
+
+        $label = match ($operation) {
+            'sync'        => __('Syncing Supervisor config…'),
+            'install'     => __('Installing Supervisor…'),
+            'restart_all' => __('Restarting all programs…'),
+            default       => __('Running operation…'),
+        };
+        $this->emitPanelEvent($label, [], 'running');
+
+        RunSupervisorOperationJob::dispatch($this->server->id, $operation, $runId);
     }
 
     public function supervisorServiceAction(SupervisorProvisioner $provisioner, string $action): void
@@ -187,6 +301,19 @@ class WorkspaceDaemons extends Component
         try {
             $out = $provisioner->manageSupervisorService($this->server->fresh(), $action);
             $this->supervisor_service_output = $out;
+
+            // Infer state so Start/Stop buttons can be shown contextually.
+            match ($action) {
+                'start'      => $this->supervisor_service_state = 'active',
+                'stop'       => $this->supervisor_service_state = 'inactive',
+                'is-active'  => $this->supervisor_service_state = (str_contains(strtolower(trim($out)), 'active') && ! str_contains(strtolower(trim($out)), 'inactive')) ? 'active' : 'inactive',
+                'status'     => $this->supervisor_service_state = str_contains($out, 'Active: active') ? 'active' : (str_contains($out, 'Active: inactive') || str_contains($out, 'Active: failed') ? 'inactive' : $this->supervisor_service_state),
+                'enable'     => $this->supervisor_boot_state = 'enabled',
+                'disable'    => $this->supervisor_boot_state = 'disabled',
+                'is-enabled' => $this->supervisor_boot_state = str_contains(strtolower(trim($out)), 'enabled') ? 'enabled' : 'disabled',
+                default      => null,
+            };
+
             if (! $readOnly) {
                 SupervisorDaemonAudit::log($this->server->fresh(), null, 'supervisor_service_'.$action, [
                     'output' => Str::limit($out, 2000),
@@ -594,6 +721,12 @@ class WorkspaceDaemons extends Component
     public function loadProgramStatuses(SupervisorProvisioner $provisioner): void
     {
         $this->authorize('view', $this->server);
+        $this->refreshProgramStatusMap($provisioner);
+    }
+
+    protected function refreshProgramStatusMap(?SupervisorProvisioner $provisioner = null): void
+    {
+        $provisioner ??= app(SupervisorProvisioner::class);
         $this->program_status_map = [];
         if (! $this->server->isReady() || empty($this->server->ssh_private_key)) {
             return;
@@ -601,8 +734,8 @@ class WorkspaceDaemons extends Component
         try {
             $out = $provisioner->fetchSupervisorctlStatus($this->server->fresh());
             $this->program_status_map = $provisioner->parseManagedProgramStatuses($this->server->fresh(), $out);
-        } catch (\Throwable $e) {
-            $this->toastError($e->getMessage());
+        } catch (\Throwable) {
+            // Non-fatal — statuses stay empty
         }
     }
 
@@ -822,19 +955,14 @@ class WorkspaceDaemons extends Component
         }
     }
 
-    public function restartAllPrograms(SupervisorProvisioner $provisioner, bool $override = false): void
+    public function restartAllPrograms(bool $override = false): void
     {
         $this->authorize('update', $this->server);
         if (! $this->disruptiveActionAllowed(__('Restart all programs'), $override)) {
             return;
         }
-        try {
-            $out = $provisioner->restartAllManagedPrograms($this->server->fresh());
-            SupervisorDaemonAudit::log($this->server->fresh(), null, 'restart_all', ['output' => Str::limit($out, 1200)]);
-            $this->toastSuccess(__('Restart all: :out', ['out' => Str::limit($out, 1200)]));
-        } catch (\Throwable $e) {
-            $this->toastError($e->getMessage());
-        }
+        SupervisorDaemonAudit::log($this->server->fresh(), null, 'restart_all_queued', []);
+        $this->dispatchDaemonOperation('restart_all');
     }
 
     public function loadSupervisorInspect(SupervisorProvisioner $provisioner): void
@@ -911,8 +1039,7 @@ class WorkspaceDaemons extends Component
                 ->where('server_id', $this->server->id)
                 ->with('user')
                 ->latest('created_at')
-                ->limit(40)
-                ->get()
+                ->paginate(20)
             : collect();
 
         $orgServersForCopy = $orgId

@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 7, 2026',
+                    'tags'    => ['improved'],
+                    'title'   => 'Background Supervisor Operations',
+                    'summary' => 'Supervisor install, sync, and restart now run as background jobs with directory pre-flight checks, a worker backend status check, and paginated cron/daemon history.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 7, 2026',
                     'tags'    => ['fixed'],
                     'title'   => 'More Reliable Server Provisioning',
                     'summary' => 'Warm-pool servers that silently stall during provisioning are now detected and recovered automatically, so new servers finish setup reliably.',

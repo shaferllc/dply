@@ -38,4 +38,9 @@
             </table>
         @endif
     </div>
+    @if (! $recentCronRuns->isEmpty() && $recentCronRuns->hasPages())
+        <div class="border-t border-brand-ink/10 px-6 py-4 sm:px-8">
+            {{ $recentCronRuns->links() }}
+        </div>
+    @endif
 </div>

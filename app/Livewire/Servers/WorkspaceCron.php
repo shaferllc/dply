@@ -29,6 +29,7 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use Livewire\Attributes\Lazy;
 
@@ -39,6 +40,7 @@ class WorkspaceCron extends Component
     use RendersWorkspacePlaceholder;
     use ConfirmsActionWithModal;
     use EmitsPanelEvent;
+    use WithPagination;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
 
@@ -1557,8 +1559,7 @@ class WorkspaceCron extends Component
                 ->whereHas('cronJob', fn ($q) => $q->where('server_id', $this->server->id))
                 ->with(['cronJob'])
                 ->orderByDesc('started_at')
-                ->limit(100)
-                ->get()
+                ->paginate(25)
             : collect();
 
         $runAsUserDatalistChoices = ($needsJobs || $needsInspect)

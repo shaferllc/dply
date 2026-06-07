@@ -5,15 +5,15 @@
 
 <section class="dply-card overflow-hidden">
     <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div class="flex items-start gap-3">
+        {{-- Top row: icon + title + actions --}}
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
                 <x-icon-badge>
                     <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $contextSiteModel && $schedulers_list_scope === 'site' ? __('Schedulers for this site') : __('Schedulers on this server') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Monitor tick health, run schedule:run once, pause/resume, or change cadence. Enable monitoring to wrap bare cron entries with heartbeat tracking.') }}</p>
+                    <h3 class="text-base font-semibold text-brand-ink">{{ $contextSiteModel && $schedulers_list_scope === 'site' ? __('Schedulers for this site') : __('Schedulers on this server') }}</h3>
                 </div>
             </div>
             <div class="flex shrink-0 flex-wrap items-center gap-2">
@@ -30,6 +30,8 @@
                 </button>
             </div>
         </div>
+        {{-- Description — full width below --}}
+        <p class="mt-3 text-sm leading-relaxed text-brand-moss">{{ __('Monitor tick health, run schedule:run once, pause/resume, or change cadence. Enable monitoring to wrap bare cron entries with heartbeat tracking.') }}</p>
     </div>
 
     @if ($contextSiteModel)
@@ -151,7 +153,8 @@
                                 class="rounded-lg p-2 text-brand-forest hover:bg-emerald-50 disabled:opacity-40"
                                 title="{{ $isPaused ? __('Resume first') : __('Run now') }}"
                             >
-                                <x-heroicon-o-play class="h-5 w-5" />
+                                <x-heroicon-o-play class="h-5 w-5" wire:loading.remove wire:target="runNow('{{ $heartbeatId }}')" />
+                                <x-spinner wire:loading wire:target="runNow('{{ $heartbeatId }}')" size="sm" />
                             </button>
                             <button
                                 type="button"
@@ -161,11 +164,14 @@
                                 class="rounded-lg p-2 text-amber-800 hover:bg-amber-50"
                                 title="{{ $isPaused ? __('Resume') : __('Pause') }}"
                             >
-                                @if ($isPaused)
-                                    <x-heroicon-o-play class="h-5 w-5" />
-                                @else
-                                    <x-heroicon-o-pause class="h-5 w-5" />
-                                @endif
+                                <span wire:loading.remove wire:target="togglePause('{{ $heartbeatId }}')">
+                                    @if ($isPaused)
+                                        <x-heroicon-o-play class="h-5 w-5" />
+                                    @else
+                                        <x-heroicon-o-pause class="h-5 w-5" />
+                                    @endif
+                                </span>
+                                <x-spinner wire:loading wire:target="togglePause('{{ $heartbeatId }}')" variant="amber" size="sm" />
                             </button>
                             <button
                                 type="button"

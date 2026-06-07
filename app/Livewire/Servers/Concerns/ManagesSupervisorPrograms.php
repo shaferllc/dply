@@ -84,6 +84,8 @@ trait ManagesSupervisorPrograms
 
     public ?string $editing_program_id = null;
 
+    public string $sv_selected_preset = '';
+
     public string $last_supervisor_sync_output = '';
 
     /**
@@ -181,6 +183,13 @@ trait ManagesSupervisorPrograms
         $this->new_sv_user = $this->defaultProgramUser();
         $this->new_sv_directory = $this->defaultProgramDirectory();
         $this->resetDefaultsForNewProgramForm();
+    }
+
+    public function updatedSvSelectedPreset(string $value): void
+    {
+        if ($value !== '') {
+            $this->applySupervisorPreset($value);
+        }
     }
 
     public function updatedNewSvType(string $value): void
@@ -547,6 +556,31 @@ trait ManagesSupervisorPrograms
         $attrs = $this->programAttributesFromForm();
         $this->assertProgramTypeAllowed((string) $attrs['program_type']);
 
+        $dir = trim((string) ($attrs['directory'] ?? ''));
+        if ($dir !== '' && $this->server->isReady() && ! empty($this->server->ssh_private_key)) {
+            try {
+                $result = app(\App\Services\Servers\ServerSshConnectionRunner::class)->run(
+                    $this->server->fresh(),
+                    fn ($ssh): string => trim((string) $ssh->exec(
+                        'if test -d '.escapeshellarg($dir).' ; then echo ok; elif test -e '.escapeshellarg($dir).' ; then echo notdir; else echo missing; fi',
+                        15,
+                    )),
+                    true,
+                    true,
+                );
+                if ($result === 'missing') {
+                    $this->addError('new_sv_directory', __('Directory does not exist on the server: :path', ['path' => $dir]));
+                    return;
+                }
+                if ($result === 'notdir') {
+                    $this->addError('new_sv_directory', __('Path exists but is not a directory: :path', ['path' => $dir]));
+                    return;
+                }
+            } catch (\Throwable) {
+                // Non-fatal — SSH unavailable; proceed and let sync catch it
+            }
+        }
+
         $modal = $this->supervisorProgramModalName();
 
         if ($this->editing_program_id !== null) {
@@ -617,6 +651,7 @@ trait ManagesSupervisorPrograms
         $this->quick_max_time = 3600;
         $this->quick_app_env = 'production';
         $this->new_sv_command = 'php artisan queue:work --sleep=3 --tries=3';
+        $this->sv_selected_preset = '';
         $this->new_sv_directory = $this->defaultProgramDirectory();
         $this->new_sv_user = $this->defaultProgramUser();
         $this->new_sv_numprocs = 1;
@@ -736,45 +771,24 @@ trait ManagesSupervisorPrograms
         $this->toastSuccess(__('Removed. Sync Supervisor to reload on the server.'));
     }
 
-    public function installSupervisorPackage(SupervisorProvisioner $provisioner): void
+    public function installSupervisorPackage(): void
     {
-        $this->authorize('update', $this->server);
-        try {
-            $out = $provisioner->installSupervisorPackage($this->server->fresh());
-            $this->last_supervisor_sync_output = trim($out);
-            $this->server->refresh();
-            $this->supervisor_installed = $provisioner->isSupervisorPackageInstalled($this->server->fresh());
-            if ($this->supervisor_installed) {
-                $this->server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_INSTALLED]);
-            } else {
-                $this->server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_MISSING]);
-            }
-            SupervisorDaemonAudit::log($this->server->fresh(), null, 'package_install_attempted', [
-                'installed' => (bool) $this->supervisor_installed,
-                'output' => Str::limit($out, 1000),
-            ]);
-            $this->toastSuccess(__('Supervisor was installed on the server. You can add programs and sync.'));
-        } catch (\Throwable $e) {
-            $this->toastError($e->getMessage());
-            $this->supervisor_installed = false;
-        }
+        $this->dispatchDaemonOperation('install');
     }
 
     public function syncSupervisor(SupervisorProvisioner $provisioner): void
     {
-        $this->authorize('update', $this->server);
-        try {
-            $this->server->refresh();
-            $out = $provisioner->sync($this->server);
-            $trimmed = trim($out);
-            $this->last_supervisor_sync_output = $trimmed;
-            SupervisorDaemonAudit::log($this->server->fresh(), null, 'supervisor_sync', ['output' => Str::limit($trimmed, 2000)]);
-            $this->toastSuccess(__('Supervisor sync: :snippet', ['snippet' => Str::limit($trimmed, 800)]));
-            $this->supervisor_installed = true;
-            $this->server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_INSTALLED]);
-        } catch (\Throwable $e) {
-            $this->toastError($e->getMessage());
+        // Pre-flight directory check before queuing — missing dirs cause BACKOFF/FATAL.
+        $this->server->refresh();
+        $preflight = $provisioner->preflightPathCheck($this->server);
+        if (! $preflight['ok']) {
+            $warnings = array_map(fn (string $m): string => '⚠ '.$m, $preflight['messages']);
+            $this->emitPanelEvent(__('Directory check failed — fix paths before syncing.'), $warnings, 'failed');
+            return;
         }
+
+        $this->dispatchDaemonOperation('sync');
+        SupervisorDaemonAudit::log($this->server->fresh(), null, 'supervisor_sync_queued', []);
     }
 
     /**

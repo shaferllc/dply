@@ -136,17 +136,32 @@
 </section>
 
 @if ($opsReady)
+    {{-- Console banner for scheduler actions (enable, pause, run-now, cadence save) --}}
+    <div wire:loading wire:target="enableScheduler,togglePause,saveCadence,runNow" class="mb-4">
+        <x-workspace-console-banner status="running" :message="__('Applying scheduler change…')" :busy="true" />
+    </div>
+    @if ($panel_event_message !== '')
+        <div wire:loading.remove wire:target="enableScheduler,togglePause,saveCadence,runNow" class="mb-4">
+            <x-workspace-console-banner
+                :status="$panel_event_status"
+                :message="$panel_event_message"
+                :output="$panel_event_lines"
+                dismiss-action="dismissPanelBanner"
+            />
+        </div>
+    @endif
+
     <x-server-workspace-tablist :aria-label="__('Schedule workspace sections')">
-        <x-server-workspace-tab id="schedule-tab-overview" icon="heroicon-o-heart" :active="$schedule_workspace_tab === 'overview'" wire:click="setScheduleWorkspaceTab('overview')">
-            {{ __('Overview') }}
-            @if ($scheduleStats['attention'] > 0)
-                <span class="inline-flex shrink-0 items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-amber-900">{{ number_format($scheduleStats['attention']) }}</span>
-            @endif
-        </x-server-workspace-tab>
         <x-server-workspace-tab id="schedule-tab-schedulers" icon="heroicon-o-clock" :active="$schedule_workspace_tab === 'schedulers'" wire:click="setScheduleWorkspaceTab('schedulers')">
             {{ __('Schedulers') }}
             @if ($scheduleStats['total'] > 0)
                 <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-brand-moss">{{ number_format($scheduleStats['total']) }}</span>
+            @endif
+        </x-server-workspace-tab>
+        <x-server-workspace-tab id="schedule-tab-overview" icon="heroicon-o-heart" :active="$schedule_workspace_tab === 'overview'" wire:click="setScheduleWorkspaceTab('overview')">
+            {{ __('Overview') }}
+            @if ($scheduleStats['attention'] > 0)
+                <span class="inline-flex shrink-0 items-center rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold leading-none tabular-nums text-amber-900">{{ number_format($scheduleStats['attention']) }}</span>
             @endif
         </x-server-workspace-tab>
         <x-server-workspace-tab id="schedule-tab-enable" icon="heroicon-o-plus-circle" :active="$schedule_workspace_tab === 'enable'" wire:click="setScheduleWorkspaceTab('enable')">

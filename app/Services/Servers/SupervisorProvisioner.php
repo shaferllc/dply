@@ -42,7 +42,14 @@ class SupervisorProvisioner
             throw new \RuntimeException('Server must be ready with an SSH key.');
         }
 
-        $inner = 'export DEBIAN_FRONTEND=noninteractive && apt-get update -y && apt-get install -y --no-install-recommends supervisor && systemctl enable --now supervisor';
+        // After install, patch the main supervisord.conf to add user=root so the
+        // "Supervisor is running as root" CRIT is suppressed on every start.
+        $inner = 'export DEBIAN_FRONTEND=noninteractive'
+            .' && apt-get update -y'
+            .' && apt-get install -y --no-install-recommends supervisor'
+            .' && grep -qxF "user=root" /etc/supervisor/supervisord.conf'
+            .'    || sed -i "/^\[supervisord\]/a user=root" /etc/supervisor/supervisord.conf'
+            .' && systemctl enable --now supervisor';
         $cmd = $this->privilegedBash($server, $inner);
 
         return app(ServerSshConnectionRunner::class)->run(

@@ -1,9 +1,15 @@
             <div @class([$card, 'mb-6' => $server->supervisorPrograms->isNotEmpty()])>
-                <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Supervisord daemon log') }}</h2>
-                    <p class="mt-1 text-xs text-brand-moss leading-relaxed">
-                        {{ __('Tail of /var/log/supervisor/supervisord.log — supervisord itself logs here (startup, config reloads, child-process spawn failures). Independent of program stdout/stderr.') }}
-                    </p>
+                <div class="flex min-w-0 items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
+                    <x-icon-badge>
+                        <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Logs') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Supervisord daemon log') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            {{ __('Tail of /var/log/supervisor/supervisord.log — supervisord itself logs here (startup, config reloads, child-process spawn failures). Independent of program stdout/stderr.') }}
+                        </p>
+                    </div>
                 </div>
                 <div class="space-y-4 p-6 sm:p-8">
                     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -16,7 +22,10 @@
                             @disabled($supervisor_installed === false)
                             class="inline-flex shrink-0 items-center justify-center rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            <span wire:loading.remove wire:target="tailSupervisordDaemonLog">{{ __('Tail daemon log') }}</span>
+                            <span wire:loading.remove wire:target="tailSupervisordDaemonLog" class="inline-flex items-center gap-1.5">
+                                <x-heroicon-o-document-text class="h-4 w-4" />
+                                {{ __('Tail daemon log') }}
+                            </span>
                             <span wire:loading wire:target="tailSupervisordDaemonLog" class="inline-flex items-center gap-2">
                                 <x-spinner variant="forest" />
                                 {{ __('Loading…') }}
@@ -29,11 +38,17 @@
 
             @if ($server->supervisorPrograms->isNotEmpty())
             <div class="{{ $card }}">
-                <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8">
-                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Program logs') }}</h2>
-                    <p class="mt-1 text-xs text-brand-moss leading-relaxed">
-                        {{ __('Last lines from each program’s stdout log path (default under /tmp).') }}
-                    </p>
+                <div class="flex min-w-0 items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
+                    <x-icon-badge>
+                        <x-heroicon-o-cpu-chip class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Programs') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Program logs') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            {{ __('Last lines from each program stdout log path (default under /tmp).') }}
+                        </p>
+                    </div>
                 </div>
                 <div
                     class="space-y-4 p-6 sm:p-8"

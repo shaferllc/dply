@@ -23,3 +23,28 @@
                 </button>
             </div>
         @endif
+
+        {{-- Async ops (sync/install/restart_all) — poll until job completes --}}
+        @if ($daemon_op_busy)
+            <div class="mb-4" wire:poll.1s="pollDaemonOperation">
+                <x-workspace-console-banner
+                    :status="$panel_event_status"
+                    :message="$panel_event_message ?: __('Operation queued…')"
+                    :busy="true"
+                />
+            </div>
+        @elseif ($panel_event_message !== '')
+            <div class="mb-4">
+                <x-workspace-console-banner
+                    :status="$panel_event_status"
+                    :message="$panel_event_message"
+                    :output="$panel_event_lines"
+                    dismiss-action="dismissPanelBanner"
+                />
+            </div>
+        @endif
+
+        {{-- Inline SSH ops (start/stop/restart one program, service actions) --}}
+        <div wire:loading wire:target="startOneProgram,stopOneProgram,restartOneProgram,supervisorServiceAction" class="mb-4">
+            <x-workspace-console-banner status="running" :message="__('Running supervisorctl command…')" :busy="true" />
+        </div>

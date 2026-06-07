@@ -41,17 +41,17 @@
 
 {{-- Programs list card. Header carries the primary actions (Sync, Restart all,
      Add program) and a count chip; rows below. --}}
-<section class="dply-card overflow-hidden">
+<section class="dply-card overflow-hidden" wire:init="loadProgramStatuses">
     <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div class="flex items-start gap-3">
+        {{-- Top row: icon + title + buttons --}}
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
                 <x-icon-badge>
                     <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
                 </x-icon-badge>
                 <div class="min-w-0">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
-                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $contextSiteModel ? __('Programs for this site') : __('Programs on this server') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Add a new Supervisor program or edit / start / stop / restart / delete an existing one. Sync afterwards to apply changes on the server.') }}</p>
+                    <h3 class="text-base font-semibold text-brand-ink">{{ $contextSiteModel ? __('Programs for this site') : __('Programs on this server') }}</h3>
                 </div>
             </div>
             <div class="flex shrink-0 flex-wrap items-center gap-2">
@@ -82,10 +82,14 @@
                 </button>
                 <button
                     type="button"
-                    wire:click="restartAllPrograms({{ $restartAllConfirmMessage !== '' ? 'true' : 'false' }})"
-                    @if ($restartAllConfirmMessage !== '')
-                        wire:confirm="{{ $restartAllConfirmMessage }}"
-                    @endif
+                    wire:click="openConfirmActionModal(
+                        'restartAllPrograms',
+                        [true],
+                        @js(__('Restart all programs')),
+                        @js($restartAllConfirmMessage !== '' ? $restartAllConfirmMessage : __('Restart every active Supervisor program on this server. In-flight jobs will be interrupted.')),
+                        @js(__('Restart all')),
+                        true
+                    )"
                     wire:loading.attr="disabled"
                     wire:target="restartAllPrograms"
                     @disabled($supervisor_installed !== true)
@@ -102,13 +106,27 @@
                 </button>
                 <button
                     type="button"
-                    wire:click="syncSupervisor"
+                    wire:click="openConfirmActionModal(
+                        'syncSupervisor',
+                        [],
+                        @js(__('Sync Supervisor')),
+                        @js(__('Write all active program configs to the server and run supervisorctl update. Programs added or removed since the last sync will be picked up.')),
+                        @js(__('Sync')),
+                        false
+                    )"
                     wire:loading.attr="disabled"
+                    wire:target="syncSupervisor"
                     @disabled($supervisor_installed !== true)
                     class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                    <x-heroicon-m-cloud-arrow-up class="h-4 w-4 shrink-0" aria-hidden="true" />
-                    {{ __('Sync') }}
+                    <span wire:loading.remove wire:target="syncSupervisor" class="inline-flex items-center gap-1.5">
+                        <x-heroicon-m-cloud-arrow-up class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {{ __('Sync') }}
+                    </span>
+                    <span wire:loading wire:target="syncSupervisor" class="inline-flex items-center gap-1.5 whitespace-nowrap">
+                        <x-spinner variant="forest" size="sm" />
+                        {{ __('Working…') }}
+                    </span>
                 </button>
                 <button
                     type="button"
@@ -121,6 +139,8 @@
                 </button>
             </div>
         </div>
+        {{-- Description — full width below the row --}}
+        <p class="mt-3 text-sm leading-relaxed text-brand-moss">{{ __('Add a new Supervisor program or edit / start / stop / restart / delete an existing one. Sync afterwards to apply changes on the server.') }}</p>
     </div>
 
     @if ($contextSiteModel)
@@ -200,7 +220,31 @@
                     <div class="min-w-0 flex-1 py-4 pl-5 pr-4 sm:py-5 sm:pl-6 sm:pr-6">
                         <div class="flex flex-wrap items-center gap-2">
                             <p class="font-mono text-sm font-semibold text-brand-ink">{{ $sp->slug }}</p>
-                            <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $badgeClass }}">{{ $pst }}</span>
+                            @if (! $statusesLoaded)
+                                <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist ring-1 ring-brand-ink/10" wire:loading.remove wire:target="loadProgramStatuses">
+                                    <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-mist/50"></span>
+                                    {{ __('—') }}
+                                </span>
+                                <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist ring-1 ring-brand-ink/10" wire:loading wire:target="loadProgramStatuses">
+                                    <x-spinner size="sm" variant="muted" />
+                                    {{ __('Loading') }}
+                                </span>
+                            @else
+                                @php
+                                    $pstTooltip = match ($pst) {
+                                        'backoff' => __('Crash loop — the process started but exited too quickly (before startsecs). Supervisor keeps retrying with a delay. Common causes: missing .env, Redis unreachable, wrong working directory, or the app itself failing on boot. Check the program log for the actual error.'),
+                                        'fatal'   => __('Failed permanently — Supervisor gave up after too many retries. The process crashed every time it started. Check the program log to find the error, fix the cause, then restart.'),
+                                        'exited'  => __('Exited cleanly — the process ran and finished on its own. If it should be long-running (like a queue worker), it may have crashed. Check autorestart settings and the program log.'),
+                                        'stopped' => __('Stopped manually — the process was stopped via supervisorctl or dply. Start it again when ready.'),
+                                        'starting' => __('Starting — Supervisor is waiting for the process to pass the startsecs threshold before marking it as running.'),
+                                        default   => null,
+                                    };
+                                @endphp
+                                <span
+                                    class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $badgeClass }}"
+                                    @if ($pstTooltip) title="{{ $pstTooltip }}" @endif
+                                >{{ $pst }}</span>
+                            @endif
                         </div>
                         <p class="mt-1 text-xs text-brand-moss">
                             <span class="font-medium text-brand-ink/80">{{ $sp->program_type }}</span>
@@ -212,6 +256,14 @@
                         </p>
                         <p class="mt-2 break-all font-mono text-xs leading-relaxed text-brand-moss">{{ $sp->command }}</p>
                         <p class="mt-1 text-xs text-brand-mist">{{ $sp->effectiveDirectory() }}</p>
+                        @if (in_array($pst, ['backoff', 'fatal'], true))
+                            <p class="mt-2 text-[11px] leading-relaxed text-red-700">
+                                <span class="font-semibold">{{ $pst === 'backoff' ? __('Crash loop:') : __('Fatal:') }}</span>
+                                {{ $pst === 'backoff'
+                                    ? __('Process starts then exits immediately. Check .env, Redis/DB connectivity, and that the working directory exists.')
+                                    : __('Supervisor gave up retrying. Fix the crash cause then restart.') }}
+                            </p>
+                        @endif
                         @if ($isUnreported)
                             <div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900">
                                 <p class="font-semibold">{{ __('Not reported by Supervisor') }}</p>
@@ -317,7 +369,7 @@
                                 </button>
                             @endif
                         @endif
-                        @unless ($isUnreported)
+                        @if ($isRunningState)
                             <button
                                 type="button"
                                 wire:click="restartOneProgram('{{ $sp->id }}')"
@@ -329,7 +381,7 @@
                             >
                                 <x-heroicon-o-arrow-path class="h-5 w-5" />
                             </button>
-                        @endunless
+                        @endif
                         <button
                             type="button"
                             wire:click="openConfirmActionModal('deleteSupervisorProgram', ['{{ $sp->id }}'], @js(__('Delete program')), @js(__('Delete this program? Sync Supervisor afterward to remove its config from the server.')), @js(__('Delete program')), true)"

@@ -16,7 +16,7 @@
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Scaling') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Create a worker pool') }}</h2>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        {{ __('Turn this worker into the primary of a pool. You can then scale to N workers — each clone replays this server’s sites and joins the same queue.') }}
+                        {{ __('Turn this worker into the primary of a pool. You can then scale to N workers — each clone replays this server's sites and joins the same queue.') }}
                     </p>
                 </div>
             </div>
@@ -378,7 +378,7 @@
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cross-region') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Add a worker in another region') }}</h2>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        {{ __('Provision one replica in a different region (same provider). Its env is rewritten to reach your backends over their public address — you’ll then need to expose + allowlist those backends (shown above once it’s ready).') }}
+                        {{ __('Provision one replica in a different region (same provider). Its env is rewritten to reach your backends over their public address — you'll then need to expose + allowlist those backends (shown above once it's ready).') }}
                     </p>
                 </div>
             </div>
@@ -433,7 +433,7 @@
                 </div>
                 <label class="flex items-start gap-3">
                     <input type="checkbox" wire:model="cr_ack_secrets" class="mt-0.5 h-4 w-4 rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage/30" />
-                    <span class="text-xs text-brand-moss">{{ __('I understand this server’s secrets (.env, including credentials) will be replicated to the new region/provider.') }}</span>
+                    <span class="text-xs text-brand-moss">{{ __('I understand this server's secrets (.env, including credentials) will be replicated to the new region/provider.') }}</span>
                 </label>
                 <div class="flex justify-end">
                     <x-primary-button type="submit">{{ __('Provision cross-region worker') }}</x-primary-button>
@@ -485,10 +485,11 @@
                             </p>
                         </div>
                         <div class="flex items-center gap-2">
-                            <div class="inline-flex overflow-hidden rounded-lg border border-brand-ink/15" title="{{ __('Start / restart / stop this member’s worker daemon (Horizon or queue:work) via systemd.') }}">
+                            <div class="inline-flex overflow-hidden rounded-lg border border-brand-ink/15" title="{{ __('Start / restart / stop this member's worker daemon (Horizon or queue:work) via the active process manager.') }}">
                                 <button type="button" wire:click="controlMemberWorkers('{{ $member->id }}', 'start')" class="px-2.5 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Start') }}</button>
                                 <button type="button" wire:click="controlMemberWorkers('{{ $member->id }}', 'restart')" class="border-l border-brand-ink/15 px-2.5 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Restart') }}</button>
                                 <button type="button" wire:click="controlMemberWorkers('{{ $member->id }}', 'stop')" class="border-l border-brand-ink/15 px-2.5 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50">{{ __('Stop') }}</button>
+                                <button type="button" wire:click="controlMemberWorkers('{{ $member->id }}', 'check')" class="border-l border-brand-ink/15 px-2.5 py-1.5 text-xs font-medium text-brand-sage hover:bg-brand-sage/10" title="{{ __('Show process manager status in the console below') }}">{{ __('Check') }}</button>
                             </div>
                             @if (! $member->isPoolPrimary())
                                 <button type="button" wire:click="openConfirmActionModal('promote', @js([$member->id]), @js(__('Promote to primary')), @js(__(':name will become the pool primary (scheduler owner); the current primary becomes a replica.', ['name' => $member->name])), @js(__('Promote')), false)" class="rounded-lg border border-brand-ink/15 px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Promote') }}</button>
@@ -503,7 +504,7 @@
         </section>
 
         <p class="mt-4 text-xs text-brand-moss">
-            {{ __('Same-region workers join this server’s private network (env copied verbatim). Cross-region workers reach backends over the public network (env rewritten) and require you to expose + allowlist those backends. Backend exposure is not automated yet.') }}
+            {{ __('Same-region workers join this server's private network (env copied verbatim). Cross-region workers reach backends over the public network (env rewritten) and require you to expose + allowlist those backends. Backend exposure is not automated yet.') }}
         </p>
         @endif {{-- /members --}}
 
@@ -552,7 +553,7 @@
             @unless ($hzInstalled)
                 <div class="flex items-start gap-2 rounded-xl border border-brand-ink/15 bg-brand-sand/30 px-4 py-3 text-sm text-brand-moss">
                     <x-heroicon-o-information-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-mist" />
-                    <span>{{ __('Horizon isn’t installed on this app, so aggregate metrics are unavailable — the Live jobs feed below still streams every job in real time. Install laravel/horizon for the full dashboard.') }}</span>
+                    <span>{{ __('Horizon isn't installed on this app, so aggregate metrics are unavailable — the Live jobs feed below still streams every job in real time. Install laravel/horizon for the full dashboard.') }}</span>
                 </div>
             @endunless
             @if ($hzInstalled && ! empty($hzDrift))
@@ -561,7 +562,7 @@
                         <x-heroicon-o-exclamation-triangle class="h-4 w-4 shrink-0" />
                         {{ __('Running config differs from saved') }}
                     </div>
-                    <p class="mt-1 text-xs text-amber-700">{{ __('The workers are running settings that don’t match this pool’s saved config. Click “Save & apply” to push the saved values, or update the saved config to match.') }}</p>
+                    <p class="mt-1 text-xs text-amber-700">{{ __('The workers are running settings that don't match this pool's saved config. Click “Save & apply” to push the saved values, or update the saved config to match.') }}</p>
                     <ul class="mt-2 space-y-0.5 font-mono text-[11px] text-amber-800">
                         @foreach ($hzDrift as $field => $d)
                             <li>{{ $field }}: <span class="text-amber-600">saved={{ is_array($d['saved'] ?? null) ? implode(',', $d['saved']) : ($d['saved'] ?? '—') }}</span> → <span class="font-semibold">running={{ is_array($d['running'] ?? null) ? implode(',', $d['running']) : ($d['running'] ?? '—') }}</span></li>
@@ -584,14 +585,14 @@
                                 ])>{{ $hzStatus }}</span>
                             @endif
                         </div>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Live job metrics pulled from the app’s Horizon over SSH — processed, failed, pending, throughput and recent failures across the pool.') }}</p>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Live job metrics pulled from the app's Horizon over SSH — processed, failed, pending, throughput and recent failures across the pool.') }}</p>
                         @php $watchedQueues = \App\Support\WorkerPools\WorkerPoolHorizonConfig::for($pool)['queues'] ?? ['default']; @endphp
                         <p class="mt-1.5 text-xs text-brand-moss">
                             <span class="font-medium text-brand-ink">{{ __('Queues watched:') }}</span>
                             @foreach ($watchedQueues as $q)
                                 <code class="ml-1 rounded bg-brand-sand/60 px-1.5 py-0.5 font-mono text-[11px]">{{ $q }}</code>
                             @endforeach
-                            <span class="ml-1 text-brand-mist">{{ __('· isolated from dply’s own queues (dply / dply-control)') }}</span>
+                            <span class="ml-1 text-brand-mist">{{ __('· isolated from dply's own queues (dply / dply-control)') }}</span>
                         </p>
                     </div>
                     <div class="flex flex-col items-end gap-2 text-right text-xs text-brand-moss">
@@ -703,6 +704,54 @@
                 'kindLabels' => (array) config('console_actions.kinds', []),
             ])
 
+            {{-- Process manager — always visible, not Horizon-gated. Switching
+                 re-provisions every member under the chosen backend and tears
+                 down the other. Uses saveProcessManager() (PM only) when changed
+                 standalone; saveHorizonConfig() bundles it with Horizon tuning. --}}
+            @if ($pool)
+            <section class="dply-card overflow-hidden">
+                <div class="flex min-w-0 items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <x-icon-badge>
+                        <x-heroicon-o-cog-8-tooth class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Process manager') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Worker daemon backend') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            {{ __('Choose how dply manages long-running workers on each member. Switching tears down the current backend and re-provisions under the new one.') }}
+                        </p>
+                    </div>
+                </div>
+                <form wire:submit="saveProcessManager" class="space-y-5 px-6 py-5 sm:px-7">
+                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        @foreach ([
+                            ['v' => 'systemd',    'icon' => 'server-stack',    'label' => __('systemd'),    'desc' => __('One unit per worker. Restart=always, journald logs. Default.')],
+                            ['v' => 'supervisor', 'icon' => 'rectangle-stack', 'label' => __('Supervisor'), 'desc' => __('supervisord [program] groups. Installs supervisor if not present.')],
+                        ] as $pm)
+                            <label @class([
+                                'flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition-colors',
+                                'border-brand-forest bg-brand-sage/10 ring-1 ring-brand-sage/30' => $hz_process_manager === $pm['v'],
+                                'border-brand-ink/10 hover:border-brand-ink/20' => $hz_process_manager !== $pm['v'],
+                            ])>
+                                <input type="radio" wire:model="hz_process_manager" value="{{ $pm['v'] }}" class="mt-0.5 text-brand-forest focus:ring-brand-forest" />
+                                <span class="min-w-0">
+                                    <span class="block text-sm font-semibold text-brand-ink">{{ $pm['label'] }}</span>
+                                    <span class="block text-xs text-brand-moss">{{ $pm['desc'] }}</span>
+                                </span>
+                            </label>
+                        @endforeach
+                    </div>
+                    <div class="flex items-center justify-between gap-3 border-t border-brand-ink/8 pt-4">
+                        <p class="text-xs text-brand-moss">{{ __('Currently active: :pm. Changing this re-provisions every member over SSH.', ['pm' => $pool->processManager()]) }}</p>
+                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveProcessManager">
+                            <span wire:loading.remove wire:target="saveProcessManager">{{ __('Switch backend') }}</span>
+                            <span wire:loading wire:target="saveProcessManager">{{ __('Switching…') }}</span>
+                        </x-primary-button>
+                    </div>
+                </form>
+            </section>
+            @endif
+
             {{-- Horizon configuration — env-var driven; dply writes HORIZON_* to
                  each member's .env and restarts the workers. Auto-defaulted.
                  Horizon-only: a queue:work member is configured via its unit. --}}
@@ -716,28 +765,6 @@
                     <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform" x-bind:class="open ? 'rotate-90' : ''" />
                 </button>
                 <form wire:submit="saveHorizonConfig" x-show="open" x-cloak class="space-y-5 px-6 py-6 sm:px-7">
-                    <div>
-                        <x-input-label :value="__('Process manager')" />
-                        <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                            @foreach ([
-                                ['v' => 'systemd', 'label' => __('systemd'), 'desc' => __('One unit per worker (dply default). Restart=always, journald logs.')],
-                                ['v' => 'supervisor', 'label' => __('Supervisor'), 'desc' => __('supervisord [program] groups. Installs supervisor if missing.')],
-                            ] as $pm)
-                                <label @class([
-                                    'flex cursor-pointer items-start gap-3 rounded-xl border px-4 py-3 transition-colors',
-                                    'border-brand-forest bg-brand-sage/10 ring-1 ring-brand-sage/30' => $hz_process_manager === $pm['v'],
-                                    'border-brand-ink/10 hover:border-brand-ink/20' => $hz_process_manager !== $pm['v'],
-                                ])>
-                                    <input type="radio" wire:model="hz_process_manager" value="{{ $pm['v'] }}" class="mt-0.5 text-brand-forest focus:ring-brand-forest" />
-                                    <span class="min-w-0">
-                                        <span class="block text-sm font-medium text-brand-ink">{{ $pm['label'] }}</span>
-                                        <span class="block text-xs text-brand-moss">{{ $pm['desc'] }}</span>
-                                    </span>
-                                </label>
-                            @endforeach
-                        </div>
-                        <p class="mt-1 text-xs text-brand-moss">{{ __('Changing this re-provisions each member’s worker daemons under the chosen manager and tears down the other.') }}</p>
-                    </div>
                     <div>
                         <x-input-label for="hz_queues" :value="__('Queues watched')" />
                         <x-text-input id="hz_queues" wire:model="hz_queues" class="mt-2 block w-full font-mono text-sm" placeholder="default, emails, notifications" />
@@ -774,7 +801,7 @@
                         </div>
                     </div>
                     <div class="flex items-center justify-between gap-3">
-                        <p class="text-xs text-brand-moss">{{ __('Saving restarts each worker’s Horizon to pick up the new settings.') }}</p>
+                        <p class="text-xs text-brand-moss">{{ __('Saving restarts each worker's Horizon to pick up the new settings.') }}</p>
                         <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveHorizonConfig">
                             <span wire:loading.remove wire:target="saveHorizonConfig">{{ __('Save & apply') }}</span>
                             <span wire:loading wire:target="saveHorizonConfig">{{ __('Applying…') }}</span>

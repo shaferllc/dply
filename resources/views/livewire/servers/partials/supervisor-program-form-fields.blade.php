@@ -13,8 +13,7 @@
                     <x-input-label for="supervisor_preset_picker" value="{{ __('Start from a preset (optional)') }}" />
                     <select
                         id="supervisor_preset_picker"
-                        x-data
-                        x-on:change="if ($event.target.value) { $wire.applySupervisorPreset($event.target.value); $event.target.value = ''; }"
+                        wire:model.live="sv_selected_preset"
                         class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
                     >
                         <option value="">{{ __('— Pick a preset to fill the form —') }}</option>
@@ -137,7 +136,7 @@
                 </div>
             @endif
 
-            <div @class(['hidden' => $new_sv_type === 'queue' && $queue_builder_mode === 'quick', 'space-y-5'])>
+            <div class="space-y-5">
                 <div>
                     <x-input-label for="new_sv_command" value="{{ __('Command') }}" />
                     <textarea

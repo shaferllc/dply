@@ -3,6 +3,7 @@
 namespace App\Livewire\Servers;
 
 use App\Jobs\RunSchedulerNowJob;
+use App\Livewire\Concerns\EmitsPanelEvent;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
@@ -42,6 +43,7 @@ class WorkspaceSchedule extends Component
 {
     use RendersWorkspacePlaceholder;
     use RequiresFeature;
+    use EmitsPanelEvent;
 
     protected string $requiredFeature = 'workspace.schedule';
 
@@ -49,11 +51,11 @@ class WorkspaceSchedule extends Component
     use InteractsWithServerWorkspace;
 
     /** @var list<string> */
-    public const SCHEDULE_TABS = ['overview', 'schedulers', 'enable'];
+    public const SCHEDULE_TABS = ['schedulers', 'overview', 'enable'];
 
-    /** @var 'overview'|'schedulers'|'enable' */
-    #[Url(as: 'tab', except: 'overview', history: true)]
-    public string $schedule_workspace_tab = 'overview';
+    /** @var 'schedulers'|'overview'|'enable' */
+    #[Url(as: 'tab', except: 'schedulers', history: true)]
+    public string $schedule_workspace_tab = 'schedulers';
 
     /** Form state for "Enable scheduler for site". */
     public string $enable_site_id = '';
@@ -311,7 +313,11 @@ class WorkspaceSchedule extends Component
         $this->reset(['enable_site_id', 'enable_framework', 'enable_custom_command']);
         $this->enable_cron_expression = '* * * * *';
         $this->schedule_workspace_tab = 'schedulers';
-        $this->toastSuccess(__('Scheduler enabled for :site. Waiting for the first tick — the chip will go green within ~60-90 seconds.', ['site' => $site->name]));
+        $this->emitPanelEvent(
+            __('Scheduler enabled for :site.', ['site' => $site->name]),
+            [__('Waiting for the first tick — the chip will turn green within ~60-90 seconds.')],
+            'completed',
+        );
     }
 
     /**
@@ -366,9 +372,13 @@ class WorkspaceSchedule extends Component
             return;
         }
 
-        $this->toastSuccess($newEnabled
-            ? __('Scheduler resumed — will tick again within the cadence window.')
-            : __('Scheduler paused — no further ticks until you resume.'));
+        $this->emitPanelEvent(
+            $newEnabled
+                ? __('Scheduler resumed — will tick again within the cadence window.')
+                : __('Scheduler paused — no further ticks until you resume.'),
+            [],
+            'completed',
+        );
     }
 
     public function startEditCadence(string $heartbeatId): void
@@ -433,7 +443,7 @@ class WorkspaceSchedule extends Component
             return;
         }
 
-        $this->toastSuccess(__('Cadence updated to :expr.', ['expr' => $newExpression]));
+        $this->emitPanelEvent(__('Cadence updated to :expr.', ['expr' => $newExpression]), [], 'completed');
     }
 
     /**
@@ -549,7 +559,11 @@ class WorkspaceSchedule extends Component
             (string) auth()->id(),
         );
 
-        $this->toastSuccess(__('Run now queued. Watch the activity tab for streaming output (5-minute timeout).'));
+        $this->emitPanelEvent(
+            __('Run now queued for :site scheduler.', ['site' => $heartbeat->site?->name ?? $heartbeatId]),
+            [__('Output streams to the activity tab. Timeout: 5 minutes.')],
+            'running',
+        );
     }
 
     /**

@@ -128,6 +128,22 @@ class ControlWorkerDaemonJob implements ShouldQueue
                 return;
             }
 
+            if ($this->action === 'check') {
+                if ($site->server === null) {
+                    throw new \RuntimeException('Member server is not available.');
+                }
+                $pm = $backend->backendFor($site);
+                $cmd = $pm === 'supervisor'
+                    ? 'supervisorctl status 2>&1 || true'
+                    : 'systemctl list-units "dply-*" --no-pager --output=short 2>&1 || true';
+                $emit->step($pm, 'checking worker backend status');
+                $out = $exec->runInlineBash($site->server, 'worker-pool:check', $cmd, timeoutSeconds: 15, asRoot: false);
+                $emit(trim((string) $out->buffer) ?: '(no output)', 'info', $pm);
+                $this->completeConsoleAction();
+
+                return;
+            }
+
             if ($this->action === 'ensure') {
                 // Guarantee redis-cli is present so the Traffic tab can read the
                 // Redis backend (the app uses phpredis, so redis-tools may be
