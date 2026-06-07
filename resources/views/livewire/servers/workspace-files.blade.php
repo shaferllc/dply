@@ -1,6 +1,5 @@
 @php
     $card = 'dply-card overflow-hidden';
-    $btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors disabled:cursor-not-allowed disabled:opacity-50';
 
     $crumbs = [];
     $accum = '';
@@ -40,9 +39,9 @@
                 </div>
 
                 @if ($canViewAsRoot)
-                    <button type="button" wire:click="toggleViewAsRoot" class="{{ $btnSecondary }} {{ $viewAsRoot ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100' : '' }}">
+                    <x-secondary-button size="xs" type="button" wire:click="toggleViewAsRoot" class="{{ $viewAsRoot ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100' : '' }}">
                         {{ $viewAsRoot ? __('Viewing as root — click to drop') : __('View as root') }}
-                    </button>
+                    </x-secondary-button>
                 @endif
             </div>
 

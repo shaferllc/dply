@@ -50,8 +50,10 @@ async function handleConnect(request: Request, env: Env, appKey: string): Promis
 
   const app = await lookupAppByKey(env, appKey);
   if (!app || !app.enabled) {
+    console.log({ src: 'realtime', event: 'connect_rejected', reason: app ? 'disabled' : 'unknown_key', appKey });
     return Response.json({ error: 'invalid_app_key' }, { status: 401 });
   }
+  console.log({ src: 'realtime', event: 'connect', appId: app.id, appKey: app.key });
 
   const stub = hubFor(env, app.id);
   // Forward the upgrade to the app's hub, carrying resolved credentials so the
@@ -66,6 +68,7 @@ async function handleConnect(request: Request, env: Env, appKey: string): Promis
 async function handlePublish(request: Request, env: Env, url: URL, appId: string): Promise<Response> {
   const record = await lookupAppById(env, appId);
   if (!record || !record.enabled) {
+    console.log({ src: 'realtime', event: 'publish_rejected', reason: record ? 'disabled' : 'unknown_app', appId });
     return Response.json({ error: 'invalid_app' }, { status: 401 });
   }
 
@@ -80,6 +83,7 @@ async function handlePublish(request: Request, env: Env, url: URL, appId: string
     rawBody,
   );
   if (!authorized) {
+    console.log({ src: 'realtime', event: 'publish_unauthorized', appId });
     return Response.json({ error: 'unauthorized' }, { status: 401 });
   }
 

@@ -1,6 +1,5 @@
 <div>
 @php
-    $btnSecondary = 'inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50';
     $btnDanger = 'inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-red-700 shadow-sm transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50';
 @endphp
 <section class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm">
@@ -13,13 +12,13 @@
         </div>
         <div class="flex flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end">
             @if ($manageUrl)
-                <a href="{{ $manageUrl }}" wire:navigate class="{{ $btnSecondary }}">
+                <a href="{{ $manageUrl }}" wire:navigate class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50">
                     <x-heroicon-o-adjustments-horizontal class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     {{ __('Manage routing') }}
                 </a>
             @endif
             @if ($tablesReady)
-                <a href="{{ route('notifications.index') }}" wire:navigate class="{{ $btnSecondary }}">
+                <a href="{{ route('notifications.index') }}" wire:navigate class="inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50">
                     <x-heroicon-o-inbox class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     {{ __('Open inbox') }}
                 </a>

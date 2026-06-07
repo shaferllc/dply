@@ -89,6 +89,8 @@ export class AppHub implements DurableObject {
       }),
     );
 
+    console.log({ src: 'realtime', do: 'AppHub', event: 'connected', socketId, connections: this.state.getWebSockets().length });
+
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -175,6 +177,7 @@ export class AppHub implements DurableObject {
         channelData,
       );
       if (!ok) {
+        console.log({ src: 'realtime', do: 'AppHub', event: 'subscribe_denied', channel, socketId: conn.socketId });
         ws.send(
           encode('pusher:error', channel, {
             code: 4009,
@@ -201,6 +204,7 @@ export class AppHub implements DurableObject {
 
     conn.channels[channel] = member;
     ws.serializeAttachment(conn);
+    console.log({ src: 'realtime', do: 'AppHub', event: 'subscribed', channel, presence: isPresenceChannel(channel), socketId: conn.socketId });
 
     if (isPresenceChannel(channel) && member) {
       const members = this.presenceMembers(channel);
@@ -262,10 +266,12 @@ export class AppHub implements DurableObject {
       return Response.json({ error: 'invalid_body' }, { status: 400 });
     }
     const channels = payload.channels ?? (payload.channel ? [payload.channel] : []);
+    let delivered = 0;
     for (const channel of channels) {
-      this.broadcast(channel, encode(payload.name, channel, payload.data), payload.socket_id);
+      delivered += this.broadcast(channel, encode(payload.name, channel, payload.data), payload.socket_id);
     }
-    return Response.json({ ok: true, channels: channels.length });
+    console.log({ src: 'realtime', do: 'AppHub', event: 'publish', name: payload.name, channels: channels.length, delivered });
+    return Response.json({ ok: true, channels: channels.length, delivered });
   }
 
   // --- Helpers ------------------------------------------------------------
@@ -281,8 +287,12 @@ export class AppHub implements DurableObject {
     );
   }
 
-  /** Send a frame to every socket subscribed to `channel`, except `exceptSocketId`. */
-  private broadcast(channel: string, frame: string, exceptSocketId?: string): void {
+  /**
+   * Send a frame to every socket subscribed to `channel`, except
+   * `exceptSocketId`. Returns the number of sockets the frame was delivered to.
+   */
+  private broadcast(channel: string, frame: string, exceptSocketId?: string): number {
+    let delivered = 0;
     for (const ws of this.state.getWebSockets()) {
       const conn = this.attachmentOf(ws);
       if (!conn || !(channel in conn.channels)) {
@@ -293,10 +303,12 @@ export class AppHub implements DurableObject {
       }
       try {
         ws.send(frame);
+        delivered++;
       } catch {
         // socket closing mid-broadcast; ignore
       }
     }
+    return delivered;
   }
 
   /** Distinct presence members currently in `channel`, keyed by user_id. */

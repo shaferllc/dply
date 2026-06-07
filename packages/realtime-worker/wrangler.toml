@@ -36,3 +36,13 @@ class_name = "AppHub"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["AppHub"]
+
+# Workers Logs: retain console.log output in the Cloudflare dashboard
+# (Workers & Pages → dply-realtime → Logs) and power `wrangler tail`. The
+# worker logs connect/subscribe/publish events as structured objects.
+# head_sampling_rate = 1 keeps 100% of invocations (fine at this volume).
+# NOTE: keep this table LAST — a [table] header before the top-level `routes`
+# key would capture it as observability.routes and drop the custom domain.
+[observability]
+enabled = true
+head_sampling_rate = 1

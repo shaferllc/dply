@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 6, 2026',
                     'tags'    => ['new'],
+                    'title'   => 'Realtime Worker Observability',
+                    'summary' => 'The realtime broadcasting relay now records connection, subscription, and publish events with per-message delivery counts for easier monitoring.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
+                    'tags'    => ['new'],
                     'title'   => 'Live App Log Streaming',
                     'summary' => 'Site logs can now stream live into an in-app App Logs panel via the dply Realtime drain, with one-command Cloudflare relay setup.',
                     'items'   => [],

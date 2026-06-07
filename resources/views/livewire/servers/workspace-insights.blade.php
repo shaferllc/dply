@@ -422,7 +422,7 @@
                                                     {{ __('Apply fix') }}
                                                 </x-secondary-button>
                                             @endif
-                                            <button type="button" wire:click="ignoreFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="ignoreFinding({{ $f->id }})" class="pointer-events-auto relative z-10 {{ $btnSecondary }}">
+                                            <x-secondary-button size="sm" type="button" wire:click="ignoreFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="ignoreFinding({{ $f->id }})" class="pointer-events-auto relative z-10">
                                                 <x-heroicon-o-eye-slash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                                 {{ __('Ignore') }}
                                             </button>
@@ -481,17 +481,18 @@
                                     {{ __('Backup') }}: <span class="font-mono">{{ $f->meta['backup_path'] }}</span>
                                 </p>
                             </div>
-                            <button
+                            <x-secondary-button
+                                size="sm"
                                 type="button"
                                 wire:click="revertFix({{ $f->id }})"
                                 wire:loading.attr="disabled"
                                 wire:target="revertFix({{ $f->id }})"
                                 wire:confirm="{{ __('Restore the previous configuration from backup and reload the affected service?') }}"
-                                class="{{ $btnSecondary }} shrink-0"
+                                class="shrink-0"
                             >
                                 <x-heroicon-o-arrow-uturn-left class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                 {{ __('Revert') }}
-                            </button>
+                            </x-secondary-button>
                         </li>
                     @endforeach
                 </ul>
@@ -586,7 +587,7 @@
                                     {{ $fmt($f->ignored_at) ?? '—' }}
                                 </p>
                             </div>
-                            <button type="button" wire:click="unignoreFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="unignoreFinding({{ $f->id }})" class="{{ $btnSecondary }} shrink-0">
+                            <x-secondary-button size="sm" type="button" wire:click="unignoreFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="unignoreFinding({{ $f->id }})" class="shrink-0">
                                 {{ __('Restore') }}
                             </button>
                         </li>
@@ -622,10 +623,10 @@
         @include('livewire.partials.insights-settings-form', ['catalog' => $insightsCatalog, 'orgHasPro' => $orgHasPro])
         <div class="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-brand-ink/10">
             <div class="flex flex-wrap gap-2">
-                <button type="button" wire:click="enableAll" class="{{ $btnSecondary }}">{{ __('Enable all') }}</button>
-                <button type="button" wire:click="disableAll" class="{{ $btnSecondary }}">{{ __('Disable all') }}</button>
+                <x-secondary-button size="sm" type="button" wire:click="enableAll">{{ __('Enable all') }}</x-secondary-button>
+                <x-secondary-button size="sm" type="button" wire:click="disableAll">{{ __('Disable all') }}</x-secondary-button>
             </div>
-            <button type="button" wire:click="saveSettings" class="{{ $btnPrimary }}">{{ __('Save settings') }}</button>
+            <x-primary-button size="sm" type="button" wire:click="saveSettings">{{ __('Save settings') }}</x-primary-button>
         </div>
     @endif
 

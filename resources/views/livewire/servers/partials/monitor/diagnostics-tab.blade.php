@@ -22,11 +22,11 @@
                 <p class="mt-1 text-xs leading-relaxed text-brand-moss">
                     {{ __('Re-deploys the agent script, callback env, and cron over SSH. Use when samples have stopped arriving but SSH still works.') }}
                 </p>
-                <button type="button" wire:click="repairMonitorNow" wire:loading.attr="disabled" wire:target="repairMonitorNow" class="{{ $btnPrimary }} mt-4">
+                <x-primary-button size="sm" type="button" wire:click="repairMonitorNow" wire:loading.attr="disabled" wire:target="repairMonitorNow" class="mt-4">
                     <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0" wire:loading.class="animate-spin" wire:target="repairMonitorNow" aria-hidden="true" />
                     <span wire:loading.remove wire:target="repairMonitorNow">{{ __('Repair monitor now') }}</span>
                     <span wire:loading wire:target="repairMonitorNow">{{ __('Repairing…') }}</span>
-                </button>
+                </x-primary-button>
             </div>
 
             <div class="rounded-xl border border-brand-ink/10 bg-white p-4 sm:p-5">
@@ -34,11 +34,11 @@
                 <p class="mt-1 text-xs leading-relaxed text-brand-moss">
                     {{ __('Runs the snapshot script locally and probes the callback URL from the host. Useful when repair finishes but samples still don\'t arrive.') }}
                 </p>
-                <button type="button" wire:click="runMonitorCallbackDiagnostics" wire:loading.attr="disabled" wire:target="runMonitorCallbackDiagnostics" class="{{ $btnSecondary }} mt-4">
+                <x-secondary-button size="sm" type="button" wire:click="runMonitorCallbackDiagnostics" wire:loading.attr="disabled" wire:target="runMonitorCallbackDiagnostics" class="mt-4">
                     <x-heroicon-o-bug-ant class="h-4 w-4 shrink-0" wire:loading.class="animate-spin" wire:target="runMonitorCallbackDiagnostics" aria-hidden="true" />
                     <span wire:loading.remove wire:target="runMonitorCallbackDiagnostics">{{ __('Run callback diagnostics') }}</span>
                     <span wire:loading wire:target="runMonitorCallbackDiagnostics">{{ __('Running…') }}</span>
-                </button>
+                </x-secondary-button>
             </div>
 
             <div class="rounded-xl border border-brand-ink/10 bg-white p-4 sm:p-5">
@@ -46,11 +46,11 @@
                 <p class="mt-1 text-xs leading-relaxed text-brand-moss">
                     {{ __('Prints the agent\'s metrics-callback.env file with the token redacted. Verifies the URL the agent is POSTing to.') }}
                 </p>
-                <button type="button" wire:click="inspectMetricsCallbackEnv" wire:loading.attr="disabled" wire:target="inspectMetricsCallbackEnv" class="{{ $btnSecondary }} mt-4">
+                <x-secondary-button size="sm" type="button" wire:click="inspectMetricsCallbackEnv" wire:loading.attr="disabled" wire:target="inspectMetricsCallbackEnv" class="mt-4">
                     <x-heroicon-o-document-magnifying-glass class="h-4 w-4 shrink-0" wire:loading.class="animate-spin" wire:target="inspectMetricsCallbackEnv" aria-hidden="true" />
                     <span wire:loading.remove wire:target="inspectMetricsCallbackEnv">{{ __('Inspect callback env') }}</span>
                     <span wire:loading wire:target="inspectMetricsCallbackEnv">{{ __('Inspecting…') }}</span>
-                </button>
+                </x-secondary-button>
             </div>
 
             <div class="rounded-xl border border-brand-ink/10 bg-white p-4 sm:p-5">
@@ -58,11 +58,11 @@
                 <p class="mt-1 text-xs leading-relaxed text-brand-moss">
                     {{ __('Re-reads the script SHA, env, and cron from the host and queues repair jobs for anything missing.') }}
                 </p>
-                <button type="button" wire:click="verifyGuestPush" wire:loading.attr="disabled" wire:target="verifyGuestPush" class="{{ $btnSecondary }} mt-4">
+                <x-secondary-button size="sm" type="button" wire:click="verifyGuestPush" wire:loading.attr="disabled" wire:target="verifyGuestPush" class="mt-4">
                     <x-heroicon-o-shield-check class="h-4 w-4 shrink-0" wire:loading.class="animate-spin" wire:target="verifyGuestPush" aria-hidden="true" />
                     <span wire:loading.remove wire:target="verifyGuestPush">{{ __('Re-verify guest push') }}</span>
                     <span wire:loading wire:target="verifyGuestPush">{{ __('Verifying…') }}</span>
-                </button>
+                </x-secondary-button>
             </div>
         </div>
 

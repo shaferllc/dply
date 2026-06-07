@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 ### Added
+- The realtime broadcasting relay now records connection, subscription, and publish events with per-message delivery counts for easier monitoring.
+### Added
 - Site logs can now stream live into an in-app App Logs panel via the dply Realtime drain, with one-command Cloudflare relay setup.
 ### Added
 - Sites can now define their complete logging setup—channels, default, stack, and deprecations—which dply generates and owns in config/logging.php on the next deploy.

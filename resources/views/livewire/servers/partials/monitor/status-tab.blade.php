@@ -37,16 +37,16 @@
         </div>
         @if (! $isDeployer)
             <div class="flex shrink-0 flex-wrap items-center gap-2">
-                <button type="button" wire:click="queueMonitoringProbe" wire:loading.attr="disabled" wire:target="queueMonitoringProbe" class="{{ $btnSecondary }}">
+                <x-secondary-button size="sm" type="button" wire:click="queueMonitoringProbe" wire:loading.attr="disabled" wire:target="queueMonitoringProbe">
                     <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0" wire:loading.class="animate-spin" wire:target="queueMonitoringProbe" aria-hidden="true" />
                     <span wire:loading.remove wire:target="queueMonitoringProbe">{{ __('Recheck status') }}</span>
                     <span wire:loading wire:target="queueMonitoringProbe">{{ __('Queueing…') }}</span>
-                </button>
+                </x-secondary-button>
                 @if (! $monitorHealthy)
-                    <button type="button" wire:click="setMonitorWorkspaceTab('diagnostics')" class="{{ $btnSecondary }}">
+                    <x-secondary-button size="sm" type="button" wire:click="setMonitorWorkspaceTab('diagnostics')">
                         <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         {{ __('Open Diagnostics') }}
-                    </button>
+                    </x-secondary-button>
                 @endif
             </div>
         @endif
@@ -264,42 +264,42 @@
                 </div>
                 <div class="flex shrink-0 flex-wrap items-center gap-2">
                     @if ($editingThresholds)
-                        <button
+                        <x-secondary-button
+                            size="sm"
                             type="button"
                             wire:click="cancelEditingThresholds"
-                            class="{{ $btnSecondary }}"
                         >
                             {{ __('Cancel') }}
-                        </button>
-                        <button
+                        </x-secondary-button>
+                        <x-primary-button
+                            size="sm"
                             type="button"
                             wire:click="saveThresholdSettings"
                             wire:loading.attr="disabled"
-                            class="{{ $btnPrimary }}"
                         >
                             <span wire:loading.remove wire:target="saveThresholdSettings">{{ __('Save thresholds') }}</span>
                             <span wire:loading wire:target="saveThresholdSettings">{{ __('Saving…') }}</span>
-                        </button>
+                        </x-primary-button>
                     @else
-                        <button
+                        <x-secondary-button
+                            size="sm"
                             type="button"
                             wire:click="startEditingThresholds"
-                            class="{{ $btnSecondary }}"
                         >
                             <x-heroicon-o-pencil class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                             {{ __('Edit thresholds') }}
-                        </button>
+                        </x-secondary-button>
                         @if ($thresholds['cpu'] !== (float) config('insights.thresholds.cpu_warn_pct', 85) ||
                               $thresholds['mem'] !== (float) config('insights.thresholds.mem_warn_pct', 85) ||
                               $thresholds['load'] !== (float) config('insights.thresholds.load_warn', 4.0))
-                            <button
+                            <x-secondary-button
+                                size="sm"
                                 type="button"
                                 wire:click="resetThresholdsToDefaults"
                                 wire:confirm="{{ __('Revert to organization defaults?') }}"
-                                class="{{ $btnSecondary }}"
                             >
                                 {{ __('Reset to defaults') }}
-                            </button>
+                            </x-secondary-button>
                         @endif
                     @endif
                 </div>

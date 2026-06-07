@@ -2,8 +2,6 @@
     use App\Services\Servers\SchedulerHealthEvaluator;
 
     $card = 'dply-card overflow-hidden';
-    $btnPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50';
-    $btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors';
     $input = 'block w-full rounded-lg border border-brand-ink/20 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-2 focus:ring-brand-forest/30';
 
     $chipForHealth = static function (?string $health): array {
@@ -49,8 +47,6 @@
         'contextSiteModel',
         'siteDedicatedContext',
         'card',
-        'btnPrimary',
-        'btnSecondary',
         'input',
         'chipForHealth',
         'hasStale',

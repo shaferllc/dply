@@ -125,18 +125,18 @@
                         :empty-message="__('No probe error captured.')"
                     />
                     <div class="flex flex-wrap gap-3">
-                        <a href="{{ route('servers.settings', ['server' => $server, 'section' => 'connection']) }}" wire:navigate class="{{ $btnSecondary }}">{{ __('Server connection settings') }}</a>
-                        <button type="button" wire:click="queueMonitoringProbe" wire:loading.attr="disabled" class="{{ $btnPrimary }}">
+                        <a href="{{ route('servers.settings', ['server' => $server, 'section' => 'connection']) }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors disabled:cursor-not-allowed disabled:opacity-50">{{ __('Server connection settings') }}</a>
+                        <x-primary-button size="sm" type="button" wire:click="queueMonitoringProbe" wire:loading.attr="disabled">
                             <span wire:loading.remove wire:target="queueMonitoringProbe">{{ __('Recheck SSH') }}</span>
                             <span wire:loading wire:target="queueMonitoringProbe">{{ __('Queueing…') }}</span>
-                        </button>
+                        </x-primary-button>
                     </div>
                 </div>
             @elseif ($isDeployer)
                 <div class="mt-6 rounded-xl border border-amber-200/80 bg-amber-50/80 p-4 text-sm text-amber-950">
                     {{ __('Your role cannot run installs. Ask an admin to open this Metrics page or Services and use “Install Python for monitoring”, then Recheck.') }}
                     <div class="mt-3">
-                        <button type="button" wire:click="queueMonitoringProbe" wire:loading.attr="disabled" class="{{ $btnSecondary }} !py-2">{{ __('Recheck status') }}</button>
+                        <x-secondary-button size="sm" type="button" wire:click="queueMonitoringProbe" wire:loading.attr="disabled" class="!py-2">{{ __('Recheck status') }}</x-secondary-button>
                     </div>
                 </div>
             @elseif ($servicesRemoteTaskId || $monitoringInstallInProgress)
@@ -192,22 +192,22 @@
                 </div>
             @else
                 <div class="mt-6 flex flex-wrap items-center gap-3">
-                    <button
+                    <x-primary-button
+                        size="sm"
                         type="button"
                         wire:click="openInstallMonitoringModal('step1')"
                         wire:loading.attr="disabled"
                         wire:target="openInstallMonitoringModal,runInstallAction"
-                        class="{{ $btnPrimary }}"
                     >
                         <x-heroicon-o-arrow-down-tray class="h-4 w-4 shrink-0" wire:loading.remove wire:target="openInstallMonitoringModal,runInstallAction" aria-hidden="true" />
                         <span class="inline-block size-4 shrink-0 animate-spin rounded-full border-2 border-brand-cream/40 border-t-brand-cream" wire:loading wire:target="openInstallMonitoringModal,runInstallAction" aria-hidden="true"></span>
                         <span wire:loading.remove wire:target="openInstallMonitoringModal,runInstallAction">{{ __('Install monitor') }}</span>
                         <span wire:loading wire:target="openInstallMonitoringModal,runInstallAction">{{ __('Installing…') }}</span>
-                    </button>
-                    <button type="button" wire:click="queueMonitoringProbe" wire:loading.attr="disabled" class="{{ $btnSecondary }}">
+                    </x-primary-button>
+                    <x-secondary-button size="sm" type="button" wire:click="queueMonitoringProbe" wire:loading.attr="disabled">
                         <span wire:loading.remove wire:target="queueMonitoringProbe">{{ __('Recheck status') }}</span>
                         <span wire:loading wire:target="queueMonitoringProbe">{{ __('Queueing…') }}</span>
-                    </button>
+                    </x-secondary-button>
                 </div>
                 @if ($probeAt)
                     <p class="mt-4 text-xs text-brand-mist">{{ __('Last check') }}: {{ $probeAt->format('Y-m-d H:i:s T') }}</p>
