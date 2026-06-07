@@ -43,6 +43,7 @@ use App\Console\Commands\RunDueDeploymentSchedulesCommand;
 use App\Console\Commands\ServerlessTickCommand;
 use App\Console\Commands\SnapshotOrganizationBillingCommand;
 use App\Console\Commands\SweepStalledTasksCommand;
+use App\Console\Commands\WarmPoolAutoscaleCommand;
 use App\Console\Commands\SyncAllOrganizationBillingCommand;
 use App\Console\Commands\WorkerPoolAutoscaleCommand;
 use App\Console\Commands\WorkerPoolPrimaryHealthCommand;
@@ -143,6 +144,14 @@ final class DplySchedule
             ->everyMinute()
             ->withoutOverlapping()
             ->name('sweep-stalled-tasks');
+
+        // Keep warm-pool buckets topped up to their min + retire idle surplus.
+        // No-op unless warm_pool.enabled and buckets are configured.
+        $schedule->command(WarmPoolAutoscaleCommand::class)
+            ->everyMinute()
+            ->withoutOverlapping()
+            ->when(fn (): bool => (bool) config('warm_pool.enabled', false))
+            ->name('warm-pool-autoscale');
 
         $schedule->command(PruneServerCronJobRunsCommand::class)->dailyAt('03:15');
         $schedule->command(PruneAuditLogsCommand::class)->dailyAt('03:20');

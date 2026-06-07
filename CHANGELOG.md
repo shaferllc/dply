@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Managed servers can now be claimed instantly from a pre-provisioned warm pool instead of waiting for a cold provision.
 ### Changed
 - Server provisioning can now download language runtimes in the background and prefetch stock packages in parallel to shorten setup time, and the server-removal flow no longer flashes a spurious 404 modal.
 ### Changed

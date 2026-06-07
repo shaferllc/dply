@@ -102,7 +102,11 @@ final class StoreManagedServer
             'comped_until' => $org->isBeta() ? BetaProgram::compedUntil() : null,
         ]);
 
-        ProvisionHetznerServerJob::dispatch($server);
+        // Try the warm pool first (managed VMs live on the platform account, so
+        // a pooled VM can be adopted directly). Only cold-provision on a miss.
+        if (! app(ClaimWarmServer::class)->attempt($server)) {
+            ProvisionHetznerServerJob::dispatch($server);
+        }
         audit_log($org, $user, 'server.created', $server, ['hosting_backend' => Server::HOSTING_BACKEND_DPLY]);
 
         return $server;

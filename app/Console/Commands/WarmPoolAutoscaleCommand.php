@@ -1,0 +1,235 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Console\Commands;
+
+use App\Actions\Servers\CreateWarmPoolMember;
+use App\Models\Server;
+use App\Models\ServerPoolMember;
+use App\Modules\TaskRunner\Enums\TaskStatus;
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
+
+/**
+ * Keep each configured warm-pool bucket topped up to its `min` and trim idle
+ * members above its `max`. Runs every minute (gated by warm_pool.enabled).
+ *
+ * Reconcile first (cheap, idempotent): warming members whose server finished
+ * provisioning flip to `ready`; members whose server errored/vanished flip to
+ * `failed` so they're replaced and don't get claimed. Then per bucket, create
+ * up to the deficit (capped per tick to avoid bursts) and retire surplus idle
+ * members. Mirrors the WorkerPoolAutoscale pattern.
+ */
+class WarmPoolAutoscaleCommand extends Command
+{
+    protected $signature = 'dply:warm-pool:autoscale {--dry-run : Report actions without creating/retiring}';
+
+    protected $description = 'Top up warm server pool buckets to their min and retire idle surplus.';
+
+    /** Cap new members created per bucket per tick so a cold start ramps gently. */
+    private const CREATE_CAP_PER_TICK = 3;
+
+    public function handle(CreateWarmPoolMember $creator): int
+    {
+        if (! (bool) config('warm_pool.enabled', false)) {
+            $this->info('Warm pool disabled (warm_pool.enabled=false).');
+
+            return self::SUCCESS;
+        }
+
+        $buckets = (array) config('warm_pool.buckets', []);
+        if ($buckets === []) {
+            $this->info('No warm-pool buckets configured.');
+
+            return self::SUCCESS;
+        }
+
+        $dry = (bool) $this->option('dry-run');
+
+        $this->reconcile($dry);
+
+        foreach ($buckets as $bucket) {
+            if (! is_array($bucket)) {
+                continue;
+            }
+            $this->reconcileBucket($creator, $bucket, $dry);
+        }
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * Flip warming→ready (provision done) and →failed (server gone/errored).
+     */
+    private function reconcile(bool $dry): void
+    {
+        $warming = ServerPoolMember::query()
+            ->where('status', ServerPoolMember::STATUS_WARMING)
+            ->get();
+
+        foreach ($warming as $member) {
+            $server = $member->server_id ? Server::query()->find($member->server_id) : null;
+
+            if (! $server) {
+                $this->transition($member, ServerPoolMember::STATUS_FAILED, $dry, 'server row missing');
+
+                continue;
+            }
+
+            if ($server->status === Server::STATUS_ERROR || $server->setup_status === Server::SETUP_STATUS_FAILED) {
+                $this->transition($member, ServerPoolMember::STATUS_FAILED, $dry, 'provision failed');
+
+                continue;
+            }
+
+            if ($server->status === Server::STATUS_READY && $server->setup_status === Server::SETUP_STATUS_DONE) {
+                if (! $dry) {
+                    $member->update([
+                        'status' => ServerPoolMember::STATUS_READY,
+                        'health_checked_at' => now(),
+                    ]);
+                }
+                $this->line("  [ready] member {$member->id} (server {$server->id})");
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $bucket
+     */
+    private function reconcileBucket(CreateWarmPoolMember $creator, array $bucket, bool $dry): void
+    {
+        $provider = (string) ($bucket['provider'] ?? '');
+        $region = (string) ($bucket['region'] ?? '');
+        $size = (string) ($bucket['size'] ?? '');
+        $tier = (string) ($bucket['tier'] ?? ServerPoolMember::TIER_BASELINE);
+        $min = max(0, (int) ($bucket['min'] ?? 0));
+        $max = max($min, (int) ($bucket['max'] ?? $min));
+
+        if ($provider === '' || $region === '' || $size === '') {
+            return;
+        }
+
+        // Off-hours: collapse the bucket toward the off-hours min (default 0) so
+        // idle spares retire overnight and aren't refilled.
+        if ($this->inOffHours()) {
+            $offMin = (int) ($bucket['off_hours_min'] ?? config('warm_pool.off_hours.min', 0));
+            $min = max(0, min($min, $offMin));
+            $max = $min;
+        }
+
+        $base = ServerPoolMember::query()->forBucket($provider, $region, $size, $tier);
+
+        // Retire stale ready members (security drift) so the refill below
+        // replaces them with fresh, patched ones — gentle, capped per tick.
+        $this->retireStale($base, $dry);
+
+        $available = (clone $base)->available()->count();
+        $ready = (clone $base)->where('status', ServerPoolMember::STATUS_READY)->count();
+        $label = "{$provider}/{$region}/{$size}/{$tier}";
+
+        // Top up to min (capped per tick).
+        if ($available < $min) {
+            $deficit = min($min - $available, self::CREATE_CAP_PER_TICK);
+            $this->info("  [create x{$deficit}] {$label} (available {$available} < min {$min})");
+            for ($i = 0; $i < $deficit; $i++) {
+                if ($dry) {
+                    continue;
+                }
+                try {
+                    $creator->create($bucket);
+                } catch (\Throwable $e) {
+                    Log::error('warm_pool.autoscale.create_failed', ['bucket' => $label, 'message' => $e->getMessage()]);
+                }
+            }
+        }
+
+        // Retire idle surplus above max (only ready ones — never kill warming).
+        if ($ready > $max) {
+            $surplus = $ready - $max;
+            $this->info("  [retire x{$surplus}] {$label} (ready {$ready} > max {$max})");
+            $extras = (clone $base)
+                ->where('status', ServerPoolMember::STATUS_READY)
+                ->orderBy('created_at')
+                ->limit($surplus)
+                ->get();
+            foreach ($extras as $member) {
+                $this->retireMember($member, $dry, 'surplus over max');
+            }
+        }
+    }
+
+    /**
+     * Retire ready members older than max_member_age_seconds so the next refill
+     * replaces them with fresh (security-patched) ones. Capped per tick.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $base
+     */
+    private function retireStale($base, bool $dry): void
+    {
+        $maxAge = (int) config('warm_pool.max_member_age_seconds', 0);
+        if ($maxAge <= 0) {
+            return;
+        }
+
+        $cap = max(1, (int) config('warm_pool.retire_cap_per_tick', 1));
+        $stale = (clone $base)
+            ->where('status', ServerPoolMember::STATUS_READY)
+            ->where('created_at', '<', now()->subSeconds($maxAge))
+            ->orderBy('created_at')
+            ->limit($cap)
+            ->get();
+
+        foreach ($stale as $member) {
+            $this->retireMember($member, $dry, "stale (>{$maxAge}s) — replacing with fresh");
+        }
+    }
+
+    private function retireMember(ServerPoolMember $member, bool $dry, string $reason): void
+    {
+        $this->transition($member, ServerPoolMember::STATUS_RETIRING, $dry, $reason);
+        if ($dry) {
+            return;
+        }
+        $server = $member->server_id ? Server::query()->find($member->server_id) : null;
+        if ($server) {
+            // Reuse the real removal action so the provider resource is actually
+            // destroyed (not just the DB row).
+            try {
+                app(\App\Actions\Servers\DeleteServerAction::class)
+                    ->execute($server, null, ['reason' => 'warm_pool_retire']);
+            } catch (\Throwable $e) {
+                Log::error('warm_pool.retire.failed', ['member' => $member->id, 'message' => $e->getMessage()]);
+
+                return;
+            }
+        }
+        $member->delete();
+    }
+
+    /** True when the current app-tz hour is inside the configured off-hours window. */
+    private function inOffHours(): bool
+    {
+        if (! (bool) config('warm_pool.off_hours.enabled', false)) {
+            return false;
+        }
+
+        $hour = (int) now()->hour;
+        $start = (int) config('warm_pool.off_hours.start', 22);
+        $end = (int) config('warm_pool.off_hours.end', 6);
+
+        // Wrapping window (e.g. 22→6) when start > end.
+        return $start <= $end
+            ? ($hour >= $start && $hour < $end)
+            : ($hour >= $start || $hour < $end);
+    }
+
+    private function transition(ServerPoolMember $member, string $status, bool $dry, string $reason): void
+    {
+        $this->line("  [{$status}] member {$member->id} — {$reason}");
+        if (! $dry) {
+            $member->update(['status' => $status]);
+        }
+    }
+}

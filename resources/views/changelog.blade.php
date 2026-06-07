@@ -56,6 +56,13 @@
         @php
             $entries = [
                 [
+                    'date'    => 'June 7, 2026',
+                    'tags'    => ['new'],
+                    'title'   => 'Faster Managed Server Creation',
+                    'summary' => 'Managed servers can now be claimed instantly from a pre-provisioned warm pool instead of waiting for a cold provision.',
+                    'items'   => [],
+                ],
+                [
                     'date'    => 'June 6, 2026',
                     'tags'    => ['improved'],
                     'title'   => 'Faster Server Provisioning',
