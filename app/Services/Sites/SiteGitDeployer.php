@@ -182,6 +182,14 @@ class SiteGitDeployer
             throw new \RuntimeException('Deploy failed during the build phase. See the deployment log for details.');
         }
 
+        // ── LOGGING ── overlay dply's generated config/logging.php now that
+        // vendor/ exists (the probe boots the app) and before activate, so a
+        // rejected config aborts the deploy without going live. No-op unless the
+        // site has a managed (v2-spec) logging binding.
+        if ($server->hostCapabilities()->supportsEnvPushToHost()) {
+            $log .= app(SiteLoggingConfigPusher::class)->apply($site, $ssh, $path)['log'];
+        }
+
         // ── ACTIVATE ── before-activate hooks + the activate anchor (a no-op
         // for simple deploys, which serve straight from the repo path).
         $activateStart = microtime(true);

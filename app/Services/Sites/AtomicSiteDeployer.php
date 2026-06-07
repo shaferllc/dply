@@ -214,6 +214,15 @@ class AtomicSiteDeployer
 
         $log .= sprintf("[dply] BUILD done → %d step(s), ok=%s\n", count($build['steps']), $build['ok'] ? 'true' : 'false');
 
+        // ── LOGGING ── overlay dply's generated config/logging.php into the new
+        // release now that vendor/ is installed (the probe boots the app) and
+        // BEFORE the symlink flip below — a rejected config throws here, so the
+        // flip never happens and the prior release keeps serving. No-op unless
+        // the site has a managed (v2-spec) logging binding.
+        if ($server->hostCapabilities()->supportsEnvPushToHost()) {
+            $log .= app(SiteLoggingConfigPusher::class)->apply($site, $ssh, $newRelease)['log'];
+        }
+
         // ── ACTIVATE ── before-activate hooks + the atomic symlink flip.
         $activateStart = microtime(true);
         $log .= sprintf("\n[dply] ACTIVATE → before-activate hooks + flip %s -> %s\n", $currentPath, $newRelease);

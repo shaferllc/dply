@@ -469,6 +469,36 @@
                                                         </details>
                                                     @endif
                                                 </div>
+                                            @elseif ($cloudProvisionError)
+                                                @php
+                                                    $cloudReasonMessage = trim((string) ($cloudProvisionError['message'] ?? ''))
+                                                        ?: __('The provider rejected the request before any resource was created.');
+                                                    $cloudReasonMeta = array_values(array_filter([
+                                                        filled($cloudProvisionError['provider'] ?? null) ? __('Provider: :v', ['v' => $cloudProvisionError['provider']]) : null,
+                                                        filled($cloudProvisionError['region'] ?? null) ? __('Region: :v', ['v' => $cloudProvisionError['region']]) : null,
+                                                        filled($cloudProvisionError['size'] ?? null) ? __('Size: :v', ['v' => $cloudProvisionError['size']]) : null,
+                                                    ]));
+                                                @endphp
+                                                <div class="mt-2 rounded-xl border border-red-300 bg-white/80 px-4 py-3">
+                                                    <div class="flex items-start justify-between gap-3">
+                                                        <p class="text-[11px] font-semibold uppercase tracking-wide text-red-700">
+                                                            {{ __('What the provider said') }}
+                                                        </p>
+                                                        <button
+                                                            type="button"
+                                                            x-data="{ copied: false }"
+                                                            x-on:click="navigator.clipboard.writeText(@js($cloudReasonMessage)); copied = true; setTimeout(() => copied = false, 1500)"
+                                                            class="shrink-0 rounded-md border border-red-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 hover:border-red-300 hover:bg-red-50"
+                                                        >
+                                                            <span x-show="!copied">{{ __('Copy') }}</span>
+                                                            <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
+                                                        </button>
+                                                    </div>
+                                                    <p class="mt-1 break-words font-mono text-sm leading-6 text-red-900">{{ $cloudReasonMessage }}</p>
+                                                    @if ($cloudReasonMeta !== [])
+                                                        <p class="mt-2 text-xs text-red-700/80">{{ implode(' · ', $cloudReasonMeta) }}</p>
+                                                    @endif
+                                                </div>
                                             @else
                                                 <p class="mt-1 text-sm leading-6 text-red-800">{{ $failedStep['detail'] ?: __('The setup script aborted before this step finished. The server is in an unknown state — review the captured output and the rollback summary below before retrying.') }}</p>
                                             @endif

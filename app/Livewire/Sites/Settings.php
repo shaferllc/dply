@@ -78,6 +78,7 @@ class Settings extends Show
     use DismissesConsoleActionRun;
     use ManagesContainerSite;
     use ManagesSiteBindings;
+    use ManagesSiteLogging;
     use ManagesSiteLogo;
     use StreamsRemoteSshLivewire;
 

@@ -20,6 +20,8 @@ use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Models\User;
 use App\Services\DigitalOceanService;
+use App\Services\Logging\LoggingSpec;
+use App\Services\Logging\LoggingSpecValidator;
 use App\Services\Realtime\RealtimeBackendFactory;
 use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Services\Sites\DotEnvFileParser;
@@ -298,6 +300,12 @@ class SiteBindingManager
                 'POSTMARK_TOKEN', 'POSTMARK_MESSAGE_STREAM_ID',
                 'RESEND_KEY',
             ],
+            // Storage fully owns FILESYSTEM_DISK — attaching it sets the disk to
+            // s3, so the loose default (local) should be cleared.
+            'storage' => ['FILESYSTEM_DISK'],
+            // Broadcasting fully owns BROADCAST_CONNECTION — the binding is the
+            // single source of truth for the driver, so a loose copy is stale.
+            'broadcasting' => ['BROADCAST_CONNECTION'],
             default => [],
         };
     }
@@ -1224,6 +1232,16 @@ class SiteBindingManager
         $creds = $this->resolveLogDrainCredentials($site, $provider, $params);
         $this->validateLogDrainCredentials($provider, $creds);
 
+        // Build the v2 logging spec (the structure dply will own and generate
+        // into config/logging.php from Phase 2 on) behaviour-preservingly from
+        // the single-provider form. We store it on `config` now so the data is
+        // ready ahead of the generator/overlay; `injected_env` stays the legacy
+        // drain env so nothing about today's behaviour changes yet. The
+        // transitional `provider` key keeps the current modal's form binding
+        // working until the Phase 3 editor replaces it.
+        $spec = LoggingSpec::fromLegacyProvider($provider, $creds);
+        (new LoggingSpecValidator)->validate($spec);
+
         $binding = $this->persist($site, 'logging', [
             'mode' => 'attach_existing',
             'status' => SiteBinding::STATUS_CONFIGURED,
@@ -1231,13 +1249,101 @@ class SiteBindingManager
             'target_type' => 'log_drain',
             'target_id' => null,
             'injected_env' => $this->logDrainEnv($provider, $creds),
-            'config' => ['provider' => $provider],
+            'config' => ['provider' => $provider] + $spec,
             'last_error' => null,
         ]);
 
         $this->maybeSaveLogDrainCredential($site, $provider, $params, $creds);
 
         return $binding;
+    }
+
+    /**
+     * Persist a full v2 logging spec from the Phase 3 editor. The spec (the
+     * secret-free structure dply generates into config/logging.php) is stored on
+     * `config`; the secret leaf values are written to `injected_env` keyed by
+     * each channel's env map, so the generated file's `env(...)` references
+     * resolve. Secrets the operator left blank on an edit are preserved from the
+     * existing binding rather than wiped.
+     *
+     * @param  array<string, mixed>  $spec
+     * @param  array<string, array<string, string>>  $secrets  [channelName][field] => value
+     */
+    public function saveLoggingSpec(Site $site, array $spec, array $secrets = []): SiteBinding
+    {
+        $spec['version'] = LoggingSpec::VERSION;
+        (new LoggingSpecValidator)->validate($spec);
+
+        $existing = $site->bindings->firstWhere('type', 'logging');
+        $existingEnv = ($existing instanceof SiteBinding && is_array($existing->injected_env)) ? $existing->injected_env : [];
+
+        return $this->persist($site, 'logging', [
+            'mode' => 'attach_existing',
+            'status' => SiteBinding::STATUS_CONFIGURED,
+            'name' => $this->loggingSpecLabel($spec),
+            'target_type' => 'log_drain',
+            'target_id' => null,
+            'injected_env' => $this->loggingInjectedEnvFromSpec($spec, $secrets, $existingEnv),
+            'config' => $spec,
+            'last_error' => null,
+        ]);
+    }
+
+    /**
+     * Build the secret env map a spec injects. Each channel's `env` map names
+     * the env key per secret field; the value comes from $secrets, falling back
+     * to the previously-stored value when the operator didn't re-enter it.
+     * dply Realtime is special: its endpoint comes from config, not the form.
+     *
+     * @param  array<string, mixed>  $spec
+     * @param  array<string, array<string, string>>  $secrets
+     * @param  array<string, string>  $existingEnv
+     * @return array<string, string>
+     */
+    private function loggingInjectedEnvFromSpec(array $spec, array $secrets, array $existingEnv): array
+    {
+        $env = [];
+        foreach ((array) ($spec['channels'] ?? []) as $channel) {
+            if (! is_array($channel)) {
+                continue;
+            }
+            $name = (string) ($channel['name'] ?? '');
+            $type = (string) ($channel['type'] ?? '');
+            $envMap = is_array($channel['env'] ?? null) ? $channel['env'] : [];
+
+            if ($type === 'dply_realtime') {
+                foreach (['host' => 'host', 'port' => 'port'] as $field => $cfgKey) {
+                    if (isset($envMap[$field])) {
+                        $env[$envMap[$field]] = (string) config('log_drains.dply_realtime.'.$cfgKey, '');
+                    }
+                }
+
+                continue;
+            }
+
+            foreach ($envMap as $field => $key) {
+                $key = (string) $key;
+                $new = trim((string) ($secrets[$name][$field] ?? ''));
+                $value = $new !== '' ? $new : (string) ($existingEnv[$key] ?? '');
+                if ($value !== '') {
+                    $env[$key] = $value;
+                }
+            }
+        }
+
+        return $env;
+    }
+
+    /** @param  array<string, mixed>  $spec */
+    private function loggingSpecLabel(array $spec): string
+    {
+        $channels = (array) ($spec['channels'] ?? []);
+        $count = count($channels);
+        $default = (string) ($spec['default'] ?? '');
+
+        return $count === 1
+            ? __('Logging · :default', ['default' => $default])
+            : __('Logging · :count channels (default :default)', ['count' => $count, 'default' => $default]);
     }
 
     /**

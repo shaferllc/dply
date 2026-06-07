@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 6, 2026',
                     'tags'    => ['new'],
+                    'title'   => 'Custom Site Logging Configuration',
+                    'summary' => 'Sites can now define their complete logging setup—channels, default, stack, and deprecations—which dply generates and owns in config/logging.php on the next deploy.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
+                    'tags'    => ['new'],
                     'title'   => 'Mail And Log Drain Bindings',
                     'summary' => 'Sites can now configure mail and log drain resources with per-provider credentials and server-side test email delivery, alongside tiered realtime apps.',
                     'items'   => [],
