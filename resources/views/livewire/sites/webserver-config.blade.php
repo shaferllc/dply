@@ -1,6 +1,4 @@
 @php
-    $btnPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50';
-    $btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors';
     $actionSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors';
     $actionPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50 w-full sm:w-auto';
     $canEdit = auth()->user()->can('update', $site);
@@ -209,15 +207,15 @@
                         <label class="block text-xs font-semibold text-brand-moss mb-2">{{ __('Effective configuration (pending apply)') }}</label>
                         <textarea readonly rows="22" id="pending-effective" class="w-full rounded-lg border border-brand-ink/10 bg-brand-sand/30 font-mono text-xs leading-relaxed text-brand-ink min-h-[28rem]">{{ $effective_config_preview }}</textarea>
                         <div class="mt-3 flex flex-wrap gap-2">
-                            <button type="button" wire:click="downloadEffective" class="{{ $btnSecondary }}">{{ __('Download') }}</button>
-                            <button type="button" x-data @click="navigator.clipboard.writeText(document.getElementById('pending-effective').value)" class="{{ $btnSecondary }}">{{ __('Copy') }}</button>
+                            <x-secondary-button size="sm" type="button" wire:click="downloadEffective">{{ __('Download') }}</x-secondary-button>
+                            <x-secondary-button size="sm" type="button" x-data x-on:click="navigator.clipboard.writeText(document.getElementById('pending-effective').value)">{{ __('Copy') }}</x-secondary-button>
                         </div>
                     @else
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <p class="text-xs font-semibold text-brand-moss mb-2">{{ __('Live on server') }}</p>
                                 <textarea readonly rows="14" class="w-full rounded-lg border border-brand-ink/10 bg-white font-mono text-[11px] leading-relaxed text-brand-ink min-h-[18rem]">{{ $remote_live_config ?? __('Not loaded — use Fetch.') }}</textarea>
-                                <button type="button" wire:click="fetchRemoteConfig" wire:loading.attr="disabled" class="mt-2 {{ $btnSecondary }}">{{ __('Fetch from server') }}</button>
+                                <x-secondary-button size="sm" type="button" wire:click="fetchRemoteConfig" wire:loading.attr="disabled" class="mt-2">{{ __('Fetch from server') }}</x-secondary-button>
                                 @error('remote_fetch')
                                     <p class="mt-1 text-xs text-red-700">{{ $message }}</p>
                                 @enderror
@@ -434,7 +432,7 @@
                             <p class="text-sm font-medium text-brand-ink">{{ $rev->summary ?? __('Snapshot') }}</p>
                             <p class="mt-1 text-xs text-brand-moss">{{ $rev->created_at?->timezone(config('app.timezone'))->format('Y-m-d H:i') }}</p>
                         </div>
-                        <button type="button" wire:click="restoreRevision('{{ $rev->id }}')" class="{{ $btnSecondary }} shrink-0">{{ __('Restore') }}</button>
+                        <x-secondary-button size="sm" type="button" wire:click="restoreRevision('{{ $rev->id }}')" class="shrink-0">{{ __('Restore') }}</x-secondary-button>
                     </li>
                 @empty
                     <li class="px-6 py-10 text-center text-sm text-brand-moss">{{ __('No revisions yet.') }}</li>

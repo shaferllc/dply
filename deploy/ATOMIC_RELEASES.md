@@ -66,8 +66,10 @@ change every `command=` / `directory=` from
 `/home/dply/worker-1.dply.io/artisan` → `/home/dply/worker-1.dply.io/current/artisan`
 (and the matching `directory=.../current`).
 
-**Web** — `/etc/supervisor/conf.d/dply-reverb.conf`, `dply-pulse.conf`,
-`dply-default-worker.conf`: same swap, `/home/dply/dply/...` → `/home/dply/dply/current/...`.
+**Web** — `dply-pulse.conf`, `dply-default-worker.conf`: same swap,
+`/home/dply/dply/...` → `/home/dply/dply/current/...`. (The old
+`dply-reverb.conf` is retired — realtime is now the Cloudflare relay; remove
+that conf from the box if it's still present.)
 
 Then on each host:
 

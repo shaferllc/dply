@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Concerns;
 
+use App\Jobs\SendSiteLogTestJob;
+use App\Models\SiteBinding;
 use App\Services\Deploy\SiteBindingManager;
 use App\Services\Logging\LoggingChannelCatalog;
 use App\Services\Logging\LoggingConfigGenerator;
@@ -139,8 +141,9 @@ trait ManagesSiteLogging
     {
         $this->hydrateLoggingSpec();
         try {
-            (new LoggingSpecValidator)->validate($this->loggingSpec);
-            $this->loggingPreviewContent = app(LoggingConfigGenerator::class)->generate($this->loggingSpec);
+            $spec = $this->normalizedLoggingSpec();
+            (new LoggingSpecValidator)->validate($spec);
+            $this->loggingPreviewContent = app(LoggingConfigGenerator::class)->generate($spec);
             $this->showLoggingPreview = true;
         } catch (\Throwable $e) {
             $this->showLoggingPreview = false;
@@ -154,7 +157,7 @@ trait ManagesSiteLogging
         $this->hydrateLoggingSpec();
 
         try {
-            $manager->saveLoggingSpec($this->site, $this->loggingSpec, $this->loggingSecrets);
+            $manager->saveLoggingSpec($this->site, $this->normalizedLoggingSpec(), $this->loggingSecrets);
         } catch (\Throwable $e) {
             $this->dispatchLoggingError($e->getMessage());
 
@@ -169,6 +172,50 @@ trait ManagesSiteLogging
         if (method_exists($this, 'toastSuccess')) {
             $this->toastSuccess(__('Logging configuration saved. It takes effect on the next deploy.'));
         }
+    }
+
+    /**
+     * Emit a real test record through a saved channel on the box (Phase 4). The
+     * test boots the deployed app, so the channel must already be saved AND
+     * deployed — testing reflects the last deploy, not unsaved editor state.
+     * Result streams into the page-top console (queued SSH per dply's rule).
+     */
+    public function testLoggingChannel(string $name): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $binding = $this->site->bindings->firstWhere('type', 'logging');
+        if (! $binding instanceof SiteBinding) {
+            $this->dispatchLoggingError(__('Save and deploy logging before testing a channel.'));
+
+            return;
+        }
+
+        $savedNames = array_column(
+            is_array($binding->config) ? ($binding->config['channels'] ?? []) : [],
+            'name',
+        );
+        if (! in_array($name, $savedNames, true)) {
+            $this->dispatchLoggingError(__('Save this channel (and deploy) before testing it.'));
+
+            return;
+        }
+
+        if (! method_exists($this, 'seedQueuedConsoleAction') || ! method_exists($this, 'watchConsoleAction')) {
+            $this->dispatchLoggingError(__('Testing a channel is available from the deploy hub.'));
+
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('log_test', __('Testing log channel'));
+        SendSiteLogTestJob::dispatch((string) $run->id, (string) $this->site->id, (string) $binding->id, $name);
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            __('Test record sent through “:ch”.', ['ch' => $name]),
+            __('The channel test failed — see the console for details.'),
+        );
     }
 
     /**
@@ -189,6 +236,64 @@ trait ManagesSiteLogging
         }
 
         return $out;
+    }
+
+    /**
+     * Produce a clean spec for validation/generation/save: convert the editor's
+     * free-text custom-channel inputs (`handler_with_text` as `key: value`
+     * lines, `processors_text` as one class per line) into the array shapes the
+     * generator expects, and drop the transient text fields.
+     *
+     * @return array<string, mixed>
+     */
+    private function normalizedLoggingSpec(): array
+    {
+        $spec = $this->loggingSpec;
+        foreach (($spec['channels'] ?? []) as $i => $channel) {
+            if (! is_array($channel) || ($channel['type'] ?? '') !== LoggingChannelCatalog::CUSTOM_MONOLOG) {
+                continue;
+            }
+
+            if (array_key_exists('handler_with_text', $channel)) {
+                $spec['channels'][$i]['handler_with'] = $this->parseKeyValueLines((string) $channel['handler_with_text']);
+                unset($spec['channels'][$i]['handler_with_text']);
+            }
+            if (array_key_exists('processors_text', $channel)) {
+                $spec['channels'][$i]['processors'] = $this->parseLines((string) $channel['processors_text']);
+                unset($spec['channels'][$i]['processors_text']);
+            }
+        }
+
+        return $spec;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function parseKeyValueLines(string $text): array
+    {
+        $out = [];
+        foreach (preg_split('/\r?\n/', $text) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '' || ! str_contains($line, ':')) {
+                continue;
+            }
+            [$k, $v] = explode(':', $line, 2);
+            $k = trim($k);
+            if ($k !== '') {
+                $out[$k] = trim($v);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function parseLines(string $text): array
+    {
+        return array_values(array_filter(array_map('trim', preg_split('/\r?\n/', $text) ?: [])));
     }
 
     /** @return array<string, mixed> */

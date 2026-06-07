@@ -150,10 +150,19 @@ TXT;
 
             LoggingChannelCatalog::ERRORLOG => ['driver' => 'errorlog', 'level' => $level, 'replace_placeholders' => true],
 
-            LoggingChannelCatalog::PAPERTRAIL, LoggingChannelCatalog::DPLY_REALTIME => $this->syslogUdp(
+            LoggingChannelCatalog::PAPERTRAIL => $this->syslogUdp(
                 $this->envKey($env, 'host'),
                 $this->envKey($env, 'port'),
                 $level,
+            ),
+
+            LoggingChannelCatalog::DPLY_REALTIME => $this->syslogUdp(
+                $this->envKey($env, 'host'),
+                $this->envKey($env, 'port'),
+                $level,
+                // Stamp the per-site routing token as the syslog ident so dply's
+                // drain receiver can attribute each datagram to this site.
+                identKey: $this->envKey($env, 'token'),
             ),
 
             LoggingChannelCatalog::LOGTAIL => $this->monolog(
@@ -198,20 +207,27 @@ TXT;
      *
      * @return array<string, mixed>
      */
-    private function syslogUdp(string $hostKey, string $portKey, string $level): array
+    private function syslogUdp(string $hostKey, string $portKey, string $level, ?string $identKey = null): array
     {
         $host = 'env('.$this->str($hostKey).')';
         $port = 'env('.$this->str($portKey).')';
+
+        $handlerWith = [
+            'host' => new RawPhp($host),
+            'port' => new RawPhp($port),
+            'connectionString' => new RawPhp("'tls://'.".$host.".':'.".$port),
+        ];
+        if ($identKey !== null) {
+            // SyslogUdpHandler's $ident constructor arg — carried in the syslog
+            // APP-NAME so the receiver can route the record to its site.
+            $handlerWith['ident'] = new RawPhp('env('.$this->str($identKey).')');
+        }
 
         return [
             'driver' => 'monolog',
             'level' => $level,
             'handler' => new RawPhp('\\Monolog\\Handler\\SyslogUdpHandler::class'),
-            'handler_with' => [
-                'host' => new RawPhp($host),
-                'port' => new RawPhp($port),
-                'connectionString' => new RawPhp("'tls://'.".$host.".':'.".$port),
-            ],
+            'handler_with' => $handlerWith,
             'processors' => [new RawPhp('\\Monolog\\Processor\\PsrLogMessageProcessor::class')],
         ];
     }

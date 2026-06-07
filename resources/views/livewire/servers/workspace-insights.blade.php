@@ -1,8 +1,3 @@
-@php
-    $btnPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50';
-    $btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors';
-@endphp
-
 <x-server-workspace-layout
     :server="$server"
     active="insights"
@@ -11,11 +6,11 @@
     :pageHeaderToolbar="true"
 >
     <x-slot name="headerActions">
-        <button type="button" wire:click="runChecksNow" wire:loading.attr="disabled" class="{{ $btnPrimary }}">
+        <x-primary-button size="sm" type="button" wire:click="runChecksNow" wire:loading.attr="disabled">
             <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0" wire:loading.class="animate-spin" wire:target="runChecksNow" aria-hidden="true" />
             <span wire:loading.remove wire:target="runChecksNow">{{ __('Refresh') }}</span>
             <span wire:loading wire:target="runChecksNow">{{ __('Queueing…') }}</span>
-        </button>
+        </x-primary-button>
     </x-slot>
 
     @include('livewire.servers.partials.workspace-flashes')
@@ -365,10 +360,10 @@
                                                     {{ __('Fix queued…') }}
                                                 </span>
                                             @else
-                                                <button type="button" wire:click="openApplyFixModal({{ $f->id }})" class="pointer-events-auto relative z-10 {{ $btnSecondary }}">
+                                                <x-secondary-button size="sm" type="button" wire:click="openApplyFixModal({{ $f->id }})" class="pointer-events-auto relative z-10">
                                                     <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                                     {{ __('Apply fix') }}
-                                                </button>
+                                                </x-secondary-button>
                                             @endif
                                         </div>
                                     @endif
@@ -422,10 +417,10 @@
                                         @include('livewire.partials.insight-correlation', ['finding' => $f])
                                         <div class="mt-3 flex flex-wrap gap-2">
                                             @if ($sCanFix)
-                                                <button type="button" wire:click="openApplyFixModal({{ $f->id }})" class="pointer-events-auto relative z-10 {{ $btnSecondary }}">
+                                                <x-secondary-button size="sm" type="button" wire:click="openApplyFixModal({{ $f->id }})" class="pointer-events-auto relative z-10">
                                                     <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                                     {{ __('Apply fix') }}
-                                                </button>
+                                                </x-secondary-button>
                                             @endif
                                             <button type="button" wire:click="ignoreFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="ignoreFinding({{ $f->id }})" class="pointer-events-auto relative z-10 {{ $btnSecondary }}">
                                                 <x-heroicon-o-eye-slash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />

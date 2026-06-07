@@ -12,6 +12,7 @@ use App\Jobs\SyncBasicAuthFromServerJob;
 use App\Livewire\Concerns\DismissesConsoleActionRun;
 use App\Livewire\Concerns\ManagesContainerSite;
 use App\Livewire\Concerns\ManagesSiteBindings;
+use App\Livewire\Concerns\ManagesSiteLogging;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
 use App\Livewire\Sites\Concerns\ManagesSiteLogo;
 use App\Models\NotificationChannel;

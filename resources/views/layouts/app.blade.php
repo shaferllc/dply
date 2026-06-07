@@ -9,23 +9,16 @@
 
         <title>@yield('title', config('app.name', 'Laravel'))</title>
 
-        @if (filled(config('broadcasting.connections.reverb.key')))
+        @php
+            // Driver-aware: resolves whichever broadcast connection is active —
+            // reverb (local dev) or pusher → the dply realtime Worker (prod).
+            $echoClient = \App\Support\EchoClientConfig::forBrowser();
+        @endphp
+        @if ($echoClient)
             {{-- Echo reads this at runtime (bypasses stale Vite env in public/build). Meta is fallback if window is cleared. --}}
-            @php
-                $reverbOpts = config('broadcasting.connections.reverb.options', []);
-                $reverbScheme = $reverbOpts['scheme'] ?? 'http';
-                $reverbClient = [
-                    'key' => config('broadcasting.connections.reverb.key'),
-                    'host' => filled($reverbOpts['host'] ?? null) ? $reverbOpts['host'] : null,
-                    'port' => (int) ($reverbOpts['port'] ?? ($reverbScheme === 'https' ? 443 : 8080)),
-                    'scheme' => $reverbScheme,
-                    'enabled' => (bool) config('broadcasting.echo_client_enabled', true),
-                    'bypass_local_guard' => (bool) config('broadcasting.reverb_bypass_local_guard', false),
-                ];
-            @endphp
-            <meta name="dply-reverb-config" content="{{ e(json_encode($reverbClient)) }}">
+            <meta name="dply-reverb-config" content="{{ e(json_encode($echoClient)) }}">
             <script>
-                window.__DPLY_REVERB__ = @json($reverbClient);
+                window.__DPLY_REVERB__ = @json($echoClient);
             </script>
         @endif
 
@@ -35,7 +28,7 @@
 
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
-        @if (filled(config('broadcasting.connections.reverb.key')))
+        @if ($echoClient)
             {{-- After Vite so a stale app-*.js that still bundled Echo cannot overwrite this. --}}
             @include('partials.reverb-echo-module')
         @endif

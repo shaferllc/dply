@@ -1,8 +1,8 @@
 <?php
 
+use App\Models\SiteBinding;
 use App\Services\Logging\LoggingSpec;
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Managed logging now stores a full v2 channel *spec* on each logging
@@ -11,59 +11,47 @@ use Illuminate\Support\Facades\DB;
  * equivalent spec behaviour-preservingly (Q8): each old provider maps to the
  * exact channel/default/stack that reproduces its current env output.
  *
- * Only `config` is touched — `injected_env` (the secrets) is left alone, and
- * the spec's env keys are chosen to match the keys those secrets already live
- * under, so a migrated site's logging behaviour is unchanged.
+ * Uses the Eloquent model so the encrypted `injected_env` cast round-trips. For
+ * `dply_realtime` bindings we also add the dedicated DPLY_LOG_DRAIN_* env keys
+ * the generated overlay references (the old binding only had PAPERTRAIL_*),
+ * pulled from config — so a migrated dply Realtime drain keeps working once the
+ * file is overlaid. User-secret channels (papertrail/logtail/syslog) keep their
+ * existing injected_env untouched: their env keys are unchanged.
  */
 return new class extends Migration
 {
     public function up(): void
     {
-        $rows = DB::table('site_bindings')->where('type', 'logging')->get(['id', 'config']);
-
-        foreach ($rows as $row) {
-            $config = $this->decode($row->config);
+        SiteBinding::query()->where('type', 'logging')->cursor()->each(function (SiteBinding $binding): void {
+            $config = is_array($binding->config) ? $binding->config : [];
             if (LoggingSpec::isV2($config)) {
-                continue; // already migrated
+                return;
             }
 
             $provider = strtolower(trim((string) ($config['provider'] ?? 'papertrail')));
             $spec = LoggingSpec::fromLegacyProvider($provider, []);
+            $binding->config = ['provider' => $provider] + $spec;
 
-            DB::table('site_bindings')
-                ->where('id', $row->id)
-                ->update(['config' => json_encode(['provider' => $provider] + $spec)]);
-        }
+            if ($provider === 'dply_realtime') {
+                $env = is_array($binding->injected_env) ? $binding->injected_env : [];
+                $env['DPLY_LOG_DRAIN_HOST'] = (string) config('log_drains.dply_realtime.host', '');
+                $env['DPLY_LOG_DRAIN_PORT'] = (string) config('log_drains.dply_realtime.port', '');
+                $binding->injected_env = array_filter($env, fn ($v) => (string) $v !== '');
+            }
+
+            $binding->save();
+        });
     }
 
     public function down(): void
     {
-        // Reduce each spec back to the bare {provider} shape it came from.
-        $rows = DB::table('site_bindings')->where('type', 'logging')->get(['id', 'config']);
-
-        foreach ($rows as $row) {
-            $config = $this->decode($row->config);
+        SiteBinding::query()->where('type', 'logging')->cursor()->each(function (SiteBinding $binding): void {
+            $config = is_array($binding->config) ? $binding->config : [];
             if (! LoggingSpec::isV2($config)) {
-                continue;
+                return;
             }
-            $provider = (string) ($config['provider'] ?? 'papertrail');
-
-            DB::table('site_bindings')
-                ->where('id', $row->id)
-                ->update(['config' => json_encode(['provider' => $provider])]);
-        }
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function decode(mixed $raw): array
-    {
-        if (is_array($raw)) {
-            return $raw;
-        }
-        $decoded = json_decode((string) $raw, true);
-
-        return is_array($decoded) ? $decoded : [];
+            $binding->config = ['provider' => (string) ($config['provider'] ?? 'papertrail')];
+            $binding->save();
+        });
     }
 };

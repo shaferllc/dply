@@ -186,7 +186,7 @@
                             wire:target="submitRemoveSite"
                         >
                             <span wire:loading.remove wire:target="submitRemoveSite" class="inline-flex items-center gap-2">
-                                <x-heroicon-m-trash class="h-4 w-4" aria-hidden="true" />
+                                <x-heroicon-m-trash class="h-4 w-4 inline-block pr-2" aria-hidden="true" />
                                 {{ $submitLabel }}
                             </span>
                             <span wire:loading wire:target="submitRemoveSite" class="inline-flex items-center gap-2">

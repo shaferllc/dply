@@ -1,8 +1,3 @@
-@php
-    $btnPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50';
-    $btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors';
-@endphp
-
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     @include('livewire.sites.partials.workspace-breadcrumb-bar', [
         'server' => $server,
@@ -20,10 +15,10 @@
             compact
         >
             <x-slot name="actions">
-                <button type="button" wire:click="runChecksNow" wire:loading.attr="disabled" class="{{ $btnPrimary }}">
+                <x-primary-button size="sm" type="button" wire:click="runChecksNow" wire:loading.attr="disabled">
                     <span wire:loading.remove wire:target="runChecksNow">{{ __('Refresh') }}</span>
                     <span wire:loading wire:target="runChecksNow">{{ __('Queueing…') }}</span>
-                </button>
+                </x-primary-button>
             </x-slot>
         </x-page-header>
     </div>
@@ -159,7 +154,7 @@
                                 @include('livewire.partials.insight-correlation', ['finding' => $f])
                             </div>
                             @if ($canFix)
-                                <button type="button" wire:click="openConfirmActionModal('applyFix', [{{ $f->id }}], @js(__('Apply suggested fix')), @js(__('Apply the suggested fix on the server?')), @js(__('Apply fix')), true)" class="{{ $btnSecondary }} shrink-0">
+                                <x-secondary-button size="sm" type="button" wire:click="openConfirmActionModal('applyFix', [{{ $f->id }}], @js(__('Apply suggested fix')), @js(__('Apply the suggested fix on the server?')), @js(__('Apply fix')), true)" class="shrink-0">
                                     {{ __('Apply fix') }}
                                 </button>
                             @endif
@@ -175,8 +170,8 @@
             <p>{{ __('Deploy completions, deployment start, and uptime transitions for this site are configured under Site workspace → Notifications. Connect outbound webhooks and channel subscriptions there.') }}</p>
             <p>{{ __('Insights findings still use the server’s “Insights alerts” subscription when enabled.') }}</p>
             <div class="flex flex-wrap gap-2 pt-1">
-                <a href="{{ route('sites.show', [$server, $site, 'section' => 'notifications']) }}" wire:navigate class="{{ $btnPrimary }}">{{ __('Open site Notifications') }}</a>
-                <a href="{{ route('profile.notification-channels') }}" wire:navigate class="{{ $btnSecondary }}">{{ __('Manage notification channels') }}</a>
+                <a href="{{ route('sites.show', [$server, $site, 'section' => 'notifications']) }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50">{{ __('Open site Notifications') }}</a>
+                <a href="{{ route('profile.notification-channels') }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors">{{ __('Manage notification channels') }}</a>
             </div>
         </div>
     @endif
@@ -185,10 +180,10 @@
         @include('livewire.partials.insights-settings-form', ['catalog' => $insightsCatalog, 'orgHasPro' => $orgHasPro])
         <div class="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-brand-ink/10">
             <div class="flex flex-wrap gap-2">
-                <button type="button" wire:click="enableAll" class="{{ $btnSecondary }}">{{ __('Enable all') }}</button>
-                <button type="button" wire:click="disableAll" class="{{ $btnSecondary }}">{{ __('Disable all') }}</button>
+                <x-secondary-button size="sm" type="button" wire:click="enableAll">{{ __('Enable all') }}</x-secondary-button>
+                <x-secondary-button size="sm" type="button" wire:click="disableAll">{{ __('Disable all') }}</x-secondary-button>
             </div>
-            <button type="button" wire:click="saveSettings" class="{{ $btnPrimary }}">{{ __('Save settings') }}</button>
+            <x-primary-button size="sm" type="button" wire:click="saveSettings">{{ __('Save settings') }}</x-primary-button>
         </div>
     @endif
 

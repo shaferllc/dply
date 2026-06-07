@@ -167,6 +167,9 @@ final class LoggingChannelCatalog
                 'fields' => [
                     ['key' => 'host', 'label' => 'Endpoint host', 'kind' => 'secret', 'secret' => true, 'system' => true],
                     ['key' => 'port', 'label' => 'Endpoint port', 'kind' => 'secret', 'secret' => true, 'system' => true],
+                    // Per-site routing id stamped as the syslog ident so the
+                    // receiver can map a datagram back to this site.
+                    ['key' => 'token', 'label' => 'Routing token', 'kind' => 'secret', 'secret' => true, 'system' => true],
                 ],
             ],
             self::CUSTOM_MONOLOG => [

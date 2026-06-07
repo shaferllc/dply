@@ -6,7 +6,7 @@ Split the control plane across dedicated VMs when a single box cannot keep up wi
 
 | Server | `DPLY_RUNTIME` | `DPLY_WORKER_ROLE` | Supervisor programs |
 |--------|----------------|--------------------|---------------------|
-| Web | `web` | — | Reverb (`deploy/supervisor/dply-web.conf`) |
+| Web | `web` | — | none (realtime is the Cloudflare relay; see `deploy/supervisor/dply-web.conf`) |
 | Worker 1 | `worker` | `primary` | Horizon, `schedule:work` (`dply-worker-primary.conf`) |
 | Worker 2 | `worker` | `replica` | Horizon only (`dply-worker.conf`) |
 | Redis | — | — | Dedicated (queues, cache, schedule mutex) |
@@ -55,7 +55,7 @@ Web tier: nginx + php-fpm are **not** in these snippets — configure them separ
 1. **Worker 1** — pull release → `php artisan migrate --force`
 2. **Worker 2** — pull → `php artisan horizon:terminate` → restart Horizon
 3. **Worker 1** — pull → `horizon:terminate` → restart Horizon + `schedule:work`
-4. **Web** — pull → reload php-fpm → restart Reverb
+4. **Web** — pull → reload php-fpm (realtime is the Cloudflare relay — nothing to restart on-box)
 
 ## Health checks
 

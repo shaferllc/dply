@@ -1283,10 +1283,26 @@ class SiteBindingManager
             'name' => $this->loggingSpecLabel($spec),
             'target_type' => 'log_drain',
             'target_id' => null,
-            'injected_env' => $this->loggingInjectedEnvFromSpec($spec, $secrets, $existingEnv),
+            'injected_env' => $this->loggingInjectedEnvFromSpec($spec, $secrets, $existingEnv, $site),
             'config' => $spec,
             'last_error' => null,
         ]);
+    }
+
+    /**
+     * The site's stable dply Realtime routing token, minted on first use. The
+     * generated SyslogUdpHandler stamps it as the syslog ident and the drain
+     * receiver maps datagrams back to the site by it.
+     */
+    private function ensureLogDrainToken(Site $site): string
+    {
+        $token = trim((string) ($site->log_drain_token ?? ''));
+        if ($token === '') {
+            $token = 'dly_'.Str::lower(Str::random(40));
+            $site->forceFill(['log_drain_token' => $token])->save();
+        }
+
+        return $token;
     }
 
     /**
@@ -1300,7 +1316,7 @@ class SiteBindingManager
      * @param  array<string, string>  $existingEnv
      * @return array<string, string>
      */
-    private function loggingInjectedEnvFromSpec(array $spec, array $secrets, array $existingEnv): array
+    private function loggingInjectedEnvFromSpec(array $spec, array $secrets, array $existingEnv, Site $site): array
     {
         $env = [];
         foreach ((array) ($spec['channels'] ?? []) as $channel) {
@@ -1312,10 +1328,14 @@ class SiteBindingManager
             $envMap = is_array($channel['env'] ?? null) ? $channel['env'] : [];
 
             if ($type === 'dply_realtime') {
+                // Endpoint comes from config; the routing token from the site.
                 foreach (['host' => 'host', 'port' => 'port'] as $field => $cfgKey) {
                     if (isset($envMap[$field])) {
                         $env[$envMap[$field]] = (string) config('log_drains.dply_realtime.'.$cfgKey, '');
                     }
+                }
+                if (isset($envMap['token'])) {
+                    $env[$envMap['token']] = $this->ensureLogDrainToken($site);
                 }
 
                 continue;
@@ -1425,8 +1445,14 @@ class SiteBindingManager
             'syslog' => ['LOG_CHANNEL' => 'syslog'],
             'dply_realtime' => array_filter([
                 'LOG_CHANNEL' => 'papertrail',
+                // PAPERTRAIL_* drives the stock channel on env-only hosts;
+                // DPLY_LOG_DRAIN_* are the dedicated keys the generated overlay
+                // file references (so dply Realtime never collides with a real
+                // Papertrail channel). Emitting both is harmless.
                 'PAPERTRAIL_URL' => (string) config('log_drains.dply_realtime.host', ''),
                 'PAPERTRAIL_PORT' => (string) config('log_drains.dply_realtime.port', ''),
+                'DPLY_LOG_DRAIN_HOST' => (string) config('log_drains.dply_realtime.host', ''),
+                'DPLY_LOG_DRAIN_PORT' => (string) config('log_drains.dply_realtime.port', ''),
             ], fn ($v) => $v !== ''),
             default => [],
         };

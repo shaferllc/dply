@@ -34,6 +34,90 @@ class RealtimeCloudflareClient
     }
 
     /**
+     * Confirm the API token is valid and active (GET /user/tokens/verify).
+     */
+    public function tokenIsActive(): bool
+    {
+        if ($this->apiToken === '') {
+            return false;
+        }
+
+        $response = Http::withToken($this->apiToken)
+            ->acceptJson()
+            ->get(self::BASE.'/user/tokens/verify');
+
+        return $response->successful() && (string) $response->json('result.status') === 'active';
+    }
+
+    /**
+     * All KV namespaces in the account, keyed by title → id.
+     *
+     * @return array<string, string>
+     */
+    public function listNamespaces(): array
+    {
+        $this->assertAccountConfigured();
+
+        $namespaces = [];
+        $page = 1;
+
+        do {
+            $response = Http::withToken($this->apiToken)
+                ->acceptJson()
+                ->get(self::BASE.'/accounts/'.$this->accountId.'/storage/kv/namespaces', [
+                    'per_page' => 100,
+                    'page' => $page,
+                ]);
+            $this->assertSuccess($response, 'list KV namespaces');
+
+            foreach ((array) $response->json('result', []) as $namespace) {
+                if (isset($namespace['id'], $namespace['title'])) {
+                    $namespaces[(string) $namespace['title']] = (string) $namespace['id'];
+                }
+            }
+
+            $totalPages = (int) ($response->json('result_info.total_pages') ?? 1);
+            $page++;
+        } while ($page <= $totalPages);
+
+        return $namespaces;
+    }
+
+    /**
+     * Create a KV namespace and return its id.
+     */
+    public function createNamespace(string $title): string
+    {
+        $this->assertAccountConfigured();
+
+        $response = Http::withToken($this->apiToken)
+            ->acceptJson()
+            ->post(self::BASE.'/accounts/'.$this->accountId.'/storage/kv/namespaces', [
+                'title' => $title,
+            ]);
+        $this->assertSuccess($response, 'create KV namespace '.$title);
+
+        $id = (string) $response->json('result.id');
+        if ($id === '') {
+            throw new RuntimeException('Cloudflare did not return a namespace id for '.$title.'.');
+        }
+
+        return $id;
+    }
+
+    /**
+     * Whether the given namespace id exists in the account.
+     */
+    public function namespaceExists(string $namespaceId): bool
+    {
+        if ($namespaceId === '') {
+            return false;
+        }
+
+        return in_array($namespaceId, array_values($this->listNamespaces()), true);
+    }
+
+    /**
      * Write a string value at $key in the given KV namespace.
      */
     public function putKvValue(string $namespaceId, string $key, string $value): void
@@ -76,6 +160,16 @@ class RealtimeCloudflareClient
             throw new RuntimeException(
                 'Realtime Cloudflare client is not configured — set DPLY_REALTIME_CF_ACCOUNT_ID, '
                 .'DPLY_REALTIME_CF_API_TOKEN, and DPLY_REALTIME_CF_KV_NAMESPACE_ID.'
+            );
+        }
+    }
+
+    private function assertAccountConfigured(): void
+    {
+        if ($this->accountId === '' || $this->apiToken === '') {
+            throw new RuntimeException(
+                'Realtime Cloudflare client is not configured — set DPLY_REALTIME_CF_ACCOUNT_ID '
+                .'(or DPLY_EDGE_CF_ACCOUNT_ID) and DPLY_REALTIME_CF_API_TOKEN (or DPLY_EDGE_CF_API_TOKEN).'
             );
         }
     }

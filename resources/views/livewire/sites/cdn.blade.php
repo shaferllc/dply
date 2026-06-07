@@ -1,7 +1,5 @@
 @php
     $card = 'dply-card overflow-hidden';
-    $btnPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50';
-    $btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/40 transition-colors disabled:cursor-not-allowed disabled:opacity-50';
     $labelCls = 'block text-xs font-semibold uppercase tracking-wide text-brand-moss mb-1';
     $inputCls = 'block w-full rounded-md border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-1 focus:ring-brand-forest';
     $presets = [
@@ -261,7 +259,7 @@
                                     <input id="newRuleTtl" type="number" min="1" wire:model="newRuleTtl" class="{{ $inputCls }}" @disabled($newRuleAction !== 'cache')>
                                 </div>
                                 <div class="sm:col-span-2">
-                                    <button type="button" wire:click="addRule" class="{{ $btnSecondary }} w-full">{{ __('Add rule') }}</button>
+                                    <x-secondary-button size="sm" type="button" wire:click="addRule" class="w-full">{{ __('Add rule') }}</x-secondary-button>
                                 </div>
                             </div>
                         </div>
@@ -324,10 +322,10 @@
                     @endif
 
                     <div class="flex flex-wrap items-center gap-3">
-                        <button type="submit" class="{{ $btnPrimary }}">{{ __('Save and sync') }}</button>
-                        <button type="button" wire:click="purge" class="{{ $btnSecondary }}" @disabled(! $enabled)>
+                        <x-primary-button size="sm" type="submit">{{ __('Save and sync') }}</x-primary-button>
+                        <x-secondary-button size="sm" type="button" wire:click="purge" @disabled(! $enabled)>
                             {{ __('Purge cache') }}
-                        </button>
+                        </x-secondary-button>
                         @if ($lastPurgeAt)
                             <span class="text-[11px] text-brand-moss">{{ __('Last purge:') }} <span class="font-mono text-brand-ink">{{ $lastPurgeAt }}</span></span>
                         @endif

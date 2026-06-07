@@ -809,7 +809,7 @@
                                             >{{ $liveTaskOutput }}</pre>
                                         </details>
                                     @elseif ($task && ! $activeStep['output'])
-                                        <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-white/70 p-4">
+                                        <div class="mt-4 rounded-xl border border-brand-ink/10 bg-white/90 p-4">
                                             <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Live task output') }}</p>
                                             <p class="mt-2 text-sm text-brand-moss">{{ __('No output received from the server yet. The bootstrap script may still be initialising or the webhook callback is unreachable from the target host.') }}</p>
                                             @if ($taskUpdatedAt)

@@ -29,7 +29,10 @@ final class LoggingSpec
      */
     private const LEGACY_ENV = [
         LoggingChannelCatalog::PAPERTRAIL => ['host' => 'PAPERTRAIL_URL', 'port' => 'PAPERTRAIL_PORT'],
-        LoggingChannelCatalog::DPLY_REALTIME => ['host' => 'PAPERTRAIL_URL', 'port' => 'PAPERTRAIL_PORT'],
+        // dply Realtime gets DEDICATED keys, not PAPERTRAIL_* — otherwise a site
+        // with both a real Papertrail channel and dply Realtime would collide on
+        // the same env keys and one would clobber the other.
+        LoggingChannelCatalog::DPLY_REALTIME => ['host' => 'DPLY_LOG_DRAIN_HOST', 'port' => 'DPLY_LOG_DRAIN_PORT', 'token' => 'DPLY_LOG_DRAIN_TOKEN'],
         LoggingChannelCatalog::LOGTAIL => ['source_token' => 'LOGTAIL_SOURCE_TOKEN'],
         LoggingChannelCatalog::SLACK => ['webhook_url' => 'LOG_SLACK_WEBHOOK_URL'],
     ];

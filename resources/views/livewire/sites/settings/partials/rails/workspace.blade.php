@@ -4,8 +4,6 @@
     $sidekiqPresetUrl = $daemonsUrl.'?preset=sidekiq';
     $solidQueuePresetUrl = $daemonsUrl.'?preset=solid-queue';
     $actionCablePresetUrl = $daemonsUrl.'?preset=action-cable';
-    $btnPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors';
-    $btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors';
 @endphp
 
 @if (! $site->isRailsFrameworkDetected())
@@ -42,7 +40,7 @@
                     <h3 class="text-base font-semibold text-brand-ink">{{ __('Sidekiq') }}</h3>
                     <p class="mt-1 text-xs text-brand-moss">{{ __('Redis-backed background worker for Rails. Launches a managed Supervisor program running bundle exec sidekiq.') }}</p>
                 </div>
-                <a href="{{ $sidekiqPresetUrl }}" wire:navigate class="{{ $btnPrimary }}">
+                <a href="{{ $sidekiqPresetUrl }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors">
                     {{ __('Add Sidekiq worker') }}
                 </a>
             </div>

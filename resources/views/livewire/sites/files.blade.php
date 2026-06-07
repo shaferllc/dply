@@ -1,7 +1,5 @@
 @php
     $card = 'dply-card overflow-hidden';
-    $btnPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50';
-    $btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors';
 
     $rel = str_starts_with($path, $siteRoot) ? substr($path, strlen($siteRoot)) : $path;
     $crumbs = [];
@@ -293,14 +291,14 @@
                         <p class="font-semibold">{{ __('Saving inside a release directory') }}</p>
                         <p class="mt-1 text-xs">{{ __('Confirm you want to save here. The next deploy will create a new release directory and this change will be wiped.') }}</p>
                         <div class="mt-3 flex gap-2">
-                            <button type="button" wire:click="saveEdit(true)" class="{{ $btnPrimary }} bg-amber-600 hover:bg-amber-700">{{ __('Save anyway') }}</button>
-                            <button type="button" wire:click="$set('pendingReleaseWarning', false)" class="{{ $btnSecondary }}">{{ __('Back to editor') }}</button>
+                            <x-primary-button size="sm" type="button" wire:click="saveEdit(true)" class="bg-amber-600 hover:bg-amber-700">{{ __('Save anyway') }}</x-primary-button>
+                            <x-secondary-button size="xs" type="button" wire:click="$set('pendingReleaseWarning', false)">{{ __('Back to editor') }}</x-secondary-button>
                         </div>
                     </div>
                 @else
                     <div class="flex justify-end gap-2">
-                        <button type="button" wire:click="closeEditModal" class="{{ $btnSecondary }}">{{ __('Cancel') }}</button>
-                        <button type="button" wire:click="saveEdit" class="{{ $btnPrimary }}">{{ __('Save') }}</button>
+                        <x-secondary-button size="xs" type="button" wire:click="closeEditModal">{{ __('Cancel') }}</x-secondary-button>
+                        <x-primary-button size="sm" type="button" wire:click="saveEdit">{{ __('Save') }}</x-primary-button>
                     </div>
                 @endif
             </div>
@@ -314,7 +312,7 @@
                 <p class="text-sm font-semibold text-brand-ink">{{ __('File changed on disk') }}</p>
                 <p class="text-sm text-brand-moss">{{ $conflictMessage }}</p>
                 <div class="flex justify-end">
-                    <button type="button" wire:click="closeConflictModal" class="{{ $btnSecondary }}">{{ __('Close') }}</button>
+                    <x-secondary-button size="xs" type="button" wire:click="closeConflictModal">{{ __('Close') }}</x-secondary-button>
                 </div>
             </div>
         </x-modal>

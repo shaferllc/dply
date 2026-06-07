@@ -2,8 +2,6 @@
     $card = 'rounded-xl border border-brand-ink/10 bg-white p-5 shadow-sm';
     $labelCls = 'block text-xs font-semibold uppercase tracking-wide text-brand-moss mb-1';
     $inputCls = 'block w-full rounded-md border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-1 focus:ring-brand-forest';
-    $btnPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50';
-    $btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/40 transition-colors disabled:cursor-not-allowed disabled:opacity-50';
     $statusColors = [
         'active' => 'bg-emerald-100 text-emerald-800',
         'provisioning' => 'bg-amber-100 text-amber-900',
@@ -33,11 +31,11 @@
             </p>
         </div>
         @if ($isContainer)
-            <button type="button" wire:click="openAttach('attach')" class="{{ $btnPrimary }}">
+            <x-primary-button size="sm" type="button" wire:click="openAttach('attach')">
                 + {{ __('Attach resource') }}
-            </button>
+            </x-primary-button>
         @else
-            <a href="{{ route('sites.daemons', [$server, $site]) }}" wire:navigate class="{{ $btnPrimary }}">
+            <a href="{{ route('sites.daemons', [$server, $site]) }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50">
                 {{ __('Manage workers') }}
             </a>
         @endif
@@ -52,8 +50,8 @@
                 <p class="mt-1 text-xs text-brand-moss">{{ __('Queue / Horizon / scheduler processes draining this site\'s work. Off-box rows run on a worker server that shares this site\'s private network.') }}</p>
             </div>
             <div class="flex gap-2">
-                <a href="{{ route('sites.daemons', [$server, $site]) }}?preset=laravel-queue&open=worker" wire:navigate class="{{ $btnSecondary }}">+ {{ __('Queue worker') }}</a>
-                <a href="{{ route('sites.daemons', [$server, $site]) }}?preset=laravel-horizon&open=worker" wire:navigate class="{{ $btnSecondary }}">+ {{ __('Horizon') }}</a>
+                <a href="{{ route('sites.daemons', [$server, $site]) }}?preset=laravel-queue&open=worker" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/40 transition-colors disabled:cursor-not-allowed disabled:opacity-50">+ {{ __('Queue worker') }}</a>
+                <a href="{{ route('sites.daemons', [$server, $site]) }}?preset=laravel-horizon&open=worker" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/40 transition-colors disabled:cursor-not-allowed disabled:opacity-50">+ {{ __('Horizon') }}</a>
             </div>
         </div>
 
@@ -94,8 +92,8 @@
                 <p class="mt-1 text-xs text-brand-moss">{{ __('Managed Postgres / MySQL / Redis. Connection env vars are merged into the site\'s env file and a redeploy is queued automatically on attach.') }}</p>
             </div>
             <div class="flex gap-2">
-                <button type="button" wire:click="openAttach('database-existing')" class="{{ $btnSecondary }}">+ {{ __('Attach') }}</button>
-                <button type="button" wire:click="openAttach('database-new')" class="{{ $btnSecondary }}">+ {{ __('Create new') }}</button>
+                <x-secondary-button size="sm" type="button" wire:click="openAttach('database-existing')">+ {{ __('Attach') }}</x-secondary-button>
+                <x-secondary-button size="sm" type="button" wire:click="openAttach('database-new')">+ {{ __('Create new') }}</x-secondary-button>
             </div>
         </div>
 
@@ -140,8 +138,8 @@
                 <p class="mt-1 text-xs text-brand-moss">{{ __('Queue workers and the Laravel scheduler. Each becomes a long-running App Platform component built from the same source as the web service.') }}</p>
             </div>
             <div class="flex gap-2">
-                <button type="button" wire:click="openAttach('worker')" class="{{ $btnSecondary }}">+ {{ __('Worker') }}</button>
-                <button type="button" wire:click="openAttach('scheduler')" class="{{ $btnSecondary }}" @disabled($this->hasScheduler())>+ {{ __('Scheduler') }}</button>
+                <x-secondary-button size="sm" type="button" wire:click="openAttach('worker')">+ {{ __('Worker') }}</x-secondary-button>
+                <x-secondary-button size="sm" type="button" wire:click="openAttach('scheduler')" @disabled($this->hasScheduler())>+ {{ __('Scheduler') }}</x-secondary-button>
             </div>
         </div>
 
@@ -231,8 +229,8 @@
                                 @error('attach_database_id') <p class="mt-1 text-xs text-rose-700">{{ $message }}</p> @enderror
                             </div>
                             <div class="flex justify-end gap-2">
-                                <button type="button" wire:click="closeModal" class="{{ $btnSecondary }}">{{ __('Cancel') }}</button>
-                                <button type="submit" class="{{ $btnPrimary }}">{{ __('Attach') }}</button>
+                                <x-secondary-button size="sm" type="button" wire:click="closeModal">{{ __('Cancel') }}</x-secondary-button>
+                                <x-primary-button size="sm" type="submit">{{ __('Attach') }}</x-primary-button>
                             </div>
                         </form>
 
@@ -263,8 +261,8 @@
                             </div>
                             <p class="text-xs text-brand-moss">{{ __('Provisioning takes ~5-10 minutes. DB_* env vars are merged and the site is redeployed automatically once the cluster is online.') }}</p>
                             <div class="flex justify-end gap-2">
-                                <button type="button" wire:click="closeModal" class="{{ $btnSecondary }}">{{ __('Cancel') }}</button>
-                                <button type="submit" class="{{ $btnPrimary }}">{{ __('Create') }}</button>
+                                <x-secondary-button size="sm" type="button" wire:click="closeModal">{{ __('Cancel') }}</x-secondary-button>
+                                <x-primary-button size="sm" type="submit">{{ __('Create') }}</x-primary-button>
                             </div>
                         </form>
 
@@ -296,8 +294,8 @@
                                 </div>
                             </div>
                             <div class="flex justify-end gap-2">
-                                <button type="button" wire:click="closeModal" class="{{ $btnSecondary }}">{{ __('Cancel') }}</button>
-                                <button type="submit" class="{{ $btnPrimary }}">{{ __('Add worker') }}</button>
+                                <x-secondary-button size="sm" type="button" wire:click="closeModal">{{ __('Cancel') }}</x-secondary-button>
+                                <x-primary-button size="sm" type="submit">{{ __('Add worker') }}</x-primary-button>
                             </div>
                         </form>
 
@@ -305,8 +303,8 @@
                         <form wire:submit.prevent="attachWorker('scheduler')" class="space-y-4">
                             <p class="text-sm text-brand-ink">{{ __('The scheduler runs `php artisan schedule:work` on a single pinned instance — App Platform has no native cron, so this is how Laravel\'s scheduled tasks fire.') }}</p>
                             <div class="flex justify-end gap-2">
-                                <button type="button" wire:click="closeModal" class="{{ $btnSecondary }}">{{ __('Cancel') }}</button>
-                                <button type="submit" class="{{ $btnPrimary }}">{{ __('Add scheduler') }}</button>
+                                <x-secondary-button size="sm" type="button" wire:click="closeModal">{{ __('Cancel') }}</x-secondary-button>
+                                <x-primary-button size="sm" type="submit">{{ __('Add scheduler') }}</x-primary-button>
                             </div>
                         </form>
                     @endif

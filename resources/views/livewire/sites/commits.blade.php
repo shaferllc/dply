@@ -1,8 +1,3 @@
-@php
-    $btnPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50';
-    $btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors';
-@endphp
-
 <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
     @include('livewire.sites.partials.workspace-breadcrumb-bar', [
         'server' => $server,
@@ -76,11 +71,11 @@
                             </div>
                         </div>
                         <div class="flex flex-wrap gap-2 shrink-0">
-                            <button type="button" wire:click="refreshCommits" wire:loading.attr="disabled" class="{{ $btnPrimary }}">
+                            <x-primary-button size="sm" type="button" wire:click="refreshCommits" wire:loading.attr="disabled">
                                 <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0" wire:loading.class="animate-spin" wire:target="refreshCommits" />
                                 <span wire:loading.remove wire:target="refreshCommits">{{ __('Refresh') }}</span>
                                 <span wire:loading wire:target="refreshCommits">{{ __('Loading…') }}</span>
-                            </button>
+                            </x-primary-button>
                         </div>
                     </div>
                     @if ($lastDeployedSha)
@@ -160,7 +155,7 @@
                                             href="{{ $c['html_url'] }}"
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            class="{{ $btnSecondary }} !py-2 !px-3 !text-[11px]"
+                                            class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors !py-2 !px-3 !text-[11px]"
                                         >
                                             {{ __('View commit') }}
                                         </a>

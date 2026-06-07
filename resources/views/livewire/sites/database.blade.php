@@ -2,8 +2,6 @@
     $card = 'dply-card overflow-hidden';
     $labelCls = 'block text-xs font-semibold uppercase tracking-wide text-brand-moss mb-1';
     $inputCls = 'block w-full rounded-md border border-brand-ink/15 bg-white px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-1 focus:ring-brand-forest';
-    $btnPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50';
-    $btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors';
 
     $runtimeMode = $site->runtimeTargetMode();
     $runtimeTarget = $site->runtimeTarget();
@@ -70,7 +68,7 @@
                     <p class="mx-auto mt-1 max-w-md text-sm text-brand-moss">
                         {{ __('This server has no running database engine yet. Install one (MySQL, MariaDB, PostgreSQL, …) on the server, then come back to create a database for this site.') }}
                     </p>
-                    <a href="{{ route('servers.databases', $server) }}" wire:navigate class="{{ $btnPrimary }} mt-4">
+                    <a href="{{ route('servers.databases', $server) }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50 mt-4">
                         <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" />
                         {{ __('Manage server databases') }}
                     </a>
@@ -106,15 +104,15 @@
                                             @endif
                                         </p>
                                     </div>
-                                    <button
+                                    <x-secondary-button
+                                        size="xs"
                                         type="button"
                                         wire:click="unlinkDatabase('{{ $db->id }}')"
                                         wire:confirm="{{ __('Detach :name from this site? The database is NOT dropped on the server.', ['name' => $db->name]) }}"
-                                        class="{{ $btnSecondary }}"
                                     >
                                         <x-heroicon-o-link-slash class="h-4 w-4" />
                                         {{ __('Detach') }}
-                                    </button>
+                                    </x-secondary-button>
                                 </li>
                             @endforeach
                         </ul>
@@ -203,10 +201,10 @@
                         </div>
 
                         <div class="flex justify-end">
-                            <button type="submit" class="{{ $btnPrimary }}" wire:loading.attr="disabled" wire:target="createDatabase">
+                            <x-primary-button size="sm" type="submit" wire:loading.attr="disabled" wire:target="createDatabase">
                                 <x-heroicon-o-plus class="h-4 w-4" />
                                 {{ __('Create database') }}
-                            </button>
+                            </x-primary-button>
                         </div>
                     </div>
                 </form>
@@ -229,10 +227,10 @@
                                 </select>
                                 @error('link_database_id') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
                             </div>
-                            <button type="submit" class="{{ $btnSecondary }}">
+                            <x-secondary-button size="xs" type="submit">
                                 <x-heroicon-o-link class="h-4 w-4" />
                                 {{ __('Link') }}
-                            </button>
+                            </x-secondary-button>
                         </div>
                     </form>
                 @endif
@@ -266,22 +264,23 @@
                     <p class="mt-1 text-xs text-brand-moss">{{ __('Share this link to reveal the username and password. It expires and can only be opened a limited number of times.') }}</p>
                     <div class="mt-3 flex items-center gap-2" x-data="{ copied: false }">
                         <input type="text" readonly value="{{ $share_link_url }}" class="{{ $inputCls }} font-mono text-xs" />
-                        <button
+                        <x-secondary-button
+                            size="xs"
                             type="button"
-                            class="{{ $btnSecondary }} shrink-0"
+                            class="shrink-0"
                             x-on:click="navigator.clipboard.writeText(@js($share_link_url)); copied = true; setTimeout(() => copied = false, 2000)"
                         >
                             <span x-show="!copied">{{ __('Copy') }}</span>
                             <span x-show="copied" x-cloak class="text-brand-forest">{{ __('Copied') }}</span>
-                        </button>
+                        </x-secondary-button>
                     </div>
                 </div>
             @endif
 
             <div class="mt-5 flex justify-end">
-                <button type="button" x-on:click="$dispatch('close-modal', 'site-db-credentials-modal')" class="{{ $btnPrimary }}">
+                <x-primary-button size="sm" type="button" x-on:click="$dispatch('close-modal', 'site-db-credentials-modal')">
                     {{ __('Done') }}
-                </button>
+                </x-primary-button>
             </div>
         </div>
     </x-modal>
