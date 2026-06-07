@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 ### Changed
+- Server provisioning jobs now run on a dedicated priority queue and MySQL readiness is detected faster, so new servers come online sooner.
+### Changed
 - Servers can warm up apt packages at boot and defer certbot off the provisioning critical path, with too-small sizing now a warning instead of a hard block.
 ### Added
 - New Hetzner servers can launch from a pre-baked base image, cutting provisioning time, with refreshed loading states across the server workspace.

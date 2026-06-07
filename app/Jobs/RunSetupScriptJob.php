@@ -53,7 +53,9 @@ class RunSetupScriptJob implements ShouldQueue
 
     public function __construct(
         public Server $server
-    ) {}
+    ) {
+        $this->onQueue(config('server_provision.queue', 'dply'));
+    }
 
     /** Cap on automatic retries for transient provisioning failures (network/apt timeouts, etc.). */
     public const MAX_AUTO_RETRY_ATTEMPTS = 3;

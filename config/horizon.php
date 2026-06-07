@@ -44,7 +44,11 @@ if (is_string($horizonQueuesOverride) && trim($horizonQueuesOverride) !== '') {
     // same Redis (worker pools); if both consumed 'default' they'd steal each
     // other's jobs. Pool members are pushed HORIZON_QUEUES=default + REDIS_QUEUE
     // =default, so they own 'default' and the control plane owns 'dply'.
-    $horizonWorkerQueues = array_values(array_unique(array_merge(['dply', 'dply-control'], $horizonExtraQueues, $probeQueues)));
+    // 'dply-provision' is listed FIRST so it has top dispatch priority — server
+    // provisioning jobs jump ahead of routine control-plane work. It's always
+    // WATCHED here (so routing a job to it can never silently stall), but jobs
+    // only land on it when server_provision.queue is set to it (default 'dply').
+    $horizonWorkerQueues = array_values(array_unique(array_merge(['dply-provision', 'dply', 'dply-control'], $horizonExtraQueues, $probeQueues)));
 }
 
 // dply-managed Horizon worker knobs — all env-driven so the pool UI can tune

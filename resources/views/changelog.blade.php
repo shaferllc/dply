@@ -59,6 +59,13 @@
                     'date'    => 'June 6, 2026',
                     'tags'    => ['improved'],
                     'title'   => 'Faster Server Provisioning',
+                    'summary' => 'Server provisioning jobs now run on a dedicated priority queue and MySQL readiness is detected faster, so new servers come online sooner.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
+                    'tags'    => ['improved'],
+                    'title'   => 'Faster Server Provisioning',
                     'summary' => 'Servers can warm up apt packages at boot and defer certbot off the provisioning critical path, with too-small sizing now a warning instead of a hard block.',
                     'items'   => [],
                 ],

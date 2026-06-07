@@ -24,7 +24,9 @@ class ProvisionHetznerServerJob implements ShouldQueue
 
     public function __construct(
         public Server $server
-    ) {}
+    ) {
+        $this->onQueue(config('server_provision.queue', 'dply'));
+    }
 
     public function handle(): void
     {

@@ -58,6 +58,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Queue for server-provisioning jobs
+    |--------------------------------------------------------------------------
+    | Provisioning jobs (cloud create → poll IP → wait SSH → run setup) run on
+    | this queue. Default 'dply' = same as today. Set to 'dply-provision' (which
+    | Horizon already watches, at top priority) so a create doesn't wait behind
+    | routine control-plane jobs. Only use a queue Horizon actually watches, or
+    | the jobs will silently stall.
+    */
+    'queue' => env('DPLY_PROVISION_QUEUE', 'dply'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Wait for SSH after cloud assigns a public IP (before stack setup)
     |--------------------------------------------------------------------------
     */

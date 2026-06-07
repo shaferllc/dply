@@ -1582,15 +1582,16 @@ final class ServerProvisionCommandBuilder
                     .'exit 1; '
                 .'}; '
             .'fi',
-            // Wait up to 30s for the daemon to actually accept
-            // connections — systemctl returns when the unit is active,
-            // but mysqld can still be running internal init.
+            // Wait for the daemon to actually accept connections — systemctl
+            // returns when the unit is active, but mysqld can still be running
+            // internal init. Poll at 1s (was 3s) so we proceed the moment it's
+            // ready instead of overshooting by up to ~3s; same ~60s ceiling.
             'echo "[dply] waiting for mysqld socket..."',
-            'for i in 1 2 3 4 5 6 7 8 9 10; do '
+            'for i in $(seq 1 60); do '
                 .'if mysqladmin --protocol=socket -uroot ping >/dev/null 2>&1; then '
-                    .'echo "[dply] MySQL is accepting connections."; break; '
+                    .'echo "[dply] MySQL is accepting connections (after ${i}s)."; break; '
                 .'fi; '
-                .'sleep 3; '
+                .'sleep 1; '
             .'done',
             'echo "[dply] MySQL variants (5.7/8.0/8.4) use distro mysql-server package where applicable; pin versions in follow-up automation if required."',
             // Reconciliation marker: normal-path mysql install, snapshot
