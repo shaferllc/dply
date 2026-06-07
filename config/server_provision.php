@@ -72,14 +72,16 @@ return [
 
     /*
     | Install the metrics agent INLINE during the bash provision script.
-    | When false (default), the inline step is skipped and the install
-    | runs over SSH after the journey completes via
-    | InstallMetricsAgentJob — saves 30–60s on the journey wall-clock at
-    | the cost of monitoring being unavailable for ~1 minute after the
-    | journey reads "ready". Set DPLY_SERVER_INSTALL_METRICS_AGENT_INLINE=true
-    | to force the inline behaviour back on.
+    | When true (default), the snapshot script + python3-minimal land as a
+    | provision step and RunSetupScriptJob's success path writes the env +
+    | crontab synchronously, so a freshly-built server starts collecting and
+    | pushing metrics the moment the journey reads "ready" — no waiting on a
+    | follow-up SSH job. Costs 30–60s of journey wall-clock for the apt +
+    | deploy. Set DPLY_SERVER_INSTALL_METRICS_AGENT_INLINE=false to defer the
+    | install to InstallMetricsAgentJob over SSH after the journey completes
+    | (faster journey, monitoring unavailable for ~1 minute afterward).
     */
-    'install_metrics_agent_inline' => (bool) env('DPLY_SERVER_INSTALL_METRICS_AGENT_INLINE', false),
+    'install_metrics_agent_inline' => (bool) env('DPLY_SERVER_INSTALL_METRICS_AGENT_INLINE', true),
 
     /*
     | Disable cloud-init's apt-daily / apt-daily-upgrade /

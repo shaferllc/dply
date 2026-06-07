@@ -55,18 +55,46 @@ class RedirectGuestsToComingSoon
             return $next($request);
         }
 
+        // Public, unauthenticated surfaces that must stay reachable even while
+        // the beta gate is up: social-login (OAuth) and passkey-login round
+        // trips (the visitor has no session yet at the callback), the
+        // `curl … | sh` CLI installer, public status pages, and one-time
+        // credential-share links. These are NOT machine callbacks (they
+        // legitimately 503 during maintenance), so they live in their own list.
+        if ($this->isPublicDuringComingSoon($request)) {
+            return $next($request);
+        }
+
         return redirect()->route('coming-soon');
     }
 
     /**
-     * Unauthenticated machine callbacks that must bypass the coming-soon gate:
-     * task lifecycle webhooks, deploy/git hooks, and the health probe. Each has
-     * its own request authentication, so skipping the gate is safe.
+     * Unauthenticated machine callbacks that must bypass the coming-soon gate
+     * (task lifecycle webhooks, deploy/git hooks, function URLs, health probe).
+     * Each carries its own request authentication, so skipping the gate is safe.
+     * Sourced from the shared canonical list so this can't drift from the other
+     * guest gate (maintenance mode) or the CSRF except-list.
      */
     private function isMachineCallback(Request $request): bool
     {
-        return $request->is('webhook/*', 'hooks/*', 'up')
+        return \App\Support\MachineCallbackPaths::matches($request)
             || $request->routeIs('webhook.*');
+    }
+
+    /**
+     * Public guest-facing routes that should remain reachable during the beta
+     * coming-soon window (login round-trips, CLI install, status, share links).
+     */
+    private function isPublicDuringComingSoon(Request $request): bool
+    {
+        return $request->is(
+            'auth/*/redirect',   // OAuth social-login start
+            'auth/*/callback',   // OAuth social-login return (no session yet)
+            'passkeys/*',        // passkey login options/verify (mgmt routes are auth-gated anyway)
+            'cli/*',             // `curl https://dply.io/cli/install.sh | sh`
+            'status/*',          // public status pages
+            'share/*',           // one-time credential-share links
+        );
     }
 
     private function isLocalDevelopmentRequest(Request $request): bool

@@ -207,6 +207,7 @@ use App\Livewire\Sites\ScaffoldJourney;
 use App\Livewire\Sites\Schedule;
 use App\Livewire\Sites\ServerlessRouting;
 use App\Livewire\Sites\SiteClone as SitesClone;
+use App\Livewire\Sites\SiteEnvironment;
 use App\Livewire\Sites\SitePromote as SitesPromote;
 use App\Livewire\Sites\WebserverConfig as SitesWebserverConfig;
 use App\Livewire\Sites\Workers;
@@ -720,6 +721,8 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::get('servers/{server}/sites/{site}/resources', SiteWorkspaceController::class)
         ->defaults('section', 'resources')
         ->name('sites.resources');
+    // Standalone Environment page — first-class, no longer a Deployments-hub tab.
+    Route::livewire('servers/{server}/sites/{site}/environment', SiteEnvironment::class)->name('sites.environment');
     // NETWORKING group for serverless / container workspaces — manages the dply
     // edge proxy (hostname/DNS, custom domains, redirects, headers + CORS,
     // invocation URLs). MUST live on its own path: the generic VM routing surface

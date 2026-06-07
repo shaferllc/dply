@@ -170,6 +170,14 @@ class DeploymentsList extends Component
             return;
         }
 
+        // Environment is now its own first-class section (sites.environment) —
+        // no longer a tab in this hub. Old ?tab=environment links resolve there.
+        if ($this->tab === self::TAB_ENVIRONMENT) {
+            $this->redirect(route('sites.environment', ['server' => $server, 'site' => $site]), navigate: true);
+
+            return;
+        }
+
         if (! in_array($this->tab, self::TABS, true)) {
             $this->tab = self::TAB_DEPLOY;
         }

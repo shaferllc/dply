@@ -42,6 +42,7 @@ use App\Console\Commands\RollupEdgeAnalyticsEngineCommand;
 use App\Console\Commands\RunDueDeploymentSchedulesCommand;
 use App\Console\Commands\ServerlessTickCommand;
 use App\Console\Commands\SnapshotOrganizationBillingCommand;
+use App\Console\Commands\SweepStalledTasksCommand;
 use App\Console\Commands\SyncAllOrganizationBillingCommand;
 use App\Console\Commands\WorkerPoolAutoscaleCommand;
 use App\Console\Commands\WorkerPoolPrimaryHealthCommand;
@@ -132,6 +133,16 @@ final class DplySchedule
         // written via the query builder, which bypasses model events).
         $schedule->command(SyncErrorEventsCommand::class)->everyMinute()->withoutOverlapping();
         $schedule->command(PruneErrorEventsCommand::class)->dailyAt('03:25');
+
+        // Backstop for remote tasks that go silent (rejected webhook, OOM/reboot,
+        // dropped network): fail any `running` task past its timeout or with no
+        // heartbeat so wedged provisions surface + recover instead of spinning
+        // forever. Eloquent updates here trip TaskRunnerTaskObserver, which
+        // flips the server to setup_status=FAILED.
+        $schedule->command(SweepStalledTasksCommand::class)
+            ->everyMinute()
+            ->withoutOverlapping()
+            ->name('sweep-stalled-tasks');
 
         $schedule->command(PruneServerCronJobRunsCommand::class)->dailyAt('03:15');
         $schedule->command(PruneAuditLogsCommand::class)->dailyAt('03:20');

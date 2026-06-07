@@ -12,7 +12,7 @@
     $cronAllServerUrl = route('servers.cron', $server);
     $daemonsAllServerUrl = route('servers.workers', $server);
     // Environment now lives in the Deployments hub (Deploy → Environment tab).
-    $envUrl = route('sites.deployments.index', ['server' => $server, 'site' => $site, 'tab' => 'environment']);
+    $envUrl = route('sites.environment', ['server' => $server, 'site' => $site]);
     $laravelLogKey = 'site_'.$site->getKey().'_laravel';
     $daemonSuggestions = \App\Support\Sites\SiteDaemonAdvisor::suggestions($site);
 @endphp

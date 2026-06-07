@@ -655,7 +655,7 @@
                 <div class="p-6 sm:p-7">
                     @if (! $metricHasAny)
                         <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-cream/30 px-4 py-3 text-sm text-brand-moss">
-                            {{ __('No metric snapshots yet — install the monitor agent from the Monitor tab so this card lights up.') }}
+                            {{ __('Waiting for the first snapshot — the monitor agent is installed during provisioning and reports every minute. Open the Monitor tab if this card stays empty.') }}
                         </div>
                     @else
                         <div class="grid gap-3 sm:grid-cols-3">

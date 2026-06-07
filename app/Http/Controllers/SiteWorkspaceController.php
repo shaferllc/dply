@@ -56,10 +56,9 @@ class SiteWorkspaceController
             && ! $site->usesFunctionsRuntime()
             && ! $site->usesEdgeRuntime()
         ) {
-            return redirect()->route('sites.deployments.index', [
+            return redirect()->route('sites.environment', [
                 'server' => $server,
                 'site' => $site,
-                'tab' => 'environment',
                 ...request()->query(),
             ]);
         }

@@ -33,6 +33,16 @@ class EnforceMaintenanceMode
             return $next($request);
         }
 
+        // Non-interactive machine/external callbacks (webhooks, deploy hooks,
+        // function URLs, health) must keep working during a control-plane
+        // maintenance window — otherwise deploy results, billing events, task
+        // callbacks, and customer function traffic silently fail (the caller's
+        // bare curl reads the 503 as success). Same canonical list the
+        // coming-soon gate uses, so the two gates can't drift apart.
+        if (\App\Support\MachineCallbackPaths::matches($request)) {
+            return $next($request);
+        }
+
         $routeName = (string) ($request->route()?->getName() ?? '');
         if (in_array($routeName, self::ALLOW_ROUTES, true) || str_starts_with($routeName, 'admin.')) {
             return $next($request);

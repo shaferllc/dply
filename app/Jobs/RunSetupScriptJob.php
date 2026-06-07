@@ -16,6 +16,7 @@ use App\Models\UserSshKey;
 use App\Modules\TaskRunner\AnonymousTask;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Exceptions\TaskExecutionException;
+use App\Modules\TaskRunner\Jobs\TaskTimeoutJob;
 use App\Modules\TaskRunner\Models\Task as TaskRunnerTaskModel;
 use App\Modules\TaskRunner\TaskDispatcher;
 use App\Modules\TaskRunner\TrackTaskInBackground;
@@ -140,16 +141,17 @@ class RunSetupScriptJob implements ShouldQueue
             // Wire up the metrics push pipeline. Two paths converge here
             // depending on whether the inline metrics step ran during
             // the bash provision:
-            //   - inline=true  → bash already installed Python + the
-            //     snapshot script. syncPushArtifactsAfterInstall just
-            //     writes the env file + crontab block.
-            //   - inline=false (default) → bash skipped the agent.
-            //     Dispatch InstallMetricsAgentJob to SSH the install
-            //     bash on a separate connection AFTER the journey reads
-            //     "ready". That job dispatches the env/cron deploy on
-            //     success, so the post-install state ends up identical
-            //     either way; the user just gets ~30–60s back on the
-            //     wall-clock.
+            //   - inline=true (default) → bash already installed Python +
+            //     the snapshot script. syncPushArtifactsAfterInstall just
+            //     writes the env file + crontab block, so the server starts
+            //     pushing metrics the moment the journey reads "ready".
+            //   - inline=false → bash skipped the agent. Dispatch
+            //     InstallMetricsAgentJob to SSH the install bash on a
+            //     separate connection AFTER the journey reads "ready". That
+            //     job dispatches the env/cron deploy on success, so the
+            //     post-install state ends up identical either way; the user
+            //     just gets ~30–60s back on the wall-clock at the cost of
+            //     ~1 minute with no monitoring.
             if ((bool) config('server_provision.install_metrics_agent', true)
                 && ! empty($server->ip_address)
                 && $server->isVmHost()
@@ -837,6 +839,15 @@ class RunSetupScriptJob implements ShouldQueue
                     'task_runner_task_id' => $taskModel->id,
                     'provision_run_id' => $run->id,
                 ]);
+
+                // The background start succeeded; the box now streams output and
+                // POSTs a terminal webhook when the script finishes. Schedule a
+                // timeout backstop in case that callback never arrives (silent
+                // OOM/reboot). This is the fast path; the every-minute
+                // SweepStalledTasksCommand is the durable net if this delayed
+                // job is lost across a Horizon restart.
+                TaskTimeoutJob::dispatch($taskModel)
+                    ->delay(now()->addSeconds(($taskModel->timeout ?: 3600) + 120));
             }
         } catch (TaskExecutionException $e) {
             ProvisionPipelineLog::warning('server.provision.run_setup.task_runner_exception', $server, [

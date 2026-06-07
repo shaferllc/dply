@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 6, 2026',
+                    'tags'    => ['new'],
+                    'title'   => 'Automatic Recovery For Stalled Provisions',
+                    'summary' => 'Wedged server provisions now surface and recover automatically when a remote task goes silent, and machine callbacks keep working during maintenance windows.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
                     'tags'    => ['fixed'],
                     'title'   => 'Reliable Server Provisioning',
                     'summary' => 'Server provisioning no longer stalls when machine callbacks hit the coming-soon gate or when an optional PHP extension is unavailable in the configured apt repositories.',

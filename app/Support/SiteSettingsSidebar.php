@@ -89,7 +89,7 @@ final class SiteSettingsSidebar
                 // First-class Environment + Resources. Environment deep-links to
                 // the Deploy hub's Environment tab (where the editor lives); both
                 // render inside the same workspace sidebar chrome.
-                ['id' => 'environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line', 'group' => 'runtime', 'route' => 'sites.deployments.index', 'route_query' => ['tab' => 'environment']],
+                ['id' => 'environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line', 'group' => 'runtime', 'route' => 'sites.environment'],
                 ['id' => 'resources', 'label' => __('Resources'), 'icon' => 'heroicon-o-puzzle-piece', 'group' => 'runtime', 'route' => 'sites.resources'],
                 ['id' => 'system-user', 'label' => __('System user'), 'icon' => 'heroicon-o-user', 'group' => 'runtime', 'feature' => 'workspace.site_system_user', 'preview_feature' => 'workspace.site_system_user_preview'],
                 ['id' => 'laravel-stack', 'label' => __('Laravel'), 'icon' => 'heroicon-o-bolt', 'group' => 'runtime'],
@@ -295,7 +295,7 @@ final class SiteSettingsSidebar
         ];
 
         $items = [...$items,
-            ['id' => 'environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line', 'group' => 'runtime', 'route' => 'sites.deployments.index', 'route_query' => ['tab' => 'environment']],
+            ['id' => 'environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line', 'group' => 'runtime', 'route' => 'sites.environment'],
             ['id' => 'resources', 'label' => __('Resources'), 'icon' => 'heroicon-o-puzzle-piece', 'group' => 'runtime', 'route' => 'sites.resources'],
             ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability', 'feature' => 'workspace.site_logs', 'preview_feature' => 'workspace.site_logs_preview'],
             ['id' => 'notifications', 'label' => __('Notifications'), 'icon' => 'heroicon-o-bell', 'group' => 'observability', 'feature' => 'workspace.site_notifications', 'preview_feature' => 'workspace.site_notifications_preview'],

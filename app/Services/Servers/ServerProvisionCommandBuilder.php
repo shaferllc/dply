@@ -130,12 +130,14 @@ final class ServerProvisionCommandBuilder
             return [];
         }
 
-        // Default: skip inline metrics install. RunSetupScriptJob's
-        // success path dispatches InstallMetricsAgentJob which runs the
-        // same install bash via SSH after the journey reads "ready" —
-        // shaves 30–60s off the journey wall-clock without losing the
-        // capability. Override with DPLY_SERVER_INSTALL_METRICS_AGENT_INLINE=true.
-        if (! (bool) config('server_provision.install_metrics_agent_inline', false)) {
+        // Default: install the metrics agent inline so the server starts
+        // collecting the moment the journey reads "ready" (RunSetupScriptJob's
+        // success path then writes the env + crontab synchronously). Set
+        // DPLY_SERVER_INSTALL_METRICS_AGENT_INLINE=false to defer the install
+        // to InstallMetricsAgentJob over SSH after the journey completes —
+        // shaves 30–60s off the journey wall-clock at the cost of monitoring
+        // being unavailable for ~1 minute afterward.
+        if (! (bool) config('server_provision.install_metrics_agent_inline', true)) {
             return [];
         }
 

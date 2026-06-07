@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Wedged server provisions now surface and recover automatically when a remote task goes silent, and machine callbacks keep working during maintenance windows.
 ### Fixed
 - Server provisioning no longer stalls when machine callbacks hit the coming-soon gate or when an optional PHP extension is unavailable in the configured apt repositories.
 ### Changed
