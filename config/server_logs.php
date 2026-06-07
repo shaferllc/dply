@@ -130,6 +130,16 @@ return [
         'timeout' => (int) env('CLICKHOUSE_TIMEOUT', 15),
 
         /**
+         * TLS verification for https connections. When the endpoint uses a cert
+         * signed by our private CA (cross-provider prod → DO over public internet,
+         * via the nginx TLS proxy), set CLICKHOUSE_CA_CERT_B64 to the base64 CA so
+         * the client verifies against it. As a last resort CLICKHOUSE_TLS_VERIFY=false
+         * disables verification (still encrypted; only for IP-locked endpoints).
+         */
+        'verify' => filter_var(env('CLICKHOUSE_TLS_VERIFY', true), FILTER_VALIDATE_BOOL),
+        'ca_cert_b64' => env('CLICKHOUSE_CA_CERT_B64', ''),
+
+        /**
          * Default retention applied as the table TTL by the schema-sync command.
          * Per-tier retention (Phase 2 billing) will override per partition later;
          * this is the floor every box gets in the free MVP.

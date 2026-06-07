@@ -72,7 +72,6 @@ class WorkspaceEdgeProxy extends WorkspaceWebserver
             } catch (\Throwable) {
                 $configFiles = [];
             }
-            $configFiles = $this->annotateCachedConfigFiles($configFiles);
         }
 
         return view('livewire.servers.workspace-edge-proxy', array_merge(

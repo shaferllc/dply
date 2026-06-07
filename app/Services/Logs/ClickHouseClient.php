@@ -143,13 +143,43 @@ class ClickHouseClient
             $query['database'] = $database;
         }
 
-        return Http::withHeaders([
+        $request = Http::withHeaders([
             'X-ClickHouse-User' => (string) ($cfg['username'] ?? 'default'),
             'X-ClickHouse-Key' => (string) ($cfg['password'] ?? ''),
         ])
             ->withQueryParameters($query)
             ->timeout((int) ($cfg['timeout'] ?? 15))
             ->acceptJson();
+
+        // For https (cross-provider prod → DO via the TLS proxy) the cert is
+        // signed by our private CA, so default system-CA verification would fail.
+        // Verify against the supplied CA when present; otherwise honour the
+        // explicit verify flag (false = encrypted-but-unverified, IP-locked only).
+        if (($cfg['scheme'] ?? 'http') === 'https') {
+            $caB64 = trim((string) ($cfg['ca_cert_b64'] ?? ''));
+            if ($caB64 !== '') {
+                $request = $request->withOptions(['verify' => $this->materializeCa($caB64)]);
+            } elseif (($cfg['verify'] ?? true) === false) {
+                $request = $request->withOptions(['verify' => false]);
+            }
+        }
+
+        return $request;
+    }
+
+    /**
+     * Write the base64 CA PEM to a stable file (Guzzle's `verify` wants a path)
+     * and return it. Rewrites only when the content changes.
+     */
+    protected function materializeCa(string $b64): string
+    {
+        $pem = base64_decode($b64, true) ?: '';
+        $path = storage_path('app/dply-clickhouse-ca.pem');
+        if (! is_file($path) || md5_file($path) !== md5($pem)) {
+            @file_put_contents($path, $pem);
+        }
+
+        return $path;
     }
 
     protected function baseUrl(): string

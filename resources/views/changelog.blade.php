@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 7, 2026',
+                    'tags'    => ['improved'],
+                    'title'   => 'Server Logs HTTPS CA Verification',
+                    'summary' => 'The Server Logs ClickHouse client now verifies HTTPS connections against the supplied private CA certificate, securing cross-provider log queries to the managed log store.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 7, 2026',
                     'tags'    => ['fixed'],
                     'title'   => 'Log Agent Install Reliability',
                     'summary' => 'Log agent installs no longer get stuck on "installing" and now report a clear failure when the server isn\'t a reachable VM host.',

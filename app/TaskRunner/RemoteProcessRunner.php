@@ -102,15 +102,13 @@ class RemoteProcessRunner
     }
 
     /**
-     * Client-side multiplexing options for command ssh/scp. Critically uses
-     * ControlMaster=no: these invocations ATTACH to an out-of-band master when
-     * one exists (skipping the TCP + auth handshake), but never *create* a
-     * persistent master themselves. That distinction matters — a command that
-     * becomes the persistent master leaks its stdout/stderr into the daemonised
-     * master, so the PHP Symfony Process never sees EOF and blocks until the
-     * request hits max_execution_time. Establishing the master separately (see
-     * ensureMasterConnection) keeps the command path hang-proof: worst case it
-     * falls back to a normal direct connection.
+     * Client-side multiplexing options for command ssh/scp. Uses
+     * ControlMaster=no so these invocations only ATTACH to an out-of-band master
+     * when one exists (skipping the TCP + auth handshake) and never *create* a
+     * persistent master themselves — a command that became the master would leak
+     * its stdout/stderr into the daemonised master and hang Symfony Process at
+     * max_execution_time. Establishing the master is done separately in
+     * {@see ensureMasterConnection}. Off unless task-runner.ssh_multiplexing.
      *
      * @return array<int, string>
      */

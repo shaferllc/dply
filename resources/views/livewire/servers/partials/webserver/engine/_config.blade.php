@@ -29,16 +29,6 @@
                     </div>
 
                     <div class="px-6 py-6 sm:px-7">
-                    {{-- Fast pickup poll. A config read/write/validate completes on
-                         a worker and stashes its result in cache; render() drains it
-                         via pickupQueuedConfig*(). The shared banner only polls every
-                         3–4s, so without this the file can take seconds to appear even
-                         though the read itself is sub-second. Poll briskly (but only
-                         while an op is actually in flight) to pick the result up almost
-                         immediately, then stop. --}}
-                    @if ($pending_load_console_id !== null || $pending_write_console_id !== null || $pending_validate_console_id !== null)
-                        <div wire:poll.750ms class="hidden" aria-hidden="true"></div>
-                    @endif
                     @if ($configOptimisticPending)
                         <div class="flex items-center gap-2 rounded-xl border border-dashed border-brand-ink/15 bg-white px-6 py-12 text-sm text-brand-moss">
                             <x-spinner variant="forest" class="h-4 w-4" />
@@ -103,9 +93,6 @@
                                                             @if ($fileRoleLabel)
                                                                 <x-config-file-role-pill :label="$fileRoleLabel" :role="$fileRole" />
                                                             @endif
-                                                            @if (! empty($f['cached']))
-                                                                <x-heroicon-o-bolt class="h-3 w-3 shrink-0 text-sky-600" title="{{ __('Cached — opens instantly') }}" />
-                                                            @endif
                                                         </span>
                                                         <span class="block truncate font-mono text-[10px] text-brand-mist">{{ $f['path'] }}</span>
                                                         @php $fileDescription = app(\App\Services\Servers\WebserverConfigDocLinks::class)->describe($key, $f['path']); @endphp
@@ -165,19 +152,9 @@
                                                     {{ __('Truncated on load — saving is disabled') }}
                                                 </p>
                                             @endif
-                                            @if ($config_loaded_from_cache)
-                                                <p class="mt-1 inline-flex items-center gap-1 rounded-md bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800 ring-1 ring-sky-200" title="{{ __('Served instantly from a recent read. Click Reload to re-read the live file.') }}">
-                                                    <x-heroicon-o-bolt class="h-3 w-3" />
-                                                    @if ($config_content_cached_at)
-                                                        {{ __('From cache · read :time', ['time' => \Illuminate\Support\Carbon::parse($config_content_cached_at)->diffForHumans()]) }}
-                                                    @else
-                                                        {{ __('From cache') }}
-                                                    @endif
-                                                </p>
-                                            @endif
                                         </div>
                                         <div class="flex flex-wrap gap-1.5">
-                                            <button type="button" wire:click="loadWebserverConfig(@js($config_selected_path), true)" wire:target="loadWebserverConfig(@js($config_selected_path), true)" wire:loading.attr="disabled" class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40" title="{{ __('Re-read the live file from the server, bypassing the cache.') }}">
+                                            <button type="button" wire:click="loadWebserverConfig(@js($config_selected_path))" class="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink hover:bg-brand-sand/40">
                                                 <x-heroicon-o-arrow-path class="h-3 w-3" />
                                                 {{ __('Reload') }}
                                             </button>

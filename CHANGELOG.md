@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Changed
+- The Server Logs ClickHouse client now verifies HTTPS connections against the supplied private CA certificate, securing cross-provider log queries to the managed log store.
 ### Fixed
 - Log agent installs no longer get stuck on "installing" and now report a clear failure when the server isn't a reachable VM host.
 ### Added

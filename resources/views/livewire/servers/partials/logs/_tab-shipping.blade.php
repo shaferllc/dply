@@ -156,7 +156,7 @@
                 <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7">
                     <x-heroicon-o-signal-slash class="mx-auto h-6 w-6 text-brand-ink/30" aria-hidden="true" />
                     <p class="mt-2 font-medium text-brand-ink">{{ __('Log store unavailable') }}</p>
-                    <p class="mt-0.5">{{ __('Could not reach the dply Logs store. Check the ClickHouse connection (CLICKHOUSE_* env).') }}</p>
+                    <p class="mt-0.5">{{ __('Could not reach the dply Logs store.') }}</p>
                 </div>
             @else
                 {{-- Filters --}}
