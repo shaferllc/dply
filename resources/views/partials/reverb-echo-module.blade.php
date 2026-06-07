@@ -66,6 +66,9 @@ if (server && server.enabled !== false) {
         window.Echo = new Echo({
             broadcaster,
             key: String(server.key).trim(),
+            // pusher-js requires a non-empty cluster even with wsHost set; the
+            // relay ignores it. reverb doesn't need it but it's harmless there.
+            cluster: String(server.cluster ?? 'mt1'),
             wsHost,
             wsPort: port,
             wssPort: port,

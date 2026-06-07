@@ -35,9 +35,9 @@
                 + {{ __('Attach resource') }}
             </x-primary-button>
         @else
-            <a href="{{ route('sites.daemons', [$server, $site]) }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50">
+            <x-primary-button size="sm" href="{{ route('sites.daemons', [$server, $site]) }}" wire:navigate>
                 {{ __('Manage workers') }}
-            </a>
+            </x-primary-button>
         @endif
     </div>
 
@@ -50,8 +50,8 @@
                 <p class="mt-1 text-xs text-brand-moss">{{ __('Queue / Horizon / scheduler processes draining this site\'s work. Off-box rows run on a worker server that shares this site\'s private network.') }}</p>
             </div>
             <div class="flex gap-2">
-                <a href="{{ route('sites.daemons', [$server, $site]) }}?preset=laravel-queue&open=worker" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/40 transition-colors disabled:cursor-not-allowed disabled:opacity-50">+ {{ __('Queue worker') }}</a>
-                <a href="{{ route('sites.daemons', [$server, $site]) }}?preset=laravel-horizon&open=worker" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/40 transition-colors disabled:cursor-not-allowed disabled:opacity-50">+ {{ __('Horizon') }}</a>
+                <x-secondary-button size="sm" href="{{ route('sites.daemons', [$server, $site]) }}?preset=laravel-queue&open=worker" wire:navigate>+ {{ __('Queue worker') }}</x-secondary-button>
+                <x-secondary-button size="sm" href="{{ route('sites.daemons', [$server, $site]) }}?preset=laravel-horizon&open=worker" wire:navigate>+ {{ __('Horizon') }}</x-secondary-button>
             </div>
         </div>
 

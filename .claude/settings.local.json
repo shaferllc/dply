@@ -1,6 +1,11 @@
 {
   "permissions": {
     "allow": [
+      "Bash(ssh dply-app:*)",
+      "Bash(ssh dply-worker-1:*)",
+      "Bash(/usr/bin/ssh dply-app:*)",
+      "Bash(/usr/bin/ssh dply-worker-1:*)",
+      "Bash(./deploy.sh:*)",
       "Bash(php artisan *)",
       "Bash(php -r ' *)",
       "Bash(./vendor/bin/phpunit --filter=ServerWorkspaceNavTest)",

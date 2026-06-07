@@ -125,7 +125,7 @@
                         :empty-message="__('No probe error captured.')"
                     />
                     <div class="flex flex-wrap gap-3">
-                        <a href="{{ route('servers.settings', ['server' => $server, 'section' => 'connection']) }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors disabled:cursor-not-allowed disabled:opacity-50">{{ __('Server connection settings') }}</a>
+                        <x-secondary-button size="sm" href="{{ route('servers.settings', ['server' => $server, 'section' => 'connection']) }}" wire:navigate>{{ __('Server connection settings') }}</x-secondary-button>
                         <x-primary-button size="sm" type="button" wire:click="queueMonitoringProbe" wire:loading.attr="disabled">
                             <span wire:loading.remove wire:target="queueMonitoringProbe">{{ __('Recheck SSH') }}</span>
                             <span wire:loading wire:target="queueMonitoringProbe">{{ __('Queueing…') }}</span>

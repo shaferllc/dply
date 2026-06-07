@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 6, 2026',
                     'tags'    => ['improved'],
+                    'title'   => 'Smarter Buttons And Driver Guards',
+                    'summary' => 'Button components now render as links when given an href, and attaching a redis-driver queue, cache, or session binding now requires a Redis resource first.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
+                    'tags'    => ['improved'],
                     'title'   => 'Standardize Server Action Buttons',
                     'summary' => 'Server schedule and services screens now use shared button components for consistent styling across actions.',
                     'items'   => [],

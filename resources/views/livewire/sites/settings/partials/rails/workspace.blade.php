@@ -40,9 +40,9 @@
                     <h3 class="text-base font-semibold text-brand-ink">{{ __('Sidekiq') }}</h3>
                     <p class="mt-1 text-xs text-brand-moss">{{ __('Redis-backed background worker for Rails. Launches a managed Supervisor program running bundle exec sidekiq.') }}</p>
                 </div>
-                <a href="{{ $sidekiqPresetUrl }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors">
+                <x-primary-button size="sm" href="{{ $sidekiqPresetUrl }}" wire:navigate>
                     {{ __('Add Sidekiq worker') }}
-                </a>
+                </x-primary-button>
             </div>
         </div>
 

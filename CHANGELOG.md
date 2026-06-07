@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 ### Changed
+- Button components now render as links when given an href, and attaching a redis-driver queue, cache, or session binding now requires a Redis resource first.
+### Changed
 - Server schedule and services screens now use shared button components for consistent styling across actions.
 ### Added
 - The realtime broadcasting relay now records connection, subscription, and publish events with per-message delivery counts for easier monitoring.

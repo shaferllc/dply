@@ -170,8 +170,8 @@
             <p>{{ __('Deploy completions, deployment start, and uptime transitions for this site are configured under Site workspace → Notifications. Connect outbound webhooks and channel subscriptions there.') }}</p>
             <p>{{ __('Insights findings still use the server’s “Insights alerts” subscription when enabled.') }}</p>
             <div class="flex flex-wrap gap-2 pt-1">
-                <a href="{{ route('sites.show', [$server, $site, 'section' => 'notifications']) }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50">{{ __('Open site Notifications') }}</a>
-                <a href="{{ route('profile.notification-channels') }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors">{{ __('Manage notification channels') }}</a>
+                <x-primary-button size="sm" href="{{ route('sites.show', [$server, $site, 'section' => 'notifications']) }}" wire:navigate>{{ __('Open site Notifications') }}</x-primary-button>
+                <x-secondary-button size="sm" href="{{ route('profile.notification-channels') }}" wire:navigate>{{ __('Manage notification channels') }}</x-secondary-button>
             </div>
         </div>
     @endif

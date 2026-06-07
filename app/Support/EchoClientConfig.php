@@ -58,6 +58,10 @@ class EchoClientConfig
             'host' => $host !== '' ? $host : null,
             'port' => (int) ($options['port'] ?? 443),
             'scheme' => $scheme === 'https' ? 'https' : 'http',
+            // pusher-js throws "Options object must provide a cluster" with the
+            // pusher broadcaster even when wsHost is set; the relay ignores the
+            // value but the client requires a non-empty one.
+            'cluster' => trim((string) ($options['cluster'] ?? '')) ?: 'mt1',
             'enabled' => (bool) config('broadcasting.echo_client_enabled', true),
             'bypass_local_guard' => (bool) config('broadcasting.reverb_bypass_local_guard', false),
         ];

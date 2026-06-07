@@ -38,7 +38,10 @@
             fn ($b) => ! in_array($b->type, ['database', 'redis', 'queue', 'cache', 'session', 'storage', 'logging', 'mail', 'broadcasting'], true),
         ));
     @endphp
-    @if ($resourceBindings !== [])
+    {{-- $bindingModalOnly: the Resources hub includes this partial solely to
+         get the shared site-binding-modal into its DOM; it renders its own
+         resource UI, so suppress this legacy read-only card there. --}}
+    @if ($resourceBindings !== [] && ! ($bindingModalOnly ?? false))
     <section class="dply-card overflow-hidden">
         <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-8 sm:py-6">
             <div class="flex items-start gap-3">

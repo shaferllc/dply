@@ -68,10 +68,10 @@
                     <p class="mx-auto mt-1 max-w-md text-sm text-brand-moss">
                         {{ __('This server has no running database engine yet. Install one (MySQL, MariaDB, PostgreSQL, …) on the server, then come back to create a database for this site.') }}
                     </p>
-                    <a href="{{ route('servers.databases', $server) }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50 mt-4">
+                    <x-primary-button size="sm" href="{{ route('servers.databases', $server) }}" wire:navigate class="mt-4">
                         <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" />
                         {{ __('Manage server databases') }}
-                    </a>
+                    </x-primary-button>
                 </div>
             @else
                 {{-- Linked databases ------------------------------------------------ --}}

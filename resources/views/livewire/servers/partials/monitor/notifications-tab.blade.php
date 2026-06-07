@@ -16,10 +16,10 @@
                 </p>
             </div>
         </div>
-        <a href="{{ route('servers.settings', ['server' => $server, 'section' => 'alerts']) }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors">
+        <x-secondary-button size="sm" href="{{ route('servers.settings', ['server' => $server, 'section' => 'alerts']) }}" wire:navigate>
             {{ __('Manage in Settings') }}
             <x-heroicon-o-arrow-right class="h-3.5 w-3.5" aria-hidden="true" />
-        </a>
+        </x-secondary-button>
     </div>
 
     {{-- Current subscriptions list --}}

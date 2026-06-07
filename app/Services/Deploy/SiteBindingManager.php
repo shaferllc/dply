@@ -800,6 +800,7 @@ class SiteBindingManager
         if (! in_array($driver, ['database', 'redis'], true)) {
             throw new InvalidArgumentException(__('Queue driver must be database or redis.'));
         }
+        $this->assertDriverDependency($site, __('the queue'), $driver);
 
         return $this->persist($site, 'queue', [
             'mode' => 'attach_existing',
@@ -810,6 +811,29 @@ class SiteBindingManager
             'injected_env' => ['QUEUE_CONNECTION' => $driver],
             'config' => ['driver' => $driver],
         ]);
+    }
+
+    /**
+     * Guard a driver-style binding (queue/cache/session) against a missing
+     * dependency. The `redis` driver only injects QUEUE_CONNECTION/CACHE_STORE/
+     * SESSION_DRIVER=redis — the actual REDIS_HOST/PORT/PASSWORD come from a
+     * Redis binding. Without one, the config saves, the app boots, then dies at
+     * runtime the first time it touches the store. Block it up front with a
+     * message that says what to do instead. (We only enforce Redis: a database
+     * connection commonly already exists via server defaults or loose DB_* env,
+     * so requiring a database binding would false-positive too often.)
+     */
+    private function assertDriverDependency(Site $site, string $resource, string $driver): void
+    {
+        if ($driver !== 'redis') {
+            return;
+        }
+        if (! $site->bindings()->where('type', 'redis')->exists()) {
+            throw new InvalidArgumentException(__(
+                'Attach a Redis resource before setting :resource to the redis driver — Redis supplies REDIS_HOST and the connection credentials.',
+                ['resource' => $resource],
+            ));
+        }
     }
 
     // ---- cache ------------------------------------------------------------
@@ -828,6 +852,7 @@ class SiteBindingManager
         if (! in_array($driver, ['database', 'redis', 'file', 'array'], true)) {
             throw new InvalidArgumentException(__('Cache store must be database, redis, file, or array.'));
         }
+        $this->assertDriverDependency($site, __('the cache store'), $driver);
 
         // Optional cache key prefix. Owned by the cache binding so it surfaces as
         // a managed CACHE_PREFIX row under the Cache resource rather than as a
@@ -902,6 +927,7 @@ class SiteBindingManager
         if (! in_array($injected['SESSION_DRIVER'], ['file', 'database', 'cookie', 'redis', 'memcached', 'array'], true)) {
             throw new InvalidArgumentException(__('Unsupported session driver.'));
         }
+        $this->assertDriverDependency($site, __('sessions'), $injected['SESSION_DRIVER']);
         if (! ctype_digit($injected['SESSION_LIFETIME'])) {
             throw new InvalidArgumentException(__('Session lifetime must be a whole number of minutes.'));
         }
