@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- New Hetzner servers can launch from a pre-baked base image, cutting provisioning time, with refreshed loading states across the server workspace.
 ### Changed
 - New servers launch from region-scoped baked snapshots when available and poll for their IP address faster, cutting provisioning time.
 ### Added

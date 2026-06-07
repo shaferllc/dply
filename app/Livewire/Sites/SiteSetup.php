@@ -126,7 +126,7 @@ class SiteSetup extends Component
         $this->site->refresh();
 
         if (! $this->site->isInFirstDeploySetup()) {
-            // Clean scan auto-deployed: bounce to the live site.
+            // Setup is fully done (first deploy kicked off by wizard or already complete).
             $this->redirectRoute('sites.show', ['server' => $this->server->id, 'site' => $this->site->id], navigate: true);
 
             return;

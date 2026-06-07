@@ -1729,6 +1729,25 @@ BASH;
         }
     }
 
+    /**
+     * Override the trait placeholder so the Manage sub-tab strip stays
+     * visible (with the destination section highlighted) while the body
+     * lazy-loads — only the content area below the sub-tabs skeletons.
+     */
+    public function placeholder(): View
+    {
+        return view('livewire.servers.partials.workspace-subtab-placeholder', [
+            'server' => $this->server,
+            'active' => 'manage',
+            'title' => __('Manage'),
+            'tabs' => $this->manageWorkspaceTabs(),
+            'section' => $this->section,
+            'routeName' => 'servers.manage',
+            'idPrefix' => 'manage-tab-',
+            'ariaLabel' => __('Manage categories'),
+        ]);
+    }
+
     public function render(ServerManageToolsReport $toolsReport): View
     {
         // No $this->server->refresh() here: Livewire re-resolves the bound

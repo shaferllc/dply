@@ -270,7 +270,12 @@
 
                             @error('deploy')<p class="mt-4 rounded-lg bg-brand-rust/10 px-3 py-2 text-sm text-brand-rust">{{ $message }}</p>@enderror
 
-                            @if (! empty($missing))
+                            @if (empty($missing))
+                                <div class="mt-4 flex items-center gap-2 rounded-xl border border-brand-sage/30 bg-brand-sage/10 px-4 py-3">
+                                    <x-heroicon-o-check-circle class="h-4 w-4 shrink-0 text-brand-forest" aria-hidden="true" />
+                                    <p class="text-sm text-brand-forest">{{ __('All required variables are set. Ready to deploy.') }}</p>
+                                </div>
+                            @else
                                 {{-- Warn, don't block: required vars are flagged but the operator
                                      can deploy anyway and let it fail — their call. --}}
                                 <div class="mt-4 rounded-xl border border-brand-gold/40 bg-brand-gold/10 p-4">

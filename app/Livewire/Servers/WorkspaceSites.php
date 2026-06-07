@@ -93,12 +93,16 @@ class WorkspaceSites extends Component
             && ! $this->server->isKubernetesCluster();
     }
 
-    public function mount(Server $server, ServerPhpManager $phpManager): void
+    public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
 
+        // Resolve via app() rather than mount() injection: #[Lazy] components
+        // capture all mount() params in a snapshot for the placeholder, and
+        // Livewire can't serialize a service-container object (it has no public
+        // properties, producing {} which matches no registered synth).
         if ($server->hostCapabilities()->supportsMachinePhpManagement()) {
-            $phpData = $phpManager->siteCreationPhpData($server);
+            $phpData = app(ServerPhpManager::class)->siteCreationPhpData($server);
             $this->phpVersions = $phpData['available_versions'];
             $this->form->php_version = $phpData['preselected_version'];
         }

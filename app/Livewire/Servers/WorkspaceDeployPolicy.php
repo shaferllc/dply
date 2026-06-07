@@ -44,7 +44,7 @@ class WorkspaceDeployPolicy extends Component
     /** @var list<array{days: list<string>, start: string, end: string}> */
     public array $deny_rules = [];
 
-    public function mount(Server $server, ServerDeployPolicyGuard $guard): void
+    public function mount(Server $server): void
     {
         abort_unless($server->isVmHost(), 404);
 
@@ -61,7 +61,7 @@ class WorkspaceDeployPolicy extends Component
 
         $this->bootWorkspace($server);
 
-        $policy = $guard->policyForServer($server);
+        $policy = app(ServerDeployPolicyGuard::class)->policyForServer($server);
         $this->policy_enabled = (bool) ($policy['enabled'] ?? false);
         $this->policy_timezone = (string) ($policy['timezone'] ?? config('app.timezone'));
         $this->policy_message = (string) ($policy['message'] ?? '');

@@ -196,6 +196,9 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
             }
 
             // ── Decision ──────────────────────────────────────────────────────
+            // Always land in the setup wizard so the operator can review env
+            // variables, connect resources (database, cache, queue, storage),
+            // and trigger the first deploy themselves. Never auto-deploy.
             $blocking = $this->blockingKeys($requirements);
 
             if ($blocking !== []) {
@@ -207,30 +210,10 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
                 $this->scanLog($site, 'All boot-critical variables have defaults or are auto-managed.');
             }
 
+            $this->scanLog($site, 'Setup wizard ready — configure resources and environment, then deploy.');
+
             $meta = is_array($site->meta) ? $site->meta : [];
             $meta['env_requirements'] = $requirements;
-
-            if ($blocking === []) {
-                // CLEAN — fire the first deploy. Stay live; the deploy runs on the
-                // already-provisioned host.
-                $this->scanLog($site, 'No blocking variables — starting first deploy now.');
-                $meta['setup'] = [
-                    'state' => 'deploying',
-                    'scanned_at' => now()->toIso8601String(),
-                ];
-                $site->forceFill(['meta' => $meta])->save();
-
-                $this->scanLog($site, 'Dispatching deploy pipeline…');
-                $fresh = $site->fresh() ?? $site;
-                $pipeline->seedRuntimeDefaults($fresh, (string) $fresh->runtime ?: 'php');
-                $coordinator->dispatchManualForGroup($fresh->fresh() ?? $fresh);
-                $this->scanLog($site, 'Deploy queued. Watch the Deployments tab for progress.');
-
-                return;
-            }
-
-            // HOLD — missing blocking vars. Stay live; render the setup wizard.
-            $this->scanLog($site, 'Setup wizard ready. Fill the required variable(s) above, then deploy.');
             $meta['setup'] = [
                 'state' => 'needs_setup',
                 'scanned_at' => now()->toIso8601String(),

@@ -59,17 +59,26 @@ trait ConfiguresGitRepository
      */
     public string $repoScanState = 'idle';
 
-    /**
-     * Metadata returned by the public provider API after a successful scan.
-     *
-     * @var array{provider?: string, name?: string, description?: string, visibility?: string, default_branch?: string, stars?: int}
-     */
-    public array $scannedRepoMeta = [];
+    // Flat scalars for scan result metadata — Livewire requires typed scalar
+    // properties; associative arrays serialize as JSON objects and break
+    // hydration on typed `array` properties (LW expects sequential lists).
+    public string $scannedProvider = '';
+
+    public string $scannedRepoName = '';
+
+    public string $scannedDescription = '';
+
+    public string $scannedVisibility = '';
+
+    public string $scannedDefaultBranch = '';
+
+    public int $scannedStars = 0;
 
     /**
-     * Branch list from the public provider API (populated alongside scannedRepoMeta).
+     * Branch names from the public provider API.
+     * Plain list of strings so Livewire can roundtrip it as a JSON array.
      *
-     * @var list<array{name: string, default: bool}>
+     * @var list<string>
      */
     public array $scannedBranches = [];
 
@@ -135,7 +144,12 @@ trait ConfiguresGitRepository
     {
         $this->git_repository_url = trim($this->git_repository_url);
         $this->repoScanState = 'idle';
-        $this->scannedRepoMeta = [];
+        $this->scannedProvider = '';
+        $this->scannedRepoName = '';
+        $this->scannedDescription = '';
+        $this->scannedVisibility = '';
+        $this->scannedDefaultBranch = '';
+        $this->scannedStars = 0;
         $this->scannedBranches = [];
 
         // Notify the host first so it can reset stale ref-picker state before
@@ -264,14 +278,12 @@ trait ConfiguresGitRepository
         $data = $meta->json();
         $defaultBranch = (string) ($data['default_branch'] ?? 'main');
 
-        $this->scannedRepoMeta = [
-            'provider' => 'github',
-            'name' => (string) ($data['full_name'] ?? "{$owner}/{$repo}"),
-            'description' => (string) ($data['description'] ?? ''),
-            'visibility' => (bool) ($data['private'] ?? false) ? 'private' : 'public',
-            'default_branch' => $defaultBranch,
-            'stars' => (int) ($data['stargazers_count'] ?? 0),
-        ];
+        $this->scannedProvider = 'github';
+        $this->scannedRepoName = (string) ($data['full_name'] ?? "{$owner}/{$repo}");
+        $this->scannedDescription = (string) ($data['description'] ?? '');
+        $this->scannedVisibility = (bool) ($data['private'] ?? false) ? 'private' : 'public';
+        $this->scannedDefaultBranch = $defaultBranch;
+        $this->scannedStars = (int) ($data['stargazers_count'] ?? 0);
 
         $this->git_branch = $defaultBranch;
         $this->git_ref_kind = 'branch';
@@ -279,7 +291,7 @@ trait ConfiguresGitRepository
         if ($branches->ok()) {
             $this->scannedBranches = collect($branches->json())
                 ->filter(fn ($b) => is_array($b) && ($b['name'] ?? '') !== '')
-                ->map(fn ($b) => ['name' => (string) $b['name'], 'default' => (string) $b['name'] === $defaultBranch])
+                ->map(fn ($b) => (string) $b['name'])
                 ->values()
                 ->all();
         }
@@ -306,14 +318,12 @@ trait ConfiguresGitRepository
         $data = $meta->json();
         $defaultBranch = (string) ($data['default_branch'] ?? 'main');
 
-        $this->scannedRepoMeta = [
-            'provider' => 'gitlab',
-            'name' => (string) ($data['path_with_namespace'] ?? "{$owner}/{$repo}"),
-            'description' => (string) ($data['description'] ?? ''),
-            'visibility' => (string) ($data['visibility'] ?? 'public'),
-            'default_branch' => $defaultBranch,
-            'stars' => (int) ($data['star_count'] ?? 0),
-        ];
+        $this->scannedProvider = 'gitlab';
+        $this->scannedRepoName = (string) ($data['path_with_namespace'] ?? "{$owner}/{$repo}");
+        $this->scannedDescription = (string) ($data['description'] ?? '');
+        $this->scannedVisibility = (string) ($data['visibility'] ?? 'public');
+        $this->scannedDefaultBranch = $defaultBranch;
+        $this->scannedStars = (int) ($data['star_count'] ?? 0);
 
         $this->git_branch = $defaultBranch;
         $this->git_ref_kind = 'branch';
@@ -321,7 +331,7 @@ trait ConfiguresGitRepository
         if ($branches->ok()) {
             $this->scannedBranches = collect($branches->json())
                 ->filter(fn ($b) => is_array($b) && ($b['name'] ?? '') !== '')
-                ->map(fn ($b) => ['name' => (string) $b['name'], 'default' => (string) $b['name'] === $defaultBranch])
+                ->map(fn ($b) => (string) $b['name'])
                 ->values()
                 ->all();
         }
@@ -347,14 +357,12 @@ trait ConfiguresGitRepository
         $data = $meta->json();
         $defaultBranch = (string) (($data['mainbranch'] ?? [])['name'] ?? 'main');
 
-        $this->scannedRepoMeta = [
-            'provider' => 'bitbucket',
-            'name' => (string) ($data['full_name'] ?? "{$owner}/{$repo}"),
-            'description' => (string) ($data['description'] ?? ''),
-            'visibility' => (bool) ($data['is_private'] ?? false) ? 'private' : 'public',
-            'default_branch' => $defaultBranch,
-            'stars' => 0,
-        ];
+        $this->scannedProvider = 'bitbucket';
+        $this->scannedRepoName = (string) ($data['full_name'] ?? "{$owner}/{$repo}");
+        $this->scannedDescription = (string) ($data['description'] ?? '');
+        $this->scannedVisibility = (bool) ($data['is_private'] ?? false) ? 'private' : 'public';
+        $this->scannedDefaultBranch = $defaultBranch;
+        $this->scannedStars = 0;
 
         $this->git_branch = $defaultBranch;
         $this->git_ref_kind = 'branch';
@@ -362,7 +370,7 @@ trait ConfiguresGitRepository
         if ($branches->ok()) {
             $this->scannedBranches = collect(($branches->json())['values'] ?? [])
                 ->filter(fn ($b) => is_array($b) && ($b['name'] ?? '') !== '')
-                ->map(fn ($b) => ['name' => (string) $b['name'], 'default' => (string) $b['name'] === $defaultBranch])
+                ->map(fn ($b) => (string) $b['name'])
                 ->values()
                 ->all();
         }

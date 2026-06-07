@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 6, 2026',
+                    'tags'    => ['new'],
+                    'title'   => 'Faster Hetzner Server Provisioning',
+                    'summary' => 'New Hetzner servers can launch from a pre-baked base image, cutting provisioning time, with refreshed loading states across the server workspace.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
                     'tags'    => ['improved'],
                     'title'   => 'Faster Server Provisioning',
                     'summary' => 'New servers launch from region-scoped baked snapshots when available and poll for their IP address faster, cutting provisioning time.',

@@ -182,6 +182,25 @@ class WorkspaceSettings extends Component
         $this->toastSuccess(__('Delivery requeued.'));
     }
 
+    /**
+     * Override the trait placeholder so the Settings sub-tab strip stays
+     * visible (with the destination section highlighted) while the body
+     * lazy-loads — only the content area below the sub-tabs skeletons.
+     */
+    public function placeholder(): View
+    {
+        return view('livewire.servers.partials.workspace-subtab-placeholder', [
+            'server' => $this->server,
+            'active' => 'settings',
+            'title' => __('Settings'),
+            'tabs' => $this->settingsWorkspaceTabs(),
+            'section' => $this->section,
+            'routeName' => 'servers.settings',
+            'idPrefix' => 'settings-tab-',
+            'ariaLabel' => __('Settings categories'),
+        ]);
+    }
+
     public function render(): View
     {
         $this->server->load([

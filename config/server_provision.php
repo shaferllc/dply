@@ -19,6 +19,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Optional regional apt mirror (opt-in, off by default)
+    |--------------------------------------------------------------------------
+    | When set, provisioning rewrites the Ubuntu archive/security sources to
+    | this mirror before the first apt update — provider regional mirrors are
+    | far faster than archive.ubuntu.com. Examples:
+    |   DigitalOcean: http://mirrors.digitalocean.com/ubuntu
+    |   Hetzner:      http://mirror.hetzner.com/ubuntu/packages
+    | Leave empty to keep the image's default sources. Set a wrong value and
+    | apt can't fetch, so only enable a mirror you know serves your region.
+    */
+    'apt_mirror' => env('DPLY_APT_MIRROR', ''),
+
+    /*
+    |--------------------------------------------------------------------------
     | Wait for SSH after cloud assigns a public IP (before stack setup)
     |--------------------------------------------------------------------------
     */

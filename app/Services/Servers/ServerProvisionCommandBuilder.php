@@ -460,6 +460,12 @@ final class ServerProvisionCommandBuilder
             // speedup on package-heavy installs (mysql/php). Install-Suggests off
             // avoids pulling optional suggested packages we never asked for.
             'printf \'Acquire::ForceIPv4 "true";\nAcquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAPT::Install-Suggests "false";\nDpkg::Options:: "--force-unsafe-io";\n\' > /etc/apt/apt.conf.d/99dply',
+            // Optional regional apt mirror (config: server_provision.apt_mirror).
+            // Provider mirrors are much faster than archive.ubuntu.com. No-op when
+            // unset. Rewrites both the classic sources.list and noble's deb822
+            // ubuntu.sources. Must run before the first apt update below.
+            'DPLY_APT_MIRROR='.escapeshellarg((string) config('server_provision.apt_mirror', '')),
+            'if [ -n "${DPLY_APT_MIRROR}" ]; then echo "[dply] pointing apt sources at ${DPLY_APT_MIRROR}"; for _src in /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do [ -f "$_src" ] && sed -i -E "s@https?://(archive|security)\\.ubuntu\\.com/ubuntu@${DPLY_APT_MIRROR}@g" "$_src" || true; done; fi',
             // Silence needrestart. On Ubuntu 24.04 (noble) it's enabled
             // by default and runs after every dpkg install. Its
             // service-restart probe occasionally fails on non-interactive
@@ -1263,14 +1269,13 @@ final class ServerProvisionCommandBuilder
             $optionalPkgs[] = $stem.'-opcache';
         }
 
-        $lines = array_merge($lines, $this->ensurePackagesInstalled(
+        // Core + optional extensions in ONE apt transaction (was two): core is
+        // strict, optional is filtered to what's available, so a single dpkg run
+        // installs everything that exists without a missing optional aborting it.
+        $lines = array_merge($lines, $this->ensureMixedPackagesInstalled(
             $requiredPkgs,
-            '[dply] core PHP packages already installed; skipping package install.'
-        ));
-
-        $lines = array_merge($lines, $this->ensureOptionalPackagesInstalled(
             $optionalPkgs,
-            '[dply] optional PHP extensions already installed; skipping.'
+            '[dply] PHP packages already installed; skipping package install.'
         ));
 
         // apt-get respects /usr/sbin/policy-rc.d during install (returns 101 → don't start services),
@@ -2257,6 +2262,63 @@ APACHE,
 
         return [
             'if '.implode(' && ', $checks).'; then echo '.escapeshellarg($alreadyInstalledMessage).'; else'."\n".$filterAndInstall."\n".'fi',
+        ];
+    }
+
+    /**
+     * Install REQUIRED packages (strict — abort on any missing) and OPTIONAL
+     * packages (best-effort — filtered to what apt can resolve) in a SINGLE
+     * apt-get transaction. This merges what was two separate dpkg runs (e.g.
+     * PHP core + PHP extensions) into one, saving a full lock-wait + dpkg cycle.
+     * Required-missing still trips exit 100; optional-missing are pre-filtered
+     * out so they can't.
+     *
+     * @param  list<string>  $required
+     * @param  list<string>  $optional
+     * @return list<string>
+     */
+    private function ensureMixedPackagesInstalled(array $required, array $optional, string $alreadyInstalledMessage): array
+    {
+        $required = array_values(array_filter($required, fn (string $p): bool => trim($p) !== ''));
+        $optional = array_values(array_filter($optional, fn (string $p): bool => trim($p) !== ''));
+        if ($required === [] && $optional === []) {
+            return [];
+        }
+
+        $checks = array_map(
+            fn (string $p): string => 'dpkg -s '.escapeshellarg($p).' >/dev/null 2>&1',
+            array_merge($required, $optional),
+        );
+
+        $requiredList = implode(' ', $required);
+        $optionalList = implode(' ', $optional);
+
+        $install = implode("\n", [
+            '_dply_opt_avail=""',
+            $optional === [] ? ': # no optional packages' : 'for _dply_opt_pkg in '.$optionalList.'; do',
+            $optional === [] ? '' : '  if apt-cache show "$_dply_opt_pkg" >/dev/null 2>&1; then _dply_opt_avail="$_dply_opt_avail $_dply_opt_pkg"; else echo "[dply] optional PHP extension $_dply_opt_pkg not available in configured repos — skipping."; fi',
+            $optional === [] ? '' : 'done',
+            'dply_wait_for_apt_locks || exit 100',
+            'for _dply_apt_attempt in 1 2 3 4 5 6; do',
+            '  dply_wait_for_apt_locks || exit 100',
+            '  _dply_apt_log=$(DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends '.$requiredList.' $_dply_opt_avail 2>&1) || true',
+            '  echo "$_dply_apt_log"',
+            '  if echo "$_dply_apt_log" | grep -qE "Could not get lock|Unable to acquire the dpkg frontend lock|is held by process"; then',
+            '    echo "[dply] apt lock during install — sleeping 15s before retry $_dply_apt_attempt/6."',
+            '    sleep 15',
+            '    continue',
+            '  fi',
+            '  if ! echo "$_dply_apt_log" | grep -qE "^E: "; then break; fi',
+            '  if [ "$_dply_apt_attempt" -eq 6 ]; then exit 100; fi',
+            '  sleep 15',
+            'done',
+        ]);
+
+        // Drop the empty placeholder lines we may have inserted for the no-optional case.
+        $install = implode("\n", array_values(array_filter(explode("\n", $install), fn (string $l): bool => $l !== '')));
+
+        return [
+            'if '.implode(' && ', $checks).'; then echo '.escapeshellarg($alreadyInstalledMessage).'; else'."\n".$install."\n".'fi',
         ];
     }
 

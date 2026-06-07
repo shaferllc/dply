@@ -46,7 +46,7 @@ class WorkspaceMaintenance extends Component
 
     public string $maintenance_message = '';
 
-    public function mount(Server $server, ServerMaintenanceWindow $maintenance): void
+    public function mount(Server $server): void
     {
         abort_unless($server->isVmHost() && $server->hostCapabilities()->supportsSsh(), 404);
 
@@ -63,6 +63,7 @@ class WorkspaceMaintenance extends Component
 
         $this->bootWorkspace($server);
 
+        $maintenance = app(ServerMaintenanceWindow::class);
         $maintenance->refreshExpired($server, auth()->user());
         $this->server->refresh();
 
