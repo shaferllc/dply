@@ -87,13 +87,13 @@
         <div class="px-6 py-5 sm:px-7">
             <p class="text-sm text-brand-moss">{{ __('No schedulers need attention right now.') }}</p>
             <div class="mt-4 flex flex-wrap gap-2">
-                <button type="button" wire:click="setScheduleWorkspaceTab('schedulers')" class="{{ $btnSecondary }}">
+                <x-secondary-button size="sm" type="button" wire:click="setScheduleWorkspaceTab('schedulers')">
                     {{ __('View all schedulers') }}
-                </button>
+                </x-secondary-button>
                 @if ($sites->isNotEmpty())
-                    <button type="button" wire:click="setScheduleWorkspaceTab('enable')" class="{{ $btnSecondary }}">
+                    <x-secondary-button size="sm" type="button" wire:click="setScheduleWorkspaceTab('enable')">
                         {{ __('Enable scheduler') }}
-                    </button>
+                    </x-secondary-button>
                 @endif
             </div>
         </div>

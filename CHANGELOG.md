@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Changed
+- Server schedule and services screens now use shared button components for consistent styling across actions.
 ### Added
 - The realtime broadcasting relay now records connection, subscription, and publish events with per-message delivery counts for easier monitoring.
 ### Added

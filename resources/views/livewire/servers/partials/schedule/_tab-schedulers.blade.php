@@ -134,7 +134,7 @@
                                     size="11"
                                     placeholder="* * * * *"
                                 />
-                                <button type="button" wire:click="saveCadence('{{ $heartbeatId }}')" class="{{ $btnSecondary }}">{{ __('Save') }}</button>
+                                <x-secondary-button size="sm" type="button" wire:click="saveCadence('{{ $heartbeatId }}')">{{ __('Save') }}</x-secondary-button>
                                 <button type="button" wire:click="cancelEditCadence('{{ $heartbeatId }}')" class="text-xs text-brand-moss hover:underline">{{ __('Cancel') }}</button>
                             </div>
                         @endif

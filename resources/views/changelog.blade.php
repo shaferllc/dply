@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 6, 2026',
+                    'tags'    => ['improved'],
+                    'title'   => 'Standardize Server Action Buttons',
+                    'summary' => 'Server schedule and services screens now use shared button components for consistent styling across actions.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 6, 2026',
                     'tags'    => ['new'],
                     'title'   => 'Realtime Worker Observability',
                     'summary' => 'The realtime broadcasting relay now records connection, subscription, and publish events with per-message delivery counts for easier monitoring.',

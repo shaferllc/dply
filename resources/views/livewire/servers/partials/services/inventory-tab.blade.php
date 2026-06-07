@@ -34,31 +34,31 @@
                 @endif
             </div>
             <div class="flex flex-wrap items-center gap-2">
-                <button
+                <x-secondary-button
+                    size="sm"
                     type="button"
                     wire:click="openCustomSystemdModal"
                     wire:loading.attr="disabled"
                     wire:target="openCustomSystemdModal"
                     @disabled($isDeployer)
-                    class="{{ $btnSecondary }}"
                 >
                     <x-heroicon-o-adjustments-horizontal class="h-4 w-4 shrink-0 opacity-90" wire:loading.remove wire:target="openCustomSystemdModal" />
                     <span wire:loading wire:target="openCustomSystemdModal" class="inline-flex h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-brand-ink/25 border-t-brand-ink" aria-hidden="true"></span>
                     <span wire:loading.remove wire:target="openCustomSystemdModal">{{ __('Custom services') }}</span>
                     <span wire:loading wire:target="openCustomSystemdModal">{{ __('Working…') }}</span>
-                </button>
-                <button
+                </x-secondary-button>
+                <x-primary-button
+                    size="sm"
                     type="button"
                     wire:click="refreshSystemdInventory"
                     wire:loading.attr="disabled"
                     @disabled(! $opsReady || $isDeployer || $syncInFlight)
                     title="{{ $syncInFlight ? __('A sync is already running. Wait for it to finish.') : '' }}"
-                    class="{{ $btnPrimary }}"
                 >
                     <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0 opacity-90 {{ $syncInFlight ? 'animate-spin' : '' }}" wire:loading.class="animate-spin" wire:target="refreshSystemdInventory" />
                     <span wire:loading.remove wire:target="refreshSystemdInventory">{{ $syncInFlight ? __('Syncing…') : __('Sync now') }}</span>
                     <span wire:loading wire:target="refreshSystemdInventory">{{ __('Working…') }}</span>
-                </button>
+                </x-primary-button>
             </div>
         </div>
 
@@ -68,30 +68,30 @@
                     {{ __(':count selected', ['count' => $selectedCount]) }}
                 </p>
                 <div class="flex flex-wrap gap-2">
-                    <button
+                    <x-secondary-button
+                        size="sm"
                         type="button"
                         wire:click="openSystemdActionConfirm('bulk-restart')"
                         wire:loading.attr="disabled"
                         wire:target="openSystemdActionConfirm"
                         @disabled($systemdBulkBusy || ($systemdRowBusyUnit !== null && $systemdRowBusyUnit !== ''))
-                        class="{{ $btnSecondary }}"
                     >
                         <span wire:loading wire:target="openSystemdActionConfirm" class="inline-flex h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-brand-ink/25 border-t-brand-ink" aria-hidden="true"></span>
                         <span wire:loading.remove wire:target="openSystemdActionConfirm">{{ __('Restart selected') }}</span>
                         <span wire:loading wire:target="openSystemdActionConfirm">{{ __('Working…') }}</span>
-                    </button>
-                    <button
+                    </x-secondary-button>
+                    <x-danger-button
+                        size="sm"
                         type="button"
                         wire:click="openSystemdActionConfirm('bulk-stop')"
                         wire:loading.attr="disabled"
                         wire:target="openSystemdActionConfirm"
                         @disabled($systemdBulkBusy || ($systemdRowBusyUnit !== null && $systemdRowBusyUnit !== ''))
-                        class="{{ $btnDanger }}"
                     >
                         <span wire:loading wire:target="openSystemdActionConfirm" class="inline-flex h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden="true"></span>
                         <span wire:loading.remove wire:target="openSystemdActionConfirm">{{ __('Stop selected') }}</span>
                         <span wire:loading wire:target="openSystemdActionConfirm">{{ __('Working…') }}</span>
-                    </button>
+                    </x-danger-button>
                     <button type="button" wire:click="$set('systemdSelectedList', []); $set('systemdSelectAll', false)" class="text-sm font-semibold text-brand-moss hover:text-brand-ink">
                         {{ __('Clear') }}
                     </button>
@@ -293,7 +293,8 @@
                                         @php
                                             $startUsesConfirm = ! empty($row['standby_reason']);
                                         @endphp
-                                        <button
+                                        <x-secondary-button
+                                            size="sm"
                                             type="button"
                                             @if ($startUsesConfirm)
                                                 wire:click="openSystemdActionConfirm('start', @js($rowUnit))"
@@ -302,50 +303,53 @@
                                             @endif
                                             wire:loading.attr="disabled"
                                             @disabled(! $opsReady || $otherBusy || $rowPending)
-                                            class="{{ $btnSecondary }} !inline-flex !items-center !gap-1.5 !shrink-0 !py-2 !text-[11px]"
+                                            class="!inline-flex !items-center !gap-1.5 !shrink-0 !py-2 !text-[11px]"
                                             @if ($startUsesConfirm)
                                                 title="{{ $row['standby_reason'] }}"
                                             @endif
                                         >
                                             <x-heroicon-o-play class="h-3.5 w-3.5 shrink-0 text-emerald-700" aria-hidden="true" />
                                             {{ __('Start') }}
-                                        </button>
+                                        </x-secondary-button>
                                     @elseif ($mayMutate)
-                                        <button
+                                        <x-secondary-button
+                                            size="sm"
                                             type="button"
                                             wire:click="openSystemdActionConfirm('restart', @js($rowUnit))"
                                             wire:loading.attr="disabled"
                                             wire:target="openSystemdActionConfirm('restart', @js($rowUnit))"
                                             @disabled(! $opsReady || $otherBusy || $rowPending)
-                                            class="{{ $btnSecondary }} !inline-flex !items-center !gap-1.5 !shrink-0 !py-2 !text-[11px]"
+                                            class="!inline-flex !items-center !gap-1.5 !shrink-0 !py-2 !text-[11px]"
                                         >
                                             <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0 text-brand-ink/80" aria-hidden="true" />
                                             {{ __('Restart') }}
-                                        </button>
+                                        </x-secondary-button>
                                     @else
-                                        <button
+                                        <x-secondary-button
+                                            size="sm"
                                             type="button"
                                             wire:click="openSystemdStatusModalForService(@js($rowUnit))"
                                             wire:loading.attr="disabled"
                                             @disabled(! $opsReady || ($deployerSystemdLocked ?? true) || $otherBusy)
-                                            class="{{ $btnSecondary }} !inline-flex !items-center !gap-1.5 !shrink-0 !py-2 !text-[11px]"
+                                            class="!inline-flex !items-center !gap-1.5 !shrink-0 !py-2 !text-[11px]"
                                         >
                                             <x-heroicon-o-eye class="h-3.5 w-3.5 shrink-0 text-brand-ink/80" aria-hidden="true" />
                                             {{ __('Status') }}
-                                        </button>
+                                        </x-secondary-button>
                                     @endif
                                     <div class="relative shrink-0">
                                         <x-dropdown align="right" width="w-56" contentClasses="py-1.5">
                                             <x-slot name="trigger">
-                                                <button
+                                                <x-secondary-button
+                                                    size="sm"
                                                     type="button"
-                                                    class="{{ $btnSecondary }} !inline-flex !shrink-0 !items-center !gap-1 !px-2 !py-2 !text-[11px]"
+                                                    class="!inline-flex !shrink-0 !items-center !gap-1 !px-2 !py-2 !text-[11px]"
                                                     aria-label="{{ __('More actions') }}"
                                                     aria-haspopup="true"
                                                     @disabled($otherBusy || $rowBusy || $rowPending)
                                                 >
                                                     <x-heroicon-o-ellipsis-horizontal class="h-4 w-4 shrink-0 text-brand-ink/80" />
-                                                </button>
+                                                </x-secondary-button>
                                             </x-slot>
                                             <x-slot name="content">
                                                 @php

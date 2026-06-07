@@ -106,9 +106,9 @@
             @endif
 
             <div class="flex flex-wrap items-center gap-3 pt-1">
-                <button type="submit" class="{{ $btnPrimary }}" @disabled(! $opsReady || $enableTargetSite === null)>
+                <x-primary-button size="sm" type="submit" @disabled(! $opsReady || $enableTargetSite === null)>
                     {{ __('Enable scheduler') }}
-                </button>
+                </x-primary-button>
             </div>
         </form>
 

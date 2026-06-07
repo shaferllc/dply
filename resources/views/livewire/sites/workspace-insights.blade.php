@@ -156,7 +156,7 @@
                             @if ($canFix)
                                 <x-secondary-button size="sm" type="button" wire:click="openConfirmActionModal('applyFix', [{{ $f->id }}], @js(__('Apply suggested fix')), @js(__('Apply the suggested fix on the server?')), @js(__('Apply fix')), true)" class="shrink-0">
                                     {{ __('Apply fix') }}
-                                </button>
+                                </x-secondary-button>
                             @endif
                         </li>
                     @endforeach

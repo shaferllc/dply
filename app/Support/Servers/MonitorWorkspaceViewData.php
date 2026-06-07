@@ -28,8 +28,6 @@ final class MonitorWorkspaceViewData
         ?string $monitorLastGuestSampleAt,
         int $pollRemoteTaskSeconds,
     ): array {
-        $btnPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50';
-        $btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors disabled:cursor-not-allowed disabled:opacity-50';
         $card = 'dply-card overflow-hidden';
 
         $m = $server->meta ?? [];
@@ -219,8 +217,6 @@ final class MonitorWorkspaceViewData
         };
 
         return compact(
-            'btnPrimary',
-            'btnSecondary',
             'card',
             'm',
             'sshKnown',

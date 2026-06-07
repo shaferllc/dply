@@ -275,18 +275,19 @@
                             placeholder="{{ __('e.g. mysql or redis-server') }}"
                             class="w-full rounded-lg border border-brand-ink/15 px-3 py-2 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
                         />
-                        <button
+                        <x-primary-button
+                            size="sm"
                             type="button"
                             wire:click="addCustomSystemdUnit"
                             wire:loading.attr="disabled"
                             wire:target="addCustomSystemdUnit"
                             @disabled($isDeployer)
-                            class="{{ $btnPrimary }} shrink-0"
+                            class="shrink-0"
                         >
                             <span wire:loading wire:target="addCustomSystemdUnit" class="inline-flex h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-brand-cream/40 border-t-brand-cream" aria-hidden="true"></span>
                             <span wire:loading.remove wire:target="addCustomSystemdUnit">{{ __('Add') }}</span>
                             <span wire:loading wire:target="addCustomSystemdUnit">{{ __('Working…') }}</span>
-                        </button>
+                        </x-primary-button>
                     </div>
                     @if ($customMetaList !== [])
                         <ul class="mt-4 max-h-48 space-y-2 overflow-y-auto rounded-xl border border-brand-ink/10 p-3 text-sm">
@@ -311,9 +312,9 @@
                         <p class="mt-4 text-sm text-brand-moss">{{ __('No custom units yet.') }}</p>
                     @endif
                     <div class="mt-6 flex justify-end gap-2">
-                        <button type="button" wire:click="closeCustomSystemdModal" class="{{ $btnSecondary }}">
+                        <x-secondary-button size="sm" type="button" wire:click="closeCustomSystemdModal">
                             {{ __('Done') }}
-                        </button>
+                        </x-secondary-button>
                     </div>
                 </div>
             </div>
@@ -345,21 +346,22 @@
                                 </div>
                             </div>
                             <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                                <button
+                                <x-secondary-button
+                                    size="sm"
                                     type="button"
                                     wire:click="fetchSystemdModalStatus"
                                     wire:loading.attr="disabled"
                                     wire:target="fetchSystemdModalStatus"
                                     @disabled(! $opsReady || ($deployerSystemdLocked ?? true) || $systemdStatusModalLoading)
-                                    class="{{ $btnSecondary }} !inline-flex !items-center !gap-1.5 !py-2 !text-[11px]"
+                                    class="!inline-flex !items-center !gap-1.5 !py-2 !text-[11px]"
                                 >
                                     <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0 text-brand-ink/80" wire:loading.class="animate-spin" wire:target="fetchSystemdModalStatus" />
                                     <span wire:loading.remove wire:target="fetchSystemdModalStatus">{{ __('Refresh') }}</span>
                                     <span wire:loading wire:target="fetchSystemdModalStatus">{{ __('Working…') }}</span>
-                                </button>
-                                <button type="button" wire:click="closeSystemdStatusModal" class="{{ $btnSecondary }} !py-2 !text-[11px]">
+                                </x-secondary-button>
+                                <x-secondary-button size="sm" type="button" wire:click="closeSystemdStatusModal" class="!py-2 !text-[11px]">
                                     {{ __('Close') }}
-                                </button>
+                                </x-secondary-button>
                             </div>
                         </div>
                     </div>
@@ -524,9 +526,9 @@
                                 <h2 id="systemd-notify-modal-heading" class="text-base font-semibold text-brand-ink">{{ __('Notify on service changes') }}</h2>
                                 <p class="mt-0.5 font-mono text-xs text-brand-moss break-all">{{ $systemdNotifyUnit }}</p>
                             </div>
-                            <button type="button" wire:click="closeSystemdNotifyModal" class="{{ $btnSecondary }} !py-2 !text-[11px]">
+                            <x-secondary-button size="sm" type="button" wire:click="closeSystemdNotifyModal" class="!py-2 !text-[11px]">
                                 {{ __('Close') }}
-                            </button>
+                            </x-secondary-button>
                         </div>
                     </div>
                     <div class="px-4 py-4 sm:px-6 sm:py-5">
@@ -543,12 +545,12 @@
                                     <a
                                         href="{{ route('organizations.notification-channels', $server->organization_id) }}"
                                         wire:navigate
-                                        class="{{ $btnPrimary }} !py-2 !text-[11px]"
+                                        class="inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50 !py-2 !text-[11px]"
                                     >
                                         {{ __('Add organization channels') }}
                                     </a>
                                 @endif
-                                <a href="{{ route('profile.notification-channels') }}" wire:navigate class="{{ $btnSecondary }} !py-2 !text-[11px]">
+                                <a href="{{ route('profile.notification-channels') }}" wire:navigate class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors disabled:cursor-not-allowed disabled:opacity-50 !py-2 !text-[11px]">
                                     {{ __('My notification channels') }}
                                 </a>
                             </div>
@@ -583,18 +585,19 @@
                                 </table>
                             </div>
                             <div class="mt-3 flex flex-wrap justify-end gap-2">
-                                <button
+                                <x-primary-button
+                                    size="sm"
                                     type="button"
                                     wire:click="saveSystemdNotifyPreferences"
                                     wire:loading.attr="disabled"
                                     wire:target="saveSystemdNotifyPreferences"
                                     @disabled($isDeployer)
-                                    class="{{ $btnPrimary }} !py-2 !text-[11px]"
+                                    class="!py-2 !text-[11px]"
                                 >
                                     <span wire:loading wire:target="saveSystemdNotifyPreferences" class="inline-flex h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-brand-cream/40 border-t-brand-cream" aria-hidden="true"></span>
                                     <span wire:loading.remove wire:target="saveSystemdNotifyPreferences">{{ __('Save alert routing') }}</span>
                                     <span wire:loading wire:target="saveSystemdNotifyPreferences">{{ __('Working…') }}</span>
-                                </button>
+                                </x-primary-button>
                             </div>
                         @endif
                     </div>

@@ -31,9 +31,6 @@ final class ServicesWorkspaceViewData
         ?string $systemdInventoryFetchedAt = null,
     ): array {
         $card = 'dply-card';
-        $btnPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50';
-        $btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors disabled:cursor-not-allowed disabled:opacity-50';
-        $btnDanger = 'inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-white shadow-sm hover:bg-red-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50';
 
         $customMeta = $server->meta['custom_systemd_services'] ?? [];
         $customMetaList = is_array($customMeta)
@@ -42,9 +39,6 @@ final class ServicesWorkspaceViewData
 
         $data = compact(
             'card',
-            'btnPrimary',
-            'btnSecondary',
-            'btnDanger',
             'customMetaList',
         );
 
