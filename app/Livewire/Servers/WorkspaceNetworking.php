@@ -182,7 +182,7 @@ class WorkspaceNetworking extends Component
                 'vultr' => VultrService::getPrivateIp(
                     (new VultrService($credential))->getInstance((string) $target->provider_id)
                 ),
-                'linode', 'akamai' => LinodeService::getPrivateIp(
+                'linode' => LinodeService::getPrivateIp(
                     (new LinodeService($credential))->getInstance((int) $target->provider_id)
                 ),
                 default => null,

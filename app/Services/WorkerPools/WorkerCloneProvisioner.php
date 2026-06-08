@@ -6,13 +6,9 @@ use App\Enums\ServerProvider;
 use App\Jobs\ProvisionAwsEc2ServerJob;
 use App\Jobs\ProvisionAzureServerJob;
 use App\Jobs\ProvisionDigitalOceanDropletJob;
-use App\Jobs\ProvisionEquinixMetalServerJob;
-use App\Jobs\ProvisionFlyIoServerJob;
-use App\Jobs\ProvisionGcpServerJob;
 use App\Jobs\ProvisionHetznerServerJob;
 use App\Jobs\ProvisionLinodeServerJob;
 use App\Jobs\ProvisionOracleServerJob;
-use App\Jobs\ProvisionScalewayServerJob;
 use App\Jobs\ProvisionUpCloudServerJob;
 use App\Jobs\ProvisionVultrServerJob;
 use App\Models\Server;
@@ -130,14 +126,10 @@ class WorkerCloneProvisioner
         match ($clone->provider) {
             ServerProvider::Hetzner => ProvisionHetznerServerJob::dispatch($clone),
             ServerProvider::DigitalOcean => ProvisionDigitalOceanDropletJob::dispatch($clone),
-            ServerProvider::Linode, ServerProvider::Akamai => ProvisionLinodeServerJob::dispatch($clone),
+            ServerProvider::Linode => ProvisionLinodeServerJob::dispatch($clone),
             ServerProvider::Vultr => ProvisionVultrServerJob::dispatch($clone),
-            ServerProvider::Scaleway => ProvisionScalewayServerJob::dispatch($clone),
             ServerProvider::UpCloud => ProvisionUpCloudServerJob::dispatch($clone),
-            ServerProvider::EquinixMetal => ProvisionEquinixMetalServerJob::dispatch($clone),
-            ServerProvider::FlyIo => ProvisionFlyIoServerJob::dispatch($clone),
             ServerProvider::Aws => ProvisionAwsEc2ServerJob::dispatch($clone),
-            ServerProvider::Gcp => ProvisionGcpServerJob::dispatch($clone),
             ServerProvider::Azure => ProvisionAzureServerJob::dispatch($clone),
             ServerProvider::Oracle => ProvisionOracleServerJob::dispatch($clone),
             default => throw new RuntimeException(__('Cloning :provider workers is not supported yet.', [
@@ -151,9 +143,9 @@ class WorkerCloneProvisioner
     {
         return [
             ServerProvider::Hetzner, ServerProvider::DigitalOcean, ServerProvider::Linode,
-            ServerProvider::Akamai, ServerProvider::Vultr, ServerProvider::Scaleway,
-            ServerProvider::UpCloud, ServerProvider::EquinixMetal, ServerProvider::FlyIo,
-            ServerProvider::Aws, ServerProvider::Gcp, ServerProvider::Azure, ServerProvider::Oracle,
+            ServerProvider::Vultr,
+            ServerProvider::UpCloud,
+            ServerProvider::Aws, ServerProvider::Azure, ServerProvider::Oracle,
         ];
     }
 

@@ -178,6 +178,22 @@
         @endif
 
         @if ($showFileModal)
+            @php
+                $viewingIsImage = $viewingMime && str_starts_with($viewingMime, 'image/');
+                $viewingImagePreviewable = $viewingIsImage && $viewingSize !== null && $viewingSize <= $downloadMaxBytes;
+                $viewingImageUrl = null;
+                if ($viewingImagePreviewable && $viewingPath !== null) {
+                    try {
+                        $viewingImageUrl = route('servers.files.download', array_filter([
+                            'server' => $server,
+                            'path' => $viewingPath,
+                            'root' => ($viewAsRoot && $canViewAsRoot) ? '1' : null,
+                        ]));
+                    } catch (\InvalidArgumentException) {
+                        $viewingImageUrl = null;
+                    }
+                }
+            @endphp
             <x-modal name="file-view" :show="true" max-width="4xl">
                 <div class="space-y-4 p-6">
                     <div class="flex items-start justify-between gap-3">
@@ -193,6 +209,10 @@
 
                     @if ($viewingError)
                         <div class="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{{ $viewingError }}</div>
+                    @elseif ($viewingImageUrl)
+                        <div class="flex max-h-[60vh] items-center justify-center overflow-auto rounded-md border border-brand-ink/10 bg-brand-ink/5 p-3">
+                            <img src="{{ $viewingImageUrl }}" alt="{{ basename((string) $viewingPath) }}" class="max-h-[56vh] max-w-full object-contain" />
+                        </div>
                     @elseif ($viewingTruncated)
                         <div class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                             {{ __('File is larger than the inline cap (:cap MB). Use Download.', ['cap' => (int) ($editMaxBytes / 1024 / 1024)]) }}

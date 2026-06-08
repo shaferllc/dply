@@ -233,7 +233,7 @@
                                     >{{ __('Attach to existing') }}</button>
                                 </div>
                             @endif
-                        @elseif (in_array($s->provider->value, ['digitalocean', 'vultr', 'linode', 'akamai'], true))
+                        @elseif (in_array($s->provider->value, ['digitalocean', 'vultr', 'linode'], true))
                             <div class="mt-2 flex flex-wrap items-center gap-2">
                                 <p class="text-[11px] text-brand-mist">{{ __('No private IP — must have private networking enabled.') }}</p>
                                 <button

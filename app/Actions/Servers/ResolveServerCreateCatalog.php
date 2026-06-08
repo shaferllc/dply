@@ -10,13 +10,9 @@ use App\Models\ProviderCredential;
 use App\Services\AwsEc2Service;
 use App\Services\AzureComputeService;
 use App\Services\DigitalOceanService;
-use App\Services\EquinixMetalService;
-use App\Services\FlyIoService;
-use App\Services\GcpComputeService;
 use App\Services\HetznerService;
 use App\Services\LinodeService;
 use App\Services\OracleComputeService;
-use App\Services\ScalewayService;
 use App\Services\UpCloudService;
 use App\Services\OvhService;
 use App\Services\VultrService;
@@ -62,10 +58,6 @@ final class ResolveServerCreateCatalog
             return array_merge($empty, ['credentials' => $credentials]);
         }
 
-        if ($type === 'fly_io') {
-            return $this->catalogFlyIo($credentials);
-        }
-
         $credential = ($providerCredentialId !== '' && $providerCredentialId !== '0')
             ? $credentials->firstWhere('id', $providerCredentialId)
             : null;
@@ -83,7 +75,7 @@ final class ResolveServerCreateCatalog
                 return $this->catalogVultr($credentials, null, $selectedRegion);
             }
 
-            if (in_array($type, ['linode', 'akamai'], true) && filled((string) config('services.linode.token'))) {
+            if ($type === 'linode' && filled((string) config('services.linode.token'))) {
                 return $this->catalogLinodeApi($credentials, null, __('Region'), __('Plan / type'));
             }
 
@@ -96,13 +88,9 @@ final class ResolveServerCreateCatalog
             'hetzner' => $this->catalogHetzner($credentials, $credential, $selectedRegion),
             'linode' => $this->catalogLinode($credentials, $credential),
             'vultr' => $this->catalogVultr($credentials, $credential, $selectedRegion),
-            'akamai' => $this->catalogAkamai($credentials, $credential),
-            'scaleway' => $this->catalogScaleway($credentials, $credential, $selectedRegion),
             'ovh' => $this->catalogOvh($credentials, $credential, $selectedRegion),
             'upcloud' => $this->catalogUpcloud($credentials, $credential),
-            'equinix_metal' => $this->catalogEquinixMetal($credentials, $credential),
             'aws' => $this->catalogAws($credentials, $credential),
-            'gcp' => $this->catalogGcp($credentials, $credential, $selectedRegion),
             'azure' => $this->catalogAzure($credentials, $credential, $selectedRegion),
             'oracle' => $this->catalogOracle($credentials, $credential),
             default => array_merge($empty, ['credentials' => $credentials]),
@@ -465,15 +453,6 @@ final class ResolveServerCreateCatalog
      * @param  Collection<int, ProviderCredential>  $credentials
      * @return array{credentials: Collection<int, ProviderCredential>, regions: list<array{value: string, label: string}>, sizes: list<array{value: string, label: string}>, region_label: string, size_label: string}
      */
-    private function catalogAkamai(Collection $credentials, ProviderCredential $credential): array
-    {
-        return $this->catalogLinodeApi($credentials, $credential, __('Region'), __('Plan / type'));
-    }
-
-    /**
-     * @param  Collection<int, ProviderCredential>  $credentials
-     * @return array{credentials: Collection<int, ProviderCredential>, regions: list<array{value: string, label: string}>, sizes: list<array{value: string, label: string}>, region_label: string, size_label: string}
-     */
     private function catalogLinodeApi(Collection $credentials, ?ProviderCredential $credential, string $regionLabel, string $sizeLabel): array
     {
         $regions = [];
@@ -594,106 +573,6 @@ final class ResolveServerCreateCatalog
      * @param  Collection<int, ProviderCredential>  $credentials
      * @return array{credentials: Collection<int, ProviderCredential>, regions: list<array{value: string, label: string}>, sizes: list<array{value: string, label: string}>, region_label: string, size_label: string}
      */
-    private function catalogScaleway(Collection $credentials, ProviderCredential $credential, string $selectedRegion): array
-    {
-        $regions = [];
-        $sizes = [];
-        try {
-            $svc = new ScalewayService($credential);
-            $zones = $svc->getZones();
-            foreach ($zones as $z) {
-                $v = (string) ($z['id'] ?? '');
-                if ($v === '') {
-                    continue;
-                }
-                $regions[] = [
-                    'value' => $v,
-                    'label' => ($z['name'] ?? $v).' ('.$v.')',
-                ];
-            }
-            $valid = collect($zones)->contains(fn ($z) => ($z['id'] ?? '') === $selectedRegion);
-            if ($valid && $selectedRegion !== '') {
-                foreach ($svc->getServerTypes($selectedRegion) as $t) {
-                    $v = (string) ($t['name'] ?? $t['id'] ?? '');
-                    if ($v === '') {
-                        continue;
-                    }
-                    $sizes[] = [
-                        'value' => $v,
-                        'label' => $v,
-                        'memory_mb' => null,
-                        'vcpus' => $this->extractInt($t, ['ncpus', 'cpus']),
-                        'disk_gb' => null,
-                    ];
-                }
-            }
-        } catch (\Throwable) {
-            //
-        }
-
-        return [
-            'credentials' => $credentials,
-            'regions' => $regions,
-            'sizes' => $sizes,
-            'region_label' => __('Zone'),
-            'size_label' => __('Instance type'),
-        ];
-    }
-
-    /**
-     * @param  Collection<int, ProviderCredential>  $credentials
-     */
-    private function catalogOvh(Collection $credentials, ProviderCredential $credential, string $selectedRegion): array
-    {
-        $regions = [];
-        $sizes = [];
-        try {
-            $svc = new OvhService($credential);
-            $project = $svc->projectId();
-
-            foreach ($svc->getRegions($project) as $r) {
-                $regions[] = ['value' => $r, 'label' => $r];
-            }
-
-            if ($selectedRegion !== '' && in_array($selectedRegion, array_column($regions, 'value'), true)) {
-                foreach ($svc->getFlavors($project, $selectedRegion) as $f) {
-                    if (! is_array($f)) {
-                        continue;
-                    }
-                    if (($f['osType'] ?? 'linux') !== 'linux' || ($f['available'] ?? true) === false) {
-                        continue;
-                    }
-                    $v = (string) ($f['id'] ?? '');
-                    if ($v === '') {
-                        continue;
-                    }
-                    $ram = $this->extractInt($f, ['ram']);
-                    $sizes[] = [
-                        'value' => $v,
-                        'label' => (string) ($f['name'] ?? $v),
-                        'memory_mb' => $ram,
-                        'vcpus' => $this->extractInt($f, ['vcpus']),
-                        'disk_gb' => $this->extractInt($f, ['disk']),
-                    ];
-                }
-            }
-        } catch (\Throwable) {
-            //
-        }
-
-        return [
-            'credentials' => $credentials,
-            'regions' => $regions,
-            'sizes' => $sizes,
-            'region_label' => __('Region'),
-            'size_label' => __('Flavor'),
-        ];
-    }
-
-    /**
-     * @param  Collection<int, ProviderCredential>  $credentials
-     * @return array{credentials: Collection<int, ProviderCredential>, regions: list<array{value: string, label: string}>, sizes: list<array{value: string, label: string}>, region_label: string, size_label: string}
-     */
     private function catalogUpcloud(Collection $credentials, ProviderCredential $credential): array
     {
         $regions = [];
@@ -738,112 +617,6 @@ final class ResolveServerCreateCatalog
             'sizes' => $sizes,
             'region_label' => __('Zone'),
             'size_label' => __('Plan'),
-        ];
-    }
-
-    /**
-     * @param  Collection<int, ProviderCredential>  $credentials
-     * @return array{credentials: Collection<int, ProviderCredential>, regions: list<array{value: string, label: string}>, sizes: list<array{value: string, label: string}>, region_label: string, size_label: string}
-     */
-    private function catalogEquinixMetal(Collection $credentials, ProviderCredential $credential): array
-    {
-        $regions = [];
-        $sizes = [];
-        try {
-            $svc = new EquinixMetalService($credential);
-            foreach ($svc->getMetros() as $m) {
-                $v = (string) ($m['code'] ?? $m['id'] ?? '');
-                if ($v === '') {
-                    continue;
-                }
-                $regions[] = [
-                    'value' => $v,
-                    'label' => ($m['name'] ?? $v).' ('.$v.')',
-                ];
-            }
-            foreach ($svc->getPlans() as $p) {
-                $v = (string) ($p['slug'] ?? $p['id'] ?? '');
-                if ($v === '') {
-                    continue;
-                }
-                $monthly = $this->extractFloat($p, ['pricing.monthly', 'price_monthly']);
-                $hourly = $this->extractFloat($p, ['pricing.hourly', 'price_hourly']);
-                $sizes[] = [
-                    'value' => $v,
-                    'label' => (string) ($p['name'] ?? $v).$this->formatPriceSuffix($monthly, $hourly),
-                    'price_monthly' => $monthly,
-                    'price_hourly' => $hourly,
-                    'pricing_source' => ($monthly !== null || $hourly !== null) ? 'provider_catalog' : null,
-                    'memory_mb' => ((int) ($p['specs']['memory']['total'] ?? 0)) > 0 ? ((int) ($p['specs']['memory']['total'] ?? 0)) : null,
-                    'vcpus' => ((int) ($p['specs']['cpus'][0]['count'] ?? 0)) > 0 ? ((int) ($p['specs']['cpus'][0]['count'] ?? 0)) : null,
-                    'disk_gb' => null,
-                ];
-            }
-            $this->sortSizesByPriceAscending($sizes);
-        } catch (\Throwable) {
-            //
-        }
-
-        return [
-            'credentials' => $credentials,
-            'regions' => $regions,
-            'sizes' => $sizes,
-            'region_label' => __('Metro'),
-            'size_label' => __('Plan'),
-        ];
-    }
-
-    /**
-     * @param  Collection<int, ProviderCredential>  $credentials
-     * @return array{credentials: Collection<int, ProviderCredential>, regions: list<array{value: string, label: string}>, sizes: list<array{value: string, label: string}>, region_label: string, size_label: string}
-     */
-    private function catalogFlyIo(Collection $credentials): array
-    {
-        $regions = [];
-        $sizes = [];
-        foreach (FlyIoService::getRegions() as $r) {
-            $v = (string) ($r['id'] ?? '');
-            if ($v === '') {
-                continue;
-            }
-            $regions[] = [
-                'value' => $v,
-                'label' => ($r['name'] ?? $v).' ('.$v.')',
-            ];
-        }
-        foreach (FlyIoService::getVmSizes() as $s) {
-            $v = (string) ($s['id'] ?? '');
-            if ($v === '') {
-                continue;
-            }
-            $sizes[] = [
-                'value' => $v,
-                'label' => (string) ($s['name'] ?? $v),
-                'memory_mb' => match ($v) {
-                    'shared-cpu-1x' => 256,
-                    'shared-cpu-2x' => 512,
-                    'shared-cpu-4x' => 1024,
-                    'performance-1x' => 2048,
-                    'performance-2x' => 4096,
-                    'performance-4x' => 8192,
-                    default => null,
-                },
-                'vcpus' => match ($v) {
-                    'shared-cpu-1x', 'performance-1x' => 1,
-                    'shared-cpu-2x', 'performance-2x' => 2,
-                    'shared-cpu-4x', 'performance-4x' => 4,
-                    default => null,
-                },
-                'disk_gb' => null,
-            ];
-        }
-
-        return [
-            'credentials' => $credentials,
-            'regions' => $regions,
-            'sizes' => $sizes,
-            'region_label' => __('Region'),
-            'size_label' => __('VM size'),
         ];
     }
 
@@ -976,63 +749,6 @@ final class ResolveServerCreateCatalog
             'sizes' => $sizes,
             'region_label' => __('Region'),
             'size_label' => __('Shape'),
-        ];
-    }
-
-    /**
-     * @param  Collection<int, ProviderCredential>  $credentials
-     * @return array{credentials: Collection<int, ProviderCredential>, regions: list<array{value: string, label: string}>, sizes: list<array{value: string, label: string, memory_mb?: int|null, vcpus?: int|null, disk_gb?: int|null}>, region_label: string, size_label: string}
-     */
-    private function catalogGcp(Collection $credentials, ProviderCredential $credential, string $selectedRegion = ''): array
-    {
-        $regions = [];
-        $sizes = [];
-
-        $service = new GcpComputeService($credential);
-
-        foreach ($service->getZones() as $zone) {
-            $id = (string) ($zone['id'] ?? '');
-            if ($id === '') {
-                continue;
-            }
-
-            $regions[] = [
-                'value' => $id,
-                'label' => (string) ($zone['name'] ?? $id),
-            ];
-        }
-
-        $selectedZone = trim($selectedRegion) !== ''
-            ? trim($selectedRegion)
-            : (string) ($regions[0]['value'] ?? config('services.gcp.default_zone', 'us-central1-a'));
-        foreach ($service->getMachineTypes($selectedZone) as $size) {
-            $id = (string) ($size['id'] ?? '');
-            if ($id === '') {
-                continue;
-            }
-
-            $memoryMb = is_numeric($size['memory_mb'] ?? null) ? (int) $size['memory_mb'] : null;
-            $vcpus = is_numeric($size['vcpus'] ?? null) ? (int) $size['vcpus'] : null;
-            $label = (string) ($size['name'] ?? $id);
-            if ($memoryMb !== null && $vcpus !== null) {
-                $label .= sprintf(' (%d vCPU, %dMB RAM)', $vcpus, $memoryMb);
-            }
-
-            $sizes[] = [
-                'value' => $id,
-                'label' => $label,
-                'memory_mb' => $memoryMb,
-                'vcpus' => $vcpus,
-                'disk_gb' => null,
-            ];
-        }
-
-        return [
-            'credentials' => $credentials,
-            'regions' => $regions,
-            'sizes' => $sizes,
-            'region_label' => __('Zone'),
-            'size_label' => __('Machine type'),
         ];
     }
 

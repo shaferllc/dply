@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 8, 2026',
+                    'tags'    => ['improved'],
+                    'title'   => 'Removed Several Cloud Providers',
+                    'summary' => 'Support for Google Cloud, Scaleway, Equinix Metal, and Fly.io server providers has been removed.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 8, 2026',
                     'tags'    => ['new'],
                     'title'   => 'Server Snapshots Workspace',
                     'summary' => 'Servers gain a unified Snapshots workspace to capture full-disk provider images, take and restore site database snapshots, and manage cache (Redis/Valkey) snapshots from one place.',

@@ -31,7 +31,6 @@ use App\Console\Commands\ProcessScheduledSiteDeletionsCommand;
 use App\Console\Commands\ProcessSshKeyRotationRemindersCommand;
 use App\Console\Commands\PruneAuditLogsCommand;
 use App\Console\Commands\PruneErrorEventsCommand;
-use App\Console\Commands\SyncErrorEventsCommand;
 use App\Console\Commands\PruneFunctionInvocationsCommand;
 use App\Console\Commands\PruneLocalWorkspaceArtifactsCommand;
 use App\Console\Commands\PruneServerCreateDraftsCommand;
@@ -42,9 +41,11 @@ use App\Console\Commands\RollupEdgeAnalyticsEngineCommand;
 use App\Console\Commands\RunDueDeploymentSchedulesCommand;
 use App\Console\Commands\ServerlessTickCommand;
 use App\Console\Commands\SnapshotOrganizationBillingCommand;
+use App\Console\Commands\SweepExpiredMaintenanceWindowsCommand;
 use App\Console\Commands\SweepStalledTasksCommand;
-use App\Console\Commands\WarmPoolAutoscaleCommand;
 use App\Console\Commands\SyncAllOrganizationBillingCommand;
+use App\Console\Commands\SyncErrorEventsCommand;
+use App\Console\Commands\WarmPoolAutoscaleCommand;
 use App\Console\Commands\WorkerPoolAutoscaleCommand;
 use App\Console\Commands\WorkerPoolPrimaryHealthCommand;
 use App\Jobs\VerifyEdgeCustomDomainsJob;
@@ -144,6 +145,14 @@ final class DplySchedule
             ->everyMinute()
             ->withoutOverlapping()
             ->name('sweep-stalled-tasks');
+
+        // Auto-clear timed visitor maintenance windows once their `until`
+        // passes — otherwise sites stay suspended until someone opens the
+        // Maintenance page (which is the only other caller of refreshExpired).
+        $schedule->command(SweepExpiredMaintenanceWindowsCommand::class)
+            ->everyMinute()
+            ->withoutOverlapping()
+            ->name('sweep-expired-maintenance-windows');
 
         // Keep warm-pool buckets topped up to their min + retire idle surplus.
         // No-op unless warm_pool.enabled and buckets are configured.

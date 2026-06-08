@@ -16,8 +16,6 @@ uses(RefreshDatabase::class);
 
 uses(WithFeatures::class);
 
-usesFeatures('provider.fly_io');
-
 function userWithOrganization(): User
 {
     $user = User::factory()->create();
@@ -52,20 +50,6 @@ test('organization credentials page is displayed', function () {
     $response->assertOk();
     $response->assertSee('Provider credentials');
     $response->assertSee('Server providers');
-});
-
-test('organization credentials fly io panel shows value prop', function () {
-    config(['server_providers.enabled.fly_io' => true]);
-
-    $user = userWithOrganization();
-    $org = $user->currentOrganization();
-
-    $response = $this->actingAs($user)->get(route('organizations.credentials', ['organization' => $org, 'provider' => 'fly_io']));
-
-    $response->assertOk()
-        ->assertSee('What Fly.io adds to Dply')
-        ->assertSee('Node and static sites')
-        ->assertSee('Connect Fly.io');
 });
 
 test('credentials index forbidden for deployer', function () {
@@ -239,10 +223,10 @@ test('cdn tab lists only cdn capable providers', function () {
 test('compute vm providers are grouped under vps and cloud not infrastructure hub label', function () {
     config([
         'server_providers.enabled.upcloud' => true,
-        'server_providers.enabled.scaleway' => true,
+        'server_providers.enabled.linode' => true,
     ]);
     Feature::define('provider.upcloud', fn (): bool => true);
-    Feature::define('provider.scaleway', fn (): bool => true);
+    Feature::define('provider.linode', fn (): bool => true);
     Feature::flushCache();
 
     $nav = CredentialsIndex::credentialProviderNav();
@@ -256,6 +240,6 @@ test('compute vm providers are grouped under vps and cloud not infrastructure hu
     $vpsGroup = __('VPS & cloud');
 
     expect($groupById['upcloud'] ?? null)->toBe($vpsGroup);
-    expect($groupById['scaleway'] ?? null)->toBe($vpsGroup);
+    expect($groupById['linode'] ?? null)->toBe($vpsGroup);
     expect(array_column($nav, 'label'))->not->toContain(__('Infrastructure'));
 });

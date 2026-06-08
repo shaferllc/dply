@@ -17,9 +17,9 @@ use Carbon\Carbon;
  * of the per-provider service classes (which share no common interface — see
  * {@see \App\Jobs\RefreshServerPrivateIpJob} for the same match-on-provider idiom).
  *
- * DigitalOcean, Hetzner, Vultr, and Linode/Akamai wrap the image API today;
- * everything else reports unsupported so the Snapshots workspace can render a
- * "not available" state rather than a broken button.
+ * DigitalOcean, Hetzner, Vultr, and Linode wrap the image API today; everything
+ * else reports unsupported so the Snapshots workspace can render a "not
+ * available" state rather than a broken button.
  *
  * `create()` blocks while it polls the provider action to completion — it MUST run
  * inside a queue job ({@see \App\Jobs\CreateServerImageJob}), never in a web request.
@@ -55,7 +55,7 @@ class ServerImageProvider
             ServerProvider::DigitalOcean => $this->createDigitalOcean(new DigitalOceanService($credential), (int) $providerId, $name, $onTick),
             ServerProvider::Hetzner => $this->createHetzner(new HetznerService($credential), (int) $providerId, $name, $onTick),
             ServerProvider::Vultr => $this->createVultr(new VultrService($credential), $providerId, $name, $onTick),
-            ServerProvider::Linode, ServerProvider::Akamai => $this->createLinode(new LinodeService($credential), (int) $providerId, $name, $onTick),
+            ServerProvider::Linode => $this->createLinode(new LinodeService($credential), (int) $providerId, $name, $onTick),
             default => throw new \RuntimeException('Image snapshots are not supported on '.($server->provider?->label() ?? 'this provider').'.'),
         };
     }
@@ -71,7 +71,7 @@ class ServerImageProvider
             ServerProvider::DigitalOcean => (new DigitalOceanService($credential))->deleteSnapshot($providerImageId),
             ServerProvider::Hetzner => (new HetznerService($credential))->deleteImage((int) $providerImageId),
             ServerProvider::Vultr => (new VultrService($credential))->deleteSnapshot($providerImageId),
-            ServerProvider::Linode, ServerProvider::Akamai => (new LinodeService($credential))->deleteImage($providerImageId),
+            ServerProvider::Linode => (new LinodeService($credential))->deleteImage($providerImageId),
             default => throw new \RuntimeException('Image snapshots are not supported on '.($server->provider?->label() ?? 'this provider').'.'),
         };
     }

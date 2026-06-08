@@ -186,7 +186,7 @@
                 <div class="max-w-2xl">
                     <p class="text-xs font-semibold uppercase tracking-wider text-brand-sage">Day-two operations</p>
                     <h2 class="mt-3 text-3xl font-bold tracking-tight text-brand-ink sm:text-4xl">The server record is your control plane</h2>
-                    <p class="mt-4 text-brand-moss leading-relaxed">Provision from DigitalOcean, Hetzner, Linode, Vultr, UpCloud, Scaleway, Equinix Metal, Fly.io, AWS EC2, and more—or attach any machine over SSH. Then operate it without leaving the console.</p>
+                    <p class="mt-4 text-brand-moss leading-relaxed">Provision from DigitalOcean, Hetzner, Linode, Vultr, UpCloud, AWS EC2, Azure, Oracle Cloud, and more—or attach any machine over SSH. Then operate it without leaving the console.</p>
                 </div>
 
                 <div class="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -428,7 +428,7 @@
                         <tbody class="divide-y divide-brand-ink/10 text-brand-ink">
                             @php
                                 $coverage = [
-                                    ['Server provisioning', 'ok', 'Create or destroy servers via DigitalOcean, Hetzner, Linode, Vultr, UpCloud, Scaleway, Equinix Metal, Fly.io, AWS EC2, and more; attach Custom servers over SSH. The OS and base image stay yours—no resident agent.'],
+                                    ['Server provisioning', 'ok', 'Create or destroy servers via DigitalOcean, Hetzner, Linode, Vultr, UpCloud, AWS EC2, Azure, Oracle Cloud, and more; attach Custom servers over SSH. The OS and base image stay yours—no resident agent.'],
                                     ['Git deploys &amp; rollbacks', 'ok', 'Git remotes, signed webhooks, deploy hooks, atomic deploys with a <code class="text-xs bg-brand-sand/60 px-1 rounded">releases/</code> directory, and rollback to a prior release.'],
                                     ['PHP / Laravel / Node / static', 'ok', 'Site types for PHP-FPM, Node reverse proxy, and static; Laravel options like scheduler, Octane, and env in the deploy flow.'],
                                     ['Edge &amp; Cloud hosting', 'ok', 'Container apps on DigitalOcean App Platform or AWS App Runner via a unified EdgeBackend. Deploy from git without a server, Nginx config, or OS to maintain. Cloudflare CDN, R2 object storage, and KV included.'],

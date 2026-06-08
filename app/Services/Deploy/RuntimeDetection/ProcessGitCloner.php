@@ -20,7 +20,7 @@ final class ProcessGitCloner implements GitCloner
     /**
      * Default timeout for the clone process, in seconds. Overridable so
      * tests can drop it; the production value gives a reasonable budget
-     * for a Render/Railway-shape large monorepo on a slow connection.
+     * for a large monorepo on a slow connection.
      */
     public function __construct(
         private readonly int $timeoutSeconds = 120,

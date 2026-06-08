@@ -5,8 +5,10 @@ namespace App\Livewire\Servers;
 use App\Jobs\ApplyInsightFixJob;
 use App\Jobs\RevertInsightFixJob;
 use App\Jobs\RunServerInsightsJob;
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\ManagesInsightsNotifications;
 use App\Models\InsightFinding;
 use App\Models\Organization;
 use App\Models\Server;
@@ -22,6 +24,7 @@ use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use Livewire\Attributes\Lazy;
@@ -36,6 +39,8 @@ class WorkspaceInsights extends Component
     protected string $requiredFeature = 'workspace.insights';
 
     use InteractsWithServerWorkspace;
+    use CreatesNotificationChannelInline;
+    use ManagesInsightsNotifications;
 
     /** When true, render the coming-soon teaser instead of the full workspace. */
     public bool $comingSoonPreview = false;
@@ -111,6 +116,18 @@ class WorkspaceInsights extends Component
     public function setTab(string $tab): void
     {
         $this->tab = in_array($tab, ['overview', 'dismissed', 'notifications', 'settings'], true) ? $tab : 'overview';
+    }
+
+    /**
+     * Fired by {@see CreatesNotificationChannelInline} after the inline modal
+     * creates a channel. Jump to the Notifications tab and pre-select the new
+     * channel so the operator can finish wiring it to the insights alert.
+     */
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId): void
+    {
+        $this->tab = 'notifications';
+        $this->notif_channel_id = $channelId;
     }
 
     public function saveSettings(): void
@@ -1158,6 +1175,9 @@ class WorkspaceInsights extends Component
             'selectedFixFinding' => $this->applyFixFindingId === null
                 ? null
                 : $findings->firstWhere('id', $this->applyFixFindingId),
+            'notifChannels' => $this->tab === 'notifications' ? $this->assignableInsightsNotificationChannels() : collect(),
+            'notifSubscriptions' => $this->tab === 'notifications' ? $this->insightsNotificationSubscriptions() : collect(),
+            'notifEventLabels' => $this->tab === 'notifications' ? $this->insightsEventLabels() : [],
         ]);
     }
 }

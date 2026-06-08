@@ -5,7 +5,6 @@ namespace App\Services\Servers;
 use App\Enums\ServerProvider;
 use App\Models\Server;
 use App\Services\DigitalOceanService;
-use App\Services\EquinixMetalService;
 use App\Services\HetznerService;
 use App\Services\VultrService;
 use Carbon\CarbonImmutable;
@@ -39,7 +38,6 @@ class ServerProviderCostEstimator
             ServerProvider::DigitalOcean,
             ServerProvider::Hetzner,
             ServerProvider::Vultr,
-            ServerProvider::EquinixMetal,
         ], true);
     }
 
@@ -86,7 +84,6 @@ class ServerProviderCostEstimator
             ServerProvider::DigitalOcean => $this->lookupDigitalOcean($server),
             ServerProvider::Hetzner => $this->lookupHetzner($server),
             ServerProvider::Vultr => $this->lookupVultr($server),
-            ServerProvider::EquinixMetal => $this->lookupEquinixMetal($server),
             default => throw new ProviderCostUnavailableException(
                 __('Pulling cost from :provider is not supported yet — type the value into the field instead.', [
                     'provider' => $provider->label(),
@@ -214,46 +211,6 @@ class ServerProviderCostEstimator
             'plan' => $id,
             'provider_label' => ServerProvider::Vultr->label(),
             'source' => __('Vultr catalog price'),
-        ];
-    }
-
-    /**
-     * @return array{monthly: float, hourly: float, currency: string, plan: string, provider_label: string, source: string}
-     */
-    protected function lookupEquinixMetal(Server $server): array
-    {
-        $plans = $this->cachedCatalog(
-            $server,
-            'equinix_metal:plans',
-            fn () => (new EquinixMetalService($server->providerCredential))->getPlans()
-        );
-
-        $slug = (string) $server->size;
-        $match = $this->findFirst($plans, fn ($row) => ($row['slug'] ?? null) === $slug
-            || ($row['name'] ?? null) === $slug);
-
-        if ($match === null) {
-            throw new ProviderCostUnavailableException(
-                __('Equinix Metal did not return plan :slug.', ['slug' => $slug])
-            );
-        }
-
-        $hourly = (float) ($match['pricing']['hour'] ?? 0);
-        if ($hourly <= 0) {
-            throw new ProviderCostUnavailableException(
-                __('Equinix Metal returned no public hourly price for :slug — this plan is likely quote-only.', ['slug' => $slug])
-            );
-        }
-
-        $monthly = $hourly * self::HOURS_PER_MONTH;
-
-        return [
-            'monthly' => $monthly,
-            'hourly' => $hourly,
-            'currency' => 'USD',
-            'plan' => $slug,
-            'provider_label' => ServerProvider::EquinixMetal->label(),
-            'source' => __('Equinix Metal catalog hourly × :hours', ['hours' => (int) self::HOURS_PER_MONTH]),
         ];
     }
 

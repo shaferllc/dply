@@ -8,6 +8,7 @@ use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\Notifications\ServerMaintenanceNotificationDispatcher;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -282,6 +283,24 @@ final class ServerMaintenanceWindow
             ]);
         }
 
+        app(ServerMaintenanceNotificationDispatcher::class)->notify(
+            $server,
+            'enabled',
+            [
+                trans_choice(':count site suspended.|:count sites suspended.', count($suspendedIds), ['count' => count($suspendedIds)]),
+                $until !== null
+                    ? __('Ends automatically at :time', ['time' => $until->toIso8601String()])
+                    : __('Manual clear only — no scheduled end.'),
+                $publicMessage !== '' ? __('Public message: :message', ['message' => $publicMessage]) : '',
+                trim($note) !== '' ? __('Operator note: :note', ['note' => trim($note)]) : '',
+            ],
+            $user,
+            [
+                'until' => $until?->toIso8601String(),
+                'suspended_count' => count($suspendedIds),
+            ],
+        );
+
         return [
             'suspended' => count($suspendedIds),
             'already_suspended' => $alreadySuspended,
@@ -291,7 +310,7 @@ final class ServerMaintenanceWindow
     /**
      * @return array{resumed: int, left_suspended: int}
      */
-    public function disable(Server $server, ?User $user = null): array
+    public function disable(Server $server, ?User $user = null, bool $autoExpired = false): array
     {
         $state = $this->state($server);
         if ($state === null || ! ($state['active'] ?? false)) {
@@ -348,8 +367,25 @@ final class ServerMaintenanceWindow
             audit_log($org, $user, 'server.maintenance.disabled', $server, null, [
                 'resumed_count' => $resumed,
                 'left_suspended' => $leftSuspended,
+                'auto_expired' => $autoExpired,
             ]);
         }
+
+        app(ServerMaintenanceNotificationDispatcher::class)->notify(
+            $server,
+            $autoExpired ? 'auto_expired' : 'disabled',
+            [
+                trans_choice(':count site resumed.|:count sites resumed.', $resumed, ['count' => $resumed]),
+                $leftSuspended > 0
+                    ? trans_choice(':count site left suspended (manually suspended — unchanged).|:count sites left suspended (manually suspended — unchanged).', $leftSuspended, ['count' => $leftSuspended])
+                    : '',
+            ],
+            $user,
+            [
+                'resumed_count' => $resumed,
+                'left_suspended' => $leftSuspended,
+            ],
+        );
 
         return [
             'resumed' => $resumed,
@@ -372,7 +408,7 @@ final class ServerMaintenanceWindow
             return false;
         }
 
-        $this->disable($server, $user);
+        $this->disable($server, $user, autoExpired: true);
 
         return true;
     }

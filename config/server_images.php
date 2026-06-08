@@ -33,7 +33,6 @@ return [
                 'digitalocean' => 'ubuntu-24-04-x64',
                 'hetzner' => 'ubuntu-24.04',
                 'linode' => 'linode/ubuntu24.04',
-                'scaleway' => 'ubuntu_noble',
             ],
         ],
 
@@ -44,7 +43,6 @@ return [
                 'digitalocean' => 'ubuntu-22-04-x64',
                 'hetzner' => 'ubuntu-22.04',
                 'linode' => 'linode/ubuntu22.04',
-                'scaleway' => 'ubuntu_jammy',
             ],
         ],
 
@@ -55,7 +53,6 @@ return [
                 'digitalocean' => 'ubuntu-20-04-x64',
                 'hetzner' => 'ubuntu-20.04',
                 'linode' => 'linode/ubuntu20.04',
-                'scaleway' => 'ubuntu_focal',
             ],
         ],
 
@@ -66,7 +63,6 @@ return [
                 'digitalocean' => 'debian-12-x64',
                 'hetzner' => 'debian-12',
                 'linode' => 'linode/debian12',
-                'scaleway' => 'debian_bookworm',
             ],
         ],
 
@@ -77,7 +73,6 @@ return [
                 'digitalocean' => 'debian-11-x64',
                 'hetzner' => 'debian-11',
                 'linode' => 'linode/debian11',
-                'scaleway' => 'debian_bullseye',
             ],
         ],
 

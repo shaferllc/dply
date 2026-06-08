@@ -480,8 +480,6 @@ class StepReview extends Component
             'digitalocean_functions' => __('DigitalOcean Functions host added. Create a site to wire its runtime and deploy settings.'),
             'aws_lambda' => __('AWS Lambda target added. Create a site to wire its runtime and Bref deploy settings.'),
             'digitalocean_kubernetes' => __('DigitalOcean Kubernetes target added. Create a site to prepare manifests and cluster runtime settings.'),
-            'equinix_metal' => __('Bare metal can take 5–10 minutes.'),
-            'fly_io' => __('Fly.io machine is being created.'),
             'aws' => __('AWS EC2 instance is being created. This usually takes 1–2 minutes.'),
             'custom' => __('Server added.'),
             default => __('Server is being created. This usually takes 1–2 minutes.'),

@@ -111,9 +111,6 @@ class Index extends Component
                     ['id' => 'linode', 'label' => 'Linode'],
                     ['id' => 'vultr', 'label' => 'Vultr'],
                     ['id' => 'upcloud', 'label' => 'UpCloud'],
-                    ['id' => 'scaleway', 'label' => 'Scaleway'],
-                    ['id' => 'akamai', 'label' => __('Akamai (Linode API)')],
-                    ['id' => 'equinix_metal', 'label' => 'Equinix Metal'],
                 ],
             ],
             [
@@ -129,19 +126,13 @@ class Index extends Component
                 'label' => __('Other providers'),
                 'items' => [
                     ['id' => 'ovh', 'label' => __('OVH Public Cloud')],
-                    ['id' => 'rackspace', 'label' => __('Rackspace (OpenStack)')],
                 ],
             ],
             [
                 'label' => __('Platforms'),
                 'items' => [
-                    ['id' => 'fly_io', 'label' => 'Fly.io'],
                     ['id' => 'aws_app_runner', 'label' => 'AWS App Runner'],
                     ['id' => 'ghcr', 'label' => __('GitHub Container Registry')],
-                    ['id' => 'render', 'label' => 'Render'],
-                    ['id' => 'railway', 'label' => 'Railway'],
-                    ['id' => 'coolify', 'label' => 'Coolify'],
-                    ['id' => 'cap_rover', 'label' => 'CapRover'],
                 ],
             ],
             [

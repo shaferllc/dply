@@ -74,12 +74,12 @@ trait ServerCreateActions
 
     public function updatedFormRegion(): void
     {
-        // Region-scoped catalogs (DO, Scaleway) must re-resolve with the
-        // new region so the size dropdown stops offering plans that don't
-        // exist in that DC. We also blank the current size pick — if it
-        // isn't available in the new region the next render would silently
-        // leave it stale and provisioning would fail server-side.
-        if (in_array($this->form->type, ['scaleway', 'digitalocean'], true)) {
+        // Region-scoped catalogs (DO) must re-resolve with the new region so the
+        // size dropdown stops offering plans that don't exist in that DC. We also
+        // blank the current size pick — if it isn't available in the new region the
+        // next render would silently leave it stale and provisioning would fail
+        // server-side.
+        if (in_array($this->form->type, ['digitalocean'], true)) {
             $this->form->size = '';
             $this->memoServerCreateCatalog = null;
             $this->memoServerCreateCatalogKey = null;
@@ -206,10 +206,9 @@ trait ServerCreateActions
     {
         $selectedRegion = $selectedRegionOverride ?? $this->form->region;
         // Sizes are region-scoped on every provider that publishes per-region
-        // availability — Scaleway's catalog is region-specific, and DO's
-        // /sizes returns a regions array per plan. Without region in the
-        // memo key, switching region reuses the previous region's sizes.
-        $memoSegment = in_array($this->form->type, ['scaleway', 'digitalocean'], true) ? $selectedRegion : '';
+        // availability — DO's /sizes returns a regions array per plan. Without
+        // region in the memo key, switching region reuses the previous region's sizes.
+        $memoSegment = in_array($this->form->type, ['digitalocean'], true) ? $selectedRegion : '';
         $memoKey = implode('|', [(string) $org->getKey(), $this->form->type, $this->form->provider_credential_id, $memoSegment]);
 
         if ($this->memoServerCreateCatalog !== null && $this->memoServerCreateCatalogKey === $memoKey) {
@@ -274,8 +273,8 @@ trait ServerCreateActions
         return array_values(array_filter(
             $cards,
             fn (array $card): bool => in_array($card['id'], [
-                'digitalocean', 'hetzner', 'vultr', 'linode', 'akamai',
-                'scaleway', 'upcloud', 'equinix_metal', 'fly_io', 'aws', 'gcp', 'azure', 'oracle',
+                'digitalocean', 'hetzner', 'vultr', 'linode',
+                'upcloud', 'aws', 'azure', 'oracle',
             ], true)
         ));
     }
@@ -365,10 +364,6 @@ trait ServerCreateActions
         $catalog = $this->resolveServerCreateCatalog($org, '');
 
         $this->form->region = $this->preferredRegionValue($catalog['regions'] ?? []);
-
-        if ($this->form->type === 'scaleway' && $this->form->region !== '') {
-            $catalog = $this->resolveServerCreateCatalog($org);
-        }
 
         $this->form->size = $this->recommendedSizeValue($catalog['sizes'] ?? [], $this->form->server_role);
     }

@@ -44,7 +44,7 @@ return [
 
     'byo_cron_callback' => [
         'title' => 'Sequence → BYO cron callback',
-        'summary' => 'Finish an OpenWhisk sequence with a BYO server cron or HTTP callback — useful for VPS tasks Railway cannot reach.',
+        'summary' => 'Finish an OpenWhisk sequence with a BYO server cron or HTTP callback — useful for VPS tasks a managed PaaS cannot reach.',
         'doc_slug' => 'server-cron-jobs',
         'requires' => 'byo_cron_and_actions',
         'steps' => [

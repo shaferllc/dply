@@ -198,7 +198,7 @@
                 </div>
             @endif
         </section>
-    @elseif ($flyUpsell)
+    @elseif ($cloudUpsell)
         <section class="mt-8 rounded-2xl border border-sky-200 bg-sky-50/60 p-5 shadow-sm">
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>

@@ -43,8 +43,38 @@
         <p>{{ __('Enable visitor maintenance to suspend every eligible VM site at once with a shared public message. Deploy hooks and settings still work. Manually suspended sites are left unchanged and are not auto-resumed when maintenance ends.') }}</p>
     </x-explainer>
 
+    @php
+        $maintTabBase = 'inline-flex items-center gap-1.5 border-b-2 px-1 py-3 text-sm font-medium transition-colors';
+        $maintTabOn = 'border-brand-forest text-brand-ink';
+        $maintTabOff = 'border-transparent text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink';
+    @endphp
+    <div class="mb-6 border-b border-brand-ink/10">
+        <nav class="-mb-px flex flex-wrap gap-6" aria-label="{{ __('Maintenance sections') }}">
+            <button type="button" wire:click="setMaintenanceTab('window')" @class([$maintTabBase, $maintenance_tab === 'window' ? $maintTabOn : $maintTabOff])>
+                <x-heroicon-o-pause-circle class="h-4 w-4" aria-hidden="true" />
+                {{ __('Visitor window') }}
+                @if ($active)
+                    <span class="ml-0.5 inline-flex h-2 w-2 rounded-full bg-amber-500" title="{{ __('Maintenance active') }}"></span>
+                @endif
+            </button>
+            <button type="button" wire:click="setMaintenanceTab('operations')" @class([$maintTabBase, $maintenance_tab === 'operations' ? $maintTabOn : $maintTabOff])>
+                <x-heroicon-o-wrench-screwdriver class="h-4 w-4" aria-hidden="true" />
+                {{ __('Operations') }}
+            </button>
+            <button type="button" wire:click="setMaintenanceTab('schedule')" @class([$maintTabBase, $maintenance_tab === 'schedule' ? $maintTabOn : $maintTabOff])>
+                <x-heroicon-o-calendar-days class="h-4 w-4" aria-hidden="true" />
+                {{ __('Schedule') }}
+            </button>
+            <button type="button" wire:click="setMaintenanceTab('notifications')" @class([$maintTabBase, $maintenance_tab === 'notifications' ? $maintTabOn : $maintTabOff])>
+                <x-heroicon-o-bell class="h-4 w-4" aria-hidden="true" />
+                {{ __('Notifications') }}
+            </button>
+        </nav>
+    </div>
+
     <div class="space-y-6">
-        {{-- Overall --}}
+        {{-- Overall (window tab) --}}
+        <div @class(['hidden' => $maintenance_tab !== 'window'])>
         <section class="dply-card overflow-hidden">
             <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <div class="flex flex-wrap items-start justify-between gap-3">
@@ -124,7 +154,10 @@
             @endif
         </section>
 
-        {{-- Related maintenance controls --}}
+        </div>
+
+        {{-- Related maintenance controls (schedule tab) --}}
+        <div @class(['hidden' => $maintenance_tab !== 'schedule'])>
         <div class="grid gap-6 lg:grid-cols-2">
             <section class="dply-card overflow-hidden">
                 <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
@@ -199,8 +232,10 @@
                 </div>
             </section>
         </div>
+        </div>
 
-        {{-- Site impact --}}
+        {{-- Site impact (window tab) --}}
+        <div @class(['hidden' => $maintenance_tab !== 'window'])>
         <section class="dply-card overflow-hidden">
             <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
                 <div class="flex flex-wrap items-start justify-between gap-3">
@@ -266,7 +301,90 @@
             @endif
         </section>
 
-        {{-- Enable / settings form --}}
+        </div>
+
+        {{-- Server maintenance operations (operations tab) --}}
+        <div @class(['hidden' => $maintenance_tab !== 'operations'])>
+        <section class="dply-card overflow-hidden">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <x-icon-badge>
+                    <x-heroicon-o-wrench-screwdriver class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Operations') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Server maintenance operations') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Run host-level upkeep over SSH — package updates, cleanup, and reboot. Each run is queued and recorded in the activity log below.') }}</p>
+                </div>
+            </div>
+
+            <div class="space-y-6 px-6 py-6 sm:px-7">
+                @if ($maintenanceRemoteTaskId)
+                    <x-workspace-console-banner
+                        :status="$bannerStatus"
+                        :message="$maintenanceActionLabel ?? __('Maintenance operation')"
+                        :output="$bannerOutputLines"
+                        :busy="$bannerBusy"
+                        :dismiss-action="$bannerBusy ? null : 'dismissMaintenanceTask'"
+                        :poll-action="$bannerBusy ? 'syncMaintenanceRemoteTaskFromCache' : null"
+                        poll-interval="2s"
+                        :default-expanded="true"
+                    />
+                @endif
+
+                @if (! $opsReady)
+                    <p class="rounded-lg bg-brand-sand/40 px-4 py-3 text-sm text-brand-moss ring-1 ring-brand-ink/10">
+                        {{ __('Provisioning and SSH must be ready, and you need server-management permission, to run these operations.') }}
+                    </p>
+                @elseif ($recurringWindow->enabled() && ! $recurringWindow->containsNow())
+                    <p class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-900 ring-1 ring-amber-200">
+                        <x-heroicon-o-clock class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {{ __('Outside the preferred maintenance window — disruptive actions may be better scheduled.') }}
+                    </p>
+                @endif
+
+                @foreach ($operationGroups as $group)
+                    <div wire:key="maint-ops-{{ \Illuminate\Support\Str::slug($group['title']) }}">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __($group['title']) }}</p>
+                        <div class="mt-2 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                            @foreach ($group['actions'] as $action)
+                                <div wire:key="maint-op-{{ $action['key'] }}" class="flex flex-col rounded-xl border border-brand-ink/10 bg-white p-4 shadow-sm">
+                                    <div class="flex items-start justify-between gap-2">
+                                        <p class="text-sm font-semibold text-brand-ink">{{ $action['label'] }}</p>
+                                        @if ($action['danger'])
+                                            <span class="inline-flex shrink-0 items-center rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700 ring-1 ring-rose-200">{{ __('Disruptive') }}</span>
+                                        @endif
+                                    </div>
+                                    @if ($action['description'] !== '')
+                                        <p class="mt-1 flex-1 text-xs leading-relaxed text-brand-moss">{{ $action['description'] }}</p>
+                                    @endif
+                                    <button
+                                        type="button"
+                                        wire:click="confirmAction('{{ $action['key'] }}')"
+                                        @disabled(! $opsReady || $bannerBusy)
+                                        @class([
+                                            'mt-3 inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50',
+                                            'border border-rose-300 bg-white text-rose-700 hover:bg-rose-50' => $action['danger'],
+                                            'border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => ! $action['danger'],
+                                        ])
+                                    >
+                                        {{ __('Run') }}
+                                    </button>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endforeach
+
+                <div class="border-t border-brand-ink/10 pt-5">
+                    @livewire(\App\Livewire\Servers\RecentActionsLog::class, ['server' => $server], key('recent-actions-log-'.$server->id))
+                </div>
+            </div>
+        </section>
+
+        </div>
+
+        {{-- Enable / settings form (window tab) --}}
+        <div @class(['hidden' => $maintenance_tab !== 'window'])>
         <section class="dply-card overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
                 <x-icon-badge tone="amber">
@@ -334,7 +452,15 @@
                 @endif
             </form>
         </section>
+        </div>
+
+        {{-- Notifications tab --}}
+        <div @class(['hidden' => $maintenance_tab !== 'notifications'])>
+            @include('livewire.servers.partials.maintenance.notifications-tab')
+        </div>
     </div>
+
+    @include('livewire.partials.create-notification-channel-modal')
 
     <x-modal name="enable-maintenance-confirmation" maxWidth="md">
         <div class="p-6">
@@ -365,6 +491,27 @@
                     <span wire:loading.remove wire:target="disableMaintenance">{{ __('End maintenance') }}</span>
                     <span wire:loading wire:target="disableMaintenance">{{ __('Ending…') }}</span>
                 </x-primary-button>
+            </div>
+        </div>
+    </x-modal>
+
+    <x-modal name="maintenance-operation-confirmation" maxWidth="md">
+        <div class="p-6">
+            <h2 class="text-lg font-semibold text-brand-ink">{{ $pendingAction['label'] ?? __('Run operation') }}</h2>
+            <p class="mt-2 text-sm text-brand-moss">{{ $pendingAction['confirm'] ?? __('Run this operation on the server?') }}</p>
+            <div class="mt-6 flex justify-end gap-3">
+                <x-secondary-button type="button" wire:click="closeActionModal">{{ __('Cancel') }}</x-secondary-button>
+                @if (($pendingAction['danger'] ?? false))
+                    <x-danger-button type="button" wire:click="runConfirmedAction" wire:loading.attr="disabled">
+                        <span wire:loading.remove wire:target="runConfirmedAction">{{ __('Run') }}</span>
+                        <span wire:loading wire:target="runConfirmedAction">{{ __('Starting…') }}</span>
+                    </x-danger-button>
+                @else
+                    <x-primary-button type="button" wire:click="runConfirmedAction" wire:loading.attr="disabled">
+                        <span wire:loading.remove wire:target="runConfirmedAction">{{ __('Run') }}</span>
+                        <span wire:loading wire:target="runConfirmedAction">{{ __('Starting…') }}</span>
+                    </x-primary-button>
+                @endif
             </div>
         </div>
     </x-modal>

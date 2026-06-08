@@ -123,13 +123,4 @@ class ServerFactory extends Factory
             'size' => 'VM.Standard.E2.1.Micro',
         ]);
     }
-
-    public function scaleway(): static
-    {
-        return $this->state(fn (array $attributes) => [
-            'provider' => ServerProvider::Scaleway,
-            'region' => 'fr-par-1',
-            'size' => 'DEV1-S',
-        ]);
-    }
 }

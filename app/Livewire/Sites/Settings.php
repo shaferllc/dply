@@ -1718,7 +1718,7 @@ class Settings extends Show
 
                             return;
                         }
-                    } elseif (in_array($credForApi->provider, ['linode', 'akamai'], true)) {
+                    } elseif ($credForApi->provider === 'linode') {
                         $linode = new LinodeService($credForApi);
                         if (! $linode->domainExists($zone)) {
                             $this->addError('settings_dns_zone', __('That domain was not found in this Linode account. Add it under Linode → Domains first.'));

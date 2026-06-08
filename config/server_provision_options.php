@@ -139,7 +139,6 @@ return [
             'installs' => ['Valkey', 'UFW'],
             'best_for' => 'Teams that want a standalone cache server using Valkey instead of Redis.',
             'does_not_include' => 'Does not install PHP, a web server, or a relational database.',
-            'exclude_providers' => ['fly_io'],
         ],
         [
             'id' => 'worker',
@@ -158,7 +157,6 @@ return [
             'installs' => ['Docker', 'Supervisor', 'UFW'],
             'best_for' => 'Custom container deployments where you manage services inside Docker yourself.',
             'does_not_include' => 'Does not install the default PHP web stack or a database engine for you.',
-            'exclude_providers' => ['fly_io'],
         ],
         [
             'id' => 'plain',
@@ -172,7 +170,7 @@ return [
     ],
     'cache_services' => [
         ['id' => 'redis', 'label' => 'Redis', 'exclude_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain']],
-        ['id' => 'valkey', 'label' => 'Valkey', 'exclude_providers' => ['fly_io'], 'exclude_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain']],
+        ['id' => 'valkey', 'label' => 'Valkey', 'exclude_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain']],
         ['id' => 'memcached', 'label' => 'Memcached', 'exclude_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain']],
         ['id' => 'keydb', 'label' => 'KeyDB (Redis-compatible, multithreaded)', 'exclude_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain']],
         ['id' => 'dragonfly', 'label' => 'Dragonfly (Redis-compatible)', 'exclude_server_roles' => ['load_balancer', 'database', 'redis', 'valkey', 'plain']],

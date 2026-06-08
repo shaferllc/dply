@@ -19,7 +19,7 @@ final class SiteDnsProviderFactory
         return match ($credential->provider) {
             'digitalocean' => new DigitalOceanDnsProvider(new DigitalOceanService($credential)),
             'hetzner' => new HetznerDnsProvider(new HetznerService($credential)),
-            'linode', 'akamai' => new LinodeDnsProvider(new LinodeService($credential)),
+            'linode' => new LinodeDnsProvider(new LinodeService($credential)),
             'vultr' => new VultrDnsProvider(new VultrService($credential)),
             'azure' => new AzureDnsProvider(new AzureDnsService($credential)),
             'cloudflare' => new CloudflareDnsProvider(new CloudflareDnsService($credential)),

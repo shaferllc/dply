@@ -26,7 +26,7 @@ class ProvisionLinodeServerJob implements ShouldQueue
     public function handle(): void
     {
         $credential = $this->server->providerCredential;
-        if (! $credential || ! in_array($credential->provider, ['linode', 'akamai'], true)) {
+        if (! $credential || $credential->provider !== 'linode') {
             $this->markFailed('Missing or wrong-provider credential. Re-link a Linode credential to this server.');
 
             return;

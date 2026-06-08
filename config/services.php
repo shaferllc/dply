@@ -141,49 +141,12 @@ return [
         'ssh_user' => env('UPCLOUD_SSH_USER', 'root'),
     ],
 
-    'scaleway' => [
-        'default_image' => env('SCALEWAY_DEFAULT_IMAGE', 'ubuntu_jammy'),
-        'ssh_user' => env('SCALEWAY_SSH_USER', 'root'),
-    ],
-
-    'equinix_metal' => [
-        'default_os' => env('EQUINIX_METAL_DEFAULT_OS', 'ubuntu_22_04'),
-        'ssh_user' => env('EQUINIX_METAL_SSH_USER', 'root'),
-    ],
-
     'ovh' => [
         // OVH Public Cloud Ubuntu images default to the `ubuntu` login user.
         'ssh_user' => env('OVH_SSH_USER', 'ubuntu'),
         // Image name matched (case-insensitive substring) against the project's
         // image catalogue at provision time. See OvhService::resolveImageId().
         'default_image' => env('OVH_DEFAULT_IMAGE', 'Ubuntu 24.04'),
-    ],
-
-    'rackspace' => [
-        'ssh_user' => env('RACKSPACE_SSH_USER', 'root'),
-    ],
-
-    'fly_io' => [
-        'api_host' => env('FLY_API_HOSTNAME', 'https://api.machines.dev'),
-        'default_image' => env('FLY_DEFAULT_IMAGE', 'registry-1.docker.io/library/ubuntu:22.04'),
-        'default_vm_size' => env('FLY_DEFAULT_VM_SIZE', 'shared-cpu-1x'),
-        'ssh_user' => env('FLY_SSH_USER', 'root'),
-    ],
-
-    'render' => [
-        'ssh_user' => env('RENDER_SSH_USER', 'root'),
-    ],
-
-    'railway' => [
-        'ssh_user' => env('RAILWAY_SSH_USER', 'root'),
-    ],
-
-    'coolify' => [
-        'ssh_user' => env('COOLIFY_SSH_USER', 'root'),
-    ],
-
-    'cap_rover' => [
-        'ssh_user' => env('CAP_ROVER_SSH_USER', 'root'),
     ],
 
     'aws' => [
@@ -199,13 +162,6 @@ return [
         'provision_security_group' => env('AWS_EC2_PROVISION_SECURITY_GROUP', true),
         'provision_security_group_name' => env('AWS_EC2_PROVISION_SECURITY_GROUP_NAME', 'dply-provision'),
         'ssh_user' => env('AWS_EC2_SSH_USER', 'ubuntu'),
-    ],
-
-    'gcp' => [
-        'default_zone' => env('GCP_DEFAULT_ZONE', 'us-central1-a'),
-        'default_machine_type' => env('GCP_DEFAULT_MACHINE_TYPE', 'e2-micro'),
-        'default_image' => env('GCP_DEFAULT_IMAGE', 'projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64'),
-        'ssh_user' => env('GCP_SSH_USER', 'ubuntu'),
     ],
 
     'azure' => [

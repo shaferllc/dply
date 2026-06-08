@@ -16,9 +16,6 @@ return [
         'upcloud' => env('DPLY_SERVER_PROVIDER_UPCLOUD', true), // https://upcloud.com/
 
         'ovh' => env('DPLY_SERVER_PROVIDER_OVH', true), // https://www.ovhcloud.com/en/public-cloud/
-        'scaleway' => env('DPLY_SERVER_PROVIDER_SCALEWAY', true), // https://www.scaleway.com/en/iaas/
-
-
 
         'aws' => env('DPLY_SERVER_PROVIDER_AWS', true), // https://aws.amazon.com/ec2/
         'aws_app_runner' => env('DPLY_SERVER_PROVIDER_AWS_APP_RUNNER', false), // https://aws.amazon.com/apprunner/
@@ -28,7 +25,7 @@ return [
         'aws_lambda' => env('DPLY_SERVER_PROVIDER_AWS_LAMBDA', true), // https://aws.amazon.com/lambda/
         'ghcr' => env('DPLY_SERVER_PROVIDER_GHCR', false), // GitHub Container Registry — image pull creds for Cloud apps
         'aws_kubernetes' => env('DPLY_SERVER_PROVIDER_AWS_KUBERNETES', true), // https://aws.amazon.com/eks/
-        'gcp' => env('DPLY_SERVER_PROVIDER_GCP', false), // https://cloud.google.com/compute
+        'gcp' => env('DPLY_SERVER_PROVIDER_GCP', false), // DNS only (Cloud DNS); compute removed
         'azure' => env('DPLY_SERVER_PROVIDER_AZURE', true), // https://azure.microsoft.com/en-us/products/virtual-machines/
         'custom' => env('DPLY_SERVER_PROVIDER_CUSTOM', true), // Custom/manual server entry
 

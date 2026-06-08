@@ -216,7 +216,7 @@
             <p class="text-center text-xs font-semibold uppercase tracking-wider text-brand-mist mb-6">Provision anywhere — one inventory</p>
             <div class="dply-marquee relative overflow-hidden" style="mask-image:linear-gradient(to right,transparent,#000 8%,#000 92%,transparent);-webkit-mask-image:linear-gradient(to right,transparent,#000 8%,#000 92%,transparent);">
                 <div class="dply-marquee-track gap-4 pr-4">
-                    @php($providers = ['DigitalOcean','Hetzner','AWS', 'Linode','Vultr','Google Cloud','Azure','Scaleway','UpCloud','Fly.io','Oracle','Equinix Metal'])
+                    @php($providers = ['DigitalOcean','Hetzner','AWS', 'Linode','Vultr','Google Cloud','Azure','UpCloud','Oracle'])
                     @foreach (array_merge($providers, $providers) as $p)
                         <span class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/10 bg-white/70 px-5 py-2.5 text-sm font-semibold text-brand-forest whitespace-nowrap">
                             <span class="h-1.5 w-1.5 rounded-full bg-brand-gold"></span>{{ $p }}

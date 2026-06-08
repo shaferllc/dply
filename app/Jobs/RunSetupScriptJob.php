@@ -685,10 +685,6 @@ class RunSetupScriptJob implements ShouldQueue
             return false;
         }
 
-        if ($server->provider === ServerProvider::FlyIo) {
-            return false;
-        }
-
         $meta = $server->meta ?? [];
         $hasStack = is_array($meta) && filled($meta['server_role'] ?? null);
         $hasOptionalScript = filled($server->setup_script_key) && $server->setup_script_key !== 'none';

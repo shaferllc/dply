@@ -10,16 +10,13 @@ use App\Services\AzureComputeService;
 use App\Services\Cloudflare\CloudflareDnsService;
 use App\Services\Cloudflare\CloudflareEdgeCredentialValidator;
 use App\Services\DigitalOceanService;
-use App\Services\EquinixMetalService;
-use App\Services\FlyIoService;
-use App\Services\GcpComputeService;
+use App\Services\GcpDnsService;
 use App\Services\HetznerService;
 use App\Services\Imports\Forge\ForgeImportDriver;
 use App\Services\Imports\Ploi\PloiImportDriver;
 use App\Services\LinodeService;
 use App\Services\OracleComputeService;
 use App\Services\OvhService;
-use App\Services\ScalewayService;
 use App\Services\UpCloudService;
 use App\Services\VultrService;
 use App\Support\Cloud\GcpAccessToken;
@@ -54,27 +51,11 @@ trait ManagesProviderCredentials
 
     public string $vultr_api_token = '';
 
-    public string $akamai_name = '';
-
-    public string $akamai_api_token = '';
-
-    public string $equinix_metal_name = '';
-
-    public string $equinix_metal_api_token = '';
-
-    public string $equinix_metal_project_id = '';
-
     public string $upcloud_name = '';
 
     public string $upcloud_username = '';
 
     public string $upcloud_password = '';
-
-    public string $scaleway_name = '';
-
-    public string $scaleway_api_token = '';
-
-    public string $scaleway_project_id = '';
 
     public string $ovh_name = '';
 
@@ -85,36 +66,6 @@ trait ManagesProviderCredentials
     public string $ovh_application_secret = '';
 
     public string $ovh_consumer_key = '';
-
-    public string $rackspace_name = '';
-
-    public string $rackspace_api_token = '';
-
-    public string $fly_io_name = '';
-
-    public string $fly_io_api_token = '';
-
-    public string $fly_io_org_slug = 'personal';
-
-    public string $render_name = '';
-
-    public string $render_api_token = '';
-
-    public string $railway_name = '';
-
-    public string $railway_api_token = '';
-
-    public string $coolify_name = '';
-
-    public string $coolify_api_url = '';
-
-    public string $coolify_api_token = '';
-
-    public string $cap_rover_name = '';
-
-    public string $cap_rover_api_url = '';
-
-    public string $cap_rover_api_token = '';
 
     public string $aws_name = '';
 
@@ -322,65 +273,6 @@ trait ManagesProviderCredentials
         }
     }
 
-    public function storeAkamai(): void
-    {
-        if (! $this->ensureProviderEnabled('akamai')) {
-            return;
-        }
-        $this->validate([
-            'akamai_name' => 'nullable|string|max:255',
-            'akamai_api_token' => 'required|string',
-        ], [], ['akamai_api_token' => 'API token']);
-        if ($this->storeProviderCredential('akamai', $this->akamai_name, $this->akamai_api_token, 'akamai_api_token')) {
-            $this->reset('akamai_name', 'akamai_api_token');
-        }
-    }
-
-    public function storeEquinixMetal(): void
-    {
-        if (! $this->ensureProviderEnabled('equinix_metal')) {
-            return;
-        }
-        $this->validate([
-            'equinix_metal_name' => 'nullable|string|max:255',
-            'equinix_metal_api_token' => 'required|string',
-            'equinix_metal_project_id' => 'required|string|max:255',
-        ], [], [
-            'equinix_metal_api_token' => 'API token',
-            'equinix_metal_project_id' => 'Project ID',
-        ]);
-        $this->authorize('create', ProviderCredential::class);
-        $org = auth()->user()->currentOrganization();
-        if (! $org) {
-            $this->toastError('Select or create an organization first.');
-
-            return;
-        }
-        $credential = auth()->user()->providerCredentials()->create([
-            'organization_id' => $org->id,
-            'provider' => 'equinix_metal',
-            'name' => trim($this->equinix_metal_name) ?: 'Equinix Metal',
-            'credentials' => [
-                'api_token' => $this->equinix_metal_api_token,
-                'project_id' => $this->equinix_metal_project_id,
-            ],
-        ]);
-        try {
-            $metal = new EquinixMetalService($credential);
-            $metal->validateToken();
-        } catch (\Throwable $e) {
-            $credential->delete();
-            $msg = 'Invalid token/project or API error: '.$e->getMessage();
-            $this->addError('equinix_metal_api_token', $msg);
-            $this->toastError($msg);
-
-            return;
-        }
-        $this->toastSuccess('Provider connected.');
-        $this->reset('equinix_metal_name', 'equinix_metal_api_token', 'equinix_metal_project_id');
-        $this->notifyProviderCredentialStored('equinix_metal');
-    }
-
     public function storeUpCloud(): void
     {
         if (! $this->ensureProviderEnabled('upcloud')) {
@@ -424,51 +316,6 @@ trait ManagesProviderCredentials
         $this->toastSuccess('Provider connected.');
         $this->reset('upcloud_name', 'upcloud_username', 'upcloud_password');
         $this->notifyProviderCredentialStored('upcloud');
-    }
-
-    public function storeScaleway(): void
-    {
-        if (! $this->ensureProviderEnabled('scaleway')) {
-            return;
-        }
-        $this->validate([
-            'scaleway_name' => 'nullable|string|max:255',
-            'scaleway_api_token' => 'required|string',
-            'scaleway_project_id' => 'required|string|max:255',
-        ], [], [
-            'scaleway_api_token' => 'API token',
-            'scaleway_project_id' => 'Project ID',
-        ]);
-        $this->authorize('create', ProviderCredential::class);
-        $org = auth()->user()->currentOrganization();
-        if (! $org) {
-            $this->toastError('Select or create an organization first.');
-
-            return;
-        }
-        $credential = auth()->user()->providerCredentials()->create([
-            'organization_id' => $org->id,
-            'provider' => 'scaleway',
-            'name' => trim($this->scaleway_name) ?: 'Scaleway',
-            'credentials' => [
-                'api_token' => $this->scaleway_api_token,
-                'project_id' => $this->scaleway_project_id,
-            ],
-        ]);
-        try {
-            $scw = new ScalewayService($credential);
-            $scw->validateToken();
-        } catch (\Throwable $e) {
-            $credential->delete();
-            $msg = 'Invalid token/project or API error: '.$e->getMessage();
-            $this->addError('scaleway_api_token', $msg);
-            $this->toastError($msg);
-
-            return;
-        }
-        $this->toastSuccess('Provider connected.');
-        $this->reset('scaleway_name', 'scaleway_api_token', 'scaleway_project_id');
-        $this->notifyProviderCredentialStored('scaleway');
     }
 
     public function storeOvh(): void
@@ -534,65 +381,6 @@ trait ManagesProviderCredentials
         $this->notifyProviderCredentialStored('ovh');
     }
 
-    public function storeRackspace(): void
-    {
-        if (! $this->ensureProviderEnabled('rackspace')) {
-            return;
-        }
-        $this->validate([
-            'rackspace_name' => 'nullable|string|max:255',
-            'rackspace_api_token' => 'required|string',
-        ], [], ['rackspace_api_token' => 'API key']);
-        if ($this->storeProviderCredential('rackspace', $this->rackspace_name, $this->rackspace_api_token, 'rackspace_api_token')) {
-            $this->reset('rackspace_name', 'rackspace_api_token');
-        }
-    }
-
-    public function storeFlyIo(): void
-    {
-        if (! $this->ensureProviderEnabled('fly_io')) {
-            return;
-        }
-        $this->validate([
-            'fly_io_name' => 'nullable|string|max:255',
-            'fly_io_api_token' => 'required|string',
-            'fly_io_org_slug' => 'required|string|max:100',
-        ], [], [
-            'fly_io_api_token' => 'API token',
-            'fly_io_org_slug' => 'Organization slug',
-        ]);
-        $this->authorize('create', ProviderCredential::class);
-        $org = auth()->user()->currentOrganization();
-        if (! $org) {
-            $this->toastError('Select or create an organization first.');
-
-            return;
-        }
-        $credential = auth()->user()->providerCredentials()->create([
-            'organization_id' => $org->id,
-            'provider' => 'fly_io',
-            'name' => trim($this->fly_io_name) ?: 'Fly.io',
-            'credentials' => [
-                'api_token' => $this->fly_io_api_token,
-                'org_slug' => $this->fly_io_org_slug,
-            ],
-        ]);
-        try {
-            $fly = new FlyIoService($credential);
-            $fly->validateToken($this->fly_io_org_slug);
-        } catch (\Throwable $e) {
-            $credential->delete();
-            $msg = 'Invalid token or API error: '.$e->getMessage();
-            $this->addError('fly_io_api_token', $msg);
-            $this->toastError($msg);
-
-            return;
-        }
-        $this->toastSuccess('Provider connected.');
-        $this->reset('fly_io_name', 'fly_io_api_token', 'fly_io_org_slug');
-        $this->notifyProviderCredentialStored('fly_io');
-    }
-
     public function storeAwsAppRunner(): void
     {
         if (! $this->ensureProviderEnabled('aws_app_runner')) {
@@ -632,84 +420,6 @@ trait ManagesProviderCredentials
             'aws_app_runner_secret_access_key',
         );
         $this->notifyProviderCredentialStored('aws_app_runner');
-    }
-
-    public function storeRender(): void
-    {
-        if (! $this->ensureProviderEnabled('render')) {
-            return;
-        }
-        $this->validate(['render_name' => 'nullable|string|max:255', 'render_api_token' => 'required|string'], [], ['render_api_token' => 'API token']);
-        if ($this->storeProviderCredential('render', $this->render_name, $this->render_api_token, 'render_api_token')) {
-            $this->reset('render_name', 'render_api_token');
-        }
-    }
-
-    public function storeRailway(): void
-    {
-        if (! $this->ensureProviderEnabled('railway')) {
-            return;
-        }
-        $this->validate(['railway_name' => 'nullable|string|max:255', 'railway_api_token' => 'required|string'], [], ['railway_api_token' => 'API token']);
-        if ($this->storeProviderCredential('railway', $this->railway_name, $this->railway_api_token, 'railway_api_token')) {
-            $this->reset('railway_name', 'railway_api_token');
-        }
-    }
-
-    public function storeCoolify(): void
-    {
-        if (! $this->ensureProviderEnabled('coolify')) {
-            return;
-        }
-        $this->validate([
-            'coolify_name' => 'nullable|string|max:255',
-            'coolify_api_url' => 'required|string|max:500',
-            'coolify_api_token' => 'required|string',
-        ], [], ['coolify_api_url' => 'Coolify server URL', 'coolify_api_token' => 'API token']);
-        $this->authorize('create', ProviderCredential::class);
-        $org = auth()->user()->currentOrganization();
-        if (! $org) {
-            $this->toastError('Select or create an organization first.');
-
-            return;
-        }
-        auth()->user()->providerCredentials()->create([
-            'organization_id' => $org->id,
-            'provider' => 'coolify',
-            'name' => trim($this->coolify_name) ?: 'Coolify',
-            'credentials' => ['api_url' => rtrim($this->coolify_api_url, '/'), 'api_token' => $this->coolify_api_token],
-        ]);
-        $this->toastSuccess('Credential saved. Server create/destroy not yet implemented.');
-        $this->reset('coolify_name', 'coolify_api_url', 'coolify_api_token');
-        $this->notifyProviderCredentialStored('coolify');
-    }
-
-    public function storeCapRover(): void
-    {
-        if (! $this->ensureProviderEnabled('cap_rover')) {
-            return;
-        }
-        $this->validate([
-            'cap_rover_name' => 'nullable|string|max:255',
-            'cap_rover_api_url' => 'required|string|max:500',
-            'cap_rover_api_token' => 'required|string',
-        ], [], ['cap_rover_api_url' => 'CapRover server URL', 'cap_rover_api_token' => 'API token']);
-        $this->authorize('create', ProviderCredential::class);
-        $org = auth()->user()->currentOrganization();
-        if (! $org) {
-            $this->toastError('Select or create an organization first.');
-
-            return;
-        }
-        auth()->user()->providerCredentials()->create([
-            'organization_id' => $org->id,
-            'provider' => 'cap_rover',
-            'name' => trim($this->cap_rover_name) ?: 'CapRover',
-            'credentials' => ['api_url' => rtrim($this->cap_rover_api_url, '/'), 'api_token' => $this->cap_rover_api_token],
-        ]);
-        $this->toastSuccess('Credential saved. Server create/destroy not yet implemented.');
-        $this->reset('cap_rover_name', 'cap_rover_api_url', 'cap_rover_api_token');
-        $this->notifyProviderCredentialStored('cap_rover');
     }
 
     public function storeAws(): void
@@ -800,7 +510,7 @@ trait ManagesProviderCredentials
         ]);
 
         try {
-            (new GcpComputeService($credential))->validateCredentials();
+            (new GcpDnsService($credential))->validateCredentials();
         } catch (\Throwable $e) {
             $credential->delete();
             $msg = 'Invalid service account or API error: '.$e->getMessage();
@@ -1036,7 +746,7 @@ trait ManagesProviderCredentials
 
         $defaultNames = [
             'digitalocean' => 'DigitalOcean', 'cloudflare' => 'Cloudflare', 'hetzner' => 'Hetzner', 'linode' => 'Linode', 'vultr' => 'Vultr',
-            'akamai' => 'Akamai', 'ovh' => 'OVH', 'rackspace' => 'Rackspace', 'render' => 'Render', 'railway' => 'Railway',
+            'ovh' => 'OVH',
             'gcp' => 'GCP', 'azure' => 'Azure', 'oracle' => 'Oracle Cloud', 'ploi' => 'Ploi', 'forge' => 'Laravel Forge',
             'gandi' => 'Gandi',
         ];
@@ -1054,7 +764,7 @@ trait ManagesProviderCredentials
             } elseif ($provider === 'hetzner') {
                 $hetzner = new HetznerService($credential);
                 $hetzner->validateToken();
-            } elseif ($provider === 'linode' || $provider === 'akamai') {
+            } elseif ($provider === 'linode') {
                 $linode = new LinodeService($credential);
                 $linode->validateToken();
             } elseif ($provider === 'vultr') {
@@ -1070,7 +780,7 @@ trait ManagesProviderCredentials
                 PloiImportDriver::for($credential)->validateConnection();
             } elseif ($provider === 'forge') {
                 ForgeImportDriver::for($credential)->validateConnection();
-            } elseif (in_array($provider, ['rackspace', 'render', 'railway', 'gandi', 'ghcr'], true)) {
+            } elseif (in_array($provider, ['gandi', 'ghcr'], true)) {
                 // No validation service yet; credential saved for future use
             } else {
                 throw new \InvalidArgumentException("Unknown provider: {$provider}");
@@ -1107,8 +817,8 @@ trait ManagesProviderCredentials
     public function canVerifyCredentialProvider(string $provider): bool
     {
         return in_array($provider, [
-            'digitalocean', 'cloudflare', 'hetzner', 'linode', 'akamai', 'vultr',
-            'equinix_metal', 'upcloud', 'scaleway', 'fly_io', 'aws', 'gcp', 'azure', 'oracle', 'ploi', 'forge',
+            'digitalocean', 'cloudflare', 'hetzner', 'linode', 'vultr',
+            'upcloud', 'aws', 'gcp', 'azure', 'oracle', 'ploi', 'forge',
         ], true);
     }
 
@@ -1137,14 +847,11 @@ trait ManagesProviderCredentials
                     ? (new CloudflareEdgeCredentialValidator)->validate($credential)
                     : (new CloudflareDnsService($credential))->verifyToken(),
                 'hetzner' => (new HetznerService($credential))->validateToken(),
-                'linode', 'akamai' => (new LinodeService($credential))->validateToken(),
+                'linode' => (new LinodeService($credential))->validateToken(),
                 'vultr' => (new VultrService($credential))->validateToken(),
-                'equinix_metal' => (new EquinixMetalService($credential))->validateToken(),
                 'upcloud' => (new UpCloudService($credential))->validateToken(),
-                'scaleway' => (new ScalewayService($credential))->validateToken(),
-                'fly_io' => (new FlyIoService($credential))->validateToken($credential->credentials['org_slug'] ?? 'personal'),
                 'aws' => (new AwsEc2Service($credential))->validateCredentials(),
-                'gcp' => (new GcpComputeService($credential))->validateCredentials(),
+                'gcp' => (new GcpDnsService($credential))->validateCredentials(),
                 'azure' => (new AzureComputeService($credential))->validateCredentials(),
                 'oracle' => (new OracleComputeService($credential))->validateCredentials(),
                 'ploi' => PloiImportDriver::for($credential)->validateConnection(),

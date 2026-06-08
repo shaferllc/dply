@@ -46,11 +46,6 @@ class FleetSummaryCommand extends Command
         $totalServers = Server::query()->count();
         $totalSites = Site::query()->count();
 
-        $flyConnected = ProviderCredential::query()->where('provider', 'fly_io')->exists();
-        $edgeEligibleSites = Site::query()
-            ->whereIn('runtime', ['node', 'static'])
-            ->count();
-
         $cloudSites = Site::query()
             ->whereNotNull('container_backend')
             ->get(['container_backend', 'status', 'meta']);
@@ -77,10 +72,6 @@ class FleetSummaryCommand extends Command
             'server_statuses' => $serverStatuses->toArray(),
             'site_runtimes' => $siteRuntimes->toArray(),
             'engine_usage' => $engineUsage->toArray(),
-            'fly_io' => [
-                'connected' => $flyConnected,
-                'edge_eligible_sites' => $edgeEligibleSites,
-            ],
             'cloud_fleet' => [
                 'total' => $cloudSites->count(),
                 'by_backend' => $cloudByBackend,

@@ -572,7 +572,7 @@ class DigitalOceanAppPlatformService
     /**
      * Available DO App Platform regions. Pulled directly from the
      * DO public list — keeping it local avoids a round trip on the
-     * region picker and matches how FlyIoService::getRegions does it.
+     * region picker.
      *
      * @return list<array{slug: string, label: string}>
      */

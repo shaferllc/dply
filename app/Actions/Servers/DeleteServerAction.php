@@ -11,15 +11,11 @@ use App\Notifications\ServerRemovalExecutedNotification;
 use App\Services\AwsEc2ServiceFactory;
 use App\Services\AzureComputeService;
 use App\Services\DigitalOceanService;
-use App\Services\EquinixMetalService;
-use App\Services\FlyIoService;
-use App\Services\GcpComputeService;
 use App\Services\HetznerService;
 use App\Services\LinodeService;
 use App\Services\Notifications\NotificationPublisher;
 use App\Services\OracleComputeService;
 use App\Services\OvhService;
-use App\Services\ScalewayService;
 use App\Services\UpCloudService;
 use App\Services\VultrService;
 use App\Support\Servers\ServerHostingPlatformContext;
@@ -157,14 +153,14 @@ final class DeleteServerAction
             }
         }
 
-        if (in_array($server->provider, [ServerProvider::Linode, ServerProvider::Akamai], true) && ! empty($server->provider_id)) {
+        if ($server->provider === ServerProvider::Linode && ! empty($server->provider_id)) {
             $credential = $server->providerCredential;
             if ($credential) {
                 try {
                     $linode = new LinodeService($credential);
                     $linode->destroyInstance((int) $server->provider_id);
                 } catch (\Throwable $e) {
-                    Log::warning('Failed to destroy Linode/Akamai instance on server delete.', [
+                    Log::warning('Failed to destroy Linode instance on server delete.', [
                         'server_id' => $server->id,
                         'provider_id' => $server->provider_id,
                         'error' => $e->getMessage(),
@@ -201,22 +197,6 @@ final class DeleteServerAction
             }
         }
 
-        if ($server->provider === ServerProvider::Scaleway && ! empty($server->provider_id)) {
-            $credential = $server->providerCredential;
-            if ($credential) {
-                try {
-                    $scw = new ScalewayService($credential);
-                    $scw->destroyServer($server->region, $server->provider_id);
-                } catch (\Throwable $e) {
-                    Log::warning('Failed to destroy Scaleway instance on server delete.', [
-                        'server_id' => $server->id,
-                        'provider_id' => $server->provider_id,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
-            }
-        }
-
         if ($server->provider === ServerProvider::Ovh && ! empty($server->provider_id)) {
             $credential = $server->providerCredential;
             if ($credential) {
@@ -241,40 +221,6 @@ final class DeleteServerAction
                     $upcloud->destroyServer($server->provider_id);
                 } catch (\Throwable $e) {
                     Log::warning('Failed to destroy UpCloud server on server delete.', [
-                        'server_id' => $server->id,
-                        'provider_id' => $server->provider_id,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
-            }
-        }
-
-        if ($server->provider === ServerProvider::EquinixMetal && ! empty($server->provider_id)) {
-            $credential = $server->providerCredential;
-            if ($credential) {
-                try {
-                    $metal = new EquinixMetalService($credential);
-                    $metal->destroyDevice($server->provider_id);
-                } catch (\Throwable $e) {
-                    Log::warning('Failed to destroy Equinix Metal device on server delete.', [
-                        'server_id' => $server->id,
-                        'provider_id' => $server->provider_id,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
-            }
-        }
-
-        if ($server->provider === ServerProvider::FlyIo && ! empty($server->provider_id)) {
-            $credential = $server->providerCredential;
-            $appName = $server->meta['app_name'] ?? null;
-            if ($credential && $appName) {
-                try {
-                    $fly = new FlyIoService($credential);
-                    $fly->deleteMachine($appName, $server->provider_id);
-                    $fly->deleteApp($appName);
-                } catch (\Throwable $e) {
-                    Log::warning('Failed to destroy Fly.io machine/app on server delete.', [
                         'server_id' => $server->id,
                         'provider_id' => $server->provider_id,
                         'error' => $e->getMessage(),
@@ -335,22 +281,6 @@ final class DeleteServerAction
                     (new OracleComputeService($credential))->terminateInstance($server->provider_id);
                 } catch (\Throwable $e) {
                     Log::warning('Failed to destroy Oracle instance on server delete.', [
-                        'server_id' => $server->id,
-                        'provider_id' => $server->provider_id,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
-            }
-        }
-
-        if ($server->provider === ServerProvider::Gcp && ! empty($server->provider_id)) {
-            $credential = $server->providerCredential;
-            if ($credential) {
-                try {
-                    $gcp = new GcpComputeService($credential);
-                    $gcp->deleteInstance($server->region, $server->provider_id);
-                } catch (\Throwable $e) {
-                    Log::warning('Failed to destroy GCP instance on server delete.', [
                         'server_id' => $server->id,
                         'provider_id' => $server->provider_id,
                         'error' => $e->getMessage(),

@@ -132,7 +132,7 @@ class CutoverDnsSwapHandler implements StepHandler
             'digitalocean' => (new DigitalOceanService($credential->getApiToken() ?? ''))
                 ->domainExistsInAccount($zone),
             'hetzner' => (new HetznerService($credential))->zoneExists($zone),
-            'linode', 'akamai' => (new LinodeService($credential))->domainExists($zone),
+            'linode' => (new LinodeService($credential))->domainExists($zone),
             'vultr' => (new VultrService($credential))->domainExists($zone),
             'aws' => (new Route53Service($credential))->hostedZoneExists($zone),
             'gcp' => (new GcpDnsService($credential))->zoneExists($zone),
@@ -176,7 +176,7 @@ class CutoverDnsSwapHandler implements StepHandler
 
         return match ($credential->provider) {
             'digitalocean' => $this->swapViaDigitalOcean($credential, $domain, $zone, $relative, $newIp),
-            'hetzner', 'linode', 'akamai', 'vultr', 'aws', 'gcp', 'azure' => $this->swapViaDnsProvider($credential, $zone, $relative, $newIp),
+            'hetzner', 'linode', 'vultr', 'aws', 'gcp', 'azure' => $this->swapViaDnsProvider($credential, $zone, $relative, $newIp),
             'cloudflare' => $this->swapViaCloudflare($credential, $domain, $zone, $relative, $newIp),
             default => [
                 'strategy' => 'instructions',

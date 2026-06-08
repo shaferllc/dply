@@ -147,27 +147,6 @@ test('fly upsell hides when org has only php sites', function () {
     $response->assertOk()
         ->assertDontSee('Deploy a container app on dply cloud');
 });
-test('fly upsell hides when org already has fly credential', function () {
-    [$user, $org] = makeUserOrg();
-    $server = Server::factory()->create(['organization_id' => $org->id]);
-    Site::factory()->create([
-        'server_id' => $server->id,
-        'organization_id' => $org->id,
-        'runtime' => 'node',
-    ]);
-    ProviderCredential::factory()->create([
-        'user_id' => $user->id,
-        'organization_id' => $org->id,
-        'provider' => 'fly_io',
-        'name' => 'Existing Fly token',
-        'credentials' => ['api_token' => 'fly-token-test'],
-    ]);
-
-    $response = $this->actingAs($user)->get(route('fleet.health'));
-
-    $response->assertOk()
-        ->assertDontSee('Deploy a container app on dply cloud');
-});
 test('fleet link renders in top nav', function () {
     [$user, $org] = makeUserOrg();
 

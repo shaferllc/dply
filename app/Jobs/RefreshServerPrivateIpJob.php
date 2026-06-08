@@ -64,7 +64,7 @@ class RefreshServerPrivateIpJob implements ShouldQueue
                 ServerProvider::Vultr => VultrService::getPrivateIp(
                     (new VultrService($credential))->getInstance((string) $server->provider_id)
                 ),
-                ServerProvider::Linode, ServerProvider::Akamai => LinodeService::getPrivateIp(
+                ServerProvider::Linode => LinodeService::getPrivateIp(
                     (new LinodeService($credential))->getInstance((int) $server->provider_id)
                 ),
                 default => null,

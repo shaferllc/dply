@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire\Fleet;
 
 use App\Livewire\Concerns\RequiresFeature;
-use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
@@ -51,7 +50,7 @@ class Health extends Component
         $deploys = $this->computeDeployHealth($sites);
         $successRate = $this->computeSuccessRate($sites->pluck('id'));
         $mostActive = $this->computeMostActive($sites);
-        $flyUpsell = $this->computeFlyUpsell($org->id, $sites);
+        $cloudUpsell = $this->computeCloudUpsell($sites);
         $cloudFleet = $this->computeCloudFleet($org->id);
 
         return view('livewire.fleet.health', [
@@ -62,7 +61,7 @@ class Health extends Component
             'drift' => $drift,
             'deploys' => $deploys,
             'mostActive' => $mostActive,
-            'flyUpsell' => $flyUpsell,
+            'cloudUpsell' => $cloudUpsell,
             'cloudFleet' => $cloudFleet,
         ])->layout('layouts.app');
     }
@@ -121,14 +120,14 @@ class Health extends Component
     }
 
     /**
-     * Decide whether to surface the "Try Fly.io edge" upsell.
-     * Shows when the org has Node/static sites that could benefit
-     * from edge deployment, and no Fly credential is connected yet.
+     * Decide whether to surface the "Deploy a container app on dply cloud"
+     * upsell. Shows when the org has Node/static sites that could benefit from
+     * managed container/edge deployment.
      *
      * @param  \Illuminate\Database\Eloquent\Collection<int, Site>  $sites
-     * @return array{eligible_count: int, has_fly_credential: bool}|null
+     * @return array{eligible_count: int}|null
      */
-    private function computeFlyUpsell(string $organizationId, $sites): ?array
+    private function computeCloudUpsell($sites): ?array
     {
         $eligibleCount = $sites
             ->filter(fn (Site $s) => in_array($s->runtime, ['node', 'static'], true))
@@ -137,18 +136,8 @@ class Health extends Component
             return null;
         }
 
-        $hasFly = ProviderCredential::query()
-            ->where('organization_id', $organizationId)
-            ->where('provider', 'fly_io')
-            ->exists();
-        if ($hasFly) {
-            // Operator's already connected — no need to nudge.
-            return null;
-        }
-
         return [
             'eligible_count' => $eligibleCount,
-            'has_fly_credential' => false,
         ];
     }
 

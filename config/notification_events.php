@@ -39,6 +39,21 @@ return [
                 'server.ssh_key.removed' => 'SSH key removed',
             ],
         ],
+        'cert_inventory' => [
+            'label' => 'Certificate notifications',
+            'events' => [
+                'server.cert.renewed' => 'Certificate issued / renewed',
+                'server.cert.renewal_failed' => 'Certificate issue / renewal failed (action required)',
+            ],
+        ],
+        'maintenance' => [
+            'label' => 'Maintenance window notifications',
+            'events' => [
+                'server.maintenance.enabled' => 'Visitor maintenance enabled',
+                'server.maintenance.disabled' => 'Visitor maintenance ended',
+                'server.maintenance.auto_expired' => 'Visitor maintenance auto-ended (window expired)',
+            ],
+        ],
         'patches' => [
             'label' => 'Patch / update notifications',
             'events' => [

@@ -29,10 +29,7 @@ final class ServerProviderGate
         'vultr' => 'provider.vultr',
         'azure' => 'provider.azure',
         'oracle' => 'provider.oracle',
-        'fly_io' => 'provider.fly_io',
         'upcloud' => 'provider.upcloud',
-        'scaleway' => 'provider.scaleway',
-        'equinix_metal' => 'provider.equinix_metal',
     ];
 
     /**
@@ -45,13 +42,8 @@ final class ServerProviderGate
         'hetzner',
         'vultr',
         'linode',
-        'akamai',
-        'scaleway',
         'upcloud',
-        'equinix_metal',
-        'fly_io',
         'aws',
-        'gcp',
         'azure',
         'oracle',
         'aws_app_runner',

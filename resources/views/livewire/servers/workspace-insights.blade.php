@@ -608,15 +608,7 @@
     @endif
 
     @if ($tab === 'notifications')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm p-6 space-y-3 text-sm text-brand-moss">
-            <p>{{ __('Subscribe to “Insights alerts” on this server from your notification channels. When new findings open (or a resolved issue recurs), subscribed channels receive a short message with a link back here.') }}</p>
-            <p>
-                <a href="{{ route('profile.notification-channels') }}" wire:navigate class="font-medium text-brand-forest underline">{{ __('Manage notification channels') }}</a>
-                ·
-                <a href="{{ route('profile.notification-channels.bulk-assign') }}" wire:navigate class="font-medium text-brand-forest underline">{{ __('Bulk-assign event types') }}</a>
-            </p>
-            <p class="text-xs text-brand-mist">{{ __('Event key: server.insights_alerts') }}</p>
-        </div>
+        @include('livewire.servers.partials.insights._tab-notifications')
     @endif
 
     @if ($tab === 'settings')
@@ -631,6 +623,10 @@
     @endif
 
     <x-slot name="modals">
+        {{-- Reusable inline channel-create modal (CreatesNotificationChannelInline trait),
+             shared with the Notifications tab so an operator can add a channel without
+             leaving the page; the new channel is auto-selected on success. --}}
+        @include('livewire.partials.create-notification-channel-modal')
         @php($detail = $this->selectedFindingDetail)
         @if ($detailFindingId !== null && $detail)
             @php($a = $detail['actions'])

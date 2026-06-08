@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Removed
+- Support for Google Cloud, Scaleway, Equinix Metal, and Fly.io server providers has been removed.
 ### Added
 - Servers gain a unified Snapshots workspace to capture full-disk provider images, take and restore site database snapshots, and manage cache (Redis/Valkey) snapshots from one place.
 ### Fixed

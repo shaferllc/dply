@@ -9,16 +9,7 @@ enum ServerProvider: string
     case Linode = 'linode';
     case Vultr = 'vultr';
     case UpCloud = 'upcloud';
-    case Scaleway = 'scaleway';
     case Ovh = 'ovh';
-    case Rackspace = 'rackspace';
-    case EquinixMetal = 'equinix_metal';
-    case Akamai = 'akamai';
-    case FlyIo = 'fly_io';
-    case Render = 'render';
-    case Railway = 'railway';
-    case Coolify = 'coolify';
-    case CapRover = 'cap_rover';
     case Aws = 'aws';
     case Cloudflare = 'cloudflare';
     case Gcp = 'gcp';
@@ -42,16 +33,7 @@ enum ServerProvider: string
             self::Linode => 'Linode',
             self::Vultr => 'Vultr',
             self::UpCloud => 'UpCloud',
-            self::Scaleway => 'Scaleway',
             self::Ovh => 'OVH',
-            self::Rackspace => 'Rackspace',
-            self::EquinixMetal => 'Equinix Metal',
-            self::Akamai => 'Akamai',
-            self::FlyIo => 'Fly.io',
-            self::Render => 'Render',
-            self::Railway => 'Railway',
-            self::Coolify => 'Coolify',
-            self::CapRover => 'CapRover',
             self::Aws => 'AWS',
             self::Cloudflare => 'Cloudflare',
             self::Gcp => 'GCP',
@@ -87,7 +69,6 @@ enum ServerProvider: string
             self::DigitalOcean,
             self::Hetzner,
             self::Linode,
-            self::Akamai,
             self::Vultr,
             self::Cloudflare,
             self::Aws,
@@ -235,8 +216,7 @@ enum ServerProvider: string
             self::DigitalOcean,
             self::Hetzner,
             self::Vultr,
-            self::Linode,
-            self::Akamai => true,
+            self::Linode => true,
             default => false,
         };
     }
@@ -255,8 +235,7 @@ enum ServerProvider: string
             self::DigitalOcean,
             self::Hetzner,
             self::Vultr,
-            self::Linode,
-            self::Akamai => true,
+            self::Linode => true,
             default => false,
         };
     }
@@ -280,8 +259,8 @@ enum ServerProvider: string
      * cut). null when the provider doesn't meter images or the rate is unknown.
      *
      * Rates (verified 2026-06): DigitalOcean snapshots $0.06/GiB/mo; Hetzner
-     * snapshots €0.0119/GB/mo; Vultr snapshots $0.05/GB/mo; Linode/Akamai custom
-     * images $0.10/GB/mo. Vultr bills the *compressed* snapshot size —
+     * snapshots €0.0119/GB/mo; Vultr snapshots $0.05/GB/mo; Linode custom images
+     * $0.10/GB/mo. Vultr bills the *compressed* snapshot size —
      * {@see \App\Support\Servers\ServerImageProvider} stores `compressed_size` as
      * the image's bytes so this estimate lines up with the actual bill.
      *
@@ -293,7 +272,7 @@ enum ServerProvider: string
             self::DigitalOcean => ['rate' => 0.06, 'currency' => 'USD'],
             self::Hetzner => ['rate' => 0.0119, 'currency' => 'EUR'],
             self::Vultr => ['rate' => 0.05, 'currency' => 'USD'],
-            self::Linode, self::Akamai => ['rate' => 0.10, 'currency' => 'USD'],
+            self::Linode => ['rate' => 0.10, 'currency' => 'USD'],
             default => null,
         };
     }
@@ -310,13 +289,8 @@ enum ServerProvider: string
             self::Linode,
             self::Vultr,
             self::UpCloud,
-            self::Scaleway,
             self::Ovh,
-            self::EquinixMetal,
-            self::Akamai,
-            self::FlyIo,
             self::Aws,
-            self::Gcp,
             self::Azure,
             self::Oracle => true,
             self::Cloudflare => false,

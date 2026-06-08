@@ -45,7 +45,27 @@
         <p>{{ __('Ops teams renew per-server. This page rolls up Dply-managed certificates (Let\'s Encrypt, ZeroSSL, imported) from all sites on the host, sorted by urgency. Bulk renew queues jobs for failed certs and anything expiring within :warning days.', ['warning' => $report['warning_days']]) }}</p>
     </x-explainer>
 
-    <div class="space-y-6">
+    {{-- In-page sub-tabs: the certificate inventory vs. notification routing for this
+         server's server.cert.* events. Mirrors the system-users page. --}}
+    <div class="mb-6 border-b border-brand-ink/10">
+        <nav class="-mb-px flex gap-6" aria-label="{{ __('Certificate sections') }}">
+            @php
+                $tabBase = 'inline-flex items-center gap-1.5 border-b-2 px-1 py-3 text-sm font-medium transition-colors';
+                $tabOn = 'border-brand-forest text-brand-ink';
+                $tabOff = 'border-transparent text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink';
+            @endphp
+            <button type="button" wire:click="setCertWorkspaceTab('inventory')" @class([$tabBase, $cert_workspace_tab === 'inventory' ? $tabOn : $tabOff])>
+                <x-heroicon-o-lock-closed class="h-4 w-4" aria-hidden="true" />
+                {{ __('Certificates') }}
+            </button>
+            <button type="button" wire:click="setCertWorkspaceTab('notifications')" @class([$tabBase, $cert_workspace_tab === 'notifications' ? $tabOn : $tabOff])>
+                <x-heroicon-o-bell class="h-4 w-4" aria-hidden="true" />
+                {{ __('Notifications') }}
+            </button>
+        </nav>
+    </div>
+
+    <div @class(['space-y-6', 'hidden' => $cert_workspace_tab !== 'inventory'])>
         @if ($isDeployer)
             <section class="dply-card overflow-hidden border-amber-200">
                 <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
@@ -389,6 +409,10 @@
         ])
     </div>
 
+    <div @class(['space-y-6', 'hidden' => $cert_workspace_tab !== 'notifications'])>
+        @include('livewire.servers.partials.cert-inventory.notifications-tab')
+    </div>
+
     <x-modal name="cert-inventory-renew" :show="$showRenewModal" wire:model="showRenewModal">
         <div class="space-y-4 p-6">
             <div>
@@ -424,4 +448,9 @@
             </div>
         </div>
     </x-modal>
+
+    {{-- Reusable inline channel-create modal (CreatesNotificationChannelInline trait),
+         shared with the Notifications tab so an operator can add a channel without
+         leaving the page; the new channel is auto-selected on success. --}}
+    @include('livewire.partials.create-notification-channel-modal')
 </x-server-workspace-layout>

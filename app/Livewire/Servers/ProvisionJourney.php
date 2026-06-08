@@ -7,14 +7,10 @@ namespace App\Livewire\Servers;
 use App\Jobs\ProvisionAwsEc2ServerJob;
 use App\Jobs\ProvisionAzureServerJob;
 use App\Jobs\ProvisionDigitalOceanDropletJob;
-use App\Jobs\ProvisionEquinixMetalServerJob;
-use App\Jobs\ProvisionFlyIoServerJob;
-use App\Jobs\ProvisionGcpServerJob;
 use App\Jobs\ProvisionHetznerServerJob;
 use App\Jobs\ProvisionLinodeServerJob;
 use App\Jobs\ProvisionOracleServerJob;
 use App\Jobs\ProvisionOvhServerJob;
-use App\Jobs\ProvisionScalewayServerJob;
 use App\Jobs\ProvisionUpCloudServerJob;
 use App\Jobs\ProvisionVultrServerJob;
 use App\Jobs\RunSetupScriptJob;
@@ -513,17 +509,13 @@ class ProvisionJourney extends Component
         return match ($server->provider) {
             ServerProvider::DigitalOcean => ProvisionDigitalOceanDropletJob::class,
             ServerProvider::Hetzner => ProvisionHetznerServerJob::class,
-            ServerProvider::Linode, ServerProvider::Akamai => ProvisionLinodeServerJob::class,
+            ServerProvider::Linode => ProvisionLinodeServerJob::class,
             ServerProvider::Vultr => ProvisionVultrServerJob::class,
-            ServerProvider::Scaleway => ProvisionScalewayServerJob::class,
             ServerProvider::Ovh => ProvisionOvhServerJob::class,
             ServerProvider::UpCloud => ProvisionUpCloudServerJob::class,
-            ServerProvider::EquinixMetal => ProvisionEquinixMetalServerJob::class,
-            ServerProvider::FlyIo => ProvisionFlyIoServerJob::class,
             ServerProvider::Aws => ProvisionAwsEc2ServerJob::class,
             ServerProvider::Azure => ProvisionAzureServerJob::class,
             ServerProvider::Oracle => ProvisionOracleServerJob::class,
-            ServerProvider::Gcp => ProvisionGcpServerJob::class,
             default => null,
         };
     }

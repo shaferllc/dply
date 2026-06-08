@@ -60,7 +60,7 @@ return [
 
     /*
     | Cloud providers. MVP ships DigitalOcean + Hetzner + Linode globally;
-    | Vultr, UpCloud, Scaleway, and AWS stay per-org gated for design partners.
+    | Vultr, UpCloud, and AWS stay per-org gated for design partners.
     */
     'provider' => [
         // exit: keep on; flagship MVP provider — flag exists for per-org pause / emergency cutoff
@@ -69,7 +69,7 @@ return [
         'hetzner' => env('FEATURE_PROVIDER_HETZNER', true),
         // exit: ship to all orgs once we've had 5+ successful AWS provisions in prod
         'aws' => env('FEATURE_PROVIDER_AWS', false),
-        // exit: full BYO compute + Cloud DNS — per-org rollout via Pennant
+        // exit: DNS only (Cloud DNS); compute removed — per-org rollout via Pennant
         'gcp' => env('FEATURE_PROVIDER_GCP', false),
         // exit: keep on; full BYO compute + Linode DNS Manager — flag for per-org pause / emergency cutoff
         'linode' => env('FEATURE_PROVIDER_LINODE', true),
@@ -79,14 +79,8 @@ return [
         'azure' => env('FEATURE_PROVIDER_AZURE', false),
         // exit: full BYO compute on OCI — per-org rollout via Pennant
         'oracle' => env('FEATURE_PROVIDER_ORACLE', false),
-        // exit: ship once Fly.io machine provisioning is end-to-end green
-        'fly_io' => env('FEATURE_PROVIDER_FLY_IO', false),
         // exit: ship after UpCloud SSH-key handshake is verified against a real account
         'upcloud' => env('FEATURE_PROVIDER_UPCLOUD', false),
-        // exit: ship after Scaleway API token flow + cost catalog are validated
-        'scaleway' => env('FEATURE_PROVIDER_SCALEWAY', false),
-        // exit: bare-metal flow is materially different; keep gated until a paying customer asks
-        'equinix_metal' => env('FEATURE_PROVIDER_EQUINIX_METAL', false),
         // exit: ship once container-on-AppRunner architecture lands per dply cloud memo
         'aws_app_runner' => env('FEATURE_PROVIDER_AWS_APP_RUNNER', false),
         // exit: keep gated indefinitely; EKS is enterprise-only positioning
@@ -161,7 +155,7 @@ return [
         // exit: ship once deploy window policy validated blocking/allowing deploy jobs
         'deploy_windows' => env('FEATURE_WORKSPACE_DEPLOY_WINDOWS', true),
         // exit: ship alongside deploy windows GA; teaser only when deploy windows is off
-        'deploy_windows_preview' => env('FEATURE_WORKSPACE_DEPLOY_WINDOWS_PREVIEW', true),
+        'deploy_windows_preview' => env('FEATURE_WORKSPACE_DEPLOY_WINDOWS_PREVIEW', false),
         // exit: ship once SSH access graph validated against authorized_keys panel
         'ssh_access_graph' => env('FEATURE_WORKSPACE_SSH_ACCESS_GRAPH', true),
         // exit: ship alongside SSH access graph GA; teaser only when it is off
@@ -188,9 +182,9 @@ return [
         'cli_preview' => env('FEATURE_WORKSPACE_CLI_PREVIEW', true),
 
         // exit: ship once remote file-write atomic guarantees are reviewed; security surface
-        'files' => env('FEATURE_WORKSPACE_FILES', false),
+        'files' => env('FEATURE_WORKSPACE_FILES', true),
         // exit: ship alongside files GA; teaser only when files is off
-        'files_preview' => env('FEATURE_WORKSPACE_FILES_PREVIEW', true),
+        'files_preview' => env('FEATURE_WORKSPACE_FILES_PREVIEW', false),
         // exit: ship when systemd inventory UI has been validated against three real OSes
         'services' => env('FEATURE_WORKSPACE_SERVICES', true),
         // exit: ship when system-user deletion policy is signed off (data loss risk)
@@ -313,10 +307,12 @@ return [
         'billing_enabled' => env('FEATURE_GLOBAL_BILLING_ENABLED', true),
         // exit: flip to true when closed beta opens to the public
         'signups_open' => env('FEATURE_GLOBAL_SIGNUPS_OPEN', true),
-        // exit: kept indefinitely as an emergency switch; never retire
+        // exit: kept indefinitely as an emergency switch; never retire.
+        // MUST default false — a true default means any fresh flag resolution
+        // (purge / new scope / cache clear / seeder) silently 503s the whole site.
         'maintenance_mode' => env('FEATURE_GLOBAL_MAINTENANCE_MODE', false),
         // exit: ship when BYO redirect/cron/hook sync is validated on three OSes
-        'byo_repo_config' => env('FEATURE_GLOBAL_BYO_REPO_CONFIG', true),
+        'byo_repo_config' => env('FEATURE_GLOBAL_BYO_REPO_CONFIG', false),
         // exit: ship after replay validated against password-protected previews
         'edge_deploy_replay' => env('FEATURE_GLOBAL_EDGE_DEPLOY_REPLAY', true),
         // exit: ship when Edge promote gate + waiver audit validated E2E

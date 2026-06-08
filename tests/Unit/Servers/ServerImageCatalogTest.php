@@ -18,7 +18,6 @@ test('resolves a chosen key to the provider-native slug', function () {
     expect(ServerImageCatalog::resolveSlug('digitalocean', 'debian-12'))->toBe('debian-12-x64');
     expect(ServerImageCatalog::resolveSlug('hetzner', 'debian-12'))->toBe('debian-12');
     expect(ServerImageCatalog::resolveSlug('linode', 'ubuntu-22-04'))->toBe('linode/ubuntu22.04');
-    expect(ServerImageCatalog::resolveSlug('scaleway', 'ubuntu-24-04'))->toBe('ubuntu_noble');
 });
 
 test('returns null for unknown keys, blank keys, or unmapped providers', function () {

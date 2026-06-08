@@ -299,64 +299,6 @@
         </div>
         @break
 
-    @case('akamai')
-        <div class="dply-card overflow-hidden">
-            <div class="p-6 sm:p-8 space-y-6">
-                <p class="text-sm text-brand-moss leading-relaxed">{{ __('Uses the same API as Linode. Your Linode Cloud token works here.') }}</p>
-                <div class="space-y-5">
-                    <div>
-                        <x-input-label for="akamai_name" :value="__('Label (optional)')" />
-                        <x-text-input id="akamai_name" wire:model="akamai_name" type="text" class="mt-1 block w-full" />
-                    </div>
-                    <div>
-                        <x-input-label for="akamai_api_token" :value="__('API token')" />
-                        <x-text-input id="akamai_api_token" wire:model="akamai_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                        <p class="{{ $hint }}">{!! __('Use your Linode Cloud token. :link', ['link' => '<a href="https://cloud.linode.com/profile/tokens" target="_blank" rel="noopener" class="'.$link.'">Linode → Profile → API Tokens</a>']) !!}</p>
-                        <x-input-error :messages="$errors->get('akamai_api_token')" class="mt-2" />
-                    </div>
-                    <x-primary-button type="button" wire:click="storeAkamai" wire:loading.attr="disabled" wire:target="storeAkamai">
-                        <span wire:loading.remove wire:target="storeAkamai">{{ __('Connect Akamai') }}</span>
-                        <span wire:loading wire:target="storeAkamai" class="inline-flex items-center justify-center gap-2">
-                            <x-spinner variant="cream" />
-                            {{ __('Connecting…') }}
-                        </span>
-                    </x-primary-button>
-                </div>
-            </div>
-        </div>
-        @break
-
-    @case('equinix_metal')
-        <div class="dply-card overflow-hidden">
-            <div class="p-6 sm:p-8 space-y-6">
-                <div class="space-y-5">
-                    <div>
-                        <x-input-label for="equinix_metal_name" :value="__('Label (optional)')" />
-                        <x-text-input id="equinix_metal_name" wire:model="equinix_metal_name" type="text" class="mt-1 block w-full" />
-                    </div>
-                    <div>
-                        <x-input-label for="equinix_metal_api_token" :value="__('API token')" />
-                        <x-text-input id="equinix_metal_api_token" wire:model="equinix_metal_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                        <p class="{{ $hint }}">{!! __('Create a token: :link', ['link' => '<a href="https://cloud.equinix.com/developers/api" target="_blank" rel="noopener" class="'.$link.'">Equinix Metal → API</a>']) !!}</p>
-                        <x-input-error :messages="$errors->get('equinix_metal_api_token')" class="mt-2" />
-                    </div>
-                    <div>
-                        <x-input-label for="equinix_metal_project_id" :value="__('Project ID')" />
-                        <x-text-input id="equinix_metal_project_id" wire:model="equinix_metal_project_id" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="{{ __('UUID') }}" required />
-                        <x-input-error :messages="$errors->get('equinix_metal_project_id')" class="mt-2" />
-                    </div>
-                    <x-primary-button type="button" wire:click="storeEquinixMetal" wire:loading.attr="disabled" wire:target="storeEquinixMetal">
-                        <span wire:loading.remove wire:target="storeEquinixMetal">{{ __('Connect Equinix Metal') }}</span>
-                        <span wire:loading wire:target="storeEquinixMetal" class="inline-flex items-center justify-center gap-2">
-                            <x-spinner variant="cream" />
-                            {{ __('Connecting…') }}
-                        </span>
-                    </x-primary-button>
-                </div>
-            </div>
-        </div>
-        @break
-
     @case('upcloud')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
@@ -379,37 +321,6 @@
                     <x-primary-button type="button" wire:click="storeUpCloud" wire:loading.attr="disabled" wire:target="storeUpCloud">
                         <span wire:loading.remove wire:target="storeUpCloud">{{ __('Connect UpCloud') }}</span>
                         <span wire:loading wire:target="storeUpCloud" class="inline-flex items-center justify-center gap-2">
-                            <x-spinner variant="cream" />
-                            {{ __('Connecting…') }}
-                        </span>
-                    </x-primary-button>
-                </div>
-            </div>
-        </div>
-        @break
-
-    @case('scaleway')
-        <div class="dply-card overflow-hidden">
-            <div class="p-6 sm:p-8 space-y-6">
-                <div class="space-y-5">
-                    <div>
-                        <x-input-label for="scaleway_name" :value="__('Label (optional)')" />
-                        <x-text-input id="scaleway_name" wire:model="scaleway_name" type="text" class="mt-1 block w-full" />
-                    </div>
-                    <div>
-                        <x-input-label for="scaleway_api_token" :value="__('Secret key')" />
-                        <x-text-input id="scaleway_api_token" wire:model="scaleway_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                        <p class="{{ $hint }}">{!! __('Create an API key: :link', ['link' => '<a href="https://console.scaleway.com/iam/credentials" target="_blank" rel="noopener" class="'.$link.'">Scaleway Console → IAM → API Keys</a>']) !!}</p>
-                        <x-input-error :messages="$errors->get('scaleway_api_token')" class="mt-2" />
-                    </div>
-                    <div>
-                        <x-input-label for="scaleway_project_id" :value="__('Project ID')" />
-                        <x-text-input id="scaleway_project_id" wire:model="scaleway_project_id" type="text" class="mt-1 block w-full font-mono text-sm" required />
-                        <x-input-error :messages="$errors->get('scaleway_project_id')" class="mt-2" />
-                    </div>
-                    <x-primary-button type="button" wire:click="storeScaleway" wire:loading.attr="disabled" wire:target="storeScaleway">
-                        <span wire:loading.remove wire:target="storeScaleway">{{ __('Connect Scaleway') }}</span>
-                        <span wire:loading wire:target="storeScaleway" class="inline-flex items-center justify-center gap-2">
                             <x-spinner variant="cream" />
                             {{ __('Connecting…') }}
                         </span>
@@ -456,75 +367,6 @@
                         <x-input-error :messages="$errors->get('ovh_consumer_key')" class="mt-2" />
                     </div>
                     <x-primary-button type="button" wire:click="storeOvh" wire:loading.attr="disabled" wire:target="storeOvh">{{ __('Save credential') }}</x-primary-button>
-                </div>
-            </div>
-        </div>
-        @break
-
-    @case('rackspace')
-        <div class="dply-card overflow-hidden">
-            <div class="p-6 sm:p-8 space-y-6">
-                <section class="dply-card overflow-hidden border-amber-200">
-                    <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
-                                <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Coming soon') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Stored for future use') }}</h3>
-                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Credential is stored for future use. Automated server creation via this provider is not available yet.') }}</p>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-                <div class="space-y-5">
-                    <div>
-                        <x-input-label for="rackspace_name" :value="__('Label (optional)')" />
-                        <x-text-input id="rackspace_name" wire:model="rackspace_name" type="text" class="mt-1 block w-full" />
-                    </div>
-                    <div>
-                        <x-input-label for="rackspace_api_token" :value="__('API key')" />
-                        <x-text-input id="rackspace_api_token" wire:model="rackspace_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                        <x-input-error :messages="$errors->get('rackspace_api_token')" class="mt-2" />
-                    </div>
-                    <x-primary-button type="button" wire:click="storeRackspace" wire:loading.attr="disabled" wire:target="storeRackspace">{{ __('Save credential') }}</x-primary-button>
-                </div>
-            </div>
-        </div>
-        @break
-
-    @case('fly_io')
-        <div class="dply-card overflow-hidden">
-            <div class="p-6 sm:p-8 space-y-6">
-                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-2">
-                    <p class="text-sm font-semibold text-brand-ink">{{ __('What Fly.io adds to Dply') }}</p>
-                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Connect a Fly.io API token to deploy your Node and static sites globally on Fly\'s edge platform. Best fit for stateless workloads where you want sub-100ms response times in 30+ regions for ~$3/mo per app.') }}</p>
-                    <p class="text-xs text-brand-moss leading-relaxed">{{ __('Your existing VM-hosted PHP/Ruby/Python sites stay where they are — Fly.io is purely additive.') }}</p>
-                </div>
-                <div class="space-y-5">
-                    <div>
-                        <x-input-label for="fly_io_name" :value="__('Label (optional)')" />
-                        <x-text-input id="fly_io_name" wire:model="fly_io_name" type="text" class="mt-1 block w-full" />
-                    </div>
-                    <div>
-                        <x-input-label for="fly_io_api_token" :value="__('API token')" />
-                        <x-text-input id="fly_io_api_token" wire:model="fly_io_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                        <p class="{{ $hint }}">{!! __('Use :cmd or :link.', ['cmd' => '<code class="'.$code.'">fly tokens create</code>', 'link' => '<a href="https://fly.io/dashboard" target="_blank" rel="noopener" class="'.$link.'">Fly.io Dashboard → Tokens</a>']) !!}</p>
-                        <x-input-error :messages="$errors->get('fly_io_api_token')" class="mt-2" />
-                    </div>
-                    <div>
-                        <x-input-label for="fly_io_org_slug" :value="__('Organization slug')" />
-                        <x-text-input id="fly_io_org_slug" wire:model="fly_io_org_slug" type="text" class="mt-1 block w-full" placeholder="personal" required />
-                        <x-input-error :messages="$errors->get('fly_io_org_slug')" class="mt-2" />
-                    </div>
-                    <x-primary-button type="button" wire:click="storeFlyIo" wire:loading.attr="disabled" wire:target="storeFlyIo">
-                        <span wire:loading.remove wire:target="storeFlyIo">{{ __('Connect Fly.io') }}</span>
-                        <span wire:loading wire:target="storeFlyIo" class="inline-flex items-center justify-center gap-2">
-                            <x-spinner variant="cream" />
-                            {{ __('Connecting…') }}
-                        </span>
-                    </x-primary-button>
                 </div>
             </div>
         </div>
@@ -588,92 +430,6 @@
                         <x-input-error :messages="$errors->get('ghcr_token')" class="mt-2" />
                     </div>
                     <x-primary-button type="button" wire:click="storeGhcr" wire:loading.attr="disabled" wire:target="storeGhcr">{{ __('Save credential') }}</x-primary-button>
-                </div>
-            </div>
-        </div>
-        @break
-
-    @case('render')
-        <div class="dply-card overflow-hidden">
-            <div class="p-6 sm:p-8 space-y-6">
-                <p class="text-sm text-brand-moss">{{ __('Saved for future integrations. Not used for VM provisioning in Dply today.') }}</p>
-                <div class="space-y-5">
-                    <div>
-                        <x-input-label for="render_name" :value="__('Label (optional)')" />
-                        <x-text-input id="render_name" wire:model="render_name" type="text" class="mt-1 block w-full" />
-                    </div>
-                    <div>
-                        <x-input-label for="render_api_token" :value="__('API key')" />
-                        <x-text-input id="render_api_token" wire:model="render_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                    </div>
-                    <x-primary-button type="button" wire:click="storeRender" wire:loading.attr="disabled" wire:target="storeRender">{{ __('Save') }}</x-primary-button>
-                </div>
-            </div>
-        </div>
-        @break
-
-    @case('railway')
-        <div class="dply-card overflow-hidden">
-            <div class="p-6 sm:p-8 space-y-6">
-                <p class="text-sm text-brand-moss">{{ __('Saved for future integrations.') }}</p>
-                <div class="space-y-5">
-                    <div>
-                        <x-input-label for="railway_name" :value="__('Label (optional)')" />
-                        <x-text-input id="railway_name" wire:model="railway_name" type="text" class="mt-1 block w-full" />
-                    </div>
-                    <div>
-                        <x-input-label for="railway_api_token" :value="__('API token')" />
-                        <x-text-input id="railway_api_token" wire:model="railway_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                    </div>
-                    <x-primary-button type="button" wire:click="storeRailway" wire:loading.attr="disabled" wire:target="storeRailway">{{ __('Save') }}</x-primary-button>
-                </div>
-            </div>
-        </div>
-        @break
-
-    @case('coolify')
-        <div class="dply-card overflow-hidden">
-            <div class="p-6 sm:p-8 space-y-6">
-                <div class="space-y-5">
-                    <div>
-                        <x-input-label for="coolify_name" :value="__('Label (optional)')" />
-                        <x-text-input id="coolify_name" wire:model="coolify_name" type="text" class="mt-1 block w-full" />
-                    </div>
-                    <div>
-                        <x-input-label for="coolify_api_url" :value="__('Coolify URL')" />
-                        <x-text-input id="coolify_api_url" wire:model="coolify_api_url" type="url" class="mt-1 block w-full font-mono text-sm" placeholder="https://coolify.example.com" required />
-                        <x-input-error :messages="$errors->get('coolify_api_url')" class="mt-2" />
-                    </div>
-                    <div>
-                        <x-input-label for="coolify_api_token" :value="__('API token')" />
-                        <x-text-input id="coolify_api_token" wire:model="coolify_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                        <x-input-error :messages="$errors->get('coolify_api_token')" class="mt-2" />
-                    </div>
-                    <x-primary-button type="button" wire:click="storeCoolify" wire:loading.attr="disabled" wire:target="storeCoolify">{{ __('Save') }}</x-primary-button>
-                </div>
-            </div>
-        </div>
-        @break
-
-    @case('cap_rover')
-        <div class="dply-card overflow-hidden">
-            <div class="p-6 sm:p-8 space-y-6">
-                <div class="space-y-5">
-                    <div>
-                        <x-input-label for="cap_rover_name" :value="__('Label (optional)')" />
-                        <x-text-input id="cap_rover_name" wire:model="cap_rover_name" type="text" class="mt-1 block w-full" />
-                    </div>
-                    <div>
-                        <x-input-label for="cap_rover_api_url" :value="__('Captain URL')" />
-                        <x-text-input id="cap_rover_api_url" wire:model="cap_rover_api_url" type="url" class="mt-1 block w-full font-mono text-sm" placeholder="https://captain.example.com" required />
-                        <x-input-error :messages="$errors->get('cap_rover_api_url')" class="mt-2" />
-                    </div>
-                    <div>
-                        <x-input-label for="cap_rover_api_token" :value="__('API token')" />
-                        <x-text-input id="cap_rover_api_token" wire:model="cap_rover_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                        <x-input-error :messages="$errors->get('cap_rover_api_token')" class="mt-2" />
-                    </div>
-                    <x-primary-button type="button" wire:click="storeCapRover" wire:loading.attr="disabled" wire:target="storeCapRover">{{ __('Save') }}</x-primary-button>
                 </div>
             </div>
         </div>

@@ -75,31 +75,6 @@ test('command groups unset runtime under unset key', function () {
     expect($decoded['site_runtimes']['unset'])->toBe(1);
     expect($decoded['site_runtimes']['go'])->toBe(1);
 });
-test('fly io section reports eligible sites when not connected', function () {
-    $server = Server::factory()->create();
-    Site::factory()->create(['server_id' => $server->id, 'runtime' => 'node']);
-    Site::factory()->create(['server_id' => $server->id, 'runtime' => 'static']);
-    Site::factory()->create(['server_id' => $server->id, 'runtime' => 'php']);
-
-    // not eligible
-    Artisan::call('dply:fleet:summary', ['--json' => true]);
-    $decoded = json_decode(Artisan::output(), true);
-
-    expect($decoded['fly_io']['connected'])->toBeFalse();
-    expect($decoded['fly_io']['edge_eligible_sites'])->toBe(2);
-});
-test('fly io section marks connected when credential exists', function () {
-    ProviderCredential::factory()->create([
-        'provider' => 'fly_io',
-        'name' => 'Fly token',
-        'credentials' => ['api_token' => 't'],
-    ]);
-
-    Artisan::call('dply:fleet:summary', ['--json' => true]);
-    $decoded = json_decode(Artisan::output(), true);
-
-    expect($decoded['fly_io']['connected'])->toBeTrue();
-});
 test('cloud fleet section aggregates by backend and status', function () {
     $user = User::factory()->create();
     $server = Server::factory()->create([

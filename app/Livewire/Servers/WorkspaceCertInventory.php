@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers;
 
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\LoadsLiveServerCerts;
+use App\Livewire\Servers\Concerns\ManagesCertInventoryNotifications;
 use App\Models\Server;
 use App\Models\SiteCertificate;
 use App\Services\Servers\ServerCertificateInventory;
 use App\Services\Servers\WebserverCertsAggregator;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use Livewire\Attributes\Lazy;
@@ -25,8 +28,13 @@ class WorkspaceCertInventory extends Component
     use InteractsWithServerWorkspace;
     use LoadsLiveServerCerts;
     use RequiresFeature;
+    use CreatesNotificationChannelInline;
+    use ManagesCertInventoryNotifications;
 
     protected string $requiredFeature = 'workspace.cert_inventory';
+
+    /** In-page sub-tab: 'inventory' (the cert list) or 'notifications' (event routing). */
+    public string $cert_workspace_tab = 'inventory';
 
     public bool $showRenewModal = false;
 
@@ -45,6 +53,23 @@ class WorkspaceCertInventory extends Component
     {
         $allowed = ['all', 'attention', 'failed', 'expiring', 'pending', 'active'];
         $this->certFilter = in_array($filter, $allowed, true) ? $filter : 'all';
+    }
+
+    public function setCertWorkspaceTab(string $tab): void
+    {
+        $this->cert_workspace_tab = in_array($tab, ['inventory', 'notifications'], true) ? $tab : 'inventory';
+    }
+
+    /**
+     * Fired by {@see CreatesNotificationChannelInline} after the inline modal
+     * creates a channel. Jump to the Notifications tab and pre-select the new
+     * channel so the operator can finish wiring it to events in one motion.
+     */
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId): void
+    {
+        $this->cert_workspace_tab = 'notifications';
+        $this->notif_channel_id = $channelId;
     }
 
     public function openRenewModal(): void
@@ -169,6 +194,9 @@ class WorkspaceCertInventory extends Component
                     || ($item['status'] ?? '') === SiteCertificate::STATUS_EXPIRED
                     || (($item['days_left'] ?? null) !== null && (int) $item['days_left'] <= $report['warning_days']);
             }),
+            'notifChannels' => $this->cert_workspace_tab === 'notifications' ? $this->assignableCertNotificationChannels() : collect(),
+            'notifSubscriptions' => $this->cert_workspace_tab === 'notifications' ? $this->certNotificationSubscriptions() : collect(),
+            'notifEventLabels' => $this->cert_workspace_tab === 'notifications' ? $this->certEventLabels() : [],
         ]);
     }
 }

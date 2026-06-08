@@ -65,6 +65,7 @@ class ExecuteSiteCertificateJob implements ShouldQueue
             $emit->success('certificate request executed', 'ssl');
             $this->completeConsoleAction();
             $this->recordAudit($certificate, 'site.ssl.issued', null);
+            $this->notifyCertOutcome($certificate, 'renewed', null);
         } catch (\Throwable $e) {
             $certificate->refresh();
             $summary = is_string($certificate->last_output)
@@ -81,8 +82,50 @@ class ExecuteSiteCertificateJob implements ShouldQueue
                 'error' => $e->getMessage(),
             ]);
             $this->recordAudit($certificate, 'site.ssl.failed', $e->getMessage());
+            $this->notifyCertOutcome($certificate, 'renewal_failed', $e->getMessage());
             throw $e;
         }
+    }
+
+    /**
+     * Publish a server-scoped certificate notification (issue/renew success or
+     * failure). The cert's site resolves the server; the triggering user is the actor.
+     */
+    private function notifyCertOutcome(SiteCertificate $certificate, string $kind, ?string $error): void
+    {
+        $certificate->loadMissing('site.server');
+        $server = $certificate->site?->server;
+        if ($server === null) {
+            return;
+        }
+
+        $domains = method_exists($certificate, 'domainHostnames')
+            ? $certificate->domainHostnames()
+            : (is_array($certificate->domains ?? null) ? $certificate->domains : []);
+        $domainLabel = is_array($domains) && $domains !== []
+            ? implode(', ', array_slice($domains, 0, 3))
+            : ($certificate->site?->name ?? 'certificate');
+
+        $details = [__('Certificate: :domains', ['domains' => $domainLabel])];
+        if ($certificate->site) {
+            $details[] = __('Site: :name', ['name' => $certificate->site->name]);
+        }
+        if ($kind === 'renewal_failed' && $error) {
+            $details[] = __('Error: :error', ['error' => \Illuminate\Support\Str::limit($error, 300)]);
+        }
+
+        app(\App\Services\Notifications\ServerCertInventoryNotificationDispatcher::class)->notify(
+            $server,
+            $kind,
+            $details,
+            $this->userId ? User::query()->find($this->userId) : null,
+            [
+                'certificate_id' => (string) $certificate->id,
+                'site_id' => (string) $certificate->site_id,
+                'provider_type' => $certificate->provider_type ?? null,
+                'expires_at' => $certificate->expires_at?->toIso8601String(),
+            ],
+        );
     }
 
     private function recordAudit(SiteCertificate $certificate, string $action, ?string $errorMessage): void
