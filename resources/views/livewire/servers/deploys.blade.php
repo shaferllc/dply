@@ -1,15 +1,10 @@
-<div class="mx-auto max-w-6xl px-6 py-10">
-    <nav class="mb-4 text-sm text-slate-500">
-        <a href="{{ route('servers.overview', $server) }}" wire:navigate class="hover:text-slate-700">{{ $server->name }}</a>
-        <span class="mx-2 text-slate-400">/</span>
-        <span class="text-slate-700">{{ __('Deploys') }}</span>
-    </nav>
-
-    <header class="mb-6 border-b border-slate-200 pb-4">
-        <h1 class="text-2xl font-semibold text-slate-900">{{ __('Deploys on :server', ['server' => $server->name]) }}</h1>
-        <p class="mt-1 text-sm text-slate-600">{{ __('Every deployment recorded for sites on this server, newest first.') }}</p>
-    </header>
-
+<x-server-workspace-layout
+    :server="$server"
+    active="deploys"
+    :title="__('Deploys')"
+    :description="__('Every deployment recorded for sites on this server, newest first.')"
+    :pageHeaderToolbar="true"
+>
     <div class="mb-4 flex flex-wrap items-end gap-3">
         <div>
             <label for="status_filter" class="block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">{{ __('Status') }}</label>
@@ -100,5 +95,6 @@
         </div>
     @endif
 
-    <x-cli-snippet class="mt-8" :command="'dply fleet:deploys:running --json | jq \'.deployments[] | select(.server_id==\"'.$server->id.'\")\''" />
-</div>
+    @php($runningDeploysSnippet = "dply fleet:deploys:running --json | jq '.deployments[] | select(.server_id==\"{$server->id}\")'")
+    <x-cli-snippet class="mt-8" :command="$runningDeploysSnippet" />
+</x-server-workspace-layout>

@@ -7,8 +7,10 @@ namespace App\Support\Errors;
 use App\Models\ConsoleAction;
 use App\Models\ErrorEvent;
 use App\Models\SiteDeployment;
+use App\Services\Notifications\ServerErrorsNotificationDispatcher;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 /**
  * Captures failed sources into {@see ErrorEvent} rows by scanning the source
@@ -24,7 +26,10 @@ use Illuminate\Support\Facades\DB;
  */
 class ErrorEventSyncer
 {
-    public function __construct(private readonly ErrorEventRecorder $recorder) {}
+    public function __construct(
+        private readonly ErrorEventRecorder $recorder,
+        private readonly ServerErrorsNotificationDispatcher $notifier,
+    ) {}
 
     /**
      * Record every failed ConsoleAction / SiteDeployment finalized at or after
@@ -34,13 +39,18 @@ class ErrorEventSyncer
      * @param  bool  $refresh  Re-record sources that already have an event too
      *                         (updateOrCreate refreshes link/title/detail after
      *                         a recorder change). Default skips captured sources.
+     * @param  bool  $notify   Fire an error-stream notification for each newly
+     *                         captured event. The per-minute live sweep wants
+     *                         this; the historical backfill passes false so it
+     *                         doesn't blast alerts for old failures.
      */
-    public function sync(CarbonInterface $since, bool $refresh = false): int
+    public function sync(CarbonInterface $since, bool $refresh = false, bool $notify = true): int
     {
-        return $this->syncConsoleActions($since, $refresh) + $this->syncDeployments($since, $refresh);
+        return $this->syncConsoleActions($since, $refresh, $notify)
+            + $this->syncDeployments($since, $refresh, $notify);
     }
 
-    private function syncConsoleActions(CarbonInterface $since, bool $refresh = false): int
+    private function syncConsoleActions(CarbonInterface $since, bool $refresh = false, bool $notify = true): int
     {
         $captured = ConsoleAction::query()->getModel()->getMorphClass();
         $count = 0;
@@ -54,10 +64,12 @@ class ErrorEventSyncer
                 ->where('error_events.source_type', $captured)))
             ->with('subject')
             ->orderBy('id')
-            ->chunkById(200, function ($rows) use (&$count): void {
+            ->chunkById(200, function ($rows) use (&$count, $notify): void {
                 foreach ($rows as $row) {
-                    if ($this->recorder->recordConsoleAction($row)) {
+                    $event = $this->recorder->recordConsoleAction($row);
+                    if ($event) {
                         $count++;
+                        $this->maybeNotify($event, $notify);
                     }
                 }
             });
@@ -65,7 +77,7 @@ class ErrorEventSyncer
         return $count;
     }
 
-    private function syncDeployments(CarbonInterface $since, bool $refresh = false): int
+    private function syncDeployments(CarbonInterface $since, bool $refresh = false, bool $notify = true): int
     {
         $captured = SiteDeployment::query()->getModel()->getMorphClass();
         $count = 0;

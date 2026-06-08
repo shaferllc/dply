@@ -6,8 +6,7 @@ namespace App\Livewire\Servers\Concerns;
 
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
 use App\Models\ServerRecipe;
-use App\Services\Servers\ServerReleaseHygieneScript;
-use App\Services\SshConnection;
+use App\Services\Servers\ServerReleaseHygieneScanner;
 use Illuminate\Support\Facades\Auth;
 
 /**
@@ -32,70 +31,16 @@ trait RunsServerReleaseHygieneScan
             return;
         }
 
-        $sites = $this->server->sites()
-            ->get(['slug', 'repository_path', 'deploy_strategy', 'releases_to_keep'])
-            ->map(fn ($site): array => [
-                'slug' => (string) $site->slug,
-                'path' => $site->effectiveRepositoryPath(),
-                'keep' => max(1, min(50, (int) ($site->releases_to_keep ?? 5))),
-                'atomic' => $site->isAtomicDeploys(),
-            ])
-            ->values()
-            ->all();
-
-        $script = app(ServerReleaseHygieneScript::class)->build($sites);
-        $wrapped = '/bin/sh -c '.escapeshellarg($script);
-        $timeout = max(60, (int) config('server_settings.inventory_ssh_timeout_basic', 120));
-
-        $deploy = trim((string) $this->server->ssh_user) ?: 'root';
-        $wantRoot = (bool) config('server_settings.inventory_use_root_ssh', true);
-        $fallback = (bool) config('server_settings.inventory_fallback_to_deploy_user_ssh', true);
-        $candidates = [];
-        if ($wantRoot && $deploy !== 'root') {
-            $candidates[] = 'root';
-            if ($fallback) {
-                $candidates[] = $deploy;
-            }
-        } else {
-            $candidates[] = $deploy;
-        }
-
         $this->resetRemoteSshStreamTargets();
-        $lastError = null;
-        $out = null;
-
-        foreach ($candidates as $i => $loginUser) {
-            $this->remoteSshStreamSetMeta(
-                __('Scan release hygiene'),
-                sprintf('%s@%s  %s', $loginUser, $this->server->ip_address, $wrapped),
-            );
-            if ($i > 0) {
-                $this->remoteSshStreamAppendStdout("\n\n--- ".__('Retrying as deploy SSH user')." ---\n\n");
-            }
-
-            try {
-                $ssh = new SshConnection($this->server, $loginUser);
-                $out = trim($ssh->execWithCallback(
-                    $wrapped,
-                    fn (string $chunk): mixed => $this->remoteSshStreamAppendStdout($chunk),
-                    $timeout,
-                ));
-                $ssh->disconnect();
-                break;
-            } catch (\Throwable $e) {
-                $lastError = $e;
-            }
-        }
-
-        if ($out === null) {
-            $this->toastError($lastError !== null ? $lastError->getMessage() : __('SSH connection failed for hygiene scan.'));
-
-            return;
-        }
 
         try {
-            $meta = app(ServerReleaseHygieneScript::class)->parse($out, $this->server->meta ?? []);
-            $this->server->update(['meta' => $meta]);
+            // Shared scan path: connects, parses, persists meta, and fires
+            // transition-aware posture notifications. Streams stdout to the UI.
+            app(ServerReleaseHygieneScanner::class)->scanAndNotify(
+                $this->server,
+                auth()->user(),
+                fn (string $chunk): mixed => $this->remoteSshStreamAppendStdout($chunk),
+            );
             $this->server->refresh();
             $this->toastSuccess(__('Release hygiene scan completed.'));
         } catch (\Throwable $e) {

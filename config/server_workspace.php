@@ -50,8 +50,9 @@ return [
         // monitor (alphabetical by label)
         ['key' => 'activity', 'route' => 'servers.activity', 'icon' => 'clipboard-document-list', 'label' => 'Activity', 'group' => 'monitor', 'feature' => 'workspace.activity', 'soon_badge' => true],
         ['key' => 'cert-inventory', 'route' => 'servers.cert-inventory', 'icon' => 'lock-closed', 'label' => 'Certificates', 'group' => 'monitor', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.cert_inventory'],
-        ['key' => 'errors', 'route' => 'servers.errors', 'icon' => 'exclamation-triangle', 'label' => 'Errors', 'group' => 'monitor', 'soon_badge' => true],
-        ['key' => 'health', 'route' => 'servers.health', 'icon' => 'heart', 'label' => 'Health', 'group' => 'monitor', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.health', 'soon_badge' => true],
+        ['key' => 'deploys', 'route' => 'servers.deploys', 'icon' => 'rocket-launch', 'label' => 'Deploys', 'group' => 'monitor', 'except_host_kinds' => ['kubernetes']],
+        ['key' => 'errors', 'route' => 'servers.errors', 'icon' => 'exclamation-triangle', 'label' => 'Errors', 'group' => 'monitor'],
+        ['key' => 'health', 'route' => 'servers.health', 'icon' => 'heart', 'label' => 'Health', 'group' => 'monitor', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.health'],
         ['key' => 'hygiene', 'route' => 'servers.hygiene', 'preview_route' => 'servers.hygiene', 'icon' => 'archive-box', 'label' => 'Hygiene', 'group' => 'monitor', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.release_hygiene', 'preview_feature' => 'workspace.release_hygiene_preview'],
         ['key' => 'insights', 'route' => 'servers.insights', 'preview_route' => 'servers.insights', 'icon' => 'light-bulb', 'label' => 'Insights', 'group' => 'monitor', 'feature' => 'workspace.insights', 'preview_feature' => 'workspace.insights_preview'],
         ['key' => 'monitor', 'route' => 'servers.monitor', 'icon' => 'chart-bar', 'label' => 'Metrics', 'group' => 'monitor', 'except_host_kinds' => ['kubernetes']],
@@ -197,7 +198,7 @@ return [
     // (<x-workspace-coming-soon>) instead of their (not-yet-finished) real
     // content. Pages with a dedicated *-preview-panel + Pennant preview flag
     // (docker, ssh-access, files, …) handle their own teaser via that flag.
-    'coming_soon_keys' => ['load-balancers', 'edge-proxy', 'errors', 'health', 'activity'],
+    'coming_soon_keys' => ['load-balancers', 'edge-proxy'],
 
     'webserver_coming_soon' => ['apache', 'openlitespeed'],
 

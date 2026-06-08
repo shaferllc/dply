@@ -46,6 +46,45 @@ return [
                 'server.cert.renewal_failed' => 'Certificate issue / renewal failed (action required)',
             ],
         ],
+        'security_digest' => [
+            'label' => 'Security digest notifications',
+            'events' => [
+                'server.security_digest.critical_finding' => 'Critical security finding',
+                'server.security_digest.warning_finding' => 'Security warning detected',
+                'server.security_digest.posture_cleared' => 'Security posture returned to healthy',
+            ],
+        ],
+        'release_hygiene' => [
+            'label' => 'Release hygiene notifications',
+            'events' => [
+                'server.release_hygiene.critical_finding' => 'Critical release / disk pressure',
+                'server.release_hygiene.warning_finding' => 'Release hygiene warning detected',
+                'server.release_hygiene.posture_cleared' => 'Release hygiene returned to healthy',
+            ],
+        ],
+        'health' => [
+            'label' => 'Health notifications',
+            'events' => [
+                'server.health.critical_finding' => 'Critical health alert',
+                'server.health.warning_finding' => 'Health warning detected',
+                'server.health.posture_cleared' => 'Health returned to healthy',
+            ],
+        ],
+        'errors' => [
+            'label' => 'Error stream notifications',
+            'events' => [
+                'server.errors.deploy_failed' => 'Deployment failed',
+                'server.errors.operation_failed' => 'Server operation failed',
+            ],
+        ],
+        'deploy_window' => [
+            'label' => 'Deploy window notifications',
+            'events' => [
+                'server.deploy_window.deploy_blocked' => 'Deploy blocked by a deny window',
+                'server.deploy_window.policy_enabled' => 'Deploy window policy enabled',
+                'server.deploy_window.policy_disabled' => 'Deploy window policy disabled',
+            ],
+        ],
         'maintenance' => [
             'label' => 'Maintenance window notifications',
             'events' => [

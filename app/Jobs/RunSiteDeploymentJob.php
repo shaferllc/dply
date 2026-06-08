@@ -120,6 +120,7 @@ class RunSiteDeploymentJob implements ShouldQueue
                 $this->auditDeploy($deployment);
                 $this->clearIdempotencyInflight();
                 $this->notifyStakeholders($deployment, $notificationPublisher);
+                $this->notifyDeployWindowBlocked($policyDecision);
 
                 return;
             }
@@ -482,6 +483,51 @@ class RunSiteDeploymentJob implements ShouldQueue
         }
 
         Notification::send($users, new SiteDeploymentCompletedNotification($event));
+    }
+
+    /**
+     * Route a server-scoped "deploy blocked by deny window" event to any channels
+     * subscribed on the deploy-window workspace. Best-effort: never let a
+     * notification failure derail the (already-skipped) deploy.
+     *
+     * @param  array{allowed: bool, reason: ?string, policy: array<string, mixed>, next_allowed_at: ?\Illuminate\Support\Carbon}  $policyDecision
+     */
+    protected function notifyDeployWindowBlocked(array $policyDecision): void
+    {
+        $server = $this->site->server;
+        if ($server === null) {
+            return;
+        }
+
+        try {
+            $details = [__('Site: :name', ['name' => $this->site->name])];
+            if (! empty($policyDecision['reason'])) {
+                $details[] = (string) $policyDecision['reason'];
+            }
+            $nextAllowedAt = $policyDecision['next_allowed_at'] ?? null;
+            if ($nextAllowedAt !== null) {
+                $tz = (string) ($policyDecision['policy']['timezone'] ?? config('app.timezone'));
+                $details[] = __('Allowed again: :time', ['time' => $nextAllowedAt->timezone($tz)->format('D H:i T')]);
+            }
+
+            app(\App\Services\Notifications\ServerDeployPolicyNotificationDispatcher::class)->notify(
+                $server,
+                'deploy_blocked',
+                $details,
+                $this->auditUserId ? User::query()->find($this->auditUserId) : null,
+                [
+                    'site_id' => (string) $this->site->id,
+                    'site_name' => $this->site->name,
+                    'trigger' => $this->trigger,
+                    'next_allowed_at' => $nextAllowedAt?->toIso8601String(),
+                ],
+            );
+        } catch (\Throwable $e) {
+            Log::warning('RunSiteDeploymentJob: deploy-window block notification failed', [
+                'site_id' => $this->site->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     public function failed(?\Throwable $exception): void

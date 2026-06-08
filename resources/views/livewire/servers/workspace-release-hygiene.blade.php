@@ -28,13 +28,43 @@
         <p>{{ __('This page combines Dply release records with an optional SSH scan of on-disk release folders, laravel.log sizes, and queue:failed counts. Use the prune saved command on Run when extra release folders accumulate. After a scan, use View on any log row to tail the last lines over SSH.') }}</p>
     </x-explainer>
 
-    <div class="space-y-6">
+    {{-- In-page tabs: pressure overview, atomic release detail, log/failed-job
+         sizes, and notification routing for this server's server.release_hygiene.*
+         events. Mirrors the security-digest workspace. --}}
+    <div class="mb-6 border-b border-brand-ink/10">
+        <nav class="-mb-px flex flex-wrap gap-6" aria-label="{{ __('Release hygiene sections') }}">
+            @php
+                $tabBase = 'inline-flex items-center gap-1.5 border-b-2 px-1 py-3 text-sm font-medium transition-colors';
+                $tabOn = 'border-brand-forest text-brand-ink';
+                $tabOff = 'border-transparent text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink';
+            @endphp
+            <button type="button" wire:click="setHygieneTab('overview')" @class([$tabBase, $hygiene_tab === 'overview' ? $tabOn : $tabOff])>
+                <x-heroicon-o-archive-box class="h-4 w-4" aria-hidden="true" />
+                {{ __('Overview') }}
+            </button>
+            <button type="button" wire:click="setHygieneTab('releases')" @class([$tabBase, $hygiene_tab === 'releases' ? $tabOn : $tabOff])>
+                <x-heroicon-o-square-3-stack-3d class="h-4 w-4" aria-hidden="true" />
+                {{ __('Releases') }}
+            </button>
+            <button type="button" wire:click="setHygieneTab('logs')" @class([$tabBase, $hygiene_tab === 'logs' ? $tabOn : $tabOff])>
+                <x-heroicon-o-document-text class="h-4 w-4" aria-hidden="true" />
+                {{ __('Logs & jobs') }}
+            </button>
+            <button type="button" wire:click="setHygieneTab('notifications')" @class([$tabBase, $hygiene_tab === 'notifications' ? $tabOn : $tabOff])>
+                <x-heroicon-o-bell class="h-4 w-4" aria-hidden="true" />
+                {{ __('Notifications') }}
+            </button>
+        </nav>
+    </div>
+
+    {{-- Overview --}}
+    <div @class(['space-y-6', 'hidden' => $hygiene_tab !== 'overview'])>
         <section class="dply-card overflow-hidden">
             <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <div class="flex items-start gap-3">
-                        <x-icon-badge>
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ring-1 {{ $overallTone }}">
                             <x-heroicon-o-archive-box class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
+                        </span>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Overall') }}</p>
                             <h2 class="mt-0.5 text-base font-semibold text-brand-ink">
@@ -114,200 +144,71 @@
                 </div>
             @endif
         </section>
+    </div>
 
-        <div class="grid gap-6 lg:grid-cols-2">
-            <section class="dply-card overflow-hidden">
-                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <x-icon-badge>
-                        <x-heroicon-o-archive-box class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Releases') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Atomic releases') }}</h2>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Stored in Dply vs on-disk release folders from the last scan.') }}</p>
-                    </div>
+    {{-- Releases --}}
+    <div @class(['space-y-6', 'hidden' => $hygiene_tab !== 'releases'])>
+        <section class="dply-card overflow-hidden">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <x-icon-badge>
+                    <x-heroicon-o-archive-box class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Releases') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Atomic releases') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Stored in Dply vs on-disk release folders from the last scan.') }}</p>
                 </div>
-                <div class="px-6 py-4 sm:px-7">
-                    @if ($report['releases']['atomic_site_count'] === 0)
-                        <p class="text-sm text-brand-moss">{{ __('No atomic deploy sites on this server.') }}</p>
-                    @else
-                        <dl class="mb-4 grid grid-cols-3 gap-4 text-sm">
-                            <div>
-                                <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Atomic sites') }}</dt>
-                                <dd class="mt-1 text-2xl font-semibold text-brand-ink">{{ $report['releases']['atomic_site_count'] }}</dd>
-                            </div>
-                            <div>
-                                <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Stored records') }}</dt>
-                                <dd class="mt-1 text-2xl font-semibold text-brand-ink">{{ $report['releases']['total_stored'] }}</dd>
-                            </div>
-                            <div>
-                                <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Over keep') }}</dt>
-                                <dd class="mt-1 text-2xl font-semibold {{ $report['releases']['sites_over_keep'] > 0 ? 'text-amber-800' : 'text-brand-ink' }}">
-                                    {{ $report['releases']['sites_over_keep'] }}
-                                </dd>
-                            </div>
-                        </dl>
-
-                        <div class="overflow-x-auto rounded-xl border border-brand-ink/10">
-                            <table class="min-w-full divide-y divide-brand-ink/10 text-left text-xs">
-                                <thead class="bg-brand-sand/30 text-brand-moss">
-                                    <tr>
-                                        <th class="px-3 py-2 font-semibold">{{ __('Site') }}</th>
-                                        <th class="px-3 py-2 font-semibold">{{ __('Stored') }}</th>
-                                        <th class="px-3 py-2 font-semibold">{{ __('On disk') }}</th>
-                                        <th class="px-3 py-2 font-semibold">{{ __('Keep') }}</th>
-                                        <th class="px-3 py-2 font-semibold">{{ __('Size') }}</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-brand-ink/5 bg-white">
-                                    @foreach ($report['releases']['rows'] as $row)
-                                        <tr @class(['bg-amber-50/40' => ($row['extra'] ?? 0) > 0])>
-                                            <td class="px-3 py-2">
-                                                <a href="{{ $row['href'] }}" wire:navigate class="font-medium text-brand-forest hover:underline">{{ $row['site_name'] }}</a>
-                                            </td>
-                                            <td class="px-3 py-2 text-brand-moss">{{ $row['stored'] }}</td>
-                                            <td class="px-3 py-2 text-brand-moss">{{ $row['on_disk'] ?: '—' }}</td>
-                                            <td class="px-3 py-2 text-brand-moss">{{ $row['keep'] }}</td>
-                                            <td class="px-3 py-2 text-brand-moss">{{ $row['release_bytes'] > 0 ? $formatBytes($row['release_bytes']) : '—' }}</td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    @endif
-                </div>
-            </section>
-
-            <section class="dply-card overflow-hidden">
-                <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <x-icon-badge>
-                                <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
-                            </x-icon-badge>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Logs') }}</p>
-                                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Logs & failed jobs') }}</h2>
-                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Laravel logs and queue:failed counts from the last SSH scan. View tails the newest lines over SSH.') }}</p>
-                            </div>
-                        </div>
-                        <a href="{{ route('servers.logs', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-forest hover:bg-brand-sand/40">
-                            {{ __('Full log viewer') }}
-                            <x-heroicon-m-arrow-up-right class="h-3 w-3" aria-hidden="true" />
-                        </a>
-                </div>
-                <div class="space-y-4 px-6 py-4 sm:px-7">
-                    <dl class="grid grid-cols-2 gap-4 text-sm">
+            </div>
+            <div class="px-6 py-4 sm:px-7">
+                @if ($report['releases']['atomic_site_count'] === 0)
+                    <p class="text-sm text-brand-moss">{{ __('No atomic deploy sites on this server.') }}</p>
+                @else
+                    <dl class="mb-4 grid grid-cols-3 gap-4 text-sm">
                         <div>
-                            <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Laravel logs') }}</dt>
-                            <dd class="mt-1 text-lg font-semibold text-brand-ink">{{ $formatBytes($report['logs']['laravel_total_bytes']) }}</dd>
+                            <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Atomic sites') }}</dt>
+                            <dd class="mt-1 text-2xl font-semibold text-brand-ink">{{ $report['releases']['atomic_site_count'] }}</dd>
                         </div>
                         <div>
-                            <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Failed jobs') }}</dt>
-                            <dd class="mt-1 text-lg font-semibold {{ $report['failed_jobs']['total'] > 0 ? 'text-rose-700' : 'text-brand-ink' }}">
-                                {{ $report['failed_jobs']['total'] }}
+                            <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Stored records') }}</dt>
+                            <dd class="mt-1 text-2xl font-semibold text-brand-ink">{{ $report['releases']['total_stored'] }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Over keep') }}</dt>
+                            <dd class="mt-1 text-2xl font-semibold {{ $report['releases']['sites_over_keep'] > 0 ? 'text-amber-800' : 'text-brand-ink' }}">
+                                {{ $report['releases']['sites_over_keep'] }}
                             </dd>
                         </div>
                     </dl>
 
-                    @if (count($report['logs']['site_rows']) > 0)
-                        <div class="overflow-x-auto rounded-xl border border-brand-ink/10">
-                            <table class="min-w-full text-left text-xs">
-                                <thead class="bg-brand-sand/30 text-brand-moss">
-                                    <tr>
-                                        <th class="px-3 py-2 font-semibold">{{ __('Site') }}</th>
-                                        <th class="px-3 py-2 font-semibold">{{ __('Laravel log') }}</th>
-                                        <th class="px-3 py-2 font-semibold">{{ __('Size') }}</th>
-                                        @if ($opsReady && ! $isDeployer)
-                                            <th class="px-3 py-2 font-semibold text-right">{{ __('Read') }}</th>
-                                        @endif
+                    <div class="overflow-x-auto rounded-xl border border-brand-ink/10">
+                        <table class="min-w-full divide-y divide-brand-ink/10 text-left text-xs">
+                            <thead class="bg-brand-sand/30 text-brand-moss">
+                                <tr>
+                                    <th class="px-3 py-2 font-semibold">{{ __('Site') }}</th>
+                                    <th class="px-3 py-2 font-semibold">{{ __('Stored') }}</th>
+                                    <th class="px-3 py-2 font-semibold">{{ __('On disk') }}</th>
+                                    <th class="px-3 py-2 font-semibold">{{ __('Keep') }}</th>
+                                    <th class="px-3 py-2 font-semibold">{{ __('Size') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-brand-ink/5 bg-white">
+                                @foreach ($report['releases']['rows'] as $row)
+                                    <tr @class(['bg-amber-50/40' => ($row['extra'] ?? 0) > 0])>
+                                        <td class="px-3 py-2">
+                                            <a href="{{ $row['href'] }}" wire:navigate class="font-medium text-brand-forest hover:underline">{{ $row['site_name'] }}</a>
+                                        </td>
+                                        <td class="px-3 py-2 text-brand-moss">{{ $row['stored'] }}</td>
+                                        <td class="px-3 py-2 text-brand-moss">{{ $row['on_disk'] ?: '—' }}</td>
+                                        <td class="px-3 py-2 text-brand-moss">{{ $row['keep'] }}</td>
+                                        <td class="px-3 py-2 text-brand-moss">{{ $row['release_bytes'] > 0 ? $formatBytes($row['release_bytes']) : '—' }}</td>
                                     </tr>
-                                </thead>
-                                <tbody class="divide-y divide-brand-ink/5 bg-white">
-                                    @foreach ($report['logs']['site_rows'] as $row)
-                                        <tr>
-                                            <td class="px-3 py-2">
-                                                <a href="{{ $row['href'] }}" wire:navigate class="font-medium text-brand-forest hover:underline">{{ $row['site_name'] }}</a>
-                                            </td>
-                                            <td class="max-w-[12rem] truncate px-3 py-2 font-mono text-brand-moss" title="{{ $row['path'] }}">{{ $row['path'] ?: '—' }}</td>
-                                            <td class="px-3 py-2 text-brand-ink">{{ $row['bytes'] > 0 ? $formatBytes($row['bytes']) : '—' }}</td>
-                                            @if ($opsReady && ! $isDeployer)
-                                                <td class="px-3 py-2 text-right">
-                                                    @if ($row['path'] !== '')
-                                                        <button
-                                                            type="button"
-                                                            wire:click="viewHygieneLog(@js($row['path']), @js($row['site_name'].' — laravel.log'))"
-                                                            wire:loading.attr="disabled"
-                                                            wire:target="viewHygieneLog"
-                                                            class="font-semibold text-brand-forest hover:underline disabled:opacity-50"
-                                                        >
-                                                            {{ __('View') }}
-                                                        </button>
-                                                    @else
-                                                        <span class="text-brand-mist">—</span>
-                                                    @endif
-                                                </td>
-                                            @endif
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    @endif
-
-                    @if (count($report['failed_jobs']['rows']) > 0)
-                        <ul class="space-y-2 text-sm">
-                            @foreach ($report['failed_jobs']['rows'] as $row)
-                                <li class="flex items-center justify-between gap-3 rounded-lg border border-brand-ink/10 px-3 py-2">
-                                    <a href="{{ $row['href'] }}" wire:navigate class="font-medium text-brand-forest hover:underline">{{ $row['site_name'] }}</a>
-                                    <span class="text-xs font-semibold text-rose-700">{{ trans_choice(':count failed|:count failed', $row['count'], ['count' => $row['count']]) }}</span>
-                                </li>
-                            @endforeach
-                        </ul>
-                    @endif
-
-                    @if ($report['logs']['journal_usage'])
-                        <p class="text-xs text-brand-moss">{{ __('Journal') }}: {{ $report['logs']['journal_usage'] }}</p>
-                    @endif
-
-                    @if (count($report['logs']['system_logfiles']) > 0)
-                        <div class="overflow-x-auto rounded-xl border border-brand-ink/10">
-                            <table class="min-w-full text-left text-xs">
-                                <thead class="bg-brand-sand/30 text-brand-moss">
-                                    <tr>
-                                        <th class="px-3 py-2 font-semibold">{{ __('System log') }}</th>
-                                        <th class="px-3 py-2 font-semibold">{{ __('Size') }}</th>
-                                        @if ($opsReady && ! $isDeployer)
-                                            <th class="px-3 py-2 font-semibold text-right">{{ __('Read') }}</th>
-                                        @endif
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-brand-ink/5 bg-white">
-                                    @foreach ($report['logs']['system_logfiles'] as $file)
-                                        <tr>
-                                            <td class="px-3 py-2 font-mono text-brand-moss">{{ $file['path'] }}</td>
-                                            <td class="px-3 py-2 text-brand-ink">{{ $formatBytes($file['bytes']) }}</td>
-                                            @if ($opsReady && ! $isDeployer)
-                                                <td class="px-3 py-2 text-right">
-                                                    <button
-                                                        type="button"
-                                                        wire:click="viewHygieneLog(@js($file['path']), @js($file['path']))"
-                                                        wire:loading.attr="disabled"
-                                                        wire:target="viewHygieneLog"
-                                                        class="font-semibold text-brand-forest hover:underline disabled:opacity-50"
-                                                    >
-                                                        {{ __('View') }}
-                                                    </button>
-                                                </td>
-                                            @endif
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    @endif
-                </div>
-            </section>
-        </div>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+        </section>
 
         @feature('workspace.run')
         <section class="dply-card overflow-hidden">
@@ -347,6 +248,144 @@
             </div>
         </section>
         @endfeature
+    </div>
+
+    {{-- Logs & jobs --}}
+    <div @class(['space-y-6', 'hidden' => $hygiene_tab !== 'logs'])>
+        <section class="dply-card overflow-hidden">
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <div class="flex items-start gap-3">
+                        <x-icon-badge>
+                            <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
+                        </x-icon-badge>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Logs') }}</p>
+                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Logs & failed jobs') }}</h2>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Laravel logs and queue:failed counts from the last SSH scan. View tails the newest lines over SSH.') }}</p>
+                        </div>
+                    </div>
+                    <a href="{{ route('servers.logs', $server) }}" wire:navigate class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-forest hover:bg-brand-sand/40">
+                        {{ __('Full log viewer') }}
+                        <x-heroicon-m-arrow-up-right class="h-3 w-3" aria-hidden="true" />
+                    </a>
+            </div>
+            <div class="space-y-4 px-6 py-4 sm:px-7">
+                <dl class="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Laravel logs') }}</dt>
+                        <dd class="mt-1 text-lg font-semibold text-brand-ink">{{ $formatBytes($report['logs']['laravel_total_bytes']) }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Failed jobs') }}</dt>
+                        <dd class="mt-1 text-lg font-semibold {{ $report['failed_jobs']['total'] > 0 ? 'text-rose-700' : 'text-brand-ink' }}">
+                            {{ $report['failed_jobs']['total'] }}
+                        </dd>
+                    </div>
+                </dl>
+
+                @if (count($report['logs']['site_rows']) > 0)
+                    <div class="overflow-x-auto rounded-xl border border-brand-ink/10">
+                        <table class="min-w-full text-left text-xs">
+                            <thead class="bg-brand-sand/30 text-brand-moss">
+                                <tr>
+                                    <th class="px-3 py-2 font-semibold">{{ __('Site') }}</th>
+                                    <th class="px-3 py-2 font-semibold">{{ __('Laravel log') }}</th>
+                                    <th class="px-3 py-2 font-semibold">{{ __('Size') }}</th>
+                                    @if ($opsReady && ! $isDeployer)
+                                        <th class="px-3 py-2 font-semibold text-right">{{ __('Read') }}</th>
+                                    @endif
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-brand-ink/5 bg-white">
+                                @foreach ($report['logs']['site_rows'] as $row)
+                                    <tr>
+                                        <td class="px-3 py-2">
+                                            <a href="{{ $row['href'] }}" wire:navigate class="font-medium text-brand-forest hover:underline">{{ $row['site_name'] }}</a>
+                                        </td>
+                                        <td class="max-w-[12rem] truncate px-3 py-2 font-mono text-brand-moss" title="{{ $row['path'] }}">{{ $row['path'] ?: '—' }}</td>
+                                        <td class="px-3 py-2 text-brand-ink">{{ $row['bytes'] > 0 ? $formatBytes($row['bytes']) : '—' }}</td>
+                                        @if ($opsReady && ! $isDeployer)
+                                            <td class="px-3 py-2 text-right">
+                                                @if ($row['path'] !== '')
+                                                    <button
+                                                        type="button"
+                                                        wire:click="viewHygieneLog(@js($row['path']), @js($row['site_name'].' — laravel.log'))"
+                                                        wire:loading.attr="disabled"
+                                                        wire:target="viewHygieneLog"
+                                                        class="font-semibold text-brand-forest hover:underline disabled:opacity-50"
+                                                    >
+                                                        {{ __('View') }}
+                                                    </button>
+                                                @else
+                                                    <span class="text-brand-mist">—</span>
+                                                @endif
+                                            </td>
+                                        @endif
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+
+                @if (count($report['failed_jobs']['rows']) > 0)
+                    <ul class="space-y-2 text-sm">
+                        @foreach ($report['failed_jobs']['rows'] as $row)
+                            <li class="flex items-center justify-between gap-3 rounded-lg border border-brand-ink/10 px-3 py-2">
+                                <a href="{{ $row['href'] }}" wire:navigate class="font-medium text-brand-forest hover:underline">{{ $row['site_name'] }}</a>
+                                <span class="text-xs font-semibold text-rose-700">{{ trans_choice(':count failed|:count failed', $row['count'], ['count' => $row['count']]) }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+
+                @if ($report['logs']['journal_usage'])
+                    <p class="text-xs text-brand-moss">{{ __('Journal') }}: {{ $report['logs']['journal_usage'] }}</p>
+                @endif
+
+                @if (count($report['logs']['system_logfiles']) > 0)
+                    <div class="overflow-x-auto rounded-xl border border-brand-ink/10">
+                        <table class="min-w-full text-left text-xs">
+                            <thead class="bg-brand-sand/30 text-brand-moss">
+                                <tr>
+                                    <th class="px-3 py-2 font-semibold">{{ __('System log') }}</th>
+                                    <th class="px-3 py-2 font-semibold">{{ __('Size') }}</th>
+                                    @if ($opsReady && ! $isDeployer)
+                                        <th class="px-3 py-2 font-semibold text-right">{{ __('Read') }}</th>
+                                    @endif
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-brand-ink/5 bg-white">
+                                @foreach ($report['logs']['system_logfiles'] as $file)
+                                    <tr>
+                                        <td class="px-3 py-2 font-mono text-brand-moss">{{ $file['path'] }}</td>
+                                        <td class="px-3 py-2 text-brand-ink">{{ $formatBytes($file['bytes']) }}</td>
+                                        @if ($opsReady && ! $isDeployer)
+                                            <td class="px-3 py-2 text-right">
+                                                <button
+                                                    type="button"
+                                                    wire:click="viewHygieneLog(@js($file['path']), @js($file['path']))"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="viewHygieneLog"
+                                                    class="font-semibold text-brand-forest hover:underline disabled:opacity-50"
+                                                >
+                                                    {{ __('View') }}
+                                                </button>
+                                            </td>
+                                        @endif
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+        </section>
+    </div>
+
+    {{-- Notifications --}}
+    <div @class(['space-y-6', 'hidden' => $hygiene_tab !== 'notifications'])>
+        @include('livewire.servers.partials.release-hygiene.notifications-tab')
     </div>
 
     @if ($showHygieneLogModal)
@@ -408,4 +447,9 @@
             </div>
         </x-modal>
     @endif
+
+    {{-- Reusable inline channel-create modal (CreatesNotificationChannelInline trait),
+         shared with the Notifications tab so an operator can add a channel without
+         leaving the page; the new channel is auto-selected on success. --}}
+    @include('livewire.partials.create-notification-channel-modal')
 </x-server-workspace-layout>

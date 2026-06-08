@@ -145,9 +145,9 @@ return [
         // exit: ship once patch advisor rollup validated against inventory probe on three Debian/Ubuntu hosts
         'patch_advisor' => env('FEATURE_WORKSPACE_PATCH_ADVISOR', true),
         // exit: ship once release hygiene scan + prune template validated on three atomic VM stacks
-        'release_hygiene' => env('FEATURE_WORKSPACE_RELEASE_HYGIENE', false),
+        'release_hygiene' => env('FEATURE_WORKSPACE_RELEASE_HYGIENE', true),
         // exit: ship alongside release hygiene GA; teaser only when release hygiene is off
-        'release_hygiene_preview' => env('FEATURE_WORKSPACE_RELEASE_HYGIENE_PREVIEW', true),
+        'release_hygiene_preview' => env('FEATURE_WORKSPACE_RELEASE_HYGIENE_PREVIEW', false),
         // exit: ship once daemon SLO panel validated against supervisor health on three VM stacks
         'daemon_slo' => env('FEATURE_WORKSPACE_DAEMON_SLO', true),
         // exit: ship once server cert inventory + bulk renew validated on three VM hosts
@@ -167,9 +167,9 @@ return [
         // exit: ship once server-scoped redeploy-all + cert renew shortcut validated on three VM hosts
         'bulk_site_actions' => env('FEATURE_WORKSPACE_BULK_SITE_ACTIONS', true),
         // exit: ship once security digest scan validated on three VM hosts
-        'security_digest' => env('FEATURE_WORKSPACE_SECURITY_DIGEST', false),
+        'security_digest' => env('FEATURE_WORKSPACE_SECURITY_DIGEST', true),
         // exit: ship alongside security digest GA; teaser only when security digest is off
-        'security_digest_preview' => env('FEATURE_WORKSPACE_SECURITY_DIGEST_PREVIEW', true),
+        'security_digest_preview' => env('FEATURE_WORKSPACE_SECURITY_DIGEST_PREVIEW', false),
         // exit: ship once multi-node provisioning is end-to-end tested
         'cluster' => env('FEATURE_WORKSPACE_CLUSTER', true),
         // exit: ship once browser-SSH session auditing + RBAC are validated
@@ -190,9 +190,9 @@ return [
         // exit: ship when system-user deletion policy is signed off (data loss risk)
         'system_users' => env('FEATURE_WORKSPACE_SYSTEM_USERS', true),
         // exit: ship as a paid-tier differentiator once findings UX is signed off
-        'insights' => env('FEATURE_WORKSPACE_INSIGHTS', false),
+        'insights' => env('FEATURE_WORKSPACE_INSIGHTS', true),
         // exit: ship alongside insights GA; teaser only when insights is off
-        'insights_preview' => env('FEATURE_WORKSPACE_INSIGHTS_PREVIEW', true),
+        'insights_preview' => env('FEATURE_WORKSPACE_INSIGHTS_PREVIEW', false),
         // exit: ship once Redis/Memcached provisioning has parity with the cache audit
         'caches' => env('FEATURE_WORKSPACE_CACHES', true),
         // GA — remote Docker inspector (containers, images, volumes, networks, compose, maintenance)
@@ -239,8 +239,8 @@ return [
         'site_notifications_preview' => env('FEATURE_WORKSPACE_SITE_NOTIFICATIONS_PREVIEW', true),
         'site_monitor' => env('FEATURE_WORKSPACE_SITE_MONITOR', false),
         'site_monitor_preview' => env('FEATURE_WORKSPACE_SITE_MONITOR_PREVIEW', true),
-        'site_errors' => env('FEATURE_WORKSPACE_SITE_ERRORS', false),
-        'site_errors_preview' => env('FEATURE_WORKSPACE_SITE_ERRORS_PREVIEW', true),
+        'site_errors' => env('FEATURE_WORKSPACE_SITE_ERRORS', true),
+        'site_errors_preview' => env('FEATURE_WORKSPACE_SITE_ERRORS_PREVIEW', false),
         'site_files' => env('FEATURE_WORKSPACE_SITE_FILES', false),
         'site_files_preview' => env('FEATURE_WORKSPACE_SITE_FILES_PREVIEW', true),
         'site_cli' => env('FEATURE_WORKSPACE_SITE_CLI', false),

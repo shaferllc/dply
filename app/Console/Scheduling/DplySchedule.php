@@ -18,6 +18,8 @@ use App\Console\Commands\DispatchServerInsightsCommand;
 use App\Console\Commands\DispatchSiteInsightsCommand;
 use App\Console\Commands\DispatchSiteUptimeChecksCommand;
 use App\Console\Commands\DispatchSiteUrlHealthChecksCommand;
+use App\Console\Commands\DispatchReleaseHygieneScansCommand;
+use App\Console\Commands\DispatchSecurityDigestScansCommand;
 use App\Console\Commands\DispatchSshLoginScansCommand;
 use App\Console\Commands\DispatchSystemdInventorySyncCommand;
 use App\Console\Commands\EvaluateEdgeGuardrailsCommand;
@@ -71,6 +73,16 @@ final class DplySchedule
         $schedule->command(DispatchSshLoginScansCommand::class)
             ->everyFiveMinutes()
             ->name('dispatch-ssh-login-scans');
+
+        $schedule->command(DispatchSecurityDigestScansCommand::class)
+            ->dailyAt('03:15')
+            ->withoutOverlapping()
+            ->name('dispatch-security-digest-scans');
+
+        $schedule->command(DispatchReleaseHygieneScansCommand::class)
+            ->dailyAt('03:25')
+            ->withoutOverlapping()
+            ->name('dispatch-release-hygiene-scans');
 
         $schedule->command(FlushDeployDigestCommand::class)
             ->hourly()

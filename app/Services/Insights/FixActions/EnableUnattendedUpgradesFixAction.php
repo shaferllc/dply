@@ -83,8 +83,17 @@ APT::Periodic::Unattended-Upgrade "1";
 APT::Periodic::AutocleanInterval "7";
 CFG
 
-# Pick up any unit file changes the package install touched before we try to
-# enable/start the timers.
+# Unmask the timers AND the services they trigger. On minimal/cloud images these
+# are frequently masked (symlinked to /dev/null); a masked .service makes systemd
+# refuse to start the timer with "unit apt-daily-upgrade.service to trigger not
+# loaded" — installing unattended-upgrades does NOT restore them because the
+# service units ship in the `apt` package, not unattended-upgrades.
+echo "DPLY_STEP: unmasking apt-daily units"
+systemctl unmask apt-daily-upgrade.timer apt-daily.timer \
+  apt-daily-upgrade.service apt-daily.service 2>/dev/null || true
+
+# Pick up any unit file changes the package install / unmask touched before we
+# try to enable/start the timers.
 systemctl daemon-reload 2>/dev/null || true
 
 # 3. Enable + start the systemd timers. Split enable from start so we can
@@ -106,6 +115,15 @@ enable_and_start_timer() {
   if ! start_out=$(systemctl start "${unit}" 2>&1); then
     echo "DPLY_ERR: systemctl start ${unit} failed"
     printf '%s\n' "${start_out}" | tail -n 20
+    # The triggered .service being masked/missing is a distinct failure from a
+    # lock-contention catch-up failure — call it out so the operator knows the
+    # unit files themselves are the problem, not a transient apt run.
+    case "${start_out}" in
+      *"to trigger not loaded"*|*"Refusing to start"*)
+        service_unit=${unit%.timer}.service
+        echo "DPLY_HINT: ${service_unit} is masked or missing — run 'systemctl unmask ${service_unit}', or 'apt-get install --reinstall apt' if the unit file is absent."
+        ;;
+    esac
     echo "--- systemctl status ${unit} ---"
     systemctl status "${unit}" --no-pager --lines=20 2>&1 | tail -n 30 || true
     service_unit=${unit%.timer}.service

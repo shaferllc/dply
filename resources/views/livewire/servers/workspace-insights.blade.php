@@ -250,6 +250,13 @@
                 <div class="px-5 py-10 text-center">
                     <p class="text-sm font-medium text-brand-ink">{{ __('No open findings right now.') }}</p>
                     <p class="mt-2 text-sm text-brand-moss">{{ __('Run a refresh, wait for the scheduled job, or review settings if you expected a signal here.') }}</p>
+                    <div class="mt-4">
+                        <x-primary-button size="sm" type="button" wire:click="runChecksNow" wire:loading.attr="disabled" wire:target="runChecksNow">
+                            <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0" wire:loading.class="animate-spin" wire:target="runChecksNow" aria-hidden="true" />
+                            <span wire:loading.remove wire:target="runChecksNow">{{ __('Refresh') }}</span>
+                            <span wire:loading wire:target="runChecksNow">{{ __('Queueing…') }}</span>
+                        </x-primary-button>
+                    </div>
                     <div class="mt-4 inline-flex flex-wrap items-center justify-center gap-2 text-xs text-brand-mist">
                         <span class="rounded-full border border-brand-ink/10 bg-brand-sand/20 px-3 py-1.5">
                             {{ trans_choice('{1} :count enabled check|[2,*] :count enabled checks', $enabledChecks, ['count' => $enabledChecks]) }}
@@ -425,7 +432,7 @@
                                             <x-secondary-button size="sm" type="button" wire:click="ignoreFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="ignoreFinding({{ $f->id }})" class="pointer-events-auto relative z-10">
                                                 <x-heroicon-o-eye-slash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                                 {{ __('Ignore') }}
-                                            </button>
+                                            </x-secondary-button>
                                         </div>
                                     </div>
                                 </div>
@@ -589,7 +596,7 @@
                             </div>
                             <x-secondary-button size="sm" type="button" wire:click="unignoreFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="unignoreFinding({{ $f->id }})" class="shrink-0">
                                 {{ __('Restore') }}
-                            </button>
+                            </x-secondary-button>
                         </li>
                     @endforeach
                 </ul>

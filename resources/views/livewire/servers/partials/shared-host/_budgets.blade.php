@@ -70,9 +70,9 @@
                     <span wire:loading.remove wire:target="saveSharedHostBudgets">{{ __('Save budgets') }}</span>
                     <span wire:loading wire:target="saveSharedHostBudgets">{{ __('Saving…') }}</span>
                 </button>
-                <a href="{{ route('profile.notification-channels.bulk-assign', ['server' => $server->id]) }}" wire:navigate class="text-sm font-semibold text-brand-forest hover:underline">
+                <button type="button" wire:click="setSharedHostTab('notifications')" class="text-sm font-semibold text-brand-forest hover:underline">
                     {{ __('Manage alert subscriptions') }}
-                </a>
+                </button>
             </div>
         </form>
     @endif

@@ -4,13 +4,20 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers;
 
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\ManagesDeployPolicyNotifications;
 use App\Models\Server;
+use App\Models\User;
+use App\Services\Notifications\ServerDeployPolicyNotificationDispatcher;
 use App\Services\Servers\ServerDeployPolicyGuard;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Auth;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use Livewire\Attributes\Lazy;
@@ -29,8 +36,17 @@ class WorkspaceDeployPolicy extends Component
     use RendersWorkspacePlaceholder;
     use InteractsWithServerWorkspace;
     use RequiresFeature;
+    use CreatesNotificationChannelInline;
+    use ManagesDeployPolicyNotifications;
 
     protected string $requiredFeature = 'workspace.deploy_windows';
+
+    /** @var list<string> */
+    public const POLICY_TABS = ['overview', 'schedule', 'coverage', 'activity', 'notifications'];
+
+    /** In-page tab: overview | schedule | coverage | activity | notifications. */
+    #[Url(as: 'tab', except: 'overview', history: true)]
+    public string $policy_tab = 'overview';
 
     /** When true, render the coming-soon teaser instead of the full workspace. */
     public bool $comingSoonPreview = false;
@@ -80,6 +96,23 @@ class WorkspaceDeployPolicy extends Component
         }
     }
 
+    public function setPolicyTab(string $tab): void
+    {
+        $this->policy_tab = in_array($tab, self::POLICY_TABS, true) ? $tab : 'overview';
+    }
+
+    /**
+     * Fired by {@see CreatesNotificationChannelInline} after the inline modal
+     * creates a channel. Jump to the Notifications tab and pre-select the new
+     * channel so the operator can finish wiring it to events in one motion.
+     */
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId): void
+    {
+        $this->policy_tab = 'notifications';
+        $this->notif_channel_id = $channelId;
+    }
+
     public function applyWeekendFreezePreset(ServerDeployPolicyGuard $guard): void
     {
         $this->deny_rules = $guard->weekendFreezePreset();
@@ -98,7 +131,7 @@ class WorkspaceDeployPolicy extends Component
         }
     }
 
-    public function savePolicy(ServerDeployPolicyGuard $guard): void
+    public function savePolicy(ServerDeployPolicyGuard $guard, ServerDeployPolicyNotificationDispatcher $notifier): void
     {
         $this->authorize('update', $this->server);
 
@@ -106,6 +139,8 @@ class WorkspaceDeployPolicy extends Component
             'policy_timezone' => ['required', 'timezone:all'],
             'policy_message' => ['nullable', 'string', 'max:500'],
         ]);
+
+        $wasEnabled = (bool) ($guard->policyForServer($this->server)['enabled'] ?? false);
 
         $policy = $guard->normalizePolicy([
             'enabled' => $this->policy_enabled,
@@ -120,6 +155,20 @@ class WorkspaceDeployPolicy extends Component
         $this->server->update(['meta' => $meta]);
         $this->server->refresh();
 
+        // Announce enforcement flips to anyone routing deploy-window events.
+        $nowEnabled = (bool) $policy['enabled'];
+        if ($nowEnabled !== $wasEnabled) {
+            $notifier->notify(
+                $this->server,
+                $nowEnabled ? 'policy_enabled' : 'policy_disabled',
+                [
+                    __('Timezone: :tz', ['tz' => (string) $policy['timezone']]),
+                    trans_choice(':count deny rule configured|:count deny rules configured', count($policy['deny_rules']), ['count' => count($policy['deny_rules'])]),
+                ],
+                Auth::user(),
+            );
+        }
+
         $this->toastSuccess(__('Deploy window policy saved.'));
     }
 
@@ -130,6 +179,7 @@ class WorkspaceDeployPolicy extends Component
         }
 
         $report = $guard->report($this->server);
+        $onNotifications = $this->policy_tab === 'notifications';
 
         return view('livewire.servers.workspace-deploy-policy', [
             'report' => $report,
@@ -137,6 +187,9 @@ class WorkspaceDeployPolicy extends Component
             'blockReason' => $report['evaluation']['reason'],
             'nextAllowedAt' => $report['evaluation']['next_allowed_at'],
             'dayOptions' => ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'],
+            'notifChannels' => $onNotifications ? $this->assignableDeployPolicyNotificationChannels() : collect(),
+            'notifSubscriptions' => $onNotifications ? $this->deployPolicyNotificationSubscriptions() : collect(),
+            'notifEventLabels' => $onNotifications ? $this->deployPolicyEventLabels() : [],
         ]);
     }
 }

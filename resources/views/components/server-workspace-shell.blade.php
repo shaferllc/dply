@@ -288,6 +288,30 @@
                                 @case('camera')
                                     <x-heroicon-o-camera class="h-5 w-5 shrink-0 opacity-90" />
                                     @break
+                                @case('shield-exclamation')
+                                    <x-heroicon-o-shield-exclamation class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('signal')
+                                    <x-heroicon-o-signal class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('square-3-stack-3d')
+                                    <x-heroicon-o-square-3-stack-3d class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('arrow-path-rounded-square')
+                                    <x-heroicon-o-arrow-path-rounded-square class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('arrows-right-left')
+                                    <x-heroicon-o-arrows-right-left class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('finger-print')
+                                    <x-heroicon-o-finger-print class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('lock-closed')
+                                    <x-heroicon-o-lock-closed class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('share')
+                                    <x-heroicon-o-share class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
                                 @default
                                     <x-heroicon-o-square-2-stack class="h-5 w-5 shrink-0 opacity-90" />
                             @endswitch

@@ -71,6 +71,14 @@ class NotificationEventRegistry
             || str_ends_with($eventKey, 'container_launch.failed')
             || str_ends_with($eventKey, 'provision_failed')
             || str_ends_with($eventKey, 'scale_failed')
+            || str_ends_with($eventKey, 'security_digest.critical_finding')
+            || str_ends_with($eventKey, 'security_digest.warning_finding')
+            || str_ends_with($eventKey, 'release_hygiene.critical_finding')
+            || str_ends_with($eventKey, 'release_hygiene.warning_finding')
+            || str_ends_with($eventKey, 'health.critical_finding')
+            || str_ends_with($eventKey, 'health.warning_finding')
+            || str_ends_with($eventKey, 'errors.deploy_failed')
+            || str_ends_with($eventKey, 'errors.operation_failed')
         ) {
             return 'warning';
         }

@@ -3,9 +3,11 @@
 namespace App\Jobs;
 
 use App\Models\Server;
+use App\Services\Servers\ServerHealthNotifier;
 use App\Services\Servers\ServerHealthProbe;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Log;
 
 class CheckServerHealthJob implements ShouldQueue
 {
@@ -17,7 +19,7 @@ class CheckServerHealthJob implements ShouldQueue
         public Server $server
     ) {}
 
-    public function handle(ServerHealthProbe $probe): void
+    public function handle(ServerHealthProbe $probe, ServerHealthNotifier $healthNotifier): void
     {
         $server = $this->server->fresh();
         if (! $server || $server->status !== Server::STATUS_READY || empty($server->ip_address)) {
@@ -31,6 +33,17 @@ class CheckServerHealthJob implements ShouldQueue
             'last_health_check_at' => now(),
             'health_status' => $result['ok'] ? Server::HEALTH_REACHABLE : Server::HEALTH_UNREACHABLE,
         ]);
+
+        // Evaluate the health cockpit (DB-only rollup) and fire transition-aware
+        // notifications when the overall posture worsens or recovers. Isolated in
+        // its own try so a cockpit hiccup never fails the reachability probe.
+        if ($server->isVmHost()) {
+            try {
+                $healthNotifier->evaluateAndNotify($server);
+            } catch (\Throwable $e) {
+                Log::warning('health.notify_failed', ['server_id' => $server->id, 'error' => $e->getMessage()]);
+            }
+        }
 
         // First time this server reports reachable (post-provision OR
         // after a flaky window cleared), or whenever the systemd

@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Livewire\Servers;
 
 use App\Jobs\RunSharedHostLlmAnalysisJob;
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\ManagesSharedHostNotifications;
 use App\Livewire\Servers\Concerns\RunsSharedHostAttributionScan;
 use App\Models\AiAdvisorRun;
 use App\Models\Server;
@@ -19,6 +21,8 @@ use App\Support\Servers\SharedHostReport;
 use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use Livewire\Attributes\Lazy;
@@ -31,12 +35,21 @@ use Livewire\Attributes\Lazy;
 class WorkspaceSharedHost extends Component
 {
     use RendersWorkspacePlaceholder;
+    use CreatesNotificationChannelInline;
     use DispatchesToastNotifications;
     use InteractsWithServerWorkspace;
+    use ManagesSharedHostNotifications;
     use RequiresFeature;
     use RunsSharedHostAttributionScan;
 
     protected string $requiredFeature = 'workspace.shared_host';
+
+    /** @var list<string> */
+    public const SHARED_HOST_TABS = ['radar', 'budgets', 'contention', 'notifications'];
+
+    /** @var 'radar'|'budgets'|'contention'|'notifications' */
+    #[Url(as: 'tab', except: 'radar', history: true)]
+    public string $shared_host_tab = 'radar';
 
     public bool $comingSoonPreview = false;
 
@@ -53,6 +66,10 @@ class WorkspaceSharedHost extends Component
     {
         abort_unless($server->isVmHost() && $server->hostCapabilities()->supportsSsh(), 404);
 
+        if (! in_array($this->shared_host_tab, self::SHARED_HOST_TABS, true)) {
+            $this->shared_host_tab = 'radar';
+        }
+
         if (! Feature::active('workspace.shared_host')) {
             if (workspace_shared_host_preview_active()) {
                 $this->comingSoonPreview = true;
@@ -67,6 +84,23 @@ class WorkspaceSharedHost extends Component
         $this->comingSoonPreview = false;
         $this->bootWorkspace($server);
         $this->hydrateBudgetForm();
+    }
+
+    public function setSharedHostTab(string $tab): void
+    {
+        $this->shared_host_tab = in_array($tab, self::SHARED_HOST_TABS, true) ? $tab : 'radar';
+    }
+
+    /**
+     * Fired by {@see CreatesNotificationChannelInline} after the inline modal
+     * creates a channel. Jump to the Notifications tab and pre-select the new
+     * channel so the operator can finish wiring it to alerts in one motion.
+     */
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId): void
+    {
+        $this->shared_host_tab = 'notifications';
+        $this->notif_channel_id = $channelId;
     }
 
     public function setAttributionRange(string $range): void
@@ -179,12 +213,18 @@ class WorkspaceSharedHost extends Component
         }
         $llmNarrative = $llmAdvisor->narrativeFromRun($llmRun);
 
+        $onNotifTab = $this->shared_host_tab === 'notifications';
+
         return view('livewire.servers.workspace-shared-host', [
             'report' => $reportData,
             'advisor' => $fairnessAdvisor->advise($this->server, $reportData),
             'llmRun' => $llmRun,
             'llmNarrative' => $llmNarrative,
             'llmCanRun' => $org !== null && $llmAdvisor->canRun($org),
+            // Notifications tab — channel routing for this server's shared host alerts.
+            'notifChannels' => $onNotifTab ? $this->assignableSharedHostNotificationChannels() : collect(),
+            'notifSubscriptions' => $onNotifTab ? $this->sharedHostNotificationSubscriptions() : collect(),
+            'notifEventLabels' => $onNotifTab ? $this->sharedHostEventLabels() : [],
         ]);
     }
 

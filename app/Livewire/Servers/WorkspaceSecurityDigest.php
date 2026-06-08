@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers;
 
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\ManagesSecurityDigestNotifications;
 use App\Livewire\Servers\Concerns\RunsServerSecurityDigestScan;
 use App\Models\Server;
 use App\Services\Servers\ServerSecurityDigest;
@@ -13,6 +15,8 @@ use App\Services\Servers\ServerSshAccessGraph;
 use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use Livewire\Attributes\Lazy;
@@ -34,11 +38,37 @@ class WorkspaceSecurityDigest extends Component
     use InteractsWithServerWorkspace;
     use RequiresFeature;
     use RunsServerSecurityDigestScan;
+    use CreatesNotificationChannelInline;
+    use ManagesSecurityDigestNotifications;
 
     protected string $requiredFeature = 'workspace.security_digest';
 
+    /** @var list<string> */
+    public const DIGEST_TABS = ['overview', 'auth', 'hardening', 'notifications'];
+
+    /** In-page tab: overview | auth | hardening | notifications. */
+    #[Url(as: 'tab', except: 'overview', history: true)]
+    public string $digest_tab = 'overview';
+
     /** When true, render the coming-soon teaser instead of the full workspace. */
     public bool $comingSoonPreview = false;
+
+    public function setDigestTab(string $tab): void
+    {
+        $this->digest_tab = in_array($tab, self::DIGEST_TABS, true) ? $tab : 'overview';
+    }
+
+    /**
+     * Fired by {@see CreatesNotificationChannelInline} after the inline modal
+     * creates a channel. Jump to the Notifications tab and pre-select the new
+     * channel so the operator can finish wiring it to events in one motion.
+     */
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId): void
+    {
+        $this->digest_tab = 'notifications';
+        $this->notif_channel_id = $channelId;
+    }
 
     public function mount(Server $server): void
     {
@@ -91,10 +121,15 @@ class WorkspaceSecurityDigest extends Component
             ];
         }
 
+        $onNotificationsTab = $this->digest_tab === 'notifications';
+
         return view('livewire.servers.workspace-security-digest', [
             'report' => $digest->forServer($this->server),
             'sshAccess' => $sshAccess,
             'sshAccessEnabled' => Feature::active('workspace.ssh_access_graph'),
+            'notifChannels' => $onNotificationsTab ? $this->assignableSecurityDigestNotificationChannels() : collect(),
+            'notifSubscriptions' => $onNotificationsTab ? $this->securityDigestNotificationSubscriptions() : collect(),
+            'notifEventLabels' => $onNotificationsTab ? $this->securityDigestEventLabels() : [],
         ]);
     }
 }

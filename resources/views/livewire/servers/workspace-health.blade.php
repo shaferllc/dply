@@ -67,6 +67,14 @@
                     <span class="ml-1 rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-brand-moss">{{ number_format($reliabilityCount) }}</span>
                 @endif
             </x-server-workspace-tab>
+            <x-server-workspace-tab
+                id="health-tab-notifications"
+                icon="heroicon-o-bell"
+                :active="$healthTab === 'notifications'"
+                wire:click="setHealthWorkspaceTab('notifications')"
+            >
+                {{ __('Notifications') }}
+            </x-server-workspace-tab>
         </x-server-workspace-tablist>
 
         <div class="space-y-6">
@@ -85,6 +93,12 @@
             @if ($healthTab === 'reliability')
                 @include('livewire.servers.partials.health._tab-reliability', $healthTabContext)
             @endif
+
+            @if ($healthTab === 'notifications')
+                @include('livewire.servers.partials.health.notifications-tab')
+            @endif
         </div>
     </div>
+
+    @include('livewire.partials.create-notification-channel-modal')
 </x-server-workspace-layout>

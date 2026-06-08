@@ -64,7 +64,37 @@
         <p>{{ __('Counts Failed password / Invalid user lines in auth.log, reads fail2ban jail stats, checks UFW status, and samples sshd -T for password/root settings. For full log tailing, use Logs.') }}</p>
     </x-explainer>
 
-    <div class="space-y-6">
+    {{-- In-page tabs: posture overview, auth/brute-force detail, host hardening,
+         and notification routing for this server's server.security_digest.* events.
+         Mirrors the cert-inventory workspace. --}}
+    <div class="mb-6 border-b border-brand-ink/10">
+        <nav class="-mb-px flex flex-wrap gap-6" aria-label="{{ __('Security digest sections') }}">
+            @php
+                $tabBase = 'inline-flex items-center gap-1.5 border-b-2 px-1 py-3 text-sm font-medium transition-colors';
+                $tabOn = 'border-brand-forest text-brand-ink';
+                $tabOff = 'border-transparent text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink';
+            @endphp
+            <button type="button" wire:click="setDigestTab('overview')" @class([$tabBase, $digest_tab === 'overview' ? $tabOn : $tabOff])>
+                <x-heroicon-o-shield-exclamation class="h-4 w-4" aria-hidden="true" />
+                {{ __('Overview') }}
+            </button>
+            <button type="button" wire:click="setDigestTab('auth')" @class([$tabBase, $digest_tab === 'auth' ? $tabOn : $tabOff])>
+                <x-heroicon-o-document-text class="h-4 w-4" aria-hidden="true" />
+                {{ __('Auth & fail2ban') }}
+            </button>
+            <button type="button" wire:click="setDigestTab('hardening')" @class([$tabBase, $digest_tab === 'hardening' ? $tabOn : $tabOff])>
+                <x-heroicon-o-lock-closed class="h-4 w-4" aria-hidden="true" />
+                {{ __('Hardening') }}
+            </button>
+            <button type="button" wire:click="setDigestTab('notifications')" @class([$tabBase, $digest_tab === 'notifications' ? $tabOn : $tabOff])>
+                <x-heroicon-o-bell class="h-4 w-4" aria-hidden="true" />
+                {{ __('Notifications') }}
+            </button>
+        </nav>
+    </div>
+
+    {{-- Overview --}}
+    <div @class(['space-y-6', 'hidden' => $digest_tab !== 'overview'])>
         @if ($isDeployer)
             <section class="dply-card overflow-hidden border-amber-200">
                 <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
@@ -188,9 +218,11 @@
                 </div>
             </div>
         </section>
+    </div>
 
-        <div class="grid gap-6 lg:grid-cols-2">
-            <section class="dply-card overflow-hidden">
+    {{-- Auth & fail2ban --}}
+    <div @class(['space-y-6', 'hidden' => $digest_tab !== 'auth'])>
+        <section class="dply-card overflow-hidden">
                 <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                     <div class="flex items-start gap-3">
                         <x-icon-badge>
@@ -243,52 +275,6 @@
                     </a>
                 </div>
             </section>
-
-            <section class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                    <div class="flex items-start gap-3">
-                        <x-icon-badge>
-                            <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div>
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('SSH hardening') }}</p>
-                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Effective sshd settings') }}</h2>
-                            <p class="mt-1 text-sm text-brand-moss">{{ __('Sampled with sshd -T on the host during scan.') }}</p>
-                        </div>
-                    </div>
-                </div>
-                <dl class="grid gap-4 px-6 py-6 sm:grid-cols-2 sm:px-7">
-                    <div>
-                        <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('PasswordAuthentication') }}</dt>
-                        <dd class="mt-1">
-                            <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 {{ $statusBadge($sshd['password_authentication'] ?? null, ['no', 'false', '0'], ['yes', 'true', '1']) }}">
-                                {{ $formatBoolish($sshd['password_authentication'] ?? null) }}
-                            </span>
-                        </dd>
-                    </div>
-                    <div>
-                        <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('PermitRootLogin') }}</dt>
-                        <dd class="mt-1">
-                            <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 {{ $statusBadge($sshd['permit_root_login'] ?? null, ['no', 'false', '0', 'prohibit-password', 'without-password', 'forced-commands-only'], ['yes', 'true', '1']) }}">
-                                {{ $sshd['permit_root_login'] ?? '—' }}
-                            </span>
-                        </dd>
-                    </div>
-                </dl>
-                <div class="flex flex-wrap gap-4 border-t border-brand-ink/10 px-6 py-4 sm:px-7">
-                    <a href="{{ route('servers.ssh-keys', $server) }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-semibold text-brand-forest hover:underline">
-                        {{ __('SSH keys') }}
-                        <x-heroicon-m-arrow-up-right class="h-3 w-3" aria-hidden="true" />
-                    </a>
-                    @if ($sshAccessEnabled)
-                        <a href="{{ route('servers.ssh-access', $server) }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-semibold text-brand-forest hover:underline">
-                            {{ __('Access graph') }}
-                            <x-heroicon-m-arrow-up-right class="h-3 w-3" aria-hidden="true" />
-                        </a>
-                    @endif
-                </div>
-            </section>
-        </div>
 
         <section class="dply-card overflow-hidden">
             <div class="border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
@@ -360,6 +346,54 @@
                 </div>
             @endif
         </section>
+    </div>
+
+    {{-- Hardening --}}
+    <div @class(['space-y-6', 'hidden' => $digest_tab !== 'hardening'])>
+        <section class="dply-card overflow-hidden">
+            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <div class="flex items-start gap-3">
+                    <x-icon-badge>
+                        <x-heroicon-o-lock-closed class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('SSH hardening') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Effective sshd settings') }}</h2>
+                        <p class="mt-1 text-sm text-brand-moss">{{ __('Sampled with sshd -T on the host during scan.') }}</p>
+                    </div>
+                </div>
+            </div>
+            <dl class="grid gap-4 px-6 py-6 sm:grid-cols-2 sm:px-7">
+                <div>
+                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('PasswordAuthentication') }}</dt>
+                    <dd class="mt-1">
+                        <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 {{ $statusBadge($sshd['password_authentication'] ?? null, ['no', 'false', '0'], ['yes', 'true', '1']) }}">
+                            {{ $formatBoolish($sshd['password_authentication'] ?? null) }}
+                        </span>
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('PermitRootLogin') }}</dt>
+                    <dd class="mt-1">
+                        <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 {{ $statusBadge($sshd['permit_root_login'] ?? null, ['no', 'false', '0', 'prohibit-password', 'without-password', 'forced-commands-only'], ['yes', 'true', '1']) }}">
+                            {{ $sshd['permit_root_login'] ?? '—' }}
+                        </span>
+                    </dd>
+                </div>
+            </dl>
+            <div class="flex flex-wrap gap-4 border-t border-brand-ink/10 px-6 py-4 sm:px-7">
+                <a href="{{ route('servers.ssh-keys', $server) }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-semibold text-brand-forest hover:underline">
+                    {{ __('SSH keys') }}
+                    <x-heroicon-m-arrow-up-right class="h-3 w-3" aria-hidden="true" />
+                </a>
+                @if ($sshAccessEnabled)
+                    <a href="{{ route('servers.ssh-access', $server) }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-semibold text-brand-forest hover:underline">
+                        {{ __('Access graph') }}
+                        <x-heroicon-m-arrow-up-right class="h-3 w-3" aria-hidden="true" />
+                    </a>
+                @endif
+            </div>
+        </section>
 
         @if ($sshAccessEnabled && $sshAccess)
             <section class="dply-card overflow-hidden">
@@ -396,4 +430,14 @@
             </section>
         @endif
     </div>
+
+    {{-- Notifications --}}
+    <div @class(['space-y-6', 'hidden' => $digest_tab !== 'notifications'])>
+        @include('livewire.servers.partials.security-digest.notifications-tab')
+    </div>
+
+    {{-- Reusable inline channel-create modal (CreatesNotificationChannelInline trait),
+         shared with the Notifications tab so an operator can add a channel without
+         leaving the page; the new channel is auto-selected on success. --}}
+    @include('livewire.partials.create-notification-channel-modal')
 </x-server-workspace-layout>
