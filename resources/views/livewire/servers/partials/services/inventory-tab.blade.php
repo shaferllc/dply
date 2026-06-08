@@ -292,21 +292,18 @@
                                     @if ($mayMutate && ! $isActive)
                                         @php
                                             $startUsesConfirm = ! empty($row['standby_reason']);
+                                            $startWireClick = $startUsesConfirm
+                                                ? 'openSystemdActionConfirm(\'start\', '.\Illuminate\Support\Js::from($rowUnit).')'
+                                                : 'runSystemdServiceAction('.\Illuminate\Support\Js::from($rowUnit).', \'start\')';
                                         @endphp
                                         <x-secondary-button
                                             size="sm"
                                             type="button"
-                                            @if ($startUsesConfirm)
-                                                wire:click="openSystemdActionConfirm('start', @js($rowUnit))"
-                                            @else
-                                                wire:click="runSystemdServiceAction(@js($rowUnit), 'start')"
-                                            @endif
+                                            wire:click="{{ $startWireClick }}"
                                             wire:loading.attr="disabled"
                                             @disabled(! $opsReady || $otherBusy || $rowPending)
                                             class="!inline-flex !items-center !gap-1.5 !shrink-0 !py-2 !text-[11px]"
-                                            @if ($startUsesConfirm)
-                                                title="{{ $row['standby_reason'] }}"
-                                            @endif
+                                            title="{{ $startUsesConfirm ? $row['standby_reason'] : '' }}"
                                         >
                                             <x-heroicon-o-play class="h-3.5 w-3.5 shrink-0 text-emerald-700" aria-hidden="true" />
                                             {{ __('Start') }}

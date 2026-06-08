@@ -11,6 +11,11 @@
     :title="__('Edge proxy')"
     :description="__('Optional L7 reverse proxy in front of your webserver. Caddy serves each site on a high port; the edge proxy routes hosts on :80.', ['port' => 80])"
 >
+    {{-- Register the lazy CodeMirror loader on initial page render — see the
+         note in workspace-webserver.blade.php (Livewire-morph-injected module
+         scripts don't execute, so the inline config editor would mount empty). --}}
+    @vite(['resources/js/file-browser-editor-lazy.js'])
+
     @include('livewire.servers.partials.workspace-flashes', ['command_output' => null])
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 

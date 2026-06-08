@@ -6,6 +6,7 @@ namespace App\Services\Servers;
 
 use App\Models\Server;
 use App\Services\ConsoleActions\ConsoleEmitter;
+use App\Services\SshConnection;
 
 /**
  * Read / write / backup / restore for non-webserver allowlisted config files.
@@ -37,7 +38,9 @@ class RemoteServerConfigService
             $cap,
         );
 
-        $output = $this->runScript($server, 'server-config:read', $script, 60);
+        // Straight single-connection SSH pull (no queue, no script upload) so
+        // file-editor reads happen inline and fast, capped under the request limit.
+        $output = $this->directExec($server, $script, 15);
         [$head, $body] = array_pad(explode("---\n", $output, 2), 2, '');
         $size = (int) trim($head);
         $truncated = $size > $cap;
@@ -244,7 +247,7 @@ BASH;
             escapeshellarg($backupDir),
             $this->bashGlobLiteral($slug),
         );
-        $output = $this->runScript($server, 'server-config:list-backups', $script, 15);
+        $output = $this->directExec($server, $script, 12);
         $lines = preg_split('/\R+/', trim($output)) ?: [];
 
         $rows = [];
@@ -411,5 +414,22 @@ BASH;
         $out = $this->executor->runInlineBash($server, $task, $script, $timeout, $onOutput);
 
         return ServerManageSshExecutor::stripSshClientNoise($out->getBuffer());
+    }
+
+    /**
+     * Read-only "straight pull": run a script over a single phpseclib SSH
+     * connection as root and return stdout — no script upload (no mkdir/scp/bash
+     * 30s-mkdir path), no queue. Used for inline file-editor reads. Mutations
+     * still use runScript for the atomic backup/install/validate flow.
+     */
+    private function directExec(Server $server, string $script, int $timeout): string
+    {
+        $ssh = new SshConnection($server, 'root', SshConnection::ROLE_RECOVERY);
+
+        try {
+            return $ssh->exec($script, $timeout);
+        } finally {
+            $ssh->disconnect();
+        }
     }
 }

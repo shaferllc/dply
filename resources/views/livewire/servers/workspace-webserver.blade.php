@@ -15,6 +15,13 @@
     :title="__('Webserver')"
     :description="__('Pick which webserver runs on this box. Switching reprovisions all sites under the new daemon, then service-swaps to :80.')"
 >
+    {{-- Register the lazy CodeMirror loader on initial page render. The config
+         editor partial is only included after a file is opened (a Livewire
+         update), and a <script type=module> injected via Livewire morph never
+         executes — so without this, window.dplyEnsureFileBrowserEditor is never
+         defined and the editor mounts empty. --}}
+    @vite(['resources/js/file-browser-editor-lazy.js'])
+
     @include('livewire.servers.partials.workspace-flashes', ['command_output' => null])
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 

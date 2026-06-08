@@ -56,6 +56,13 @@
         @php
             $entries = [
                 [
+                    'date'    => 'June 8, 2026',
+                    'tags'    => ['fixed'],
+                    'title'   => 'Faster Config File Loading',
+                    'summary' => 'Config files now load instantly in the editor via a direct SSH read instead of the queued worker round-trip that could fail to load or hang.',
+                    'items'   => [],
+                ],
+                [
                     'date'    => 'June 7, 2026',
                     'tags'    => ['fixed'],
                     'title'   => 'Config Editor Loading Fix',

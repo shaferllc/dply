@@ -220,20 +220,38 @@ class WorkspaceConfiguration extends Component
             return;
         }
 
-        $this->enterPendingConfigFileLoad($path);
+        // Straight, synchronous SSH pull — no queue, no console banner, no poll.
+        // Both services read over a single direct SSH connection (capped under
+        // the request limit), so the file lands on this request. The queue+poll
+        // round-trip was the source of the "doesn't load" / status:null behaviour.
+        $engine = $this->resolvedConfigEngineForPath($path);
+        try {
+            $result = $engine !== null
+                ? app(RemoteWebserverConfigService::class)->read($this->server, $engine, $path)
+                : app(RemoteServerConfigService::class)->read($this->server, $path);
+        } catch (\Throwable $e) {
+            $this->toastError(__('Could not read :path: :msg', ['path' => basename($path), 'msg' => $e->getMessage()]));
+            $this->config_selected_path = null;
+            $this->config_file_loaded = false;
 
-        $consoleId = $this->seedConfigurationConsoleAction(
-            (string) __('Load config: :path', ['path' => basename($path)]),
-        );
-        $this->pending_load_console_id = $consoleId;
+            return;
+        }
 
-        RunServerConfigOpJob::dispatch(
-            $this->server->id,
-            $consoleId,
-            'read',
+        $contents = (string) ($result['contents'] ?? '');
+        $this->applyLoadedConfigFile(
             $path,
-            engine: $this->resolvedConfigEngineForPath($path),
+            $contents,
+            truncated: (bool) ($result['truncated'] ?? false),
+            fromCache: false,
         );
+
+        // Keep the per-path content cache warm so a later re-open is instant.
+        Cache::put(
+            RunServerConfigOpJob::fileContentCacheKey((string) $this->server->id, $path),
+            ['contents' => $contents, 'truncated' => (bool) ($result['truncated'] ?? false), 'cached_at' => now()->toIso8601String()],
+            now()->addMinutes(10),
+        );
+        $this->refreshCachedFlagsOnCatalog();
     }
 
     public function saveConfigFile(): void

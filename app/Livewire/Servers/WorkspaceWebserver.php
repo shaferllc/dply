@@ -7260,37 +7260,31 @@ class WorkspaceWebserver extends WorkspaceManage
             return;
         }
 
-        // Queue the load so the banner shows queued→running→completed
-        // exactly like the mutating ops. The worker stashes the file
-        // contents in a cache key; pickupQueuedConfigLoad() (called from
-        // render()) drops them into the editor buffer on the next poll
-        // cycle once the row goes to completed.
-        $consoleId = $this->seedManageConsoleAction(
-            $this->server->fresh(),
-            (string) __('Load webserver config: :path', ['path' => basename($path)]),
-        );
-        $this->pending_load_console_id = $consoleId;
-        $this->pending_load_path = $path;
-        // Clear stale buffer state so the textarea doesn't keep showing the
-        // previous file while the new one loads on the worker.
-        $this->config_selected_path = null;
-        $this->config_contents = '';
-        $this->config_truncated_on_load = false;
+        // Straight, synchronous SSH pull — no queue, no console banner, no poll.
+        // RemoteWebserverConfigService::read() now reads over a single phpseclib
+        // connection (capped well under the request limit), so the file lands in
+        // the editor on this very request. This deliberately bypasses the queued
+        // worker flow for file editing (the queue + poll round-trip was the
+        // source of the "doesn't load" / status:null behaviour).
+        try {
+            $result = app(RemoteWebserverConfigService::class)->read($this->server, $this->workspace_tab, $path);
+        } catch (\Throwable $e) {
+            $this->toastError(__('Could not read :path: :msg', ['path' => basename($path), 'msg' => $e->getMessage()]));
+
+            return;
+        }
+
+        $this->config_selected_path = $path;
+        $this->config_contents = (string) ($result['contents'] ?? '');
+        $this->config_original_contents = $this->config_contents;
+        $this->config_truncated_on_load = (bool) ($result['truncated'] ?? false);
         $this->config_validate_output = null;
         $this->config_validate_ok = null;
         $this->config_last_backup = null;
-        $this->config_backups = [];
-        $this->config_original_contents = '';
         $this->webserverConfigSaveDiffOpen = false;
         $this->closeWebserverConfigRevisionDiff();
-
-        RunWebserverConfigOpJob::dispatch(
-            $this->server->id,
-            $consoleId,
-            'read',
-            $this->workspace_tab,
-            $path,
-        );
+        $this->refreshConfigBackups();
+        $this->refreshWebserverConfigRevisionState();
     }
 
     /**

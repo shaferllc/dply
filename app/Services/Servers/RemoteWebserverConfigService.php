@@ -7,6 +7,7 @@ namespace App\Services\Servers;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\ConsoleActions\ConsoleEmitter;
+use App\Services\SshConnection;
 use App\Services\Sites\OpenLiteSpeedSiteConfigBuilder;
 
 /**
@@ -59,12 +60,10 @@ class RemoteWebserverConfigService
         }
         $script = '{ '.implode('; ', $cmds).'; } 2>/dev/null || true';
 
-        // Tight timeout: this is called inline from render() on every wire:poll,
-        // and a hanging SSH burns the PHP request's 30s execution budget. If
-        // the box is unresponsive we'd rather show an empty picker (the
-        // catch in render() handles RuntimeException from runInlineBash) than
-        // 503 the whole workspace.
-        $output = $this->runScript($server, 'webserver-config:list', $script, 10);
+        // Straight, single-connection SSH pull with a tight timeout — never the
+        // heavy mkdir+scp+bash TaskRunner path (whose mkdir step alone can block
+        // for 30s and wedge the request). Failure falls back to an empty picker.
+        $output = $this->directExec($server, $script, 12);
         $lines = preg_split('/\R+/', trim($output)) ?: [];
 
         $main = (string) $layout['main'];
@@ -117,10 +116,11 @@ class RemoteWebserverConfigService
             $cap,
         );
 
-        // Pass null so the file contents don't stream into the banner — the
-        // line-by-line output would flood the console with the whole config.
-        // The step + summary lines below give the operator enough context.
-        $output = $this->runScript($server, 'webserver-config:read', $script, 60);
+        // Straight, single-connection SSH pull (no queue, no script upload) so a
+        // file editor click reads inline and fast. Capped well under PHP's 30s
+        // request limit so a stalled connection fails cleanly instead of wedging
+        // the request.
+        $output = $this->directExec($server, $script, 15);
         [$head, $body] = array_pad(explode("---\n", $output, 2), 2, '');
         $size = (int) trim($head);
         $truncated = $size > $cap;
@@ -401,7 +401,7 @@ BASH;
             escapeshellarg($backupDir),
             $this->bashGlobLiteral($slug),
         );
-        $output = $this->runScript($server, 'webserver-config:list-backups', $script, 15);
+        $output = $this->directExec($server, $script, 12);
         $lines = preg_split('/\R+/', trim($output)) ?: [];
 
         $rows = [];
@@ -558,6 +558,25 @@ BASH;
         $out = $this->executor->runInlineBash($server, $task, $script, $timeout, $onOutput);
 
         return ServerManageSshExecutor::stripSshClientNoise($out->getBuffer());
+    }
+
+    /**
+     * Read-only "straight pull": run a script over a single phpseclib SSH
+     * connection as root and return its stdout. Unlike {@see runScript} this
+     * does NOT upload a script (no mkdir/scp/bash dance, no 30s mkdir timeout)
+     * and never queues — so file-editor reads (list / read / list-backups) are a
+     * fast, inline, single round-trip. Read-only by design; mutations still go
+     * through runScript for the atomic backup/install/validate flow.
+     */
+    private function directExec(Server $server, string $script, int $timeout): string
+    {
+        $ssh = new SshConnection($server, 'root', SshConnection::ROLE_RECOVERY);
+
+        try {
+            return $ssh->exec($script, $timeout);
+        } finally {
+            $ssh->disconnect();
+        }
     }
 
     /**
