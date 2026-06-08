@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Fixed
+- The webserver config-file picker now loads via a background request instead of on every render, fixing intermittent poll errors and showing a "discovering files" state while the listing loads.
 ### Changed
 - The Server Logs ClickHouse client now verifies HTTPS connections against the supplied private CA certificate, securing cross-provider log queries to the managed log store.
 ### Fixed

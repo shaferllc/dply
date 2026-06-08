@@ -29,6 +29,14 @@
                     </div>
 
                     <div class="px-6 py-6 sm:px-7">
+                    {{-- Pickup poll: while a read/write/validate is queued, keep the
+                         component re-rendering (2s, matching the standalone config
+                         page) so pickupQueuedConfig*() drains the worker result into
+                         the editor as soon as it lands. render() does no SSH, so this
+                         can't block the request. Stops the moment the op clears. --}}
+                    @if ($pending_load_console_id !== null || $pending_write_console_id !== null || $pending_validate_console_id !== null)
+                        <div wire:poll.2s class="hidden" aria-hidden="true"></div>
+                    @endif
                     @if ($configOptimisticPending)
                         <div class="flex items-center gap-2 rounded-xl border border-dashed border-brand-ink/15 bg-white px-6 py-12 text-sm text-brand-moss">
                             <x-spinner variant="forest" class="h-4 w-4" />
@@ -41,7 +49,12 @@
                             {{-- File picker --}}
                             <div class="rounded-xl border border-brand-ink/10 bg-white">
                                 <div class="border-b border-brand-ink/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Files') }}</div>
-                                @if (empty($webserverConfigFiles))
+                                @if (! $webserverConfigFilesLoaded)
+                                    <div class="flex items-center gap-2 px-3 py-4 text-xs text-brand-moss">
+                                        <x-spinner variant="forest" class="h-3.5 w-3.5 shrink-0" />
+                                        {{ __('Discovering config files on server…') }}
+                                    </div>
+                                @elseif (empty($webserverConfigFiles))
                                     <p class="px-3 py-3 text-xs text-brand-moss">{{ __('No config files discovered. Confirm the server is reachable.') }}</p>
                                 @else
                                     <ul class="max-h-[55vh] divide-y divide-brand-ink/5 overflow-auto text-sm">
@@ -215,11 +228,19 @@
                                         </div>
                                     </div>
 
-                                    @include('livewire.servers.partials.configuration.code-editor', [
-                                        'path' => $config_selected_path,
-                                        'readOnly' => false,
-                                        'autocomplete' => [],
-                                    ])
+                                    {{-- Give the CodeMirror mount a definite height. The
+                                         shared code-editor uses flex-1/min-h-0 and renders
+                                         blank inside an auto-height parent (it needs a height
+                                         ancestor to fill, like the standalone page's h-[60vh]
+                                         grid). --}}
+                                    <div class="mt-2 flex h-[55vh] flex-col">
+                                        @include('livewire.servers.partials.configuration.code-editor', [
+                                            'path' => $config_selected_path,
+                                            'readOnly' => false,
+                                            'autocomplete' => [],
+                                        ])
+                                    </div>
+
 
                                     @include('livewire.servers.partials.webserver.engine._config-revisions')
 

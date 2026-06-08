@@ -163,6 +163,19 @@ class WorkspaceWebserver extends WorkspaceManage
     /** Cached backup listing for the loaded file (path => row). */
     public array $config_backups = [];
 
+    /**
+     * Config-file picker listing for the active engine. Loaded via wire:init
+     * when the Config sub-tab opens — NOT inside render(), so the pickup poll
+     * (and any other wire:poll) doesn't trigger an inline SSH listing on every
+     * tick (which blocked the request and produced "status: null" poll errors).
+     *
+     * @var array<int, array<string, mixed>>
+     */
+    public array $webserverConfigFilesRaw = [];
+
+    /** False until the first listing load finishes, so the picker shows a "discovering" state rather than a misleading "no files". */
+    public bool $webserverConfigFilesLoaded = false;
+
     // ---- Log viewer state --------------------------------------------
 
     /** Which log to read: 'access', 'error', or 'journal'. */
@@ -1209,9 +1222,42 @@ class WorkspaceWebserver extends WorkspaceManage
             }
         }
 
+        if ($sub === 'config' && $this->engineSupportsConfig($tab) && ! $this->webserverConfigFilesLoaded) {
+            $this->loadWebserverConfigFiles();
+        }
+
         if ($this->isEngineLiveStateSubtab($sub, $tab)) {
             $this->ensureEngineLiveState();
         }
+    }
+
+    /**
+     * Discover the config-file picker listing for the active engine over SSH.
+     * Called from wire:init (loadActiveEngineSubtabData) when the Config sub-tab
+     * opens — deliberately NOT from render(), so renders + wire:polls stay free
+     * of SSH. Cached briefly so rapid re-entries coalesce.
+     */
+    public function loadWebserverConfigFiles(): void
+    {
+        if (! $this->engineSupportsConfig($this->workspace_tab) || ! $this->serverOpsReady()) {
+            $this->webserverConfigFilesRaw = [];
+            $this->webserverConfigFilesLoaded = true;
+
+            return;
+        }
+
+        $cacheKey = 'dply.webserver-config-files:'.$this->server->id.':'.$this->workspace_tab;
+        try {
+            $this->webserverConfigFilesRaw = Cache::remember(
+                $cacheKey,
+                10,
+                fn () => app(RemoteWebserverConfigService::class)->listFiles($this->server, $this->workspace_tab),
+            );
+        } catch (\Throwable) {
+            $this->webserverConfigFilesRaw = [];
+        }
+
+        $this->webserverConfigFilesLoaded = true;
     }
 
     /**
@@ -7598,27 +7644,10 @@ class WorkspaceWebserver extends WorkspaceManage
         $this->pickupQueuedConfigWrite();
         $this->pickupQueuedConfigValidate();
 
-        // listFiles does an SSH call. render() runs on every Livewire commit,
-        // including every banner wire:poll tick — so without caching it,
-        // every 4s poll fires a fresh SSH connection. Cache for 10s per
-        // (server, engine) keeps the picker fresh enough but lets the polls
-        // re-use the result. Also gate on the Config sub-tab so other sub-
-        // tabs (Overview / Live-state) skip the SSH entirely.
-        $configFiles = [];
-        if ($this->engine_subtab === 'config'
-            && in_array($this->workspace_tab, ['nginx', 'caddy', 'apache', 'openlitespeed', 'traefik', 'haproxy', 'envoy', 'openresty'], true)
-            && $this->serverOpsReady()) {
-            $cacheKey = 'dply.webserver-config-files:'.$this->server->id.':'.$this->workspace_tab;
-            try {
-                $configFiles = Cache::remember(
-                    $cacheKey,
-                    10,
-                    fn () => app(RemoteWebserverConfigService::class)->listFiles($this->server, $this->workspace_tab),
-                );
-            } catch (\Throwable) {
-                $configFiles = [];
-            }
-        }
+        // Picker listing is loaded off the render path (loadWebserverConfigFiles
+        // via wire:init) and held in $webserverConfigFilesRaw — render() does NO
+        // SSH, so the pickup poll can tick safely without blocking the request.
+        $configFiles = $this->engine_subtab === 'config' ? $this->webserverConfigFilesRaw : [];
 
         return view('livewire.servers.workspace-webserver', array_merge(
             WebserverWorkspaceViewData::for($this->server, $this),
@@ -7695,6 +7724,8 @@ class WorkspaceWebserver extends WorkspaceManage
         $this->config_truncated_on_load = false;
         $this->config_last_backup = null;
         $this->config_backups = [];
+        $this->webserverConfigFilesRaw = [];
+        $this->webserverConfigFilesLoaded = false;
     }
 
     protected function resetLogViewerState(): void

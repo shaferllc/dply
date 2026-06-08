@@ -5,13 +5,11 @@ declare(strict_types=1);
 namespace App\Livewire\Servers;
 
 use App\Models\Server;
-use App\Services\Servers\RemoteWebserverConfigService;
 use App\Services\Servers\ServerManageToolsReport;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\EdgeProxyWorkspaceViewData;
 use App\Support\Servers\ServerConsoleActionLookup;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 
@@ -58,21 +56,9 @@ class WorkspaceEdgeProxy extends WorkspaceWebserver
         $this->pickupQueuedConfigWrite();
         $this->pickupQueuedConfigValidate();
 
-        $configFiles = [];
-        if ($this->engine_subtab === 'config'
-            && in_array($this->workspace_tab, ['traefik', 'haproxy'], true)
-            && $this->serverOpsReady()) {
-            $cacheKey = 'dply.edge-proxy-config-files:'.$this->server->id.':'.$this->workspace_tab;
-            try {
-                $configFiles = Cache::remember(
-                    $cacheKey,
-                    10,
-                    fn () => app(RemoteWebserverConfigService::class)->listFiles($this->server, $this->workspace_tab),
-                );
-            } catch (\Throwable) {
-                $configFiles = [];
-            }
-        }
+        // Listing loaded off the render path via wire:init (inherited
+        // loadWebserverConfigFiles); render() does no SSH.
+        $configFiles = $this->engine_subtab === 'config' ? $this->webserverConfigFilesRaw : [];
 
         return view('livewire.servers.workspace-edge-proxy', array_merge(
             EdgeProxyWorkspaceViewData::for($this->server, $this),
