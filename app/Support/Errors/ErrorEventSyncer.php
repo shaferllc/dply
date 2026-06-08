@@ -91,14 +91,35 @@ class ErrorEventSyncer
                 ->where('error_events.source_type', $captured)))
             ->with('site.server')
             ->orderBy('id')
-            ->chunkById(200, function ($rows) use (&$count): void {
+            ->chunkById(200, function ($rows) use (&$count, $notify): void {
                 foreach ($rows as $row) {
-                    if ($this->recorder->recordDeployment($row)) {
+                    $event = $this->recorder->recordDeployment($row);
+                    if ($event) {
                         $count++;
+                        $this->maybeNotify($event, $notify);
                     }
                 }
             });
 
         return $count;
+    }
+
+    /**
+     * Notify only for genuinely new events (the recorder upserts on
+     * source identity, so a re-sweep of the same failure is not "recently
+     * created"). Notification failures must never break the sweep, so they're
+     * swallowed — the capture itself is the source of truth.
+     */
+    private function maybeNotify(ErrorEvent $event, bool $notify): void
+    {
+        if (! $notify || ! $event->wasRecentlyCreated) {
+            return;
+        }
+
+        try {
+            $this->notifier->notify($event);
+        } catch (Throwable $e) {
+            report($e);
+        }
     }
 }

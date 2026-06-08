@@ -48,7 +48,7 @@ return [
         ['key' => 'run', 'route' => 'servers.run', 'preview_route' => 'servers.run-preview', 'icon' => 'play-circle', 'label' => 'Run', 'group' => 'overview', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.run', 'preview_feature' => 'workspace.run_preview'],
         ['key' => 'sites', 'route' => 'servers.sites', 'icon' => 'globe-alt', 'label' => 'Sites', 'group' => 'overview'],
         // monitor (alphabetical by label)
-        ['key' => 'activity', 'route' => 'servers.activity', 'icon' => 'clipboard-document-list', 'label' => 'Activity', 'group' => 'monitor', 'feature' => 'workspace.activity', 'soon_badge' => true],
+        ['key' => 'activity', 'route' => 'servers.activity', 'icon' => 'clipboard-document-list', 'label' => 'Activity', 'group' => 'monitor', 'feature' => 'workspace.activity'],
         ['key' => 'cert-inventory', 'route' => 'servers.cert-inventory', 'icon' => 'lock-closed', 'label' => 'Certificates', 'group' => 'monitor', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.cert_inventory'],
         ['key' => 'deploys', 'route' => 'servers.deploys', 'icon' => 'rocket-launch', 'label' => 'Deploys', 'group' => 'monitor', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'errors', 'route' => 'servers.errors', 'icon' => 'exclamation-triangle', 'label' => 'Errors', 'group' => 'monitor'],

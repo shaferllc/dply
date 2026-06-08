@@ -23,7 +23,8 @@ class BackfillErrorEventsCommand extends Command
     public function handle(ErrorEventSyncer $syncer): int
     {
         $days = max(1, (int) $this->option('days'));
-        $count = $syncer->sync(now()->subDays($days), (bool) $this->option('refresh'));
+        // Historical seed — never fire alerts for failures that already happened.
+        $count = $syncer->sync(now()->subDays($days), (bool) $this->option('refresh'), notify: false);
 
         $this->info("Backfilled {$count} error event(s) from the last {$days} day(s).");
 

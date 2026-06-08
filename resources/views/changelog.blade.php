@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 8, 2026',
+                    'tags'    => ['new'],
+                    'title'   => 'Server Error Notifications',
+                    'summary' => 'Route a server\'s error events to notification channels from a new Notifications tab on the server Errors workspace, without firing alerts for historical backfilled failures.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 8, 2026',
                     'tags'    => ['improved'],
                     'title'   => 'Removed Several Cloud Providers',
                     'summary' => 'Support for Google Cloud, Scaleway, Equinix Metal, and Fly.io server providers has been removed.',

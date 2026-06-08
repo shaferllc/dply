@@ -85,6 +85,32 @@ class ErrorEvent extends Model
         return $query->whereNull('dismissed_at');
     }
 
+    /**
+     * Request-scoped memo of the undismissed error count per server. The server
+     * workspace nav badge ({@see server-workspace-shell}) and the Errors stream
+     * both want this count; sharing it here keeps the same `count(*)` from
+     * running twice on a page render. Primed by the stream's paginator when it's
+     * unfiltered (see {@see \App\Livewire\Servers\WorkspaceErrors::shareStreamTotal});
+     * otherwise computed on first read. Keyed per server, reset each request.
+     *
+     * @var array<string, int>
+     */
+    protected static array $undismissedServerCountMemo = [];
+
+    public static function undismissedCountForServer(string $serverId): int
+    {
+        return static::$undismissedServerCountMemo[$serverId] ??= static::query()
+            ->where('server_id', $serverId)
+            ->whereNull('dismissed_at')
+            ->count();
+    }
+
+    /** Seed the memo from a count computed elsewhere (e.g. the stream paginator). */
+    public static function primeUndismissedCountForServer(string $serverId, int $count): void
+    {
+        static::$undismissedServerCountMemo[$serverId] = $count;
+    }
+
     public function isDismissed(): bool
     {
         return $this->dismissed_at !== null;

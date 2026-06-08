@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Route a server's error events to notification channels from a new Notifications tab on the server Errors workspace, without firing alerts for historical backfilled failures.
 ### Removed
 - Support for Google Cloud, Scaleway, Equinix Metal, and Fly.io server providers has been removed.
 ### Added

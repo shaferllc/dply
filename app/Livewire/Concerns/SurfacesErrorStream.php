@@ -127,18 +127,38 @@ trait SurfacesErrorStream
 
     public function getEventsProperty(): LengthAwarePaginator
     {
-        return $this->scopedErrors()
+        $events = $this->scopedErrors()
             ->with('server:id,name')
             ->when(! $this->showDismissed, fn ($q) => $q->whereNull('dismissed_at'))
             ->when($this->category !== '', fn ($q) => $q->where('category', $this->category))
             ->orderByDesc('occurred_at')
             ->paginate(25);
+
+        // When the stream is unfiltered, its total IS the undismissed count, so
+        // hand it to the host (e.g. to prime the workspace nav badge) and avoid a
+        // second identical count() elsewhere on the page.
+        if (! $this->showDismissed && $this->category === '') {
+            $this->shareStreamTotal($events->total());
+        }
+
+        return $events;
     }
 
+    /**
+     * Total undismissed errors in scope. Derived from the per-category facet
+     * counts (already computed for the filter chips) so it costs no extra query.
+     */
     public function getOpenCountProperty(): int
     {
-        return $this->scopedErrors()->whereNull('dismissed_at')->count();
+        return array_sum($this->facets);
     }
+
+    /**
+     * Hook for the host to reuse the unfiltered stream total elsewhere (the
+     * server view primes its nav badge). No-op by default — the site view has no
+     * nav badge to feed.
+     */
+    protected function shareStreamTotal(int $total): void {}
 
     /**
      * Un-dismissed counts per category, for the filter chips.
