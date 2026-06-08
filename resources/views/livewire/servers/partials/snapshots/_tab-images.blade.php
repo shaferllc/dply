@@ -1,3 +1,21 @@
+@php
+    // Shared button + cost helpers, matching the Backups workspace styling.
+    $btnDanger = 'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100';
+
+    // Per-image monthly storage estimate, in the provider's billing currency.
+    // Informational only — the image sits on the user's own cloud account.
+    $imageRate = $server->provider?->imageSnapshotRatePerGbMonth();
+    $formatImageCost = function (?int $bytes) use ($imageRate): ?string {
+        if ($imageRate === null || $bytes === null || $bytes <= 0) {
+            return null;
+        }
+        $monthly = ($bytes / 1_000_000_000) * $imageRate['rate'];
+        $symbol = ['USD' => '$', 'EUR' => '€'][$imageRate['currency']] ?? '';
+        $amount = $monthly < 0.01 ? '<0.01' : number_format($monthly, 2);
+
+        return $symbol.$amount;
+    };
+@endphp
 <x-server-workspace-tab-panel id="snapshots-panel-images" labelled-by="snapshots-tab-images" panel-class="space-y-8">
     {{-- Capture a new image. --}}
     <section class="dply-card overflow-hidden">
@@ -24,21 +42,21 @@
                     </p>
                 </div>
             @else
-                <form wire:submit="createServerImage" class="flex flex-wrap items-end gap-3">
-                    <div class="min-w-0 flex-1">
-                        <x-input-label for="new_image_name" :value="__('Image name')" />
+                <form wire:submit="createServerImage" class="space-y-2">
+                    <x-input-label for="new_image_name" :value="__('Image name')" />
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
                         <x-text-input
                             id="new_image_name"
                             wire:model="new_image_name"
-                            class="mt-1 block w-full text-sm"
-                            :placeholder="\Illuminate\Support\Str::slug($server->name ?: 'server').'-'.now()->format('Y-m-d')"
+                            class="block w-full text-sm sm:flex-1"
+                            :placeholder="\Illuminate\Support\Str::slug($server->name ?: 'server').'-'.now()->format('Y-m-d-His')"
                         />
-                        <p class="mt-1 text-[11px] text-brand-moss">{{ __('Leave blank to auto-name with the date.') }}</p>
+                        <x-primary-button type="submit" class="shrink-0 justify-center" wire:loading.attr="disabled" wire:target="createServerImage" :disabled="! $opsReady">
+                            <span wire:loading.remove wire:target="createServerImage">{{ __('Create image now') }}</span>
+                            <span wire:loading wire:target="createServerImage">{{ __('Queueing…') }}</span>
+                        </x-primary-button>
                     </div>
-                    <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="createServerImage" @disabled(! $opsReady)>
-                        <span wire:loading.remove wire:target="createServerImage">{{ __('Create image now') }}</span>
-                        <span wire:loading wire:target="createServerImage">{{ __('Queueing…') }}</span>
-                    </x-primary-button>
+                    <p class="text-[11px] text-brand-moss">{{ __('Auto-named with the date & time — edit to rename, or clear to regenerate on save.') }}</p>
                 </form>
                 @unless ($opsReady)
                     <p class="mt-3 text-[11px] text-amber-700">{{ __('This server is still provisioning — imaging unlocks once it is ready.') }}</p>
@@ -47,8 +65,8 @@
         </div>
     </section>
 
-    {{-- History. --}}
-    <section class="dply-card overflow-hidden">
+    {{-- History. Polls while a capture is still running, then goes quiet. --}}
+    <section class="dply-card overflow-hidden" @if ($imagesInFlight) wire:poll.10s @endif>
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
                 <x-heroicon-o-archive-box class="h-5 w-5" aria-hidden="true" />
@@ -78,6 +96,7 @@
                                 <th class="px-4 py-3">{{ __('Name') }}</th>
                                 <th class="px-4 py-3">{{ __('Status') }}</th>
                                 <th class="px-4 py-3 text-right">{{ __('Size') }}</th>
+                                <th class="px-4 py-3 text-right">{{ __('Est. cost') }}</th>
                                 <th class="px-4 py-3">{{ __('Region') }}</th>
                                 <th class="px-4 py-3"></th>
                             </tr>
@@ -102,16 +121,18 @@
                                         @endif
                                     </td>
                                     <td class="px-4 py-3 text-right font-mono tabular-nums text-brand-ink">{{ $image->bytes !== null ? \Illuminate\Support\Number::fileSize((int) $image->bytes) : '—' }}</td>
+                                    @php $imageCost = $formatImageCost($image->bytes); @endphp
+                                    <td class="px-4 py-3 text-right font-mono tabular-nums text-brand-moss" @if ($imageCost !== null) title="{{ __('Estimated monthly storage on :provider — billed by them, not Dply.', ['provider' => $server->provider?->label() ?? __('your provider')]) }}" @endif>{{ $imageCost !== null ? $imageCost.'/mo' : '—' }}</td>
                                     <td class="px-4 py-3 text-brand-moss">{{ $image->region ?? '—' }}</td>
                                     <td class="px-4 py-3 text-right">
                                         <button
                                             type="button"
-                                            wire:click="deleteServerImage('{{ $image->id }}')"
-                                            wire:confirm="{{ __('Delete this image? This removes it from your cloud account and cannot be undone.') }}"
-                                            class="rounded-md p-1 text-brand-mist hover:bg-brand-sand/50 hover:text-rose-700"
+                                            wire:click="openConfirmActionModal('deleteServerImage', ['{{ $image->id }}'], @js(__('Delete image')), @js(__('Delete this image? This removes it from your cloud account and cannot be undone.')), @js(__('Delete image')), true)"
+                                            class="{{ $btnDanger }}"
                                             title="{{ __('Delete image') }}"
                                         >
-                                            <x-heroicon-o-trash class="h-4 w-4" />
+                                            <x-heroicon-m-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                            {{ __('Delete') }}
                                         </button>
                                     </td>
                                 </tr>

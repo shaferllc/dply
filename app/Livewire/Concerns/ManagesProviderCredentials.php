@@ -18,6 +18,7 @@ use App\Services\Imports\Forge\ForgeImportDriver;
 use App\Services\Imports\Ploi\PloiImportDriver;
 use App\Services\LinodeService;
 use App\Services\OracleComputeService;
+use App\Services\OvhService;
 use App\Services\ScalewayService;
 use App\Services\UpCloudService;
 use App\Services\VultrService;
@@ -77,7 +78,13 @@ trait ManagesProviderCredentials
 
     public string $ovh_name = '';
 
-    public string $ovh_api_token = '';
+    public string $ovh_endpoint = 'ovh-eu';
+
+    public string $ovh_application_key = '';
+
+    public string $ovh_application_secret = '';
+
+    public string $ovh_consumer_key = '';
 
     public string $rackspace_name = '';
 
@@ -471,11 +478,60 @@ trait ManagesProviderCredentials
         }
         $this->validate([
             'ovh_name' => 'nullable|string|max:255',
-            'ovh_api_token' => 'required|string',
-        ], [], ['ovh_api_token' => 'API token']);
-        if ($this->storeProviderCredential('ovh', $this->ovh_name, $this->ovh_api_token, 'ovh_api_token')) {
-            $this->reset('ovh_name', 'ovh_api_token');
+            'ovh_endpoint' => 'required|string|in:ovh-eu,ovh-us,ovh-ca',
+            'ovh_application_key' => 'required|string|max:255',
+            'ovh_application_secret' => 'required|string|max:255',
+            'ovh_consumer_key' => 'required|string|max:255',
+        ], [], [
+            'ovh_endpoint' => 'API endpoint',
+            'ovh_application_key' => 'Application Key',
+            'ovh_application_secret' => 'Application Secret',
+            'ovh_consumer_key' => 'Consumer Key',
+        ]);
+        $this->authorize('create', ProviderCredential::class);
+        $org = auth()->user()->currentOrganization();
+        if (! $org) {
+            $this->toastError('Select or create an organization first.');
+
+            return;
         }
+        $credential = auth()->user()->providerCredentials()->create([
+            'organization_id' => $org->id,
+            'provider' => 'ovh',
+            'name' => trim($this->ovh_name) ?: 'OVH',
+            'credentials' => [
+                'endpoint' => $this->ovh_endpoint,
+                'application_key' => $this->ovh_application_key,
+                'application_secret' => $this->ovh_application_secret,
+                'consumer_key' => $this->ovh_consumer_key,
+            ],
+        ]);
+
+        try {
+            $ovh = new OvhService($credential);
+            $ovh->validateToken();
+
+            // Bind the credential to a Cloud project so provisioning knows where
+            // instances live (OVH instances are project-scoped, not account-scoped).
+            $project = $ovh->projectId();
+            $credential->update(['credentials' => array_merge($credential->credentials, ['project' => $project])]);
+        } catch (\Throwable $e) {
+            $credential->delete();
+            $msg = 'Invalid OVH credentials or API error: '.$e->getMessage();
+            $this->addError('ovh_application_key', $msg);
+            $this->toastError($msg);
+
+            return;
+        }
+
+        audit_log($org, auth()->user(), 'credential.created', $credential, null, [
+            'provider' => 'ovh',
+            'name' => $credential->name,
+        ]);
+
+        $this->toastSuccess('Provider connected.');
+        $this->reset('ovh_name', 'ovh_application_key', 'ovh_application_secret', 'ovh_consumer_key');
+        $this->notifyProviderCredentialStored('ovh');
     }
 
     public function storeRackspace(): void
@@ -1014,7 +1070,7 @@ trait ManagesProviderCredentials
                 PloiImportDriver::for($credential)->validateConnection();
             } elseif ($provider === 'forge') {
                 ForgeImportDriver::for($credential)->validateConnection();
-            } elseif (in_array($provider, ['ovh', 'rackspace', 'render', 'railway', 'gandi', 'ghcr'], true)) {
+            } elseif (in_array($provider, ['rackspace', 'render', 'railway', 'gandi', 'ghcr'], true)) {
                 // No validation service yet; credential saved for future use
             } else {
                 throw new \InvalidArgumentException("Unknown provider: {$provider}");

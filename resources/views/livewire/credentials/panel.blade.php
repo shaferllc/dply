@@ -422,29 +422,38 @@
     @case('ovh')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
-                <section class="dply-card overflow-hidden border-amber-200">
-                    <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
-                        <div class="flex items-start gap-3">
-                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
-                                <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                            </span>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Coming soon') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Stored for future use') }}</h3>
-                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Credential is stored for future use. Automated server creation via this provider is not available yet.') }}</p>
-                            </div>
-                        </div>
-                    </div>
-                </section>
                 <div class="space-y-5">
+                    <p class="text-sm leading-relaxed text-brand-moss">
+                        {{ __('Create application credentials at') }}
+                        <a href="https://api.ovh.com/createToken/" target="_blank" rel="noopener" class="font-medium text-brand-ink underline">api.ovh.com/createToken</a>.
+                    </p>
                     <div>
                         <x-input-label for="ovh_name" :value="__('Label (optional)')" />
                         <x-text-input id="ovh_name" wire:model="ovh_name" type="text" class="mt-1 block w-full" />
                     </div>
                     <div>
-                        <x-input-label for="ovh_api_token" :value="__('API token')" />
-                        <x-text-input id="ovh_api_token" wire:model="ovh_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                        <x-input-error :messages="$errors->get('ovh_api_token')" class="mt-2" />
+                        <x-input-label for="ovh_endpoint" :value="__('API endpoint')" />
+                        <x-select id="ovh_endpoint" wire:model="ovh_endpoint" class="mt-1 block w-full">
+                            <option value="ovh-eu">{{ __('OVH Europe (ovh-eu)') }}</option>
+                            <option value="ovh-us">{{ __('OVH US (ovh-us)') }}</option>
+                            <option value="ovh-ca">{{ __('OVH Canada (ovh-ca)') }}</option>
+                        </x-select>
+                        <x-input-error :messages="$errors->get('ovh_endpoint')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="ovh_application_key" :value="__('Application Key')" />
+                        <x-text-input id="ovh_application_key" wire:model="ovh_application_key" type="text" class="mt-1 block w-full" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('ovh_application_key')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="ovh_application_secret" :value="__('Application Secret')" />
+                        <x-text-input id="ovh_application_secret" wire:model="ovh_application_secret" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('ovh_application_secret')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="ovh_consumer_key" :value="__('Consumer Key')" />
+                        <x-text-input id="ovh_consumer_key" wire:model="ovh_consumer_key" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('ovh_consumer_key')" class="mt-2" />
                     </div>
                     <x-primary-button type="button" wire:click="storeOvh" wire:loading.attr="disabled" wire:target="storeOvh">{{ __('Save credential') }}</x-primary-button>
                 </div>

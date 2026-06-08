@@ -42,6 +42,12 @@
                         {{ __('Activity') }}
                     </span>
                 </x-server-workspace-tab>
+                <x-server-workspace-tab id="ssh-tab-notifications" :active="$ssh_workspace_tab === 'notifications'" wire:click="setSshWorkspaceTab('notifications')">
+                    <span class="inline-flex items-center gap-1.5">
+                        <x-heroicon-o-bell class="h-4 w-4" aria-hidden="true" />
+                        {{ __('Notifications') }}
+                    </span>
+                </x-server-workspace-tab>
             </x-server-workspace-tablist>
 
             <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="setSshWorkspaceTab">
@@ -83,6 +89,15 @@
                 </x-server-workspace-tab-panel>
             @endif
 
+            @if ($ssh_workspace_tab === 'notifications')
+                <x-server-workspace-tab-panel
+                    id="ssh-panel-notifications"
+                    labelled-by="ssh-tab-notifications"
+                >
+                    @include('livewire.servers.partials.ssh-keys.notifications-tab')
+                </x-server-workspace-tab-panel>
+            @endif
+
             </div>
         </div>
     @else
@@ -91,6 +106,10 @@
 
     <x-slot name="modals">
         <livewire:profile.personal-ssh-key-modal source="servers.workspace-ssh-keys" />
+        {{-- Reusable inline channel-create modal (CreatesNotificationChannelInline trait),
+             shared with the Notifications tab so an operator can add a channel without
+             leaving the page; the new channel is auto-selected on success. --}}
+        @include('livewire.partials.create-notification-channel-modal')
         @include('livewire.partials.confirm-action-modal')
         @include('livewire.servers.partials.remove-server-modal', [
             'open' => $showRemoveServerModal,

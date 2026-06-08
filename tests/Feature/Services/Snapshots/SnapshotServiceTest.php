@@ -138,7 +138,11 @@ test('take throws and audits when dump returns nonzero', function () {
             reason: Snapshot::REASON_MANUAL,
         );
     } finally {
-        expect(Snapshot::query()->count())->toBe(0, 'Failed dump must not leave a Snapshot row behind');
+        // The pending row is created up front and flipped to failed (not deleted)
+        // so the operator can see what went wrong in the Databases history.
+        $snap = Snapshot::query()->sole();
+        expect($snap->status)->toBe(Snapshot::STATUS_FAILED);
+        $this->assertStringContainsString('exited 2', (string) $snap->error_message);
     }
 });
 test('restore runs gunzip pipe and audits destructive action', function () {

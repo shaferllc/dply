@@ -4,6 +4,8 @@ namespace App\Jobs;
 
 use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\Server;
+use App\Models\User;
+use App\Services\Notifications\ServerSystemUserNotificationDispatcher;
 use App\Services\Servers\ServerSystemUserService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -53,8 +55,10 @@ class DeleteServerSystemUserJob implements ShouldBeUnique, ShouldQueue
         return $this->userId;
     }
 
-    public function handle(ServerSystemUserService $service): void
-    {
+    public function handle(
+        ServerSystemUserService $service,
+        ServerSystemUserNotificationDispatcher $notifications,
+    ): void {
         $server = Server::query()->find($this->serverId);
         if (! $server) {
             return;
@@ -68,6 +72,13 @@ class DeleteServerSystemUserJob implements ShouldBeUnique, ShouldQueue
 
             $emit->success('system user '.$this->username.' removed', 'system_user');
             $this->completeConsoleAction();
+
+            $notifications->notify(
+                $server,
+                'removed',
+                [$this->username],
+                $this->userId ? User::query()->find($this->userId) : null,
+            );
         } catch (\Throwable $e) {
             $emit->error($e->getMessage(), 'system_user');
             $this->failConsoleAction($e->getMessage());

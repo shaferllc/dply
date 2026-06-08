@@ -12,13 +12,39 @@ class VultrService
 
     protected string $token;
 
-    public function __construct(ProviderCredential $credential)
+    /**
+     * @param  ProviderCredential|non-empty-string  $credentialOrToken  Saved credential or a raw API token string.
+     */
+    public function __construct(ProviderCredential|string $credentialOrToken)
     {
-        $token = $credential->getApiToken();
-        if (empty($token)) {
+        $token = $credentialOrToken instanceof ProviderCredential
+            ? $credentialOrToken->getApiToken()
+            : $credentialOrToken;
+        $token = is_string($token) ? trim($token) : '';
+        if ($token === '') {
             throw new \InvalidArgumentException('Vultr API token is required.');
         }
         $this->token = $token;
+    }
+
+    /**
+     * Build a service bound to a raw API token (e.g. the app-level base key).
+     */
+    public static function fromToken(string $token): self
+    {
+        return new self($token);
+    }
+
+    /**
+     * Build a service bound to the app-level base key (services.vultr.token /
+     * VULTR_TOKEN) for global operations with no connected customer credential.
+     * Returns null when no base key is configured.
+     */
+    public static function fromConfig(): ?self
+    {
+        $token = trim((string) config('services.vultr.token', ''));
+
+        return $token === '' ? null : new self($token);
     }
 
     /**
@@ -105,12 +131,123 @@ class VultrService
     }
 
     /**
+     * Private / internal IPv4 from an instance array. Vultr exposes the legacy
+     * private-network address as `internal_ip` (empty string when the instance
+     * isn't on a private network); VPC attachments live under `vpcs[].subnet`.
+     * Returns null when the instance has no private networking — same null-safe
+     * contract as {@see DigitalOceanService::getDropletPrivateIp()}.
+     */
+    public static function getPrivateIp(array $instance): ?string
+    {
+        $internal = $instance['internal_ip'] ?? null;
+        if (is_string($internal) && trim($internal) !== '') {
+            return trim($internal);
+        }
+
+        foreach ($instance['vpcs'] ?? [] as $vpc) {
+            $subnet = is_array($vpc) ? ($vpc['subnet'] ?? null) : null;
+            if (is_string($subnet) && trim($subnet) !== '') {
+                return trim($subnet);
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Destroy (delete) an instance by ID.
      */
     public function destroyInstance(string $id): void
     {
         $response = $this->request('delete', '/instances/'.$id);
         $this->assertSuccess($response, 'delete instance');
+    }
+
+    /**
+     * Create a snapshot of an instance. Returns the new snapshot's ID. The capture
+     * runs asynchronously on Vultr's side — poll {@see waitForSnapshot()} for
+     * completion.
+     */
+    public function createSnapshot(string $instanceId, string $description): string
+    {
+        $response = $this->request('post', '/snapshots', [
+            'instance_id' => $instanceId,
+            'description' => $description,
+        ]);
+        $this->assertSuccess($response, 'create snapshot');
+
+        $data = $response->json();
+        $snapshot = $data['snapshot'] ?? $data;
+        $id = $snapshot['id'] ?? $data['id'] ?? null;
+        if (empty($id)) {
+            throw new \RuntimeException('Vultr API did not return snapshot id.');
+        }
+
+        return (string) $id;
+    }
+
+    /**
+     * Get a snapshot by ID. Returns the decoded `snapshot` object — notable fields:
+     * `status` (pending|complete), `size` (bytes), `date_created`.
+     *
+     * @return array<string, mixed>
+     */
+    public function getSnapshot(string $id): array
+    {
+        $response = $this->request('get', '/snapshots/'.$id);
+        $this->assertSuccess($response, 'get snapshot');
+
+        $data = $response->json();
+        $snapshot = $data['snapshot'] ?? $data;
+        if (! is_array($snapshot) || $snapshot === []) {
+            throw new \RuntimeException('Vultr API did not return snapshot.');
+        }
+
+        return $snapshot;
+    }
+
+    /**
+     * Poll a snapshot until it reports `status == complete`. Vultr has no
+     * action-object model (unlike DO/Hetzner), so completion is read off the
+     * snapshot's own status field. Returns the final snapshot array.
+     *
+     * MUST run inside a queue job — it blocks while polling.
+     *
+     * @param  callable(array<string, mixed>):void|null  $onTick  receives each poll's snapshot
+     * @return array<string, mixed>
+     */
+    public function waitForSnapshot(string $id, ?callable $onTick = null, int $maxAttempts = 360, int $sleepSeconds = 10): array
+    {
+        $snapshot = [];
+        for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
+            $snapshot = $this->getSnapshot($id);
+            if ($onTick !== null) {
+                $onTick($snapshot);
+            }
+            if ((string) ($snapshot['status'] ?? '') === 'complete') {
+                return $snapshot;
+            }
+            sleep($sleepSeconds);
+        }
+
+        throw new \RuntimeException('Timed out waiting for Vultr snapshot '.$id.' to complete.');
+    }
+
+    /**
+     * Delete a snapshot by ID. A 404 (already gone) is treated as success.
+     */
+    public function deleteSnapshot(string $id): void
+    {
+        if ($id === '') {
+            return;
+        }
+
+        $response = $this->request('delete', '/snapshots/'.$id);
+        if ($response->status() === 404) {
+            return;
+        }
+
+        $this->assertSuccess($response, 'delete snapshot');
     }
 
     /**

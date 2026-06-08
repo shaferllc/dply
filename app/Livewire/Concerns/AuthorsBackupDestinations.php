@@ -38,6 +38,7 @@ trait AuthorsBackupDestinations
                 'region' => '',
                 'endpoint' => '',
                 'use_path_style' => false,
+                'storage_class' => '', // AWS-only object storage class (cold tiers).
             ],
             'dropbox' => [
                 'access_token' => '',
@@ -111,6 +112,7 @@ trait AuthorsBackupDestinations
                 'region' => $form['s3']['region'] ?? '',
                 'endpoint' => $form['s3']['endpoint'] ?? '',
                 'use_path_style' => (bool) ($form['s3']['use_path_style'] ?? false),
+                'storage_class' => trim((string) ($form['s3']['storage_class'] ?? '')),
             ],
             BackupConfiguration::PROVIDER_DROPBOX => [
                 'access_token' => $form['dropbox']['access_token'],
@@ -162,6 +164,7 @@ trait AuthorsBackupDestinations
                 'region' => $config['region'] ?? '',
                 'endpoint' => $config['endpoint'] ?? '',
                 'use_path_style' => (bool) ($config['use_path_style'] ?? false),
+                'storage_class' => $config['storage_class'] ?? '',
             ]),
             BackupConfiguration::PROVIDER_DROPBOX => $form['dropbox'] = array_merge($form['dropbox'], [
                 'access_token' => $config['access_token'] ?? '',
@@ -222,6 +225,10 @@ trait AuthorsBackupDestinations
                     ? ['nullable', 'string', 'max:500']
                     : ['required', 'string', 'max:500'],
                 $formProperty.'.s3.use_path_style' => ['boolean'],
+                // Object storage class — only AWS exposes one; validated against the catalog.
+                $formProperty.'.s3.storage_class' => $provider === BackupConfiguration::PROVIDER_AWS_S3
+                    ? ['nullable', 'string', Rule::in(array_keys((array) config('object_storage.providers.aws_s3.storage_classes', [])))]
+                    : ['nullable', 'string', 'max:40'],
             ],
             BackupConfiguration::PROVIDER_DROPBOX => [
                 $formProperty.'.dropbox.access_token' => ['required', 'string', 'max:4000'],

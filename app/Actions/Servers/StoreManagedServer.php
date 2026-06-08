@@ -7,6 +7,7 @@ namespace App\Actions\Servers;
 use App\Actions\Concerns\AsObject;
 use App\Enums\ServerProvider;
 use App\Jobs\ProvisionHetznerServerJob;
+use App\Jobs\ProvisionVultrServerJob;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
@@ -17,12 +18,14 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Creates a dply-managed server: a Hetzner VM provisioned on dply's OWN platform
- * account (dply pays Hetzner) and billed all-in cost-plus, rather than the
- * customer's connected credential. The size/region come from the curated catalog
- * in config/managed_servers.php and the stack from a standard install profile.
+ * Creates a dply-managed server: a VM provisioned on dply's OWN platform cloud
+ * account (the operator-configured managed backend — Hetzner or Vultr — see
+ * {@see ServerHostingPlatformContext}) and billed all-in cost-plus, rather than
+ * the customer's connected credential. The size/region come from the active
+ * backend's curated catalog in config/managed_servers.php and the stack from a
+ * standard install profile.
  *
- * Counterpart to {@see StoreServerFromCreateForm::storeHetzner()} for BYO servers.
+ * Counterpart to {@see StoreServerFromCreateForm} for BYO servers.
  */
 final class StoreManagedServer
 {
@@ -55,13 +58,15 @@ final class StoreManagedServer
             ]);
         }
 
-        // Beta's free box is pinned to CX22 — no comp-the-difference math.
-        if ($org->isBeta()) {
+        // Beta's free box is pinned to CX22 — no comp-the-difference math. The
+        // beta free-box program is Hetzner-specific; on a Vultr backend beta orgs
+        // keep their selected size (still comped via comped_until).
+        if ($org->isBeta() && $platform->provider === ServerProvider::Hetzner) {
             $input['size'] = (string) config('subscription.standard.beta.managed_size', 'cx22');
         }
 
-        $regions = array_keys((array) config('managed_servers.regions', []));
-        $sizes = collect((array) config('managed_servers.sizes', []))
+        $regions = array_keys($platform->regions());
+        $sizes = collect($platform->sizes())
             ->pluck('slug')->filter()->values()->all();
         $profiles = collect((array) config('server_provision_options.install_profiles', []))
             ->pluck('id')->filter()->values()->all();
@@ -88,7 +93,7 @@ final class StoreManagedServer
         $server = $user->servers()->create([
             'organization_id' => $org->id,
             'name' => $data['name'],
-            'provider' => ServerProvider::Hetzner,
+            'provider' => $platform->provider,
             'hosting_backend' => Server::HOSTING_BACKEND_DPLY,
             'provider_credential_id' => null,
             'region' => $data['region'],
@@ -103,9 +108,14 @@ final class StoreManagedServer
         ]);
 
         // Try the warm pool first (managed VMs live on the platform account, so
-        // a pooled VM can be adopted directly). Only cold-provision on a miss.
+        // a pooled VM can be adopted directly). Only cold-provision on a miss,
+        // dispatching the active backend's provision job (its managed branch
+        // reads the platform token instead of a customer credential).
         if (! app(ClaimWarmServer::class)->attempt($server)) {
-            ProvisionHetznerServerJob::dispatch($server);
+            match ($platform->provider) {
+                ServerProvider::Vultr => ProvisionVultrServerJob::dispatch($server),
+                default => ProvisionHetznerServerJob::dispatch($server),
+            };
         }
         audit_log($org, $user, 'server.created', $server, ['hosting_backend' => Server::HOSTING_BACKEND_DPLY]);
 

@@ -19,6 +19,8 @@ return [
 
     'timeline_max_events' => max(1, (int) env('SERVER_SSH_ACCESS_TIMELINE_MAX_EVENTS', 40)),
 
+    'timeline_events_per_page' => max(1, (int) env('SERVER_SSH_ACCESS_TIMELINE_EVENTS_PER_PAGE', 8)),
+
     /*
     |--------------------------------------------------------------------------
     | Platform SSH access logging

@@ -44,8 +44,14 @@ class S3Destination implements SnapshotDestination
         private readonly string $keyPrefix = '',
     ) {}
 
-    public function persist(Site $site, string $reason, string $dumpRemotePath, int $bytes, string $engine, ?string $userId): Snapshot
+    public function kind(): string
     {
+        return Snapshot::DESTINATION_S3;
+    }
+
+    public function persist(Snapshot $snapshot, string $dumpRemotePath, int $bytes): Snapshot
+    {
+        $site = $snapshot->site;
         $key = $this->buildObjectKey($site, $dumpRemotePath);
 
         $putRequest = $this->s3->createPresignedRequest(
@@ -84,22 +90,21 @@ class S3Destination implements SnapshotDestination
             );
         }
 
-        return Snapshot::query()->create([
-            'site_id' => $site->getKey(),
+        $snapshot->update([
             'destination' => Snapshot::DESTINATION_S3,
             's3_bucket' => $this->bucket,
             's3_key' => $key,
             'local_path' => null,
             'bytes' => $bytes,
-            'engine' => $engine,
-            'reason' => $reason,
-            'taken_by_user_id' => $userId,
             // S3 destination relies on the bucket's lifecycle rules
             // for retention; expires_at stays null so the local-disk
             // sweeper (which checks expires_at) doesn't think this is
             // a transient row.
             'expires_at' => null,
+            'status' => Snapshot::STATUS_COMPLETED,
         ]);
+
+        return $snapshot;
     }
 
     public function restore(Snapshot $snapshot): void

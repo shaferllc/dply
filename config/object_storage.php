@@ -27,6 +27,18 @@ return [
             'label' => 'AWS S3',
             'endpoint_template' => '', // SDK derives the endpoint from the region.
             'provision' => false, // Attach-only for now (CreateBucket needs LocationConstraint handling).
+            'pricing_url' => 'https://aws.amazon.com/s3/pricing/',
+            'pricing_note' => 'Billed by AWS on your own account. Per-GB/mo (us-east-1, approx): Standard $0.023, Standard-IA $0.0125, Glacier Instant Retrieval $0.004, Glacier Flexible $0.0036, Deep Archive $0.00099. Retrieval/request fees apply to colder classes.',
+            // Per-object S3 storage classes. `restore` = the object must be
+            // thawed (RestoreObject) before it can be downloaded.
+            'storage_classes' => [
+                'STANDARD' => ['label' => 'Standard', 'restore' => false, 'note' => 'Default. Instant download.'],
+                'STANDARD_IA' => ['label' => 'Standard-IA (infrequent access)', 'restore' => false, 'note' => 'Cheaper storage + small retrieval fee. Instant download.'],
+                'INTELLIGENT_TIERING' => ['label' => 'Intelligent-Tiering', 'restore' => false, 'note' => 'Auto-tiers by access pattern. Instant download.'],
+                'GLACIER_IR' => ['label' => 'Glacier Instant Retrieval', 'restore' => false, 'note' => 'Archive price, instant download. Great for backups.'],
+                'GLACIER' => ['label' => 'Glacier Flexible Retrieval', 'restore' => true, 'note' => 'Cheapest tier with restore. Download needs a thaw (minutes–hours).'],
+                'DEEP_ARCHIVE' => ['label' => 'Glacier Deep Archive', 'restore' => true, 'note' => 'Lowest cost. Download needs a thaw (up to ~12h).'],
+            ],
             'regions' => [
                 'us-east-1' => 'US East (N. Virginia) · us-east-1',
                 'us-east-2' => 'US East (Ohio) · us-east-2',
@@ -50,6 +62,13 @@ return [
             // cloud-provider slug whose ProviderCredential token is used.
             'api_managed' => true,
             'api_provider' => 'digitalocean',
+            'pricing_url' => 'https://docs.digitalocean.com/products/spaces/details/pricing/',
+            'pricing_note' => 'Billed by DigitalOcean on your own account. Spaces base $5/mo includes 250 GiB storage + 1 TiB transfer, then $0.02/GiB/mo. Cold Storage: $0.007/GiB/mo + $0.01/GiB retrieved (objects <128 KiB billed as 128 KiB).',
+            // DO cold storage is a BUCKET-level tier that can only be created in
+            // the DigitalOcean control panel (not the S3 API). dply provisions
+            // standard buckets; connect a cold bucket via "Connect existing".
+            'cold_note' => 'Cold Storage buckets are ~3× cheaper but can only be created in the DigitalOcean console. Create one there, then add it here with “Connect existing”.',
+            'cold_console_url' => 'https://cloud.digitalocean.com/spaces/new',
             'regions' => [
                 'nyc3' => 'New York · nyc3',
                 'sfo2' => 'San Francisco · sfo2',
@@ -70,6 +89,8 @@ return [
             // generates them in the console once. Surface where to get them.
             'key_help' => 'Hetzner has no API for dply to create keys. In the Hetzner Cloud Console, open your project → Object Storage → “Generate S3 credentials”, then paste the Access key and Secret below. Use the same region you pick here.',
             'key_console_url' => 'https://console.hetzner.com/',
+            'pricing_url' => 'https://www.hetzner.com/storage/object-storage/',
+            'pricing_note' => 'Billed by Hetzner on your own account. Base €4.99/mo includes 1 TB storage + 1 TB egress, then €4.99 per additional TB stored. No cold-storage tier.',
             'regions' => [
                 'fsn1' => 'Falkenstein, Germany · fsn1',
                 'nbg1' => 'Nuremberg, Germany · nbg1',
@@ -100,5 +121,20 @@ return [
     */
     'fresh_key_retry_attempts' => (int) env('OBJECT_STORAGE_FRESH_KEY_RETRY_ATTEMPTS', 6),
     'fresh_key_retry_delay_ms' => (int) env('OBJECT_STORAGE_FRESH_KEY_RETRY_DELAY_MS', 2500),
+
+    /*
+    | Cold-storage restore (thaw) for AWS Glacier Flexible / Deep Archive when a
+    | backup in those classes is downloaded. `restore_available_days` = how long
+    | the thawed copy stays downloadable; `restore_tier` = Standard|Bulk|Expedited
+    | (Deep Archive does not support Expedited).
+    */
+    'restore_available_days' => (int) env('OBJECT_STORAGE_RESTORE_DAYS', 7),
+    'restore_tier' => env('OBJECT_STORAGE_RESTORE_TIER', 'Standard'),
+
+    /*
+    | Shown wherever dply helps create/connect a bucket: storage is billed by
+    | the provider on the customer's own account and dply adds no markup.
+    */
+    'no_cut_disclaimer' => 'Storage is billed by the provider directly on your own account — dply doesn’t add any fee or take a cut.',
 
 ];

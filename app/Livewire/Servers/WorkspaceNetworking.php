@@ -8,19 +8,24 @@ use App\Jobs\AttachServerToNetworkJob;
 use App\Jobs\CreateProviderNetworkJob;
 use App\Jobs\ToggleDatabaseNetworkingJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\SurfacesBindingConsumers;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\ManagesNetworkingNotifications;
 use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseEngine;
 use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
+use App\Services\LinodeService;
+use App\Services\VultrService;
 use App\Support\Servers\CacheServiceNetworkExposure;
 use App\Support\Servers\DatabaseEngineInstallScripts;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
@@ -41,16 +46,18 @@ class WorkspaceNetworking extends Component
     use RendersWorkspacePlaceholder;
     use AuthorizesRequests;
     use ConfirmsActionWithModal;
+    use CreatesNotificationChannelInline;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use ManagesNetworkingNotifications;
     use SurfacesBindingConsumers;
 
     public Server $server;
 
     /** @var list<string> */
-    public const NETWORKING_TABS = ['servers', 'access', 'attached', 'routes'];
+    public const NETWORKING_TABS = ['servers', 'access', 'attached', 'routes', 'notifications'];
 
-    /** @var 'servers'|'access'|'attached'|'routes' */
+    /** @var 'servers'|'access'|'attached'|'routes'|'notifications' */
     #[Url(as: 'tab', except: 'servers', history: true)]
     public string $networking_tab = 'servers';
 
@@ -101,6 +108,18 @@ class WorkspaceNetworking extends Component
         $this->networking_tab = in_array($tab, self::NETWORKING_TABS, true) ? $tab : 'servers';
     }
 
+    /**
+     * Fired by {@see CreatesNotificationChannelInline} after the inline modal
+     * creates a channel. Jump to the Notifications tab and pre-select the new
+     * channel so the operator can finish wiring it to events in one motion.
+     */
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId): void
+    {
+        $this->networking_tab = 'notifications';
+        $this->notif_channel_id = $channelId;
+    }
+
     public function loadHetznerNetworks(): void
     {
         $this->authorize('update', $this->server);
@@ -125,9 +144,11 @@ class WorkspaceNetworking extends Component
     }
 
     /**
-     * Sync the private IP for a DigitalOcean server from the provider API.
-     * DO assigns private IPs at creation; this covers servers created before the
-     * private_ip_address column existed, or servers moved between VPCs.
+     * Sync the private IP for a server from the provider API. Providers assign
+     * private IPs at creation (or on VPC attachment); this covers servers created
+     * before the private_ip_address column existed, or moved between VPCs. Supports
+     * every provider whose service exposes a private-IP reader
+     * ({@see ServerProvider::supportsPrivateIpLookup()}).
      */
     public function syncPrivateIp(string $serverId): void
     {
@@ -137,23 +158,35 @@ class WorkspaceNetworking extends Component
             ? $this->server
             : Server::query()->where('organization_id', $this->server->organization_id)->find($serverId);
 
-        if (! $target || $target->provider->value !== 'digitalocean') {
-            $this->toastError(__('Server not found or not a DigitalOcean server.'));
+        if (! $target || ! ($target->provider?->supportsPrivateIpLookup() ?? false)) {
+            $this->toastError(__('Server not found or its provider does not support private IP lookup.'));
 
             return;
         }
 
         $credential = $target->providerCredential;
         if (! $credential) {
-            $this->toastError(__('No DigitalOcean credential found.'));
+            $this->toastError(__('No provider credential found for :name.', ['name' => $target->name]));
 
             return;
         }
 
         try {
-            $do = new DigitalOceanService($credential);
-            $droplet = $do->getDroplet((int) $target->provider_id);
-            $privateIp = DigitalOceanService::getDropletPrivateIp($droplet);
+            $privateIp = match ($target->provider->value) {
+                'digitalocean' => DigitalOceanService::getDropletPrivateIp(
+                    (new DigitalOceanService($credential))->getDroplet((int) $target->provider_id)
+                ),
+                'hetzner' => HetznerService::getPrivateIp(
+                    (new HetznerService($credential))->getInstance((int) $target->provider_id)
+                ),
+                'vultr' => VultrService::getPrivateIp(
+                    (new VultrService($credential))->getInstance((string) $target->provider_id)
+                ),
+                'linode', 'akamai' => LinodeService::getPrivateIp(
+                    (new LinodeService($credential))->getInstance((int) $target->provider_id)
+                ),
+                default => null,
+            };
 
             if ($privateIp) {
                 $target->update(['private_ip_address' => $privateIp]);
@@ -214,6 +247,11 @@ class WorkspaceNetworking extends Component
             'hetzner_network_id' => null,
         ]);
 
+        $this->dispatchNetworkingNotification($target->fresh(), 'network_detached', [$target->name], [
+            'detached_server_id' => $target->id,
+            'network_id' => $networkId,
+        ]);
+
         $this->toastSuccess(__(':name detached from network — private IP cleared.', ['name' => $target->name]));
     }
 
@@ -254,6 +292,11 @@ class WorkspaceNetworking extends Component
         try {
             $exposure->expose($row->server, $row, $cidr, auth()->id());
             $this->cache_networking_allowed_from[$cacheId] = '';
+            $this->dispatchNetworkingNotification($this->server->fresh(), 'cache_exposed', [ucfirst($row->engine)], [
+                'cache_id' => $row->id,
+                'engine' => $row->engine,
+                'allowed_from' => $cidr,
+            ]);
             $this->toastSuccess(__(':engine exposed from :cidr — firewall apply queued.', ['engine' => ucfirst($row->engine), 'cidr' => $cidr]));
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
@@ -276,6 +319,10 @@ class WorkspaceNetworking extends Component
 
         try {
             $exposure->lockdown($row->server, $row, auth()->id());
+            $this->dispatchNetworkingNotification($this->server->fresh(), 'cache_locked_down', [ucfirst($row->engine)], [
+                'cache_id' => $row->id,
+                'engine' => $row->engine,
+            ]);
             $this->toastSuccess(__(':engine locked down to localhost — firewall rule removed.', ['engine' => ucfirst($row->engine)]));
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
@@ -388,6 +435,12 @@ class WorkspaceNetworking extends Component
         );
 
         $this->dispatch('close-modal', 'create-network-modal');
+
+        $this->dispatchNetworkingNotification($this->server->fresh(), 'network_created', [$name], [
+            'ip_range' => $ipRange,
+            'server_ids' => $serverIds,
+        ]);
+
         $this->new_network_name = '';
         $this->new_network_server_ids = [];
 
@@ -429,6 +482,11 @@ class WorkspaceNetworking extends Component
         }
 
         AttachServerToNetworkJob::dispatch($target->id, $networkId);
+
+        $this->dispatchNetworkingNotification($target->fresh(), 'network_attached', [$target->name], [
+            'attached_server_id' => $target->id,
+            'network_id' => $networkId,
+        ]);
 
         $this->dispatch('close-modal', 'attach-network-modal-'.$serverId);
         $this->attach_network_id[$serverId] = '';
@@ -541,6 +599,10 @@ class WorkspaceNetworking extends Component
             'networkId' => $networkId,
             // Remote databases/caches that sites on this server reach out to.
             'attachedRemoteResources' => $this->buildAttachedRemoteResources($this->server->id),
+            // Notifications tab — channel routing for this server's networking events.
+            'notifChannels' => $this->networking_tab === 'notifications' ? $this->assignableNetworkingNotificationChannels() : collect(),
+            'notifSubscriptions' => $this->networking_tab === 'notifications' ? $this->networkingNotificationSubscriptions() : collect(),
+            'notifEventLabels' => $this->networking_tab === 'notifications' ? $this->networkingEventLabels() : [],
         ]);
     }
 
@@ -578,6 +640,11 @@ class WorkspaceNetworking extends Component
         try {
             $hetzner = new HetznerService($credential);
             $hetzner->addNetworkRoute($networkId, $destination, $gateway);
+            $this->dispatchNetworkingNotification($this->server->fresh(), 'route_added', [$destination.' → '.$gateway], [
+                'destination' => $destination,
+                'gateway' => $gateway,
+                'network_id' => $networkId,
+            ]);
             $this->route_destination = '';
             $this->route_gateway = '';
             $this->toastSuccess(__('Route :dest → :gw added.', ['dest' => $destination, 'gw' => $gateway]));
@@ -603,6 +670,11 @@ class WorkspaceNetworking extends Component
         try {
             $hetzner = new HetznerService($credential);
             $hetzner->deleteNetworkRoute($networkId, $destination, $gateway);
+            $this->dispatchNetworkingNotification($this->server->fresh(), 'route_removed', [$destination], [
+                'destination' => $destination,
+                'gateway' => $gateway,
+                'network_id' => $networkId,
+            ]);
             $this->toastSuccess(__('Route :dest removed.', ['dest' => $destination]));
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());

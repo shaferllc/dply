@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\SiteFileBackup;
+use App\Services\Notifications\ServerBackupNotificationDispatcher;
 use App\Services\Servers\ServerSshConnectionRunner;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -24,7 +25,7 @@ class ExportSiteFileBackupJob implements ShouldQueue
         $this->timeout = (int) config('site_file_backup.timeout_seconds', 7200);
     }
 
-    public function handle(ServerSshConnectionRunner $sshRunner): void
+    public function handle(ServerSshConnectionRunner $sshRunner, ServerBackupNotificationDispatcher $notifications): void
     {
         $backup = SiteFileBackup::query()->with(['site.server'])->find($this->backupId);
         if (! $backup) {
@@ -42,6 +43,15 @@ class ExportSiteFileBackupJob implements ShouldQueue
                 'status' => SiteFileBackup::STATUS_FAILED,
                 'error_message' => __('This site cannot export files over SSH (runtime or server not ready).'),
             ]);
+
+            if ($server) {
+                $notifications->notify($server, 'failed', [__('Site files — :name', ['name' => $site->name])], $backup->user, [
+                    'backup_type' => 'site_files',
+                    'backup_id' => (string) $backup->id,
+                    'site_id' => (string) $site->id,
+                    'error' => 'unsupported',
+                ]);
+            }
 
             return;
         }
@@ -129,6 +139,13 @@ class ExportSiteFileBackupJob implements ShouldQueue
                 'disk_path' => $relative,
                 'bytes' => $bytes,
             ]);
+
+            $notifications->notify($server, 'completed', [__('Site files — :name', ['name' => $site->name])], $backup->user, [
+                'backup_type' => 'site_files',
+                'backup_id' => (string) $backup->id,
+                'site_id' => (string) $site->id,
+                'bytes' => $bytes,
+            ]);
         } catch (\Throwable $e) {
             if (isset($relative)) {
                 Storage::disk('local')->delete($relative);
@@ -137,6 +154,13 @@ class ExportSiteFileBackupJob implements ShouldQueue
             $backup->update([
                 'status' => SiteFileBackup::STATUS_FAILED,
                 'error_message' => $e->getMessage(),
+            ]);
+
+            $notifications->notify($server, 'failed', [__('Site files — :name', ['name' => $site->name])], $backup->user, [
+                'backup_type' => 'site_files',
+                'backup_id' => (string) $backup->id,
+                'site_id' => (string) $site->id,
+                'error' => $e->getMessage(),
             ]);
         }
     }

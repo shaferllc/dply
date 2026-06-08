@@ -53,7 +53,7 @@ class RunWebserverConfigOpJob implements ShouldQueue
         public ?string $revisionSummary = null,
     ) {}
 
-    public function handle(RemoteWebserverConfigService $service): void
+    public function handle(RemoteWebserverConfigService $service, \App\Services\Notifications\ServerWebserverNotificationDispatcher $notifications): void
     {
         $server = Server::query()->find($this->serverId);
         if ($server === null) {
@@ -123,6 +123,18 @@ class RunWebserverConfigOpJob implements ShouldQueue
                 self::validateResultCacheKey($this->consoleActionId),
                 $result,
                 now()->addMinutes(5),
+            );
+        }
+
+        // A successful write/restore changed the live config file — notify
+        // subscribers. (validate/read don't mutate, so they don't fire.)
+        if ($ok && in_array($this->op, ['write', 'restore'], true)) {
+            $notifications->notify(
+                $server,
+                'config_saved',
+                [__(':engine config: :path', ['engine' => $this->engine, 'path' => $this->path])],
+                $this->userId !== null ? User::query()->find($this->userId) : null,
+                ['engine' => $this->engine, 'path' => $this->path, 'op' => $this->op],
             );
         }
 

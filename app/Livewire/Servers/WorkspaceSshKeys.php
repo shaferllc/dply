@@ -5,9 +5,12 @@ namespace App\Livewire\Servers;
 use App\Jobs\PreviewDriftJob;
 use App\Jobs\SyncAuthorizedKeysJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\EmitsPanelEvent;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\ManagesSshKeyNotifications;
+use App\Services\Notifications\ServerSshKeyNotificationDispatcher;
 use App\Models\OrganizationSshKey;
 use App\Models\Server;
 use App\Models\ServerAuthorizedKey;
@@ -41,11 +44,13 @@ class WorkspaceSshKeys extends Component
 {
     use RendersWorkspacePlaceholder;
     use ConfirmsActionWithModal;
+    use CreatesNotificationChannelInline;
     use EmitsPanelEvent;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use ManagesSshKeyNotifications;
 
-    /** @var 'keys'|'preview'|'advanced'|'activity' */
+    /** @var 'keys'|'preview'|'advanced'|'activity'|'notifications' */
     public string $ssh_workspace_tab = 'keys';
 
     public string $new_auth_name = '';
@@ -100,8 +105,20 @@ class WorkspaceSshKeys extends Component
 
     public function setSshWorkspaceTab(string $tab): void
     {
-        $allowed = ['keys', 'preview', 'advanced', 'activity'];
+        $allowed = ['keys', 'preview', 'advanced', 'activity', 'notifications'];
         $this->ssh_workspace_tab = in_array($tab, $allowed, true) ? $tab : 'keys';
+    }
+
+    /**
+     * Fired by {@see CreatesNotificationChannelInline} after the inline modal
+     * creates a channel. Jump to the Notifications tab and pre-select the new
+     * channel so the operator can finish wiring it to events in one motion.
+     */
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId): void
+    {
+        $this->ssh_workspace_tab = 'notifications';
+        $this->notif_channel_id = $channelId;
     }
 
     protected function loadReviewDateInputs(): void
@@ -327,7 +344,7 @@ class WorkspaceSshKeys extends Component
         PreviewDriftJob::dispatch($this->server->id, $runId);
     }
 
-    public function addAuthorizedKey(ServerAuthorizedKeysAuditLogger $audit): void
+    public function addAuthorizedKey(ServerAuthorizedKeysAuditLogger $audit, ServerSshKeyNotificationDispatcher $notifications): void
     {
         $this->authorize('update', $this->server);
         $this->validate([
@@ -418,6 +435,11 @@ class WorkspaceSshKeys extends Component
             ],
         );
 
+        $notifications->notify($this->server->fresh(), 'created', [$row->name], Auth::user(), [
+            'authorized_key_id' => $row->id,
+            'target_linux_user' => $selected !== '' ? $selected : (string) $this->server->ssh_user,
+        ]);
+
         $this->toastSuccess(__('Key saved. Click “Sync authorized_keys” to apply on the server.'));
     }
 
@@ -451,7 +473,7 @@ class WorkspaceSshKeys extends Component
         $this->toastSuccess(__('Review date updated.'));
     }
 
-    public function deleteAuthorizedKey(string $id, ServerAuthorizedKeysAuditLogger $audit): void
+    public function deleteAuthorizedKey(string $id, ServerAuthorizedKeysAuditLogger $audit, ServerSshKeyNotificationDispatcher $notifications): void
     {
         $this->authorize('update', $this->server);
         $key = ServerAuthorizedKey::query()
@@ -484,9 +506,13 @@ class WorkspaceSshKeys extends Component
             Request::ip()
         );
 
+        $removedName = (string) $key->name;
         $key->delete();
         $this->server->unsetRelation('authorizedKeys');
         $this->loadReviewDateInputs();
+
+        $notifications->notify($this->server->fresh(), 'removed', [$removedName], Auth::user());
+
         $this->toastSuccess(__('Key removed. Sync again to update the server.'));
     }
 
@@ -877,7 +903,7 @@ class WorkspaceSshKeys extends Component
 
     public function render(): View
     {
-        $allowedTabs = ['keys', 'preview', 'advanced', 'activity'];
+        $allowedTabs = ['keys', 'preview', 'advanced', 'activity', 'notifications'];
         if (! in_array($this->ssh_workspace_tab, $allowedTabs, true)) {
             $this->ssh_workspace_tab = 'keys';
         }
@@ -886,6 +912,7 @@ class WorkspaceSshKeys extends Component
         $needsKeys = $tab === 'keys';
         $needsPreview = $tab === 'preview';
         $needsActivity = $tab === 'activity';
+        $needsNotifications = $tab === 'notifications';
 
         if ($needsKeys || $needsPreview) {
             $this->server->loadMissing('authorizedKeys');
@@ -950,6 +977,9 @@ class WorkspaceSshKeys extends Component
             'teamKeys' => $teamKeys,
             'auditEvents' => $auditEvents,
             'fingerprints' => $fingerprints,
+            'notifChannels' => $needsNotifications ? $this->assignableSshKeyNotificationChannels() : collect(),
+            'notifSubscriptions' => $needsNotifications ? $this->sshKeyNotificationSubscriptions() : collect(),
+            'notifEventLabels' => $needsNotifications ? $this->sshKeyEventLabels() : [],
         ]));
     }
 }

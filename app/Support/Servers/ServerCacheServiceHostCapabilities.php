@@ -114,7 +114,7 @@ class ServerCacheServiceHostCapabilities
             $out = $this->runner->run(
                 $server,
                 fn ($ssh): string => $ssh->exec('bash -lc '.escapeshellarg($script), 45),
-                useRoot: (bool) config('server_database.use_root_ssh', true),
+                useRoot: (bool) config('server_cache.probe_use_root_ssh', false),
                 fallbackToDeploy: (bool) config('server_database.fallback_to_deploy_user_ssh', true),
             );
         } catch (\Throwable) {
@@ -206,7 +206,7 @@ class ServerCacheServiceHostCapabilities
             $out = $this->runner->run(
                 $server,
                 fn ($ssh): string => $ssh->exec('bash -lc '.escapeshellarg($command), 30),
-                useRoot: (bool) config('server_database.use_root_ssh', true),
+                useRoot: (bool) config('server_cache.probe_use_root_ssh', false),
                 fallbackToDeploy: (bool) config('server_database.fallback_to_deploy_user_ssh', true),
             );
         } catch (\Throwable) {
@@ -249,7 +249,7 @@ class ServerCacheServiceHostCapabilities
                         "bash -lc '. /etc/os-release && echo \"\${ID:-}|\${VERSION_CODENAME:-}\"'",
                         30,
                     ),
-                    useRoot: (bool) config('server_database.use_root_ssh', true),
+                    useRoot: (bool) config('server_cache.probe_use_root_ssh', false),
                     fallbackToDeploy: (bool) config('server_database.fallback_to_deploy_user_ssh', true),
                 );
             } catch (\Throwable) {

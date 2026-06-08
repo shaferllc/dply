@@ -45,6 +45,7 @@ class ApplyFirewallJob implements ShouldQueue
         ServerFirewallProvisioner $firewall,
         ServerFirewallAuditLogger $audit,
         ServerFirewallApplyRecorder $recorder,
+        \App\Services\Notifications\ServerFirewallNotificationDispatcher $notifications,
     ): void {
         $server = Server::query()->find($this->serverId);
         if ($server === null) {
@@ -109,6 +110,15 @@ class ApplyFirewallJob implements ShouldQueue
                 $finishedKey => now()->toIso8601String(),
                 $errorKey => null,
             ]);
+
+            $enabledCount = $server->firewallRules()->where('enabled', true)->count();
+            $notifications->notify(
+                $server,
+                'applied',
+                [trans_choice('{0} no enabled rules|{1} :count enabled rule|[2,*] :count enabled rules', $enabledCount, ['count' => $enabledCount])],
+                $user,
+                ['run_id' => $this->runId, 'enabled_rule_count' => $enabledCount],
+            );
 
             // Refresh inventory in the background so the listening-ports table on the
             // firewall workspace reflects any services that came/went as a side effect

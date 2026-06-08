@@ -101,10 +101,17 @@ return [
         */
         'managed_server_markup_percent' => (int) env('SUBSCRIPTION_MANAGED_SERVER_MARKUP_PERCENT', 60),
         'managed_server_cents' => [
+            // Hetzner server_type slugs (raw monthly provider cost, cents).
             'cx22' => 450,
             'cx32' => 740,
             'cx42' => 1790,
             'cx52' => 3330,
+            // Vultr plan slugs (raw monthly provider cost, cents). Same
+            // managed_server_markup_percent applies, keyed by slug.
+            'vc2-1c-2gb' => 1000,
+            'vc2-2c-4gb' => 2000,
+            'vc2-4c-8gb' => 4000,
+            'vc2-6c-16gb' => 8000,
         ],
         // Metered managed-server cost is billed in 1-cent Stripe units (quantity = cents).
         'managed_server_usage_unit_cents' => 1,

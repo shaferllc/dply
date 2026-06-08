@@ -74,6 +74,12 @@ trait ManagesRedisSnapshots
 
         ExportRedisSnapshotJob::dispatch($snapshot->id);
 
+        $this->dispatchSnapshotNotification('created', [__('Cache snapshot (:engine)', ['engine' => $row->engine])], [
+            'snapshot_type' => 'cache',
+            'redis_snapshot_id' => $snapshot->id,
+            'engine' => $row->engine,
+        ]);
+
         $this->toastSuccess(__('Snapshot queued. Check History for completion.'));
     }
 
@@ -195,7 +201,13 @@ trait ManagesRedisSnapshots
             ->where('server_id', $this->server->id)
             ->whereKey($snapshotId)
             ->first();
-        $snapshot?->delete();
+        if ($snapshot !== null) {
+            $snapshot->delete();
+            $this->dispatchSnapshotNotification('deleted', [__('Cache snapshot')], [
+                'snapshot_type' => 'cache',
+                'redis_snapshot_id' => $snapshotId,
+            ]);
+        }
         $this->toastSuccess(__('Snapshot deleted.'));
     }
 

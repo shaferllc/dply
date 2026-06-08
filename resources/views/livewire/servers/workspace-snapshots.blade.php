@@ -7,6 +7,14 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
+    <x-explainer>
+        <p>
+            <span class="font-semibold text-brand-ink">{{ __('Snapshots vs Backups:') }}</span>
+            {{ __('Snapshots are full-state, point-in-time captures — a whole-disk server image, a volume, or a cache/database snapshot — that you roll the server back to. They live on your cloud account and are billed by the provider. For granular, portable exports of a single database or a site\'s files to storage you own (and restored by importing), use') }}
+            <a href="{{ route('servers.backups', $server) }}" wire:navigate class="font-semibold text-brand-ink underline hover:no-underline">{{ __('Backups') }}</a>{{ __(' instead.') }}
+        </p>
+    </x-explainer>
+
     <x-server-workspace-tablist :aria-label="__('Snapshot types')">
         <x-server-workspace-tab id="snapshots-tab-images" :active="$snapshots_tab === 'images'" wire:click="setSnapshotsTab('images')">
             <span class="inline-flex items-center gap-1.5">
@@ -32,6 +40,12 @@
                 {{ __('Volumes') }}
             </span>
         </x-server-workspace-tab>
+        <x-server-workspace-tab id="snapshots-tab-notifications" :active="$snapshots_tab === 'notifications'" wire:click="setSnapshotsTab('notifications')">
+            <span class="inline-flex items-center gap-1.5">
+                <x-heroicon-o-bell class="h-4 w-4" aria-hidden="true" />
+                {{ __('Notifications') }}
+            </span>
+        </x-server-workspace-tab>
     </x-server-workspace-tablist>
 
     <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="setSnapshotsTab">
@@ -41,8 +55,18 @@
             @include('livewire.servers.partials.snapshots._tab-cache')
         @elseif ($snapshots_tab === 'databases')
             @include('livewire.servers.partials.snapshots._tab-databases')
+        @elseif ($snapshots_tab === 'notifications')
+            @include('livewire.servers.partials.snapshots._tab-notifications')
         @else
             @include('livewire.servers.partials.snapshots._tab-volumes')
         @endif
     </div>
+
+    {{-- Shared confirm + add-destination modals. --}}
+    @include('livewire.partials.confirm-action-modal')
+    @include('livewire.servers.partials.backups._add-destination-modal')
+    {{-- Reusable inline channel-create modal (CreatesNotificationChannelInline trait),
+         shared with the Notifications tab so an operator can add a channel without
+         leaving the page; the new channel is auto-selected on success. --}}
+    @include('livewire.partials.create-notification-channel-modal')
 </x-server-workspace-layout>

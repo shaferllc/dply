@@ -8,10 +8,12 @@ use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Models\Snapshot;
 use App\Models\User;
+use App\Notifications\SnapshotStatusNotification;
 use App\Services\RemoteCli\RiskLevel;
 use App\Services\RemoteCli\SiteAuditWriter;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -51,6 +53,20 @@ class SnapshotService
 
         $dumpCmd = $this->buildDumpCommand($engine, $dbName, $tmpPath);
 
+        // Create the row up front in 'pending' so the Snapshots → Databases tab
+        // shows the snapshot the instant it's queued and polls it to completion,
+        // instead of the row only materializing once the dump lands. The
+        // destination ({@see SnapshotDestination::persist()}) fills in the
+        // location/size and flips it to completed.
+        $snapshot = Snapshot::query()->create([
+            'site_id' => $site->getKey(),
+            'destination' => $destination->kind(),
+            'engine' => $engine,
+            'reason' => $reason,
+            'taken_by_user_id' => $userId,
+            'status' => Snapshot::STATUS_PENDING,
+        ]);
+
         try {
             $out = $this->executor->runInlineBash(
                 server: $site->server,
@@ -64,6 +80,7 @@ class SnapshotService
                 'engine' => $engine,
                 'error' => $e->getMessage(),
             ]);
+            $this->markFailed($snapshot, $e->getMessage());
             $this->audit->record(
                 site: $site,
                 user: null,
@@ -77,14 +94,18 @@ class SnapshotService
 
             // A failed/partial dump can still leave a file behind.
             $this->removeRemoteTmp($site, $tmpPath);
+            $this->notifyOrgAdmins($site, Snapshot::STATUS_FAILED, $e->getMessage());
 
             throw $e;
         }
 
         if ($out->getExitCode() !== 0) {
             $this->removeRemoteTmp($site, $tmpPath);
+            $message = "Dump command exited {$out->getExitCode()}: {$out->getBuffer()}";
+            $this->markFailed($snapshot, $message);
+            $this->notifyOrgAdmins($site, Snapshot::STATUS_FAILED, $message);
 
-            throw new \RuntimeException("Dump command exited {$out->getExitCode()}: {$out->getBuffer()}");
+            throw new \RuntimeException($message);
         }
 
         // On success the destination consumes $tmpPath (local mv / S3
@@ -92,9 +113,11 @@ class SnapshotService
         // database — would linger in /tmp, so remove it before rethrowing.
         try {
             $bytes = $this->fileSizeOnServer($site, $tmpPath);
-            $snapshot = $destination->persist($site, $reason, $tmpPath, $bytes, $engine, $userId);
+            $destination->persist($snapshot, $tmpPath, $bytes);
         } catch (Throwable $e) {
             $this->removeRemoteTmp($site, $tmpPath);
+            $this->markFailed($snapshot, $e->getMessage());
+            $this->notifyOrgAdmins($site, Snapshot::STATUS_FAILED, $e->getMessage());
 
             throw $e;
         }
@@ -109,7 +132,57 @@ class SnapshotService
             payload: ['snapshot_id' => $snapshot->id, 'destination' => $snapshot->destination, 'bytes' => $bytes],
         );
 
+        // Only the explicit "Take snapshot" action emails a success note — the
+        // automatic pre-destructive safety nets fire constantly and would spam.
+        // Failures above always notify, regardless of reason.
+        if ($reason === Snapshot::REASON_MANUAL) {
+            $this->notifyOrgAdmins($site, Snapshot::STATUS_COMPLETED, '');
+        }
+
         return $snapshot;
+    }
+
+    /** Flip a pending row to failed, recording the error. Never throws. */
+    private function markFailed(Snapshot $snapshot, string $error): void
+    {
+        try {
+            $snapshot->update([
+                'status' => Snapshot::STATUS_FAILED,
+                'error_message' => Str::limit($error, 2000),
+            ]);
+        } catch (Throwable) {
+            // best-effort — must not mask the original failure
+        }
+    }
+
+    /**
+     * Email the org's owners/admins about a snapshot's completion or failure.
+     * Best-effort: a notification problem must never break the snapshot flow.
+     */
+    private function notifyOrgAdmins(Site $site, string $status, string $errorMessage): void
+    {
+        try {
+            $org = $site->server?->organization;
+            if ($org === null) {
+                return;
+            }
+
+            $admins = $org->users()->wherePivotIn('role', ['owner', 'admin'])->get();
+            if ($admins->isEmpty()) {
+                return;
+            }
+
+            Notification::send($admins, new SnapshotStatusNotification(
+                kind: 'database',
+                status: $status,
+                label: (string) ($site->name ?: $site->slug),
+                serverName: (string) ($site->server?->name ?? ''),
+                url: route('servers.snapshots', $site->server_id, absolute: true),
+                errorMessage: $errorMessage,
+            ));
+        } catch (Throwable $e) {
+            Log::warning('SnapshotService notify failed', ['error' => $e->getMessage()]);
+        }
     }
 
     /**

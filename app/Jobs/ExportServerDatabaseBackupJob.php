@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseAuditEvent;
 use App\Models\ServerDatabaseBackup;
+use App\Services\Notifications\ServerBackupNotificationDispatcher;
 use App\Services\Servers\DatabaseBackupExporter;
 use App\Services\Servers\ServerDatabaseAuditLogger;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -25,7 +26,7 @@ class ExportServerDatabaseBackupJob implements ShouldQueue
         }
     }
 
-    public function handle(DatabaseBackupExporter $exporter, ServerDatabaseAuditLogger $auditLogger): void
+    public function handle(DatabaseBackupExporter $exporter, ServerDatabaseAuditLogger $auditLogger, ServerBackupNotificationDispatcher $notifications): void
     {
         $backup = ServerDatabaseBackup::query()->with(['serverDatabase.server'])->find($this->backupId);
         if (! $backup) {
@@ -53,11 +54,29 @@ class ExportServerDatabaseBackupJob implements ShouldQueue
                     'storage_kind' => $backup->fresh()?->storage_kind,
                 ], $user);
             }
+
+            if ($server) {
+                $notifications->notify($server, 'completed', [__('Database — :name', ['name' => $db->name])], $backup->user, [
+                    'backup_type' => 'database',
+                    'backup_id' => (string) $backup->id,
+                    'database_id' => (string) $db->id,
+                    'bytes' => $backup->fresh()?->bytes,
+                ]);
+            }
         } catch (\Throwable $e) {
             $backup->update([
                 'status' => ServerDatabaseBackup::STATUS_FAILED,
                 'error_message' => $e->getMessage(),
             ]);
+
+            if ($server) {
+                $notifications->notify($server, 'failed', [__('Database — :name', ['name' => $db->name])], $backup->user, [
+                    'backup_type' => 'database',
+                    'backup_id' => (string) $backup->id,
+                    'database_id' => (string) $db->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
     }
 

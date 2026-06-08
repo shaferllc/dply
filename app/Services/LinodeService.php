@@ -13,13 +13,39 @@ class LinodeService
 
     protected string $token;
 
-    public function __construct(ProviderCredential $credential)
+    /**
+     * @param  ProviderCredential|non-empty-string  $credentialOrToken  Saved credential or a raw API token string.
+     */
+    public function __construct(ProviderCredential|string $credentialOrToken)
     {
-        $token = $credential->getApiToken();
-        if (empty($token)) {
+        $token = $credentialOrToken instanceof ProviderCredential
+            ? $credentialOrToken->getApiToken()
+            : $credentialOrToken;
+        $token = is_string($token) ? trim($token) : '';
+        if ($token === '') {
             throw new \InvalidArgumentException('Linode API token is required.');
         }
         $this->token = $token;
+    }
+
+    /**
+     * Build a service bound to a raw API token (e.g. the app-level base key).
+     */
+    public static function fromToken(string $token): self
+    {
+        return new self($token);
+    }
+
+    /**
+     * Build a service bound to the app-level base key (services.linode.token /
+     * LINODE_TOKEN) for global operations with no connected customer credential.
+     * Returns null when no base key is configured.
+     */
+    public static function fromConfig(): ?self
+    {
+        $token = trim((string) config('services.linode.token', ''));
+
+        return $token === '' ? null : new self($token);
     }
 
     /**
@@ -102,6 +128,152 @@ class LinodeService
     {
         $response = $this->request('delete', "/linode/instances/{$id}");
         $this->assertSuccess($response, 'delete instance');
+    }
+
+    /**
+     * Private IPv4 from an instance array. Linode lists every address (public +
+     * private) in `ipv4`; private addresses live in the 192.168.0.0/16 range
+     * (Linode allocates private IPs from 192.168.128.0/17). Returns null when the
+     * Linode has no private networking — same null-safe contract as the other
+     * providers' private-IP readers.
+     */
+    public static function getPrivateIp(array $instance): ?string
+    {
+        foreach ($instance['ipv4'] ?? [] as $entry) {
+            $address = is_string($entry) ? $entry : (is_array($entry) ? ($entry['address'] ?? '') : '');
+            $address = trim((string) $address);
+            if ($address !== '' && str_starts_with($address, '192.168.')) {
+                return $address;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * List a Linode's disks. Used to locate the bootable disk to image.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function getInstanceDisks(int $id): array
+    {
+        $response = $this->request('get', "/linode/instances/{$id}/disks");
+        $this->assertSuccess($response, 'list instance disks');
+
+        return $response->json('data') ?? [];
+    }
+
+    /**
+     * The disk to image: the largest `ext4` (bootable) disk, ignoring swap/raw.
+     * Returns null when the Linode has no ext4 disk (e.g. a raw/custom layout we
+     * can't safely auto-image).
+     */
+    public function primaryDiskId(int $instanceId): ?int
+    {
+        $candidate = null;
+        $candidateSize = -1;
+        foreach ($this->getInstanceDisks($instanceId) as $disk) {
+            if (! is_array($disk) || ($disk['filesystem'] ?? '') !== 'ext4') {
+                continue;
+            }
+            $size = (int) ($disk['size'] ?? 0);
+            if ($size > $candidateSize) {
+                $candidate = (int) ($disk['id'] ?? 0);
+                $candidateSize = $size;
+            }
+        }
+
+        return $candidate ?: null;
+    }
+
+    /**
+     * Create a private image from a disk. Returns the image object (notably `id`
+     * like "private/12345" and `status`). Linode images are captured from a single
+     * disk, not the whole instance — see {@see primaryDiskId()}.
+     *
+     * @return array<string, mixed>
+     */
+    public function createImageFromDisk(int $diskId, string $label, string $description = ''): array
+    {
+        $body = ['disk_id' => $diskId, 'label' => $label];
+        if ($description !== '') {
+            $body['description'] = $description;
+        }
+
+        $response = $this->request('post', '/images', $body);
+        $this->assertSuccess($response, 'create image');
+
+        $data = $response->json();
+        $image = $data['data'] ?? $data;
+        if (! is_array($image) || empty($image['id'])) {
+            throw new \RuntimeException('Linode API did not return an image id.');
+        }
+
+        return $image;
+    }
+
+    /**
+     * Get an image by ID (e.g. "private/12345"). Notable fields: `status`
+     * (creating|pending_upload|available), `size` (in MB).
+     *
+     * @return array<string, mixed>
+     */
+    public function getImage(string $imageId): array
+    {
+        // The id contains a slash ("private/12345") that is part of the path —
+        // don't url-encode it.
+        $response = $this->request('get', '/images/'.ltrim($imageId, '/'));
+        $this->assertSuccess($response, 'get image');
+
+        $data = $response->json();
+        $image = $data['data'] ?? $data;
+        if (! is_array($image) || $image === []) {
+            throw new \RuntimeException('Linode API did not return image.');
+        }
+
+        return $image;
+    }
+
+    /**
+     * Poll an image until it reports `status == available`. Linode images have no
+     * action-object model, so completion is read off the image's status. Returns
+     * the final image array. MUST run inside a queue job — it blocks while polling.
+     *
+     * @param  callable(array<string, mixed>):void|null  $onTick
+     * @return array<string, mixed>
+     */
+    public function waitForImage(string $imageId, ?callable $onTick = null, int $maxAttempts = 360, int $sleepSeconds = 10): array
+    {
+        $image = [];
+        for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
+            $image = $this->getImage($imageId);
+            if ($onTick !== null) {
+                $onTick($image);
+            }
+            if ((string) ($image['status'] ?? '') === 'available') {
+                return $image;
+            }
+            sleep($sleepSeconds);
+        }
+
+        throw new \RuntimeException('Timed out waiting for Linode image '.$imageId.' to become available.');
+    }
+
+    /**
+     * Delete an image by ID. A 404 (already gone) is treated as success.
+     */
+    public function deleteImage(string $imageId): void
+    {
+        if ($imageId === '') {
+            return;
+        }
+
+        $response = $this->request('delete', '/images/'.ltrim($imageId, '/'));
+        if ($response->status() === 404) {
+            return;
+        }
+
+        $this->assertSuccess($response, 'delete image');
     }
 
     /**

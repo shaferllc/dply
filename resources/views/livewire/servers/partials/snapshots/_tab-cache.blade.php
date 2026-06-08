@@ -24,15 +24,23 @@
                     </p>
                 </div>
             @elseif ($destinations->isEmpty())
-                <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-8 text-center">
+                <button
+                    type="button"
+                    wire:click="openDestinationModal"
+                    class="group block w-full rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-8 text-center transition hover:border-brand-sage/40 hover:bg-brand-sand/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-sage/40"
+                >
                     <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-50 text-amber-700 ring-1 ring-amber-200">
                         <x-heroicon-o-cloud class="h-5 w-5" aria-hidden="true" />
                     </span>
                     <p class="mt-3 text-sm font-semibold text-brand-ink">{{ __('No backup destination configured') }}</p>
                     <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
-                        {{ __('Add an S3-style backup destination from Settings → Backups, then come back to capture your first snapshot.') }}
+                        {{ __('Add an S3-style backup destination, then come back to capture your first snapshot.') }}
                     </p>
-                </div>
+                    <span class="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-brand-forest group-hover:underline">
+                        <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
+                        {{ __('Add a backup destination') }}
+                    </span>
+                </button>
             @else
                 <form wire:submit="runRedisSnapshotNow" class="flex flex-wrap items-end gap-3">
                     <div class="min-w-0 flex-1">
@@ -118,8 +126,7 @@
                                 </button>
                                 <button
                                     type="button"
-                                    wire:click="deleteRedisSchedule('{{ $schedule->id }}')"
-                                    wire:confirm="{{ __('Delete this schedule?') }}"
+                                    wire:click="openConfirmActionModal('deleteRedisSchedule', ['{{ $schedule->id }}'], @js(__('Delete schedule')), @js(__('Delete this snapshot schedule? Future automatic snapshots stop firing.')), @js(__('Delete')), true)"
                                     class="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
                                 >
                                     <x-heroicon-o-trash class="h-4 w-4" aria-hidden="true" />
@@ -227,8 +234,7 @@
                                     <td class="px-4 py-3 text-right">
                                         <button
                                             type="button"
-                                            wire:click="deleteRedisSnapshot('{{ $snap->id }}')"
-                                            wire:confirm="{{ __('Delete this snapshot record? The S3 object is not removed.') }}"
+                                            wire:click="openConfirmActionModal('deleteRedisSnapshot', ['{{ $snap->id }}'], @js(__('Delete snapshot record')), @js(__('Delete this snapshot record? The S3 object is not removed.')), @js(__('Delete')), true)"
                                             class="rounded-md p-1 text-brand-mist hover:bg-brand-sand/50 hover:text-rose-700"
                                             title="{{ __('Delete record') }}"
                                         >

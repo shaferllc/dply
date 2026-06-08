@@ -7,10 +7,12 @@ use App\Jobs\DeleteOrphanSystemUsersJob;
 use App\Jobs\DeleteServerSystemUserJob;
 use App\Jobs\SyncServerSystemUsersJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\DismissesConsoleActionRun;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\ManagesSystemUserNotifications;
 use App\Livewire\Sites\Show;
 use App\Models\ConsoleAction;
 use App\Models\Server;
@@ -19,6 +21,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use Livewire\Attributes\Lazy;
@@ -33,9 +36,14 @@ class WorkspaceSystemUsers extends Component
     protected string $requiredFeature = 'workspace.system_users';
 
     use ConfirmsActionWithModal;
+    use CreatesNotificationChannelInline;
     use DismissesConsoleActionRun;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use ManagesSystemUserNotifications;
+
+    /** Active in-page sub-tab: 'accounts' (the user list) or 'notifications' (event routing). */
+    public string $activeTab = 'accounts';
 
     protected function consoleActionSubject(): Model
     {
@@ -71,6 +79,18 @@ class WorkspaceSystemUsers extends Component
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
+    }
+
+    /**
+     * Fired by {@see CreatesNotificationChannelInline} after the inline modal
+     * creates a channel. Jump to the Notifications tab and pre-select the new
+     * channel so the operator can finish wiring it to events in one motion.
+     */
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId): void
+    {
+        $this->activeTab = 'notifications';
+        $this->notif_channel_id = $channelId;
     }
 
     /**
@@ -330,7 +350,11 @@ class WorkspaceSystemUsers extends Component
             $this->pending_remove_usernames = [];
         }
 
-        return view('livewire.servers.workspace-system-users');
+        return view('livewire.servers.workspace-system-users', [
+            'notifChannels' => $this->assignableSystemUserNotificationChannels(),
+            'notifSubscriptions' => $this->systemUserNotificationSubscriptions(),
+            'notifEventLabels' => $this->systemUserEventLabels(),
+        ]);
     }
 
     private function hasInFlightSystemUserAction(): bool

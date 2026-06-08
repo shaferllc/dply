@@ -18,6 +18,7 @@ use App\Services\HetznerService;
 use App\Services\LinodeService;
 use App\Services\Notifications\NotificationPublisher;
 use App\Services\OracleComputeService;
+use App\Services\OvhService;
 use App\Services\ScalewayService;
 use App\Services\UpCloudService;
 use App\Services\VultrService;
@@ -173,15 +174,27 @@ final class DeleteServerAction
         }
 
         if ($server->provider === ServerProvider::Vultr && ! empty($server->provider_id)) {
-            $credential = $server->providerCredential;
-            if ($credential) {
+            // Managed Vultr VMs run on dply's own platform account, so teardown
+            // MUST use the platform token (the customer has no credential) —
+            // otherwise the dply-owned VM keeps costing us money after cancellation.
+            $vultr = null;
+            if ($server->usesManagedHosting()) {
+                $platform = ServerHostingPlatformContext::forOrg($server->organization);
+                if ($platform->provider === ServerProvider::Vultr && $platform->configured()) {
+                    $vultr = $platform->vultr();
+                }
+            } elseif ($server->providerCredential) {
+                $vultr = new VultrService($server->providerCredential);
+            }
+
+            if ($vultr) {
                 try {
-                    $vultr = new VultrService($credential);
                     $vultr->destroyInstance($server->provider_id);
                 } catch (\Throwable $e) {
                     Log::warning('Failed to destroy Vultr instance on server delete.', [
                         'server_id' => $server->id,
                         'provider_id' => $server->provider_id,
+                        'managed' => $server->usesManagedHosting(),
                         'error' => $e->getMessage(),
                     ]);
                 }
@@ -196,6 +209,22 @@ final class DeleteServerAction
                     $scw->destroyServer($server->region, $server->provider_id);
                 } catch (\Throwable $e) {
                     Log::warning('Failed to destroy Scaleway instance on server delete.', [
+                        'server_id' => $server->id,
+                        'provider_id' => $server->provider_id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+
+        if ($server->provider === ServerProvider::Ovh && ! empty($server->provider_id)) {
+            $credential = $server->providerCredential;
+            if ($credential) {
+                try {
+                    $ovh = new OvhService($credential);
+                    $ovh->deleteInstance($ovh->projectId(), (string) $server->provider_id);
+                } catch (\Throwable $e) {
+                    Log::warning('Failed to destroy OVH instance on server delete.', [
                         'server_id' => $server->id,
                         'provider_id' => $server->provider_id,
                         'error' => $e->getMessage(),

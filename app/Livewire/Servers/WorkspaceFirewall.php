@@ -4,11 +4,13 @@ namespace App\Livewire\Servers;
 
 use App\Jobs\ApplyFirewallJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\EmitsPanelEvent;
 use App\Livewire\Forms\FirewallRuleForm;
 use App\Livewire\Servers\Concerns\GuardsDisruptiveActions;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\ManagesFirewallNotifications;
 use App\Livewire\Servers\Concerns\ManagesFirewallWorkspaceAdvanced;
 use App\Models\FirewallRuleTemplate;
 use App\Models\Server;
@@ -29,6 +31,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use Livewire\Attributes\Lazy;
@@ -41,9 +44,11 @@ class WorkspaceFirewall extends Component
     use RendersWorkspacePlaceholder;
     use ConfirmsActionWithModal;
     use EmitsPanelEvent;
+    use CreatesNotificationChannelInline;
     use GuardsDisruptiveActions;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use ManagesFirewallNotifications;
     use ManagesFirewallWorkspaceAdvanced;
 
     public FirewallRuleForm $form;
@@ -88,8 +93,20 @@ class WorkspaceFirewall extends Component
 
     public function setFirewallWorkspaceTab(string $tab): void
     {
-        $allowed = ['rules', 'templates', 'activity'];
+        $allowed = ['rules', 'templates', 'activity', 'notifications'];
         $this->firewall_workspace_tab = in_array($tab, $allowed, true) ? $tab : 'rules';
+    }
+
+    /**
+     * Fired by {@see CreatesNotificationChannelInline} after the inline modal
+     * creates a channel. Jump to the Notifications tab and pre-select the new
+     * channel so the operator can finish wiring it to events in one motion.
+     */
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId): void
+    {
+        $this->firewall_workspace_tab = 'notifications';
+        $this->notif_channel_id = $channelId;
     }
 
     protected function opsReady(): bool
@@ -222,6 +239,13 @@ class WorkspaceFirewall extends Component
                     $this->lastUfwHostSyncError ? '> Host sync failed: '.Str::limit($this->lastUfwHostSyncError, 200) : '> Host sync attempted automatically.',
                 ])),
             );
+            $this->dispatchFirewallNotification('updated', [$this->firewallRuleLabel($rule)], [
+                'rule_id' => $rule->id,
+                'port' => $rule->port,
+                'protocol' => $rule->protocol,
+                'source' => $rule->source,
+                'action' => $rule->action,
+            ]);
             $this->editing_rule_id = null;
             $this->form->resetForNew();
             $this->dispatch('close-modal', 'add-firewall-rule-modal');
@@ -275,6 +299,14 @@ class WorkspaceFirewall extends Component
                         : null,
                 ])),
             );
+            $this->dispatchFirewallNotification('created', [$this->firewallRuleLabel($rule)], [
+                'rule_id' => $rule->id,
+                'port' => $rule->port,
+                'protocol' => $rule->protocol,
+                'source' => $rule->source,
+                'action' => $rule->action,
+                'enabled' => (bool) $rule->enabled,
+            ]);
             $this->form->resetForNew();
             $this->dispatch('close-modal', 'add-firewall-rule-modal');
         }
@@ -334,6 +366,11 @@ class WorkspaceFirewall extends Component
             ],
             auth()->user(),
         );
+
+        $this->dispatchFirewallNotification('updated', [$this->firewallRuleLabel($rule)], [
+            'rule_id' => (string) $rule->id,
+            'change' => $rule->enabled ? 'enabled' : 'disabled',
+        ]);
 
         if (! $this->opsReady()) {
             $this->toastSuccess($rule->enabled
@@ -406,6 +443,9 @@ class WorkspaceFirewall extends Component
                 '> Click "Apply rules" to reconcile the host firewall.',
             ])),
         );
+        $this->dispatchFirewallNotification('deleted', [$this->firewallRuleLabel($rule)], [
+            'rule_id' => $id,
+        ]);
         $this->toastSuccess($removedMsg);
     }
 
@@ -570,6 +610,9 @@ class WorkspaceFirewall extends Component
             'bulk' => 'enable',
             'count' => $n,
         ], auth()->user());
+        if ($n > 0) {
+            $this->dispatchFirewallNotification('updated', [trans_choice('{1} :count rule|[2,*] :count rules', $n, ['count' => $n])], ['bulk' => 'enable', 'count' => $n]);
+        }
         $this->toastSuccess(__('Enabled :n rule(s) in the panel. Use “Apply firewall rules” to sync the host.', ['n' => $n]));
     }
 
@@ -591,6 +634,9 @@ class WorkspaceFirewall extends Component
             'bulk' => 'disable',
             'count' => $n,
         ], auth()->user());
+        if ($n > 0) {
+            $this->dispatchFirewallNotification('updated', [trans_choice('{1} :count rule|[2,*] :count rules', $n, ['count' => $n])], ['bulk' => 'disable', 'count' => $n]);
+        }
         $this->toastSuccess(__('Disabled :n rule(s) in the panel. Use “Apply firewall rules” to sync the host.', ['n' => $n]));
     }
 
@@ -632,6 +678,7 @@ class WorkspaceFirewall extends Component
             'rule_ids' => $ruleIds,
             'count' => count($ruleIds),
         ], auth()->user());
+        $this->dispatchFirewallNotification('deleted', [trans_choice('{1} :count rule|[2,*] :count rules', count($ruleIds), ['count' => count($ruleIds)])], ['bulk' => true, 'rule_ids' => $ruleIds, 'count' => count($ruleIds)]);
         $this->toastSuccess(__('Removed :n rule(s).', ['n' => count($ruleIds)]));
     }
 
@@ -1353,7 +1400,7 @@ class WorkspaceFirewall extends Component
             $this->firewall_workspace_tab = 'activity';
         }
 
-        $allowedTabs = ['rules', 'templates', 'activity'];
+        $allowedTabs = ['rules', 'templates', 'activity', 'notifications'];
         if (! in_array($this->firewall_workspace_tab, $allowedTabs, true)) {
             $this->firewall_workspace_tab = 'rules';
         }
@@ -1362,6 +1409,7 @@ class WorkspaceFirewall extends Component
         $needsRules = $tab === 'rules';
         $needsTemplates = $tab === 'templates';
         $needsActivity = $tab === 'activity';
+        $needsNotifications = $tab === 'notifications';
 
         $this->server->loadMissing(['organization']);
 
@@ -1502,6 +1550,9 @@ class WorkspaceFirewall extends Component
                 'applyFirewallConfirmMessage' => $this->disruptiveConfirmMessage(__('Apply firewall rules')),
                 'defaultPolicies' => $defaultPolicies,
                 'loggingLevel' => $loggingLevel,
+                'notifChannels' => $needsNotifications ? $this->assignableFirewallNotificationChannels() : collect(),
+                'notifSubscriptions' => $needsNotifications ? $this->firewallNotificationSubscriptions() : collect(),
+                'notifEventLabels' => $needsNotifications ? $this->firewallEventLabels() : [],
             ],
         ));
     }

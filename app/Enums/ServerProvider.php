@@ -225,14 +225,18 @@ enum ServerProvider: string
     /**
      * Whether Dply can re-query this provider's API for a server's private /
      * internal networking IP after creation. Only providers whose service class
-     * exposes a private-IP reader qualify (DigitalOcean VPC, Hetzner private_net).
+     * exposes a private-IP reader qualify (DigitalOcean VPC, Hetzner private_net,
+     * Vultr internal_ip / VPC subnet, Linode 192.168/16 private address).
      * Gates the "Refresh" affordance on the connection settings card.
      */
     public function supportsPrivateIpLookup(): bool
     {
         return match ($this) {
             self::DigitalOcean,
-            self::Hetzner => true,
+            self::Hetzner,
+            self::Vultr,
+            self::Linode,
+            self::Akamai => true,
             default => false,
         };
     }
@@ -241,14 +245,18 @@ enum ServerProvider: string
      * Whether Dply can capture a full-disk image / snapshot of a server through
      * this provider's API. Only providers whose service class exposes the
      * create-image + poll-action methods qualify (DigitalOcean snapshotDroplet,
-     * Hetzner createImageFromServer). Gates the "Create image" affordance on the
-     * Snapshots workspace; other providers render a "not available" state.
+     * Hetzner createImageFromServer, Vultr createSnapshot, Linode
+     * createImageFromDisk). Gates the "Create image" affordance on the Snapshots
+     * workspace; other providers render a "not available" state.
      */
     public function supportsImageSnapshots(): bool
     {
         return match ($this) {
             self::DigitalOcean,
-            self::Hetzner => true,
+            self::Hetzner,
+            self::Vultr,
+            self::Linode,
+            self::Akamai => true,
             default => false,
         };
     }
@@ -265,6 +273,32 @@ enum ServerProvider: string
     }
 
     /**
+     * Provider's published per-GB/month price for storing a server image /
+     * snapshot, in the provider's billing currency. Surfaces an at-a-glance
+     * monthly cost estimate on the Snapshots → images table; the image lives on
+     * the user's own cloud account, so this is informational only (Dply takes no
+     * cut). null when the provider doesn't meter images or the rate is unknown.
+     *
+     * Rates (verified 2026-06): DigitalOcean snapshots $0.06/GiB/mo; Hetzner
+     * snapshots €0.0119/GB/mo; Vultr snapshots $0.05/GB/mo; Linode/Akamai custom
+     * images $0.10/GB/mo. Vultr bills the *compressed* snapshot size —
+     * {@see \App\Support\Servers\ServerImageProvider} stores `compressed_size` as
+     * the image's bytes so this estimate lines up with the actual bill.
+     *
+     * @return array{rate: float, currency: string}|null
+     */
+    public function imageSnapshotRatePerGbMonth(): ?array
+    {
+        return match ($this) {
+            self::DigitalOcean => ['rate' => 0.06, 'currency' => 'USD'],
+            self::Hetzner => ['rate' => 0.0119, 'currency' => 'EUR'],
+            self::Vultr => ['rate' => 0.05, 'currency' => 'USD'],
+            self::Linode, self::Akamai => ['rate' => 0.10, 'currency' => 'USD'],
+            default => null,
+        };
+    }
+
+    /**
      * Whether this provider has full support: service class, provision/poll jobs,
      * create tab, and destroy handling. Otherwise only credentials are stored.
      */
@@ -277,6 +311,7 @@ enum ServerProvider: string
             self::Vultr,
             self::UpCloud,
             self::Scaleway,
+            self::Ovh,
             self::EquinixMetal,
             self::Akamai,
             self::FlyIo,

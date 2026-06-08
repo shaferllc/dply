@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Livewire\Servers;
 
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\ManagesPatchNotifications;
 use App\Livewire\Servers\Concerns\RunsAllowlistedManageAction;
 use App\Livewire\Servers\Concerns\RunsServerInventoryProbe;
 use App\Models\ConsoleAction;
@@ -14,6 +16,7 @@ use App\Models\Server;
 use App\Services\Servers\ServerPatchAdvisor;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
@@ -29,7 +32,9 @@ class WorkspacePatchAdvisor extends Component
 {
     use RendersWorkspacePlaceholder;
     use ConfirmsActionWithModal;
+    use CreatesNotificationChannelInline;
     use InteractsWithServerWorkspace;
+    use ManagesPatchNotifications;
     use RequiresFeature;
     use RunsAllowlistedManageAction;
     use RunsServerInventoryProbe;
@@ -37,7 +42,7 @@ class WorkspacePatchAdvisor extends Component
     protected string $requiredFeature = 'workspace.patch_advisor';
 
     /** @var list<string> */
-    public const PATCHES_TABS = ['overview', 'packages', 'actions', 'settings'];
+    public const PATCHES_TABS = ['overview', 'packages', 'actions', 'settings', 'notifications'];
 
     #[Url(as: 'tab', except: 'overview')]
     public string $patchesTab = 'overview';
@@ -128,6 +133,18 @@ class WorkspacePatchAdvisor extends Component
         $this->patchesTab = in_array($tab, self::PATCHES_TABS, true) ? $tab : 'overview';
     }
 
+    /**
+     * Fired by {@see CreatesNotificationChannelInline} after the inline modal
+     * creates a channel. Jump to the Notifications tab and pre-select the new
+     * channel so the operator can finish wiring it to events in one motion.
+     */
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId): void
+    {
+        $this->patchesTab = 'notifications';
+        $this->notif_channel_id = $channelId;
+    }
+
     protected function forceExtendedInventoryProbe(): bool
     {
         return true;
@@ -154,6 +171,9 @@ class WorkspacePatchAdvisor extends Component
             'extendedSnapshot' => is_string($this->server->meta['inventory_extended_snapshot'] ?? null)
                 ? $this->server->meta['inventory_extended_snapshot']
                 : null,
+            'notifChannels' => $this->patchesTab === 'notifications' ? $this->assignablePatchNotificationChannels() : collect(),
+            'notifSubscriptions' => $this->patchesTab === 'notifications' ? $this->patchNotificationSubscriptions() : collect(),
+            'notifEventLabels' => $this->patchesTab === 'notifications' ? $this->patchEventLabels() : [],
         ]);
     }
 }

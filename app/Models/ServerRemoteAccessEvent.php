@@ -60,6 +60,6 @@ class ServerRemoteAccessEvent extends Model
 
         $end = $this->finished_at ?? now();
 
-        return max(0, $this->started_at->diffInSeconds($end));
+        return max(0, (int) $this->started_at->diffInSeconds($end));
     }
 }

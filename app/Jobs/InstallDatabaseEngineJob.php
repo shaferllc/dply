@@ -64,6 +64,7 @@ class InstallDatabaseEngineJob implements ShouldQueue
         ServerDatabaseHostCapabilities $capabilities,
         DatabaseEngineAuditLogger $audit,
         ServerResourcePreflight $preflight,
+        \App\Services\Notifications\ServerDatabaseNotificationDispatcher $notifications,
     ): void {
         /** @var ServerDatabaseEngine|null $row */
         $row = ServerDatabaseEngine::query()->with('server')->find($this->serverDatabaseEngineId);
@@ -146,6 +147,14 @@ class InstallDatabaseEngineJob implements ShouldQueue
                 'version' => $version,
                 'port' => $row->port,
             ]);
+
+            $notifications->notify(
+                $row->server,
+                'engine_installed',
+                [__('Engine: :engine :version', ['engine' => $row->engine, 'version' => (string) $version])],
+                $this->userId !== null ? \App\Models\User::query()->find($this->userId) : null,
+                ['engine' => $row->engine, 'version' => $version, 'port' => $row->port],
+            );
 
             $emit->success('db', __(':engine is running.', ['engine' => $row->engine]));
             $this->completeConsoleAction();

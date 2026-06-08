@@ -87,7 +87,7 @@ final class RedisSnapshotExporter
             escapeshellarg($tempPath),
         );
 
-        [$copyOut, $copyExit] = $this->remoteExec->shellRunWithExit($server, 'bash -lc '.escapeshellarg($copyCmd), 120);
+        [$copyOut, $copyExit] = $this->remoteExec->shellRunWithExit($server, $copyCmd, 120);
         if ($copyExit !== 0) {
             throw new \RuntimeException('Failed to stage RDB file: '.Str::limit(trim($copyOut), 600));
         }
@@ -95,18 +95,18 @@ final class RedisSnapshotExporter
         // Read bytes from the temp copy so the recorded size matches the upload.
         [$statOut, $statExit] = $this->remoteExec->shellRunWithExit(
             $server,
-            'bash -lc '.escapeshellarg('stat -c %s '.escapeshellarg($tempPath).' 2>/dev/null || stat -f %z '.escapeshellarg($tempPath)),
+            'stat -c %s '.escapeshellarg($tempPath).' 2>/dev/null || stat -f %z '.escapeshellarg($tempPath),
             30,
         );
         if ($statExit !== 0 || ! is_numeric(trim($statOut))) {
-            $this->remoteExec->shellRunWithExit($server, 'bash -lc '.escapeshellarg('rm -f '.escapeshellarg($tempPath)), 30);
+            $this->remoteExec->shellRunWithExit($server, 'rm -f '.escapeshellarg($tempPath), 30);
 
             throw new \RuntimeException('Failed to size RDB file.');
         }
         $bytes = (int) trim($statOut);
 
         if ($bytes <= 0) {
-            $this->remoteExec->shellRunWithExit($server, 'bash -lc '.escapeshellarg('rm -f '.escapeshellarg($tempPath)), 30);
+            $this->remoteExec->shellRunWithExit($server, 'rm -f '.escapeshellarg($tempPath), 30);
 
             throw new \RuntimeException('RDB file is empty — engine may not have any data.');
         }
@@ -132,9 +132,9 @@ final class RedisSnapshotExporter
             escapeshellarg($tempPath),
         );
 
-        [$uploadOut, $uploadExit] = $this->remoteExec->shellRunWithExit($server, 'bash -lc '.escapeshellarg($uploadCmd), 3600);
+        [$uploadOut, $uploadExit] = $this->remoteExec->shellRunWithExit($server, $uploadCmd, 3600);
         if ($uploadExit !== 0) {
-            $this->remoteExec->shellRunWithExit($server, 'bash -lc '.escapeshellarg('rm -f '.escapeshellarg($tempPath)), 30);
+            $this->remoteExec->shellRunWithExit($server, 'rm -f '.escapeshellarg($tempPath), 30);
 
             throw new \RuntimeException('S3 upload failed: '.Str::limit(trim($uploadOut), 800));
         }

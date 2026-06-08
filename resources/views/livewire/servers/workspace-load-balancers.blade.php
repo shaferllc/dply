@@ -30,7 +30,27 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <div class="space-y-6">
+    {{-- In-page sub-tabs: the load-balancer list vs. notification routing for this
+         server's load_balancer.* events. Mirrors the system-users page. --}}
+    <div class="mb-6 border-b border-brand-ink/10">
+        <nav class="-mb-px flex gap-6" aria-label="{{ __('Load balancer sections') }}">
+            @php
+                $tabBase = 'inline-flex items-center gap-1.5 border-b-2 px-1 py-3 text-sm font-medium transition-colors';
+                $tabOn = 'border-brand-forest text-brand-ink';
+                $tabOff = 'border-transparent text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink';
+            @endphp
+            <button type="button" wire:click="setLbWorkspaceTab('load_balancers')" @class([$tabBase, $lb_workspace_tab === 'load_balancers' ? $tabOn : $tabOff])>
+                <x-heroicon-o-arrows-right-left class="h-4 w-4" aria-hidden="true" />
+                {{ __('Load balancers') }}
+            </button>
+            <button type="button" wire:click="setLbWorkspaceTab('notifications')" @class([$tabBase, $lb_workspace_tab === 'notifications' ? $tabOn : $tabOff])>
+                <x-heroicon-o-bell class="h-4 w-4" aria-hidden="true" />
+                {{ __('Notifications') }}
+            </button>
+        </nav>
+    </div>
+
+    <div @class(['space-y-6', 'hidden' => $lb_workspace_tab !== 'load_balancers'])>
 
         {{-- ─── SECTION HEADER (always shown) ──────────────────────────────── --}}
         <section class="dply-card overflow-hidden">
@@ -222,6 +242,10 @@
             </section>
         @endforeach
 
+    </div>
+
+    <div @class(['space-y-6', 'hidden' => $lb_workspace_tab !== 'notifications'])>
+        @include('livewire.servers.partials.load-balancers.notifications-tab')
     </div>
 
     {{-- ─── CREATE SOFTWARE (HAPROXY) LOAD BALANCER MODAL ────────────────────── --}}
@@ -513,5 +537,9 @@
     </x-modal>
 
     @include('livewire.partials.confirm-action-modal')
+    {{-- Reusable inline channel-create modal (CreatesNotificationChannelInline trait),
+         shared with the Notifications tab so an operator can add a channel without
+         leaving the page; the new channel is auto-selected on success. --}}
+    @include('livewire.partials.create-notification-channel-modal')
     @endif
 </x-server-workspace-layout>

@@ -103,17 +103,65 @@
                 @if (count($timeline['events']) > 0)
                     <div class="border-t border-brand-ink/8 pt-4">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Recent changes') }}</p>
-                        <ul class="mt-3 space-y-2">
+                        <ul class="mt-3 divide-y divide-brand-ink/5 overflow-hidden rounded-xl border border-brand-ink/8 bg-white">
                             @foreach ($timeline['events'] as $event)
-                                <li wire:key="access-event-{{ $event['at']->timestamp }}-{{ $event['label'] }}" class="flex flex-wrap items-start justify-between gap-2 rounded-lg border border-brand-ink/8 bg-white px-3 py-2 text-sm">
-                                    <div>
-                                        <p @class(['font-semibold', 'text-amber-800' => $event['is_you'], 'text-sky-800' => ! $event['is_you'] && ($event['source'] ?? '') === 'platform', 'text-brand-ink' => ! $event['is_you'] && ($event['source'] ?? '') !== 'platform'])>{{ $event['label'] }}</p>
-                                        <p class="text-[11px] text-brand-moss">{{ $event['detail'] }}</p>
-                                    </div>
-                                    <span class="text-[11px] text-brand-mist" title="{{ $event['at']->toIso8601String() }}">{{ $event['at']->diffForHumans() }}</span>
+                                @php
+                                    $eventSource = $event['source'] ?? '';
+                                    $dotClass = $event['is_you']
+                                        ? 'bg-amber-400 ring-amber-100'
+                                        : ($eventSource === 'platform' ? 'bg-sky-500 ring-sky-100'
+                                        : ($eventSource === 'session' ? 'bg-emerald-500 ring-emerald-100'
+                                        : 'bg-brand-forest/60 ring-brand-forest/10'));
+                                    $titleClass = $event['is_you']
+                                        ? 'text-amber-800'
+                                        : ($eventSource === 'platform' ? 'text-sky-800' : 'text-brand-ink');
+                                @endphp
+                                <li wire:key="access-event-{{ $event['at']->timestamp }}-{{ $event['label'] }}">
+                                    <button
+                                        type="button"
+                                        wire:click="showEventDetail('{{ $event['type'] ?? '' }}', '{{ $event['id'] ?? '' }}')"
+                                        class="group flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-brand-sand/30 focus:outline-none focus-visible:bg-brand-sand/40"
+                                    >
+                                        <span class="mt-0.5 inline-flex h-2.5 w-2.5 shrink-0 rounded-full ring-4 {{ $dotClass }}" aria-hidden="true"></span>
+                                        <span class="min-w-0 flex-1">
+                                            <span class="block truncate text-sm font-semibold {{ $titleClass }}">{{ $event['label'] }}</span>
+                                            <span class="block truncate text-xs text-brand-moss">{{ $event['detail'] }}</span>
+                                        </span>
+                                        <span class="shrink-0 whitespace-nowrap text-[11px] text-brand-mist" title="{{ $event['at']->toIso8601String() }}">{{ $event['at']->diffForHumans() }}</span>
+                                        <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-mist/60 transition group-hover:translate-x-0.5 group-hover:text-brand-moss" aria-hidden="true" />
+                                    </button>
                                 </li>
                             @endforeach
                         </ul>
+
+                        @if (($eventsPagination['total_pages'] ?? 1) > 1)
+                            <div class="mt-3 flex items-center justify-between gap-3 text-[11px] text-brand-moss">
+                                <span>
+                                    {{ __('Page :page of :total', ['page' => $eventsPagination['page'], 'total' => $eventsPagination['total_pages']]) }}
+                                    · {{ trans_choice(':count change|:count changes', $eventsPagination['total'], ['count' => $eventsPagination['total']]) }}
+                                </span>
+                                <div class="flex items-center gap-1.5">
+                                    <button
+                                        type="button"
+                                        wire:click="$set('eventsPage', {{ max(1, $eventsPagination['page'] - 1) }})"
+                                        @disabled($eventsPagination['page'] <= 1)
+                                        class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-40"
+                                    >
+                                        <x-heroicon-o-chevron-left class="h-3.5 w-3.5" aria-hidden="true" />
+                                        {{ __('Previous') }}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        wire:click="$set('eventsPage', {{ min($eventsPagination['total_pages'], $eventsPagination['page'] + 1) }})"
+                                        @disabled($eventsPagination['page'] >= $eventsPagination['total_pages'])
+                                        class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-40"
+                                    >
+                                        {{ __('Next') }}
+                                        <x-heroicon-o-chevron-right class="h-3.5 w-3.5" aria-hidden="true" />
+                                    </button>
+                                </div>
+                            </div>
+                        @endif
                     </div>
                 @endif
             </div>
@@ -349,4 +397,74 @@
             </div>
         </x-modal>
     @endif
+
+    <x-modal name="ssh-access-event" maxWidth="lg" overlayClass="bg-brand-ink/40">
+        @php
+            $detail = $selectedEvent ?? [];
+            $detailTone = $detail['tone'] ?? 'slate';
+            $detailHeaderClass = match ($detailTone) {
+                'rose' => 'bg-rose-50/50',
+                'amber' => 'bg-amber-50/50',
+                'sky' => 'bg-sky-50/50',
+                'emerald' => 'bg-emerald-50/50',
+                default => 'bg-brand-cream/40',
+            };
+            $detailPillClass = match ($detailTone) {
+                'rose' => 'bg-rose-100 text-rose-700 ring-rose-200',
+                'amber' => 'bg-amber-100 text-amber-800 ring-amber-200',
+                'sky' => 'bg-sky-100 text-sky-700 ring-sky-200',
+                'emerald' => 'bg-emerald-100 text-emerald-700 ring-emerald-200',
+                default => 'bg-brand-sand/60 text-brand-moss ring-brand-ink/10',
+            };
+        @endphp
+
+        <div class="relative border-b border-brand-ink/10 {{ $detailHeaderClass }} px-6 py-5 sm:px-7">
+            <div class="pr-10">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $detail['eyebrow'] ?? __('Access event') }}</p>
+                <div class="mt-1 flex flex-wrap items-center gap-2">
+                    <h2 class="text-lg font-semibold text-brand-ink">{{ $detail['title'] ?? __('Access event') }}</h2>
+                    @if (! empty($detail['status']))
+                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 {{ $detailPillClass }}">{{ $detail['status'] }}</span>
+                    @endif
+                </div>
+            </div>
+            <button
+                type="button"
+                x-on:click="$dispatch('close-modal', 'ssh-access-event')"
+                class="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist transition-colors hover:bg-brand-sand/40 hover:text-brand-ink focus:outline-none focus:ring-2 focus:ring-brand-sage/40"
+                aria-label="{{ __('Close') }}"
+            >
+                <x-heroicon-o-x-mark class="h-5 w-5" />
+            </button>
+        </div>
+
+        <div class="space-y-4 px-6 py-5 sm:px-7">
+            @if (! empty($detail['rows']))
+                <dl class="divide-y divide-brand-ink/5">
+                    @foreach ($detail['rows'] as $row)
+                        <div class="flex items-start justify-between gap-4 py-2">
+                            <dt class="text-xs font-medium text-brand-moss">{{ $row['label'] }}</dt>
+                            <dd @class(['text-right text-sm text-brand-ink', 'font-mono text-xs break-all' => ! empty($row['mono'])])>{{ $row['value'] }}</dd>
+                        </div>
+                    @endforeach
+                </dl>
+            @endif
+
+            @if (! empty($detail['command']))
+                <div>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Last command') }}</p>
+                    <div class="mt-2 flex items-start gap-2 rounded-xl border border-brand-ink/10 bg-brand-ink/5 px-3 py-2.5">
+                        <span class="select-none font-mono text-xs leading-relaxed text-brand-mist" aria-hidden="true">$</span>
+                        <pre class="min-w-0 flex-1 whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-brand-ink">{{ $detail['command'] }}</pre>
+                    </div>
+                </div>
+            @endif
+        </div>
+
+        <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/10 px-6 py-4 sm:px-7">
+            <x-secondary-button type="button" x-on:click="$dispatch('close-modal', 'ssh-access-event')">
+                {{ __('Close') }}
+            </x-secondary-button>
+        </div>
+    </x-modal>
 </x-server-workspace-layout>

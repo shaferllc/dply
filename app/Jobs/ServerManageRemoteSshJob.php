@@ -56,6 +56,49 @@ class ServerManageRemoteSshJob implements ShouldQueue
     }
 
     /**
+     * Publish a patches notification when this manage-action is an OS patch task
+     * (apt upgrade/dist-upgrade, reboot, unattended-upgrades toggle). No-op for the
+     * many other manage-action task names that flow through this shared job. The
+     * actor is read off the ServerManageAction row seeded at dispatch time.
+     */
+    private function maybeNotifyPatchAction(Server $server, bool $success, ?string $error): void
+    {
+        if (! preg_match('/^manage-action:(.+)$/', $this->taskName, $m)) {
+            return;
+        }
+
+        $kind = match (true) {
+            $m[1] === 'apt_upgrade' => $success ? 'updates_applied' : 'apply_failed',
+            $m[1] === 'apt_dist_upgrade' => $success ? 'dist_upgrade_applied' : 'apply_failed',
+            $m[1] === 'reboot' && $success => 'reboot_completed',
+            $m[1] === 'unattended_upgrades_enable' && $success => 'auto_updates_enabled',
+            $m[1] === 'unattended_upgrades_disable' && $success => 'auto_updates_disabled',
+            default => null,
+        };
+        if ($kind === null) {
+            return;
+        }
+
+        $actor = null;
+        if ($this->logId !== null) {
+            $userId = ServerManageAction::query()->whereKey($this->logId)->value('user_id');
+            if ($userId) {
+                $actor = \App\Models\User::query()->find($userId);
+            }
+        }
+
+        $details = (! $success && $error) ? [__('Error: :error', ['error' => $error])] : [];
+
+        app(\App\Services\Notifications\ServerPatchNotificationDispatcher::class)->notify(
+            $server,
+            $kind,
+            $details,
+            $actor,
+            ['task' => $m[1], 'success' => $success],
+        );
+    }
+
+    /**
      * Fire the optional completion broadcast configured at construction time. No-op when no
      * event class was provided — keeps SSH-keys / Firewall callers on the cache-poll path.
      */
@@ -222,6 +265,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
                 $this->emitConsoleTail($emitter, $trimmed, $lastEmittedLen);
                 $this->markConsoleFailed($error);
                 $this->broadcastCompletion(false, $error, $trimmed);
+                $this->maybeNotifyPatchAction($server, false, $error);
 
                 return;
             }
@@ -237,6 +281,7 @@ class ServerManageRemoteSshJob implements ShouldQueue
             $this->emitConsolePlaceholderIfEmpty($emitter, $trimmed);
             $this->markConsoleCompleted();
             $this->broadcastCompletion(true, null, $trimmed);
+            $this->maybeNotifyPatchAction($server, true, null);
 
             if ($this->taskName === 'services-install:install_monitoring_prerequisites') {
                 $server = Server::query()->find($this->serverId);

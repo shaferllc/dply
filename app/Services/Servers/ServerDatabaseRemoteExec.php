@@ -531,7 +531,7 @@ BASH;
             'sqlite3 '.escapeshellarg($sourcePath).' ".backup '.escapeshellarg($destPath).'" >/dev/null && '.
             'stat -c%s '.escapeshellarg($destPath);
 
-        [$out, $exit] = $this->shellRunWithExit($server, 'bash -lc '.escapeshellarg($script), $timeout);
+        [$out, $exit] = $this->shellRunWithExit($server, $script, $timeout);
 
         if ($exit !== null && $exit !== 0) {
             throw new \RuntimeException(Str::limit(trim($out), 800));
@@ -543,7 +543,7 @@ BASH;
         }
 
         if ($bytes > $maxBytes) {
-            $this->shellRunWithExit($server, 'bash -lc '.escapeshellarg('rm -f '.escapeshellarg($destPath)), 30);
+            $this->shellRunWithExit($server, 'rm -f '.escapeshellarg($destPath), 30);
 
             throw new \RuntimeException(sprintf(
                 'SQLite backup exceeds the %d byte cap; raise SERVER_DATABASE_SQLITE_BACKUP_MAX_BYTES if needed.',
@@ -562,7 +562,7 @@ BASH;
             ' --single-transaction --quick --routines=false '.escapeshellarg($database).
             ' > '.escapeshellarg($destPath).' 2>&1 && stat -c%s '.escapeshellarg($destPath);
 
-        [$out, $exit] = $this->shellRunWithExit($server, 'bash -lc '.escapeshellarg($inner), $timeout);
+        [$out, $exit] = $this->shellRunWithExit($server, $inner, $timeout);
 
         if ($exit !== null && $exit !== 0) {
             throw new \RuntimeException(Str::limit(trim($out), 800));
@@ -579,7 +579,7 @@ BASH;
             ' '.escapeshellarg($database).
             ' > '.escapeshellarg($destPath).' 2>&1 && stat -c%s '.escapeshellarg($destPath);
 
-        [$out, $exit] = $this->shellRunWithExit($server, 'bash -lc '.escapeshellarg($inner), $timeout);
+        [$out, $exit] = $this->shellRunWithExit($server, $inner, $timeout);
 
         if ($exit !== null && $exit !== 0) {
             throw new \RuntimeException(Str::limit(trim($out), 800));
@@ -607,7 +607,7 @@ BASH;
             'rm -f "$oldest"; '.
             'done';
 
-        $this->shellRunWithExit($server, 'bash -lc '.escapeshellarg($inner), $timeout);
+        $this->shellRunWithExit($server, $inner, $timeout);
     }
 
     /**

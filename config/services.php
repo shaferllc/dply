@@ -111,11 +111,29 @@ return [
     'linode' => [
         'default_image' => env('LINODE_DEFAULT_IMAGE', 'linode/ubuntu24.04'),
         'ssh_user' => env('LINODE_SSH_USER', 'root'),
+
+        /*
+         * App-level Linode (Akamai Connected Cloud) API token for "global" ops with
+         * no connected customer credential — catalog (regions/types) browsing before
+         * a credential is linked. Mirrors services.digitalocean.token /
+         * services.vultr.token. Per-server provisioning still uses each server's
+         * own ProviderCredential.
+         */
+        'token' => env('LINODE_TOKEN'),
     ],
 
     'vultr' => [
         'default_os_id' => env('VULTR_DEFAULT_OS_ID', 2152), // Ubuntu 24.04 LTS
         'ssh_user' => env('VULTR_SSH_USER', 'root'),
+
+        /*
+         * App-level Vultr API token for "global" operations that aren't tied to a
+         * connected customer credential — catalog (regions/plans) browsing before a
+         * credential is linked, and any control-plane reads. Mirrors
+         * services.digitalocean.token. Per-server provisioning still uses the
+         * server's own ProviderCredential.
+         */
+        'token' => env('VULTR_TOKEN'),
     ],
 
     'upcloud' => [
@@ -134,7 +152,11 @@ return [
     ],
 
     'ovh' => [
-        'ssh_user' => env('OVH_SSH_USER', 'root'),
+        // OVH Public Cloud Ubuntu images default to the `ubuntu` login user.
+        'ssh_user' => env('OVH_SSH_USER', 'ubuntu'),
+        // Image name matched (case-insensitive substring) against the project's
+        // image catalogue at provision time. See OvhService::resolveImageId().
+        'default_image' => env('OVH_DEFAULT_IMAGE', 'Ubuntu 24.04'),
     ],
 
     'rackspace' => [

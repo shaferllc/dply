@@ -140,6 +140,14 @@
             >
                 {{ __('Advanced') }}
             </x-server-workspace-tab>
+            <x-server-workspace-tab
+                id="ws-tab-notifications"
+                :active="$workspace_tab === 'notifications'"
+                wire:click="setWorkspaceTab('notifications')"
+                icon="heroicon-o-bell"
+            >
+                {{ __('Notifications') }}
+            </x-server-workspace-tab>
         </x-server-workspace-tablist>
     </div>
 
@@ -196,12 +204,26 @@
         </x-server-workspace-tab-panel>
     @endif
 
+    @if ($workspace_tab === 'notifications')
+        <x-server-workspace-tab-panel
+            id="ws-panel-notifications"
+            labelled-by="ws-tab-notifications"
+            panel-class="space-y-6"
+        >
+            @include('livewire.servers.partials.webserver.notifications-tab')
+        </x-server-workspace-tab-panel>
+    @endif
+
     </x-workspace-tab-panel-loading>
 
     @include('livewire.servers.partials.webserver.switch-modal')
 
     <x-slot name="modals">
         @include('livewire.partials.confirm-action-modal')
+        {{-- Reusable inline channel-create modal (CreatesNotificationChannelInline trait),
+             shared with the Notifications tab so an operator can add a channel without
+             leaving the page; the new channel is auto-selected on success. --}}
+        @include('livewire.partials.create-notification-channel-modal')
         @include('livewire.servers.partials.remove-server-modal', [
             'open' => $showRemoveServerModal,
             'serverName' => $server->name,

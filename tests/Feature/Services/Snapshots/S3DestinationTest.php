@@ -86,15 +86,25 @@ test('persist streams dump to s3 via presigned put url and records snapshot', fu
         keyPrefix: 'prod',
     );
 
-    $snapshot = $destination->persist(
-        site: $site,
-        reason: Snapshot::REASON_MANUAL,
+    // The pending row is created up front by SnapshotService::take(); persist()
+    // fills it in and flips it to completed.
+    $snapshot = Snapshot::create([
+        'site_id' => $site->id,
+        'destination' => Snapshot::DESTINATION_S3,
+        'engine' => 'mysql84',
+        'reason' => Snapshot::REASON_MANUAL,
+        'taken_by_user_id' => $site->user_id,
+        'status' => Snapshot::STATUS_PENDING,
+    ]);
+
+    $destination->persist(
+        snapshot: $snapshot,
         dumpRemotePath: '/tmp/dply-snapshot-shopco-abc123.sql.gz',
         bytes: 4096,
-        engine: 'mysql84',
-        userId: $site->user_id,
     );
 
+    $snapshot->refresh();
+    expect($snapshot->status)->toBe(Snapshot::STATUS_COMPLETED);
     expect($snapshot->destination)->toBe(Snapshot::DESTINATION_S3);
     expect($snapshot->s3_bucket)->toBe('dply-backups');
     expect($snapshot->s3_key)->toStartWith('prod/');
@@ -112,19 +122,26 @@ test('persist throws when curl upload fails', function () {
     $executor->shouldReceive('runInlineBash')
         ->andReturn(new ProcessOutput('curl: (22) The requested URL returned error: 403 Forbidden', 22, false));
 
+    $pending = Snapshot::create([
+        'site_id' => $site->id,
+        'destination' => Snapshot::DESTINATION_S3,
+        'engine' => 'mysql84',
+        'reason' => Snapshot::REASON_MANUAL,
+        'status' => Snapshot::STATUS_PENDING,
+    ]);
+
     $this->expectExceptionMessage('S3 presigned-PUT upload failed');
 
     try {
         (new S3Destination($executor, mockS3Client(), 'b'))->persist(
-            site: $site,
-            reason: Snapshot::REASON_MANUAL,
+            snapshot: $pending,
             dumpRemotePath: '/tmp/x.sql.gz',
             bytes: 100,
-            engine: 'mysql84',
-            userId: null,
         );
     } finally {
-        expect(Snapshot::query()->count())->toBe(0, 'A failed S3 upload must not leave a Snapshot row behind');
+        // persist() never flips a failed upload to completed; the row stays
+        // pending. SnapshotService::take() is what marks it failed.
+        expect($pending->fresh()->status)->toBe(Snapshot::STATUS_PENDING);
     }
 });
 test('restore streams via presigned get url into engine client', function () {

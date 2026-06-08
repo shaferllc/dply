@@ -150,3 +150,92 @@ test('normalize record name maps apex hostnames to empty string', function () {
     expect(LinodeService::normalizeRecordName('example.com', 'example.com'))->toBe('');
     expect(LinodeService::normalizeRecordName('preview', 'example.com'))->toBe('preview');
 });
+
+test('from token builds a service bound to a raw api token', function () {
+    Http::fake([
+        'https://api.linode.com/v4/profile' => Http::response(['username' => 'dply'], 200),
+    ]);
+
+    LinodeService::fromToken('base-key-123')->validateToken();
+
+    Http::assertSent(fn ($request) => $request->hasHeader('Authorization', 'Bearer base-key-123'));
+});
+
+test('from config returns null without a base key and a service when set', function () {
+    config(['services.linode.token' => '']);
+    expect(LinodeService::fromConfig())->toBeNull();
+
+    config(['services.linode.token' => 'global-tok']);
+    expect(LinodeService::fromConfig())->toBeInstanceOf(LinodeService::class);
+});
+
+test('get private ip returns the 192.168 private address from the ipv4 list', function () {
+    expect(LinodeService::getPrivateIp(['ipv4' => ['192.0.2.7', '192.168.140.5']]))->toBe('192.168.140.5');
+    expect(LinodeService::getPrivateIp(['ipv4' => ['192.0.2.7']]))->toBeNull();
+    expect(LinodeService::getPrivateIp(['ipv4' => []]))->toBeNull();
+});
+
+test('primary disk id picks the largest ext4 disk and skips swap', function () {
+    Http::fake([
+        'https://api.linode.com/v4/linode/instances/1234/disks' => Http::response([
+            'data' => [
+                ['id' => 1, 'filesystem' => 'swap', 'size' => 512],
+                ['id' => 2, 'filesystem' => 'ext4', 'size' => 20480],
+                ['id' => 3, 'filesystem' => 'ext4', 'size' => 81920],
+            ],
+        ], 200),
+    ]);
+
+    $credential = ProviderCredential::factory()->create([
+        'provider' => 'linode',
+        'credentials' => ['api_token' => 'lin_test'],
+    ]);
+
+    expect((new LinodeService($credential))->primaryDiskId(1234))->toBe(3);
+});
+
+test('create image from disk posts disk id and label and returns the image', function () {
+    Http::fake([
+        'https://api.linode.com/v4/images' => Http::response([
+            'id' => 'private/98765', 'label' => 'nightly', 'status' => 'creating',
+        ], 200),
+    ]);
+
+    $credential = ProviderCredential::factory()->create([
+        'provider' => 'linode',
+        'credentials' => ['api_token' => 'lin_test'],
+    ]);
+
+    $image = (new LinodeService($credential))->createImageFromDisk(3, 'nightly');
+
+    expect($image['id'])->toBe('private/98765');
+
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && $request->url() === 'https://api.linode.com/v4/images'
+        && $request->data()['disk_id'] === 3
+        && $request->data()['label'] === 'nightly');
+});
+
+test('wait for image returns once status is available and delete tolerates 404', function () {
+    Http::fake([
+        'https://api.linode.com/v4/images/private/98765' => Http::sequence()
+            ->push(['id' => 'private/98765', 'status' => 'available', 'size' => 2048], 200)
+            ->push([], 404),
+    ]);
+
+    $credential = ProviderCredential::factory()->create([
+        'provider' => 'linode',
+        'credentials' => ['api_token' => 'lin_test'],
+    ]);
+
+    $svc = new LinodeService($credential);
+
+    $image = $svc->waitForImage('private/98765');
+    expect($image['status'])->toBe('available')
+        ->and($image['size'])->toBe(2048);
+
+    $svc->deleteImage('private/98765'); // 404 must not throw
+
+    Http::assertSent(fn ($request) => $request->method() === 'DELETE'
+        && $request->url() === 'https://api.linode.com/v4/images/private/98765');
+});

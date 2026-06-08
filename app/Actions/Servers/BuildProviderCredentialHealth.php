@@ -15,6 +15,7 @@ use App\Services\GcpComputeService;
 use App\Services\HetznerService;
 use App\Services\LinodeService;
 use App\Services\OracleComputeService;
+use App\Services\OvhService;
 use App\Services\ScalewayService;
 use App\Services\UpCloudService;
 use App\Services\VultrService;
@@ -91,6 +92,7 @@ final class BuildProviderCredentialHealth
             'linode', 'akamai' => (new LinodeService($credential))->validateToken(),
             'vultr' => (new VultrService($credential))->validateToken(),
             'scaleway' => (new ScalewayService($credential))->validateToken(),
+            'ovh' => (new OvhService($credential))->validateToken(),
             'upcloud' => (new UpCloudService($credential))->validateToken(),
             'equinix_metal' => (new EquinixMetalService($credential))->validateToken(),
             'aws', 'aws_lambda' => (new AwsEc2Service($credential))->validateCredentials(),

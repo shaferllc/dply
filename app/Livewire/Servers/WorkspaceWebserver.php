@@ -7,8 +7,10 @@ namespace App\Livewire\Servers;
 use App\Enums\SiteType;
 use App\Jobs\RunWebserverConfigOpJob;
 use App\Jobs\ServerManageRemoteSshJob;
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Servers\Concerns\LoadsLiveServerCerts;
 use App\Livewire\Servers\Concerns\ManagesWebserverConfigRevisions;
+use App\Livewire\Servers\Concerns\ManagesWebserverNotifications;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerManageAction;
@@ -81,6 +83,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 
 /**
@@ -108,8 +111,10 @@ use Livewire\Attributes\Url;
 #[Layout('layouts.app')]
 class WorkspaceWebserver extends WorkspaceManage
 {
+    use CreatesNotificationChannelInline;
     use LoadsLiveServerCerts;
     use ManagesWebserverConfigRevisions;
+    use ManagesWebserverNotifications;
 
     /**
      * Second-level tab within this workspace — mirrors WorkspaceDatabases /
@@ -987,7 +992,7 @@ class WorkspaceWebserver extends WorkspaceManage
 
     public function setWorkspaceTab(string $tab): void
     {
-        $allowed = ['overview', 'change', 'health', 'nginx', 'caddy', 'apache', 'openlitespeed', 'advanced'];
+        $allowed = ['overview', 'change', 'health', 'nginx', 'caddy', 'apache', 'openlitespeed', 'advanced', 'notifications'];
         $this->workspace_tab = in_array($tab, $allowed, true) ? $tab : 'overview';
         // Reset the sub-tab on every top-level switch so the operator always
         // lands on the actionable view first. Skipping this would leave
@@ -999,6 +1004,18 @@ class WorkspaceWebserver extends WorkspaceManage
         if ($this->workspace_tab === 'health' && $this->serverOpsReady()) {
             $this->loadDriftDetector();
         }
+    }
+
+    /**
+     * Fired by {@see CreatesNotificationChannelInline} after the inline modal
+     * creates a channel. Jump to the Notifications tab and pre-select the new
+     * channel so the operator can finish wiring it to events in one motion.
+     */
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId): void
+    {
+        $this->workspace_tab = 'notifications';
+        $this->notif_channel_id = $channelId;
     }
 
     /**
@@ -7656,6 +7673,9 @@ class WorkspaceWebserver extends WorkspaceManage
                 'deletionSummary' => $this->showRemoveServerModal
                     ? ServerRemovalAdvisor::summary($this->server)
                     : null,
+                'notifChannels' => $this->workspace_tab === 'notifications' ? $this->assignableWebserverNotificationChannels() : collect(),
+                'notifSubscriptions' => $this->workspace_tab === 'notifications' ? $this->webserverNotificationSubscriptions() : collect(),
+                'notifEventLabels' => $this->workspace_tab === 'notifications' ? $this->webserverEventLabels() : [],
             ],
         ));
     }

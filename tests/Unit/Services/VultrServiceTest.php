@@ -149,3 +149,90 @@ test('normalize record name maps apex hostnames to empty string', function () {
     expect(VultrService::normalizeRecordName('example.com', 'example.com'))->toBe('');
     expect(VultrService::normalizeRecordName('preview', 'example.com'))->toBe('preview');
 });
+
+test('from token builds a service bound to a raw api token', function () {
+    Http::fake([
+        'https://api.vultr.com/v2/account' => Http::response(['account' => []], 200),
+    ]);
+
+    VultrService::fromToken('base-key-123')->validateToken();
+
+    Http::assertSent(fn ($request) => $request->hasHeader('Authorization', 'Bearer base-key-123'));
+});
+
+test('from config returns null without a base key and a service when set', function () {
+    config(['services.vultr.token' => '']);
+    expect(VultrService::fromConfig())->toBeNull();
+
+    config(['services.vultr.token' => 'global-tok']);
+    expect(VultrService::fromConfig())->toBeInstanceOf(VultrService::class);
+});
+
+test('get private ip prefers internal_ip then falls back to vpc subnet', function () {
+    expect(VultrService::getPrivateIp(['internal_ip' => '10.1.96.3']))->toBe('10.1.96.3');
+
+    expect(VultrService::getPrivateIp([
+        'internal_ip' => '',
+        'vpcs' => [['id' => 'v1', 'subnet' => '10.2.0.5']],
+    ]))->toBe('10.2.0.5');
+
+    expect(VultrService::getPrivateIp(['internal_ip' => '', 'vpcs' => []]))->toBeNull();
+});
+
+test('create snapshot posts instance id and description and returns id', function () {
+    Http::fake([
+        'https://api.vultr.com/v2/snapshots' => Http::response([
+            'snapshot' => ['id' => 'snap-77', 'status' => 'pending'],
+        ], 201),
+    ]);
+
+    $credential = ProviderCredential::factory()->create([
+        'provider' => 'vultr',
+        'credentials' => ['api_token' => 'vultr_test'],
+    ]);
+
+    $id = (new VultrService($credential))->createSnapshot('vps-1234', 'nightly');
+
+    expect($id)->toBe('snap-77');
+
+    Http::assertSent(fn ($request) => $request->method() === 'POST'
+        && $request->url() === 'https://api.vultr.com/v2/snapshots'
+        && $request->data()['instance_id'] === 'vps-1234'
+        && $request->data()['description'] === 'nightly');
+});
+
+test('wait for snapshot returns once status is complete', function () {
+    Http::fake([
+        'https://api.vultr.com/v2/snapshots/snap-77' => Http::response([
+            'snapshot' => ['id' => 'snap-77', 'status' => 'complete', 'size' => 42949672960, 'compressed_size' => 949678560],
+        ], 200),
+    ]);
+
+    $credential = ProviderCredential::factory()->create([
+        'provider' => 'vultr',
+        'credentials' => ['api_token' => 'vultr_test'],
+    ]);
+
+    $snapshot = (new VultrService($credential))->waitForSnapshot('snap-77');
+
+    expect($snapshot['status'])->toBe('complete')
+        ->and($snapshot['compressed_size'])->toBe(949678560);
+});
+
+test('delete snapshot deletes by id and treats 404 as success', function () {
+    Http::fake([
+        'https://api.vultr.com/v2/snapshots/snap-gone' => Http::response([], 404),
+        'https://api.vultr.com/v2/snapshots/snap-77' => Http::response([], 204),
+    ]);
+
+    $credential = ProviderCredential::factory()->create([
+        'provider' => 'vultr',
+        'credentials' => ['api_token' => 'vultr_test'],
+    ]);
+
+    (new VultrService($credential))->deleteSnapshot('snap-77');
+    (new VultrService($credential))->deleteSnapshot('snap-gone'); // must not throw
+
+    Http::assertSent(fn ($request) => $request->method() === 'DELETE'
+        && $request->url() === 'https://api.vultr.com/v2/snapshots/snap-77');
+});

@@ -4,6 +4,8 @@ namespace App\Jobs;
 
 use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\Server;
+use App\Models\User;
+use App\Services\Notifications\ServerSystemUserNotificationDispatcher;
 use App\Services\Servers\ServerPasswdUserLister;
 use App\Services\Servers\ServerSystemUserService;
 use Illuminate\Bus\Queueable;
@@ -61,8 +63,11 @@ class CreateServerSystemUserJob implements ShouldBeUnique, ShouldQueue
         return $this->userId;
     }
 
-    public function handle(ServerSystemUserService $service, ServerPasswdUserLister $lister): void
-    {
+    public function handle(
+        ServerSystemUserService $service,
+        ServerPasswdUserLister $lister,
+        ServerSystemUserNotificationDispatcher $notifications,
+    ): void {
         $server = Server::query()->find($this->serverId);
         if (! $server) {
             return;
@@ -82,6 +87,14 @@ class CreateServerSystemUserJob implements ShouldBeUnique, ShouldQueue
 
             $emit->success('system user '.$this->username.' created', 'system_user');
             $this->completeConsoleAction();
+
+            $notifications->notify(
+                $server,
+                'created',
+                [$this->username],
+                $this->userId ? User::query()->find($this->userId) : null,
+                ['sudo' => $this->grantSudo, 'shell' => $this->shell],
+            );
         } catch (\Throwable $e) {
             $emit->error($e->getMessage(), 'system_user');
             $this->failConsoleAction($e->getMessage());

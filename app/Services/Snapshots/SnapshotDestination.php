@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Snapshots;
 
-use App\Models\Site;
 use App\Models\Snapshot;
 
 /**
@@ -19,15 +18,25 @@ use App\Models\Snapshot;
 interface SnapshotDestination
 {
     /**
-     * Persist the dump bytes to wherever the destination lives, then
-     * write a Snapshot row recording the location + size + reason.
-     *
-     * @param  string  $reason  one of {@see Snapshot::REASON_*}
-     * @param  string  $dumpRemotePath  on-server path of the freshly-written
-     *                                  gzipped dump file produced by SnapshotService — the destination
-     *                                  is responsible for moving / streaming it out.
+     * The destination kind this adapter writes — one of {@see Snapshot::DESTINATION_*}.
+     * {@see SnapshotService} stamps it on the pending row up front so the history
+     * list shows "Disk" / "S3" before the dump has finished.
      */
-    public function persist(Site $site, string $reason, string $dumpRemotePath, int $bytes, string $engine, ?string $userId): Snapshot;
+    public function kind(): string;
+
+    /**
+     * Persist the dump bytes to wherever the destination lives, then fill in the
+     * already-created (pending) Snapshot row with the resulting location + size and
+     * flip it to completed. The row is pre-created by {@see SnapshotService::take()}
+     * so it can surface as a "pending" entry the instant the snapshot is queued.
+     *
+     * @param  Snapshot  $snapshot  the pending row to update in place (already carries
+     *                              site / reason / engine / taken_by_user_id).
+     * @param  string  $dumpRemotePath  on-server path of the freshly-written gzipped
+     *                                  dump file produced by SnapshotService — the
+     *                                  destination is responsible for moving / streaming it out.
+     */
+    public function persist(Snapshot $snapshot, string $dumpRemotePath, int $bytes): Snapshot;
 
     /**
      * Stream the snapshot back into the live database. Idempotent in

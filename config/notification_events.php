@@ -24,6 +24,104 @@ return [
                 'server.provision_failed' => 'Server provisioning failed (action required)',
             ],
         ],
+        'system_user' => [
+            'label' => 'System user notifications',
+            'events' => [
+                'server.system_user.created' => 'System user created',
+                'server.system_user.updated' => 'System user updated',
+                'server.system_user.removed' => 'System user removed',
+            ],
+        ],
+        'ssh_key' => [
+            'label' => 'SSH key notifications',
+            'events' => [
+                'server.ssh_key.created' => 'SSH key added',
+                'server.ssh_key.removed' => 'SSH key removed',
+            ],
+        ],
+        'patches' => [
+            'label' => 'Patch / update notifications',
+            'events' => [
+                'server.patches.updates_applied' => 'Updates applied (apt upgrade)',
+                'server.patches.dist_upgrade_applied' => 'Dist-upgrade applied',
+                'server.patches.apply_failed' => 'Update apply failed (action required)',
+                'server.patches.reboot_completed' => 'Server rebooted',
+                'server.patches.auto_updates_enabled' => 'Automatic updates enabled',
+                'server.patches.auto_updates_disabled' => 'Automatic updates disabled',
+            ],
+        ],
+        'server_database' => [
+            'label' => 'Database notifications',
+            'events' => [
+                'server.database.created' => 'Database created',
+                'server.database.removed' => 'Database removed',
+                'server.database.engine_installed' => 'Database engine installed',
+                'server.database.engine_removed' => 'Database engine removed',
+                'server.database.user_created' => 'Database user created',
+                'server.database.user_removed' => 'Database user removed',
+            ],
+        ],
+        'webserver' => [
+            'label' => 'Webserver notifications',
+            'events' => [
+                'server.webserver.engine_switched' => 'Webserver engine switched',
+                'server.webserver.engine_switch_failed' => 'Webserver switch failed (action required)',
+                'server.webserver.switch_reverted' => 'Webserver switch reverted',
+                'server.webserver.config_saved' => 'Webserver config saved',
+            ],
+        ],
+        'server_backup' => [
+            'label' => 'Server backup notifications',
+            'events' => [
+                'server.backup.run_started' => 'Backup run started',
+                'server.backup.completed' => 'Backup completed',
+                'server.backup.failed' => 'Backup failed (action required)',
+                'server.backup.deleted' => 'Backup deleted',
+                'server.backup.schedule_created' => 'Backup schedule created',
+                'server.backup.schedule_updated' => 'Backup schedule updated',
+                'server.backup.schedule_deleted' => 'Backup schedule deleted',
+            ],
+        ],
+        'snapshot' => [
+            'label' => 'Snapshot notifications',
+            'events' => [
+                'server.snapshot.created' => 'Snapshot created',
+                'server.snapshot.restored' => 'Snapshot restored',
+                'server.snapshot.deleted' => 'Snapshot deleted',
+            ],
+        ],
+        'load_balancer' => [
+            'label' => 'Load balancer notifications',
+            'events' => [
+                'server.load_balancer.created' => 'Load balancer created',
+                'server.load_balancer.deleted' => 'Load balancer deleted',
+                'server.load_balancer.target_added' => 'Load balancer target added',
+                'server.load_balancer.target_removed' => 'Load balancer target removed',
+            ],
+        ],
+        'firewall_rule' => [
+            'label' => 'Firewall notifications',
+            'events' => [
+                'server.firewall_rule.created' => 'Firewall rule created',
+                'server.firewall_rule.updated' => 'Firewall rule updated',
+                'server.firewall_rule.deleted' => 'Firewall rule deleted',
+                'server.firewall_rule.applied' => 'Firewall rules applied to host',
+            ],
+        ],
+        'networking' => [
+            'label' => 'Networking notifications',
+            'events' => [
+                'server.networking.db_access_enabled' => 'Database remote access enabled',
+                'server.networking.db_access_disabled' => 'Database remote access disabled',
+                'server.networking.cache_exposed' => 'Cache exposed to network',
+                'server.networking.cache_locked_down' => 'Cache locked down',
+                'server.networking.network_created' => 'Private network created',
+                'server.networking.network_attached' => 'Server attached to network',
+                'server.networking.network_detached' => 'Server detached from network',
+                'server.networking.route_added' => 'Network route added',
+                'server.networking.route_removed' => 'Network route removed',
+            ],
+        ],
         'site' => [
             'label' => 'Site notifications',
             'events' => [

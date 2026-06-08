@@ -29,6 +29,8 @@ use Illuminate\Support\Carbon;
  * @property int|null $bytes
  * @property string $engine 'mysql' | 'mariadb' | 'postgres' | 'sqlite'
  * @property string $reason 'manual' | 'pre_migration_rollback' | 'pre_destructive_command' | 'scheduled'
+ * @property string $status 'pending' | 'completed' | 'failed'
+ * @property string|null $error_message
  * @property string|null $taken_by_user_id
  * @property Carbon|null $expires_at
  */
@@ -47,6 +49,8 @@ class Snapshot extends Model
         'bytes',
         'engine',
         'reason',
+        'status',
+        'error_message',
         'taken_by_user_id',
         'expires_at',
     ];
@@ -54,6 +58,15 @@ class Snapshot extends Model
     public const DESTINATION_LOCAL_DISK = 'local_disk';
 
     public const DESTINATION_S3 = 's3';
+
+    /** Queued and dumping — the row exists but the dump hasn't landed yet. */
+    public const STATUS_PENDING = 'pending';
+
+    /** Dump captured and persisted to its destination. */
+    public const STATUS_COMPLETED = 'completed';
+
+    /** The dump or its upload failed; see error_message. */
+    public const STATUS_FAILED = 'failed';
 
     public const REASON_MANUAL = 'manual';
 
@@ -84,6 +97,12 @@ class Snapshot extends Model
     public function isExpired(): bool
     {
         return $this->expires_at !== null && $this->expires_at->isPast();
+    }
+
+    /** A snapshot is terminal once it has either completed or failed. */
+    public function isTerminal(): bool
+    {
+        return in_array($this->status, [self::STATUS_COMPLETED, self::STATUS_FAILED], true);
     }
 
     protected static function newFactory(): SnapshotFactory

@@ -10,10 +10,12 @@ use App\Jobs\ToggleDatabaseNetworkingJob;
 use App\Jobs\UninstallDatabaseEngineJob;
 use App\Livewire\Concerns\AuthorsBackupDestinations;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\SurfacesBindingConsumers;
 use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\ManagesDatabaseNotifications;
 use App\Livewire\Servers\Concerns\RunsAllowlistedManageAction;
 use App\Livewire\Servers\Concerns\RunsServerConsoleActions;
 use App\Models\BackupConfiguration;
@@ -53,6 +55,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
@@ -65,6 +68,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class WorkspaceDatabases extends Component
 {
     use AuthorsBackupDestinations;
+    use CreatesNotificationChannelInline;
+    use ManagesDatabaseNotifications;
     use RendersWorkspacePlaceholder;
     use ConfirmsActionWithModal;
     use DismissesServerConsoleActionRun;
@@ -339,6 +344,18 @@ class WorkspaceDatabases extends Component
         // then Postgres would land on Postgres→Info, hiding the actions.
         $this->engine_subtab = 'overview';
         $this->engine_create_form_open = false;
+    }
+
+    /**
+     * Fired by {@see CreatesNotificationChannelInline} after the inline modal
+     * creates a channel. Jump to the Notifications tab and pre-select the new
+     * channel so the operator can finish wiring it to events in one motion.
+     */
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId): void
+    {
+        $this->workspace_tab = 'notifications';
+        $this->notif_channel_id = $channelId;
     }
 
     public function openEngineDatabaseCreate(string $engine): void
@@ -1437,6 +1454,11 @@ class WorkspaceDatabases extends Component
             'username' => $extra->username,
         ], auth()->user());
 
+        $this->dispatchDatabaseNotification('user_created', [
+            __('User: :user', ['user' => $extra->username]),
+            __('Database: :name', ['name' => $db->name]),
+        ], ['server_database_id' => $db->id, 'username' => $extra->username, 'engine' => $db->engine]);
+
         $this->extra_username = '';
         $this->extra_password = '';
         $this->toastSuccess(__('Extra user created on the server.'));
@@ -1474,6 +1496,11 @@ class WorkspaceDatabases extends Component
             'username' => $user,
             'dropped_remote' => true,
         ], auth()->user());
+
+        $this->dispatchDatabaseNotification('user_removed', [
+            __('User: :user', ['user' => $user]),
+            __('Database: :name', ['name' => $db?->name ?? $dbId]),
+        ], ['server_database_id' => $dbId, 'username' => $user]);
 
         $this->toastSuccess(__('Dropped the MySQL user on the server and removed it from Dply.'));
     }
@@ -2217,6 +2244,9 @@ class WorkspaceDatabases extends Component
                 'deletionSummary' => $this->showRemoveServerModal
                     ? ServerRemovalAdvisor::summary($this->server)
                     : null,
+                'notifChannels' => $needsNotifications ? $this->assignableDatabaseNotificationChannels() : collect(),
+                'notifSubscriptions' => $needsNotifications ? $this->databaseNotificationSubscriptions() : collect(),
+                'notifEventLabels' => $needsNotifications ? $this->databaseEventLabels() : [],
             ],
         ));
     }

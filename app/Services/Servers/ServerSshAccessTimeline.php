@@ -26,7 +26,7 @@ final class ServerSshAccessTimeline
      *     to: Carbon,
      *     series: list<array{at: int, total: float, you: float}>,
      *     lanes: list<array{key: string, label: string, source: string, is_you: bool, start: Carbon, end: Carbon}>,
-     *     events: list<array{at: Carbon, label: string, detail: string, is_you: bool}>,
+     *     events: list<array{at: Carbon, label: string, detail: string, is_you: bool, type: string, id: string, source: string}>,
      *     you_active_now: bool,
      * }
      */
@@ -283,7 +283,7 @@ final class ServerSshAccessTimeline
     }
 
     /**
-     * @return list<array{at: Carbon, label: string, detail: string, is_you: bool}>
+     * @return list<array{at: Carbon, label: string, detail: string, is_you: bool, type: string, id: string, source: string}>
      */
     private function collectEvents(Server $server, ?User $viewer, Carbon $from, ServerSshAccessContext $context): array
     {
@@ -316,6 +316,9 @@ final class ServerSshAccessTimeline
                     'label' => $label,
                     'detail' => $detail,
                     'is_you' => $viewer !== null && (string) $event->user_id === (string) $viewer->id,
+                    'type' => 'audit',
+                    'id' => (string) $event->id,
+                    'source' => 'audit',
                 ];
             });
 
@@ -329,6 +332,9 @@ final class ServerSshAccessTimeline
                     'label' => __('Session granted'),
                     'detail' => $session->name.' · '.($session->createdBy?->name ?? __('Unknown')),
                     'is_you' => $viewer !== null && (string) $session->created_by_user_id === (string) $viewer->id,
+                    'type' => 'session',
+                    'id' => (string) $session->id,
+                    'source' => 'session',
                 ];
 
                 if ($session->revoked_at !== null && $session->revoked_at->gte($from)) {
@@ -337,6 +343,9 @@ final class ServerSshAccessTimeline
                         'label' => __('Session revoked'),
                         'detail' => $session->name,
                         'is_you' => $viewer !== null && (string) $session->created_by_user_id === (string) $viewer->id,
+                        'type' => 'session',
+                        'id' => (string) $session->id,
+                        'source' => 'session',
                     ];
                 }
             });
@@ -363,6 +372,8 @@ final class ServerSshAccessTimeline
                     'detail' => $detail,
                     'is_you' => false,
                     'source' => 'platform',
+                    'type' => 'platform',
+                    'id' => (string) $access->id,
                 ];
             });
 

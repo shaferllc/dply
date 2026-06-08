@@ -8,6 +8,8 @@ use App\Enums\ServerProvider;
 use App\Models\Server;
 use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
+use App\Services\LinodeService;
+use App\Services\VultrService;
 use Carbon\Carbon;
 
 /**
@@ -15,9 +17,9 @@ use Carbon\Carbon;
  * of the per-provider service classes (which share no common interface — see
  * {@see \App\Jobs\RefreshServerPrivateIpJob} for the same match-on-provider idiom).
  *
- * Only DigitalOcean and Hetzner wrap the image API today; everything else reports
- * unsupported so the Snapshots workspace can render a "not available" state rather
- * than a broken button.
+ * DigitalOcean, Hetzner, Vultr, and Linode/Akamai wrap the image API today;
+ * everything else reports unsupported so the Snapshots workspace can render a
+ * "not available" state rather than a broken button.
  *
  * `create()` blocks while it polls the provider action to completion — it MUST run
  * inside a queue job ({@see \App\Jobs\CreateServerImageJob}), never in a web request.
@@ -37,8 +39,10 @@ class ServerImageProvider
      */
     public function create(Server $server, string $name, ?callable $onTick = null): array
     {
-        $dropletId = (int) $server->provider_id;
-        if ($dropletId <= 0) {
+        // Vultr instance IDs are UUIDs, not ints — keep the raw string and only
+        // narrow to int inside the DO/Hetzner branches that expect numeric IDs.
+        $providerId = trim((string) $server->provider_id);
+        if ($providerId === '') {
             throw new \RuntimeException('Server has no provider_id to image.');
         }
 
@@ -48,8 +52,10 @@ class ServerImageProvider
         }
 
         return match ($server->provider) {
-            ServerProvider::DigitalOcean => $this->createDigitalOcean(new DigitalOceanService($credential), $dropletId, $name, $onTick),
-            ServerProvider::Hetzner => $this->createHetzner(new HetznerService($credential), $dropletId, $name, $onTick),
+            ServerProvider::DigitalOcean => $this->createDigitalOcean(new DigitalOceanService($credential), (int) $providerId, $name, $onTick),
+            ServerProvider::Hetzner => $this->createHetzner(new HetznerService($credential), (int) $providerId, $name, $onTick),
+            ServerProvider::Vultr => $this->createVultr(new VultrService($credential), $providerId, $name, $onTick),
+            ServerProvider::Linode, ServerProvider::Akamai => $this->createLinode(new LinodeService($credential), (int) $providerId, $name, $onTick),
             default => throw new \RuntimeException('Image snapshots are not supported on '.($server->provider?->label() ?? 'this provider').'.'),
         };
     }
@@ -64,6 +70,8 @@ class ServerImageProvider
         match ($server->provider) {
             ServerProvider::DigitalOcean => (new DigitalOceanService($credential))->deleteSnapshot($providerImageId),
             ServerProvider::Hetzner => (new HetznerService($credential))->deleteImage((int) $providerImageId),
+            ServerProvider::Vultr => (new VultrService($credential))->deleteSnapshot($providerImageId),
+            ServerProvider::Linode, ServerProvider::Akamai => (new LinodeService($credential))->deleteImage($providerImageId),
             default => throw new \RuntimeException('Image snapshots are not supported on '.($server->provider?->label() ?? 'this provider').'.'),
         };
     }
@@ -130,6 +138,78 @@ class ServerImageProvider
             'provider_image_id' => (string) $imageId,
             'provider_action_id' => $actionId > 0 ? (string) $actionId : null,
             'region' => $region,
+            'bytes' => $bytes,
+        ];
+    }
+
+    /**
+     * Vultr has no action-object model — the capture's progress is read off the
+     * snapshot's own `status` field, and snapshots aren't region-scoped (region is
+     * left null so the job falls back to the source server's region). `size` is
+     * already in bytes.
+     *
+     * @param  callable(string):void|null  $onTick
+     * @return array{provider_image_id: string, provider_action_id: ?string, region: ?string, bytes: ?int}
+     */
+    protected function createVultr(VultrService $vultr, string $instanceId, string $name, ?callable $onTick): array
+    {
+        $snapshotId = $vultr->createSnapshot($instanceId, $name);
+
+        $snapshot = $vultr->waitForSnapshot($snapshotId, onTick: function (array $s) use ($onTick): void {
+            if ($onTick !== null) {
+                $onTick('Vultr snapshot '.(string) ($s['status'] ?? 'in progress'));
+            }
+        });
+
+        // Vultr bills snapshots on their compressed size, so that's the figure that
+        // matches the monthly-cost estimate (ServerProvider::imageSnapshotRatePerGbMonth).
+        // Fall back to the raw disk size if compression info is absent.
+        $bytes = (int) ($snapshot['compressed_size'] ?? $snapshot['size'] ?? 0);
+
+        return [
+            'provider_image_id' => (string) ($snapshot['id'] ?? $snapshotId),
+            'provider_action_id' => null,
+            'region' => null,
+            'bytes' => $bytes > 0 ? $bytes : null,
+        ];
+    }
+
+    /**
+     * Linode images are captured from a single disk, not the whole instance — so
+     * we image the largest bootable (ext4) disk. Like Vultr there's no action
+     * object: progress is read off the image's `status`, and images aren't
+     * region-scoped (region left null → falls back to the source server's region).
+     * Linode reports `size` in MB.
+     *
+     * @param  callable(string):void|null  $onTick
+     * @return array{provider_image_id: string, provider_action_id: ?string, region: ?string, bytes: ?int}
+     */
+    protected function createLinode(LinodeService $linode, int $instanceId, string $name, ?callable $onTick): array
+    {
+        $diskId = $linode->primaryDiskId($instanceId);
+        if ($diskId === null) {
+            throw new \RuntimeException('Could not find a bootable (ext4) disk on this Linode to image.');
+        }
+
+        $created = $linode->createImageFromDisk($diskId, $name);
+        $imageId = (string) ($created['id'] ?? '');
+        if ($imageId === '') {
+            throw new \RuntimeException('Linode accepted the image request but returned no image id.');
+        }
+
+        $image = $linode->waitForImage($imageId, onTick: function (array $i) use ($onTick): void {
+            if ($onTick !== null) {
+                $onTick('Linode image '.(string) ($i['status'] ?? 'in progress'));
+            }
+        });
+
+        $sizeMb = (int) ($image['size'] ?? 0);
+        $bytes = $sizeMb > 0 ? $sizeMb * 1024 * 1024 : null;
+
+        return [
+            'provider_image_id' => (string) ($image['id'] ?? $imageId),
+            'provider_action_id' => null,
+            'region' => null,
             'bytes' => $bytes,
         ];
     }

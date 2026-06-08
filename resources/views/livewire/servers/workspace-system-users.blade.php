@@ -39,7 +39,28 @@
             </div>
         </section>
     @else
-        <div class="space-y-6">
+        {{-- In-page sub-tabs: the /etc/passwd account list vs. notification routing
+             for this server's system_user.* events. Keeps "set up alerts" one click
+             away instead of bouncing the operator out to global settings. --}}
+        <div class="mb-6 border-b border-brand-ink/10">
+            <nav class="-mb-px flex gap-6" aria-label="{{ __('System users sections') }}">
+                @php
+                    $tabBase = 'inline-flex items-center gap-1.5 border-b-2 px-1 py-3 text-sm font-medium transition-colors';
+                    $tabOn = 'border-brand-forest text-brand-ink';
+                    $tabOff = 'border-transparent text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink';
+                @endphp
+                <button type="button" wire:click="$set('activeTab', 'accounts')" @class([$tabBase, $activeTab === 'accounts' ? $tabOn : $tabOff])>
+                    <x-heroicon-o-users class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Accounts') }}
+                </button>
+                <button type="button" wire:click="$set('activeTab', 'notifications')" @class([$tabBase, $activeTab === 'notifications' ? $tabOn : $tabOff])>
+                    <x-heroicon-o-bell class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Notifications') }}
+                </button>
+            </nav>
+        </div>
+
+        <div @class(['space-y-6', 'hidden' => $activeTab !== 'accounts'])>
             {{-- Server-scoped console-actions banner. Surfaces the in-flight + most-recent
                  system_user run (create, remove) for this server. --}}
             @include('livewire.partials.console-action-banner-static', [
@@ -276,6 +297,15 @@
             </section>
         </div>
 
+        <div @class(['space-y-6', 'hidden' => $activeTab !== 'notifications'])>
+            @include('livewire.servers.partials.system-users.notifications-tab', [
+                'card' => $card,
+                'notifChannels' => $notifChannels,
+                'notifSubscriptions' => $notifSubscriptions,
+                'notifEventLabels' => $notifEventLabels,
+            ])
+        </div>
+
         {{-- Create modal --}}
         <x-modal
             name="server-system-user-create-modal"
@@ -420,6 +450,12 @@
                 </x-danger-button>
             </div>
         </x-modal>
+
+        {{-- Reusable inline channel-create modal (CreatesNotificationChannelInline trait),
+             shared with the server Monitor page. Lets the operator add a channel from the
+             Notifications tab without leaving the page; on success the new channel is
+             auto-selected via the notification-channel-created listener. --}}
+        @include('livewire.partials.create-notification-channel-modal')
 
         @include('livewire.partials.confirm-action-modal')
     @endif

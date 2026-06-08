@@ -13,6 +13,7 @@ use App\Jobs\ProvisionGcpServerJob;
 use App\Jobs\ProvisionHetznerServerJob;
 use App\Jobs\ProvisionLinodeServerJob;
 use App\Jobs\ProvisionOracleServerJob;
+use App\Jobs\ProvisionOvhServerJob;
 use App\Jobs\ProvisionScalewayServerJob;
 use App\Jobs\ProvisionUpCloudServerJob;
 use App\Jobs\ProvisionVultrServerJob;
@@ -515,6 +516,7 @@ class ProvisionJourney extends Component
             ServerProvider::Linode, ServerProvider::Akamai => ProvisionLinodeServerJob::class,
             ServerProvider::Vultr => ProvisionVultrServerJob::class,
             ServerProvider::Scaleway => ProvisionScalewayServerJob::class,
+            ServerProvider::Ovh => ProvisionOvhServerJob::class,
             ServerProvider::UpCloud => ProvisionUpCloudServerJob::class,
             ServerProvider::EquinixMetal => ProvisionEquinixMetalServerJob::class,
             ServerProvider::FlyIo => ProvisionFlyIoServerJob::class,

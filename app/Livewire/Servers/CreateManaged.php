@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\Servers;
 
 use App\Actions\Servers\StoreManagedServer;
+use App\Enums\ServerProvider;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Services\Billing\ServerResourceCostCalculator;
 use App\Support\Servers\ServerHostingPlatformContext;
@@ -17,10 +18,11 @@ use Throwable;
 
 /**
  * One-shot "Create a dply-managed server" flow — the VM counterpart to
- * Serverless\Create and Cloud\Create. dply provisions the Hetzner VM on its own
- * platform account and bills it all-in cost-plus, so there is no provider-credential
- * step. Hands off to {@see StoreManagedServer}, which creates the server and
- * dispatches the standard Hetzner provision job (managed branch).
+ * Serverless\Create and Cloud\Create. dply provisions the VM on its own platform
+ * account (the operator-configured managed backend — Hetzner or Vultr) and bills
+ * it all-in cost-plus, so there is no provider-credential step. Hands off to
+ * {@see StoreManagedServer}, which creates the server and dispatches the active
+ * backend's provision job (managed branch).
  */
 #[Layout('layouts.app')]
 class CreateManaged extends Component
@@ -39,12 +41,17 @@ class CreateManaged extends Component
     {
         abort_unless($this->managedAvailable(), 404);
 
-        $this->region = (string) (array_key_first((array) config('managed_servers.regions', [])) ?? 'fsn1');
-        $this->size = (string) (collect((array) config('managed_servers.sizes', []))->first()['slug'] ?? 'cx22');
+        $platform = ServerHostingPlatformContext::fromConfig();
+        $regions = $platform->regions();
+        $this->region = array_key_exists($platform->defaultRegion, $regions)
+            ? $platform->defaultRegion
+            : (string) (array_key_first($regions) ?? '');
+        $this->size = (string) (collect($platform->sizes())->first()['slug'] ?? '');
 
         // Beta's free box is pinned to CX22 — preselect it; the view hides the
-        // size picker and shows "Free during beta".
-        if ($this->isBetaOrg()) {
+        // size picker and shows "Free during beta". Beta free boxes are
+        // Hetzner-specific; on a Vultr backend beta orgs pick from the catalog.
+        if ($this->isBetaOrg() && $platform->provider === ServerProvider::Hetzner) {
             $this->size = (string) config('subscription.standard.beta.managed_size', 'cx22');
         }
     }
@@ -99,8 +106,9 @@ class CreateManaged extends Component
     public function render(): View
     {
         $calculator = app(ServerResourceCostCalculator::class);
+        $platform = ServerHostingPlatformContext::fromConfig();
 
-        $sizes = collect((array) config('managed_servers.sizes', []))
+        $sizes = collect($platform->sizes())
             ->map(fn (array $s) => [
                 ...$s,
                 'monthly_cents' => $calculator->monthlyCentsForSize((string) $s['slug']),
@@ -114,7 +122,7 @@ class CreateManaged extends Component
         $isBeta = (bool) $org?->isBeta();
 
         return view('livewire.servers.create-managed', [
-            'regions' => (array) config('managed_servers.regions', []),
+            'regions' => $platform->regions(),
             'sizes' => $sizes,
             'profiles' => (array) config('server_provision_options.install_profiles', []),
             'selectedMonthlyCents' => $selectedMonthlyCents,

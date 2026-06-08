@@ -31,6 +31,9 @@
                 {{ __('Routes') }}
             </x-server-workspace-tab>
         @endif
+        <x-server-workspace-tab id="net-tab-notifications" icon="heroicon-o-bell" :active="$networking_tab === 'notifications'" wire:click="setNetworkingTab('notifications')">
+            {{ __('Notifications') }}
+        </x-server-workspace-tab>
     </x-server-workspace-tablist>
 
     {{-- Skeleton placeholder shown while the incoming tab loads. --}}
@@ -230,9 +233,9 @@
                                     >{{ __('Attach to existing') }}</button>
                                 </div>
                             @endif
-                        @elseif ($s->provider->value === 'digitalocean')
+                        @elseif (in_array($s->provider->value, ['digitalocean', 'vultr', 'linode', 'akamai'], true))
                             <div class="mt-2 flex flex-wrap items-center gap-2">
-                                <p class="text-[11px] text-brand-mist">{{ __('No private IP — must be in a VPC.') }}</p>
+                                <p class="text-[11px] text-brand-mist">{{ __('No private IP — must have private networking enabled.') }}</p>
                                 <button
                                     type="button"
                                     wire:click="syncPrivateIp('{{ $s->id }}')"
@@ -240,7 +243,7 @@
                                     wire:target="syncPrivateIp('{{ $s->id }}')"
                                     class="text-[11px] font-medium text-brand-sage hover:underline disabled:opacity-50"
                                 >
-                                    <span wire:loading.remove wire:target="syncPrivateIp('{{ $s->id }}')">{{ __('Sync from DO') }}</span>
+                                    <span wire:loading.remove wire:target="syncPrivateIp('{{ $s->id }}')">{{ __('Sync from :provider', ['provider' => $s->provider->label()]) }}</span>
                                     <span wire:loading wire:target="syncPrivateIp('{{ $s->id }}')">{{ __('Syncing…') }}</span>
                                 </button>
                             </div>
@@ -745,9 +748,17 @@
             </section>
         @endif
 
+        @if ($networking_tab === 'notifications')
+            @include('livewire.servers.partials.networking.notifications-tab')
+        @endif
+
     </div>
 
     @include('livewire.partials.confirm-action-modal')
+    {{-- Reusable inline channel-create modal (CreatesNotificationChannelInline trait),
+         shared with the Notifications tab so an operator can add a channel without
+         leaving the page; the new channel is auto-selected on success. --}}
+    @include('livewire.partials.create-notification-channel-modal')
 
     {{-- Create private network modal --}}
     <x-modal name="create-network-modal" max-width="lg" focusable>

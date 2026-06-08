@@ -18,6 +18,7 @@ use App\Services\LinodeService;
 use App\Services\OracleComputeService;
 use App\Services\ScalewayService;
 use App\Services\UpCloudService;
+use App\Services\OvhService;
 use App\Services\VultrService;
 use Illuminate\Support\Collection;
 
@@ -78,6 +79,14 @@ final class ResolveServerCreateCatalog
                 return $this->catalogDigitalOcean($credentials, null, $selectedRegion);
             }
 
+            if ($type === 'vultr' && filled((string) config('services.vultr.token'))) {
+                return $this->catalogVultr($credentials, null, $selectedRegion);
+            }
+
+            if (in_array($type, ['linode', 'akamai'], true) && filled((string) config('services.linode.token'))) {
+                return $this->catalogLinodeApi($credentials, null, __('Region'), __('Plan / type'));
+            }
+
             return array_merge($empty, ['credentials' => $credentials]);
         }
 
@@ -89,6 +98,7 @@ final class ResolveServerCreateCatalog
             'vultr' => $this->catalogVultr($credentials, $credential, $selectedRegion),
             'akamai' => $this->catalogAkamai($credentials, $credential),
             'scaleway' => $this->catalogScaleway($credentials, $credential, $selectedRegion),
+            'ovh' => $this->catalogOvh($credentials, $credential, $selectedRegion),
             'upcloud' => $this->catalogUpcloud($credentials, $credential),
             'equinix_metal' => $this->catalogEquinixMetal($credentials, $credential),
             'aws' => $this->catalogAws($credentials, $credential),
@@ -464,12 +474,17 @@ final class ResolveServerCreateCatalog
      * @param  Collection<int, ProviderCredential>  $credentials
      * @return array{credentials: Collection<int, ProviderCredential>, regions: list<array{value: string, label: string}>, sizes: list<array{value: string, label: string}>, region_label: string, size_label: string}
      */
-    private function catalogLinodeApi(Collection $credentials, ProviderCredential $credential, string $regionLabel, string $sizeLabel): array
+    private function catalogLinodeApi(Collection $credentials, ?ProviderCredential $credential, string $regionLabel, string $sizeLabel): array
     {
         $regions = [];
         $sizes = [];
         try {
-            $svc = new LinodeService($credential);
+            $token = config('services.linode.token');
+            $svc = match (true) {
+                $credential !== null => new LinodeService($credential),
+                filled((string) $token) => new LinodeService((string) $token),
+                default => throw new \RuntimeException('No Linode token for catalog.'),
+            };
             foreach ($svc->getRegions() as $reg) {
                 $v = (string) ($reg['id'] ?? '');
                 if ($v === '') {
@@ -517,13 +532,18 @@ final class ResolveServerCreateCatalog
      * @param  Collection<int, ProviderCredential>  $credentials
      * @return array{credentials: Collection<int, ProviderCredential>, regions: list<array{value: string, label: string}>, sizes: list<array{value: string, label: string}>, region_label: string, size_label: string}
      */
-    private function catalogVultr(Collection $credentials, ProviderCredential $credential, string $selectedRegion = ''): array
+    private function catalogVultr(Collection $credentials, ?ProviderCredential $credential, string $selectedRegion = ''): array
     {
         $regions = [];
         $sizes = [];
         $selectedRegion = trim($selectedRegion);
         try {
-            $svc = new VultrService($credential);
+            $token = config('services.vultr.token');
+            $svc = match (true) {
+                $credential !== null => new VultrService($credential),
+                filled((string) $token) => new VultrService((string) $token),
+                default => throw new \RuntimeException('No Vultr token for catalog.'),
+            };
             foreach ($svc->getRegions() as $reg) {
                 $v = (string) ($reg['id'] ?? '');
                 if ($v === '') {
@@ -617,6 +637,56 @@ final class ResolveServerCreateCatalog
             'sizes' => $sizes,
             'region_label' => __('Zone'),
             'size_label' => __('Instance type'),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, ProviderCredential>  $credentials
+     */
+    private function catalogOvh(Collection $credentials, ProviderCredential $credential, string $selectedRegion): array
+    {
+        $regions = [];
+        $sizes = [];
+        try {
+            $svc = new OvhService($credential);
+            $project = $svc->projectId();
+
+            foreach ($svc->getRegions($project) as $r) {
+                $regions[] = ['value' => $r, 'label' => $r];
+            }
+
+            if ($selectedRegion !== '' && in_array($selectedRegion, array_column($regions, 'value'), true)) {
+                foreach ($svc->getFlavors($project, $selectedRegion) as $f) {
+                    if (! is_array($f)) {
+                        continue;
+                    }
+                    if (($f['osType'] ?? 'linux') !== 'linux' || ($f['available'] ?? true) === false) {
+                        continue;
+                    }
+                    $v = (string) ($f['id'] ?? '');
+                    if ($v === '') {
+                        continue;
+                    }
+                    $ram = $this->extractInt($f, ['ram']);
+                    $sizes[] = [
+                        'value' => $v,
+                        'label' => (string) ($f['name'] ?? $v),
+                        'memory_mb' => $ram,
+                        'vcpus' => $this->extractInt($f, ['vcpus']),
+                        'disk_gb' => $this->extractInt($f, ['disk']),
+                    ];
+                }
+            }
+        } catch (\Throwable) {
+            //
+        }
+
+        return [
+            'credentials' => $credentials,
+            'regions' => $regions,
+            'sizes' => $sizes,
+            'region_label' => __('Region'),
+            'size_label' => __('Flavor'),
         ];
     }
 

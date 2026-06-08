@@ -4,6 +4,8 @@ namespace App\Jobs;
 
 use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\Server;
+use App\Models\User;
+use App\Services\Notifications\ServerSystemUserNotificationDispatcher;
 use App\Services\Servers\ServerSystemUserService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -62,8 +64,10 @@ class DeleteOrphanSystemUsersJob implements ShouldBeUnique, ShouldQueue
         return $this->userId;
     }
 
-    public function handle(ServerSystemUserService $service): void
-    {
+    public function handle(
+        ServerSystemUserService $service,
+        ServerSystemUserNotificationDispatcher $notifications,
+    ): void {
         $server = Server::query()->find($this->serverId);
         if (! $server) {
             return;
@@ -107,6 +111,16 @@ class DeleteOrphanSystemUsersJob implements ShouldBeUnique, ShouldQueue
 
             $emit->success($summary, 'system_user');
             $this->completeConsoleAction();
+
+            // Only the accounts that actually came off the box are reported; the
+            // dispatcher no-ops when $deleted is empty (everything was skipped).
+            $notifications->notify(
+                $server,
+                'removed',
+                $deleted,
+                $this->userId ? User::query()->find($this->userId) : null,
+                ['skipped' => $skipped, 'orphan_cleanup' => true],
+            );
         } catch (\Throwable $e) {
             $emit->error($e->getMessage(), 'system_user');
             $this->failConsoleAction($e->getMessage());

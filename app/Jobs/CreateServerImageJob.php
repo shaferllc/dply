@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Models\Server;
 use App\Models\ServerImage;
+use App\Notifications\SnapshotStatusNotification;
 use App\Support\Servers\ServerImageProvider;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Notification;
 
 /**
  * Queue-side runner for a single server image capture. The provider create-image
@@ -69,11 +72,45 @@ class CreateServerImageJob implements ShouldQueue
                     'provider_image_id' => $image->provider_image_id,
                 ]);
             }
+
+            $this->notify($image, $server, ServerImage::STATUS_COMPLETED);
         } catch (\Throwable $e) {
             $image->update([
                 'status' => ServerImage::STATUS_FAILED,
                 'error_message' => $e->getMessage(),
             ]);
+
+            $this->notify($image, $server, ServerImage::STATUS_FAILED, $e->getMessage());
+        }
+    }
+
+    /**
+     * Email the org's owners/admins about the image capture's outcome. Best-effort:
+     * a notification problem must never fail the (already finished) capture.
+     */
+    private function notify(ServerImage $image, Server $server, string $status, string $error = ''): void
+    {
+        try {
+            $org = $server->organization;
+            if ($org === null) {
+                return;
+            }
+
+            $admins = $org->users()->wherePivotIn('role', ['owner', 'admin'])->get();
+            if ($admins->isEmpty()) {
+                return;
+            }
+
+            Notification::send($admins, new SnapshotStatusNotification(
+                kind: 'image',
+                status: $status,
+                label: (string) $image->name,
+                serverName: (string) ($server->name ?? ''),
+                url: route('servers.snapshots', $server->id, absolute: true),
+                errorMessage: $error,
+            ));
+        } catch (\Throwable $e) {
+            Log::warning('CreateServerImageJob notify failed', ['image' => $image->id, 'error' => $e->getMessage()]);
         }
     }
 }

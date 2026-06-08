@@ -117,13 +117,14 @@ class SwitchServerWebserverJob implements ShouldBeUnique, ShouldQueue
         return $this->userId;
     }
 
-    public function handle(): void
+    public function handle(\App\Services\Notifications\ServerWebserverNotificationDispatcher $notifications): void
     {
         $server = Server::query()->find($this->serverId);
         if ($server === null) {
             return;
         }
 
+        $actor = $this->userId !== null ? \App\Models\User::query()->find($this->userId) : null;
         $emitter = $this->beginConsoleAction();
         $startedAt = microtime(true);
         $from = strtolower(trim((string) ($server->meta['webserver'] ?? 'nginx')));
@@ -139,6 +140,11 @@ class SwitchServerWebserverJob implements ShouldBeUnique, ShouldQueue
                 'reason' => 'preflight_blocker',
                 'blocker' => $preflight['blocker'],
             ], $startedAt);
+
+            $notifications->notify($server, 'engine_switch_failed', [
+                __('Switch: :from → :to', ['from' => $from, 'to' => $this->target]),
+                __('Reason: :reason', ['reason' => (string) ($preflight['blocker']['label'] ?? 'preflight blocker')]),
+            ], $actor, ['from' => $from, 'to' => $this->target, 'reason' => 'preflight_blocker']);
 
             return;
         }
@@ -190,12 +196,22 @@ class SwitchServerWebserverJob implements ShouldBeUnique, ShouldQueue
                 'sites_affected' => $preflight['sites_affected'],
                 'site_ids' => Site::query()->where('server_id', $server->id)->pluck('id')->all(),
             ], $startedAt, ServerWebserverAuditEvent::RESULT_SUCCESS);
+
+            $notifications->notify($server, 'engine_switched', [
+                __('Switch: :from → :to', ['from' => $from, 'to' => $this->target]),
+                __('Sites reconfigured: :count', ['count' => (int) $preflight['sites_affected']]),
+            ], $actor, ['from' => $from, 'to' => $this->target, 'sites_affected' => $preflight['sites_affected']]);
         } catch (\Throwable $e) {
             $emitter->error('Switch failed: '.$e->getMessage());
             $this->failConsoleAction($e->getMessage());
             $this->recordAudit($server, $from, ServerWebserverAuditEvent::ACTION_SWITCH_FAILED, [
                 'reason' => $e->getMessage(),
             ], $startedAt);
+
+            $notifications->notify($server, 'engine_switch_failed', [
+                __('Switch: :from → :to', ['from' => $from, 'to' => $this->target]),
+                __('Reason: :reason', ['reason' => $e->getMessage()]),
+            ], $actor, ['from' => $from, 'to' => $this->target, 'error' => $e->getMessage()]);
         }
     }
 

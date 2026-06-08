@@ -116,6 +116,14 @@
             >
                 {{ __('Settings') }}
             </x-server-workspace-tab>
+            <x-server-workspace-tab
+                id="patches-tab-notifications"
+                icon="heroicon-o-bell"
+                :active="$patchesTab === 'notifications'"
+                wire:click="setPatchesWorkspaceTab('notifications')"
+            >
+                {{ __('Notifications') }}
+            </x-server-workspace-tab>
         </x-server-workspace-tablist>
 
         <div class="space-y-6">
@@ -134,10 +142,18 @@
             @if ($patchesTab === 'settings')
                 @include('livewire.servers.partials.patches._tab-settings', $patchTabContext)
             @endif
+
+            @if ($patchesTab === 'notifications')
+                @include('livewire.servers.partials.patches._tab-notifications')
+            @endif
         </div>
     </div>
 
     <x-slot name="modals">
         @include('livewire.partials.confirm-action-modal')
+        {{-- Reusable inline channel-create modal (CreatesNotificationChannelInline trait),
+             shared with the Notifications tab so an operator can add a channel without
+             leaving the page; the new channel is auto-selected on success. --}}
+        @include('livewire.partials.create-notification-channel-modal')
     </x-slot>
 </x-server-workspace-layout>

@@ -7,8 +7,10 @@ namespace App\Livewire\Servers;
 use App\Jobs\ConfigureHAProxyLoadBalancerJob;
 use App\Jobs\ProvisionHetznerLoadBalancerJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\ManagesLoadBalancerNotifications;
 use App\Models\LoadBalancer;
 use App\Models\LoadBalancerService;
 use App\Models\LoadBalancerTarget;
@@ -17,6 +19,7 @@ use App\Services\HetznerService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Str;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use Livewire\Attributes\Lazy;
@@ -27,8 +30,10 @@ class WorkspaceLoadBalancers extends Component
     use RendersWorkspacePlaceholder;
     use AuthorizesRequests;
     use ConfirmsActionWithModal;
+    use CreatesNotificationChannelInline;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use ManagesLoadBalancerNotifications;
 
     public Server $server;
 
@@ -55,6 +60,18 @@ class WorkspaceLoadBalancers extends Component
     {
         $this->server = $server;
         $this->lb_name = $server->name.'-lb';
+    }
+
+    /**
+     * Fired by {@see CreatesNotificationChannelInline} after the inline modal
+     * creates a channel. Jump to the Notifications tab and pre-select the new
+     * channel so the operator can finish wiring it to events in one motion.
+     */
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId): void
+    {
+        $this->lb_workspace_tab = 'notifications';
+        $this->notif_channel_id = $channelId;
     }
 
     public function addServiceRow(): void
@@ -134,6 +151,12 @@ class WorkspaceLoadBalancers extends Component
 
         ProvisionHetznerLoadBalancerJob::dispatch($lb->id);
 
+        $this->dispatchLoadBalancerNotification('created', [$lb->name], [
+            'load_balancer_id' => $lb->id,
+            'provider' => 'hetzner',
+            'load_balancer_type' => $lb->load_balancer_type,
+        ]);
+
         $this->dispatch('close-modal', 'create-lb-modal');
         $this->lb_name = $this->server->name.'-lb';
         $this->lb_target_server_ids = [];
@@ -205,6 +228,12 @@ class WorkspaceLoadBalancers extends Component
 
         ConfigureHAProxyLoadBalancerJob::dispatch($lb->id);
 
+        $this->dispatchLoadBalancerNotification('created', [$lb->name], [
+            'load_balancer_id' => $lb->id,
+            'provider' => 'haproxy',
+            'haproxy_server' => $haproxyServer->name,
+        ]);
+
         $this->dispatch('close-modal', 'create-haproxy-lb-modal');
         $this->lb_name = $this->server->name.'-lb';
         $this->lb_target_server_ids = [];
@@ -274,6 +303,12 @@ class WorkspaceLoadBalancers extends Component
             ]);
         }
 
+        $this->dispatchLoadBalancerNotification('target_added', [$target->name], [
+            'load_balancer_id' => $lb->id,
+            'load_balancer_name' => $lb->name,
+            'target_server_id' => $target->id,
+        ]);
+
         $this->add_target_server_id = '';
         $this->toastSuccess(__(':name added as a target.', ['name' => $target->name]));
     }
@@ -290,6 +325,10 @@ class WorkspaceLoadBalancers extends Component
         if (! $target) {
             return;
         }
+
+        $removedTargetName = $target->server?->name ?? __('a server');
+        $removedLbId = $target->loadBalancer->id;
+        $removedLbName = $target->loadBalancer->name;
 
         if ($target->loadBalancer->isSoftware()) {
             $target->delete();
@@ -312,6 +351,11 @@ class WorkspaceLoadBalancers extends Component
             $target->delete();
         }
 
+        $this->dispatchLoadBalancerNotification('target_removed', [$removedTargetName], [
+            'load_balancer_id' => $removedLbId,
+            'load_balancer_name' => $removedLbName,
+        ]);
+
         $this->toastSuccess(__('Target removed.'));
     }
 
@@ -327,9 +371,12 @@ class WorkspaceLoadBalancers extends Component
             return;
         }
 
+        $deletedLbName = (string) $lb->name;
+
         if ($lb->isSoftware()) {
             ConfigureHAProxyLoadBalancerJob::dispatch($lb->id, remove: true);
             $lb->delete();
+            $this->dispatchLoadBalancerNotification('deleted', [$deletedLbName], ['provider' => 'haproxy']);
             $this->toastSuccess(__('Load balancer deleted.'));
 
             return;
@@ -347,6 +394,7 @@ class WorkspaceLoadBalancers extends Component
         }
 
         $lb->delete();
+        $this->dispatchLoadBalancerNotification('deleted', [$deletedLbName], ['provider' => 'hetzner']);
         $this->toastSuccess(__('Load balancer deleted.'));
     }
 
@@ -368,9 +416,14 @@ class WorkspaceLoadBalancers extends Component
             ->orderBy('name')
             ->get();
 
+        $needsNotifications = $this->lb_workspace_tab === 'notifications';
+
         return view('livewire.servers.workspace-load-balancers', [
             'loadBalancers' => $loadBalancers,
             'orgServers' => $orgServers,
+            'notifChannels' => $needsNotifications ? $this->assignableLoadBalancerNotificationChannels() : collect(),
+            'notifSubscriptions' => $needsNotifications ? $this->loadBalancerNotificationSubscriptions() : collect(),
+            'notifEventLabels' => $needsNotifications ? $this->loadBalancerEventLabels() : [],
         ]);
     }
 }

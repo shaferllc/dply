@@ -11,6 +11,15 @@ return [
     'capabilities_cache_ttl_seconds' => (int) env('SERVER_CACHE_CAPABILITIES_TTL', 86_400),
 
     /**
+     * Cache-service liveness probes (redis-cli/valkey-cli PING over localhost TCP, and read-only
+     * `systemctl is-active` queries) never need OS privilege — the CLI talks to the engine over
+     * TCP/AUTH and unit-state queries are allowed for unprivileged users. So we connect as the
+     * deploy user (operational credential) by default rather than taking the root/recovery key.
+     * Flip to true only if a box restricts these probes for non-root users.
+     */
+    'probe_use_root_ssh' => (bool) env('SERVER_CACHE_PROBE_USE_ROOT_SSH', false),
+
+    /**
      * Cache TTL for the per-server distro probe (ID + codename from /etc/os-release). Codename
      * doesn't change for the lifetime of a server, so 24h is generous; force a refresh via
      * ServerCacheServiceHostCapabilities::forgetDistro() if you rebuild the box in-place.

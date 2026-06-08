@@ -2,7 +2,6 @@
 
 namespace App\Services\Notifications;
 
-use App\Support\ServerDatabaseNotificationKeys;
 use App\Support\ServerSystemdServiceNotificationKeys;
 
 class NotificationEventRegistry
@@ -30,21 +29,6 @@ class NotificationEventRegistry
                 // default them to email-on per the Q17 cadence (in-app +
                 // email at action-required moments only).
                 'supports_email' => str_starts_with($eventKey, 'import.migration.'),
-                'supports_webhook' => true,
-            ];
-        }
-
-        if (in_array($eventKey, [
-            ServerDatabaseNotificationKeys::eventKey('created'),
-            ServerDatabaseNotificationKeys::eventKey('removed'),
-        ], true)) {
-            return [
-                'key' => $eventKey,
-                'label' => $eventKey === ServerDatabaseNotificationKeys::eventKey('created') ? 'Database created' : 'Database removed',
-                'category' => 'server',
-                'severity' => 'info',
-                'supports_in_app' => true,
-                'supports_email' => false,
                 'supports_webhook' => true,
             ];
         }

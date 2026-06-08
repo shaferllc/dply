@@ -8,6 +8,8 @@ use App\Enums\ServerProvider;
 use App\Models\Server;
 use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
+use App\Services\LinodeService;
+use App\Services\VultrService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -58,6 +60,12 @@ class RefreshServerPrivateIpJob implements ShouldQueue
                 ),
                 ServerProvider::Hetzner => HetznerService::getPrivateIp(
                     (new HetznerService($credential))->getInstance((int) $server->provider_id)
+                ),
+                ServerProvider::Vultr => VultrService::getPrivateIp(
+                    (new VultrService($credential))->getInstance((string) $server->provider_id)
+                ),
+                ServerProvider::Linode, ServerProvider::Akamai => LinodeService::getPrivateIp(
+                    (new LinodeService($credential))->getInstance((int) $server->provider_id)
                 ),
                 default => null,
             };

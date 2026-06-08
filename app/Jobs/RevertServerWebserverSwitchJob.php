@@ -88,13 +88,14 @@ class RevertServerWebserverSwitchJob implements ShouldBeUnique, ShouldQueue
         return $this->userId;
     }
 
-    public function handle(): void
+    public function handle(\App\Services\Notifications\ServerWebserverNotificationDispatcher $notifications): void
     {
         $server = Server::query()->find($this->serverId);
         if ($server === null) {
             return;
         }
 
+        $actor = $this->userId !== null ? \App\Models\User::query()->find($this->userId) : null;
         $emitter = $this->beginConsoleAction();
         $startedAt = microtime(true);
         $ssh = new SshConnection($server);
@@ -125,6 +126,9 @@ class RevertServerWebserverSwitchJob implements ShouldBeUnique, ShouldQueue
             $emitter->info('Reverted.');
             $this->completeConsoleAction();
             $this->recordAudit($server, ServerWebserverAuditEvent::RESULT_SUCCESS, $startedAt);
+            $notifications->notify($server, 'switch_reverted', [
+                __('Reverted :target back to :from', ['target' => $this->target, 'from' => $this->from]),
+            ], $actor, ['from' => $this->from, 'target' => $this->target]);
         } else {
             $msg = sprintf('Could not confirm %s is running on :80 after revert — manual check required.', $this->from);
             $emitter->error($msg);

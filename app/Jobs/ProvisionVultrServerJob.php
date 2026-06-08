@@ -7,6 +7,7 @@ use App\Models\Server;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Services\VultrService;
 use App\Support\Servers\FakeCloudProvision;
+use App\Support\Servers\ServerHostingPlatformContext;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -25,11 +26,25 @@ class ProvisionVultrServerJob implements ShouldQueue
 
     public function handle(): void
     {
-        $credential = $this->server->providerCredential;
-        if (! $credential || $credential->provider !== 'vultr') {
-            $this->markFailed('Missing or wrong-provider credential. Re-link a Vultr credential to this server.');
+        // Managed servers run on dply's OWN platform Vultr account (no customer
+        // credential); BYO servers use the server's connected credential.
+        $managed = $this->server->usesManagedHosting();
+        $platform = null;
 
-            return;
+        if ($managed) {
+            $platform = ServerHostingPlatformContext::forOrg($this->server->organization);
+            if ($platform->provider !== \App\Enums\ServerProvider::Vultr || ! $platform->configured()) {
+                $this->markFailed('dply-managed servers are not configured for Vultr. Set DPLY_MANAGED_PROVIDER=vultr and DPLY_MANAGED_VULTR_API_TOKEN in the environment.');
+
+                return;
+            }
+        } else {
+            $credential = $this->server->providerCredential;
+            if (! $credential || $credential->provider !== 'vultr') {
+                $this->markFailed('Missing or wrong-provider credential. Re-link a Vultr credential to this server.');
+
+                return;
+            }
         }
 
         if (FakeCloudProvision::shouldInterceptVmProvision($this->server)) {
@@ -39,7 +54,9 @@ class ProvisionVultrServerJob implements ShouldQueue
         }
 
         try {
-            $vultr = new VultrService($credential);
+            $vultr = $managed
+                ? $platform->vultr()
+                : new VultrService($this->server->providerCredential);
 
             $keys = app(ServerProvisionSshKeyMaterial::class)->generate();
 
@@ -51,7 +68,9 @@ class ProvisionVultrServerJob implements ShouldQueue
                 return;
             }
 
-            $osId = (int) config('services.vultr.default_os_id', 2152);
+            $osId = $managed
+                ? (int) ($platform->defaultImage ?: config('services.vultr.default_os_id', 2152))
+                : (int) config('services.vultr.default_os_id', 2152);
 
             $id = $vultr->createInstance(
                 region: $this->server->region,

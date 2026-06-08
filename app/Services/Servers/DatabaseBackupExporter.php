@@ -81,11 +81,16 @@ final class DatabaseBackupExporter
             throw new \RuntimeException(__('Backup is not ready yet.'));
         }
 
+        if ($backup->storage_kind === DatabaseBackupSettings::KIND_DESTINATION) {
+            // Cold-storage (Glacier/Deep Archive) objects can't be downloaded
+            // until thawed; this requests a restore + throws a status message
+            // when the object isn't immediately retrievable.
+            $this->ensureDestinationObjectRetrievable($backup);
+
+            return ['mode' => 'redirect', 'url' => $this->presignedGetUrl($backup)];
+        }
+
         return match ($backup->storage_kind) {
-            DatabaseBackupSettings::KIND_DESTINATION => [
-                'mode' => 'redirect',
-                'url' => $this->presignedGetUrl($backup),
-            ],
             DatabaseBackupSettings::KIND_CONTROL_PLANE => [
                 'mode' => 'disk',
                 'disk_path' => $backup->disk_path,
@@ -153,7 +158,7 @@ final class DatabaseBackupExporter
         $bytes = $this->writeDumpToRemotePath($db, $server, $tempPath, $extension);
 
         if ($bytes <= 0) {
-            $this->remoteExec->shellRunWithExit($server, 'bash -lc '.escapeshellarg('rm -f '.escapeshellarg($tempPath)), 30);
+            $this->remoteExec->shellRunWithExit($server, 'rm -f '.escapeshellarg($tempPath), 30);
 
             throw new \RuntimeException('Backup produced an empty file.');
         }
@@ -161,25 +166,44 @@ final class DatabaseBackupExporter
         $key = $this->buildObjectKey($s3['key_prefix'], $server, $db, $backup, $extension);
         $contentType = $extension === 'db' ? 'application/x-sqlite3' : 'application/sql';
 
+        // AWS-only per-object storage class (cold tiers). DO Spaces cold is a
+        // bucket-level tier (no per-object class), so only AWS sets this.
+        $storageClass = $configuration->provider === BackupConfiguration::PROVIDER_AWS_S3
+            ? trim((string) ($configuration->config['storage_class'] ?? ''))
+            : '';
+        $applyClass = $storageClass !== '' && $storageClass !== 'STANDARD';
+
+        $putParams = [
+            'Bucket' => $s3['bucket'],
+            'Key' => $key,
+            'ContentType' => $contentType,
+        ];
+        if ($applyClass) {
+            $putParams['StorageClass'] = $storageClass;
+        }
+
         $putRequest = $s3['client']->createPresignedRequest(
-            $s3['client']->getCommand('PutObject', [
-                'Bucket' => $s3['bucket'],
-                'Key' => $key,
-                'ContentType' => $contentType,
-            ]),
+            $s3['client']->getCommand('PutObject', $putParams),
             '+'.self::PRESIGNED_PUT_TTL_MINUTES.' minutes',
         );
         $presignedUrl = (string) $putRequest->getUri();
 
+        // x-amz-storage-class is a signed header on the presigned PUT, so curl
+        // must send the exact same value or the signature won't match.
+        $storageClassHeader = $applyClass
+            ? ' --header '.escapeshellarg('x-amz-storage-class: '.$storageClass)
+            : '';
+
         $uploadCmd = sprintf(
-            'curl --silent --show-error --fail-with-body --request PUT --upload-file %s --header %s %s && rm -f %s',
+            'curl --silent --show-error --fail-with-body --request PUT --upload-file %s --header %s%s %s && rm -f %s',
             escapeshellarg($tempPath),
             escapeshellarg('Content-Type: '.$contentType),
+            $storageClassHeader,
             escapeshellarg($presignedUrl),
             escapeshellarg($tempPath),
         );
 
-        [$out, $exit] = $this->remoteExec->shellRunWithExit($server, 'bash -lc '.escapeshellarg($uploadCmd), 3600);
+        [$out, $exit] = $this->remoteExec->shellRunWithExit($server, $uploadCmd, 3600);
 
         if ($exit !== null && $exit !== 0) {
             throw new \RuntimeException('S3 upload failed: '.Str::limit(trim($out), 800));
@@ -281,10 +305,10 @@ final class DatabaseBackupExporter
     private function assertRemoteDumpLooksValid(Server $server, string $remotePath, string $engine): void
     {
         $headCmd = 'head -c 1200 '.escapeshellarg($remotePath).' 2>/dev/null || true';
-        [$head] = $this->remoteExec->shellRunWithExit($server, 'bash -lc '.escapeshellarg($headCmd), 60);
+        [$head] = $this->remoteExec->shellRunWithExit($server, $headCmd, 60);
 
         if (ServerDatabaseDumpOutputValidator::looksLikeFailedDump($engine, $head)) {
-            $this->remoteExec->shellRunWithExit($server, 'bash -lc '.escapeshellarg('rm -f '.escapeshellarg($remotePath)), 30);
+            $this->remoteExec->shellRunWithExit($server, 'rm -f '.escapeshellarg($remotePath), 30);
 
             throw new \RuntimeException('Dump command failed: '.Str::limit(trim($head), 800));
         }
@@ -355,6 +379,86 @@ final class DatabaseBackupExporter
         return (string) $request->getUri();
     }
 
+    /**
+     * Ensure a destination object can actually be fetched. AWS cold tiers
+     * (Glacier Flexible / Deep Archive) return InvalidObjectState on GET until
+     * thawed, so HeadObject the key and, when it's archived and not yet
+     * restored, request a RestoreObject and throw a status message. Instant
+     * classes (Standard/IA/Intelligent-Tiering/Glacier IR) and non-AWS
+     * providers (incl. DO Spaces cold, which reads instantly) pass straight
+     * through.
+     */
+    private function ensureDestinationObjectRetrievable(ServerDatabaseBackup $backup): void
+    {
+        $backup->loadMissing('backupConfiguration');
+        $configuration = $backup->backupConfiguration;
+        if ($configuration === null || $backup->s3_key === null) {
+            return; // presignedGetUrl() surfaces the clearer error.
+        }
+
+        // Only AWS S3 has classes that require a thaw before download.
+        if ($configuration->provider !== BackupConfiguration::PROVIDER_AWS_S3) {
+            return;
+        }
+
+        $restoreClasses = array_keys(array_filter(
+            (array) config('object_storage.providers.aws_s3.storage_classes', []),
+            static fn ($meta): bool => (bool) ($meta['restore'] ?? false),
+        ));
+        if ($restoreClasses === []) {
+            return;
+        }
+
+        $s3 = $this->s3Factory->forConfiguration($configuration);
+
+        try {
+            $head = $s3['client']->headObject([
+                'Bucket' => $backup->s3_bucket,
+                'Key' => $backup->s3_key,
+            ]);
+        } catch (\Throwable) {
+            return; // Let the download attempt surface real errors (missing object, etc.).
+        }
+
+        $class = (string) ($head['StorageClass'] ?? '');
+        if (! in_array($class, $restoreClasses, true)) {
+            return; // Instantly retrievable.
+        }
+
+        $restore = (string) ($head['Restore'] ?? '');
+        if (str_contains($restore, 'ongoing-request="false"')) {
+            return; // Already thawed and temporarily available.
+        }
+        if (str_contains($restore, 'ongoing-request="true"')) {
+            throw new \RuntimeException(__('This backup is in cold storage and is still being restored. Check back shortly, then download again.'));
+        }
+
+        $days = max(1, (int) config('object_storage.restore_available_days', 7));
+        $tier = (string) config('object_storage.restore_tier', 'Standard');
+
+        try {
+            $s3['client']->restoreObject([
+                'Bucket' => $backup->s3_bucket,
+                'Key' => $backup->s3_key,
+                'RestoreRequest' => [
+                    'Days' => $days,
+                    'GlacierJobParameters' => ['Tier' => $tier],
+                ],
+            ]);
+        } catch (\Aws\S3\Exception\S3Exception $e) {
+            if ($e->getAwsErrorCode() === 'RestoreAlreadyInProgress') {
+                throw new \RuntimeException(__('This backup is in cold storage and is already being restored. Check back shortly, then download again.'));
+            }
+
+            throw new \RuntimeException(__('Could not start the cold-storage restore: :err', ['err' => $e->getAwsErrorMessage() ?: $e->getMessage()]));
+        }
+
+        throw new \RuntimeException(__('This backup is in cold storage (:class). A restore has been requested — it usually takes a few hours (Deep Archive up to ~12h). It stays downloadable for :days days once ready; try the download again then.', [
+            'class' => $class,
+            'days' => $days,
+        ]));
+    }
+
     private function deleteRemoteFile(ServerDatabaseBackup $backup): void
     {
         $path = $backup->remote_path;
@@ -365,7 +469,7 @@ final class DatabaseBackupExporter
 
         $this->remoteExec->shellRunWithExit(
             $server,
-            'bash -lc '.escapeshellarg('rm -f '.escapeshellarg($path)),
+            'rm -f '.escapeshellarg($path),
             60,
         );
     }

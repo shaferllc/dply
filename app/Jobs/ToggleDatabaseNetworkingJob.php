@@ -7,6 +7,8 @@ namespace App\Jobs;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseEngine;
 use App\Models\ServerFirewallRule;
+use App\Models\User;
+use App\Services\Notifications\ServerNetworkingNotificationDispatcher;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerFirewallProvisioner;
 use App\Support\Servers\DatabaseEngineInstallScripts;
@@ -56,6 +58,7 @@ class ToggleDatabaseNetworkingJob implements ShouldQueue
     public function handle(
         ExecuteRemoteTaskOnServer $executor,
         ServerFirewallProvisioner $firewall,
+        ServerNetworkingNotificationDispatcher $notifications,
     ): void {
         /** @var ServerDatabase|null $db */
         $db = ServerDatabase::query()->with('server')->find($this->serverDatabaseId);
@@ -121,6 +124,14 @@ class ToggleDatabaseNetworkingJob implements ShouldQueue
 
         $this->syncEngineFirewallRule($db, $firewall);
         // Hetzner cloud firewall is synced inside ServerFirewallProvisioner::applyRule.
+
+        $notifications->notify(
+            $db->server,
+            $this->enable ? 'db_access_enabled' : 'db_access_disabled',
+            [(string) $db->name],
+            $this->userId ? User::query()->find($this->userId) : null,
+            ['database_id' => $db->id, 'engine' => $db->engine, 'allowed_from' => $this->enable ? $this->allowedCidr : null],
+        );
     }
 
     /**

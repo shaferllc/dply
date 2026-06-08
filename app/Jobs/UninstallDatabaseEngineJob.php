@@ -53,6 +53,7 @@ class UninstallDatabaseEngineJob implements ShouldQueue
         ExecuteRemoteTaskOnServer $executor,
         ServerDatabaseHostCapabilities $capabilities,
         DatabaseEngineAuditLogger $audit,
+        \App\Services\Notifications\ServerDatabaseNotificationDispatcher $notifications,
     ): void {
         /** @var ServerDatabaseEngine|null $row */
         $row = ServerDatabaseEngine::query()->with('server')->find($this->serverDatabaseEngineId);
@@ -101,6 +102,14 @@ class UninstallDatabaseEngineJob implements ShouldQueue
             $audit->record($serverForAudit, ServerDatabaseEngineAuditEvent::EVENT_ENGINE_UNINSTALLED, [
                 'engine' => $engine,
             ]);
+
+            $notifications->notify(
+                $serverForAudit,
+                'engine_removed',
+                [__('Engine: :engine', ['engine' => $engine])],
+                $this->userId !== null ? \App\Models\User::query()->find($this->userId) : null,
+                ['engine' => $engine],
+            );
 
             $emit->success('db', __(':engine removed.', ['engine' => $engine]));
             $this->completeConsoleAction();

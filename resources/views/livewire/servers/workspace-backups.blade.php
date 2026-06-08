@@ -100,4 +100,8 @@
 @endif
 
 @include('livewire.partials.confirm-action-modal')
+{{-- Reusable inline channel-create modal (CreatesNotificationChannelInline trait),
+     shared with the Notifications tab so an operator can add a channel without
+     leaving the page; the new channel is auto-selected on success. --}}
+@include('livewire.partials.create-notification-channel-modal')
 </div>

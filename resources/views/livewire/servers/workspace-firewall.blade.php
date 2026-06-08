@@ -36,6 +36,12 @@
                         {{ __('Activity') }}
                     </span>
                 </x-server-workspace-tab>
+                <x-server-workspace-tab id="firewall-tab-notifications" :active="$firewall_workspace_tab === 'notifications'" wire:click="setFirewallWorkspaceTab('notifications')">
+                    <span class="inline-flex items-center gap-1.5">
+                        <x-heroicon-o-bell class="h-4 w-4" aria-hidden="true" />
+                        {{ __('Notifications') }}
+                    </span>
+                </x-server-workspace-tab>
             </x-server-workspace-tablist>
 
             <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="setFirewallWorkspaceTab">
@@ -68,6 +74,15 @@
                 </x-server-workspace-tab-panel>
             @endif
 
+            @if ($firewall_workspace_tab === 'notifications')
+                <x-server-workspace-tab-panel
+                    id="firewall-panel-notifications"
+                    labelled-by="firewall-tab-notifications"
+                >
+                    @include('livewire.servers.partials.firewall.notifications-tab')
+                </x-server-workspace-tab-panel>
+            @endif
+
             </div>
         </div>
     @else
@@ -76,6 +91,10 @@
 
     <x-slot name="modals">
         @include('livewire.partials.confirm-action-modal')
+        {{-- Reusable inline channel-create modal (CreatesNotificationChannelInline trait),
+             shared with the Notifications tab so an operator can add a channel without
+             leaving the page; the new channel is auto-selected on success. --}}
+        @include('livewire.partials.create-notification-channel-modal')
         @include('livewire.servers.partials.remove-server-modal', [
             'open' => $showRemoveServerModal,
             'serverName' => $server->name,
