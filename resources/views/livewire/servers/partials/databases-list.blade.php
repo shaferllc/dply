@@ -3,7 +3,7 @@
         @foreach ($databases->sortBy('name') as $db)
             @php
                 $rowTargets = implode(',', array_filter([
-                    'queueExport',
+                    'openBackupModal',
                     'openEditDatabaseModal',
                     $db->engine === 'sqlite' ? 'openSqliteConsoleModal' : null,
                 ]));
@@ -69,17 +69,16 @@
                             @endif
                             <button
                                 type="button"
-                                wire:click="queueExport(@js($db->id))"
+                                wire:click="openBackupModal(@js($db->id))"
                                 wire:loading.attr="disabled"
-                                wire:target="queueExport"
+                                wire:target="openBackupModal"
                                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                <x-heroicon-o-cloud-arrow-down class="h-4 w-4" wire:loading.remove wire:target="queueExport" />
-                                <span wire:loading wire:target="queueExport" class="inline-flex h-4 w-4 items-center justify-center">
+                                <x-heroicon-o-cloud-arrow-down class="h-4 w-4" wire:loading.remove wire:target="openBackupModal" />
+                                <span wire:loading wire:target="openBackupModal" class="inline-flex h-4 w-4 items-center justify-center">
                                     <x-spinner variant="forest" size="sm" />
                                 </span>
-                                <span wire:loading.remove wire:target="queueExport">{{ __('Backup') }}</span>
-                                <span wire:loading wire:target="queueExport">{{ __('Queueing…') }}</span>
+                                <span>{{ __('Backup') }}</span>
                             </button>
                             <x-dropdown align="right" width="w-56">
                                 <x-slot name="trigger">

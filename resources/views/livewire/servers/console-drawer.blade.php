@@ -7,6 +7,11 @@
 <div
     x-data="{ pickerSearch: '' }"
     x-on:dply-console-drawer-opened.window="$nextTick(() => { $refs.scroll && ($refs.scroll.scrollTop = $refs.scroll.scrollHeight); $refs.prompt && $refs.prompt.focus(); })"
+    {{-- The drawer lives in the persistent layout, so on wire:navigate it can
+         survive the page swap with last page's command output. Reset it on
+         navigation so each page starts with a clean console (guarded to only
+         round-trip when there's actually output to clear). --}}
+    x-on:livewire:navigated.window="$wire.history?.length && $wire.clearHistory()"
     class="flex h-full min-h-0 flex-col bg-gradient-to-b from-brand-cream/80 to-white"
 >
     @if (! $server)

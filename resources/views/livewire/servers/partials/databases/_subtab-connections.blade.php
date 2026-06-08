@@ -50,6 +50,13 @@
             'card' => $card,
         ])
 
+        @php $driftManageable = in_array($engine, \App\Support\Servers\DatabaseWorkspaceEngines::MANAGEABLE, true); @endphp
+        @if ($driftManageable && ! $drift_loaded)
+            {{-- Drift = several SSH round-trips; load it off the render path so the
+                 Connections subtab paints instantly. --}}
+            <div wire:init="loadDriftSnapshot" class="hidden" aria-hidden="true"></div>
+        @endif
+
         @include('livewire.servers.partials.drift-card', [
             'engine' => $engine,
             'engineLabels' => $engineLabels,

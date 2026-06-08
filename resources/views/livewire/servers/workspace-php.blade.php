@@ -524,12 +524,12 @@
                             </div>
                         </div>
 
-                        <div class="flex">
+                        <div class="flex max-h-[78vh]">
                             {{-- Revision sidebar --}}
                             <aside
                                 x-show="!sidebarCollapsed"
                                 x-cloak
-                                class="w-80 shrink-0 border-r border-brand-ink/10 bg-brand-sand/10 max-h-[75vh] overflow-y-auto"
+                                class="w-80 shrink-0 border-r border-brand-ink/10 bg-brand-sand/10 overflow-y-auto"
                             >
                                 @if ($phpConfigEditorDriftDetected)
                                     <div class="border-b border-amber-200 bg-amber-50/70 px-4 py-3 text-xs text-amber-900">
@@ -640,7 +640,7 @@
                                 @endif
                             </aside>
 
-                            <div class="min-w-0 flex-1 space-y-4 p-6 sm:p-8">
+                            <div class="min-w-0 flex-1 space-y-4 overflow-y-auto p-6 sm:p-8">
                             @if ($diffOpen)
                                 <div class="flex items-center justify-between gap-3">
                                     <p class="text-sm font-medium text-brand-ink">{{ $phpConfigDiffHeader }}</p>

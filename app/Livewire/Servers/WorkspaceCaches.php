@@ -76,6 +76,20 @@ class WorkspaceCaches extends Component
     public string $workspace_tab = 'overview';
 
     /**
+     * Engine reachability + distro-support gates, SSH-probed off the render path
+     * (wire:init → loadCacheCapabilities) so the workspace paints instantly.
+     * $capabilitiesLoaded gates the "checking…" UI.
+     *
+     * @var array<string, bool>
+     */
+    public array $capabilities_state = [];
+
+    /** @var array<string, string|null> */
+    public array $cache_unsupported_reasons = [];
+
+    public bool $capabilitiesLoaded = false;
+
+    /**
      * Active sub-tab inside a per-engine tab. Per-engine layouts stack a lot of
      * cards (status, console, stats, configure) so we group them under sub-tabs.
      * URL-bound so deep links open to the right sub-section. Default 'overview'
@@ -666,7 +680,37 @@ class WorkspaceCaches extends Component
             $stats->forget($this->server, $engine);
         }
 
+        // Re-probe off the render path: clearing the flag makes the wire:init hook
+        // re-fire loadCacheCapabilities on the next render rather than blocking here.
+        $this->capabilitiesLoaded = false;
+        $this->capabilities_state = [];
+        $this->cache_unsupported_reasons = [];
+
         $this->toastSuccess(__('Refreshed cache workspace data from the server.'));
+    }
+
+    /**
+     * Resolve engine capabilities + distro-support gates off the render path.
+     * Fired by wire:init so the workspace paints instantly; the per-engine badge
+     * and Install gate appear once the (24h-cached) probe returns.
+     */
+    public function loadCacheCapabilities(ServerCacheServiceHostCapabilities $capabilities): void
+    {
+        $this->authorize('view', $this->server);
+
+        try {
+            $this->capabilities_state = $capabilities->forServer($this->server);
+        } catch (\Throwable) {
+            $this->capabilities_state = ['redis' => false, 'valkey' => false, 'memcached' => false, 'keydb' => false, 'dragonfly' => false];
+        }
+
+        try {
+            $this->cache_unsupported_reasons = $capabilities->unsupportedReasonsByEngine($this->server);
+        } catch (\Throwable) {
+            $this->cache_unsupported_reasons = ['redis' => null, 'valkey' => null, 'memcached' => null, 'keydb' => null, 'dragonfly' => null];
+        }
+
+        $this->capabilitiesLoaded = true;
     }
 
     /**
@@ -3592,33 +3636,29 @@ BASH;
     }
 
     public function render(
-        ServerCacheServiceHostCapabilities $capabilitiesService,
         CacheServiceStats $statsService,
     ): View {
-        $capabilities = ['redis' => false, 'valkey' => false, 'memcached' => false, 'keydb' => false, 'dragonfly' => false];
-        try {
-            $capabilities = $capabilitiesService->forServer($this->server);
-        } catch (\Throwable) {
-            // Probe failures (SSH timeout, key issues) leave the per-engine "running" badges off.
-        }
+        // Engine capabilities + distro-support gates are SSH-probed off the render path via
+        // wire:init (loadCacheCapabilities) so the workspace paints instantly; the per-engine
+        // "running" badge and Install gate resolve once that returns. $capabilitiesLoaded gates
+        // the "checking…" UI. Cached 24h, so this is usually a no-op after the first load.
+        $capabilities = $this->capabilitiesLoaded
+            ? ($this->capabilities_state ?: ['redis' => false, 'valkey' => false, 'memcached' => false, 'keydb' => false, 'dragonfly' => false])
+            : ['redis' => false, 'valkey' => false, 'memcached' => false, 'keydb' => false, 'dragonfly' => false];
 
-        // Per-engine distro-support gate. Null means "supported / unknown — let the operator
-        // proceed"; a string means "Install is disabled, here's why". Driven by
-        // CacheServiceInstallScripts::supportedDistroCodenames() so the UI and the install
-        // script agree on which combinations work. Swallowing exceptions matches the
-        // capabilities probe shape above — flaky SSH shouldn't grey out the whole page.
-        $engineUnsupportedReasons = ['redis' => null, 'valkey' => null, 'memcached' => null, 'keydb' => null, 'dragonfly' => null];
-        try {
-            $engineUnsupportedReasons = $capabilitiesService->unsupportedReasonsByEngine($this->server);
-        } catch (\Throwable) {
-            // Same posture as the capabilities probe — fall back to "no gating" on probe error.
-        }
+        $engineUnsupportedReasons = $this->capabilitiesLoaded
+            ? ($this->cache_unsupported_reasons ?: ['redis' => null, 'valkey' => null, 'memcached' => null, 'keydb' => null, 'dragonfly' => null])
+            : ['redis' => null, 'valkey' => null, 'memcached' => null, 'keydb' => null, 'dragonfly' => null];
 
         $allowed = array_merge(['overview', 'advanced'], CacheServiceInstallScripts::supportedEngines());
         if (! in_array($this->workspace_tab, $allowed, true)) {
             $this->workspace_tab = 'overview';
         }
 
+        // Drop any memo a pre-render busy-check populated so this render reads
+        // rows live (incl. ones a mutating action just created), then share that
+        // single fetch with every downstream consumer in this lifecycle.
+        $this->cacheServicesMemo = null;
         $services = $this->cacheServices();
 
         // Pull live stats per-engine when looking at Overview and the engine is RUNNING. The
@@ -3696,6 +3736,7 @@ BASH;
             CacheWorkspaceViewData::for($this->server, $this, $services),
             [
                 'capabilities' => $capabilities,
+                'capabilitiesLoaded' => $this->capabilitiesLoaded,
                 'engineUnsupportedReasons' => $engineUnsupportedReasons,
                 'cacheServices' => $services,
                 'cacheServicesByEngine' => $primaryByEngine,
@@ -3714,9 +3755,20 @@ BASH;
     }
 
     /** All cache service rows for this server, keyed by ULID and ordered by engine name. */
+    /**
+     * Request-scoped memo for {@see cacheServices()}. A single render fans the
+     * row set out to several consumers (the render() body, the
+     * {@see cacheConsumers()} computed, {@see CacheWorkspaceViewData}), each of
+     * which used to re-run the identical `server_cache_services` select.
+     * render() nulls this before its first read, so the rendered view always
+     * reflects rows a mutating action just created — the memo only collapses
+     * reads within one lifecycle, it never carries a stale set into a render.
+     */
+    private ?Collection $cacheServicesMemo = null;
+
     protected function cacheServices(): Collection
     {
-        return ServerCacheService::query()
+        return $this->cacheServicesMemo ??= ServerCacheService::query()
             ->where('server_id', $this->server->id)
             ->orderBy('engine')
             ->get();

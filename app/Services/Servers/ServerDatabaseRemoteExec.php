@@ -36,6 +36,126 @@ class ServerDatabaseRemoteExec
         return $cred;
     }
 
+    /**
+     * Probe all six database engines in a SINGLE SSH round-trip.
+     *
+     * The per-engine helpers (probeMysql/probePostgres/…) each open their own
+     * SSH connection — and multiplexing is off by default — so the original
+     * {@see ServerDatabaseHostCapabilities::probe()} fan-out cost 6–9 sequential
+     * handshakes on the workspace render path. This collapses every check into
+     * one bash script run once, preserving each helper's detection semantics:
+     *   - mysql/mariadb: dpkg server package installed + protocol connectivity
+     *     (passwordless root, else stored root password)
+     *   - postgres: sudo -u postgres (default) or direct 127.0.0.1 login
+     *   - sqlite: sqlite3 binary present
+     *   - mongodb: mongosh ping (authenticated when a stored password exists)
+     *   - clickhouse: clickhouse-client SELECT 1 (optional --password)
+     *
+     * @return array{mysql: bool, mariadb: bool, postgres: bool, mongodb: bool, clickhouse: bool, sqlite: bool}
+     */
+    public function probeAllCapabilities(Server $server): array
+    {
+        $false = [
+            'mysql' => false, 'mariadb' => false, 'postgres' => false,
+            'mongodb' => false, 'clickhouse' => false, 'sqlite' => false,
+        ];
+
+        if (! $server->isReady() || empty($server->ssh_private_key)) {
+            return $false;
+        }
+
+        $cred = $this->adminCredential($server);
+
+        $mysqlUser = $cred?->mysql_root_username ?: 'root';
+        $mysqlPw = (string) ($cred?->mysql_root_password ?? '');
+        $pgUser = $cred?->postgres_superuser ?: 'postgres';
+        $pgPw = (string) ($cred?->postgres_password ?? '');
+        $mongoUser = $cred?->mongodb_admin_username ?: 'admin';
+        $mongoPw = (string) ($cred?->mongodb_admin_password ?? '');
+        $chUser = $cred?->clickhouse_admin_username ?: 'default';
+        $chPw = (string) ($cred?->clickhouse_admin_password ?? '');
+
+        // Postgres: sudo path when no stored superuser password (or explicitly
+        // configured for sudo); direct 127.0.0.1 login otherwise — mirrors probePostgres().
+        if (! $cred || $cred->postgres_use_sudo) {
+            $pgLine = 'command -v psql >/dev/null 2>&1 && sudo -u postgres psql -c "SELECT 1" >/dev/null 2>&1 && POSTGRES=1';
+        } else {
+            $pgEnv = $pgPw !== '' ? 'env PGPASSWORD="$PG_PW" ' : '';
+            $pgLine = 'command -v psql >/dev/null 2>&1 && '.$pgEnv.'psql -h 127.0.0.1 -U "$PG_USER" -c "SELECT 1" >/dev/null 2>&1 && POSTGRES=1';
+        }
+
+        // Mongo: authenticated ping when a stored admin password exists — mirrors probeMongodb().
+        $mongoPing = escapeshellarg('db.adminCommand({ping:1})');
+        if ($cred && $cred->mongodb_admin_password) {
+            $mongoLine = 'command -v mongosh >/dev/null 2>&1 && systemctl is-active --quiet mongod && '
+                .'mongosh -u "$MONGO_USER" -p "$MONGO_PW" --authenticationDatabase admin --quiet --eval '.$mongoPing.' >/dev/null 2>&1 && MONGODB=1';
+        } else {
+            $mongoLine = 'command -v mongosh >/dev/null 2>&1 && systemctl is-active --quiet mongod && '
+                .'mongosh --quiet --eval '.$mongoPing.' >/dev/null 2>&1 && MONGODB=1';
+        }
+
+        // ClickHouse: SELECT 1 with optional --password — mirrors probeClickhouse().
+        $chAuth = $chPw !== ''
+            ? 'clickhouse-client --user "$CH_USER" --password "$CH_PW"'
+            : 'clickhouse-client --user "$CH_USER"';
+        $chLine = 'command -v clickhouse-client >/dev/null 2>&1 && '.$chAuth.' --query "SELECT 1" >/dev/null 2>&1 && CLICKHOUSE=1';
+
+        $assignments = implode("\n", [
+            'MYSQL_ROOT_USER='.escapeshellarg($mysqlUser),
+            'MYSQL_ROOT_PW='.escapeshellarg($mysqlPw),
+            'PG_USER='.escapeshellarg($pgUser),
+            'PG_PW='.escapeshellarg($pgPw),
+            'MONGO_USER='.escapeshellarg($mongoUser),
+            'MONGO_PW='.escapeshellarg($mongoPw),
+            'CH_USER='.escapeshellarg($chUser),
+            'CH_PW='.escapeshellarg($chPw),
+        ]);
+
+        $script = <<<BASH
+        set +e
+        {$assignments}
+
+        mysql_conn() {
+          command -v mysql >/dev/null 2>&1 || return 1
+          mysql -u root -e "SELECT 1" >/dev/null 2>&1 && return 0
+          if [ -n "\$MYSQL_ROOT_PW" ]; then
+            env MYSQL_PWD="\$MYSQL_ROOT_PW" mysql -u "\$MYSQL_ROOT_USER" -e "SELECT 1" >/dev/null 2>&1 && return 0
+          fi
+          return 1
+        }
+
+        MYSQL=0; MARIADB=0; POSTGRES=0; SQLITE=0; MONGODB=0; CLICKHOUSE=0
+
+        dpkg-query -W -f='\${Status}' mysql-server 2>/dev/null | grep -q 'install ok installed' && mysql_conn && MYSQL=1
+        dpkg-query -W -f='\${Status}' mariadb-server 2>/dev/null | grep -q 'install ok installed' && mysql_conn && MARIADB=1
+        {$pgLine}
+        command -v sqlite3 >/dev/null 2>&1 && SQLITE=1
+        {$mongoLine}
+        {$chLine}
+
+        echo "DPLY_CAPS mysql=\$MYSQL mariadb=\$MARIADB postgres=\$POSTGRES sqlite=\$SQLITE mongodb=\$MONGODB clickhouse=\$CLICKHOUSE"
+        BASH;
+
+        try {
+            $out = $this->execWithCandidates($server, 'bash -lc '.escapeshellarg($script), 60);
+        } catch (\Throwable) {
+            return $false;
+        }
+
+        if (! preg_match('/DPLY_CAPS\s+([^\n]*)/', $out, $m)) {
+            return $false;
+        }
+
+        $caps = $false;
+        foreach (array_keys($caps) as $engine) {
+            if (preg_match('/\b'.$engine.'=([01])\b/', $m[1], $mm)) {
+                $caps[$engine] = $mm[1] === '1';
+            }
+        }
+
+        return $caps;
+    }
+
     public function probeMysql(Server $server): bool
     {
         if (! $this->serverHasMysqlServerPackage($server)) {

@@ -1009,18 +1009,27 @@ class DigitalOceanService
 
     /**
      * Create a Spaces access key via the Spaces Keys API. The secret is only
-     * ever returned at creation time, so the caller must capture it. Grants
-     * scope the key to specific buckets; an empty grants list yields a
-     * full-access key (all Spaces), matching console-created keys.
+     * ever returned at creation time, so the caller must capture it.
+     *
+     * Grants scope the key to specific buckets. IMPORTANT: a DigitalOcean
+     * Spaces key created with NO grants has NO access (every S3 call returns
+     * AccessDenied) — an empty grant list is NOT "full access". So when the
+     * caller passes no grants we default to a full-access grant on all buckets
+     * (`bucket: ""`, `permission: "fullaccess"`), which is what lets the key
+     * create buckets and read/write objects like a console-created key.
      *
      * @param  list<array{bucket: string, permission: string}>  $grants
      * @return array{access_key: string, secret_key: string}
      */
     public function createSpacesKey(string $name, array $grants = []): array
     {
+        if ($grants === []) {
+            $grants = [['bucket' => '', 'permission' => 'fullaccess']];
+        }
+
         $payload = array_filter([
             'name' => $name !== '' ? $name : null,
-            'grants' => $grants !== [] ? $grants : null,
+            'grants' => $grants,
         ], fn ($v) => $v !== null);
 
         $response = $this->request('post', '/spaces/keys', $payload);

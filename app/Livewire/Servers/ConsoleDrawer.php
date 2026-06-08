@@ -161,6 +161,16 @@ class ConsoleDrawer extends Component
     protected function setActiveServer(Server $server): void
     {
         $this->authorize('view', $server);
+
+        // Switching servers (incl. landing on a different /servers/{id}/* page)
+        // must start with a clean console — otherwise command output from the
+        // previously-active server bleeds into the new one's drawer.
+        if ((string) ($this->server?->id ?? '') !== (string) $server->id) {
+            $this->history = [];
+            $this->error = null;
+            $this->command = '';
+        }
+
         $this->server = $server;
         session([self::SESSION_KEY => (string) $server->id]);
     }

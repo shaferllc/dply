@@ -51,7 +51,7 @@ return [
         'networking' => 'server-networking',
         'load-balancers' => 'server-load-balancers',
         'worker-pool' => 'server-worker-pool',
-        'redis-snapshots' => 'server-snapshots',
+        'snapshots' => 'server-snapshots',
     ],
 
     'site_section_slugs' => [

@@ -25,7 +25,6 @@
 
     @php
         $engineCanCreate = (bool) ($capabilities[$engine] ?? false);
-        $showEngineCreateForm = $engine_create_form_open && $workspace_tab === $engine && $engineCanCreate;
     @endphp
     <div class="{{ $card }} overflow-hidden">
         <div class="flex flex-wrap items-start justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
@@ -36,7 +35,7 @@
                     {{ __('Create databases on this server and manage tracked credentials from each row.') }}
                 </p>
             </div>
-            @if ($engineCanCreate && ! $showEngineCreateForm)
+            @if ($engineCanCreate)
                 <button
                     type="button"
                     wire:click="openEngineDatabaseCreate('{{ $engine }}')"
@@ -48,12 +47,7 @@
             @endif
         </div>
         <div class="px-6 py-6 sm:px-7">
-            @if ($showEngineCreateForm)
-                @include('livewire.servers.partials.databases._create-database-form', [
-                    'lockEngine' => $engine,
-                    'showExplainer' => false,
-                ])
-            @elseif ($engineDatabases->isEmpty())
+            @if ($engineDatabases->isEmpty())
                 <x-empty-state
                     borderless
                     icon="heroicon-o-circle-stack"

@@ -2,38 +2,31 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\Servers;
+namespace App\Livewire\Servers\Concerns;
 
 use App\Jobs\ExportRedisSnapshotJob;
-use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\BackupConfiguration;
 use App\Models\RedisSnapshot;
 use App\Models\RedisSnapshotSchedule;
-use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Models\ServerCronJob;
-use Illuminate\Contracts\View\View;
-use Livewire\Attributes\Layout;
-use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
+use Illuminate\Support\Collection;
 
 /**
- * Snapshots surface for dedicated cache servers (server_role redis/valkey). Run-now
- * triggers + recurring schedule CRUD + history list, parallel to
- * {@see WorkspaceBackups} which serves mysql/postgres/site files.
+ * Cache (Redis-family) RDB snapshot behaviour for the Snapshots workspace hub.
  *
- * Restore is intentionally NOT in v1 — RDB restore is destructive (SHUTDOWN NOSAVE,
- * dump.rdb replace, restart) and warrants a guarded modal/flow we haven't designed.
- * Operators can manually `scp` an RDB from S3 onto the box meanwhile.
+ * Extracted verbatim from the former WorkspaceRedisSnapshots component so the
+ * hub's "Cache" tab keeps full parity: run-now triggers, recurring schedule CRUD,
+ * and the history list, all backed by {@see RedisSnapshot} / {@see RedisSnapshotSchedule}
+ * and the {@see ExportRedisSnapshotJob} pipeline.
+ *
+ * Method names are prefixed `redis*` so they don't collide with the site-database
+ * and server-image actions that live alongside them on {@see \App\Livewire\Servers\WorkspaceSnapshots}.
+ *
+ * @property \App\Models\Server $server  Set in mount() by InteractsWithServerWorkspace.
  */
-#[Layout('layouts.app')]
-#[Lazy]
-class WorkspaceRedisSnapshots extends Component
+trait ManagesRedisSnapshots
 {
-    use RendersWorkspacePlaceholder;
-    use InteractsWithServerWorkspace;
-
     /** Form: existing BackupConfiguration to use for the run-now snapshot. */
     public string $run_now_destination_id = '';
 
@@ -46,13 +39,7 @@ class WorkspaceRedisSnapshots extends Component
     /** Form: which cache-service row a new schedule targets. */
     public string $new_cache_service_id = '';
 
-    public function mount(Server $server): void
-    {
-        $this->bootWorkspace($server);
-        $this->authorize('view', $this->server);
-    }
-
-    public function runNow(): void
+    public function runRedisSnapshotNow(): void
     {
         $this->authorize('update', $this->server);
 
@@ -90,7 +77,7 @@ class WorkspaceRedisSnapshots extends Component
         $this->toastSuccess(__('Snapshot queued. Check History for completion.'));
     }
 
-    public function addSchedule(): void
+    public function addRedisSchedule(): void
     {
         $this->authorize('update', $this->server);
 
@@ -161,7 +148,7 @@ class WorkspaceRedisSnapshots extends Component
         $this->toastSuccess(__('Snapshot schedule added.'));
     }
 
-    public function toggleSchedule(string $scheduleId): void
+    public function toggleRedisSchedule(string $scheduleId): void
     {
         $this->authorize('update', $this->server);
 
@@ -181,7 +168,7 @@ class WorkspaceRedisSnapshots extends Component
         $this->toastSuccess($next ? __('Schedule resumed.') : __('Schedule paused.'));
     }
 
-    public function deleteSchedule(string $scheduleId): void
+    public function deleteRedisSchedule(string $scheduleId): void
     {
         $this->authorize('update', $this->server);
 
@@ -200,7 +187,7 @@ class WorkspaceRedisSnapshots extends Component
         $this->toastSuccess(__('Schedule deleted.'));
     }
 
-    public function deleteSnapshot(string $snapshotId): void
+    public function deleteRedisSnapshot(string $snapshotId): void
     {
         $this->authorize('update', $this->server);
 
@@ -221,7 +208,12 @@ class WorkspaceRedisSnapshots extends Component
             ->first();
     }
 
-    public function render(): View
+    /**
+     * View data for the Cache tab — mirrors the former WorkspaceRedisSnapshots::render().
+     *
+     * @return array{cacheServices: Collection, destinations: Collection, schedules: Collection, snapshots: Collection}
+     */
+    protected function redisSnapshotViewData(): array
     {
         $cacheServices = ServerCacheService::query()
             ->where('server_id', $this->server->id)
@@ -246,11 +238,6 @@ class WorkspaceRedisSnapshots extends Component
             ->limit(50)
             ->get();
 
-        return view('livewire.servers.workspace-redis-snapshots', [
-            'cacheServices' => $cacheServices,
-            'destinations' => $destinations,
-            'schedules' => $schedules,
-            'snapshots' => $snapshots,
-        ]);
+        return compact('cacheServices', 'destinations', 'schedules', 'snapshots');
     }
 }

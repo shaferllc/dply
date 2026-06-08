@@ -66,6 +66,10 @@ return [
             'label' => 'Hetzner Object Storage',
             'endpoint_template' => 'https://{region}.your-objectstorage.com',
             'provision' => true,
+            // Hetzner has no API to mint object-storage keys, so the operator
+            // generates them in the console once. Surface where to get them.
+            'key_help' => 'Hetzner has no API for dply to create keys. In the Hetzner Cloud Console, open your project → Object Storage → “Generate S3 credentials”, then paste the Access key and Secret below. Use the same region you pick here.',
+            'key_console_url' => 'https://console.hetzner.com/',
             'regions' => [
                 'fsn1' => 'Falkenstein, Germany · fsn1',
                 'nbg1' => 'Nuremberg, Germany · nbg1',
@@ -81,5 +85,20 @@ return [
         ],
 
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Freshly-minted key propagation retry
+    |--------------------------------------------------------------------------
+    |
+    | When dply mints an S3 key via a provider API (DigitalOcean Spaces) it
+    | isn't active on the S3 gateway for a few seconds. ObjectStorageBucketProvisioner
+    | retries CreateBucket on InvalidAccessKeyId/SignatureDoesNotMatch this many
+    | times (with this delay) before giving up — only when the caller flags the
+    | keys as freshly minted, so operator-supplied keys still fail fast.
+    |
+    */
+    'fresh_key_retry_attempts' => (int) env('OBJECT_STORAGE_FRESH_KEY_RETRY_ATTEMPTS', 6),
+    'fresh_key_retry_delay_ms' => (int) env('OBJECT_STORAGE_FRESH_KEY_RETRY_DELAY_MS', 2500),
 
 ];

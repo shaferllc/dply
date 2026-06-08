@@ -48,5 +48,19 @@
     x-on:config-editor-sync.window="syncToServer()"
     class="mt-2 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-brand-ink/15 bg-white shadow-sm ring-1 ring-brand-ink/5"
 >
-    <div x-ref="editorMount" class="min-h-0 flex-1 overflow-hidden text-xs"></div>
+    <div x-ref="editorMount" class="min-h-0 flex-1 overflow-hidden text-xs">
+        {{-- Fallback editor shown when CodeMirror hasn't mounted (module still
+             loading, or failed to load). Guarantees the file contents are always
+             visible and editable. Server-rendered value + Alpine @input sync
+             because wire:model can't bind inside this wire:ignore subtree. --}}
+        <textarea
+            x-show="! editor"
+            @if ($readOnly) readonly @endif
+            @input="$wire.set('config_contents', $event.target.value, true)"
+            class="block h-full w-full resize-none border-0 bg-white p-3 font-mono text-xs leading-relaxed text-brand-ink focus:outline-none focus:ring-0"
+            spellcheck="false"
+            autocomplete="off"
+            autocapitalize="off"
+        >{{ $config_contents ?? '' }}</textarea>
+    </div>
 </div>

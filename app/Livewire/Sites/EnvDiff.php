@@ -35,6 +35,13 @@ class EnvDiff extends Component
     /** Set to true when this runtime has no server file to diff against. */
     public bool $unsupported = false;
 
+    /**
+     * The server .env read is a synchronous SSH round-trip; it is deferred to
+     * wire:init (loadServerEnv) so the page paints instantly and the diff fills
+     * in once the read completes. Until then the view shows a "comparing…" state.
+     */
+    public bool $serverEnvLoaded = false;
+
     /** Populated on render() when the SSH read succeeds. */
     public string $serverError = '';
 
@@ -57,12 +64,21 @@ class EnvDiff extends Component
         $this->reveal = ! $this->reveal;
     }
 
+    /**
+     * Read the live server .env over SSH. Fired by wire:init so it never blocks
+     * first paint; the diff renders once this resolves.
+     */
+    public function loadServerEnv(): void
+    {
+        $this->serverEnvLoaded = true;
+    }
+
     public function render(SiteEnvReader $reader, DotEnvFileParser $parser): View
     {
         $cacheVars = $parser->parse((string) ($this->site->env_file_content ?? ''))['variables'];
         $serverVars = [];
 
-        if (! $this->unsupported) {
+        if (! $this->unsupported && $this->serverEnvLoaded) {
             try {
                 $serverVars = $parser->parse($reader->read($this->site))['variables'];
             } catch (\Throwable $e) {
@@ -91,7 +107,8 @@ class EnvDiff extends Component
             'onlyInCache' => array_keys($onlyInCache),
             'onlyInServer' => array_keys($onlyInServer),
             'differs' => $differs,
-            'inSync' => $onlyInCache === [] && $onlyInServer === [] && $differs === [] && $this->serverError === '',
+            'inSync' => $this->serverEnvLoaded && $onlyInCache === [] && $onlyInServer === [] && $differs === [] && $this->serverError === '',
+            'serverEnvLoaded' => $this->serverEnvLoaded || $this->unsupported,
         ])->layout('layouts.app');
     }
 

@@ -760,7 +760,10 @@ class WorkspaceConfiguration extends Component
     protected function hydrateConfigFileFromCache(string $path): bool
     {
         $cached = Cache::get(RunServerConfigOpJob::fileContentCacheKey((string) $this->server->id, $path));
-        if (! is_array($cached) || ! array_key_exists('contents', $cached)) {
+        // Treat an empty cached payload as a miss — a stale empty entry (e.g. from
+        // a failed read during the old queued flow) must not show a blank editor;
+        // fall through to a fresh direct read instead.
+        if (! is_array($cached) || ! array_key_exists('contents', $cached) || (string) $cached['contents'] === '') {
             return false;
         }
 

@@ -206,9 +206,9 @@ return [
         // teaser only when docker is off
         'docker_preview' => env('FEATURE_WORKSPACE_DOCKER_PREVIEW', true),
         // exit: GA — server-scoped database + site-files backup runs and schedules
-        'backups' => env('FEATURE_WORKSPACE_BACKUPS', false),
+        'backups' => env('FEATURE_WORKSPACE_BACKUPS', true),
         // exit: ship alongside backups GA; teaser only when backups is off
-        'backups_preview' => env('FEATURE_WORKSPACE_BACKUPS_PREVIEW', true),
+        'backups_preview' => env('FEATURE_WORKSPACE_BACKUPS_PREVIEW', false),
         // exit: ship as the new scheduler experience once heartbeat ingest stabilizes
         'schedule' => env('FEATURE_WORKSPACE_SCHEDULE', true),
         // exit: ship once audit-log filtering UI is reviewed

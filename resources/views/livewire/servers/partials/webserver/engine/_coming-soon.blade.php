@@ -1,7 +1,10 @@
 @php
     // Coming-soon teaser shown in place of the actionable engine panel for
     // engines flagged `coming_soon` in the catalog (and not yet active).
-    // No switch / lifecycle controls — this is a preview only.
+    // No switch / lifecycle controls — this is a preview only. Uses the shared
+    // <x-workspace-coming-soon> terminal-hero treatment so the look matches the
+    // nginx live-state teaser, the database engine teasers, and every other
+    // coming-soon surface across the app.
     $isEdgeProxyPreview = ! empty($info['is_edge_proxy']);
 
     $engineBlurb = match ($key) {
@@ -16,113 +19,134 @@
         default => '',
     };
 
+    // Feature cards. Icons are heroicon-o-* leaves (the component prepends
+    // `heroicon-o-`), mirroring <x-workspace-coming-soon>'s expected shape.
     $engineHighlights = match ($key) {
         'nginx' => [
-            ['icon' => 'heroicon-o-bolt', 'title' => __('FastCGI cache'), 'body' => __('RunCloud-style page caching with shared FastCGI/proxy zones.')],
-            ['icon' => 'heroicon-o-server', 'title' => __('Upstreams'), 'body' => __('Load-balanced backend pools in nginx.conf.')],
-            ['icon' => 'heroicon-o-puzzle-piece', 'title' => __('Dynamic modules'), 'body' => __('Install and enable libnginx-mod-* packages from the dashboard.')],
-            ['icon' => 'heroicon-o-pencil-square', 'title' => __('Config editor'), 'body' => __('Edit and validate nginx config with backups.')],
+            ['icon' => 'bolt', 'title' => __('FastCGI cache'), 'body' => __('RunCloud-style page caching with shared FastCGI/proxy zones.')],
+            ['icon' => 'server', 'title' => __('Upstreams'), 'body' => __('Load-balanced backend pools in nginx.conf.')],
+            ['icon' => 'puzzle-piece', 'title' => __('Dynamic modules'), 'body' => __('Install and enable libnginx-mod-* packages from the dashboard.')],
+            ['icon' => 'pencil-square', 'title' => __('Config editor'), 'body' => __('Edit and validate nginx config with backups.')],
         ],
         'caddy' => [
-            ['icon' => 'heroicon-o-lock-closed', 'title' => __('Automatic HTTPS'), 'body' => __('Certificates provisioned and renewed with zero config.')],
-            ['icon' => 'heroicon-o-arrow-path-rounded-square', 'title' => __('Route inspector'), 'body' => __('Live routes, upstreams, and certs from the admin API.')],
-            ['icon' => 'heroicon-o-code-bracket-square', 'title' => __('Caddyfile editor'), 'body' => __('In-app validate, format, and save with backups.')],
-            ['icon' => 'heroicon-o-bolt', 'title' => __('HTTP/3 default'), 'body' => __('Modern protocol support without extra tuning.')],
+            ['icon' => 'lock-closed', 'title' => __('Automatic HTTPS'), 'body' => __('Certificates provisioned and renewed with zero config.')],
+            ['icon' => 'arrow-path-rounded-square', 'title' => __('Route inspector'), 'body' => __('Live routes, upstreams, and certs from the admin API.')],
+            ['icon' => 'code-bracket-square', 'title' => __('Caddyfile editor'), 'body' => __('In-app validate, format, and save with backups.')],
+            ['icon' => 'bolt', 'title' => __('HTTP/3 default'), 'body' => __('Modern protocol support without extra tuning.')],
         ],
         'apache' => [
-            ['icon' => 'heroicon-o-puzzle-piece', 'title' => __('Module catalog'), 'body' => __('Browse and toggle loaded modules over SSH.')],
-            ['icon' => 'heroicon-o-server-stack', 'title' => __('Vhost inspector'), 'body' => __('See every virtual host and its document root.')],
-            ['icon' => 'heroicon-o-pencil-square', 'title' => __('Config editor'), 'body' => __('Edit and validate apache2 config with backups.')],
-            ['icon' => 'heroicon-o-lock-closed', 'title' => __('Certs & workers'), 'body' => __('Certificate inventory and MPM worker stats.')],
+            ['icon' => 'puzzle-piece', 'title' => __('Module catalog'), 'body' => __('Browse and toggle loaded modules over SSH.')],
+            ['icon' => 'server-stack', 'title' => __('Vhost inspector'), 'body' => __('See every virtual host and its document root.')],
+            ['icon' => 'pencil-square', 'title' => __('Config editor'), 'body' => __('Edit and validate apache2 config with backups.')],
+            ['icon' => 'lock-closed', 'title' => __('Certs & workers'), 'body' => __('Certificate inventory and MPM worker stats.')],
         ],
         'openlitespeed' => [
-            ['icon' => 'heroicon-o-server-stack', 'title' => __('Vhosts & listeners'), 'body' => __('Inspect virtual hosts, listeners, and external apps.')],
-            ['icon' => 'heroicon-o-bolt', 'title' => __('LSCache'), 'body' => __('Per-vhost cache rules for WordPress-heavy hosting.')],
-            ['icon' => 'heroicon-o-cpu-chip', 'title' => __('LSAPI execution'), 'body' => __('The fastest PHP execution path, managed in-app.')],
-            ['icon' => 'heroicon-o-pencil-square', 'title' => __('Config editor'), 'body' => __('Edit and validate OLS config with backups.')],
+            ['icon' => 'server-stack', 'title' => __('Vhosts & listeners'), 'body' => __('Inspect virtual hosts, listeners, and external apps.')],
+            ['icon' => 'bolt', 'title' => __('LSCache'), 'body' => __('Per-vhost cache rules for WordPress-heavy hosting.')],
+            ['icon' => 'cpu-chip', 'title' => __('LSAPI execution'), 'body' => __('The fastest PHP execution path, managed in-app.')],
+            ['icon' => 'pencil-square', 'title' => __('Config editor'), 'body' => __('Edit and validate OLS config with backups.')],
         ],
         'traefik' => [
-            ['icon' => 'heroicon-o-arrow-path-rounded-square', 'title' => __('Router inspector'), 'body' => __('Live routers, services, and middlewares from the API.')],
-            ['icon' => 'heroicon-o-server-stack', 'title' => __('Site backends'), 'body' => __('Route hostnames to Caddy backends on high ports.')],
-            ['icon' => 'heroicon-o-pencil-square', 'title' => __('Static config editor'), 'body' => __('Edit and validate traefik.yml with backups.')],
-            ['icon' => 'heroicon-o-shield-check', 'title' => __('TLS termination'), 'body' => __('Terminate HTTPS on :80 before site backends.')],
+            ['icon' => 'arrow-path-rounded-square', 'title' => __('Router inspector'), 'body' => __('Live routers, services, and middlewares from the API.')],
+            ['icon' => 'server-stack', 'title' => __('Site backends'), 'body' => __('Route hostnames to Caddy backends on high ports.')],
+            ['icon' => 'pencil-square', 'title' => __('Static config editor'), 'body' => __('Edit and validate traefik.yml with backups.')],
+            ['icon' => 'shield-check', 'title' => __('TLS termination'), 'body' => __('Terminate HTTPS on :80 before site backends.')],
         ],
         'haproxy' => [
-            ['icon' => 'heroicon-o-scale', 'title' => __('Frontend / backend map'), 'body' => __('Inspect ACLs, stick tables, and backend health.')],
-            ['icon' => 'heroicon-o-server-stack', 'title' => __('Site routing'), 'body' => __('Host-based routing to Caddy backends on high ports.')],
-            ['icon' => 'heroicon-o-pencil-square', 'title' => __('Config editor'), 'body' => __('Edit and validate haproxy.cfg with backups.')],
-            ['icon' => 'heroicon-o-cpu-chip', 'title' => __('Runtime stats'), 'body' => __('Socket stats and runtime info from the server.')],
+            ['icon' => 'scale', 'title' => __('Frontend / backend map'), 'body' => __('Inspect ACLs, stick tables, and backend health.')],
+            ['icon' => 'server-stack', 'title' => __('Site routing'), 'body' => __('Host-based routing to Caddy backends on high ports.')],
+            ['icon' => 'pencil-square', 'title' => __('Config editor'), 'body' => __('Edit and validate haproxy.cfg with backups.')],
+            ['icon' => 'cpu-chip', 'title' => __('Runtime stats'), 'body' => __('Socket stats and runtime info from the server.')],
         ],
         'envoy' => [
-            ['icon' => 'heroicon-o-arrows-right-left', 'title' => __('Listeners & clusters'), 'body' => __('Dynamic xDS-style routing to Caddy backends.')],
-            ['icon' => 'heroicon-o-chart-bar', 'title' => __('Observability'), 'body' => __('Rich stats, access logs, and admin interface.')],
-            ['icon' => 'heroicon-o-server-stack', 'title' => __('Site routing'), 'body' => __('Host-based forwarding to per-site high ports.')],
-            ['icon' => 'heroicon-o-pencil-square', 'title' => __('Config editor'), 'body' => __('Validate and edit envoy.yaml with backups.')],
+            ['icon' => 'arrows-right-left', 'title' => __('Listeners & clusters'), 'body' => __('Dynamic xDS-style routing to Caddy backends.')],
+            ['icon' => 'chart-bar', 'title' => __('Observability'), 'body' => __('Rich stats, access logs, and admin interface.')],
+            ['icon' => 'server-stack', 'title' => __('Site routing'), 'body' => __('Host-based forwarding to per-site high ports.')],
+            ['icon' => 'pencil-square', 'title' => __('Config editor'), 'body' => __('Validate and edit envoy.yaml with backups.')],
         ],
         'openresty' => [
-            ['icon' => 'heroicon-o-code-bracket-square', 'title' => __('Lua routing'), 'body' => __('Programmable edge logic without per-site nginx hand-edits.')],
-            ['icon' => 'heroicon-o-server-stack', 'title' => __('Site routing'), 'body' => __('Host maps to Caddy backends on high ports.')],
-            ['icon' => 'heroicon-o-shield-check', 'title' => __('Edge auth & limits'), 'body' => __('JWT gates, ACLs, and rate limits at :80.')],
-            ['icon' => 'heroicon-o-pencil-square', 'title' => __('Config editor'), 'body' => __('Edit nginx/OpenResty configs with validate + backup.')],
+            ['icon' => 'code-bracket-square', 'title' => __('Lua routing'), 'body' => __('Programmable edge logic without per-site nginx hand-edits.')],
+            ['icon' => 'server-stack', 'title' => __('Site routing'), 'body' => __('Host maps to Caddy backends on high ports.')],
+            ['icon' => 'shield-check', 'title' => __('Edge auth & limits'), 'body' => __('JWT gates, ACLs, and rate limits at :80.')],
+            ['icon' => 'pencil-square', 'title' => __('Config editor'), 'body' => __('Edit nginx/OpenResty configs with validate + backup.')],
         ],
         default => [],
+    };
+
+    // Terminal-hero output lines per engine.
+    $engineLines = match ($key) {
+        'nginx' => [
+            ['tone' => 'cmd', 'text' => '~ $ nginx -v'],
+            ['tone' => 'muted', 'text' => 'nginx/1.27.0'],
+            ['tone' => 'muted', 'text' => 'systemctl enable --now nginx'],
+            ['tone' => 'ok', 'text' => 'listening on :80 / :443'],
+        ],
+        'caddy' => [
+            ['tone' => 'cmd', 'text' => '~ $ caddy version'],
+            ['tone' => 'muted', 'text' => 'v2.8.4'],
+            ['tone' => 'muted', 'text' => 'automatic HTTPS · example.com'],
+            ['tone' => 'ok', 'text' => 'serving · HTTP/3 enabled'],
+        ],
+        'apache' => [
+            ['tone' => 'cmd', 'text' => '~ $ apachectl -v'],
+            ['tone' => 'muted', 'text' => 'Server version: Apache/2.4'],
+            ['tone' => 'muted', 'text' => 'a2enmod rewrite ssl headers'],
+            ['tone' => 'ok', 'text' => 'mpm_event · :80 ready'],
+        ],
+        'openlitespeed' => [
+            ['tone' => 'cmd', 'text' => '~ $ lswsctrl status'],
+            ['tone' => 'muted', 'text' => 'litespeed is running'],
+            ['tone' => 'muted', 'text' => 'LSAPI lsphp82 · LSCache enabled'],
+            ['tone' => 'ok', 'text' => 'WebAdmin :7080 · HTTP :80'],
+        ],
+        'traefik' => [
+            ['tone' => 'cmd', 'text' => '~ $ traefik version'],
+            ['tone' => 'muted', 'text' => 'Version: 3.1'],
+            ['tone' => 'muted', 'text' => 'entrypoint web :80 → caddy backends'],
+            ['tone' => 'ok', 'text' => 'dashboard ready · 6 routers'],
+        ],
+        'haproxy' => [
+            ['tone' => 'cmd', 'text' => '~ $ haproxy -vv'],
+            ['tone' => 'muted', 'text' => 'HAProxy version 3.0'],
+            ['tone' => 'muted', 'text' => 'frontend fe_http bind :80'],
+            ['tone' => 'ok', 'text' => '2 backends · health checks up'],
+        ],
+        'envoy' => [
+            ['tone' => 'cmd', 'text' => '~ $ envoy --version'],
+            ['tone' => 'muted', 'text' => 'envoy 1.31'],
+            ['tone' => 'muted', 'text' => 'listener :80 → cluster caddy_backends'],
+            ['tone' => 'ok', 'text' => 'admin :9901 · 4 clusters'],
+        ],
+        'openresty' => [
+            ['tone' => 'cmd', 'text' => '~ $ openresty -v'],
+            ['tone' => 'muted', 'text' => 'openresty/1.25'],
+            ['tone' => 'muted', 'text' => 'access_by_lua · rate-limit'],
+            ['tone' => 'ok', 'text' => 'edge :80 · LuaJIT ready'],
+        ],
+        default => [
+            ['tone' => 'cmd', 'text' => '~ $ dply webserver switch '.$key],
+            ['tone' => 'muted', 'text' => 'Provisioning over SSH …'],
+            ['tone' => 'ok', 'text' => 'webserver ready'],
+        ],
     };
 @endphp
 
 @if ($engine_subtab !== 'info')
-    <div class="{{ $card }} overflow-hidden">
-        {{-- Header — engine icon + name + Coming soon badge --}}
-        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">
-            <div class="flex items-center gap-3">
-                <x-icon-badge>
-                    <x-dynamic-component :component="$info['icon']" class="h-5 w-5 text-brand-forest" />
-                </x-icon-badge>
-                <div class="min-w-0">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $isEdgeProxyPreview ? __('Edge proxy') : __('Engine') }}</p>
-                    <h3 class="text-lg font-semibold text-brand-ink">{{ $info['label'] }}</h3>
-                    <p class="mt-0.5 text-[12px] text-brand-moss">{{ $isEdgeProxyPreview ? __('Preview — not yet installable on this server.') : __('Not yet available on this server.') }}</p>
-                </div>
-            </div>
-            <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-brand-sand/70 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
-                <x-heroicon-o-clock class="h-4 w-4 shrink-0" aria-hidden="true" />
-                {{ __('Coming soon') }}
-            </span>
-        </div>
-
-        <div class="px-6 py-6 sm:px-8">
-            @if ($engineBlurb !== '')
-                <p class="max-w-prose text-sm leading-relaxed text-brand-moss">{{ $engineBlurb }}</p>
-            @endif
-
-            @if ($engineHighlights !== [])
-                <ul class="mt-6 grid gap-3 sm:grid-cols-2">
-                    @foreach ($engineHighlights as $highlight)
-                        <li class="flex gap-3 rounded-xl border border-brand-ink/8 bg-white/90 p-3.5 shadow-sm ring-1 ring-brand-ink/[0.03] sm:p-4">
-                            <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-sand/35 text-brand-forest ring-1 ring-brand-ink/8">
-                                <x-dynamic-component :component="$highlight['icon']" class="h-4 w-4" aria-hidden="true" />
-                            </span>
-                            <span class="min-w-0 text-left">
-                                <span class="block text-sm font-semibold text-brand-ink">{{ $highlight['title'] }}</span>
-                                <span class="mt-0.5 block text-[13px] leading-5 text-brand-moss">{{ $highlight['body'] }}</span>
-                            </span>
-                        </li>
-                    @endforeach
-                </ul>
-            @endif
-
-            <div class="mt-6 flex flex-col gap-3 border-t border-brand-ink/8 pt-5 sm:flex-row sm:items-center sm:justify-between">
-                <p class="text-sm text-brand-moss">
-                    @if ($isEdgeProxyPreview)
-                        {{ __(':engine install and lifecycle controls are on the way — add/remove will land here when it ships.', ['engine' => $info['label']]) }}
-                    @else
-                        {{ __(':engine support is on the way — switching will land here when it ships.', ['engine' => $info['label']]) }}
-                    @endif
-                </p>
-                <span class="inline-flex items-center justify-center gap-1.5 rounded-full bg-brand-ink/[0.04] px-3 py-1.5 text-xs font-medium text-brand-mist">
-                    <x-heroicon-o-clock class="h-4 w-4 shrink-0" aria-hidden="true" />
-                    {{ __('In development') }}
-                </span>
-            </div>
-        </div>
+    <div wire:key="webserver-coming-soon-{{ $key }}">
+        <x-workspace-coming-soon
+            :server="$server"
+            :icon="$info['icon']"
+            :title="$info['label']"
+            :description="$engineBlurb !== '' ? $engineBlurb : null"
+            :eyebrow="$isEdgeProxyPreview ? __(':engine edge-proxy preview', ['engine' => $info['label']]) : __(':engine preview', ['engine' => $info['label']])"
+            :heroNote="$isEdgeProxyPreview
+                ? __('Install and lifecycle controls for :engine land on :server when it ships.', ['engine' => $info['label'], 'server' => $server->name])
+                : __('Switching :server to :engine lands here when it ships.', ['engine' => $info['label'], 'server' => $server->name])"
+            :lines="$engineLines"
+            :features="$engineHighlights"
+            :footnote="$isEdgeProxyPreview
+                ? __(':engine install and lifecycle controls are on the way — add/remove will land here when it ships.', ['engine' => $info['label']])
+                : __(':engine support is on the way — switching will land here when it ships.', ['engine' => $info['label']])"
+        />
     </div>
 @endif

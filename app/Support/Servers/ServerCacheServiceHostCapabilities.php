@@ -87,13 +87,52 @@ class ServerCacheServiceHostCapabilities
         // probe is enough for the tab-strip badges. `probeInstance()` is kept for callers that
         // need a single bool per row (the per-card reachability badge) but is now functionally
         // equivalent to a lookup into this map for any row with a default port.
-        return [
-            'redis' => $this->probeWith($server, $this->portPingCommand($server, 'redis', 6379), 'PONG'),
-            'valkey' => $this->probeWith($server, $this->portPingCommand($server, 'valkey', 6379), 'PONG'),
-            'memcached' => $this->probeWith($server, 'systemctl is-active memcached 2>/dev/null', 'active'),
-            'keydb' => $this->probeWith($server, $this->portPingCommand($server, 'keydb', 6379), 'PONG'),
-            'dragonfly' => $this->probeWith($server, 'systemctl is-active dragonfly 2>/dev/null', 'active'),
-        ];
+        //
+        // All five checks run in a SINGLE SSH round-trip rather than one handshake per engine
+        // (multiplexing is off by default). Redis-family liveness = the ping output contains
+        // PONG; memcached/dragonfly liveness = `systemctl is-active --quiet` exit status.
+        //
+        // NOTE: the old probeWith() did a substring match on `is-active` output for memcached
+        // and dragonfly, which wrongly treated "inactive" as active (it contains "active").
+        // `--quiet` is exit-code based, so a stopped/absent unit now correctly reads false.
+        $redisCmd = $this->portPingCommand($server, 'redis', 6379);
+        $valkeyCmd = $this->portPingCommand($server, 'valkey', 6379);
+        $keydbCmd = $this->portPingCommand($server, 'keydb', 6379);
+
+        $script = <<<BASH
+        set +e
+        REDIS=0; VALKEY=0; MEMCACHED=0; KEYDB=0; DRAGONFLY=0
+        case "\$( { $redisCmd ; } 2>/dev/null | tr a-z A-Z )" in *PONG*) REDIS=1;; esac
+        case "\$( { $valkeyCmd ; } 2>/dev/null | tr a-z A-Z )" in *PONG*) VALKEY=1;; esac
+        systemctl is-active --quiet memcached 2>/dev/null && MEMCACHED=1
+        case "\$( { $keydbCmd ; } 2>/dev/null | tr a-z A-Z )" in *PONG*) KEYDB=1;; esac
+        systemctl is-active --quiet dragonfly 2>/dev/null && DRAGONFLY=1
+        echo "DPLY_CACHE_CAPS redis=\$REDIS valkey=\$VALKEY memcached=\$MEMCACHED keydb=\$KEYDB dragonfly=\$DRAGONFLY"
+        BASH;
+
+        try {
+            $out = $this->runner->run(
+                $server,
+                fn ($ssh): string => $ssh->exec('bash -lc '.escapeshellarg($script), 45),
+                useRoot: (bool) config('server_database.use_root_ssh', true),
+                fallbackToDeploy: (bool) config('server_database.fallback_to_deploy_user_ssh', true),
+            );
+        } catch (\Throwable) {
+            return $this->emptyResult();
+        }
+
+        if (! preg_match('/DPLY_CACHE_CAPS\s+([^\n]*)/', $out, $m)) {
+            return $this->emptyResult();
+        }
+
+        $caps = $this->emptyResult();
+        foreach (array_keys($caps) as $engine) {
+            if (preg_match('/\b'.$engine.'=([01])\b/', $m[1], $mm)) {
+                $caps[$engine] = $mm[1] === '1';
+            }
+        }
+
+        return $caps;
     }
 
     /**
@@ -109,10 +148,13 @@ class ServerCacheServiceHostCapabilities
             return false;
         }
 
+        // memcached/dragonfly: `--quiet` + `&& echo ACTIVE` makes this exit-code based —
+        // probeWith() ignores exit status, so without the marker a substring match on raw
+        // `is-active` output treats "inactive" as active (it contains "active").
         return match ($engine) {
             'redis', 'valkey', 'keydb' => $this->probeWith($server, $this->portPingCommand($server, $engine, $port), 'PONG'),
-            'memcached' => $this->probeWith($server, 'systemctl is-active memcached 2>/dev/null', 'active'),
-            'dragonfly' => $this->probeWith($server, 'systemctl is-active dragonfly 2>/dev/null', 'active'),
+            'memcached' => $this->probeWith($server, 'systemctl is-active --quiet memcached 2>/dev/null && echo ACTIVE', 'active'),
+            'dragonfly' => $this->probeWith($server, 'systemctl is-active --quiet dragonfly 2>/dev/null && echo ACTIVE', 'active'),
             default => false,
         };
     }

@@ -101,7 +101,7 @@ return [
             ],
             'backtrace' => env('DEBUGBAR_OPTIONS_DB_BACKTRACE', true),   // Use a backtrace to find the origin of the query in your files.
             'backtrace_exclude_paths' => [],   // Paths to exclude from backtrace. (in addition to defaults)
-            'timeline' => env('DEBUGBAR_OPTIONS_DB_TIMELINE', false),  // Add the queries to the timeline
+            'timeline' => env('DEBUGBAR_OPTIONS_DB_TIMELINE', true),  // Add the queries to the timeline
             'duration_background' => env('DEBUGBAR_OPTIONS_DB_DURATION_BACKGROUND', true),   // Show shaded background on each query relative to how long it took to execute.
             'explain' => [                 // Show EXPLAIN output on queries
                 'enabled' => env('DEBUGBAR_OPTIONS_DB_EXPLAIN_ENABLED', true),

@@ -285,6 +285,9 @@
                                 @case('exclamation-triangle')
                                     <x-heroicon-o-exclamation-triangle class="h-5 w-5 shrink-0 opacity-90" />
                                     @break
+                                @case('camera')
+                                    <x-heroicon-o-camera class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
                                 @default
                                     <x-heroicon-o-square-2-stack class="h-5 w-5 shrink-0 opacity-90" />
                             @endswitch

@@ -120,6 +120,8 @@ use App\Services\Sites\WebserverConfig\WebserverConfigEngineRegistry;
 use App\Services\Webhooks\OutboundWebhookDispatcher;
 use App\Services\WordPress\Advisories\AdvisoryProvider;
 use App\Services\WordPress\Advisories\WordfenceIntelligenceProvider;
+use App\Support\Debug\SshCallRecorder;
+use App\Support\Debug\SshCallsCollector;
 use App\Support\Debug\TaskRunnerBroadcastBridge;
 use App\Support\Edge\EdgeFilesystemRegistrar;
 use App\Support\Edge\EdgePlatformCredentials;
@@ -410,6 +412,8 @@ class AppServiceProvider extends ServiceProvider
             );
         });
 
+        $this->app->booted(fn () => $this->registerSshDebugbarCollector());
+
         Server::observe(ServerObserver::class);
         Site::observe(ImportSiteWakeupObserver::class);
         Site::observe(SiteBillingObserver::class);
@@ -616,6 +620,40 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinute(120)->by(is_string($sid) && $sid !== '' ? 'gmp:'.$sid : 'gmp-ip:'.$request->ip());
         });
+    }
+
+    /**
+     * Add an "SSH" tab to Debugbar that lists every inline SSH call the current
+     * page made (one timeline bar per command). Only wired when Debugbar is
+     * enabled, so the request-scoped recorder is never bound in queue workers
+     * or production — keeping {@see SshCallRecorder} from leaking in
+     * long-lived processes. Most dply SSH is queued and runs out-of-band, so
+     * this captures inline reads only (e.g. config-file fetches).
+     */
+    private function registerSshDebugbarCollector(): void
+    {
+        if (! $this->app->bound('debugbar')) {
+            return;
+        }
+
+        $debugbar = $this->app->make('debugbar');
+
+        if (! $debugbar->isEnabled()) {
+            return;
+        }
+
+        $this->app->instance(SshCallRecorder::class, new SshCallRecorder);
+
+        $start = defined('LARAVEL_START') ? LARAVEL_START : microtime(true);
+
+        try {
+            $debugbar->addCollector(new SshCallsCollector(
+                $this->app->make(SshCallRecorder::class),
+                $start,
+            ));
+        } catch (\Throwable) {
+            // Collector already added (e.g. on a re-resolved container) — ignore.
+        }
     }
 
     /**

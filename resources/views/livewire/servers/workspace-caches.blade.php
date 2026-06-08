@@ -63,6 +63,12 @@
     @endif
 
     @if ($opsReady)
+        @if (! $capabilitiesLoaded)
+            {{-- Probe installed cache engines off the render path so the workspace paints
+                 instantly; per-engine badges + install gates appear once it returns. --}}
+            <div wire:init="loadCacheCapabilities" class="hidden" aria-hidden="true"></div>
+        @endif
+
         @if ($cacheBusy)
             @include('livewire.servers.partials.cache._banner')
         @endif

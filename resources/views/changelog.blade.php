@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 8, 2026',
+                    'tags'    => ['new'],
+                    'title'   => 'Server Snapshots Workspace',
+                    'summary' => 'Servers gain a unified Snapshots workspace to capture full-disk provider images, take and restore site database snapshots, and manage cache (Redis/Valkey) snapshots from one place.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 8, 2026',
                     'tags'    => ['fixed'],
                     'title'   => 'Faster Config File Loading',
                     'summary' => 'Config files now load instantly in the editor via a direct SSH read instead of the queued worker round-trip that could fail to load or hang.',

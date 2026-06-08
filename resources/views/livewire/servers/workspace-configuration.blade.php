@@ -4,6 +4,13 @@
     :title="__('Configuration')"
     :description="__('Edit allowlisted server config files — webserver, PHP, Redis, databases, system, and supervisor.')"
 >
+    {{-- Register the lazy CodeMirror loader on initial page render. The editor
+         partial is only included once a file is selected; if that happens via a
+         Livewire update, the @vite module script inside it is injected by morph
+         and never executes — leaving window.dplyEnsureFileBrowserEditor undefined
+         and the editor blank. Loading it here guarantees it's available. --}}
+    @vite(['resources/js/file-browser-editor-lazy.js'])
+
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 

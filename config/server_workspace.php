@@ -71,7 +71,7 @@ return [
         ['key' => 'backups', 'route' => 'servers.backups', 'preview_route' => 'servers.backups', 'icon' => 'archive-box', 'label' => 'Backups', 'group' => 'background', 'requires_any_tags' => ['mysql', 'postgres'], 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.backups', 'preview_feature' => 'workspace.backups_preview'],
         ['key' => 'cron', 'route' => 'servers.cron', 'icon' => 'clock', 'label' => 'Cron jobs', 'group' => 'background', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'schedule', 'route' => 'servers.schedule', 'icon' => 'calendar-days', 'label' => 'Schedule', 'group' => 'background', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.schedule'],
-        ['key' => 'redis-snapshots', 'route' => 'servers.redis-snapshots', 'icon' => 'archive-box', 'label' => 'Snapshots', 'group' => 'background', 'except_host_kinds' => ['kubernetes'], 'soon_badge' => true],
+        ['key' => 'snapshots', 'route' => 'servers.snapshots', 'icon' => 'camera', 'label' => 'Snapshots', 'group' => 'background', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'worker-pool', 'route' => 'servers.worker-pool', 'icon' => 'square-3-stack-3d', 'label' => 'Worker Pool', 'group' => 'background', 'except_host_kinds' => ['kubernetes'], 'only_server_roles' => ['worker']],
         ['key' => 'daemons', 'route' => 'servers.workers', 'icon' => 'server-stack', 'label' => 'Workers', 'group' => 'background', 'except_host_kinds' => ['kubernetes']],
         // access (alphabetical by label)
@@ -118,21 +118,21 @@ return [
         // different group than its base config entry; `overrides[key].label`
         // swaps the displayed label.
         'redis' => [
-            'keys' => ['overview', 'caches', 'console', 'health', 'monitor', 'activity', 'logs', 'redis-snapshots', 'firewall', 'networking', 'ssh', 'cron', 'files', 'manage', 'settings'],
+            'keys' => ['overview', 'caches', 'console', 'health', 'monitor', 'activity', 'logs', 'snapshots', 'firewall', 'networking', 'ssh', 'cron', 'files', 'manage', 'settings'],
             'overrides' => [
                 'caches' => ['label' => 'Redis', 'group' => 'overview'],
                 'logs' => ['group' => 'monitor'],
                 'cron' => ['group' => 'admin'],
-                'redis-snapshots' => ['group' => 'admin'],
+                'snapshots' => ['group' => 'admin'],
             ],
         ],
         'valkey' => [
-            'keys' => ['overview', 'caches', 'console', 'health', 'monitor', 'activity', 'logs', 'redis-snapshots', 'firewall', 'networking', 'ssh', 'cron', 'files', 'manage', 'settings'],
+            'keys' => ['overview', 'caches', 'console', 'health', 'monitor', 'activity', 'logs', 'snapshots', 'firewall', 'networking', 'ssh', 'cron', 'files', 'manage', 'settings'],
             'overrides' => [
                 'caches' => ['label' => 'Valkey', 'group' => 'overview'],
                 'logs' => ['group' => 'monitor'],
                 'cron' => ['group' => 'admin'],
-                'redis-snapshots' => ['group' => 'admin'],
+                'snapshots' => ['group' => 'admin'],
             ],
         ],
         'load_balancer' => [
@@ -197,7 +197,7 @@ return [
     // (<x-workspace-coming-soon>) instead of their (not-yet-finished) real
     // content. Pages with a dedicated *-preview-panel + Pennant preview flag
     // (docker, ssh-access, files, …) handle their own teaser via that flag.
-    'coming_soon_keys' => ['redis-snapshots', 'load-balancers', 'edge-proxy', 'errors', 'health', 'activity'],
+    'coming_soon_keys' => ['load-balancers', 'edge-proxy', 'errors', 'health', 'activity'],
 
     'webserver_coming_soon' => ['apache', 'openlitespeed'],
 

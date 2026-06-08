@@ -157,7 +157,7 @@ use App\Livewire\Servers\WorkspaceNetworking;
 use App\Livewire\Servers\WorkspaceOverview;
 use App\Livewire\Servers\WorkspacePatchAdvisor;
 use App\Livewire\Servers\WorkspacePhp;
-use App\Livewire\Servers\WorkspaceRedisSnapshots;
+use App\Livewire\Servers\WorkspaceSnapshots;
 use App\Livewire\Servers\WorkspaceReleaseHygiene;
 use App\Livewire\Servers\WorkspaceReleaseHygienePreview;
 use App\Livewire\Servers\WorkspaceRun;
@@ -923,9 +923,13 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // is on (else 404). The service.installed gate still applies.
     Route::livewire('servers/{server}/backups', WorkspaceBackups::class)->name('servers.backups');
     Route::livewire('servers/{server}/backups-preview', WorkspaceBackupsPreview::class)->name('servers.backups-preview');
-    // Redis-mode snapshots surface. Visible on the sidebar only for
-    // role_nav_keys[redis|valkey] hosts; the middleware 404s for other roles.
-    Route::livewire('servers/{server}/redis-snapshots', WorkspaceRedisSnapshots::class)->name('servers.redis-snapshots');
+    // Unified snapshots surface: server/VM images, cache (Redis) RDB, site
+    // database snapshots, and volumes — one hub, distinct from logical Backups.
+    Route::livewire('servers/{server}/snapshots', WorkspaceSnapshots::class)->name('servers.snapshots');
+    // Back-compat: the surface was previously Redis-only at /redis-snapshots.
+    // Redirect bookmarks/links to the renamed hub instead of 404ing.
+    Route::get('servers/{server}/redis-snapshots', fn (string $server) => redirect()->route('servers.snapshots', $server))
+        ->name('servers.redis-snapshots');
     Route::livewire('servers/{server}/firewall', WorkspaceFirewall::class)->name('servers.firewall');
     Route::livewire('servers/{server}/networking', WorkspaceNetworking::class)->name('servers.networking');
     Route::livewire('servers/{server}/load-balancers', WorkspaceLoadBalancers::class)->name('servers.load-balancers');

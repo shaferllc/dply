@@ -54,13 +54,8 @@ class ServerDatabaseHostCapabilities
             return DatabaseWorkspaceEngines::defaultCapabilities();
         }
 
-        return [
-            'mysql' => $this->remoteExec->probeMysql($server),
-            'mariadb' => $this->remoteExec->probeMariadb($server),
-            'postgres' => $this->remoteExec->probePostgres($server),
-            'mongodb' => $this->remoteExec->probeMongodb($server),
-            'clickhouse' => $this->remoteExec->probeClickhouse($server),
-            'sqlite' => $this->remoteExec->probeSqlite($server),
-        ];
+        // One SSH round-trip for all six engines (see probeAllCapabilities) instead of
+        // 6–9 sequential handshakes via the per-engine probe* helpers.
+        return $this->remoteExec->probeAllCapabilities($server);
     }
 }

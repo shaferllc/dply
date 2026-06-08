@@ -8,6 +8,7 @@ use App\Jobs\ToggleDatabaseEngineActivationJob;
 use App\Jobs\ToggleDatabaseEngineRemoteAccessJob;
 use App\Jobs\ToggleDatabaseNetworkingJob;
 use App\Jobs\UninstallDatabaseEngineJob;
+use App\Livewire\Concerns\AuthorsBackupDestinations;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\SurfacesBindingConsumers;
 use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
@@ -15,6 +16,7 @@ use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\RunsAllowlistedManageAction;
 use App\Livewire\Servers\Concerns\RunsServerConsoleActions;
+use App\Models\BackupConfiguration;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerDatabase;
@@ -62,6 +64,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 #[Lazy]
 class WorkspaceDatabases extends Component
 {
+    use AuthorsBackupDestinations;
     use RendersWorkspacePlaceholder;
     use ConfirmsActionWithModal;
     use DismissesServerConsoleActionRun;
@@ -80,6 +83,9 @@ class WorkspaceDatabases extends Component
     public string $new_db_engine = 'mysql';
 
     public bool $engine_create_form_open = false;
+
+    /** When the create-database modal is open, whether the engine is fixed (per-engine tab) or selectable (Basics tab). */
+    public bool $create_lock_engine = false;
 
     public string $new_db_username = '';
 
@@ -167,6 +173,20 @@ class WorkspaceDatabases extends Component
     /** @var array<string, mixed>|null */
     public ?array $drift_snapshot = null;
 
+    /** True once loadDriftSnapshot() has run for the current Connections subtab view. */
+    public bool $drift_loaded = false;
+
+    /**
+     * Engine capabilities are SSH-probed off the render path (wire:init →
+     * loadCapabilities) so the workspace paints instantly. $capabilitiesLoaded
+     * gates the "checking…" UI; $capabilities_state holds the resolved map.
+     *
+     * @var array<string, bool>
+     */
+    public array $capabilities_state = [];
+
+    public bool $capabilitiesLoaded = false;
+
     /** State for the unified Edit modal (engine-aware). */
     public ?string $editing_db_id = null;
 
@@ -181,6 +201,21 @@ class WorkspaceDatabases extends Component
     public string $edit_mysql_collation = '';
 
     public string $edit_sqlite_path = '';
+
+    /**
+     * State for the "Back up" modal. The operator picks where the dump lands:
+     * an existing org S3 destination, a brand-new S3 destination (created inline
+     * via the AuthorsBackupDestinations trait form), or the default server disk.
+     */
+    public ?string $backup_modal_db_id = null;
+
+    /** 'existing' | 'new' | 'server' */
+    public string $backup_destination_mode = 'existing';
+
+    public ?string $backup_destination_id = null;
+
+    /** @var array<string, mixed> Trait-shaped destination form for the 'new' mode. */
+    public array $backupDestinationForm = [];
 
     /** State for the SQLite SQL console modal. */
     public ?string $sqlite_console_db_id = null;
@@ -324,12 +359,31 @@ class WorkspaceDatabases extends Component
         $this->workspace_tab = $engine;
         $this->engine_subtab = 'databases';
         $this->new_db_engine = $engine;
+        $this->create_lock_engine = true;
         $this->resetCreateDatabaseFormFields();
+        $this->resetErrorBag();
         $this->engine_create_form_open = true;
+        $this->dispatch('open-modal', 'create-database-modal');
+    }
+
+    /**
+     * Open the create-database modal from the Basics tab, where the engine is
+     * selectable rather than fixed to a single per-engine tab.
+     */
+    public function openDatabaseCreate(): void
+    {
+        $this->authorize('update', $this->server);
+
+        $this->create_lock_engine = false;
+        $this->resetCreateDatabaseFormFields();
+        $this->resetErrorBag();
+        $this->engine_create_form_open = true;
+        $this->dispatch('open-modal', 'create-database-modal');
     }
 
     public function closeEngineDatabaseCreate(): void
     {
+        $this->dispatch('close-modal', 'create-database-modal');
         $this->engine_create_form_open = false;
     }
 
@@ -777,6 +831,58 @@ class WorkspaceDatabases extends Component
         ]);
     }
 
+    /**
+     * Resolve engine capabilities off the render path. Fired by wire:init so the
+     * workspace paints immediately and the engine badges / create buttons appear
+     * once the single SSH probe (cached) returns.
+     */
+    public function loadCapabilities(ServerDatabaseHostCapabilities $capabilities): void
+    {
+        $this->authorize('view', $this->server);
+
+        try {
+            $this->capabilities_state = $capabilities->forServer($this->server);
+        } catch (\Throwable) {
+            // SSH timeout / key issues leave badges off; the user can still create
+            // databases from Basics — provisioner errors surface there.
+            $this->capabilities_state = DatabaseWorkspaceEngines::defaultCapabilities();
+        }
+
+        $this->capabilitiesLoaded = true;
+    }
+
+    /**
+     * Resolve database drift off the render path. Fired by wire:init on the
+     * Connections subtab; the drift analyzer makes several SSH round-trips, so
+     * keeping it here means it never blocks first paint.
+     */
+    public function loadDriftSnapshot(ServerDatabaseDriftAnalyzer $driftAnalyzer): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! in_array($this->workspace_tab, DatabaseWorkspaceEngines::MANAGEABLE, true)) {
+            $this->drift_loaded = true;
+
+            return;
+        }
+
+        try {
+            $this->drift_snapshot = $driftAnalyzer->analyze($this->server);
+            $this->driftProbeErrorNotified = false;
+        } catch (\Throwable $e) {
+            $message = $this->friendlyDatabaseWorkspaceError(
+                $e,
+                __('Dply could not connect to the server to compare database drift.')
+            );
+            if (! $this->driftProbeErrorNotified) {
+                $this->toastError($message);
+                $this->driftProbeErrorNotified = true;
+            }
+        }
+
+        $this->drift_loaded = true;
+    }
+
     public function refreshDatabaseCapabilities(ServerDatabaseHostCapabilities $capabilities): void
     {
         $this->authorize('update', $this->server);
@@ -786,6 +892,8 @@ class WorkspaceDatabases extends Component
         // dply doesn't have a record for yet (e.g. installed during provisioning or
         // manually via SSH — the "provision seeding gap").
         $detected = $capabilities->probe($this->server);
+        $this->capabilities_state = $detected;
+        $this->capabilitiesLoaded = true;
         $seededEngines = [];
         foreach ($detected as $engine => $running) {
             if (! $running || $engine === 'sqlite') {
@@ -1281,6 +1389,7 @@ class WorkspaceDatabases extends Component
     ): void {
         $this->authorize('update', $this->server);
         $this->drift_snapshot = $driftAnalyzer->analyze($this->server);
+        $this->drift_loaded = true;
         $auditLogger->record($this->server, ServerDatabaseAuditEvent::EVENT_DRIFT_CHECK, [], auth()->user());
         $this->toastSuccess(__('Drift analysis updated.'));
     }
@@ -1406,21 +1515,135 @@ class WorkspaceDatabases extends Component
         $this->toastSuccess(__('Share link created.'));
     }
 
-    public function queueExport(
-        string $databaseId,
-        ServerDatabaseAuditLogger $auditLogger,
+    /** S3-compatible providers — the only destinations the database exporter can upload to. */
+    public const S3_BACKUP_PROVIDERS = [
+        BackupConfiguration::PROVIDER_AWS_S3,
+        BackupConfiguration::PROVIDER_CUSTOM_S3,
+        BackupConfiguration::PROVIDER_DIGITALOCEAN_SPACES,
+    ];
+
+    /**
+     * Org-level S3-compatible backup destinations this server can reuse. Keyed
+     * for the modal's "existing destination" picker.
+     *
+     * @return \Illuminate\Support\Collection<int, BackupConfiguration>
+     */
+    protected function s3BackupDestinations(): \Illuminate\Support\Collection
+    {
+        if ($this->server->organization_id === null) {
+            return collect();
+        }
+
+        return BackupConfiguration::query()
+            ->where('organization_id', $this->server->organization_id)
+            ->whereIn('provider', self::S3_BACKUP_PROVIDERS)
+            ->orderBy('name')
+            ->get();
+    }
+
+    public function openBackupModal(string $databaseId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $db = ServerDatabase::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($databaseId)
+            ->first();
+        if (! $db) {
+            return;
+        }
+
+        $this->resetErrorBag();
+        $this->backup_modal_db_id = $db->id;
+        $this->backupDestinationForm = $this->emptyDestinationForm();
+        // Default the inline form to Custom S3 (the B2/R2/Wasabi/MinIO/Spaces catch-all).
+        $this->backupDestinationForm['provider'] = BackupConfiguration::PROVIDER_CUSTOM_S3;
+
+        $existing = $this->s3BackupDestinations();
+        $this->backup_destination_mode = $existing->isNotEmpty() ? 'existing' : 'new';
+        $this->backup_destination_id = $existing->first()?->id;
+
+        $this->dispatch('open-modal', 'backup-database-modal');
+    }
+
+    public function closeBackupModal(): void
+    {
+        $this->dispatch('close-modal', 'backup-database-modal');
+        $this->backup_modal_db_id = null;
+        $this->backup_destination_id = null;
+        $this->backup_destination_mode = 'existing';
+        $this->backupDestinationForm = [];
+        $this->resetErrorBag();
+    }
+
+    /**
+     * Queue a backup for the database in the modal, routing it to the chosen
+     * destination: an existing S3 destination, a new S3 destination created
+     * inline, or the server's default on-disk storage.
+     */
+    public function runDatabaseBackup(
         DatabaseBackupExporter $exporter,
     ): void {
         $this->authorize('update', $this->server);
-        $db = ServerDatabase::query()->where('server_id', $this->server->id)->whereKey($databaseId)->firstOrFail();
+
+        if (! $this->backup_modal_db_id) {
+            return;
+        }
+
+        $db = ServerDatabase::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($this->backup_modal_db_id)
+            ->firstOrFail();
+
+        $configId = null;
+
+        if ($this->backup_destination_mode === 'new') {
+            if ($this->server->organization_id === null) {
+                $this->toastError(__('This server has no organization to attach a backup destination to.'));
+
+                return;
+            }
+
+            $provider = (string) ($this->backupDestinationForm['provider'] ?? '');
+            if (! in_array($provider, self::S3_BACKUP_PROVIDERS, true)) {
+                $this->addError('backupDestinationForm.provider', __('Database backups support S3-compatible destinations only (AWS S3, Custom S3, or DigitalOcean Spaces).'));
+
+                return;
+            }
+
+            $this->validate($this->destinationFormRules('backupDestinationForm', $provider));
+
+            $destination = BackupConfiguration::query()->create([
+                'organization_id' => $this->server->organization_id,
+                'created_by_user_id' => auth()->id(),
+                'name' => $this->backupDestinationForm['name'],
+                'provider' => $provider,
+                'config' => $this->extractDestinationConfig($this->backupDestinationForm),
+            ]);
+
+            $configId = $destination->id;
+        } elseif ($this->backup_destination_mode === 'existing') {
+            $destination = $this->s3BackupDestinations()->firstWhere('id', $this->backup_destination_id);
+            if (! $destination) {
+                $this->addError('backup_destination_id', __('Pick a backup destination, or add a new one.'));
+
+                return;
+            }
+            $configId = $destination->id;
+        }
+
         $backup = ServerDatabaseBackup::query()->create([
             'server_database_id' => $db->id,
             'user_id' => auth()->id(),
             'status' => ServerDatabaseBackup::STATUS_PENDING,
         ]);
-        $exporter->prepareBackupRow($backup, $this->server);
+        $exporter->prepareBackupRow($backup, $this->server, $configId);
         dispatch(new ExportServerDatabaseBackupJob($backup->id));
-        $this->toastSuccess(__('Export queued. Refresh this page in a few moments and download from the backup list.'));
+
+        $this->closeBackupModal();
+        $this->toastSuccess($configId !== null
+            ? __('Backup queued to S3. Refresh in a few moments and download from the Backups tab.')
+            : __('Backup queued. Refresh in a few moments and download from the Backups tab.'));
     }
 
     public function downloadBackup(string $backupId, DatabaseBackupDownloader $downloader): StreamedResponse|Response|null
@@ -1760,6 +1983,7 @@ class WorkspaceDatabases extends Component
             $this->engine_create_form_open = false;
             $this->engine_subtab = 'databases';
             $this->resetCreateDatabaseFormFields();
+            $this->dispatch('close-modal', 'create-database-modal');
             $this->dispatch('open-modal', 'database-credentials-modal');
         } catch (UniqueConstraintViolationException) {
             $this->addError('new_db_name', __('A database named :name is already tracked on this server.', ['name' => $this->new_db_name]));
@@ -1843,10 +2067,8 @@ class WorkspaceDatabases extends Component
         }
     }
 
-    public function render(
-        ServerDatabaseDriftAnalyzer $driftAnalyzer,
-        ServerDatabaseHostCapabilities $capabilitiesService,
-    ): View {
+    public function render(): View
+    {
         $allowedTabs = DatabaseWorkspaceEngines::WORKSPACE_TABS;
         if (! in_array($this->workspace_tab, $allowedTabs, true)) {
             $this->workspace_tab = 'databases';
@@ -1870,15 +2092,13 @@ class WorkspaceDatabases extends Component
             ]);
         }
 
-        $capabilities = DatabaseWorkspaceEngines::defaultCapabilities();
-        if (! $needsNotifications) {
-            try {
-                $capabilities = $capabilitiesService->forServer($this->server);
-            } catch (\Throwable) {
-                // Probe failures (SSH timeout, key issues) leave engine badges off.
-                // The user can still create databases from Basics — provisioner errors surface there.
-            }
-        }
+        // Engine capabilities are one SSH probe; they are loaded off the render path via
+        // wire:init (loadCapabilities) so the page paints instantly. Until that resolves we
+        // render all-false and views key off $capabilitiesLoaded to show a "checking…" state
+        // rather than a misleading "not installed".
+        $capabilities = $this->capabilitiesLoaded
+            ? ($this->capabilities_state ?: DatabaseWorkspaceEngines::defaultCapabilities())
+            : DatabaseWorkspaceEngines::defaultCapabilities();
 
         if ($needsBasics && ! ($capabilities[$this->new_db_engine] ?? false)) {
             foreach (DatabaseWorkspaceEngines::ENGINE_TABS as $engine) {
@@ -1894,21 +2114,9 @@ class WorkspaceDatabases extends Component
             ->get()
             ->keyBy('engine');
 
-        if ($needsEngine && in_array($activeEngine, DatabaseWorkspaceEngines::MANAGEABLE, true) && $this->drift_snapshot === null) {
-            try {
-                $this->drift_snapshot = $driftAnalyzer->analyze($this->server);
-                $this->driftProbeErrorNotified = false;
-            } catch (\Throwable $e) {
-                $message = $this->friendlyDatabaseWorkspaceError(
-                    $e,
-                    __('Dply could not connect to the server to compare database drift.')
-                );
-                if (! $this->driftProbeErrorNotified) {
-                    $this->toastError($message);
-                    $this->driftProbeErrorNotified = true;
-                }
-            }
-        }
+        // Drift analysis is 4 sequential SSH round-trips (one per engine family); it is
+        // deferred to wire:init via loadDriftSnapshot() on the Connections subtab so it
+        // never blocks first paint. The drift card shows a "checking…" state until then.
 
         $credentialsModalDatabase = null;
         if ($this->credentials_modal_db_id !== null) {
@@ -1922,6 +2130,15 @@ class WorkspaceDatabases extends Component
             $connectionUrlModalDatabase = ServerDatabase::query()
                 ->where('server_id', $this->server->id)
                 ->find($this->connection_url_modal_db_id);
+        }
+
+        $backupModalDatabase = null;
+        $backupS3Destinations = collect();
+        if ($this->backup_modal_db_id !== null) {
+            $backupModalDatabase = ServerDatabase::query()
+                ->where('server_id', $this->server->id)
+                ->find($this->backup_modal_db_id);
+            $backupS3Destinations = $this->s3BackupDestinations();
         }
 
         $recentBackupsByEngine = collect();
@@ -1985,7 +2202,10 @@ class WorkspaceDatabases extends Component
                 $needsAdvanced,
             ),
             [
+                'capabilitiesLoaded' => $this->capabilitiesLoaded,
                 'credentialsModalDatabase' => $credentialsModalDatabase,
+                'backupModalDatabase' => $backupModalDatabase,
+                'backupS3Destinations' => $backupS3Destinations,
                 'connectionUrlModalDatabase' => $connectionUrlModalDatabase,
                 'existingMysqlUserOptions' => $needsBasics ? $this->existingMysqlUserOptions() : [],
                 'recentBackupsByEngine' => $recentBackupsByEngine,

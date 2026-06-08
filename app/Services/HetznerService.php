@@ -376,6 +376,41 @@ class HetznerService
     }
 
     /**
+     * Fetch a single image (snapshot) by ID — used to read its disk size once
+     * the create_image action completes.
+     *
+     * @return array<string, mixed>
+     */
+    public function getImage(int $imageId): array
+    {
+        $response = $this->request('get', "/images/{$imageId}");
+        $this->assertSuccess($response, 'get image');
+
+        $image = $response->json()['image'] ?? null;
+        if (! is_array($image)) {
+            throw new \RuntimeException('Hetzner API did not return an image.');
+        }
+
+        return $image;
+    }
+
+    /**
+     * Delete a snapshot/image by ID. No-op-safe on a 404 (already gone).
+     */
+    public function deleteImage(int $imageId): void
+    {
+        if ($imageId <= 0) {
+            throw new \InvalidArgumentException('Image id is required.');
+        }
+
+        $response = $this->request('delete', "/images/{$imageId}");
+        if ($response->status() === 404) {
+            return;
+        }
+        $this->assertSuccess($response, 'delete image');
+    }
+
+    /**
      * Fetch a single action by ID from the global actions endpoint.
      *
      * @return array<string, mixed>

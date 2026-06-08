@@ -258,7 +258,9 @@
                                     @php
                                         $rowSaysRunning = $row && $row->status === \App\Models\ServerCacheService::STATUS_RUNNING;
                                     @endphp
-                                    @if ($probeRunning)
+                                    @if (! $capabilitiesLoaded)
+                                        <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/60 px-2 py-0.5 text-xs font-medium text-brand-ink"><x-spinner variant="forest" size="sm" />{{ __('Checking…') }}</span>
+                                    @elseif ($probeRunning)
                                         <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">{{ __('Reachable') }}</span>
                                     @elseif ($rowSaysRunning)
                                         <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700" title="{{ __('Engine is running per dply state, but the SSH probe couldn\'t get a PONG back. Click Recheck/Debug below to see why — common causes are AUTH password mismatch, in-host firewall, or missing cli in PATH.') }}">{{ __('Couldn\'t verify') }}</span>

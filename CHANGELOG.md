@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Servers gain a unified Snapshots workspace to capture full-disk provider images, take and restore site database snapshots, and manage cache (Redis/Valkey) snapshots from one place.
 ### Fixed
 - Config files now load instantly in the editor via a direct SSH read instead of the queued worker round-trip that could fail to load or hang.
 ### Fixed

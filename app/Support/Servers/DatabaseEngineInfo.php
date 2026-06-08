@@ -103,6 +103,87 @@ final class DatabaseEngineInfo
         ];
     }
 
+    /**
+     * Terminal-hero + feature content for the shared <x-workspace-coming-soon>
+     * teaser rendered on a gated engine's workspace tabs. Keyed by engine
+     * family; falls back to a generic relational preview for anything without
+     * bespoke copy. Mirrors the line/feature shape the component expects.
+     *
+     * @return array{
+     *   icon: string,
+     *   eyebrow: string,
+     *   lines: array<int, array{tone: string, text: string}>,
+     *   features: array<int, array{icon: string, title: string, body: string}>,
+     * }
+     */
+    public static function comingSoonPreview(string $engine): array
+    {
+        return match (DatabaseWorkspaceEngines::family($engine)) {
+            'mariadb' => [
+                'icon' => 'heroicon-o-circle-stack',
+                'eyebrow' => __('MariaDB install preview'),
+                'lines' => [
+                    ['tone' => 'cmd', 'text' => '~ $ apt-get install -y mariadb-server'],
+                    ['tone' => 'muted', 'text' => 'Setting up mariadb-server (11.4) …'],
+                    ['tone' => 'muted', 'text' => 'CREATE DATABASE app; CREATE USER \'app\'@\'%\' …'],
+                    ['tone' => 'ok', 'text' => 'MariaDB ready · listening on :3306'],
+                ],
+                'features' => [
+                    ['icon' => 'circle-stack', 'title' => __('MySQL-compatible'), 'body' => __('Drop-in wire-protocol compatibility with every MySQL client and ORM.')],
+                    ['icon' => 'bolt', 'title' => __('Extra storage engines'), 'body' => __('Aria, ColumnStore, and Galera Cluster available out of the box.')],
+                    ['icon' => 'key', 'title' => __('Managed users & grants'), 'body' => __('Create databases and scoped users from the workspace, provisioned over SSH.')],
+                    ['icon' => 'arrow-uturn-left', 'title' => __('Backups & restore'), 'body' => __('Scheduled SQL dumps to your S3-style destination with one-click restore.')],
+                ],
+            ],
+            'mongodb' => [
+                'icon' => 'heroicon-o-circle-stack',
+                'eyebrow' => __('MongoDB install preview'),
+                'lines' => [
+                    ['tone' => 'cmd', 'text' => '~ $ systemctl start mongod'],
+                    ['tone' => 'muted', 'text' => 'MongoDB 7.0 listening on :27017'],
+                    ['tone' => 'muted', 'text' => 'db.createUser({ user: "app", roles: ["readWrite"] })'],
+                    ['tone' => 'ok', 'text' => 'replica set ready · 1 database'],
+                ],
+                'features' => [
+                    ['icon' => 'document-text', 'title' => __('Document model'), 'body' => __('Store JSON-shaped data with a rich query language — no migrations to evolve schema.')],
+                    ['icon' => 'key', 'title' => __('Users & roles'), 'body' => __('Provision scoped database users with readWrite/admin roles over SSH.')],
+                    ['icon' => 'signal', 'title' => __('Remote access'), 'body' => __('Expose per-database connectivity with firewalled remote access when you need it.')],
+                    ['icon' => 'arrow-uturn-left', 'title' => __('Backups'), 'body' => __('mongodump exports streamed to your backup destination.')],
+                ],
+            ],
+            'clickhouse' => [
+                'icon' => 'heroicon-o-chart-bar',
+                'eyebrow' => __('ClickHouse install preview'),
+                'lines' => [
+                    ['tone' => 'cmd', 'text' => '~ $ clickhouse-client'],
+                    ['tone' => 'muted', 'text' => 'SELECT count() FROM events  -- 4.2B rows'],
+                    ['tone' => 'muted', 'text' => '↳ 0.18s · 23.41 GB/s'],
+                    ['tone' => 'ok', 'text' => 'columnar OLAP ready · :8123 / :9000'],
+                ],
+                'features' => [
+                    ['icon' => 'chart-bar', 'title' => __('Columnar OLAP'), 'body' => __('Sub-second aggregates over billions of rows for analytics and observability.')],
+                    ['icon' => 'bolt', 'title' => __('Real-time ingest'), 'body' => __('High-throughput event pipelines alongside your row-store databases.')],
+                    ['icon' => 'key', 'title' => __('Managed users'), 'body' => __('Create scoped ClickHouse users and databases from the workspace.')],
+                    ['icon' => 'cloud-arrow-up', 'title' => __('Backups'), 'body' => __('Export and restore to your S3-style backup destination.')],
+                ],
+            ],
+            default => [
+                'icon' => 'heroicon-o-circle-stack',
+                'eyebrow' => __(':engine install preview', ['engine' => self::for($engine)['label']]),
+                'lines' => [
+                    ['tone' => 'cmd', 'text' => '~ $ dply database install '.$engine],
+                    ['tone' => 'muted', 'text' => 'Provisioning over SSH …'],
+                    ['tone' => 'ok', 'text' => 'engine ready'],
+                ],
+                'features' => [
+                    ['icon' => 'circle-stack', 'title' => __('One-click install'), 'body' => __('apt + systemctl over SSH with memory/disk preflight checks.')],
+                    ['icon' => 'key', 'title' => __('Managed users & grants'), 'body' => __('Create databases and scoped users from the workspace.')],
+                    ['icon' => 'arrow-uturn-left', 'title' => __('Backups & restore'), 'body' => __('Scheduled exports to your S3-style destination with one-click restore.')],
+                ],
+            ],
+        };
+    }
+
     public static function for(string $engine): array
     {
         return self::all()[$engine] ?? [

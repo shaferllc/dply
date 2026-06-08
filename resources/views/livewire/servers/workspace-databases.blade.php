@@ -21,6 +21,12 @@
     </x-explainer>
 
     @if ($opsReady)
+        @if (! $capabilitiesLoaded)
+            {{-- Probe installed engines off the render path so the workspace paints
+                 instantly; badges + create buttons appear once loadCapabilities() returns. --}}
+            <div wire:init="loadCapabilities" class="hidden" aria-hidden="true"></div>
+        @endif
+
         @if ($databaseConsoleBannerRun)
             <div class="mb-4">
                 @include('livewire.partials.console-action-banner-static', [
@@ -484,6 +490,49 @@
                     </div>
                 </div>
             </div>
+        @endif
+
+        @if ($engine_create_form_open)
+            <x-modal
+                name="create-database-modal"
+                :show="false"
+                maxWidth="2xl"
+                overlayClass="bg-brand-ink/30"
+                panelClass="dply-modal-panel overflow-hidden shadow-xl flex max-h-[min(90vh,880px)] flex-col"
+                focusable
+            >
+                <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+                    <x-icon-badge>
+                        <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Create database') }}</p>
+                        <h2 class="mt-1 text-lg font-semibold text-brand-ink">
+                            @if ($create_lock_engine)
+                                {{ __('New :engine database', ['engine' => $engineLabels[$new_db_engine] ?? ucfirst($new_db_engine)]) }}
+                            @else
+                                {{ __('New database') }}
+                            @endif
+                        </h2>
+                        <p class="mt-1 text-sm leading-6 text-brand-moss">
+                            {{ __('Runs CREATE DATABASE, then creates a per-database user (defaulting to the database name) and grants it access to that database only. Credentials are stored encrypted in Dply.') }}
+                        </p>
+                    </div>
+                </div>
+                <div class="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+                    @include('livewire.servers.partials.databases._create-database-form', [
+                        'lockEngine' => $create_lock_engine ? $new_db_engine : null,
+                        'showExplainer' => false,
+                    ])
+                </div>
+            </x-modal>
+        @endif
+
+        @if ($backup_modal_db_id)
+            @include('livewire.servers.partials.databases._backup-database-modal', [
+                'backupModalDatabase' => $backupModalDatabase,
+                'backupS3Destinations' => $backupS3Destinations,
+            ])
         @endif
 
         @if ($editing_db_id)

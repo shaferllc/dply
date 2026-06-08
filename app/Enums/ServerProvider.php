@@ -238,6 +238,33 @@ enum ServerProvider: string
     }
 
     /**
+     * Whether Dply can capture a full-disk image / snapshot of a server through
+     * this provider's API. Only providers whose service class exposes the
+     * create-image + poll-action methods qualify (DigitalOcean snapshotDroplet,
+     * Hetzner createImageFromServer). Gates the "Create image" affordance on the
+     * Snapshots workspace; other providers render a "not available" state.
+     */
+    public function supportsImageSnapshots(): bool
+    {
+        return match ($this) {
+            self::DigitalOcean,
+            self::Hetzner => true,
+            default => false,
+        };
+    }
+
+    /**
+     * Whether Dply can snapshot attached block-storage volumes through this
+     * provider's API. No provider service wraps the volume APIs yet, so this is
+     * uniformly false — the Snapshots workspace Volumes tab shows a "coming soon"
+     * state until the volume plumbing (Phase 3) lands.
+     */
+    public function supportsVolumeSnapshots(): bool
+    {
+        return false;
+    }
+
+    /**
      * Whether this provider has full support: service class, provision/poll jobs,
      * create tab, and destroy handling. Otherwise only credentials are stored.
      */

@@ -1068,7 +1068,9 @@ class SiteBindingManager
         // failure just bubbles up to the toast — unlike provisionDatabase, we
         // don't persist an error row, which would clobber an existing working
         // storage binding (one row per site+type).
-        $result = $this->bucketProvisioner->create($provider, $region, $key, $secret, $bucket);
+        // Auto-minted keys (DO Spaces) aren't active on the S3 gateway for a few
+        // seconds, so let the provisioner retry the rejection codes in that case.
+        $result = $this->bucketProvisioner->create($provider, $region, $key, $secret, $bucket, awaitKeyPropagation: $autoMinted);
         $endpoint = (string) ($result['endpoint'] ?? '');
 
         $binding = $this->persist($site, 'storage', [
@@ -1134,9 +1136,10 @@ class SiteBindingManager
      */
     private function mintDigitalOceanSpacesKey(ProviderCredential $credential, string $bucket): array
     {
-        // Full-access key (empty grants) so it can create the bucket — the same
-        // privilege level as a console-created Spaces key. DO returns the secret
-        // only at creation time; it lives on the binding's encrypted env after.
+        // Full-access key so it can create the bucket — createSpacesKey() turns
+        // an empty grant list into an explicit full-access grant (a DO Spaces key
+        // with NO grants has NO access). DO returns the secret only at creation
+        // time; it lives on the binding's encrypted env after.
         $minted = (new DigitalOceanService($credential))->createSpacesKey('dply-'.$bucket, []);
 
         return ['key' => $minted['access_key'], 'secret' => $minted['secret_key']];

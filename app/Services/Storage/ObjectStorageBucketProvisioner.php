@@ -27,9 +27,15 @@ final class ObjectStorageBucketProvisioner
      * when the operator already owns a bucket by that name. Returns the
      * resolved S3 endpoint so the caller can wire AWS_ENDPOINT.
      *
+     * $awaitKeyPropagation: set when the keys were just minted via a provider
+     * API (DigitalOcean Spaces). A freshly-created key isn't active on the S3
+     * gateway for a few seconds, so the first CreateBucket can fail with
+     * InvalidAccessKeyId/SignatureDoesNotMatch — we retry those briefly. Leave
+     * false for operator-supplied keys so genuinely-wrong keys fail fast.
+     *
      * @return array{endpoint: string}
      */
-    public function create(string $provider, string $region, string $accessKey, string $secret, string $bucket): array
+    public function create(string $provider, string $region, string $accessKey, string $secret, string $bucket, bool $awaitKeyPropagation = false): array
     {
         $providers = (array) config('object_storage.providers', []);
         $meta = $providers[$provider] ?? null;
@@ -61,30 +67,49 @@ final class ObjectStorageBucketProvisioner
             'http' => ['connect_timeout' => 5, 'timeout' => 20],
         ]);
 
-        try {
-            $client->createBucket(['Bucket' => $bucket]);
-        } catch (S3Exception $e) {
-            $code = (string) $e->getAwsErrorCode();
+        // A just-minted key can take a few seconds to become active on the S3
+        // gateway, so retry the rejection codes when the caller knows the keys
+        // are fresh. Operator-supplied keys (awaitKeyPropagation=false) get one
+        // attempt and fail fast.
+        $maxAttempts = $awaitKeyPropagation ? max(1, (int) config('object_storage.fresh_key_retry_attempts', 6)) : 1;
+        $delayMicros = max(0, (int) config('object_storage.fresh_key_retry_delay_ms', 2500)) * 1000;
+        $attempt = 0;
 
-            // The operator already owns this bucket — treat as success so the
-            // binding still wires it (lets "provision" double as "adopt mine").
-            if ($code === 'BucketAlreadyOwnedByYou') {
+        while (true) {
+            $attempt++;
+            try {
+                $client->createBucket(['Bucket' => $bucket]);
+
                 return ['endpoint' => $endpoint];
-            }
+            } catch (S3Exception $e) {
+                $code = (string) $e->getAwsErrorCode();
 
-            if ($code === 'BucketAlreadyExists') {
-                throw new RuntimeException(__('That bucket name is already taken on this provider — choose another.'));
-            }
+                // The operator already owns this bucket — treat as success so the
+                // binding still wires it (lets "provision" double as "adopt mine").
+                if ($code === 'BucketAlreadyOwnedByYou') {
+                    return ['endpoint' => $endpoint];
+                }
 
-            if (in_array($code, ['InvalidAccessKeyId', 'SignatureDoesNotMatch', 'AccessDenied'], true)) {
-                throw new RuntimeException(__('The storage keys were rejected by :provider — check the access key and secret.', ['provider' => $providerLabel]));
-            }
+                if ($code === 'BucketAlreadyExists') {
+                    throw new RuntimeException(__('That bucket name is already taken on this provider — choose another.'));
+                }
 
-            throw new RuntimeException(__('Could not create the bucket: :err', ['err' => $e->getAwsErrorMessage() ?: $e->getMessage()]));
-        } catch (AwsException $e) {
-            throw new RuntimeException(__('Could not reach :provider to create the bucket: :err', ['provider' => $providerLabel, 'err' => $e->getMessage()]));
+                // Fresh-key propagation window: the key was just minted and isn't
+                // active yet. Retry these before giving up.
+                if (in_array($code, ['InvalidAccessKeyId', 'SignatureDoesNotMatch'], true) && $attempt < $maxAttempts) {
+                    usleep($delayMicros);
+
+                    continue;
+                }
+
+                if (in_array($code, ['InvalidAccessKeyId', 'SignatureDoesNotMatch', 'AccessDenied'], true)) {
+                    throw new RuntimeException(__('The storage keys were rejected by :provider — check the access key and secret.', ['provider' => $providerLabel]));
+                }
+
+                throw new RuntimeException(__('Could not create the bucket: :err', ['err' => $e->getAwsErrorMessage() ?: $e->getMessage()]));
+            } catch (AwsException $e) {
+                throw new RuntimeException(__('Could not reach :provider to create the bucket: :err', ['provider' => $providerLabel, 'err' => $e->getMessage()]));
+            }
         }
-
-        return ['endpoint' => $endpoint];
     }
 }

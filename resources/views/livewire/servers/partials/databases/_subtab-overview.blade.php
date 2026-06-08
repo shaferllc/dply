@@ -48,40 +48,11 @@
         </div>
 
         <div class="px-6 py-6 sm:px-8">
-            @if (($comingSoonEngines[$engine] ?? false) && ! $engineRow)
-                {{-- Coming soon: engine is gated behind database.{engine}. MySQL /
-                     PostgreSQL stay installable; this engine shows a teaser instead
-                     of the install affordance until platform admin flips the flag on.
-                     The Info tab still describes the engine so operators can evaluate
-                     it now. --}}
-                <div class="flex items-start gap-3">
-                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sand/60 text-brand-moss ring-1 ring-brand-ink/10">
-                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
-                    </span>
-                    <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Coming soon') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine support is on the way', ['engine' => $dbEngineInfoForTab['label']]) }}</h3>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                            {{ $dbEngineInfoForTab['tagline'] }}
-                            {{ __('One-click install on this server is coming soon — for now, MySQL and PostgreSQL are the supported relational engines. See the Info tab for details on :engine.', ['engine' => $dbEngineInfoForTab['label']]) }}
-                        </p>
-                        <div class="mt-4 flex flex-wrap items-center gap-3">
-                            <button
-                                type="button"
-                                wire:click="setEngineSubtab('info')"
-                                class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                            >
-                                <x-heroicon-o-information-circle class="h-4 w-4" aria-hidden="true" />
-                                {{ __('Learn more') }}
-                            </button>
-                            <span class="inline-flex cursor-not-allowed items-center gap-2 rounded-lg bg-brand-forest/30 px-4 py-2 text-sm font-medium text-white opacity-70">
-                                <x-heroicon-o-no-symbol class="h-4 w-4" aria-hidden="true" />
-                                {{ __('Install :engine', ['engine' => $dbEngineInfoForTab['label']]) }}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            @elseif (! $engineRow)
+            {{-- Gated "coming soon" engines never reach this panel — the engine
+                 dispatcher routes all their tabs (bar Info) to the shared
+                 <x-workspace-coming-soon> teaser. This branch handles available
+                 engines that simply aren't installed on this box yet. --}}
+            @if (! $engineRow)
                 <p class="max-w-2xl text-sm leading-relaxed text-brand-moss">
                     {{ $dbEngineInfoForTab['description'] }}
                 </p>

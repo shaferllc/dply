@@ -40,7 +40,7 @@
                     wire:click="openCustomSystemdModal"
                     wire:loading.attr="disabled"
                     wire:target="openCustomSystemdModal"
-                    @disabled($isDeployer)
+                    :disabled="$isDeployer"
                 >
                     <x-heroicon-o-adjustments-horizontal class="h-4 w-4 shrink-0 opacity-90" wire:loading.remove wire:target="openCustomSystemdModal" />
                     <span wire:loading wire:target="openCustomSystemdModal" class="inline-flex h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-brand-ink/25 border-t-brand-ink" aria-hidden="true"></span>
@@ -52,7 +52,7 @@
                     type="button"
                     wire:click="refreshSystemdInventory"
                     wire:loading.attr="disabled"
-                    @disabled(! $opsReady || $isDeployer || $syncInFlight)
+                    :disabled="! $opsReady || $isDeployer || $syncInFlight"
                     title="{{ $syncInFlight ? __('A sync is already running. Wait for it to finish.') : '' }}"
                 >
                     <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0 opacity-90 {{ $syncInFlight ? 'animate-spin' : '' }}" wire:loading.class="animate-spin" wire:target="refreshSystemdInventory" />
@@ -74,7 +74,7 @@
                         wire:click="openSystemdActionConfirm('bulk-restart')"
                         wire:loading.attr="disabled"
                         wire:target="openSystemdActionConfirm"
-                        @disabled($systemdBulkBusy || ($systemdRowBusyUnit !== null && $systemdRowBusyUnit !== ''))
+                        :disabled="$systemdBulkBusy || ($systemdRowBusyUnit !== null && $systemdRowBusyUnit !== '')"
                     >
                         <span wire:loading wire:target="openSystemdActionConfirm" class="inline-flex h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-brand-ink/25 border-t-brand-ink" aria-hidden="true"></span>
                         <span wire:loading.remove wire:target="openSystemdActionConfirm">{{ __('Restart selected') }}</span>
@@ -86,7 +86,7 @@
                         wire:click="openSystemdActionConfirm('bulk-stop')"
                         wire:loading.attr="disabled"
                         wire:target="openSystemdActionConfirm"
-                        @disabled($systemdBulkBusy || ($systemdRowBusyUnit !== null && $systemdRowBusyUnit !== ''))
+                        :disabled="$systemdBulkBusy || ($systemdRowBusyUnit !== null && $systemdRowBusyUnit !== '')"
                     >
                         <span wire:loading wire:target="openSystemdActionConfirm" class="inline-flex h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden="true"></span>
                         <span wire:loading.remove wire:target="openSystemdActionConfirm">{{ __('Stop selected') }}</span>
@@ -183,6 +183,9 @@
                                 $nameLine .= ' ('.$ver.')';
                             }
                             $rowUnit = $row['unit'] ?? '';
+                            // JS-safe literal for use in wire:* attributes on <x-...> components,
+                            // where the @js directive leaks uncompiled (component tag compiler skips it).
+                            $rowUnitJs = \Illuminate\Support\Js::from($rowUnit);
                             $rowIsBusy = $this->systemdInventoryRowIsBusy($rowUnit);
                             $rowBusy = ($systemdRowBusyUnit ?? '') !== '' && ($systemdRowBusyUnit ?? '') === $rowUnit;
                             $otherBusy = (($systemdRowBusyUnit ?? '') !== '' && ! $rowBusy) || ($systemdBulkBusy ?? false);
@@ -301,7 +304,7 @@
                                             type="button"
                                             wire:click="{{ $startWireClick }}"
                                             wire:loading.attr="disabled"
-                                            @disabled(! $opsReady || $otherBusy || $rowPending)
+                                            :disabled="! $opsReady || $otherBusy || $rowPending"
                                             class="!inline-flex !items-center !gap-1.5 !shrink-0 !py-2 !text-[11px]"
                                             title="{{ $startUsesConfirm ? $row['standby_reason'] : '' }}"
                                         >
@@ -312,10 +315,10 @@
                                         <x-secondary-button
                                             size="sm"
                                             type="button"
-                                            wire:click="openSystemdActionConfirm('restart', @js($rowUnit))"
+                                            wire:click="openSystemdActionConfirm('restart', {{ $rowUnitJs }})"
                                             wire:loading.attr="disabled"
-                                            wire:target="openSystemdActionConfirm('restart', @js($rowUnit))"
-                                            @disabled(! $opsReady || $otherBusy || $rowPending)
+                                            wire:target="openSystemdActionConfirm('restart', {{ $rowUnitJs }})"
+                                            :disabled="! $opsReady || $otherBusy || $rowPending"
                                             class="!inline-flex !items-center !gap-1.5 !shrink-0 !py-2 !text-[11px]"
                                         >
                                             <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0 text-brand-ink/80" aria-hidden="true" />
@@ -325,9 +328,9 @@
                                         <x-secondary-button
                                             size="sm"
                                             type="button"
-                                            wire:click="openSystemdStatusModalForService(@js($rowUnit))"
+                                            wire:click="openSystemdStatusModalForService({{ $rowUnitJs }})"
                                             wire:loading.attr="disabled"
-                                            @disabled(! $opsReady || ($deployerSystemdLocked ?? true) || $otherBusy)
+                                            :disabled="! $opsReady || ($deployerSystemdLocked ?? true) || $otherBusy"
                                             class="!inline-flex !items-center !gap-1.5 !shrink-0 !py-2 !text-[11px]"
                                         >
                                             <x-heroicon-o-eye class="h-4 w-4 shrink-0 text-brand-ink/80" aria-hidden="true" />
@@ -343,7 +346,7 @@
                                                     class="!inline-flex !shrink-0 !items-center !gap-1 !px-2 !py-2 !text-[11px]"
                                                     aria-label="{{ __('More actions') }}"
                                                     aria-haspopup="true"
-                                                    @disabled($otherBusy || $rowBusy || $rowPending)
+                                                    :disabled="$otherBusy || $rowBusy || $rowPending"
                                                 >
                                                     <x-heroicon-o-ellipsis-horizontal class="h-4 w-4 shrink-0 text-brand-ink/80" />
                                                 </x-secondary-button>

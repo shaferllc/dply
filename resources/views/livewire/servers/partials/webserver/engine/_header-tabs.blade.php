@@ -134,6 +134,13 @@
                             :icon="$stInfo['icon']"
                         >
                             {{ $stInfo['label'] }}
+                            @if (in_array($stKey, $comingSoonSubtabKeys ?? [], true))
+                                {{-- These tabs stay clickable (roadmap teaser) but aren't backed
+                                     by a real panel yet — flag them like the webserver picker. --}}
+                                <span class="inline-flex shrink-0 items-center rounded-full bg-brand-sand/70 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
+                                    {{ __('Soon') }}
+                                </span>
+                            @endif
                         </x-server-workspace-tab>
                     @endforeach
                 @endif

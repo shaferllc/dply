@@ -49,6 +49,12 @@
         && ($isActive || $isEdgeProxyPanel)
         && in_array($engine_subtab, $nginxComingSoonSubtabs, true);
 
+    // Live-state sub-tab keys that still render the coming-soon teaser instead
+    // of a real panel — surfaced to _header-tabs so those tabs carry a "Soon"
+    // badge. Today only nginx's strip is unfinished; every other active
+    // engine's live-state tabs are backed by real panels.
+    $comingSoonSubtabKeys = $key === 'nginx' ? $nginxComingSoonSubtabs : [];
+
     // Instant sub-tab paint: entangle engine_subtab client-side, defer SSH via wire:init.
     $optimisticEngineSubtabs = ($isActive || $isEdgeProxyPanel) && ! $isComingSoon;
     $liveStateTabKeys = $liveStateTabsByEngine[$key] ?? [];
