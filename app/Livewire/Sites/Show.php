@@ -1871,6 +1871,7 @@ class Show extends Component
         $this->new_env_key = '';
         $this->new_env_value = '';
         $this->new_env_comment = '';
+        $this->dispatch('close-modal', 'add-env-modal');
         $this->autoPushAfterCacheMutation(__('Variable saved.'));
     }
 
