@@ -14,6 +14,8 @@ return [
 
     'llm' => [
         'enabled' => filter_var(env('DPLY_AI_LLM_ENABLED', env('DPLY_OPS_COPILOT_LLM_ENABLED', false)), FILTER_VALIDATE_BOOL),
+        // 'claude' (or 'claude-cli') routes completions through the local `claude` CLI
+        // — no API key needed; anything else hits an OpenAI-compatible HTTP endpoint.
         'provider' => env('DPLY_AI_LLM_PROVIDER', env('DPLY_OPS_COPILOT_LLM_PROVIDER', 'openai')),
         'model' => env('DPLY_AI_LLM_MODEL', env('DPLY_OPS_COPILOT_LLM_MODEL', 'gpt-4o-mini')),
         'api_key' => env('DPLY_AI_LLM_API_KEY', env('DPLY_OPS_COPILOT_LLM_API_KEY')),

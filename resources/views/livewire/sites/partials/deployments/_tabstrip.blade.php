@@ -3,6 +3,7 @@
     $tabs = [
         ['id' => DeploymentsList::TAB_OVERVIEW,   'label' => __('Overview'),   'icon' => 'heroicon-o-chart-bar'],
         ['id' => DeploymentsList::TAB_DEPLOY,     'label' => __('Deploy'),     'icon' => 'heroicon-o-rocket-launch'],
+        ['id' => DeploymentsList::TAB_SYNC,       'label' => __('Sync'),       'icon' => 'heroicon-o-arrows-right-left'],
         // Environment moved to its own first-class section (sites.environment).
         ['id' => DeploymentsList::TAB_WEBHOOK,  'label' => __('Webhook'),  'icon' => 'heroicon-o-bolt'],
         ['id' => DeploymentsList::TAB_HOOKS,    'label' => __('Hooks'),    'icon' => 'heroicon-o-link'],

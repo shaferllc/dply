@@ -10,13 +10,13 @@ use App\Jobs\RunSiteDeploymentJob;
 use App\Jobs\ViewServerEnvJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
-use App\Livewire\Sites\Concerns\SurfacesDeploymentRemediation;
 use App\Livewire\Concerns\ManagesSiteBindings;
 use App\Livewire\Concerns\OptimizesPipeline;
 use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
 use App\Livewire\Sites\Concerns\ManagesSiteDeployExecution;
 use App\Livewire\Sites\Concerns\ManagesSiteDeploymentSchedules;
 use App\Livewire\Sites\Concerns\ManagesSiteEnvironment;
+use App\Livewire\Sites\Concerns\SurfacesDeploymentRemediation;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\Site;
@@ -27,6 +27,8 @@ use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
 use App\Support\Sites\SiteSettingsViewData;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Url;
 use Livewire\Component;
@@ -65,11 +67,24 @@ class DeploymentsList extends Component
      */
     public array $blocked_env_values = [];
 
+    /**
+     * Selected site ids for the Sync tab's "deploy several sites together" action
+     * (e.g. a main site + its worker). Pre-seeded with the repo/server peers the
+     * first time the tab opens.
+     *
+     * @var array<int, string>
+     */
+    public array $syncSelectedSiteIds = [];
+
+    public bool $syncSelectionSeeded = false;
+
     public const TAB_OVERVIEW = 'overview';
 
     public const TAB_REPOSITORY = 'repository';
 
     public const TAB_DEPLOY = 'deploy';
+
+    public const TAB_SYNC = 'sync';
 
     public const TAB_ENVIRONMENT = 'environment';
 
@@ -97,6 +112,7 @@ class DeploymentsList extends Component
         self::TAB_OVERVIEW,
         self::TAB_REPOSITORY,
         self::TAB_DEPLOY,
+        self::TAB_SYNC,
         self::TAB_ENVIRONMENT,
         self::TAB_WEBHOOK,
         self::TAB_HOOKS,
@@ -200,9 +216,76 @@ class DeploymentsList extends Component
             return;
         }
         $this->tab = $tab;
+        if ($tab === self::TAB_SYNC && ! $this->syncSelectionSeeded) {
+            $this->syncSelectedSiteIds = $this->syncCandidates->pluck('id')->map(fn ($id): string => (string) $id)->all();
+            $this->syncSelectionSeeded = true;
+        }
         if ($tab !== self::TAB_SETTINGS) {
             $this->settingsSection = '';
         }
+    }
+
+    /**
+     * Sites the user can pick to deploy alongside this one — the repo peers
+     * (a main site + its worker share a git repository), or same-server siblings
+     * when no repo is set. Always includes this site.
+     */
+    public function getSyncCandidatesProperty(): Collection
+    {
+        $repo = trim((string) $this->site->git_repository_url);
+
+        return Site::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->where(function ($w) use ($repo): void {
+                $w->where('id', $this->site->id);
+                if ($repo !== '') {
+                    $w->orWhere('git_repository_url', $repo);
+                } else {
+                    $w->orWhere('server_id', $this->site->server_id);
+                }
+            })
+            ->with('server:id,name')
+            ->orderBy('name')
+            ->get();
+    }
+
+    /**
+     * Deploy every selected site together (parallel fan-out). Replaces the old
+     * persistent "sync group" — an ad-hoc multi-select per deploy. Each site is
+     * authorized + dispatched exactly like the single Deploy button.
+     */
+    public function deployMultiple(): void
+    {
+        $ids = array_values(array_unique(array_map('strval', $this->syncSelectedSiteIds)));
+        if ($ids === []) {
+            $this->toastError(__('Pick at least one site to deploy.'));
+
+            return;
+        }
+
+        $candidates = $this->syncCandidates->keyBy(fn ($s): string => (string) $s->id);
+        $queued = 0;
+        $skipped = 0;
+        foreach ($ids as $id) {
+            $site = $candidates->get($id);
+            if ($site === null || ! Gate::allows('update', $site)) {
+                $skipped++;
+
+                continue;
+            }
+            Cache::put('site-deploy-active:'.$site->id, [
+                'started_at' => now()->toIso8601String(),
+                'deployment_id' => null,
+            ], 600);
+            RunSiteDeploymentJob::dispatch($site, SiteDeployment::TRIGGER_MANUAL);
+            $queued++;
+        }
+
+        $msg = trans_choice('{1}:count deployment queued.|[2,*]:count deployments queued.', $queued, ['count' => $queued]);
+        if ($skipped > 0) {
+            $msg .= ' '.__(':n skipped (no permission).', ['n' => $skipped]);
+        }
+        $this->toastSuccess($msg);
     }
 
     public function setSection(string $section): void

@@ -156,6 +156,14 @@ class SiteGitDeployer
             );
         }
 
+        // ── DETECT ── persist composer-based Laravel stack hints from the fresh
+        // checkout so Site::resolvedRuntimeAppDetection() (and the Laravel
+        // settings tab) work for simple-strategy VM sites too. AtomicSiteDeployer
+        // does this from its release dir; without it, simple deploys never
+        // populate meta.vm_runtime.detected and the framework reads as unknown
+        // even for obvious Laravel apps (esp. when the app-picker was skipped).
+        app(VmSiteComposerDetectionPersister::class)->persistFromReleasePath($site, $ssh, $path);
+
         // ── ENV ── compose the .env (env cache + attached resource bindings'
         // connection vars + workspace variables) and write it BEFORE build, so
         // composer/asset steps and the live app see bound resources (DB_*,

@@ -97,6 +97,8 @@
                         @include('livewire.sites.partials.deployments._repository-panel')
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_DEPLOY)
                         @include('livewire.sites.partials.deployments._deploy-panel')
+                    @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_SYNC)
+                        @include('livewire.sites.partials.deployments._sync-panel')
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_ENVIRONMENT)
                         @include('livewire.sites.settings.partials.environment')
                     @elseif ($tab === \App\Livewire\Sites\DeploymentsList::TAB_COMMITS)

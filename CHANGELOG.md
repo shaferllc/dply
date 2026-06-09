@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 ### Added
+- AI features can now route completions through the local `claude` CLI by setting the provider to "claude", requiring no API key.
+### Added
+- AI features can now route completions through the local `claude` CLI by setting the provider to "claude", requiring no API key.
+### Added
+- A new Sync tab on the site deployments page lets you select and deploy multiple related sites—such as a main site and its worker—together in one action.
+### Added
+- Server overview now explains why CPU is busy by listing the top processes with plain-language remediation hints when CPU is elevated.
+### Added
 - Sites now expose configurable PHP-FPM pool settings and a panel to compare environment variables against worker pool members.
 ### Added
 - Site PHP settings now expose post max size, input time, input vars, file uploads, and timezone, which are applied to the live server's FastCGI config automatically.
