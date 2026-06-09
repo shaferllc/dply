@@ -6,9 +6,15 @@ namespace App\Services\Ai;
 
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
+use Symfony\Component\Process\ExecutableFinder;
+use Symfony\Component\Process\Process;
 
 final class LlmSynthesizer
 {
+    /** Provider slugs that route completions through the local `claude` CLI. */
+    private const CLAUDE_CLI_PROVIDERS = ['claude', 'claude-cli', 'anthropic-cli'];
+
     public function __construct(
         private readonly AiPromptBuilder $promptBuilder,
     ) {}
@@ -17,6 +23,11 @@ final class LlmSynthesizer
     {
         if (! (bool) config('dply_ai.llm.enabled', false)) {
             return false;
+        }
+
+        // The claude CLI needs no API key — just the binary on PATH.
+        if ($this->usesClaudeCli()) {
+            return $this->claudeBinary() !== null;
         }
 
         $apiKey = config('dply_ai.llm.api_key');
@@ -70,98 +81,36 @@ final class LlmSynthesizer
      */
     public function completeJson(string $userPrompt, ?string $systemOverride = null): array
     {
-        if (! $this->isConfigured()) {
-            throw new RuntimeException('LLM synthesis is not configured.');
-        }
-
-        $startedAt = microtime(true);
-        $timeout = (int) config('dply_ai.llm.timeout_seconds', 45);
-        $model = (string) config('dply_ai.llm.model', 'gpt-4o-mini');
-        $maxTokens = (int) config('dply_ai.llm.max_output_tokens', 1200);
-        $baseUrl = rtrim((string) config('dply_ai.llm.base_url', 'https://api.openai.com/v1'), '/');
-        $apiKey = (string) config('dply_ai.llm.api_key');
-
-        $response = Http::timeout($timeout)
-            ->withToken($apiKey)
-            ->acceptJson()
-            ->post($baseUrl.'/chat/completions', [
-                'model' => $model,
-                'temperature' => 0.2,
-                'max_tokens' => $maxTokens,
-                'response_format' => ['type' => 'json_object'],
-                'messages' => [
-                    [
-                        'role' => 'system',
-                        'content' => $systemOverride ?? 'You are a precise assistant for the dply hosting platform. Respond with valid JSON only.',
-                    ],
-                    ['role' => 'user', 'content' => $userPrompt],
-                ],
-            ]);
-
-        if (! $response->successful()) {
-            throw new RuntimeException('LLM request failed: '.$response->status().' '.$response->body());
-        }
-
-        $latencyMs = (int) round((microtime(true) - $startedAt) * 1000);
-        $payload = $response->json();
-        $content = (string) ($payload['choices'][0]['message']['content'] ?? '');
+        $result = $this->complete(
+            $systemOverride ?? 'You are a precise assistant for the dply hosting platform. Respond with valid JSON only.',
+            $userPrompt,
+        );
 
         return [
-            'data' => $this->parseJsonContent($content),
-            'prompt_tokens' => isset($payload['usage']['prompt_tokens']) ? (int) $payload['usage']['prompt_tokens'] : null,
-            'completion_tokens' => isset($payload['usage']['completion_tokens']) ? (int) $payload['usage']['completion_tokens'] : null,
-            'latency_ms' => $latencyMs,
-            'raw' => $content,
+            'data' => $this->parseJsonContent($result['content']),
+            'prompt_tokens' => $result['prompt_tokens'],
+            'completion_tokens' => $result['completion_tokens'],
+            'latency_ms' => $result['latency_ms'],
+            'raw' => $result['content'],
         ];
     }
 
     private function call(string $userPrompt): LlmSynthesisResult
     {
-        if (! $this->isConfigured()) {
-            throw new RuntimeException('LLM synthesis is not configured.');
-        }
+        $result = $this->complete(
+            'You are a precise DevOps assistant for the dply hosting platform. Respond with valid JSON only.',
+            $userPrompt,
+        );
 
-        $startedAt = microtime(true);
-        $timeout = (int) config('dply_ai.llm.timeout_seconds', 45);
-        $model = (string) config('dply_ai.llm.model', 'gpt-4o-mini');
-        $maxTokens = (int) config('dply_ai.llm.max_output_tokens', 1200);
-        $baseUrl = rtrim((string) config('dply_ai.llm.base_url', 'https://api.openai.com/v1'), '/');
-        $apiKey = (string) config('dply_ai.llm.api_key');
-
-        $response = Http::timeout($timeout)
-            ->withToken($apiKey)
-            ->acceptJson()
-            ->post($baseUrl.'/chat/completions', [
-                'model' => $model,
-                'temperature' => 0.2,
-                'max_tokens' => $maxTokens,
-                'response_format' => ['type' => 'json_object'],
-                'messages' => [
-                    [
-                        'role' => 'system',
-                        'content' => 'You are a precise DevOps assistant for the dply hosting platform. Respond with valid JSON only.',
-                    ],
-                    [
-                        'role' => 'user',
-                        'content' => $userPrompt,
-                    ],
-                ],
-            ]);
-
-        if (! $response->successful()) {
-            throw new RuntimeException('LLM request failed: '.$response->status().' '.$response->body());
-        }
-
-        $latencyMs = (int) round((microtime(true) - $startedAt) * 1000);
-        $payload = $response->json();
-        $content = (string) ($payload['choices'][0]['message']['content'] ?? '');
+        $content = $result['content'];
+        $latencyMs = $result['latency_ms'];
         $parsed = $this->parseJsonContent($content);
 
         return new LlmSynthesisResult(
             narrative: (string) ($parsed['narrative'] ?? $parsed['answer'] ?? ''),
             suggestions: $this->normalizeSuggestions($parsed),
-            promptTokens: isset($payload['usage']['prompt_tokens']) ? (int) $payload['usage']['prompt_tokens'] : null,
-            completionTokens: isset($payload['usage']['completion_tokens']) ? (int) $payload['usage']['completion_tokens'] : null,
+            promptTokens: $result['prompt_tokens'],
+            completionTokens: $result['completion_tokens'],
             latencyMs: $latencyMs,
             rawContent: $content,
             metadata: [
@@ -169,6 +118,109 @@ final class LlmSynthesizer
                 'cited_headings' => is_array($parsed['cited_headings'] ?? null) ? $parsed['cited_headings'] : [],
             ],
         );
+    }
+
+    /**
+     * Run one JSON completion against the configured provider — the local
+     * `claude` CLI when provider is "claude", otherwise an OpenAI-compatible
+     * chat endpoint. Returns the raw content plus usage so callers can decode
+     * and record it.
+     *
+     * @return array{content: string, prompt_tokens: int|null, completion_tokens: int|null, latency_ms: int}
+     */
+    private function complete(string $system, string $user): array
+    {
+        if (! $this->isConfigured()) {
+            throw new RuntimeException('LLM synthesis is not configured.');
+        }
+
+        $startedAt = microtime(true);
+
+        if ($this->usesClaudeCli()) {
+            $content = $this->runClaudeCli($system, $user);
+
+            return [
+                'content' => $content,
+                'prompt_tokens' => null,   // the claude CLI text output carries no usage counts
+                'completion_tokens' => null,
+                'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+            ];
+        }
+
+        $timeout = (int) config('dply_ai.llm.timeout_seconds', 45);
+        $model = (string) config('dply_ai.llm.model', 'gpt-4o-mini');
+        $maxTokens = (int) config('dply_ai.llm.max_output_tokens', 1200);
+        $baseUrl = rtrim((string) config('dply_ai.llm.base_url', 'https://api.openai.com/v1'), '/');
+        $apiKey = (string) config('dply_ai.llm.api_key');
+
+        $response = Http::timeout($timeout)
+            ->withToken($apiKey)
+            ->acceptJson()
+            ->post($baseUrl.'/chat/completions', [
+                'model' => $model,
+                'temperature' => 0.2,
+                'max_tokens' => $maxTokens,
+                'response_format' => ['type' => 'json_object'],
+                'messages' => [
+                    ['role' => 'system', 'content' => $system],
+                    ['role' => 'user', 'content' => $user],
+                ],
+            ]);
+
+        if (! $response->successful()) {
+            throw new RuntimeException('LLM request failed: '.$response->status().' '.$response->body());
+        }
+
+        $payload = $response->json();
+
+        return [
+            'content' => (string) ($payload['choices'][0]['message']['content'] ?? ''),
+            'prompt_tokens' => isset($payload['usage']['prompt_tokens']) ? (int) $payload['usage']['prompt_tokens'] : null,
+            'completion_tokens' => isset($payload['usage']['completion_tokens']) ? (int) $payload['usage']['completion_tokens'] : null,
+            'latency_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+        ];
+    }
+
+    private function usesClaudeCli(): bool
+    {
+        $provider = strtolower(trim((string) config('dply_ai.llm.provider', 'openai')));
+
+        return in_array($provider, self::CLAUDE_CLI_PROVIDERS, true);
+    }
+
+    private function claudeBinary(): ?string
+    {
+        return (new ExecutableFinder)->find('claude');
+    }
+
+    /** Drive the local `claude -p` CLI with a hard wall-clock cap; returns its stdout. */
+    private function runClaudeCli(string $system, string $user): string
+    {
+        $binary = $this->claudeBinary();
+        if ($binary === null) {
+            throw new RuntimeException('claude CLI not found on PATH.');
+        }
+
+        $timeout = (int) config('dply_ai.llm.timeout_seconds', 45);
+        $prompt = trim($system."\n\n".$user);
+
+        // </dev/null on stdin: claude blocks waiting for interactive input otherwise.
+        $process = new Process([$binary, '-p', $prompt], base_path(), null, null, (float) $timeout);
+        $process->setInput('');
+
+        try {
+            $process->run();
+        } catch (ProcessTimedOutException) {
+            throw new RuntimeException("claude CLI timed out after {$timeout}s.");
+        }
+
+        if (! $process->isSuccessful()) {
+            $err = trim($process->getErrorOutput()) ?: trim($process->getOutput());
+
+            throw new RuntimeException('claude CLI failed: '.$err);
+        }
+
+        return trim($process->getOutput());
     }
 
     /**

@@ -65,6 +65,13 @@
                 [
                     'date'    => 'June 9, 2026',
                     'tags'    => ['new'],
+                    'title'   => 'Local Claude CLI Provider Support',
+                    'summary' => 'AI features can now route completions through the local `claude` CLI by setting the provider to "claude", requiring no API key.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 9, 2026',
+                    'tags'    => ['new'],
                     'title'   => 'Deploy Several Sites Together',
                     'summary' => 'A new Sync tab on the site deployments page lets you select and deploy multiple related sites—such as a main site and its worker—together in one action.',
                     'items'   => [],
