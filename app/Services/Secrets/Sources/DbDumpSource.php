@@ -10,16 +10,13 @@ use Illuminate\Support\Facades\Process;
 use RuntimeException;
 
 /**
- * A logical control-plane Postgres dump. The single pg_dump implementation lives
- * in deploy/secrets/db-backup.sh (so cron, deploy, and artisan share one code
- * path); this source shells its `--plaintext-stdout` mode and lets SecretVault
- * do the age-encryption + storage. The CANONICAL scheduled DB backup is the
- * bash cron itself (works when the app is down); this exists for the artisan
- * wrapper + the reusable seam.
+ * A logical dump of the control-plane Postgres, produced in-process with
+ * `pg_dump` (no bash dependency — app-native per the dogfood direction).
+ * SecretVault age-encrypts + stores the result.
  */
 final class DbDumpSource implements SecretSource
 {
-    public function __construct(private readonly string $scriptPath) {}
+    public function __construct(private readonly ?string $connection = null) {}
 
     public function name(): string
     {
@@ -28,11 +25,28 @@ final class DbDumpSource implements SecretSource
 
     public function gather(Scope $scope): string
     {
-        if (! is_file($this->scriptPath)) {
-            throw new RuntimeException("db-backup.sh not found: {$this->scriptPath}");
+        $conn = $this->connection ?? (string) config('database.default');
+        $cfg = (array) config("database.connections.{$conn}");
+
+        if (($cfg['driver'] ?? null) !== 'pgsql') {
+            throw new RuntimeException("db-dump only supports pgsql (got {$conn}).");
         }
 
-        $result = Process::timeout(600)->run(['bash', $this->scriptPath, '--plaintext-stdout']);
+        $cmd = [
+            'pg_dump',
+            '--host='.(string) ($cfg['host'] ?? '127.0.0.1'),
+            '--port='.(string) ($cfg['port'] ?? 5432),
+            '--username='.(string) ($cfg['username'] ?? ''),
+            '--no-owner',
+            '--no-privileges',
+            '--clean',
+            '--if-exists',
+            (string) ($cfg['database'] ?? ''),
+        ];
+
+        $result = Process::timeout(900)
+            ->env(['PGPASSWORD' => (string) ($cfg['password'] ?? '')])
+            ->run($cmd);
 
         if (! $result->successful()) {
             throw new RuntimeException('pg_dump failed: '.trim($result->errorOutput()));

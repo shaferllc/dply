@@ -10,9 +10,9 @@ use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
- * Escrows / lists / restores / verifies secret blobs. Interoperates with the
- * bash guards (deploy/secrets/*.sh) purely through the shared recipient, key
- * naming, and store layout — no shared code. See deploy/SECRETS.md.
+ * Escrows / lists / restores / verifies secret blobs. App-native (scheduled
+ * commands + queued jobs); the blob key naming + store layout are stable so
+ * external tooling can still read the vault if ever needed.
  */
 final class SecretVault
 {

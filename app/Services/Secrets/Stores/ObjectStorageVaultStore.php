@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace App\Services\Secrets\Stores;
 
 use App\Services\Secrets\Contracts\VaultStore;
+use App\Services\Servers\DatabaseBackupS3ClientFactory;
 use Aws\S3\S3Client;
 use RuntimeException;
 
 /**
  * Primary store: a versioned + object-locked bucket in a SEPARATE cloud account.
- * S3 wiring mirrors {@see \App\Services\Servers\DatabaseBackupS3ClientFactory}.
+ * S3 wiring mirrors {@see DatabaseBackupS3ClientFactory}.
  * The box's IAM should be PutObject + ListBucket only (no Get/Delete) so a
  * compromised box can neither exfiltrate prior ciphertext nor erase history;
  * Get is used only from the isolated drill/restore host.

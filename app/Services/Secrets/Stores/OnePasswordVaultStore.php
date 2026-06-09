@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Secrets\Stores;
 
 use App\Services\Secrets\Contracts\VaultStore;
+use Illuminate\Contracts\Process\ProcessResult;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
 
@@ -100,7 +101,7 @@ final class OnePasswordVaultStore implements VaultStore
     /**
      * @param  list<string>  $args
      */
-    private function op(array $args): \Illuminate\Contracts\Process\ProcessResult
+    private function op(array $args): ProcessResult
     {
         return Process::timeout(60)->run(array_merge([$this->opBin()], $args));
     }

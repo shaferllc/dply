@@ -6,21 +6,20 @@ namespace App\Console\Commands;
 
 use App\Services\Secrets\Scope;
 use App\Services\Secrets\SecretVault;
+use App\Services\Secrets\Sources\CriticalKeysSource;
 use App\Services\Secrets\Sources\DbDumpSource;
 use App\Services\Secrets\Sources\PlatformEnvSource;
 use Illuminate\Console\Command;
 
 /**
  * Escrow a secret source (default: the platform .env) to the configured vault
- * stores. The CANONICAL scheduled escrow + DB backup is the app-independent
- * bash cron (deploy/secrets/*.sh); this command is the manual / health-surfacing
- * path and the daily safety-net registered in DplySchedule.
+ * stores. App-native: scheduled daily via DplySchedule and runnable on demand.
  */
 class SecretsEscrowCommand extends Command
 {
     protected $signature = 'secrets:escrow
         {--scope=platform : platform | org-<id>}
-        {--source=platform-env : platform-env | db-dump}
+        {--source=platform-env : platform-env | db-dump | critical-keys}
         {--force : escrow even if an identical blob already exists}';
 
     protected $description = 'Escrow secrets (age-encrypted) to the off-box vault stores.';
@@ -32,7 +31,8 @@ class SecretsEscrowCommand extends Command
 
         $source = match ($sourceKey) {
             'platform-env' => new PlatformEnvSource(base_path('.env')),
-            'db-dump' => new DbDumpSource(base_path('deploy/secrets/db-backup.sh')),
+            'db-dump' => new DbDumpSource,
+            'critical-keys' => new CriticalKeysSource,
             default => null,
         };
 

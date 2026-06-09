@@ -68,7 +68,7 @@ class SecretsReencryptCommand extends Command
             }
         }
 
-        foreach ($this->rawCryptTargets() as $i => $target) {
+        foreach ($this->rawCryptTargets() as $target) {
             $tag = 'raw:'.$target['table'];
             if ($this->option('resume') && in_array($tag, $checkpoint, true)) {
                 $this->line("skip (done): {$tag}");
@@ -76,6 +76,20 @@ class SecretsReencryptCommand extends Command
                 continue;
             }
             $this->reencryptRaw($target, $batch, $dryRun);
+            if (! $dryRun) {
+                $checkpoint[] = $tag;
+                $this->saveCheckpoint($checkpoint);
+            }
+        }
+
+        foreach ($this->jsonCryptTargets() as $target) {
+            $tag = 'json:'.$target['table'].'.'.$target['column'];
+            if ($this->option('resume') && in_array($tag, $checkpoint, true)) {
+                $this->line("skip (done): {$tag}");
+
+                continue;
+            }
+            $this->reencryptJson($target, $batch, $dryRun);
             if (! $dryRun) {
                 $checkpoint[] = $tag;
                 $this->saveCheckpoint($checkpoint);
@@ -145,11 +159,19 @@ class SecretsReencryptCommand extends Command
     }
 
     /**
-     * @return list<array{connection: ?string, table: string, columns: list<string>}>
+     * @return list<array{connection: ?string, table: string, key?: string, columns: list<string>}>
      */
     private function rawCryptTargets(): array
     {
         return array_values((array) config('secret_vault.reencrypt.raw_crypt', []));
+    }
+
+    /**
+     * @return list<array{connection: ?string, table: string, key?: string, column: string, paths: list<string>}>
+     */
+    private function jsonCryptTargets(): array
+    {
+        return array_values((array) config('secret_vault.reencrypt.json_crypt', []));
     }
 
     // --- execution --------------------------------------------------------
@@ -195,17 +217,18 @@ class SecretsReencryptCommand extends Command
     }
 
     /**
-     * @param  array{connection: ?string, table: string, columns: list<string>}  $target
+     * @param  array{connection: ?string, table: string, key?: string, columns: list<string>}  $target
      */
     private function reencryptRaw(array $target, int $batch, bool $dryRun): void
     {
         $conn = $target['connection'];
         $table = $target['table'];
+        $key = $target['key'] ?? 'id';
         $columns = $target['columns'];
         $changed = 0;
 
-        DB::connection($conn)->table($table)->orderBy('id')
-            ->chunkById($batch, function ($rows) use ($conn, $table, $columns, $dryRun, &$changed): void {
+        DB::connection($conn)->table($table)->orderBy($key)
+            ->chunkById($batch, function ($rows) use ($conn, $table, $key, $columns, $dryRun, &$changed): void {
                 foreach ($rows as $row) {
                     $updates = [];
                     foreach ($columns as $col) {
@@ -216,7 +239,7 @@ class SecretsReencryptCommand extends Command
                         try {
                             $plain = Crypt::decryptString($val);
                         } catch (DecryptException) {
-                            $this->warn("  undecryptable: {$table}#{$row->id}.{$col} — left as-is.");
+                            $this->warn("  undecryptable: {$table}#{$row->{$key}}.{$col} — left as-is.");
 
                             continue;
                         }
@@ -225,14 +248,69 @@ class SecretsReencryptCommand extends Command
                     if ($updates !== []) {
                         $changed++;
                         if (! $dryRun) {
-                            DB::connection($conn)->table($table)->where('id', $row->id)->update($updates);
+                            DB::connection($conn)->table($table)->where($key, $row->{$key})->update($updates);
                         }
                     }
                 }
-            });
+            }, $key);
 
         $verb = $dryRun ? 'would re-encrypt' : 're-encrypted';
         $this->line(sprintf('raw:%s: %s %d row(s)', $table, $verb, $changed));
+    }
+
+    /**
+     * Re-encrypt secret values nested at dot-paths inside a plain JSON column.
+     *
+     * @param  array{connection: ?string, table: string, key?: string, column: string, paths: list<string>}  $target
+     */
+    private function reencryptJson(array $target, int $batch, bool $dryRun): void
+    {
+        $conn = $target['connection'];
+        $table = $target['table'];
+        $key = $target['key'] ?? 'id';
+        $column = $target['column'];
+        $paths = $target['paths'];
+        $changed = 0;
+
+        DB::connection($conn)->table($table)->orderBy($key)
+            ->chunkById($batch, function ($rows) use ($conn, $table, $key, $column, $paths, $dryRun, &$changed): void {
+                foreach ($rows as $row) {
+                    $raw = $row->{$column} ?? null;
+                    if (! is_string($raw) || $raw === '') {
+                        continue;
+                    }
+                    $meta = json_decode($raw, true);
+                    if (! is_array($meta)) {
+                        continue;
+                    }
+                    $dirty = false;
+                    foreach ($paths as $path) {
+                        $val = data_get($meta, $path);
+                        if (! is_string($val) || $val === '') {
+                            continue;
+                        }
+                        try {
+                            $plain = Crypt::decryptString($val);
+                        } catch (DecryptException) {
+                            $this->warn("  undecryptable: {$table}#{$row->{$key}} {$column}.{$path} — left as-is.");
+
+                            continue;
+                        }
+                        data_set($meta, $path, Crypt::encryptString($plain));
+                        $dirty = true;
+                    }
+                    if ($dirty) {
+                        $changed++;
+                        if (! $dryRun) {
+                            DB::connection($conn)->table($table)->where($key, $row->{$key})
+                                ->update([$column => json_encode($meta)]);
+                        }
+                    }
+                }
+            }, $key);
+
+        $verb = $dryRun ? 'would re-encrypt' : 're-encrypted';
+        $this->line(sprintf('json:%s.%s: %s %d row(s)', $table, $column, $verb, $changed));
     }
 
     // --- assert-complete --------------------------------------------------
@@ -267,8 +345,9 @@ class SecretsReencryptCommand extends Command
         }
 
         foreach ($this->rawCryptTargets() as $target) {
-            DB::connection($target['connection'])->table($target['table'])->orderBy('id')
-                ->chunkById(200, function ($rows) use ($target, &$failures): void {
+            $key = $target['key'] ?? 'id';
+            DB::connection($target['connection'])->table($target['table'])->orderBy($key)
+                ->chunkById(200, function ($rows) use ($target, $key, &$failures): void {
                     foreach ($rows as $row) {
                         foreach ($target['columns'] as $col) {
                             $val = $row->{$col} ?? null;
@@ -279,11 +358,40 @@ class SecretsReencryptCommand extends Command
                                 Crypt::decryptString($val);
                             } catch (DecryptException) {
                                 $failures++;
-                                $this->error("  not on current key: {$target['table']}#{$row->id}.{$col}");
+                                $this->error("  not on current key: {$target['table']}#{$row->{$key}}.{$col}");
                             }
                         }
                     }
-                });
+                }, $key);
+        }
+
+        foreach ($this->jsonCryptTargets() as $target) {
+            $key = $target['key'] ?? 'id';
+            DB::connection($target['connection'])->table($target['table'])->orderBy($key)
+                ->chunkById(200, function ($rows) use ($target, $key, &$failures): void {
+                    foreach ($rows as $row) {
+                        $raw = $row->{$target['column']} ?? null;
+                        if (! is_string($raw) || $raw === '') {
+                            continue;
+                        }
+                        $meta = json_decode($raw, true);
+                        if (! is_array($meta)) {
+                            continue;
+                        }
+                        foreach ($target['paths'] as $path) {
+                            $val = data_get($meta, $path);
+                            if (! is_string($val) || $val === '') {
+                                continue;
+                            }
+                            try {
+                                Crypt::decryptString($val);
+                            } catch (DecryptException) {
+                                $failures++;
+                                $this->error("  not on current key: {$target['table']}#{$row->{$key}} {$target['column']}.{$path}");
+                            }
+                        }
+                    }
+                }, $key);
         }
 
         if ($failures > 0) {
@@ -313,9 +421,13 @@ class SecretsReencryptCommand extends Command
         foreach ($this->castTargets() as $class => $cols) {
             $this->line("  {$class}: ".implode(', ', $cols));
         }
-        $this->info('Raw Crypt() targets:');
+        $this->info('Raw Crypt() column targets:');
         foreach ($this->rawCryptTargets() as $t) {
             $this->line("  {$t['table']}: ".implode(', ', $t['columns']));
+        }
+        $this->info('JSON-nested Crypt() targets:');
+        foreach ($this->jsonCryptTargets() as $t) {
+            $this->line("  {$t['table']}.{$t['column']}: ".implode(', ', $t['paths']));
         }
 
         return self::SUCCESS;

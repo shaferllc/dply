@@ -62,12 +62,31 @@ return [
         // FQCNs to force-include / exclude beyond the auto-scan.
         'extra_models' => [],
         'exclude_models' => [],
-        // encrypt()-helper columns that are NOT `encrypted` casts and thus not
-        // auto-discoverable. Keep this in lockstep with the codebase — the
-        // SecretReencryptCoverageTest fails if a new raw Crypt usage appears
-        // without being listed here.
+        // Whole-column ciphertext written with raw Crypt::encryptString / encrypt()
+        // (NOT `encrypted` casts, so not auto-discoverable). Keep in lockstep with
+        // the codebase — SecretReencryptCoverageTest fails if a new raw Crypt
+        // usage appears without being covered here. `key` defaults to 'id'.
         'raw_crypt' => [
-            ['connection' => null, 'table' => 'users', 'columns' => ['two_factor_secret', 'two_factor_recovery_codes']],
+            ['connection' => null, 'table' => 'users', 'key' => 'id', 'columns' => ['two_factor_secret', 'two_factor_recovery_codes']],
+            ['connection' => null, 'table' => 'site_deployment_ephemeral_credentials', 'key' => 'id', 'columns' => ['private_key_encrypted']],
+            ['connection' => null, 'table' => 'import_server_migrations', 'key' => 'id', 'columns' => ['ssh_key_private_encrypted']],
+        ],
+
+        // Encrypted values nested inside PLAIN `array`-cast JSON columns
+        // (sites.meta / servers.meta) at the given dot-paths. These are NOT
+        // encrypted-cast columns and NOT whole-column ciphertext — they must be
+        // re-encrypted in place within the JSON. Verified paths (data_set keys).
+        'json_crypt' => [
+            ['connection' => null, 'table' => 'sites', 'key' => 'id', 'column' => 'meta', 'paths' => [
+                'scaffold.admin_password',
+                'scaffold.database.password',
+            ]],
+            ['connection' => null, 'table' => 'servers', 'key' => 'id', 'column' => 'meta', 'paths' => [
+                'cache_server.password_encrypted',
+                'database_server.password_encrypted',
+                'server_event_webhook_secret',
+                'monitoring_guest_push_cipher',
+            ]],
         ],
         'checkpoint_disk' => 'local',
         'checkpoint_path' => 'secret-vault/reencrypt-progress.json',
@@ -85,9 +104,36 @@ return [
         'retention_days' => (int) env('SECRET_VAULT_DB_RETENTION_DAYS', 30),
     ],
 
+    // Box-to-box APP_KEY drift check (W5). Targets are the adopted control-plane
+    // Servers (web + worker); the check SSHes each (via dply's own connection),
+    // hashes the APP_KEY value on the box, and alerts if the hashes diverge. The
+    // value never leaves the server — only its digest is compared.
+    'drift' => [
+        // [ ['server_id' => '<ulid>', 'env_path' => '/home/dply/.../shared/.env'], ... ]
+        'targets' => [],
+    ],
+
     // A known-present encrypted column used to prove APP_KEY round-trips.
     'canary' => [
         'model' => Server::class,
         'column' => 'ssh_private_key',
+    ],
+
+    // Fast break-glass bundle (W1): the prod box's recovery SSH key + Postgres
+    // superuser, age-encrypted off-box so recovery doesn't require restoring the
+    // whole DB. Operator-provided; escrow is skipped if unset.
+    'critical_keys' => [
+        'ssh_recovery_key_path' => env('SECRET_VAULT_CRITICAL_SSH_KEY_PATH'),
+        'pg_superuser' => env('SECRET_VAULT_CRITICAL_PG_SUPERUSER', 'postgres'),
+        'pg_password' => env('SECRET_VAULT_CRITICAL_PG_PASSWORD'),
+    ],
+
+    // Restore drill (runs on the ISOLATED drill host, which alone holds the age
+    // identity). Imports the newest db-dump into this scratch connection and
+    // proves the canary decrypts. Connection must NOT be the live control-plane DB.
+    'drill' => [
+        // Only the isolated drill host sets this true (it alone has the identity).
+        'enabled' => (bool) env('SECRET_VAULT_DRILL_ENABLED', false),
+        'connection' => env('SECRET_VAULT_DRILL_CONNECTION', 'scratch'),
     ],
 ];

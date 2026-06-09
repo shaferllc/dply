@@ -6,6 +6,7 @@ use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Models\SiteDeployment;
 use App\Models\SiteRelease;
+use App\Services\Deploy\Manifest\SiteManifestCodeShapeSync;
 use App\Services\Servers\SupervisorDeployRestarter;
 use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
@@ -203,10 +204,30 @@ class AtomicSiteDeployer
             $log .= "\n[dply] ENV → host does not expose a server .env; skipping\n";
         }
 
+        // ── SHARED STORAGE ── opt-in (Site.meta['shared_storage']): symlink the
+        // release's storage/ at a persistent dir so logs/uploads/keys survive
+        // across releases (parity with the hand-rolled deploy.sh, needed for
+        // dply's own self-deploy). Customer sites keep per-release storage unless
+        // they explicitly opt in. Default target = <project root>/shared/storage.
+        $deployMeta = is_array($site->meta) ? $site->meta : [];
+        if (! empty($deployMeta['shared_storage'])) {
+            $sharedStorage = trim((string) ($deployMeta['shared_storage_path'] ?? ''));
+            if ($sharedStorage === '') {
+                $sharedStorage = dirname($newRelease, 2).'/shared/storage';
+            }
+            $releaseStorage = $newRelease.'/storage';
+            $log .= sprintf("\n[dply] STORAGE → shared: %s → %s\n", $releaseStorage, $sharedStorage);
+            $ssh->exec(sprintf(
+                'mkdir -p %1$s && rm -rf %2$s && ln -sfn %1$s %2$s',
+                escapeshellarg($sharedStorage),
+                escapeshellarg($releaseStorage),
+            ), 30);
+        }
+
         // ── MANIFEST ── reconcile code-shape (build/release/processes) from a
         // repo dply.* BEFORE the build phase reads its steps, so a just-pushed
         // manifest takes effect on THIS deploy (gated by global.byo_repo_config).
-        $manifestLog = app(\App\Services\Deploy\Manifest\SiteManifestCodeShapeSync::class)
+        $manifestLog = app(SiteManifestCodeShapeSync::class)
             ->applyFromRemote($site, $ssh, $newRelease);
         if ($manifestLog !== '') {
             $log .= "\n".$manifestLog;

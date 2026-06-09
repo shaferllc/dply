@@ -13,13 +13,13 @@ use App\Console\Commands\CollectRealtimeUsageCommand;
 use App\Console\Commands\CollectServerlessUsageCommand;
 use App\Console\Commands\DeployIntelligenceScanCommand;
 use App\Console\Commands\DispatchGuestMetricsScriptUpgradesCommand;
+use App\Console\Commands\DispatchReleaseHygieneScansCommand;
+use App\Console\Commands\DispatchSecurityDigestScansCommand;
 use App\Console\Commands\DispatchServerHealthChecksCommand;
 use App\Console\Commands\DispatchServerInsightsCommand;
 use App\Console\Commands\DispatchSiteInsightsCommand;
 use App\Console\Commands\DispatchSiteUptimeChecksCommand;
 use App\Console\Commands\DispatchSiteUrlHealthChecksCommand;
-use App\Console\Commands\DispatchReleaseHygieneScansCommand;
-use App\Console\Commands\DispatchSecurityDigestScansCommand;
 use App\Console\Commands\DispatchSshLoginScansCommand;
 use App\Console\Commands\DispatchSystemdInventorySyncCommand;
 use App\Console\Commands\EvaluateEdgeGuardrailsCommand;
@@ -43,7 +43,9 @@ use App\Console\Commands\PruneTestingHostnameRecordsCommand;
 use App\Console\Commands\RevokeExpiredServerSshSessionsCommand;
 use App\Console\Commands\RollupEdgeAnalyticsEngineCommand;
 use App\Console\Commands\RunDueDeploymentSchedulesCommand;
+use App\Console\Commands\SecretsCheckDriftCommand;
 use App\Console\Commands\SecretsEscrowCommand;
+use App\Console\Commands\SecretsRestoreDrillCommand;
 use App\Console\Commands\ServerlessTickCommand;
 use App\Console\Commands\SnapshotOrganizationBillingCommand;
 use App\Console\Commands\SweepExpiredMaintenanceWindowsCommand;
@@ -233,14 +235,37 @@ final class DplySchedule
             ->hourly()
             ->name('dispatch-guest-metrics-script-upgrades');
 
-        // Secret-vault safety net. The canonical escrow + DB backup is the
-        // app-independent bash cron (deploy/secrets/*.sh); this is a belt-and-
-        // suspenders daily escrow that also surfaces health in-app and catches
-        // out-of-band .env edits. Restore drills run on the isolated drill host.
+        // Secret-vault (app-native, W1 off-box break-glass): daily age-encrypted
+        // escrow of the platform .env (→ APP_KEY), an independent DB dump, and the
+        // fast-recovery critical-keys bundle. dply's own ServerBackupSchedule is
+        // the PRIMARY DB backup; this dump is the provider-independent copy.
         $schedule->command(SecretsEscrowCommand::class, ['--source' => 'platform-env'])
             ->dailyAt('04:20')
             ->withoutOverlapping()
-            ->name('secrets-escrow-safety-net');
+            ->name('secrets-escrow-env');
+        $schedule->command(SecretsEscrowCommand::class, ['--source' => 'db-dump'])
+            ->dailyAt('04:30')
+            ->withoutOverlapping()
+            ->name('secrets-escrow-db-dump');
+        $schedule->command(SecretsEscrowCommand::class, ['--source' => 'critical-keys'])
+            ->dailyAt('04:35')
+            ->withoutOverlapping()
+            ->name('secrets-escrow-critical-keys')
+            ->when(fn (): bool => filled(config('secret_vault.critical_keys.pg_password')) || filled(config('secret_vault.critical_keys.ssh_recovery_key_path')));
+
+        // Restore drill runs ONLY on the isolated drill host (it alone holds the
+        // age identity + a scratch DB), gated by SECRET_VAULT_DRILL_ENABLED.
+        $schedule->command(SecretsRestoreDrillCommand::class)
+            ->dailyAt('05:00')
+            ->withoutOverlapping()
+            ->name('secrets-restore-drill')
+            ->when(fn (): bool => (bool) config('secret_vault.drill.enabled'));
+
+        // APP_KEY drift across the control-plane boxes (W5) — alerts on divergence.
+        $schedule->command(SecretsCheckDriftCommand::class)
+            ->hourly()
+            ->name('secrets-check-drift')
+            ->when(fn (): bool => filled(config('secret_vault.drift.targets')));
 
         if (DplyRuntime::isSplitDeployment()) {
             foreach ($schedule->events() as $event) {
