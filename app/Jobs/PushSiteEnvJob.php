@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\Site;
 use App\Services\Sites\SiteEnvPusher;
+use App\Services\Sites\SiteEnvRuntimeApplier;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -75,7 +76,26 @@ class PushSiteEnvJob implements ShouldBeUnique, ShouldQueue
 
             $path = $pusher->push($site);
 
-            $emit->success(__('.env written to :path', ['path' => $path]));
+            // Make the write actually take effect on the running app: rebuild
+            // cached config + reload (no-op for sites that read .env live). The
+            // applier guards against applying a broken env — if it refuses, the
+            // .env is still saved (so a mid-edit save isn't blocked) but the
+            // last-good cached config keeps serving; surface that to the operator.
+            try {
+                $emit->step('push', __('Applying environment to the running app'));
+                app(SiteEnvRuntimeApplier::class)->apply($site);
+                $emit->success(__('.env written to :path and applied', ['path' => $path]));
+            } catch (\Throwable $applyEx) {
+                $emit->success(__('.env written to :path — not applied: :why', [
+                    'path' => $path,
+                    'why' => $applyEx->getMessage(),
+                ]));
+                Log::warning('PushSiteEnvJob: env written but not applied', [
+                    'site_id' => $this->siteId,
+                    'reason' => $applyEx->getMessage(),
+                ]);
+            }
+
             $this->completeConsoleAction();
         } catch (\Throwable $e) {
             $emit->error($e->getMessage(), 'push');

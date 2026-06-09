@@ -35,29 +35,35 @@ final class AtomicDeployHealthChecker
         $attempts = max(1, min(30, (int) ($meta['deploy_health_attempts'] ?? 5)));
         $delayMs = max(0, min(10000, (int) ($meta['deploy_health_delay_ms'] ?? 500)));
 
-        $scheme = strtolower((string) ($meta['deploy_health_scheme'] ?? 'http'));
+        // Default to https: nginx 301-redirects http→https for TLS sites, so an
+        // http probe expecting 200 can NEVER pass — it always sees the 301.
+        $scheme = strtolower((string) ($meta['deploy_health_scheme'] ?? 'https'));
         if (! in_array($scheme, ['http', 'https'], true)) {
-            $scheme = 'http';
+            $scheme = 'https';
         }
+        // `deploy_health_host` is the IP to CONNECT to (the box itself). The URL
+        // is built from the real hostname and pinned to that IP via --resolve, so
+        // TLS SNI + certificate validation match the site's hostname (a bare
+        // `Host:` header would mismatch the cert) and the request lands on the
+        // site's server block instead of nginx's default server. Any non-IP value
+        // (or none) collapses to loopback — the intent is an on-box probe.
         $targetHost = trim((string) ($meta['deploy_health_host'] ?? '127.0.0.1'));
-        if ($targetHost === '') {
+        if ($targetHost === '' || filter_var($targetHost, FILTER_VALIDATE_IP) === false) {
             $targetHost = '127.0.0.1';
         }
         $portRaw = $meta['deploy_health_port'] ?? null;
-        $port = is_numeric($portRaw) ? max(1, min(65535, (int) $portRaw)) : null;
+        $port = is_numeric($portRaw)
+            ? max(1, min(65535, (int) $portRaw))
+            : ($scheme === 'https' ? 443 : 80);
 
-        $url = $scheme.'://'.$targetHost;
-        if ($port !== null) {
-            $url .= ':'.$port;
-        }
-        $url .= $path;
+        $url = $scheme.'://'.$hostHeader.$path;
 
-        $curl = 'curl -sS --max-time 20 -o /dev/null -w \'%{http_code}\' -H '
-            .escapeshellarg('Host: '.$hostHeader).' '
+        $curl = 'curl -sS --max-time 20 -o /dev/null -w \'%{http_code}\' --resolve '
+            .escapeshellarg($hostHeader.':'.$port.':'.$targetHost).' '
             .escapeshellarg($url).' 2>&1';
 
         $log = "\n--- deploy health check ---\n";
-        $log .= 'GET '.$url.' (Host: '.$hostHeader.")\n";
+        $log .= 'GET '.$url.' (resolve '.$hostHeader.':'.$port.' → '.$targetHost.")\n";
         $log .= 'Expect HTTP '.$expect.', up to '.$attempts." attempt(s)\n";
 
         $expectStr = (string) $expect;
@@ -93,7 +99,7 @@ final class AtomicDeployHealthChecker
                 'n' => $attempts,
                 'got' => $gotStr,
                 'expect' => $expectStr,
-            ])."\n\n".$this->diagnose($ssh, $site, $url, $hostHeader)
+            ])."\n\n".$this->diagnose($ssh, $site, $url, $hostHeader, $targetHost, $port)
         );
     }
 
@@ -107,9 +113,14 @@ final class AtomicDeployHealthChecker
      * hides the rest. The response body itself is dropped — on a 502 it's only
      * dply's branded fallback page, which says nothing about the cause.
      */
-    private function diagnose(SshConnection $ssh, Site $site, string $url, string $hostHeader): string
+    private function diagnose(SshConnection $ssh, Site $site, string $url, string $hostHeader, string $targetHost, int $port): string
     {
-        $repo = $site->conventionalRepositoryPath();
+        // Use the site's REAL deploy root (repository_path), not the naming
+        // convention — they differ when a site was bootstrapped at a custom path
+        // (e.g. the control plane at /home/dply/dply, not /home/dply/<domain>),
+        // which otherwise makes the "current → MISSING" line a false alarm.
+        $repo = rtrim($site->effectiveRepositoryPath(), '/');
+        $resolveArg = '--resolve '.$this->sh($hostHeader.':'.$port.':'.$targetHost);
         // Candidate Laravel log locations across release layouts.
         $logCandidates = implode(' ', array_map(fn ($p) => $this->sh($repo.$p), [
             '/current/storage/logs/laravel.log',
@@ -126,7 +137,7 @@ final class AtomicDeployHealthChecker
 
         $script = <<<BASH
 echo "── response headers ──"
-curl -sS --max-time 20 -o /dev/null -D - -H {$this->sh('Host: '.$hostHeader)} {$this->sh($url)} 2>&1 | head -n 12
+curl -sS --max-time 20 -o /dev/null -D - {$resolveArg} {$this->sh($url)} 2>&1 | head -n 12
 
 echo
 echo "── php cli (extension/load fatals) ──"
