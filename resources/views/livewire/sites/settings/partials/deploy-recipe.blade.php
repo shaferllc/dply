@@ -187,13 +187,22 @@
                                         @if ($step->custom_command)
                                             <span class="text-brand-moss">— {{ \Illuminate\Support\Str::limit($step->custom_command, 60) }}</span>
                                         @endif
+                                        @if ($step->managed_by_manifest)
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 text-[10px] font-semibold text-brand-moss ring-1 ring-brand-ink/10">
+                                                <x-heroicon-o-lock-closed class="h-3 w-3" aria-hidden="true" /> dply.yaml
+                                            </span>
+                                        @endif
                                     </span>
-                                    <span class="flex gap-3 text-xs">
-                                        <button type="button" wire:click="openEditPipelineStep('{{ $step->id }}')" class="text-brand-forest hover:underline">{{ __('Edit') }}</button>
-                                        <button type="button" wire:click="moveDeployStepUp('{{ $step->id }}')" class="text-brand-moss hover:underline">{{ __('Up') }}</button>
-                                        <button type="button" wire:click="moveDeployStepDown('{{ $step->id }}')" class="text-brand-moss hover:underline">{{ __('Down') }}</button>
-                                        <button type="button" wire:click="deleteDeployPipelineStep('{{ $step->id }}')" class="text-red-700 hover:underline">{{ __('Remove') }}</button>
-                                    </span>
+                                    @if ($step->managed_by_manifest)
+                                        <span class="text-[11px] text-brand-moss">{{ __('managed — edit in dply.yaml') }}</span>
+                                    @else
+                                        <span class="flex gap-3 text-xs">
+                                            <button type="button" wire:click="openEditPipelineStep('{{ $step->id }}')" class="text-brand-forest hover:underline">{{ __('Edit') }}</button>
+                                            <button type="button" wire:click="moveDeployStepUp('{{ $step->id }}')" class="text-brand-moss hover:underline">{{ __('Up') }}</button>
+                                            <button type="button" wire:click="moveDeployStepDown('{{ $step->id }}')" class="text-brand-moss hover:underline">{{ __('Down') }}</button>
+                                            <button type="button" wire:click="deleteDeployPipelineStep('{{ $step->id }}')" class="text-red-700 hover:underline">{{ __('Remove') }}</button>
+                                        </span>
+                                    @endif
                                 </div>
                             </li>
                         @endforeach
