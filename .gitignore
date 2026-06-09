@@ -28,3 +28,8 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 .deploy.env
+
+# Real per-role env files (secrets) — examples (.env.*.example) stay committed
+.env.prod
+.env.worker
+.env.*.local
