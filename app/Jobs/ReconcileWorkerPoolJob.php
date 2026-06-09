@@ -151,6 +151,7 @@ class ReconcileWorkerPoolJob implements ShouldQueue
 
         // 2) Replay onto members that have provisioned and are now ready.
         $inFlight = false;
+        $activated = false;
         foreach ($pool->fresh('servers')->servers as $member) {
             $state = $member->poolMemberState();
             if ($member->isPoolPrimary()) {
@@ -189,6 +190,7 @@ class ReconcileWorkerPoolJob implements ShouldQueue
             } elseif ($state === WorkerPool::MEMBER_DEPLOYING) {
                 if ($this->dispatchReadyDeploys($member, $emit)) {
                     $this->markState($member, WorkerPool::MEMBER_ACTIVE);
+                    $activated = true;
                     $emit->success(sprintf('%s is active', $member->name), 'deploy');
                     // A cross-region member needs its backends opened to its IP.
                     // Auto-apply (the operator already confirmed by adding it).
@@ -198,6 +200,30 @@ class ReconcileWorkerPoolJob implements ShouldQueue
                 } else {
                     $inFlight = true; // some sites still provisioning
                 }
+            }
+        }
+
+        // 2b) A member that just went ACTIVE has its sites deployed but no queue
+        // daemon yet — the box is "active" but processes 0 jobs. Materialise the
+        // worker SiteProcess + write/enable the systemd (or supervisor) unit +
+        // seed the pool's Horizon config onto the new member(s). Idempotent across
+        // the whole pool, so we run it once per tick when anything activated.
+        if ($activated) {
+            $emit->step('workers', 'new member active — ensuring queue daemons + Horizon config across the pool');
+            try {
+                $result = $manager->ensureWorkersAcrossPool($pool->fresh('servers'));
+                $emit->success(sprintf(
+                    'ensured %s daemon on %d member(s)',
+                    $result['daemon'],
+                    $result['members'],
+                ), 'workers');
+            } catch (\Throwable $e) {
+                Log::warning('worker-pool: ensureWorkers failed after activation', [
+                    'pool_id' => $pool->id,
+                    'error' => $e->getMessage(),
+                ]);
+                $emit->warn('could not ensure worker daemons (will retry next tick): '.$e->getMessage(), 'workers');
+                $inFlight = true; // keep ticking so the next pass retries the daemon setup
             }
         }
 

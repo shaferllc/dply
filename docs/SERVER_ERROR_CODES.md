@@ -25,16 +25,18 @@ into the logs, and resolved back to the real error inside dply.
       │
    [edge webserver]  ── mints request id  (nginx $request_id / caddy {http.request.uuid})
       │                 ├─ X-Dply-Ref: <id>            (response header, all engines)
-      │                 ├─ injects <id> into 500.html  (nginx sub_filter / caddy templates)
-      │                 ├─ access log includes <id>    (custom log_format)
-      │                 └─ fastcgi_param REQUEST_ID    (so the app/php log carries it)
+      │                 ├─ injects <id> into 500.html  (nginx sub_filter)
+      │                 └─ fastcgi_param REQUEST_ID    (→ PHP-FPM)
+      ▼
+  [php-fpm pool]    ── logs ref=<id> t=<epoch> <method> <uri> status=… to the
+      │                 per-site pool access.log (dply-owned; no global nginx cfg)
       ▼
   branded 500 page shows  "Reference  <id>"
       │
       ▼
   dply Errors tab
-   ├─ Tier 1: "Look up a reference" → queued SSH job greps the site's web+php
-   │          error logs for <id> → returns the matching stack trace
+   ├─ Tier 1: "Resolve a reference" → queued SSH job greps the FPM access log for
+   │          <id> → request + epoch, then time-correlates the app/error logs
    └─ Tier 2: scheduled sweeper parses 5xx log entries → writes ErrorEvent rows
               (category=http_5xx, reference=<id>, remediation matched) so errors
               appear automatically + notify; the page code deep-links to the event.
@@ -59,17 +61,29 @@ leaks to a visitor.
 
 ## Delivery
 
-- **PR1 — the code (this, done).** `X-Dply-Ref` header on nginx/Caddy/Apache 5xx
+- **PR1 — the code (done).** `X-Dply-Ref` header on nginx/Caddy/Apache 5xx
   + visible "Reference" row on the branded page via nginx `sub_filter` (gated on
   injection support). Existing sites pick it up on next **re-apply / provision**.
-- **PR1b — log correlation.** Add `$request_id` to the nginx `log_format` and
-  `fastcgi_param REQUEST_ID` so the id lands in access + app logs (Tier 1 needs
-  this to grep).
-- **PR2 — Tier 1 lookup.** Errors tab "Look up a reference" box → queued job tails
-  the site's web + php-fpm/Laravel error logs for the id → renders the trace.
-- **PR3 — Tier 2 auto-capture.** Scheduled sweeper → new `http_5xx` ErrorEvent
-  source + `reference` column (migration) → reuses Errors view + RemediationCatalog
-  + notifications. Page code becomes a clickable deep-link.
+- **PR1b — log correlation (done).** Correlation lives on the **FPM side**, not a
+  global nginx `log_format` (which would touch http-context config fleet-wide and
+  risk `nginx -t`). nginx passes `fastcgi_param REQUEST_ID $request_id`; the
+  per-site FPM pool — already dply-owned — logs it via a dedicated `access.log` +
+  `access.format` (`ref=… t=<epoch> … <method> <uri> … status=…`) plus a per-pool
+  `php_admin_value[error_log]`. The pool-ensure script `mkdir -p /var/log/php-fpm`
+  (the FPM master, root, opens the files). PHP 500s — the ones with traces —
+  always run through FPM, so coverage is exactly right; a pure 502 (FPM never ran)
+  has no app trace to resolve anyway.
+- **PR2 — Tier 1 lookup (done).** Errors tab → "Resolve a reference code" card.
+  `SiteErrorReferenceResolver` runs one capped bash script over SSH:
+  grep the FPM access log for `ref=<id>` → the exact request + epoch, then
+  time-correlate (UTC **and** server-local second prefixes, ±2s, to survive log
+  TZ differences) against `storage/logs/laravel.log`, the pool error log, and the
+  webserver error log. Driven by a queued `LookupSiteErrorReferenceJob`
+  (`WritesConsoleAction`) so it streams into the existing console-action banner;
+  result panel polls until terminal.
+- **PR3 — Tier 2 auto-capture (next).** Scheduled sweeper → new `http_5xx`
+  ErrorEvent source + `reference` column (migration) → reuses Errors view +
+  RemediationCatalog + notifications. Page code becomes a clickable deep-link.
 
 ## Interactions / notes
 

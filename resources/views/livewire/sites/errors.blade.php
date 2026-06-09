@@ -64,6 +64,7 @@
                 </x-server-workspace-tablist>
 
                 @if ($errorsTab === 'stream')
+                    @include('livewire.sites.partials.errors.reference-lookup')
                     @include('livewire.partials.error-stream')
                     <x-cli-snippet class="mt-6" :command="'dply sites:errors '.$site->slug" />
                 @endif

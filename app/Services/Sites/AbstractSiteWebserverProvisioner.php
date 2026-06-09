@@ -319,6 +319,10 @@ if ! command -v "php-fpm\${VER}" >/dev/null 2>&1; then
   exit 0
 fi
 
+# The pool's access/error logs live here; the FPM master (root) opens them on
+# reload but does not create the parent dir, so ensure it exists first.
+mkdir -p /var/log/php-fpm 2>/dev/null || true
+
 NEW="\$(mktemp)"
 echo {$b64} | base64 -d > "\$NEW"
 

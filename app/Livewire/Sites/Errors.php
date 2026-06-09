@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
+use App\Jobs\LookupSiteErrorReferenceJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\SurfacesErrorStream;
 use App\Livewire\Sites\Concerns\ManagesErrorsNotifications;
+use App\Models\ConsoleAction;
 use App\Models\ErrorEvent;
 use App\Models\Server;
 use App\Models\Site;
@@ -49,6 +51,12 @@ class Errors extends Component
     #[Url(as: 'tab', except: 'stream')]
     public string $errorsTab = 'stream';
 
+    /** The reference code (X-Dply-Ref) the operator pasted from a 5xx page. */
+    public string $referenceQuery = '';
+
+    /** ConsoleAction id of the in-flight / last reference lookup, if any. */
+    public ?string $lookupRunId = null;
+
     public function mount(Server $server, Site $site): void
     {
         abort_unless($site->server_id === $server->id, 404);
@@ -62,6 +70,73 @@ class Errors extends Component
     public function setErrorsWorkspaceTab(string $tab): void
     {
         $this->errorsTab = in_array($tab, self::ERRORS_TABS, true) ? $tab : 'stream';
+    }
+
+    /**
+     * Resolve a reference code from a branded 5xx page back to the actual request
+     * + error trace. SSH must not run inline (PHP 30s wall) so this dispatches a
+     * queued job that streams its result into a ConsoleAction this view polls.
+     */
+    public function lookupReference(): void
+    {
+        $this->authorizeErrorAccess();
+
+        $reference = trim($this->referenceQuery);
+        if (! preg_match('/^[A-Za-z0-9-]{8,64}$/', $reference)) {
+            $this->toastError(__('Enter the reference code shown on the error page.'));
+
+            return;
+        }
+
+        if (! $this->referenceLookupAvailable()) {
+            $this->toastError(__('Reference lookup needs an SSH-managed server.'));
+
+            return;
+        }
+
+        // Supersede any prior lookup banner for this site so the new run is the
+        // one on screen.
+        ConsoleAction::query()
+            ->where('subject_type', $this->site->getMorphClass())
+            ->where('subject_id', $this->site->id)
+            ->where('kind', 'error_reference_lookup')
+            ->whereNull('dismissed_at')
+            ->update(['dismissed_at' => now()]);
+
+        $run = ConsoleAction::query()->create([
+            'subject_type' => $this->site->getMorphClass(),
+            'subject_id' => $this->site->id,
+            'kind' => 'error_reference_lookup',
+            'status' => ConsoleAction::STATUS_QUEUED,
+            'label' => __('Resolving reference :ref', ['ref' => $reference]),
+            'user_id' => auth()->id(),
+            'output' => ['v' => (int) config('console_actions.current_version', 1), 'lines' => []],
+        ]);
+
+        LookupSiteErrorReferenceJob::dispatch(
+            (string) $this->site->id,
+            $reference,
+            (string) (auth()->id() ?? ''),
+            (string) $run->id,
+        );
+
+        $this->lookupRunId = (string) $run->id;
+        $this->dispatch('notify', message: __('Looking up :ref…', ['ref' => $reference]));
+    }
+
+    /** The in-flight / last reference-lookup ConsoleAction, for the result panel. */
+    public function lookupRun(): ?ConsoleAction
+    {
+        if ($this->lookupRunId === null) {
+            return null;
+        }
+
+        return ConsoleAction::query()->find($this->lookupRunId);
+    }
+
+    protected function referenceLookupAvailable(): bool
+    {
+        return (bool) $this->site->server?->hostCapabilities()->supportsSsh();
     }
 
     /**
@@ -112,6 +187,8 @@ class Errors extends Component
             'notifChannels' => $onNotificationsTab ? $this->assignableErrorsNotificationChannels() : collect(),
             'notifSubscriptions' => $onNotificationsTab ? $this->errorsNotificationSubscriptions() : collect(),
             'notifEventLabels' => $onNotificationsTab ? $this->errorsEventLabels() : [],
+            'referenceLookupAvailable' => $this->referenceLookupAvailable(),
+            'lookupRun' => $this->lookupRun(),
         ]);
     }
 }

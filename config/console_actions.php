@@ -24,6 +24,12 @@ return [
             'failed' => 'Webserver config apply failed.',
             'stale' => 'Webserver config apply did not finish.',
         ],
+        'error_reference_lookup' => [
+            'running' => 'Searching :host logs for the reference …',
+            'completed' => 'Reference resolved.',
+            'failed' => 'Reference lookup failed.',
+            'stale' => 'Reference lookup did not finish.',
+        ],
         'site_db_create' => [
             'running' => 'Creating the database on :host …',
             'completed' => 'Database created.',

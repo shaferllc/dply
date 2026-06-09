@@ -528,6 +528,45 @@ trait ResolvesWebserverConfig
     }
 
     /**
+     * Directory holding dply-managed PHP-FPM pool logs. Lives under /var/log so
+     * the FPM master (root) opens the files before dropping to the pool user —
+     * the pool user never needs write access to the directory.
+     */
+    public function phpFpmLogDirectory(): string
+    {
+        return '/var/log/php-fpm';
+    }
+
+    /**
+     * Per-pool FPM access log. Its format carries the per-request reference id
+     * ({@see \App\Support\Sites\SiteManagedErrorPageSupport::REFERENCE_HEADER}),
+     * so a 5xx reference resolves to the request's timestamp + URI here, which is
+     * then time-correlated against {@see self::laravelLogPath()} for the trace.
+     */
+    public function phpFpmAccessLogPath(): string
+    {
+        return $this->phpFpmLogDirectory().'/'.$this->phpFpmPoolName().'-access.log';
+    }
+
+    /** Per-pool PHP error log (uncaught fatals + worker output). */
+    public function phpFpmPoolErrorLogPath(): string
+    {
+        return $this->phpFpmLogDirectory().'/'.$this->phpFpmPoolName().'-error.log';
+    }
+
+    /** The app's own Laravel log, where handled-exception traces land. */
+    public function laravelLogPath(): string
+    {
+        return rtrim($this->effectiveEnvDirectory(), '/').'/storage/logs/laravel.log';
+    }
+
+    /** This site's webserver error log on the host. */
+    public function webserverErrorLogPath(): string
+    {
+        return rtrim($this->webserverLogDirectory(), '/').'/'.$this->webserverConfigBasename().'-error.log';
+    }
+
+    /**
      * Optional text shown on the public suspended HTML page (escaped when rendered).
      * Prefers {@see Site::$meta} `suspended_message`, then legacy {@see Site::$suspended_reason}.
      */
