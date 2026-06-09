@@ -26,7 +26,7 @@ final class ByoRepoConfigLoader
      *     crons: list<array{schedule: string, command: string, user: ?string}>,
      *     server_crons: list<array{schedule: string, command: string, user: ?string}>,
      *     deploy_hooks: list<array{phase: string, script: string, timeout: int, sort_order: int}>,
-     *     env_declarations: list<array{name: string, required: bool, description: ?string}>,
+     *     env_declarations: list<array{name: string, required: bool, description: ?string, default: ?string}>,
      *     warnings: list<string>
      * }
      */
@@ -178,7 +178,7 @@ final class ByoRepoConfigLoader
     /**
      * @param  array<string, mixed>  $parsed
      * @param  list<string>  $warnings
-     * @return list<array{name: string, required: bool, description: ?string}>
+     * @return list<array{name: string, required: bool, description: ?string, default: ?string}>
      */
     private function parseEnvDeclarations(array $parsed, array &$warnings): array
     {
@@ -197,7 +197,7 @@ final class ByoRepoConfigLoader
             if (is_string($entry)) {
                 $name = trim($entry);
                 if ($name !== '') {
-                    $out[] = ['name' => $name, 'required' => true, 'description' => null];
+                    $out[] = ['name' => $name, 'required' => true, 'description' => null, 'default' => null];
                 }
 
                 continue;
@@ -213,10 +213,19 @@ final class ByoRepoConfigLoader
 
                 continue;
             }
+            // `default` is a NON-SECRET seed value for the env editor. Coerce
+            // scalars to string; secrets should never be committed here (the
+            // dashboard owns secret values).
+            $default = $entry['default'] ?? null;
+            $default = (is_string($default) || is_int($default) || is_float($default) || is_bool($default))
+                ? (is_bool($default) ? ($default ? 'true' : 'false') : (string) $default)
+                : null;
+
             $out[] = [
                 'name' => $name,
                 'required' => (bool) ($entry['required'] ?? true),
                 'description' => is_string($entry['description'] ?? null) ? trim($entry['description']) : null,
+                'default' => $default,
             ];
         }
 

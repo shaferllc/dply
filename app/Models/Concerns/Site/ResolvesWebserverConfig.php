@@ -341,7 +341,42 @@ trait ResolvesWebserverConfig
             ];
         }
 
+        // Vars declared required in the repo dply.yaml `env:` section are also
+        // requirements even when the scanner didn't flag them — the repo author
+        // explicitly declared them. Manifest is authoritative for env shape.
+        $listed = array_flip(array_map(static fn (array $m): string => $m['key'], $missing));
+        foreach ($this->manifestEnvDeclarations() as $decl) {
+            $key = (string) ($decl['name'] ?? '');
+            if ($key === '' || ($decl['required'] ?? true) !== true) {
+                continue;
+            }
+            if (isset($satisfied[$key]) || isset($listed[$key])) {
+                continue;
+            }
+            $missing[] = [
+                'key' => $key,
+                'sources' => ['manifest'],
+                'required' => true,
+                'example' => isset($decl['default']) ? (string) $decl['default'] : null,
+            ];
+            $listed[$key] = true;
+        }
+
         return $missing;
+    }
+
+    /**
+     * Env-var declarations from the repo dply.yaml `env:` section, synced after
+     * each BYO deploy (see ByoRepoConfigSync). Drives both the deploy gate
+     * (required keys) and env-editor prefill (names + non-secret defaults).
+     *
+     * @return list<array{name: string, required: bool, description: ?string, default: ?string}>
+     */
+    public function manifestEnvDeclarations(): array
+    {
+        $decls = data_get($this->meta, 'byo.repo_config.snapshot.env_declarations');
+
+        return is_array($decls) ? array_values(array_filter($decls, 'is_array')) : [];
     }
 
     /**
