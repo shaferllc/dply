@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 ### Added
+- AI features can now route completions through the local `claude` CLI by setting the provider to "claude", requiring no API key.
+### Added
 - A new Sync tab on the site deployments page lets you select and deploy multiple related sites—such as a main site and its worker—together in one action.
 ### Added
 - Server overview now explains why CPU is busy by listing the top processes with plain-language remediation hints when CPU is elevated.
