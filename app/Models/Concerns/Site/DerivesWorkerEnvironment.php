@@ -40,6 +40,25 @@ trait DerivesWorkerEnvironment
         return $this->parent_site_id !== null;
     }
 
+    /**
+     * The site whose RESOURCE BINDINGS (database, redis, broadcasting, mail,
+     * logging, storage) and their pushed config this site should use. A derived
+     * worker inherits its parent app's resources — the server push composes
+     * connection vars + logging from here, not just from static env — so the
+     * worker mirrors the parent end-to-end. A standalone site uses its own.
+     */
+    public function resourceSourceSite(): self
+    {
+        if ($this->isDerivedWorker()) {
+            $parent = $this->parentSite;
+            if ($parent !== null) {
+                return $parent;
+            }
+        }
+
+        return $this;
+    }
+
     public static function isWorkerOverrideKey(string $key): bool
     {
         return in_array($key, self::WORKER_OVERRIDE_KEYS, true)

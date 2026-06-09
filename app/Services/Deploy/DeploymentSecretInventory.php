@@ -46,8 +46,12 @@ final class DeploymentSecretInventory
         // separate layer kept out of the editable Variables list — but an
         // explicit site .env key still overrides a binding-provided value
         // (parsed below), so operators retain a manual escape hatch.
-        $site->loadMissing('bindings');
-        foreach ($site->bindings as $binding) {
+        // A derived worker inherits its parent app's resource bindings, so the
+        // secret inventory (and the required-env gate it feeds) sees the parent's
+        // connection vars, not the worker's empty own.
+        $bindingSource = $site->resourceSourceSite();
+        $bindingSource->loadMissing('bindings');
+        foreach ($bindingSource->bindings as $binding) {
             foreach ($binding->connectionEnv() as $key => $value) {
                 $inventory[] = new DeploymentSecret(
                     key: (string) $key,

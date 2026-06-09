@@ -173,9 +173,14 @@ class SiteEnvPusher
      */
     private function bindingEnv(Site $site): array
     {
+        // A derived worker inherits its parent app's resources, so the
+        // connection vars come from the parent's bindings, not the worker's own
+        // (which are empty). Standalone sites resolve to themselves.
+        $source = $site->resourceSourceSite();
+
         $env = [];
-        $site->loadMissing('bindings');
-        foreach ($site->bindings as $binding) {
+        $source->loadMissing('bindings');
+        foreach ($source->bindings as $binding) {
             foreach ($binding->connectionEnv() as $key => $value) {
                 $env[(string) $key] = (string) $value;
             }

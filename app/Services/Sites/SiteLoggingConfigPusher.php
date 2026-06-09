@@ -106,8 +106,10 @@ class SiteLoggingConfigPusher
      */
     private function managedBinding(Site $site): ?SiteBinding
     {
-        $site->loadMissing('bindings');
-        $binding = $site->bindings->firstWhere('type', 'logging');
+        // A derived worker inherits its parent app's logging binding.
+        $source = $site->resourceSourceSite();
+        $source->loadMissing('bindings');
+        $binding = $source->bindings->firstWhere('type', 'logging');
         if (! $binding instanceof SiteBinding) {
             return null;
         }
