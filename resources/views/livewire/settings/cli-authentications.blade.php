@@ -85,8 +85,8 @@ jobs:
         with:
           node-version: 20
       - run: curl -fsSL {{ $installUrl }} | bash -s -- --no-shell
-      - run: dply login --token "${{@{{ secrets.DPLY_TOKEN }}}}" --no-shell
-      - run: dply deploy --sync --wait --idempotency-key "${{@{{ github.sha }}}}"</code></pre>
+      - run: dply login --token "$@{{ secrets.DPLY_TOKEN }}" --no-shell
+      - run: dply deploy --sync --wait --idempotency-key "$@{{ github.sha }}"</code></pre>
                         <p class="mt-2 text-xs leading-relaxed text-brand-moss">
                             {{ __('Create an org API token with sites.deploy. Link the site once locally (`dply link --byo …`) and commit `.dply/site.json`, or pass `--site` in CI.') }}
                         </p>
