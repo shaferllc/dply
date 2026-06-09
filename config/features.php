@@ -253,8 +253,11 @@ return [
         'site_files_preview' => env('FEATURE_WORKSPACE_SITE_FILES_PREVIEW',     ),
         'site_cli' => env('FEATURE_WORKSPACE_SITE_CLI', false),
         'site_cli_preview' => env('FEATURE_WORKSPACE_SITE_CLI_PREVIEW', true),
-        'site_system_user' => env('FEATURE_WORKSPACE_SITE_SYSTEM_USER', false),
-        'site_system_user_preview' => env('FEATURE_WORKSPACE_SITE_SYSTEM_USER_PREVIEW', true),
+        // Live: assign the Linux account that owns a VM-backed PHP site's files
+        // and runs its PHP-FPM pool, plus reset-permissions over SSH. Real flag
+        // on, preview off.
+        'site_system_user' => env('FEATURE_WORKSPACE_SITE_SYSTEM_USER', true),
+        'site_system_user_preview' => env('FEATURE_WORKSPACE_SITE_SYSTEM_USER_PREVIEW', false),
         // Routing sub-tabs — coming-soon teaser until each ships.
         'site_aliases' => env('FEATURE_WORKSPACE_SITE_ALIASES', false),
         'site_aliases_preview' => env('FEATURE_WORKSPACE_SITE_ALIASES_PREVIEW', true),

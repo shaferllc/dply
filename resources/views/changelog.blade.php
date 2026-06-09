@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 8, 2026',
+                    'tags'    => ['new'],
+                    'title'   => 'Site System User Management',
+                    'summary' => 'VM-backed PHP sites can now assign the Linux account that owns their files and runs their PHP-FPM pool, with permissions resettable over SSH.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 8, 2026',
                     'tags'    => ['improved'],
                     'title'   => 'Encrypted Log Drain Transport',
                     'summary' => 'The dply Logs drain receiver now accepts app logs over TLS-terminated TCP instead of plaintext UDP, with configurable certificate, key, and passphrase.',
@@ -672,6 +679,21 @@ Unified Button And Binding UI',
                 'fixed'    => 'Fixed',
                 'security' => 'Security',
             ];
+
+            // Paginate the flat (newest-first) list, then group the current
+            // page's entries by date for display.
+            $perPage  = 12;
+            $total    = count($entries);
+            $lastPage = max(1, (int) ceil($total / $perPage));
+            $page     = max(1, min((int) request()->query('page', 1), $lastPage));
+            $offset   = ($page - 1) * $perPage;
+
+            $grouped = [];
+            foreach (array_slice($entries, $offset, $perPage) as $entry) {
+                $grouped[$entry['date']][] = $entry;
+            }
+
+            $pageLink = fn ($p) => $p <= 1 ? route('changelog') : route('changelog') . '?page=' . $p;
         @endphp
 
         <section class="px-4 pb-24 sm:px-6 lg:px-8">
@@ -680,39 +702,89 @@ Unified Button And Binding UI',
                     {{-- Vertical timeline line --}}
                     <div class="absolute left-0 top-0 bottom-0 hidden w-px bg-gradient-to-b from-brand-ink/15 via-brand-ink/8 to-transparent sm:block" aria-hidden="true"></div>
 
-                    <ol class="space-y-10 sm:pl-8">
-                        @foreach ($entries as $entry)
-                            <li class="relative">
-                                {{-- Timeline dot --}}
-                                <span class="absolute -left-[calc(2rem+0.3125rem)] top-1/2 -translate-y-1/2 hidden h-2.5 w-2.5 rounded-full bg-brand-sage ring-4 ring-brand-sage/15 sm:block" aria-hidden="true"></span>
+                    <div class="space-y-12 sm:pl-8">
+                        @foreach ($grouped as $date => $dateEntries)
+                            <section>
+                                {{-- Date header --}}
+                                <div class="relative mb-5">
+                                    <span class="absolute -left-[calc(2rem+0.375rem)] top-1 hidden h-3 w-3 rounded-full bg-brand-sage ring-4 ring-brand-sage/15 sm:block" aria-hidden="true"></span>
+                                    <h2 class="text-sm font-semibold uppercase tracking-wide text-brand-forest">{{ $date }}</h2>
+                                </div>
 
-                                <article class="rounded-2xl border border-brand-ink/10 bg-white/85 p-6 shadow-sm sm:p-8">
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <time class="text-xs font-medium text-brand-mist">{{ $entry['date'] }}</time>
-                                        @foreach ($entry['tags'] as $tag)
-                                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide {{ $tagStyles[$tag] ?? '' }}">
-                                                {{ $tagLabels[$tag] ?? $tag }}
-                                            </span>
-                                        @endforeach
-                                    </div>
+                                <ol class="space-y-6">
+                                    @foreach ($dateEntries as $entry)
+                                        <li>
+                                            <article class="rounded-2xl border border-brand-ink/10 bg-white/85 p-6 shadow-sm sm:p-8">
+                                                @if (! empty($entry['tags']))
+                                                    <div class="flex flex-wrap items-center gap-2">
+                                                        @foreach ($entry['tags'] as $tag)
+                                                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide {{ $tagStyles[$tag] ?? '' }}">
+                                                                {{ $tagLabels[$tag] ?? $tag }}
+                                                            </span>
+                                                        @endforeach
+                                                    </div>
+                                                @endif
 
-                                    <h2 class="mt-3 text-lg font-semibold text-brand-ink">{{ $entry['title'] }}</h2>
-                                    <p class="mt-2 text-sm leading-relaxed text-brand-moss">{{ $entry['summary'] }}</p>
+                                                <h3 class="mt-3 text-lg font-semibold text-brand-ink">{{ $entry['title'] }}</h3>
+                                                <p class="mt-2 text-sm leading-relaxed text-brand-moss">{{ $entry['summary'] }}</p>
 
-                                    @if (! empty($entry['items']))
-                                        <ul class="mt-4 space-y-1.5">
-                                            @foreach ($entry['items'] as $item)
-                                                <li class="flex items-start gap-2 text-sm text-brand-moss">
-                                                    <x-heroicon-m-chevron-right class="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
-                                                    <span>{!! $item !!}</span>
-                                                </li>
-                                            @endforeach
-                                        </ul>
-                                    @endif
-                                </article>
-                            </li>
+                                                @if (! empty($entry['items']))
+                                                    <ul class="mt-4 space-y-1.5">
+                                                        @foreach ($entry['items'] as $item)
+                                                            <li class="flex items-start gap-2 text-sm text-brand-moss">
+                                                                <x-heroicon-m-chevron-right class="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
+                                                                <span>{!! $item !!}</span>
+                                                            </li>
+                                                        @endforeach
+                                                    </ul>
+                                                @endif
+                                            </article>
+                                        </li>
+                                    @endforeach
+                                </ol>
+                            </section>
                         @endforeach
-                    </ol>
+                    </div>
+
+                    {{-- Pagination --}}
+                    @if ($lastPage > 1)
+                        <nav class="mt-14 flex items-center justify-between gap-4 sm:pl-8" aria-label="Changelog pagination">
+                            @if ($page > 1)
+                                <a href="{{ $pageLink($page - 1) }}" rel="prev" class="inline-flex items-center gap-1.5 rounded-xl border-2 border-brand-ink/15 bg-white/70 px-4 py-2.5 text-sm font-semibold text-brand-ink transition-colors hover:border-brand-sage/40 hover:bg-white">
+                                    <x-heroicon-m-chevron-left class="h-4 w-4" aria-hidden="true" />
+                                    Newer
+                                </a>
+                            @else
+                                <span class="inline-flex cursor-not-allowed items-center gap-1.5 rounded-xl border-2 border-brand-ink/10 bg-white/40 px-4 py-2.5 text-sm font-semibold text-brand-mist/50">
+                                    <x-heroicon-m-chevron-left class="h-4 w-4" aria-hidden="true" />
+                                    Newer
+                                </span>
+                            @endif
+
+                            <div class="hidden items-center gap-1 sm:flex">
+                                @foreach (range(1, $lastPage) as $p)
+                                    <a href="{{ $pageLink($p) }}" @if ($p === $page) aria-current="page" @endif
+                                       class="inline-flex h-9 min-w-9 items-center justify-center rounded-lg px-3 text-sm font-semibold transition-colors {{ $p === $page ? 'bg-brand-forest text-white' : 'text-brand-moss hover:bg-white/70' }}">
+                                        {{ $p }}
+                                    </a>
+                                @endforeach
+                            </div>
+
+                            <span class="text-sm font-medium text-brand-moss sm:hidden">Page {{ $page }} of {{ $lastPage }}</span>
+
+                            @if ($page < $lastPage)
+                                <a href="{{ $pageLink($page + 1) }}" rel="next" class="inline-flex items-center gap-1.5 rounded-xl border-2 border-brand-ink/15 bg-white/70 px-4 py-2.5 text-sm font-semibold text-brand-ink transition-colors hover:border-brand-sage/40 hover:bg-white">
+                                    Older
+                                    <x-heroicon-m-chevron-right class="h-4 w-4" aria-hidden="true" />
+                                </a>
+                            @else
+                                <span class="inline-flex cursor-not-allowed items-center gap-1.5 rounded-xl border-2 border-brand-ink/10 bg-white/40 px-4 py-2.5 text-sm font-semibold text-brand-mist/50">
+                                    Older
+                                    <x-heroicon-m-chevron-right class="h-4 w-4" aria-hidden="true" />
+                                </span>
+                            @endif
+                        </nav>
+                    @endif
                 </div>
             </div>
         </section>

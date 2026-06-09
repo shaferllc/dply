@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- VM-backed PHP sites can now assign the Linux account that owns their files and runs their PHP-FPM pool, with permissions resettable over SSH.
 ### Changed
 - The dply Logs drain receiver now accepts app logs over TLS-terminated TCP instead of plaintext UDP, with configurable certificate, key, and passphrase.
 ### Added

@@ -91,17 +91,22 @@
                 @endif
             </div>
 
-            @if (count($system_user_remote_rows) === 0)
+            @if (! $system_users_loaded)
+                <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 p-4 text-sm text-brand-moss">
+                    {{ __('Load the server\'s Linux accounts to choose a file owner for this site.') }}
+                </div>
+            @elseif (count($system_user_remote_rows) === 0)
                 <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 p-4 text-sm text-brand-moss">
                     {{ __('No regular Linux users on this server yet. Create one on the server\'s System users page, then come back to assign it here.') }}
                 </div>
             @else
+                @php $effectiveUser = $site->effectiveSystemUser($this->server); @endphp
                 <div class="max-w-md space-y-2">
                     <x-input-label for="system_user_assign_pick" :value="__('Select system user')" />
                     <select id="system_user_assign_pick" wire:model="system_user_assign_username" class="mt-1 block w-full rounded-md border-brand-ink/15 shadow-sm text-sm">
                         <option value="">{{ __('Choose a user…') }}</option>
                         @foreach ($system_user_remote_rows as $row)
-                            <option value="{{ $row['username'] }}">{{ $row['username'] }}</option>
+                            <option value="{{ $row['username'] }}">{{ $row['username'] }}@if ($row['username'] === $effectiveUser) {{ __('(current)') }}@endif</option>
                         @endforeach
                     </select>
                     <x-primary-button type="button" class="mt-2" wire:click="openSystemUserAssignModal">

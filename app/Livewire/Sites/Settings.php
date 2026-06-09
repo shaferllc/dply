@@ -302,6 +302,14 @@ class Settings extends Show
      */
     public array $system_user_remote_rows = [];
 
+    /**
+     * True once we have a definitive account list for the picker — either a
+     * fresh SSH probe ran or we seeded a non-empty snapshot from the DB. Gates
+     * the "No regular Linux users" empty state so it never shows before a list
+     * has actually been fetched (the rows array is empty on first render too).
+     */
+    public bool $system_users_loaded = false;
+
     public ?string $system_user_list_error = null;
 
     /** @var 'commands'|'octane'|'reverb'|'logs'|'setup'|'schedule'|'migrations'|'pail' */
@@ -548,6 +556,30 @@ class Settings extends Show
         if ($this->section === 'repository') {
             $this->syncRepositorySyncUiState();
         }
+
+        if ($this->section === 'system-user') {
+            $this->seedSystemUsersFromStore();
+        }
+    }
+
+    /**
+     * Pre-fill the system-user picker from the last persisted /etc/passwd
+     * snapshot so a returning operator sees existing accounts immediately —
+     * no SSH on the render path. "Load system users" then re-probes live.
+     */
+    protected function seedSystemUsersFromStore(): void
+    {
+        if (! $this->shouldShowSystemUserPanel()) {
+            return;
+        }
+
+        $rows = app(ServerSystemUserService::class)->storedSystemUsersWithMetadata($this->server);
+        if ($rows === []) {
+            return;
+        }
+
+        $this->system_user_remote_rows = $rows;
+        $this->system_users_loaded = true;
     }
 
     protected function syncRepositorySyncUiState(): void
@@ -857,6 +889,10 @@ class Settings extends Show
         if ($value === 'runtime' || $value === 'laravel-stack' || $value === 'system-user') {
             $this->syncGeneralSettingsForm();
             $this->syncFormFromSite();
+        }
+
+        if ($value === 'system-user') {
+            $this->seedSystemUsersFromStore();
         }
 
         if ($value === 'laravel-stack' && $this->site->isLaravelFrameworkDetected() && $this->laravel_tab === 'commands') {
@@ -3565,6 +3601,7 @@ class Settings extends Show
 
         try {
             $this->system_user_remote_rows = $service->listPasswdUsersWithSiteCounts($this->server->fresh(), $lister);
+            $this->system_users_loaded = true;
         } catch (\Throwable $e) {
             $this->system_user_list_error = $e->getMessage();
             $this->system_user_remote_rows = [];
