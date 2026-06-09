@@ -113,7 +113,15 @@ class SiteDeployStep extends Model
         'phase',
         'custom_command',
         'timeout_seconds',
+        'managed_by_manifest',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'managed_by_manifest' => 'boolean',
+        ];
+    }
 
     public function site(): BelongsTo
     {
