@@ -7,23 +7,26 @@ namespace App\Console\Commands;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Services\Deploy\DeploymentRunner;
+use App\Services\Sites\SiteGitDeployer;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 use Throwable;
 
 /**
- * Run a full deployment for a site via {@see DeploymentRunner}.
+ * Run a full deployment for a site.
  *
  *   dply:site:deploy <site> [--release-dir=] [--trigger=manual] [--json]
  *
- * Walks all four phases — build → swap → release → restart — against
- * the release directory, persisting per-phase results to a new
- * SiteDeployment row. Useful for:
- *   - kicking a deploy from a CI workflow without going through the
- *     webhook + queue path
- *   - re-running a deploy on a specific release dir for recovery
- *   - end-to-end smoke testing the deploy pipeline against a known
- *     release without touching the queue worker
+ * Engine selection mirrors the queue/UI path so the CLI can never diverge
+ * from a real deploy:
+ *   - ATOMIC sites go through {@see SiteGitDeployer} → AtomicSiteDeployer,
+ *     which clones into a fresh `releases/<ts>` dir, writes .env via the
+ *     site's `env_file_path` and flips `current` to the new release. This is
+ *     the ONLY correct path for atomic sites — using DeploymentRunner with a
+ *     release dir defaulting to `repository_path` would flip `current` at the
+ *     repo ROOT and config:cache from the root .env (the prod-clobber bug).
+ *   - SIMPLE sites use {@see DeploymentRunner} (in-place build at the repo
+ *     path; the swap phase is a no-op).
  *
  * Synchronous (operator sees per-phase output land as it streams).
  * On any phase failure, status flips to failed and partial
@@ -67,6 +70,14 @@ class DeploySiteCommand extends Command
             'started_at' => now(),
         ]);
 
+        // Atomic sites MUST use the real atomic engine — it owns release-dir
+        // creation and the `current` flip. DeploymentRunner with a root
+        // release dir would clobber the live checkout. Simple sites stay on
+        // the in-place DeploymentRunner path.
+        if ($site->isAtomicDeploys()) {
+            return $this->runAtomic($site, $deployment, $releaseDir);
+        }
+
         try {
             $result = $runner->run($deployment, $releaseDir);
         } catch (Throwable $e) {
@@ -107,6 +118,80 @@ class DeploySiteCommand extends Command
     }
 
     /**
+     * Drive an atomic deploy through the same engine the queue/UI path uses.
+     * SiteGitDeployer records per-phase results on the deployment row as it
+     * goes and throws on any phase failure.
+     */
+    private function runAtomic(Site $site, SiteDeployment $deployment, string $releaseDir): int
+    {
+        try {
+            $result = app(SiteGitDeployer::class)->run($site, $deployment);
+            $deployment->update([
+                'status' => SiteDeployment::STATUS_SUCCESS,
+                'git_sha' => $result['sha'] ?? null,
+                'exit_code' => 0,
+                'finished_at' => now(),
+            ]);
+            $site->forceFill(['last_deploy_at' => now()])->save();
+        } catch (Throwable $e) {
+            $deployment->update([
+                'status' => SiteDeployment::STATUS_FAILED,
+                'exit_code' => 1,
+                'finished_at' => now(),
+            ]);
+            if ($this->option('json')) {
+                $this->line(json_encode([
+                    'ok' => false,
+                    'site_id' => $site->id,
+                    'deployment_id' => $deployment->id,
+                    'error' => $e->getMessage(),
+                ], JSON_PRETTY_PRINT));
+            } else {
+                $this->error($e->getMessage());
+            }
+
+            return self::FAILURE;
+        }
+
+        $phases = (array) ($deployment->fresh()->phase_results ?? []);
+
+        if ($this->option('json')) {
+            $this->line(json_encode([
+                'ok' => true,
+                'site_id' => $site->id,
+                'deployment_id' => $deployment->id,
+                'sha' => $result['sha'] ?? null,
+                'phases' => $phases,
+            ], JSON_PRETTY_PRINT));
+
+            return self::SUCCESS;
+        }
+
+        $this->renderHumanResults($site, $deployment->id, $releaseDir, [
+            'ok' => true,
+            'phases' => $phases,
+            'total_duration_ms' => $this->sumPhaseDurations($phases),
+        ]);
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * @param  array<string, list<array<string, mixed>>>  $phases
+     */
+    private function sumPhaseDurations(array $phases): int
+    {
+        $total = 0;
+        foreach ($phases as $steps) {
+            foreach ((array) $steps as $step) {
+                $total += (int) ($step['duration_ms'] ?? 0);
+            }
+        }
+
+        return $total;
+    }
+
+    /**
      * @param  array{ok: bool, phases: array<string, list<array<string, mixed>>>, total_duration_ms: int}  $result
      */
     private function renderHumanResults(Site $site, string $deploymentId, string $releaseDir, array $result): void
@@ -134,7 +219,7 @@ class DeploySiteCommand extends Command
                     '  <fg=%s>%s</> %s  <fg=gray>(%dms)</>',
                     $color,
                     $glyph,
-                    (string) ($step['command'] ?? '<no command>'),
+                    (string) ($step['command'] ?? $step['step_type'] ?? '<step>'),
                     (int) ($step['duration_ms'] ?? 0),
                 ));
                 $output = trim((string) ($step['output'] ?? ''));

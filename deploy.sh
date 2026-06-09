@@ -1,6 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# ===========================================================================
+# RETIRED — BREAK-GLASS ONLY. Do NOT use for routine deploys.
+#
+# The canonical deploy engine is AtomicSiteDeployer (reached via the dashboard
+# Deploy button, the queue path RunSiteDeploymentJob, or `dply:site:deploy`).
+# It clones into a fresh releases/<ts> dir, writes .env via the site's
+# env_file_path, atomically flips `current`, and health-checks the result.
+#
+# Running this script alongside that engine is what created prod's hybrid
+# layout (a flat checkout + an atomic tree in one dir) and the recurring .env
+# clobber: deploy.sh symlinks current/.env → shared/.env, while the engine
+# writes .env from the DB. Pick ONE. For self-managed dply, the engine wins.
+#
+# Keep this only as a last-resort recovery tool when the control plane itself
+# cannot deploy. See deploy/ATOMIC_RELEASES.md.
+# ===========================================================================
+
 # ---------------------------------------------------------------------------
 # deploy.sh — commit, push, and deploy dply to production
 # Usage: ./deploy.sh ["commit message"]

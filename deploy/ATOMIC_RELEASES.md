@@ -1,5 +1,14 @@
 # Atomic-release deploys
 
+> **Canonical engine: `AtomicSiteDeployer`, not `deploy.sh`.** Routine deploys go
+> through the dashboard Deploy button / `RunSiteDeploymentJob` / `dply:site:deploy`,
+> which resolve to `AtomicSiteDeployer` for atomic-strategy sites. It clones into a
+> fresh `releases/<ts>`, writes `.env` from the DB via the site's `env_file_path`
+> (so `current/.env` is a symlink to the shared env, never a clobbered regular
+> file), flips `current`, and health-checks over `https …/up`. `deploy.sh` below is
+> **retired break-glass** — running both engines on one host is what created the
+> hybrid layout + the recurring `.env` reset. Use one; the engine wins.
+
 `deploy.sh` ships every host (web + workers) as an **immutable release** and flips
 an atomic `current` symlink. This is what stops a deploy from breaking
 queued-job deserialization: a long-running Horizon never half-sees new code, and

@@ -158,6 +158,7 @@ class Site extends Model
         'post_deploy_command',
         'deploy_script_id',
         'deploy_strategy',
+        'deploy_method',
         'releases_to_keep',
         'nginx_extra_raw',
         'engine_http_cache_enabled',
