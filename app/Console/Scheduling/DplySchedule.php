@@ -54,6 +54,7 @@ use App\Console\Commands\SyncAllOrganizationBillingCommand;
 use App\Console\Commands\SyncErrorEventsCommand;
 use App\Console\Commands\WarmPoolAutoscaleCommand;
 use App\Console\Commands\WorkerPoolAutoscaleCommand;
+use App\Console\Commands\WorkerPoolMemberHealthCommand;
 use App\Console\Commands\WorkerPoolPrimaryHealthCommand;
 use App\Jobs\VerifyEdgeCustomDomainsJob;
 use App\Support\DplyRuntime;
@@ -117,6 +118,13 @@ final class DplySchedule
         $schedule->command(WorkerPoolPrimaryHealthCommand::class)
             ->everyFiveMinutes()
             ->name('worker-pools-primary-health');
+
+        // Catch replicas destroyed out-of-band after the pool settled (the
+        // reconciler only checks instance existence while actively converging).
+        $schedule->command(WorkerPoolMemberHealthCommand::class)
+            ->everyFiveMinutes()
+            ->withoutOverlapping()
+            ->name('worker-pools-member-health');
 
         $schedule->command(ServerlessTickCommand::class)
             ->everyMinute()
