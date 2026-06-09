@@ -1653,6 +1653,18 @@ class Show extends Component
             return;
         }
 
+        // Arm a one-time on-disk layout migration. The NEXT successful deploy
+        // builds the new layout and archives the old one (flat checkout ⇄ atomic
+        // releases) via SiteDeployLayoutMigrator — so switching the type can't
+        // leave a hybrid behind. See docs/DEPLOYMENT_METHODS.md.
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta['deploy_layout_migration'] = [
+            'from' => $previousStrategy === 'atomic' ? 'atomic' : 'flat',
+            'to' => $newStrategy === 'atomic' ? 'atomic' : 'flat',
+            'armed_at' => now()->toIso8601String(),
+        ];
+        $this->site->forceFill(['meta' => $meta])->save();
+
         if ($this->shouldAutoReapplyManagedWebserverConfig()) {
             ApplySiteWebserverConfigJob::dispatch($this->site->id);
             $this->toastSuccess($message.' '.__('Webserver config queued.'));

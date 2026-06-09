@@ -368,6 +368,17 @@ class AtomicSiteDeployer
             throw $e;
         }
 
+        // ── LAYOUT MIGRATE ── if a deploy-method switch armed an on-disk layout
+        // change (e.g. flat→atomic), perform it now — AFTER activate + health
+        // pass — so a failed deploy can never destroy the old layout. Best-effort:
+        // the release is already live and healthy, so a cleanup hiccup is logged,
+        // not fatal.
+        try {
+            $log .= app(SiteDeployLayoutMigrator::class)->migrateIfArmed($site, $ssh, $folder);
+        } catch (\Throwable $e) {
+            $log .= "\n[dply] layout migration skipped (non-fatal): ".$e->getMessage()."\n";
+        }
+
         $sha = trim($ssh->exec(sprintf('cd %s && git rev-parse HEAD 2>/dev/null', $newEsc), 30));
 
         $keep = max(1, min(50, (int) ($site->releases_to_keep ?? 5)));

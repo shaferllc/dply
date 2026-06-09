@@ -292,6 +292,15 @@ class SiteGitDeployer
             }
         }
 
+        // ── LAYOUT MIGRATE ── a deploy-method switch (e.g. atomic→flat) may have
+        // armed an on-disk layout change; perform it now that the flat checkout is
+        // live. Best-effort — never fail a healthy deploy over cleanup.
+        try {
+            $log .= app(SiteDeployLayoutMigrator::class)->migrateIfArmed($site, $ssh, gmdate('YmdHis'));
+        } catch (\Throwable $e) {
+            $log .= "\n[dply] layout migration skipped (non-fatal): ".$e->getMessage()."\n";
+        }
+
         return ['output' => $log, 'sha' => $sha !== '' ? $sha : null];
     }
 }
