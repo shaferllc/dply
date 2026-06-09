@@ -98,7 +98,7 @@ return [
     | Remote cleanup when a site is deleted (CleanupRemoteSiteArtifactsJob)
     |--------------------------------------------------------------------------
     */
-    'delete_remote_repository_on_site_delete' => filter_var(env('DPLY_DELETE_REMOTE_REPO_ON_SITE_DELETE', false), FILTER_VALIDATE_BOOL),
+    'delete_remote_repository_on_site_delete' => true,
 
     'delete_remote_certbot_certificate_on_site_delete' => filter_var(env('DPLY_DELETE_REMOTE_CERT_ON_SITE_DELETE', false), FILTER_VALIDATE_BOOL),
 
@@ -229,7 +229,7 @@ return [
     */
     'edge' => [
         'usage_billing' => [
-            'enabled' => filter_var(env('DPLY_EDGE_USAGE_BILLING_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+            'enabled' => true,
             'markup_percent' => (int) env('DPLY_EDGE_USAGE_MARKUP_PERCENT', 0),
             'requests_cents_per_million' => (int) env('DPLY_EDGE_USAGE_REQUESTS_CENTS_PER_MILLION', 30),
             'egress_cents_per_gb' => (int) env('DPLY_EDGE_USAGE_EGRESS_CENTS_PER_GB', 2),

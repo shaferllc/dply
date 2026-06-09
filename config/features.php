@@ -196,9 +196,9 @@ return [
         // exit: ship once Redis/Memcached provisioning has parity with the cache audit
         'caches' => env('FEATURE_WORKSPACE_CACHES', true),
         // GA — remote Docker inspector (containers, images, volumes, networks, compose, maintenance)
-        'docker' => env('FEATURE_WORKSPACE_DOCKER', false),
+        'docker' => true,
         // teaser only when docker is off
-        'docker_preview' => env('FEATURE_WORKSPACE_DOCKER_PREVIEW', true),
+        'docker_preview' => true,
         // exit: GA — server-scoped database + site-files backup runs and schedules
         'backups' => env('FEATURE_WORKSPACE_BACKUPS', true),
         // exit: ship alongside backups GA; teaser only when backups is off
@@ -278,7 +278,7 @@ return [
     */
     'surface' => [
         // exit: VM launch is dark; flip to true once container/cloud surface is GA
-        'cloud' => env('FEATURE_SURFACE_CLOUD', false),
+        'cloud' => false,
         // GA 2026-05: cross-server views (Health, Deploys, Domains, EnvSearch)
         // ship as the org-wide ops counterpart to /infrastructure. Saved-view
         // persistence is a follow-up enhancement, not a launch gate.
@@ -292,12 +292,12 @@ return [
         // exit: ship as a standalone product launch with its own positioning
         'status_pages' => env('FEATURE_SURFACE_STATUS_PAGES', false),
         // exit: ship when Edge build → R2 → CF Worker loop is green in staging
-        'edge' => env('FEATURE_SURFACE_EDGE', false),
+        'edge' => false,
         // exit: ship the managed realtime (Reverb/Pusher-compatible) resource
         // once the realtime Worker + KV provisioning + billing are validated.
         'realtime' => env('FEATURE_SURFACE_REALTIME', false),
         // exit: ship once OpenWhisk multi-language adapters + billing are GA
-        'serverless' => env('FEATURE_SURFACE_SERVERLESS', false),
+        'serverless' => false,
         // exit: offer the dply-managed serverless option (dply runs the function
         // on its own FaaS account, billed cost-plus) once platform namespace
         // credentials are bootstrapped. Falls back to BYO-only when off.

@@ -3,10 +3,13 @@
 namespace App\Livewire\Sites;
 
 use App\Enums\SiteType;
+use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Jobs\AssignSystemUserToSiteJob;
 use App\Jobs\ExecuteSiteCertificateJob;
 use App\Jobs\ProvisionTenantTestingHostnameJob;
+use App\Jobs\ResetSiteOpcacheJob;
 use App\Jobs\RunSiteDeploymentJob;
+use App\Jobs\ScanServerLiveCertsJob;
 use App\Jobs\SiteResetPermissionsJob;
 use App\Jobs\SyncBasicAuthFromServerJob;
 use App\Livewire\Concerns\CreatesNotificationChannelInline;
@@ -15,9 +18,9 @@ use App\Livewire\Concerns\ManagesContainerSite;
 use App\Livewire\Concerns\ManagesSiteBindings;
 use App\Livewire\Concerns\ManagesSiteLogging;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
+use App\Livewire\Sites\Concerns\ManagesErrorsNotifications;
 use App\Livewire\Sites\Concerns\ManagesSiteLogo;
-use App\Models\NotificationChannel;
-use App\Models\NotificationSubscription;
+use App\Models\ErrorEvent;
 use App\Models\NotificationWebhookDestination;
 use App\Models\ProviderCredential;
 use App\Models\Server;
@@ -56,23 +59,28 @@ use App\Services\Sites\LaravelConsoleExecutor;
 use App\Services\Sites\LaravelSiteSshSetupRunner;
 use App\Services\Sites\SiteAccessGateLoginLogReader;
 use App\Services\Sites\SiteAccessGateService;
+use App\Services\Sites\SiteAppServerProbe;
 use App\Services\Sites\SiteDeploySyncGroupManager;
+use App\Services\Sites\SiteOpcacheManager;
+use App\Services\Sites\SitePhpFpmProbe;
 use App\Services\Sites\SiteReachabilityChecker;
 use App\Services\Sites\SiteScopedCommandWrapper;
 use App\Services\Snapshots\LocalDiskDestination;
 use App\Services\Snapshots\SnapshotService;
 use App\Services\SshConnection;
 use App\Support\HostnameValidator;
-use App\Support\Sites\SiteSettingsViewData;
 use App\Support\NotificationSubscriptionMatrix;
+use App\Support\SiteErrorsNotificationKeys;
+use App\Support\Sites\SiteSettingsViewData;
 use App\Support\SiteSettingsSidebar;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
-use Carbon\CarbonImmutable;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
@@ -111,9 +119,9 @@ class Settings extends Show
     /**
      * Site events routable from the central Settings → Notifications matrix. The
      * site.errors.* keys are ALSO editable from the Errors → Notifications tab
-     * ({@see \App\Livewire\Sites\Concerns\ManagesErrorsNotifications}); both
+     * ({@see ManagesErrorsNotifications}); both
      * surfaces write the same Site subscriptions, so they stay in sync. Keep this
-     * list aligned with {@see \App\Support\SiteErrorsNotificationKeys::eventKeys()}.
+     * list aligned with {@see SiteErrorsNotificationKeys::eventKeys()}.
      *
      * @var list<string>
      */
@@ -132,6 +140,34 @@ class Settings extends Show
     public string $routingTab = 'domains';
 
     public string $runtimeTab = 'overview';
+
+    /**
+     * Live runtime health for the Runtime → Overview card, keyed by 'kind':
+     *   - 'fpm':  dedicated PHP-FPM pool {running, socket_present, conf_present, workers, max_children, php_version, pool}
+     *   - 'port': long-running app server {listening, port}
+     * Loaded deferred via {@see loadRuntimeHealth()} (wire:init) so the SSH probe
+     * stays off the render path; null until the probe runs / when there's nothing
+     * to probe / when the probe couldn't reach the server.
+     *
+     * @var array<string, mixed>|null
+     */
+    public ?array $runtimeHealth = null;
+
+    /** Whether {@see loadRuntimeHealth()} has run yet (drives the "checking…" state). */
+    public bool $runtimeHealthLoaded = false;
+
+    /**
+     * Live OPcache status for the Runtime → Overview card, read from the FPM
+     * worker (not CLI) via {@see SiteOpcacheManager}. Loaded deferred by
+     * {@see loadOpcacheStatus()} (wire:init); null until probed / when the site
+     * has no dedicated pool / when FPM couldn't be reached.
+     *
+     * @var array<string, mixed>|null
+     */
+    public ?array $opcacheStatus = null;
+
+    /** Whether {@see loadOpcacheStatus()} has run yet (drives the "checking…" state). */
+    public bool $opcacheStatusLoaded = false;
 
     /** @var list<string> */
     public const NOTIF_TABS = ['subscriptions', 'webhooks'];
@@ -974,7 +1010,7 @@ class Settings extends Show
         $this->site->refresh();
         $this->syncFormFromSite();
 
-        \App\Jobs\ApplySiteWebserverConfigJob::dispatch(
+        ApplySiteWebserverConfigJob::dispatch(
             (string) $this->site->id,
             (string) auth()->id(),
         );
@@ -1495,6 +1531,165 @@ class Settings extends Show
         $this->site->update(['meta' => $meta]);
         $this->syncFormFromSite();
         $this->finalizeRoutingMutation(__('Laravel stack settings saved.'));
+    }
+
+    private function runtimeHealthCacheKey(): string
+    {
+        return 'dply.site-runtime-health:'.$this->site->id;
+    }
+
+    /**
+     * Deferred (wire:init) loader for the Runtime → Overview live-health card.
+     * Kept OFF render() so renders + console wire:polls never block on SSH; the
+     * probe is one inline-bash roundtrip, cached briefly so rapid re-entries
+     * (tab nav, double fire) coalesce. The probe kind (FPM pool vs. app-server
+     * port) is decided by {@see Site::runtimeHealthProbeKind()} so the loader and
+     * the card always agree; no-ops to a "loaded but empty" state when there's
+     * nothing to probe.
+     */
+    public function loadRuntimeHealth(SitePhpFpmProbe $fpmProbe, SiteAppServerProbe $portProbe): void
+    {
+        $this->runtimeHealthLoaded = true;
+        $this->runtimeHealth = null;
+
+        $kind = $this->site->runtimeHealthProbeKind();
+        if ($kind === null || ! $this->server->hostCapabilities()->supportsSsh()) {
+            return;
+        }
+        if ($kind === 'fpm' && ! $this->server->hostCapabilities()->supportsMachinePhpManagement()) {
+            return;
+        }
+
+        try {
+            $this->runtimeHealth = Cache::remember(
+                $this->runtimeHealthCacheKey(),
+                15,
+                function () use ($kind, $fpmProbe, $portProbe): ?array {
+                    $result = $kind === 'fpm'
+                        ? $fpmProbe->probe($this->site)
+                        : $portProbe->probe($this->site);
+
+                    return $result === null ? null : ['kind' => $kind] + $result;
+                },
+            );
+        } catch (\Throwable) {
+            $this->runtimeHealth = null;
+        }
+    }
+
+    /** Force-refresh the Overview live-health card (button on the card). */
+    public function refreshRuntimeHealth(SitePhpFpmProbe $fpmProbe, SiteAppServerProbe $portProbe): void
+    {
+        Cache::forget($this->runtimeHealthCacheKey());
+        $this->runtimeHealthLoaded = false;
+        $this->loadRuntimeHealth($fpmProbe, $portProbe);
+    }
+
+    /**
+     * Re-apply this site's webserver config, which rewrites the dedicated pool
+     * conf and reloads php-fpm (idempotent — only changed files reload). Surfaced
+     * as a "Reload pool" button on the Overview FPM card. Queued + watched via
+     * the console banner, never inline {@see [[feedback_queue_ssh_operations]]}.
+     */
+    public function reloadFpmPool(): void
+    {
+        $this->authorize('update', $this->site);
+        if (! $this->site->usesDedicatedPhpFpmPool() || ! $this->server->hostCapabilities()->supportsMachinePhpManagement()) {
+            $this->toastError(__('This site has no dedicated PHP-FPM pool to reload.'));
+
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('webserver_config', __('Reloading PHP-FPM pool'));
+        ApplySiteWebserverConfigJob::dispatch(
+            (string) $this->site->id,
+            (string) (auth()->id() ?? ''),
+            (string) $run->id,
+        );
+
+        // The reload churns live worker state, so drop the cached probe — the
+        // next card render (or Refresh) re-reads it.
+        Cache::forget($this->runtimeHealthCacheKey());
+        $this->runtimeHealthLoaded = false;
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            __('PHP-FPM pool reloaded.'),
+            __('PHP-FPM pool reload failed.'),
+        );
+        $this->toastConsoleActionQueued();
+    }
+
+    private function opcacheStatusCacheKey(): string
+    {
+        return 'dply.site-opcache:'.$this->site->id;
+    }
+
+    /**
+     * Deferred (wire:init) loader for the Overview OPcache card. Reads the live
+     * FPM cache via {@see SiteOpcacheManager} (FastCGI to the pool socket) off
+     * the render path; cached briefly so re-entries coalesce.
+     */
+    public function loadOpcacheStatus(SiteOpcacheManager $opcache): void
+    {
+        $this->opcacheStatusLoaded = true;
+        $this->opcacheStatus = null;
+
+        if (! $this->site->usesDedicatedPhpFpmPool() || ! $this->server->hostCapabilities()->supportsMachinePhpManagement()) {
+            return;
+        }
+
+        try {
+            $this->opcacheStatus = Cache::remember(
+                $this->opcacheStatusCacheKey(),
+                15,
+                fn () => $opcache->status($this->site),
+            );
+        } catch (\Throwable) {
+            $this->opcacheStatus = null;
+        }
+    }
+
+    /** Force-refresh the OPcache card (button on the card). */
+    public function refreshOpcacheStatus(SiteOpcacheManager $opcache): void
+    {
+        Cache::forget($this->opcacheStatusCacheKey());
+        $this->opcacheStatusLoaded = false;
+        $this->loadOpcacheStatus($opcache);
+    }
+
+    /**
+     * Flush this site's FPM OPcache. Queued + watched via the console banner so
+     * the SSH work stays off the request {@see [[feedback_queue_ssh_operations]]}.
+     */
+    public function resetOpcache(): void
+    {
+        $this->authorize('update', $this->site);
+        if (! $this->site->usesDedicatedPhpFpmPool() || ! $this->server->hostCapabilities()->supportsMachinePhpManagement()) {
+            $this->toastError(__('This site has no dedicated PHP-FPM pool whose OPcache can be flushed.'));
+
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('opcache_reset', __('Flushing OPcache'));
+        ResetSiteOpcacheJob::dispatch(
+            (string) $this->site->id,
+            (string) (auth()->id() ?? ''),
+            (string) $run->id,
+        );
+
+        // Stats change the moment it flushes — drop the cache so the card re-reads.
+        Cache::forget($this->opcacheStatusCacheKey());
+        $this->opcacheStatusLoaded = false;
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            __('OPcache flushed.'),
+            __('OPcache flush failed.'),
+        );
+        $this->toastConsoleActionQueued();
     }
 
     public function saveRuntimePreferences(): void
@@ -3417,7 +3612,7 @@ class Settings extends Show
 
     /**
      * Surface the live Caddy-managed certificate(s) for this site's hostnames.
-     * The cross-engine SSH sweep runs async in {@see \App\Jobs\ScanServerLiveCertsJob}
+     * The cross-engine SSH sweep runs async in {@see ScanServerLiveCertsJob}
      * (shared with the server cert surfaces); this reads the cached result and
      * filters it to this site, polling via {@see pollCaddyManagedCerts()} while a
      * scan is in flight — SSH never runs in the request.
@@ -3814,6 +4009,17 @@ class Settings extends Show
             && $this->server->hostCapabilities()->supportsMachinePhpManagement()
         ) {
             $viewData['sitePhpData'] = app(ServerPhpManager::class)->sitePhpData($this->server, $this->site);
+        }
+
+        if ($section === 'runtime' && $this->runtimeTab === 'overview') {
+            // Cheap indexed read (site_id, occurred_at) — safe on the render path.
+            // The Overview shows a short tail; the full stream lives on the Errors tab.
+            $viewData['runtimeRecentErrors'] = ErrorEvent::query()
+                ->where('site_id', (string) $this->site->id)
+                ->whereNull('dismissed_at')
+                ->orderByDesc('occurred_at')
+                ->limit(5)
+                ->get();
         }
 
         if (in_array($section, ['deploy', 'repository', 'pipeline'], true)) {

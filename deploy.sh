@@ -360,9 +360,33 @@ ls -1dt "$RELEASES"/*/ 2>/dev/null | tail -n +"$((KEEP + 1))" | while read -r ol
   sudo rm -rf "$old"
 done
 
+# Post-deploy AI roadmap update (web only, best-effort). No-ops unless
+# ROADMAP_AI_ENABLED=true and the LLM is configured; never fails the deploy.
+# Runs synchronously so it's deterministic and reads the just-deployed commit.
+if [ "$ROLE" = "web" ]; then
+  p "Roadmap AI update (best-effort) ..."
+  $PHP artisan dply:roadmap:ai-update --sync --commit="$COMMIT" 2>/dev/null || p "roadmap AI update skipped/failed (non-fatal)"
+fi
+
 p "Done: live on releases/$TS ($COMMIT)."
 REMOTE
 }
+
+# ---------------------------------------------------------------------------
+# 1b. Env-drift preflight — compare SHARED env KEY NAMES (never values) across
+# web + workers so a key that exists only on one box (and silently breaks the
+# queued jobs that run on the other) is caught before we ship. Warn-only by
+# default; set DEPLOY_STRICT_ENV=1 to abort the deploy on drift.
+# ---------------------------------------------------------------------------
+if [ -n "$WORKER_HOSTS" ] && [ -x "$(dirname "$0")/deploy/check-env-drift.sh" ]; then
+  hr
+  log "Checking env drift across web + workers ..."
+  hr
+  "$(dirname "$0")/deploy/check-env-drift.sh" || {
+    log "Env drift preflight failed (DEPLOY_STRICT_ENV=1). Aborting."
+    exit 1
+  }
+fi
 
 # ---------------------------------------------------------------------------
 # 2. Deploy web server

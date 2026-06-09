@@ -53,7 +53,7 @@ return [
          * uses the selected ProviderCredential.
          */
         'token' => env('DIGITALOCEAN_TOKEN'),
-        'auto_testing_hostname_enabled' => (bool) env('DPLY_AUTO_TESTING_HOSTNAME_ENABLED', false),
+        'auto_testing_hostname_enabled' => true,
         /*
          * Universal testing-zone pool (DO). Legacy callers still read from
          * here — the provider-routing logic in TestingHostnameProvisioner
@@ -63,7 +63,7 @@ return [
             static fn (string $value): string => trim($value),
             explode(',', (string) env('DPLY_TESTING_DOMAINS', ''))
         ))),
-        'testing_domain_strategy' => env('DPLY_TESTING_DOMAIN_STRATEGY', 'deterministic'),
+        'testing_domain_strategy' => 'deterministic',
         /*
          * DNS target for a deployed serverless function's friendly hostname
          * ({slug}.{testing-domain}). An IP becomes an A record; a hostname

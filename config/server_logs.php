@@ -121,13 +121,13 @@ return [
      */
     'clickhouse' => [
         'host' => env('CLICKHOUSE_HOST', '127.0.0.1'),
-        'http_port' => (int) env('CLICKHOUSE_HTTP_PORT', 8123),
+        'http_port' => 8123,
         'scheme' => env('CLICKHOUSE_SCHEME', 'http'), // 'https' for managed
         'database' => env('CLICKHOUSE_DATABASE', 'dply_logs'),
         'username' => env('CLICKHOUSE_USERNAME', 'default'),
         'password' => env('CLICKHOUSE_PASSWORD', ''),
         'table' => env('CLICKHOUSE_LOGS_TABLE', 'server_logs'),
-        'timeout' => (int) env('CLICKHOUSE_TIMEOUT', 15),
+        'timeout' => 15,
 
         /**
          * TLS verification for https connections. When the endpoint uses a cert
@@ -136,7 +136,7 @@ return [
          * the client verifies against it. As a last resort CLICKHOUSE_TLS_VERIFY=false
          * disables verification (still encrypted; only for IP-locked endpoints).
          */
-        'verify' => filter_var(env('CLICKHOUSE_TLS_VERIFY', true), FILTER_VALIDATE_BOOL),
+        'verify' => true,
         'ca_cert_b64' => env('CLICKHOUSE_CA_CERT_B64', ''),
 
         /**
@@ -144,6 +144,6 @@ return [
          * Per-tier retention (Phase 2 billing) will override per partition later;
          * this is the floor every box gets in the free MVP.
          */
-        'retention_days' => (int) env('CLICKHOUSE_RETENTION_DAYS', 7),
+        'retention_days' => 7,
     ],
 ];

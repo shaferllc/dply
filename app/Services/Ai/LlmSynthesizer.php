@@ -61,6 +61,60 @@ final class LlmSynthesizer
         );
     }
 
+    /**
+     * Generic JSON completion for callers that need the raw decoded object plus
+     * token usage rather than the narrative/suggestions shape `call()` returns
+     * (e.g. the roadmap updater, which applies a structured plan).
+     *
+     * @return array{data: array<string, mixed>, prompt_tokens: int|null, completion_tokens: int|null, latency_ms: int, raw: string}
+     */
+    public function completeJson(string $userPrompt, ?string $systemOverride = null): array
+    {
+        if (! $this->isConfigured()) {
+            throw new RuntimeException('LLM synthesis is not configured.');
+        }
+
+        $startedAt = microtime(true);
+        $timeout = (int) config('dply_ai.llm.timeout_seconds', 45);
+        $model = (string) config('dply_ai.llm.model', 'gpt-4o-mini');
+        $maxTokens = (int) config('dply_ai.llm.max_output_tokens', 1200);
+        $baseUrl = rtrim((string) config('dply_ai.llm.base_url', 'https://api.openai.com/v1'), '/');
+        $apiKey = (string) config('dply_ai.llm.api_key');
+
+        $response = Http::timeout($timeout)
+            ->withToken($apiKey)
+            ->acceptJson()
+            ->post($baseUrl.'/chat/completions', [
+                'model' => $model,
+                'temperature' => 0.2,
+                'max_tokens' => $maxTokens,
+                'response_format' => ['type' => 'json_object'],
+                'messages' => [
+                    [
+                        'role' => 'system',
+                        'content' => $systemOverride ?? 'You are a precise assistant for the dply hosting platform. Respond with valid JSON only.',
+                    ],
+                    ['role' => 'user', 'content' => $userPrompt],
+                ],
+            ]);
+
+        if (! $response->successful()) {
+            throw new RuntimeException('LLM request failed: '.$response->status().' '.$response->body());
+        }
+
+        $latencyMs = (int) round((microtime(true) - $startedAt) * 1000);
+        $payload = $response->json();
+        $content = (string) ($payload['choices'][0]['message']['content'] ?? '');
+
+        return [
+            'data' => $this->parseJsonContent($content),
+            'prompt_tokens' => isset($payload['usage']['prompt_tokens']) ? (int) $payload['usage']['prompt_tokens'] : null,
+            'completion_tokens' => isset($payload['usage']['completion_tokens']) ? (int) $payload['usage']['completion_tokens'] : null,
+            'latency_ms' => $latencyMs,
+            'raw' => $content,
+        ];
+    }
+
     private function call(string $userPrompt): LlmSynthesisResult
     {
         if (! $this->isConfigured()) {

@@ -50,5 +50,5 @@ return [
     'registry_url' => env('CADDY_MODULES_REGISTRY_URL', 'https://caddyserver.com/api/modules'),
 
     /** Cache TTL for the registry index (seconds). */
-    'registry_cache_seconds' => (int) env('CADDY_MODULES_REGISTRY_CACHE_SECONDS', 86_400),
+    'registry_cache_seconds' => 86_400,
 ];

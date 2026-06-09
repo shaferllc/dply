@@ -1,0 +1,44 @@
+# Env keys that intentionally live ONLY on the web/app server.
+#
+# Used by deploy/check-env-drift.sh to suppress false positives: a key listed
+# here is expected to be absent from worker boxes, so it is NOT reported as
+# "missing on worker". Everything NOT in this file (and not in worker-only.keys)
+# is treated as SHARED and must exist on every role.
+#
+# One key name per line. Blank lines and # comments are ignored.
+
+# --- OAuth client credentials (used only in the web login/connect handshake;
+#     repo/clone operations use per-user/org tokens stored in the DB) ---
+GITHUB_CLIENT_ID
+GITHUB_CLIENT_SECRET
+GITHUB_OAUTH_REDIRECT_URI
+GITLAB_CLIENT_ID
+GITLAB_CLIENT_SECRET
+BITBUCKET_CLIENT_ID
+BITBUCKET_CLIENT_SECRET
+DIGITALOCEAN_OAUTH_CLIENT_ID
+DIGITALOCEAN_OAUTH_CLIENT_SECRET
+DIGITALOCEAN_OAUTH_REDIRECT_URI
+
+# --- Web-only middleware / request-path config ---
+COMING_SOON
+COMING_SOON_ALLOWED_IPS
+DB_SCHEMA_BINARY_PATH
+
+# --- Stripe webhook receiver lives on the web app only (webhooks hit HTTP);
+#     STRIPE_KEY / STRIPE_SECRET are SHARED (queued billing jobs need them) ---
+STRIPE_WEBHOOK_SECRET
+
+# --- The web box's own Horizon process config. Worker Horizon is configured
+#     by dply's managed-site mechanism, not these app-level HORIZON_* vars ---
+HORIZON_BALANCE
+HORIZON_JOB_TIMEOUT
+HORIZON_MAX_PROCESSES
+HORIZON_MIN_PROCESSES
+HORIZON_QUEUES
+HORIZON_TRIES
+HORIZON_WORKER_MEMORY
+
+# --- Stale: Reverb retired in favour of the managed Cloudflare relay. Remove
+#     once confirmed unused; kept here so it doesn't show as drift meanwhile ---
+REVERB_PORT
