@@ -156,13 +156,11 @@ TXT;
                 $level,
             ),
 
-            LoggingChannelCatalog::DPLY_REALTIME => $this->syslogUdp(
+            LoggingChannelCatalog::DPLY_REALTIME => $this->dplyLogsSocket(
                 $this->envKey($env, 'host'),
                 $this->envKey($env, 'port'),
+                $this->envKey($env, 'token'),
                 $level,
-                // Stamp the per-site routing token as the syslog ident so dply's
-                // drain receiver can attribute each datagram to this site.
-                identKey: $this->envKey($env, 'token'),
             ),
 
             LoggingChannelCatalog::LOGTAIL => $this->monolog(
@@ -233,6 +231,47 @@ TXT;
             'level' => $level,
             'handler' => new RawPhp('\\Monolog\\Handler\\SyslogUdpHandler::class'),
             'handler_with' => $handlerWith,
+            'processors' => [new RawPhp('\\Monolog\\Processor\\PsrLogMessageProcessor::class')],
+        ];
+    }
+
+    /**
+     * dply Logs: ship app logs as syslog-style lines over TCP (TLS by default)
+     * using Monolog's built-in SocketHandler + LineFormatter — no extra Composer
+     * package in the customer app. The per-site routing token is baked into the
+     * line ("<token> <LEVEL> <message> <context>\n") so the drain receiver can
+     * attribute and level each record. Scheme is `tls://` unless the operator
+     * disabled TLS (e.g. private-network dev), in which case it's `tcp://`.
+     *
+     * @return array<string, mixed>
+     */
+    private function dplyLogsSocket(string $hostKey, string $portKey, string $tokenKey, string $level): array
+    {
+        $scheme = (bool) config('log_drains.dply_realtime.tls', true) ? 'tls' : 'tcp';
+        $host = 'env('.$this->str($hostKey).')';
+        $port = 'env('.$this->str($portKey).')';
+        $token = 'env('.$this->str($tokenKey).')';
+
+        return [
+            'driver' => 'monolog',
+            'level' => $level,
+            'handler' => new RawPhp('\\Monolog\\Handler\\SocketHandler::class'),
+            'handler_with' => [
+                'connectionString' => new RawPhp("'".$scheme."://'.".$host.".':'.".$port),
+                'persistent' => true,
+                // Never let a slow/unavailable drain stall the request thread.
+                'timeout' => 2.0,
+                'writingTimeout' => 2.0,
+                'connectionTimeout' => 2.0,
+            ],
+            'formatter' => new RawPhp('\\Monolog\\Formatter\\LineFormatter::class'),
+            'formatter_with' => [
+                // Wire line the drain receiver parses: token, level word, message.
+                'format' => new RawPhp($token.".' %level_name% %message% %context%'.\"\\n\""),
+                'dateFormat' => null,
+                'allowInlineLineBreaks' => false,
+                'ignoreEmptyContextAndExtra' => true,
+            ],
             'processors' => [new RawPhp('\\Monolog\\Processor\\PsrLogMessageProcessor::class')],
         ];
     }

@@ -13,13 +13,13 @@ stored centrally, so you can read and filter them in the dashboard.
 
 ```
 your app  →  Log::channel('dply_realtime')->info('…')
-          →  Monolog SyslogUdpHandler (UDP syslog, stamped with your site token)
+          →  Monolog SocketHandler (TLS-encrypted TCP, line stamped with your site token)
           →  dply drain receiver  →  stored per-site  →  this App logs panel
 ```
 
 Each site gets a unique routing token; dply uses it to attribute every log line
-to your site. Delivery is best-effort UDP — great for operational visibility, not
-for audit-grade records.
+to your site. The connection is TLS-encrypted by default, so log contents are
+confidential in transit.
 
 ## Enable it (3 steps)
 
@@ -63,8 +63,8 @@ tagged line on your server and checks that dply received it:
   drain receiver isn't reachable — on self-hosted/operator setups the receiver is
   a supervised process that must be running and reachable on its UDP port (see the
   operator guide, `docs/LOG_DRAIN_RECEIVER.md`).
-- **Some lines missing?** Delivery is UDP (best-effort) and rate-limited per site;
-  both can drop lines under heavy volume.
+- **Some lines missing?** Ingest is rate-limited per site, so a heavy burst can
+  drop the excess for that window. Log at sensible levels in production.
 
 ## Related
 

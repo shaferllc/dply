@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 8, 2026',
+                    'tags'    => ['improved'],
+                    'title'   => 'Encrypted Log Drain Transport',
+                    'summary' => 'The dply Logs drain receiver now accepts app logs over TLS-terminated TCP instead of plaintext UDP, with configurable certificate, key, and passphrase.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 8, 2026',
                     'tags'    => ['new'],
                     'title'   => 'Site Database Management Tab',
                     'summary' => 'The site Database tab is now a full tabbed management surface for users, backups, and database events, with per-channel notification routing across site and server workspaces.',

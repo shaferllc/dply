@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Changed
+- The dply Logs drain receiver now accepts app logs over TLS-terminated TCP instead of plaintext UDP, with configurable certificate, key, and passphrase.
 ### Added
 - The site Database tab is now a full tabbed management surface for users, backups, and database events, with per-channel notification routing across site and server workspaces.
 ### Added

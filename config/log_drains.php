@@ -9,6 +9,18 @@ return [
     'dply_realtime' => [
         'host' => env('DPLY_LOG_DRAIN_HOST', ''),
         'port' => env('DPLY_LOG_DRAIN_PORT', ''),
+
+        /*
+         * Transport is syslog-style lines over TCP. With tls=true (default) the
+         * connection is TLS-encrypted: deployed sites connect with `tls://` and
+         * the receiver terminates TLS using tls_cert/tls_key. Set tls=false only
+         * for local/private-network dev where a trusted cert isn't available
+         * (the sites then use plain `tcp://`).
+         */
+        'tls' => filter_var(env('DPLY_LOG_DRAIN_TLS', true), FILTER_VALIDATE_BOOL),
+        'tls_cert' => env('DPLY_LOG_DRAIN_TLS_CERT', ''),
+        'tls_key' => env('DPLY_LOG_DRAIN_TLS_KEY', ''),
+        'tls_passphrase' => env('DPLY_LOG_DRAIN_TLS_PASSPHRASE', ''),
     ],
 
     /*
