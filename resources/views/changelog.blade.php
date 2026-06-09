@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 9, 2026',
                     'tags'    => ['new'],
+                    'title'   => 'Deploy Several Sites Together',
+                    'summary' => 'A new Sync tab on the site deployments page lets you select and deploy multiple related sites—such as a main site and its worker—together in one action.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 9, 2026',
+                    'tags'    => ['new'],
                     'title'   => 'CPU Usage Diagnostics On Server Overview',
                     'summary' => 'Server overview now explains why CPU is busy by listing the top processes with plain-language remediation hints when CPU is elevated.',
                     'items'   => [],
