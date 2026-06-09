@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 9, 2026',
                     'tags'    => ['new'],
+                    'title'   => 'CPU Usage Diagnostics On Server Overview',
+                    'summary' => 'Server overview now explains why CPU is busy by listing the top processes with plain-language remediation hints when CPU is elevated.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 9, 2026',
+                    'tags'    => ['new'],
                     'title'   => 'PHP-FPM Pool Tuning',
                     'summary' => 'Sites now expose configurable PHP-FPM pool settings and a panel to compare environment variables against worker pool members.',
                     'items'   => [],

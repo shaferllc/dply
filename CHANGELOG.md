@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 ### Added
+- Server overview now explains why CPU is busy by listing the top processes with plain-language remediation hints when CPU is elevated.
+### Added
 - Sites now expose configurable PHP-FPM pool settings and a panel to compare environment variables against worker pool members.
 ### Added
 - Site PHP settings now expose post max size, input time, input vars, file uploads, and timezone, which are applied to the live server's FastCGI config automatically.
