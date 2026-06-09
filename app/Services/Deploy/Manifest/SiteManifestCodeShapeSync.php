@@ -8,6 +8,9 @@ use App\Models\Site;
 use App\Models\SiteDeployStep;
 use App\Models\SiteProcess;
 use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Services\SshConnection;
+use Illuminate\Support\Facades\Log;
+use Laravel\Pennant\Feature;
 
 /**
  * Reconciles the code-shape half of a repo `dply.yaml` (build / release /
@@ -32,7 +35,78 @@ final class SiteManifestCodeShapeSync
 {
     public function __construct(
         private SiteDeployPipelineManager $pipelines,
+        private DplyManifestParser $parser,
     ) {}
+
+    /**
+     * Pre-build hook: fetch the deployed `dply.*` from the freshly-cloned
+     * release dir and reconcile code-shape so the just-pushed build/release/
+     * processes execute on THIS deploy. Returns a human-readable log line for
+     * the deploy timeline. Gated by `global.byo_repo_config`; a no-op (empty
+     * log) when off, when there's no manifest, or when it can't be parsed.
+     *
+     * runtime/version changes are surfaced in the log but NOT auto-applied — a
+     * version bump re-provisions the FPM pool, so it's left for an explicit
+     * Settings → Runtime action (guarded).
+     */
+    public function applyFromRemote(Site $site, SshConnection $ssh, string $remoteDir): string
+    {
+        if (! Feature::active('global.byo_repo_config')) {
+            return '';
+        }
+
+        $base = rtrim($remoteDir, '/');
+        $found = null;
+        foreach (DplyManifestParser::FILE_NAMES as $name) {
+            $content = trim($ssh->exec(
+                sprintf('cat %s/%s 2>/dev/null', escapeshellarg($base), escapeshellarg($name)),
+                30,
+            ));
+            if ($content !== '') {
+                $found = ['name' => $name, 'content' => $content];
+                break;
+            }
+        }
+
+        if ($found === null) {
+            return '';
+        }
+
+        try {
+            $manifest = $this->parser->parseRaw($found['content'], $found['name']);
+        } catch (\Throwable $e) {
+            Log::warning('dply manifest code-shape parse failed', ['site_id' => $site->id, 'error' => $e->getMessage()]);
+
+            return sprintf("[dply] %s present but could not be parsed: %s\n", $found['name'], $e->getMessage());
+        }
+
+        if (! $manifest->hasCodeShape()) {
+            return '';
+        }
+
+        $result = $this->reconcile($site, $manifest);
+
+        $log = sprintf(
+            "[dply] %s applied — build:%d release:%d processes:%d managed step(s)/process(es).\n",
+            $found['name'],
+            $result['build'],
+            $result['release'],
+            $result['processes'],
+        );
+
+        if ($result['runtime_change'] !== null) {
+            $rc = $result['runtime_change'];
+            $log .= sprintf(
+                "[dply] NOTE: %s change %s → %s declared in %s is NOT auto-applied (re-provisions the runtime). Apply it in Settings → Runtime.\n",
+                $rc['field'],
+                $rc['from'] ?? '(unset)',
+                $rc['to'] ?? '(unset)',
+                $found['name'],
+            );
+        }
+
+        return $log;
+    }
 
     /**
      * @return array{build: int, release: int, processes: int, runtime_change: ?array{field: string, from: ?string, to: ?string}}

@@ -203,6 +203,15 @@ class AtomicSiteDeployer
             $log .= "\n[dply] ENV → host does not expose a server .env; skipping\n";
         }
 
+        // ── MANIFEST ── reconcile code-shape (build/release/processes) from a
+        // repo dply.* BEFORE the build phase reads its steps, so a just-pushed
+        // manifest takes effect on THIS deploy (gated by global.byo_repo_config).
+        $manifestLog = app(\App\Services\Deploy\Manifest\SiteManifestCodeShapeSync::class)
+            ->applyFromRemote($site, $ssh, $newRelease);
+        if ($manifestLog !== '') {
+            $log .= "\n".$manifestLog;
+        }
+
         // ── BUILD ── install deps / compile assets in the new release.
         $log .= sprintf("\n[dply] BUILD → running build-phase steps in %s\n", $newRelease);
         $build = $this->pipelineRunner->runBuild($ssh, $site, $newRelease);
