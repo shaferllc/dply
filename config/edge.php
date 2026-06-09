@@ -95,7 +95,7 @@ return [
     |--------------------------------------------------------------------------
     */
     'logpush' => [
-        'enabled' => filter_var(env('DPLY_EDGE_LOGPUSH_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
+        'enabled' => true,
         'secret' => env('DPLY_EDGE_LOGPUSH_SECRET'),
         'destination_url' => env('DPLY_EDGE_LOGPUSH_DESTINATION_URL', rtrim((string) env('APP_URL', ''), '/').'/hooks/edge/logpush'),
     ],
@@ -111,7 +111,7 @@ return [
         'web_vitals_days' => (int) env('DPLY_EDGE_WEB_VITALS_DAYS', 30),
         'web_vitals_keep_per_site' => (int) env('DPLY_EDGE_WEB_VITALS_KEEP', 200),
         'performance_hourly_days' => (int) env('DPLY_EDGE_PERFORMANCE_HOURLY_DAYS', 45),
-        'prefer_analytics_engine' => filter_var(env('DPLY_EDGE_PREFER_ANALYTICS_ENGINE', true), FILTER_VALIDATE_BOOLEAN),
+        'prefer_analytics_engine' => true,
     ],
 
     /*
@@ -125,8 +125,8 @@ return [
         // with DPLY_EDGE_BUILD_IMAGE if you need to pin older Node for a
         // specific deploy.
         'docker_image' => env('DPLY_EDGE_BUILD_IMAGE', 'node:22-bookworm'),
-        'timeout_seconds' => (int) env('DPLY_EDGE_BUILD_TIMEOUT', 900),
-        'artifact_max_bytes' => (int) env('DPLY_EDGE_ARTIFACT_MAX_BYTES', 524_288_000),
+        'timeout_seconds' => 900,
+        'artifact_max_bytes' => 524_288_000,
         // Persistent --mirror clone per repo so repeated builds skip
         // re-downloading the full history. Set git_cache_enabled=false
         // to bypass the mirror and clone directly (slower, but useful
@@ -156,9 +156,9 @@ return [
     | Worker-proxied traffic. See OriginHealthcheckRunner.
     */
     'origin_healthcheck' => [
-        'timeout_seconds' => (int) env('DPLY_EDGE_ORIGIN_HEALTHCHECK_TIMEOUT', 10),
-        'retries' => (int) env('DPLY_EDGE_ORIGIN_HEALTHCHECK_RETRIES', 3),
-        'retry_wait_ms' => (int) env('DPLY_EDGE_ORIGIN_HEALTHCHECK_RETRY_WAIT_MS', 1500),
+        'timeout_seconds' => 10,
+        'retries' => 3,
+        'retry_wait_ms' => 1500,
     ],
 
     /*
