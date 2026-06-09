@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace App\Models\Concerns\Site;
 
 use App\Enums\SiteType;
+use App\Livewire\Servers\WorkspaceCron;
 use App\Livewire\Sites\Settings;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SupervisorProgram;
 use App\Services\Deploy\DeploymentSecretInventory;
 use App\Services\Deploy\LaravelComposerPackageDetector;
 use App\Services\Deploy\RuntimeDetection\PhpRuntimeDetector;
+use App\Services\Servers\ServerCronSynchronizer;
+use App\Services\Servers\SupervisorDeployRestarter;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\URL;
 
@@ -354,6 +358,57 @@ trait ResolvesSiteRuntime
     }
 
     /**
+     * A long-running application server that listens on a localhost port we can
+     * probe — Node/Python/Ruby/Go services and the JS/Python web frameworks.
+     * Excludes static builds (served by the webserver, no live process) and PHP
+     * (which is FPM, probed separately).
+     */
+    public function isLongRunningAppServer(): bool
+    {
+        if (in_array((string) $this->runtimeKey(), ['node', 'python', 'ruby', 'go'], true)) {
+            return true;
+        }
+
+        $framework = strtolower((string) ($this->resolvedRuntimeAppDetection()['framework'] ?? ''));
+
+        return in_array($framework, [
+            'rails',
+            'nextjs',
+            'nuxt',
+            'node_generic',
+            'django',
+            'flask',
+            'fastapi',
+            'python_generic',
+        ], true);
+    }
+
+    /**
+     * Which live runtime-health probe the Runtime → Overview card should run:
+     * 'fpm' for a dedicated PHP-FPM pool, 'port' for a long-running app server
+     * that listens on {@see $app_port}, or null when there's nothing cheap to
+     * probe (static, Docker/Kubernetes/serverless — those have their own
+     * discovery surfaces). Used by both the Livewire loader and the blade so the
+     * deferred probe and the rendered card always agree.
+     */
+    public function runtimeHealthProbeKind(): ?string
+    {
+        if ($this->usesDedicatedPhpFpmPool()) {
+            return 'fpm';
+        }
+
+        if ($this->usesDockerRuntime() || $this->usesKubernetesRuntime() || $this->usesFunctionsRuntime()) {
+            return null;
+        }
+
+        if ($this->app_port !== null && (int) $this->app_port > 0 && $this->isLongRunningAppServer()) {
+            return 'port';
+        }
+
+        return null;
+    }
+
+    /**
      * Whether this site can use the site-scoped systemd Services workspace
      * (dply-site-{id}[-{name}].service). PHP/static and container/serverless
      * workloads use FPM, nginx, or Supervisor (Daemons) instead.
@@ -463,7 +518,7 @@ trait ResolvesSiteRuntime
      * Whether to surface the Laravel scheduler convenience toggle (the per-minute
      * `php artisan schedule:run` cron) AND actually install it. A single rule
      * honoured by both the UI (visibility) and the deploy effect
-     * ({@see \App\Services\Servers\ServerCronSynchronizer}) so they can't drift.
+     * ({@see ServerCronSynchronizer}) so they can't drift.
      *
      * Shown for PHP sites unless we're CONFIDENT the stack can't use it: hidden
      * only for non-PHP runtimes and for frameworks that have no `artisan`
@@ -492,7 +547,7 @@ trait ResolvesSiteRuntime
     /**
      * Whether the "Restart Supervisor programs after deploy" toggle is meaningful
      * for this site — i.e. there is at least one active Supervisor program that
-     * {@see \App\Services\Servers\SupervisorDeployRestarter} would restart
+     * {@see SupervisorDeployRestarter} would restart
      * (site-scoped or a server-wide program with no site_id). Sites whose workers
      * run as systemd units (restarted automatically on the atomic release swap),
      * or that have no workers at all, return false.
@@ -504,7 +559,7 @@ trait ResolvesSiteRuntime
             return false;
         }
 
-        return \App\Models\SupervisorProgram::query()
+        return SupervisorProgram::query()
             ->where('server_id', $serverId)
             ->where('is_active', true)
             ->where(function ($q): void {
@@ -515,7 +570,7 @@ trait ResolvesSiteRuntime
 
     /**
      * Whether dply can manage per-minute crons on this site's host (mirrors
-     * {@see \App\Livewire\Servers\WorkspaceCron::siteSupportsVmManagedCron()}).
+     * {@see WorkspaceCron::siteSupportsVmManagedCron()}).
      * Gates the "→ Cron" link shown when the Laravel scheduler toggle is hidden.
      */
     public function supportsVmManagedCron(): bool

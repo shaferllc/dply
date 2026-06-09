@@ -39,6 +39,40 @@ final class AiPromptBuilder
         ]);
     }
 
+    /**
+     * Prompt for the post-deploy roadmap updater. The context carries recent
+     * commits, the open suggestion inbox, the roadmap docs, the existing items,
+     * and the allowed area/status/release vocabularies. The model returns a
+     * strict plan the updater applies verbatim.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    public function roadmapUpdateSystem(array $context): string
+    {
+        return implode("\n", [
+            'You maintain the public product roadmap for the dply hosting platform.',
+            'You are given recent git commits (what actually shipped), the open user-suggestion inbox, the roadmap markdown docs, and the EXISTING roadmap items.',
+            'Decide, conservatively and grounded ONLY in the provided evidence:',
+            '  1. ship: existing items whose work clearly landed in the commits — move them to shipped.',
+            '  2. new_items: genuinely new, user-visible capabilities from the commits that have NO existing item. Never duplicate an existing item (match on meaning, not exact title). Cap to '.((int) ($context['limits']['max_new_items'] ?? 8)).'.',
+            '  3. suggestions: triage each open suggestion to "reviewed" (sensible/now-tracked) or "declined" (off-platform/duplicate), with a one-line admin note. Do not invent suggestions.',
+            '  4. item_summaries: tighten weak/empty summaries of existing items for a consistent, plain, factual voice. Do not change their meaning.',
+            '  5. release: a one-paragraph summary for the release identified by release_slug (format YYYY-MM) covering what shipped.',
+            'Rules: never claim something shipped without commit evidence. Prefer doing nothing over guessing. Summaries <= 200 chars. Descriptions <= 1500 chars. Use ONLY the allowed area and status keys.',
+            'Allowed areas: '.implode(', ', (array) ($context['allowed']['areas'] ?? [])).'.',
+            'Allowed statuses: '.implode(', ', (array) ($context['allowed']['statuses'] ?? [])).'.',
+            'Return JSON ONLY with exactly this shape (empty arrays where nothing applies):',
+            '{"ship":[{"item_id":"id-or-empty","title":"existing item title","release_slug":"YYYY-MM"}],'
+                .'"new_items":[{"title":"","summary":"","description":"","area":"area-key","status":"shipped|in_progress|planned","release_slug":"YYYY-MM-or-empty"}],'
+                .'"suggestions":[{"id":"suggestion-id","decision":"reviewed|declined","admin_notes":""}],'
+                .'"item_summaries":[{"item_id":"id","summary":""}],'
+                .'"release":{"slug":"YYYY-MM","title":"","summary":""},'
+                .'"narrative":"one sentence on what you changed"}',
+            'Context JSON:',
+            json_encode($context, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+        ]);
+    }
+
     public function docsAskSystem(string $docSlug, string $docTitle, string $docExcerpt, string $routeName, string $question): string
     {
         return implode("\n", [
