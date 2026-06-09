@@ -331,10 +331,10 @@
                         {{ __('Deploy linked sites') }}
                     </button>
                 @endif
-                <a href="{{ route('deploy-sync.index') }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-brand-moss transition-colors hover:text-brand-ink" title="{{ __('Manage which sites deploy together.') }}">
+                <button type="button" wire:click="setTab('sync')" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-brand-moss transition-colors hover:text-brand-ink" title="{{ __('Pick several sites (this one + its worker) and deploy them together.') }}">
                     <x-heroicon-o-arrows-right-left class="h-4 w-4" />
-                    {{ __('Sync groups') }}
-                </a>
+                    {{ __('Sync deploy') }}
+                </button>
             </div>
         </div>
 

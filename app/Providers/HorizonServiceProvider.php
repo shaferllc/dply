@@ -37,14 +37,17 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
                 return false;
             }
 
-            $raw = (string) config('horizon.allowed_emails', '');
-            $allowed = array_values(array_filter(array_map('trim', explode(',', $raw))));
+            // Horizon's own allow list PLUS platform admins — so an admin is
+            // never locked out of the Horizon dashboard just because
+            // HORIZON_ALLOWED_EMAILS is unset. Setting PLATFORM_ADMIN_EMAILS is
+            // enough to grant both /admin and Horizon.
+            $list = static fn (string $key): array => array_values(array_filter(array_map(
+                'trim',
+                explode(',', (string) config($key, '')),
+            )));
+            $allowed = array_merge($list('horizon.allowed_emails'), $list('admin.allowed_emails'));
 
-            if ($allowed === []) {
-                return false;
-            }
-
-            return in_array($user->email, $allowed, true);
+            return $allowed !== [] && in_array($user->email, $allowed, true);
         });
     }
 }
