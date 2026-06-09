@@ -69,7 +69,9 @@ final class SiteManifestCodeShapeSync
         }
 
         if ($found === null) {
-            return '';
+            // No manifest in the repo. If we previously managed rows, do NOT
+            // silently wipe — flag for an explicit "revert to dashboard" confirm.
+            return $this->flagRemovalIfManaged($site);
         }
 
         try {
@@ -79,6 +81,9 @@ final class SiteManifestCodeShapeSync
 
             return sprintf("[dply] %s present but could not be parsed: %s\n", $found['name'], $e->getMessage());
         }
+
+        // The manifest is back / present — clear any pending-removal flag.
+        $this->clearRemovalFlag($site);
 
         if (! $manifest->hasCodeShape()) {
             return '';
@@ -215,5 +220,59 @@ final class SiteManifestCodeShapeSync
         }
 
         return null;
+    }
+
+    /** True when this site has rows reconciled from a manifest. */
+    public function hasManagedRows(Site $site): bool
+    {
+        return SiteDeployStep::query()->where('site_id', $site->id)->where('managed_by_manifest', true)->exists()
+            || SiteProcess::query()->where('site_id', $site->id)->where('managed_by_manifest', true)->exists();
+    }
+
+    /** True when the manifest was removed from the repo but managed rows remain. */
+    public function removalPendingConfirm(Site $site): bool
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+
+        return (bool) ($meta['manifest']['removed_pending_confirm'] ?? false);
+    }
+
+    /**
+     * Operator-confirmed revert: drop every manifest-managed row so config
+     * falls back to dashboard/auto-detection, and clear the pending flag.
+     *
+     * @return array{steps: int, processes: int}
+     */
+    public function revertToDashboard(Site $site): array
+    {
+        $steps = SiteDeployStep::query()->where('site_id', $site->id)->where('managed_by_manifest', true)->delete();
+        $processes = SiteProcess::query()->where('site_id', $site->id)->where('managed_by_manifest', true)->delete();
+        $this->clearRemovalFlag($site);
+
+        return ['steps' => (int) $steps, 'processes' => (int) $processes];
+    }
+
+    private function flagRemovalIfManaged(Site $site): string
+    {
+        if (! $this->hasManagedRows($site)) {
+            return '';
+        }
+
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta['manifest']['removed_pending_confirm'] = true;
+        $site->forceFill(['meta' => $meta])->save();
+
+        return "[dply] NOTE: no dply manifest in the repo, but steps/processes from the last manifest are still applied. "
+            ."Choose 'Revert to dashboard' in Settings to clear them, or restore the file.\n";
+    }
+
+    private function clearRemovalFlag(Site $site): void
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+        if (! isset($meta['manifest']['removed_pending_confirm'])) {
+            return;
+        }
+        unset($meta['manifest']['removed_pending_confirm']);
+        $site->forceFill(['meta' => $meta])->save();
     }
 }
