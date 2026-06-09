@@ -1,26 +1,40 @@
 # Site logs
 
-The **Logs** section tails **application and webserver logs** for this site on the server.
+The **Logs** page is the server logs experience scoped to one site. It has three
+tabs plus an optional app-log stream.
 
-## Log sources
+## Tabs
 
-Typical streams:
+- **Viewer** — live tail of this site's log files on the server, read over SSH.
+  Pick a source, filter/grep lines (text or regex, with invert), narrow the time
+  range, and turn on **Follow** to stream new lines.
+- **Overview** — a summary of what's available for this site and the current
+  viewer status.
+- **Sources** — the catalog of this site's log sources; click one to open it in
+  the Viewer.
 
-- **Deploy log** — latest release output
-- **Webserver access/error** — per-site vhost logs
-- **PHP-FPM** or **Rails** log under the deploy path
-- **Supervisor** stdout for workers
+## Log sources (scoped to this site)
 
-## Live tail
+- **Platform activity** — dply's own activity for the site
+- **Access / Error** — this site's vhost logs (nginx/caddy/apache)
+- **Laravel** log and **Horizon** log (Laravel sites)
 
-Refresh or follow recent lines. High-traffic access logs truncate in the UI.
+For machine-wide logs (syslog, PHP-FPM, fleet activity), use **Server → Logs** —
+there's a one-click link at the bottom of the page.
+
+## App logs (dply Logs)
+
+Separately, you can have your **application** push its own log lines to dply and
+read them on this page. That's a push pipeline (not file tailing) you enable per
+site. See **[App logs (dply Logs)](/docs/vm-site-app-logs)**.
 
 ## CLI alternative
 
-Use **`dply site logs`** or SSH **`tail`** via **Server → Console** for full files.
+Use **`dply sites:logs <site> --tail`**, or SSH **`tail`** via **Server →
+Console** for whole files.
 
 ## Related sections
 
+- **Monitor** — uptime, SSL, and response-time checks with alerting
 - **Deploy** — full deploy transcript on failure
-- **Monitor** — uptime vs error spikes in logs
-- **Server → Logs** — system-wide `/var/log`
+- **Server → Logs** — system-wide `/var/log` and shipping

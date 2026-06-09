@@ -113,6 +113,7 @@ return [
                 'server.database.engine_removed' => 'Database engine removed',
                 'server.database.user_created' => 'Database user created',
                 'server.database.user_removed' => 'Database user removed',
+                'server.database.credential_shared' => 'Database credentials shared',
             ],
         ],
         'webserver' => [
@@ -181,7 +182,21 @@ return [
             'events' => [
                 'site.deployments' => 'Deployments & failing deployments',
                 'site.deployment_started' => 'Deployment started',
-                'site.uptime' => 'Site uptime monitoring',
+            ],
+        ],
+        'site_uptime' => [
+            'label' => 'Site uptime monitoring',
+            'events' => [
+                'site.uptime.down' => 'Down & recovered',
+                'site.uptime.degraded' => 'Degraded (slow responses)',
+                'site.ssl.expiring' => 'SSL certificate expiring',
+            ],
+        ],
+        'site_errors' => [
+            'label' => 'Site error stream notifications',
+            'events' => [
+                'site.errors.deploy_failed' => 'Deployment failed',
+                'site.errors.operation_failed' => 'Site operation failed',
             ],
         ],
         'edge' => [

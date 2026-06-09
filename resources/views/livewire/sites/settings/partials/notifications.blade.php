@@ -1,4 +1,24 @@
 <div class="space-y-6">
+    <x-server-workspace-tablist :aria-label="__('Notifications sections')" scroll class="sm:min-w-0 sm:flex-1">
+        <x-server-workspace-tab
+            id="notif-tab-subscriptions"
+            icon="heroicon-o-bell"
+            :active="$notifTab === 'subscriptions'"
+            wire:click="setNotificationsTab('subscriptions')"
+        >
+            {{ __('Subscriptions') }}
+        </x-server-workspace-tab>
+        <x-server-workspace-tab
+            id="notif-tab-webhooks"
+            icon="heroicon-o-arrow-up-right"
+            :active="$notifTab === 'webhooks'"
+            wire:click="setNotificationsTab('webhooks')"
+        >
+            {{ __('Integration webhooks') }}
+        </x-server-workspace-tab>
+    </x-server-workspace-tablist>
+
+    @if ($notifTab === 'subscriptions')
     <section class="dply-card overflow-hidden">
         <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
@@ -43,52 +63,18 @@
             </div>
         </div>
 
-        <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-2">
-            <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Channels') }}</p>
-                <div class="mt-3 space-y-2">
-                    @forelse ($assignableNotificationChannels as $channel)
-                        <label class="flex items-center gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-3 py-2 text-sm text-brand-ink">
-                            <input
-                                type="checkbox"
-                                wire:model.live="site_notification_channel_ids"
-                                value="{{ $channel->id }}"
-                                class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"
-                            >
-                            <span>
-                                <span class="font-medium">{{ $channel->label }}</span>
-                                <span class="text-brand-mist">[{{ \App\Models\NotificationChannel::labelForType($channel->type) }}]</span>
-                            </span>
-                        </label>
-                    @empty
-                        <p class="rounded-xl border border-dashed border-brand-ink/15 px-3 py-3 text-sm text-brand-moss">
-                            {{ __('No channels available yet. Create one under My channels or Organization channels.') }}
-                        </p>
-                    @endforelse
-                </div>
-                @error('site_notification_channel_ids')
-                    <p class="mt-2 text-xs text-red-600">{{ $message }}</p>
-                @enderror
-            </div>
-            <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Site events') }}</p>
-                <div class="mt-3 space-y-2">
-                    @foreach ($siteNotificationEventLabels as $eventKey => $eventLabel)
-                        <label class="flex items-center gap-3 rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-3 py-2 text-sm text-brand-ink">
-                            <input
-                                type="checkbox"
-                                wire:model.live="site_notification_event_keys"
-                                value="{{ $eventKey }}"
-                                class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"
-                            >
-                            <span>{{ $eventLabel }}</span>
-                        </label>
-                    @endforeach
-                </div>
-                @error('site_notification_event_keys')
-                    <p class="mt-2 text-xs text-red-600">{{ $message }}</p>
-                @enderror
-            </div>
+        <div class="space-y-3 p-6 sm:p-8">
+            <p class="text-xs text-brand-mist">
+                {{ __('Each channel routes its own events — expand a channel to choose what it receives. Error-stream events are also editable from the') }}
+                <a href="{{ route('sites.errors', ['server' => $server, 'site' => $site, 'tab' => 'notifications']) }}" wire:navigate class="font-medium text-brand-forest hover:underline">{{ __('Errors → Notifications tab') }}</a>{{ __('; both edit the same subscriptions.') }}
+            </p>
+            @include('livewire.partials.notification-channel-matrix', [
+                'channels' => $assignableNotificationChannels,
+                'eventGroups' => $notificationEventGroups,
+                'selections' => $channelEventSelections,
+                'model' => 'channelEventSelections',
+                'showFilter' => false,
+            ])
         </div>
 
         <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
@@ -103,7 +89,9 @@
             </x-primary-button>
         </div>
     </section>
+    @endif
 
+    @if ($notifTab === 'webhooks')
     <section class="dply-card overflow-hidden">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
@@ -140,6 +128,8 @@
                 <span class="w-full text-xs font-medium text-brand-mist">{{ __('Uptime') }}</span>
                 <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="site_int_evt_uptime_down" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"> {{ __('Monitor down') }}</label>
                 <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="site_int_evt_uptime_recovered" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"> {{ __('Monitor recovered') }}</label>
+                <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="site_int_evt_uptime_degraded" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"> {{ __('Monitor degraded') }}</label>
+                <label class="inline-flex items-center gap-2"><input type="checkbox" wire:model="site_int_evt_ssl_expiring" class="rounded border-brand-ink/20 text-brand-sage focus:ring-brand-sage"> {{ __('SSL certificate expiring') }}</label>
             </div>
             <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveSiteIntegrationWebhookDestination" class="!text-sm w-fit">
                 <span wire:loading.remove wire:target="saveSiteIntegrationWebhookDestination">{{ __('Add webhook destination') }}</span>
@@ -174,30 +164,9 @@
         @endif
         </div>
     </section>
-
-    <section class="dply-card overflow-hidden">
-        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-            <x-icon-badge>
-                <x-heroicon-o-arrow-down-on-square class="h-5 w-5" aria-hidden="true" />
-            </x-icon-badge>
-            <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Inbound') }}</p>
-                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deploy webhook') }}</h2>
-                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('The deploy URL, secret rotation, and Quick deploy live under Repository. IP restrictions stay below.') }}</p>
-                <a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'repository']) }}" wire:navigate class="mt-2 inline-flex text-sm font-semibold text-brand-forest hover:text-brand-sage hover:underline">{{ __('Open Repository → Inbound deploy webhook') }} →</a>
-            </div>
-        </div>
-
-        <form wire:submit="saveWebhookSecurity" class="space-y-3 p-6 sm:p-8">
-            <x-input-label for="webhook_allowed_ips_text" value="{{ __('Optional IP allow list (one IPv4/IPv6 or IPv4 CIDR per line)') }}" />
-            <textarea id="webhook_allowed_ips_text" wire:model="webhook_allowed_ips_text" rows="4" class="w-full rounded-md border-brand-ink/15 shadow-sm font-mono text-xs" placeholder="203.0.113.10&#10;192.0.2.0/24"></textarea>
-            <x-input-error :messages="$errors->get('webhook_allowed_ips_text')" class="mt-1" />
-            <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveWebhookSecurity">
-                <span wire:loading.remove wire:target="saveWebhookSecurity">{{ __('Save allow list') }}</span>
-                <span wire:loading wire:target="saveWebhookSecurity">{{ __('Saving…') }}</span>
-            </x-primary-button>
-        </form>
-    </section>
+    @endif
 
     <x-cli-snippet tone="stub" />
+
+    @include('livewire.partials.create-notification-channel-modal')
 </div>

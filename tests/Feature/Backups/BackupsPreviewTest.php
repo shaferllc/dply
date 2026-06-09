@@ -41,7 +41,7 @@ test('site workspace sidebar shows backups with soon badge when preview active',
     ]);
 
     $this->actingAs($user)
-        ->get(route('sites.cron', [$server, $site]))
+        ->get(route('sites.daemons', [$server, $site]))
         ->assertOk()
         ->assertSee(__('Backups'))
         ->assertSee(__('Soon'))

@@ -70,7 +70,7 @@ final class SiteSettingsSidebar
                 ['id' => 'resources', 'label' => __('Resources'), 'icon' => 'heroicon-o-puzzle-piece', 'group' => 'runtime', 'route' => 'sites.resources'],
                 ['id' => 'schedule', 'label' => __('Schedule'), 'icon' => 'heroicon-o-calendar-days', 'group' => 'background', 'route' => 'sites.schedule'],
                 ['id' => 'workers', 'label' => __('Workers'), 'icon' => 'heroicon-o-bolt', 'group' => 'background', 'route' => 'sites.workers'],
-                ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability', 'feature' => 'workspace.site_logs', 'preview_feature' => 'workspace.site_logs_preview'],
+                ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability', 'route' => 'sites.logs', 'feature' => 'workspace.site_logs', 'preview_feature' => 'workspace.site_logs_preview'],
                 ['id' => 'platform', 'label' => __('Platform'), 'icon' => 'heroicon-o-cube', 'group' => 'observability'],
                 ['id' => 'notifications', 'label' => __('Notifications'), 'icon' => 'heroicon-o-bell', 'group' => 'observability', 'feature' => 'workspace.site_notifications', 'preview_feature' => 'workspace.site_notifications_preview'],
                 ['id' => 'monitor', 'label' => __('Monitor'), 'icon' => 'heroicon-o-chart-bar', 'group' => 'observability', 'route' => 'sites.monitor', 'feature' => 'workspace.site_monitor', 'preview_feature' => 'workspace.site_monitor_preview'],
@@ -104,7 +104,7 @@ final class SiteSettingsSidebar
                 // SSH (where the browser can't read anything).
                 ['id' => 'database', 'label' => __('Database'), 'icon' => 'heroicon-o-circle-stack', 'group' => 'runtime', 'route' => 'sites.database'],
                 ['id' => 'files', 'label' => __('Files'), 'icon' => 'heroicon-o-folder', 'group' => 'runtime', 'route' => 'sites.files', 'feature' => 'workspace.site_files', 'preview_feature' => 'workspace.site_files_preview'],
-                ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability', 'feature' => 'workspace.site_logs', 'preview_feature' => 'workspace.site_logs_preview'],
+                ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability', 'route' => 'sites.logs', 'feature' => 'workspace.site_logs', 'preview_feature' => 'workspace.site_logs_preview'],
                 ['id' => 'notifications', 'label' => __('Notifications'), 'icon' => 'heroicon-o-bell', 'group' => 'observability', 'feature' => 'workspace.site_notifications', 'preview_feature' => 'workspace.site_notifications_preview'],
                 ['id' => 'monitor', 'label' => __('Monitor'), 'icon' => 'heroicon-o-chart-bar', 'group' => 'observability', 'route' => 'sites.monitor', 'feature' => 'workspace.site_monitor', 'preview_feature' => 'workspace.site_monitor_preview'],
                 ['id' => 'errors', 'label' => __('Errors'), 'icon' => 'heroicon-o-exclamation-triangle', 'group' => 'observability', 'route' => 'sites.errors', 'feature' => 'workspace.site_errors', 'preview_feature' => 'workspace.site_errors_preview'],
@@ -205,8 +205,7 @@ final class SiteSettingsSidebar
         // The Schedule and Backups items navigate to the server-level pages — they're
         // provided here as a convenience entry point. Cron / daemons use site-scoped routes.
         $background = [
-            ['id' => 'cron', 'label' => __('Cron jobs'), 'icon' => 'heroicon-o-clock', 'group' => 'background', 'route' => 'sites.cron'],
-            ['id' => 'schedule', 'label' => __('Schedule'), 'icon' => 'heroicon-o-calendar-days', 'group' => 'background', 'route' => 'servers.schedule', 'route_params' => 'server_with_site', 'feature' => 'workspace.schedule'],
+            ['id' => 'schedule', 'label' => __('Schedule'), 'icon' => 'heroicon-o-calendar-days', 'group' => 'background', 'route' => 'sites.schedule', 'feature' => 'workspace.schedule'],
             ['id' => 'daemons', 'label' => __('Workers'), 'icon' => 'heroicon-o-server-stack', 'group' => 'background', 'route' => 'sites.daemons'],
             ['id' => 'services', 'label' => __('Services'), 'icon' => 'heroicon-o-cpu-chip', 'group' => 'background', 'route' => 'sites.services'],
             ['id' => 'backups', 'label' => __('Backups'), 'icon' => 'heroicon-o-archive-box', 'group' => 'background', 'route' => 'sites.backups', 'feature' => 'workspace.backups', 'preview_feature' => 'workspace.backups_preview'],
@@ -297,9 +296,8 @@ final class SiteSettingsSidebar
         $items = [...$items,
             ['id' => 'environment', 'label' => __('Environment'), 'icon' => 'heroicon-o-command-line', 'group' => 'runtime', 'route' => 'sites.environment'],
             ['id' => 'resources', 'label' => __('Resources'), 'icon' => 'heroicon-o-puzzle-piece', 'group' => 'runtime', 'route' => 'sites.resources'],
-            ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability', 'feature' => 'workspace.site_logs', 'preview_feature' => 'workspace.site_logs_preview'],
+            ['id' => 'logs', 'label' => __('Logs'), 'icon' => 'heroicon-o-clipboard-document-list', 'group' => 'observability', 'route' => 'sites.logs', 'feature' => 'workspace.site_logs', 'preview_feature' => 'workspace.site_logs_preview'],
             ['id' => 'notifications', 'label' => __('Notifications'), 'icon' => 'heroicon-o-bell', 'group' => 'observability', 'feature' => 'workspace.site_notifications', 'preview_feature' => 'workspace.site_notifications_preview'],
-            ['id' => 'cron', 'label' => __('Cron jobs'), 'icon' => 'heroicon-o-clock', 'group' => 'background', 'route' => 'sites.cron'],
             ['id' => 'daemons', 'label' => __('Workers'), 'icon' => 'heroicon-o-server-stack', 'group' => 'background', 'route' => 'sites.daemons'],
             ['id' => 'cli', 'label' => __('CLI'), 'icon' => 'heroicon-o-command-line', 'group' => 'general', 'feature' => 'workspace.site_cli', 'preview_feature' => 'workspace.site_cli_preview'],
             ['id' => 'danger', 'label' => __('Danger zone'), 'icon' => 'heroicon-o-archive-box', 'group' => 'danger'],

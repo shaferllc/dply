@@ -13,7 +13,7 @@
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Filter') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Filtered to :site', ['site' => $contextSite->name]) }}</h3>
                             <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                                {{ __('Database backups are hidden because databases are server-scoped, not site-scoped.') }}
+                                {{ __('Runs and schedules target only this site and any databases linked to it.') }}
                             </p>
                         </div>
                     </div>
@@ -26,7 +26,7 @@
         </section>
     @elseif ($contextSite && ($siteDedicatedContext ?? false))
         <p class="text-sm text-brand-moss">
-            {{ __('Database backups are managed at the server level.') }}
+            {{ __('Scoped to :site — runs and schedules here only target this site and its linked databases.', ['site' => $contextSite->name]) }}
             <a href="{{ route('servers.backups', $server) }}" wire:navigate class="font-semibold text-brand-ink underline hover:no-underline">{{ __('Open server backups') }}</a>
         </p>
     @endif

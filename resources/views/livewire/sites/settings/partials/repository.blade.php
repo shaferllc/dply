@@ -346,7 +346,7 @@
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Webhook') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Inbound deploy webhook') }}</h2>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        {{ __('Providers send signed POST payloads (GitHub/GitLab) or use custom X-Dply-Signature. Optional IP allow list is under Notifications.') }}
+                        {{ __('Providers send signed POST payloads (GitHub/GitLab) or use custom X-Dply-Signature. Restrict which IPs may call it with the allow list below.') }}
                     </p>
                 </div>
             </div>
@@ -397,8 +397,22 @@
                     wire:navigate
                     class="text-xs font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage"
                 >
-                    {{ __('IP allow list and notification subscriptions') }}
+                    {{ __('Notification subscriptions') }}
                 </a>
+            </div>
+
+            <div class="border-t border-brand-ink/10 pt-4">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('IP allow list') }}</p>
+                <form wire:submit="saveWebhookSecurity" class="mt-2 space-y-3">
+                    <x-input-label for="webhook_allowed_ips_text" value="{{ __('Optional IP allow list (one IPv4/IPv6 or IPv4 CIDR per line)') }}" />
+                    <textarea id="webhook_allowed_ips_text" wire:model="webhook_allowed_ips_text" rows="4" class="w-full rounded-md border-brand-ink/15 shadow-sm font-mono text-xs" placeholder="203.0.113.10&#10;192.0.2.0/24"></textarea>
+                    <p class="text-xs text-brand-mist">{{ __('Leave empty to accept the webhook from any IP (signature still required).') }}</p>
+                    <x-input-error :messages="$errors->get('webhook_allowed_ips_text')" class="mt-1" />
+                    <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveWebhookSecurity">
+                        <span wire:loading.remove wire:target="saveWebhookSecurity">{{ __('Save allow list') }}</span>
+                        <span wire:loading wire:target="saveWebhookSecurity">{{ __('Saving…') }}</span>
+                    </x-primary-button>
+                </form>
             </div>
         </div>
     </section>

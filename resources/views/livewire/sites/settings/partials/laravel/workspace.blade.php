@@ -7,7 +7,7 @@
     $canLaravelSshSetup = $site->canRunLaravelSshSetupActions();
     $allowedSshActions = $canLaravelSshSetup ? app(LaravelSiteSshSetupRunner::class)->allowedActions($site) : [];
     $presetCategories = config('laravel_site_console.preset_categories', []);
-    $cronUrl = route('sites.cron', ['server' => $server, 'site' => $site]);
+    $cronUrl = route('servers.cron', ['server' => $server, 'site' => $site]);
     $daemonsUrl = route('sites.daemons', ['server' => $server, 'site' => $site]);
     $cronAllServerUrl = route('servers.cron', $server);
     $daemonsAllServerUrl = route('servers.workers', $server);

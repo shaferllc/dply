@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 ### Added
+- The site Database tab is now a full tabbed management surface for users, backups, and database events, with per-channel notification routing across site and server workspaces.
+### Added
+- The site Database tab is now a full, tabbed management surface (Databases / Create / Notifications): add/remove database users, rotate the primary user's password (with a fresh one-time credential link), back up on demand with inline download/delete, and drop a database from the site context — all queued over SSH with live console output. A Notifications tab routes channels to database events, including a new "Database credentials shared" alert fired whenever a one-time credential link is generated.
+- New central Notifications tab on the server workspace: route notification channels to any of the server's events, grouped by category (Server, Health, Errors, Backups, Patches, Networking…). It shares the same subscriptions as each feature's own Notifications tab, surfaces the organization-wide outbound webhook destinations read-only, and links out to channel management.
+### Changed
+- The central site and server Notifications pages now route per channel — each channel is its own expandable row where you pick exactly which events it receives, so different events can go to different channels in one place. Saving reconciles only the channels shown (ticking adds, unticking removes) and never touches channels it didn't list, keeping it in sync with the per-feature Notifications tabs. You can also create a new notification channel inline from these pages without leaving. Both pages are now organized into tabs (Subscriptions / Integration webhooks); the deploy webhook's IP allow list moved to Repository settings where the rest of the deploy webhook lives.
+- Route a single site's error events to notification channels from a new Notifications tab on the site Errors workspace, or from the existing site Settings → Notifications page (both edit the same subscriptions). A site failure also appears in its server's error roll-up, so routing is deduped per channel and per in-app recipient — a subscriber wired to both the site and the server is alerted once.
 - Route a server's error events to notification channels from a new Notifications tab on the server Errors workspace, without firing alerts for historical backfilled failures.
 ### Removed
 - Support for Google Cloud, Scaleway, Equinix Metal, and Fly.io server providers has been removed.

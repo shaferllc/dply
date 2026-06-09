@@ -34,7 +34,7 @@
         <p class="mt-3 text-sm leading-relaxed text-brand-moss">{{ __('Monitor tick health, run schedule:run once, pause/resume, or change cadence. Enable monitoring to wrap bare cron entries with heartbeat tracking.') }}</p>
     </div>
 
-    @if ($contextSiteModel)
+    @if ($contextSiteModel && ! ($scheduleSiteRouteLocked ?? false))
         <div class="flex flex-wrap items-center gap-3 border-b border-brand-ink/10 bg-brand-sand/15 px-6 py-3 sm:px-7">
             <span class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Show') }}</span>
             <div class="inline-flex items-center gap-1 rounded-xl border border-brand-ink/10 bg-white p-1 shadow-sm" role="group" aria-label="{{ __('Scheduler list scope') }}">

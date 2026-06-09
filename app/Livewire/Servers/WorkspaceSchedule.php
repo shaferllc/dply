@@ -72,8 +72,11 @@ class WorkspaceSchedule extends Component
 
     public string $enable_custom_command = '';
 
-    /** When set (?site=…), filters the lists to that site's cron entries / daemons. */
+    /** When set (?site=… or the nested site route), filters lists to that site. */
     public ?string $context_site_id = null;
+
+    /** True when mounted at the nested {@see sites.schedule} route (native site workspace, not a server ?site= filter). */
+    public bool $siteDedicatedContext = false;
 
     /** @var 'site'|'all' Only when {@see} is set. */
     public string $schedulers_list_scope = 'all';
@@ -124,20 +127,32 @@ class WorkspaceSchedule extends Component
         $this->dispatch('open-modal', self::ENABLE_MODAL);
     }
 
-    public function mount(Server $server): void
+    public function mount(Server $server, ?Site $site = null): void
     {
         $this->bootWorkspace($server);
 
-        $siteId = request()->query('site');
-        if (is_string($siteId) && $siteId !== '') {
-            $exists = Site::query()
-                ->where('server_id', $server->id)
-                ->whereKey($siteId)
-                ->exists();
-            if ($exists) {
-                $this->context_site_id = $siteId;
-                $this->enable_site_id = $siteId;
-                $this->schedulers_list_scope = 'site';
+        if ($site !== null) {
+            // Native site workspace (nested route, dispatched by SiteScheduleController).
+            abort_unless($site->server_id === $server->id, 404);
+            $this->authorize('view', $site);
+
+            $this->siteDedicatedContext = true;
+            $this->context_site_id = $site->id;
+            $this->enable_site_id = $site->id;
+            $this->schedulers_list_scope = 'site';
+        } else {
+            // Server workspace deep-linked with ?site= to pre-filter without leaving server nav.
+            $siteId = request()->query('site');
+            if (is_string($siteId) && $siteId !== '') {
+                $exists = Site::query()
+                    ->where('server_id', $server->id)
+                    ->whereKey($siteId)
+                    ->exists();
+                if ($exists) {
+                    $this->context_site_id = $siteId;
+                    $this->enable_site_id = $siteId;
+                    $this->schedulers_list_scope = 'site';
+                }
             }
         }
 
@@ -248,6 +263,12 @@ class WorkspaceSchedule extends Component
     {
         $this->authorize('update', $this->server);
         $this->preflight_results = [];
+
+        // In site context the target is always the focused site — the modal shows
+        // it as a fixed label, so pin it here too rather than trusting form input.
+        if ($this->context_site_id !== null) {
+            $this->enable_site_id = $this->context_site_id;
+        }
 
         $site = Site::query()
             ->where('server_id', $this->server->id)
@@ -811,6 +832,8 @@ class WorkspaceSchedule extends Component
         if ($this->schedule_workspace_tab === 'logs') {
             $logSchedulers = ServerSchedulerHeartbeat::query()
                 ->where('server_id', $this->server->id)
+                ->when($this->context_site_id !== null && $this->schedulers_list_scope === 'site',
+                    fn ($q) => $q->where('site_id', $this->context_site_id))
                 ->with('site:id,name')
                 ->get();
 
@@ -832,6 +855,9 @@ class WorkspaceSchedule extends Component
             'opsReady' => $this->serverOpsReady(),
             'contextSite' => $contextSite,
             'contextSiteModel' => $contextSite,
+            // True only on the nested site route — hides the "all sites on server"
+            // scope toggle (the server route is where the whole-server view lives).
+            'scheduleSiteRouteLocked' => $this->siteDedicatedContext,
             'enableTargetSite' => $enableTargetSite,
             'showLaravelSchedulerEnable' => $enableTargetSite?->isLaravelFrameworkDetected() ?? false,
             'showRailsSchedulerEnable' => $enableTargetSite?->isRailsFrameworkDetected() ?? false,

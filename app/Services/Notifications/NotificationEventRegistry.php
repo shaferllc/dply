@@ -27,8 +27,11 @@ class NotificationEventRegistry
                 'supports_in_app' => true,
                 // Import migration events surface action-required moments;
                 // default them to email-on per the Q17 cadence (in-app +
-                // email at action-required moments only).
-                'supports_email' => str_starts_with($eventKey, 'import.migration.'),
+                // email at action-required moments only). Uptime down/recovered,
+                // degraded, and SSL-expiry are likewise action-required.
+                'supports_email' => str_starts_with($eventKey, 'import.migration.')
+                    || str_starts_with($eventKey, 'site.uptime.')
+                    || $eventKey === 'site.ssl.expiring',
                 'supports_webhook' => true,
             ];
         }
@@ -63,6 +66,8 @@ class NotificationEventRegistry
     protected function severityFor(string $eventKey): string
     {
         if (str_contains($eventKey, 'monitor')
+            || str_contains($eventKey, 'uptime')
+            || str_contains($eventKey, '.ssl.')
             || str_contains($eventKey, 'alerts')
             || str_ends_with($eventKey, 'step_failed')
             || str_ends_with($eventKey, 'cutover_ready')

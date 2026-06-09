@@ -9,6 +9,7 @@ use App\Jobs\ProvisionTenantTestingHostnameJob;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Jobs\SiteResetPermissionsJob;
 use App\Jobs\SyncBasicAuthFromServerJob;
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\DismissesConsoleActionRun;
 use App\Livewire\Concerns\ManagesContainerSite;
 use App\Livewire\Concerns\ManagesSiteBindings;
@@ -63,6 +64,7 @@ use App\Services\Snapshots\SnapshotService;
 use App\Services\SshConnection;
 use App\Support\HostnameValidator;
 use App\Support\Sites\SiteSettingsViewData;
+use App\Support\NotificationSubscriptionMatrix;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
@@ -73,9 +75,11 @@ use Illuminate\Support\Str;
 use Carbon\CarbonImmutable;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 
 class Settings extends Show
 {
+    use CreatesNotificationChannelInline;
     use DismissesConsoleActionRun;
     use ManagesContainerSite;
     use ManagesSiteBindings;
@@ -104,11 +108,23 @@ class Settings extends Show
         'runtime-static' => 'static',
     ];
 
-    /** @var list<string> */
+    /**
+     * Site events routable from the central Settings → Notifications matrix. The
+     * site.errors.* keys are ALSO editable from the Errors → Notifications tab
+     * ({@see \App\Livewire\Sites\Concerns\ManagesErrorsNotifications}); both
+     * surfaces write the same Site subscriptions, so they stay in sync. Keep this
+     * list aligned with {@see \App\Support\SiteErrorsNotificationKeys::eventKeys()}.
+     *
+     * @var list<string>
+     */
     private const SITE_NOTIFICATION_EVENT_KEYS = [
         'site.deployments',
         'site.deployment_started',
-        'site.uptime',
+        'site.uptime.down',
+        'site.uptime.degraded',
+        'site.ssl.expiring',
+        'site.errors.deploy_failed',
+        'site.errors.operation_failed',
     ];
 
     public string $section = 'general';
@@ -116,6 +132,12 @@ class Settings extends Show
     public string $routingTab = 'domains';
 
     public string $runtimeTab = 'overview';
+
+    /** @var list<string> */
+    public const NOTIF_TABS = ['subscriptions', 'webhooks'];
+
+    /** Sub-tab on the Notifications section (Subscriptions / Integration webhooks). */
+    public string $notifTab = 'subscriptions';
 
     public string $settings_primary_domain = '';
 
@@ -347,11 +369,16 @@ class Settings extends Show
 
     public int $laravel_log_tail_lines = 500;
 
-    /** @var list<string> */
-    public array $site_notification_channel_ids = [];
-
-    /** @var list<string> */
-    public array $site_notification_event_keys = [];
+    /**
+     * Per-channel event routing for the central matrix: channel id → list of
+     * subscribed event keys. Lets different events go to different channels in one
+     * place (replaces the old cartesian channels×events selection). Save reconciles
+     * each shown channel to its selection and never touches channels not listed
+     * here, so it stays in sync with the per-feature Notifications tabs.
+     *
+     * @var array<string, list<string>>
+     */
+    public array $channelEventSelections = [];
 
     public string $site_int_hook_name = '';
 
@@ -370,6 +397,10 @@ class Settings extends Show
     public bool $site_int_evt_uptime_down = true;
 
     public bool $site_int_evt_uptime_recovered = true;
+
+    public bool $site_int_evt_uptime_degraded = true;
+
+    public bool $site_int_evt_ssl_expiring = true;
 
     public string $sync_group_name_input = '';
 
@@ -484,6 +515,9 @@ class Settings extends Show
         $this->section = $section;
         $this->routingTab = $this->resolveRoutingTab(request()->query('tab'));
         $this->runtimeTab = $this->resolveRuntimeTabForSite($site, request()->query('tab'));
+        $this->notifTab = in_array((string) request()->query('tab'), self::NOTIF_TABS, true)
+            ? (string) request()->query('tab')
+            : 'subscriptions';
 
         $laravelTabQuery = request()->query('laravel_tab');
         if (is_string($laravelTabQuery) && in_array($laravelTabQuery, ['commands', 'octane', 'reverb', 'logs', 'setup', 'schedule', 'migrations', 'pail'], true)) {
@@ -622,14 +656,34 @@ class Settings extends Show
         ]), navigate: true);
     }
 
+    public function setNotificationsTab(string $tab): void
+    {
+        $this->notifTab = in_array($tab, self::NOTIF_TABS, true) ? $tab : 'subscriptions';
+    }
+
+    /**
+     * After the reusable inline modal ({@see CreatesNotificationChannelInline})
+     * creates a channel, refresh the matrix so the new channel appears as a row
+     * ready to route — without leaving the page. Jump to the Subscriptions tab so
+     * the new channel is visible.
+     */
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId = ''): void
+    {
+        if ($this->section === 'notifications') {
+            $this->notifTab = 'subscriptions';
+            $this->loadSiteNotificationPreferences();
+        }
+    }
+
     protected function loadSiteNotificationPreferences(): void
     {
-        $this->site->loadMissing('notificationSubscriptions');
-        $subs = $this->site->notificationSubscriptions
-            ->whereIn('event_key', self::SITE_NOTIFICATION_EVENT_KEYS);
-
-        $this->site_notification_channel_ids = $subs->pluck('notification_channel_id')->unique()->values()->map(fn ($id) => (string) $id)->all();
-        $this->site_notification_event_keys = $subs->pluck('event_key')->unique()->values()->all();
+        $this->channelEventSelections = NotificationSubscriptionMatrix::load(
+            Site::class,
+            (string) $this->site->id,
+            self::SITE_NOTIFICATION_EVENT_KEYS,
+            AssignableNotificationChannels::forUser(auth()->user(), $this->site->organization),
+        );
     }
 
     public function saveSiteNotificationSubscriptions(): void
@@ -642,67 +696,24 @@ class Settings extends Show
             return;
         }
 
-        $inRule = implode(',', self::SITE_NOTIFICATION_EVENT_KEYS);
-
-        $this->validate([
-            'site_notification_channel_ids' => ['array'],
-            'site_notification_channel_ids.*' => ['string', 'exists:notification_channels,id'],
-            'site_notification_event_keys' => ['array'],
-            'site_notification_event_keys.*' => ['string', 'in:'.$inRule],
-        ], [], [
-            'site_notification_channel_ids' => __('channels'),
-            'site_notification_event_keys' => __('events'),
-        ]);
-
-        $org = auth()->user()?->currentOrganization();
-        $allowedChannelIds = AssignableNotificationChannels::forUser(auth()->user(), $org)
-            ->pluck('id')
-            ->map(fn ($id) => (string) $id)
-            ->all();
-
-        foreach ($this->site_notification_channel_ids as $channelId) {
-            if (! in_array((string) $channelId, $allowedChannelIds, true)) {
-                $this->addError('site_notification_channel_ids', __('Invalid channel selected.'));
-
-                return;
-            }
-        }
-
-        NotificationSubscription::query()
-            ->where('subscribable_type', Site::class)
-            ->where('subscribable_id', $this->site->id)
-            ->whereIn('event_key', self::SITE_NOTIFICATION_EVENT_KEYS)
-            ->delete();
-
-        if ($this->site_notification_channel_ids === [] || $this->site_notification_event_keys === []) {
-            $this->dispatch('notify', message: __('Site notification subscriptions updated.'));
-            $this->loadSiteNotificationPreferences();
-
-            return;
-        }
-
-        foreach ($this->site_notification_channel_ids as $channelId) {
-            $channel = NotificationChannel::query()->findOrFail((string) $channelId);
-            Gate::authorize('manageNotificationChannels', $channel->owner);
-
-            foreach ($this->site_notification_event_keys as $eventKey) {
-                NotificationSubscription::query()->create([
-                    'notification_channel_id' => $channel->id,
-                    'subscribable_type' => Site::class,
-                    'subscribable_id' => $this->site->id,
-                    'event_key' => $eventKey,
-                ]);
-            }
-        }
+        $changed = NotificationSubscriptionMatrix::save(
+            Site::class,
+            (string) $this->site->id,
+            self::SITE_NOTIFICATION_EVENT_KEYS,
+            AssignableNotificationChannels::forUser(auth()->user(), auth()->user()?->currentOrganization()),
+            $this->channelEventSelections,
+        );
 
         $this->loadSiteNotificationPreferences();
 
-        $auditOrg = $this->site->server?->organization ?? auth()->user()?->currentOrganization();
-        if ($auditOrg) {
-            audit_log($auditOrg, auth()->user(), 'site.notifications.subscriptions_updated', $this->site, null, [
-                'channel_ids' => array_values(array_map('strval', $this->site_notification_channel_ids)),
-                'event_keys' => array_values($this->site_notification_event_keys),
-            ]);
+        if ($changed['changed'] > 0) {
+            $auditOrg = $this->site->server?->organization ?? auth()->user()?->currentOrganization();
+            if ($auditOrg) {
+                audit_log($auditOrg, auth()->user(), 'site.notifications.subscriptions_updated', $this->site, null, [
+                    'added' => $changed['added'],
+                    'removed' => $changed['removed'],
+                ]);
+            }
         }
 
         $this->dispatch('notify', message: __('Site notification subscriptions saved.'));
@@ -743,6 +754,12 @@ class Settings extends Show
         if ($this->site_int_evt_uptime_recovered) {
             $events[] = 'uptime_recovered';
         }
+        if ($this->site_int_evt_uptime_degraded) {
+            $events[] = 'uptime_degraded';
+        }
+        if ($this->site_int_evt_ssl_expiring) {
+            $events[] = 'ssl_expiring';
+        }
 
         $created = NotificationWebhookDestination::query()->create([
             'organization_id' => $this->site->organization_id,
@@ -775,6 +792,8 @@ class Settings extends Show
         $this->site_int_evt_deploy_started = false;
         $this->site_int_evt_uptime_down = true;
         $this->site_int_evt_uptime_recovered = true;
+        $this->site_int_evt_uptime_degraded = true;
+        $this->site_int_evt_ssl_expiring = true;
 
         $this->dispatch('notify', message: __('Webhook destination saved.'));
     }
@@ -3718,7 +3737,18 @@ class Settings extends Show
 
         if ($section === 'notifications') {
             $viewData['assignableNotificationChannels'] = AssignableNotificationChannels::forUser(auth()->user(), $org);
-            $viewData['siteNotificationEventLabels'] = config('notification_events.categories.site.events', []);
+            // The per-channel matrix groups the site's own events and the error-stream
+            // events (the latter also editable from the Errors → Notifications tab).
+            $viewData['notificationEventGroups'] = [
+                [
+                    'label' => __('Deploys & uptime'),
+                    'events' => (array) config('notification_events.categories.site.events', []),
+                ],
+                [
+                    'label' => __('Error stream'),
+                    'events' => (array) config('notification_events.categories.site_errors.events', []),
+                ],
+            ];
             $viewData['siteIntegrationWebhookDestinations'] = NotificationWebhookDestination::query()
                 ->where('organization_id', $this->site->organization_id)
                 ->where('site_id', $this->site->id)

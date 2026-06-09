@@ -14,7 +14,7 @@
     $sidebarAvatarStyle = "background-image: linear-gradient(135deg, hsl({$sidebarHueA}deg 65% 56%) 0%, hsl({$sidebarHueB}deg 65% 42%) 100%);";
 @endphp
 
-<aside class="lg:col-span-3 mb-8 lg:mb-0"
+<aside class="sm:col-span-3 mb-8 lg:mb-0"
     x-data="{
         copiedUrl: false,
     }"
@@ -143,7 +143,7 @@
                         {{-- Only show the open-error count when Errors is actually
                              live — not while it's a "Soon" (preview_only) item. --}}
                         @if ($item['id'] === 'errors' && empty($item['preview_only']))
-                            @php $openErrorCount = \App\Models\ErrorEvent::query()->where('site_id', $site->id)->whereNull('dismissed_at')->count(); @endphp
+                            @php $openErrorCount = \App\Models\ErrorEvent::undismissedCountForSite((string) $site->id); @endphp
                             @if ($openErrorCount > 0)
                                 <span class="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">{{ $openErrorCount > 99 ? '99+' : $openErrorCount }}</span>
                             @endif

@@ -46,6 +46,7 @@
         'contextSite',
         'contextSiteModel',
         'siteDedicatedContext',
+        'scheduleSiteRouteLocked',
         'card',
         'input',
         'chipForHealth',

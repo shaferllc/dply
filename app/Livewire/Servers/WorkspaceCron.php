@@ -22,7 +22,6 @@ use App\Support\Servers\CronWorkspaceViewData;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
@@ -129,22 +128,17 @@ class WorkspaceCron extends Component
 
     public string $cron_run_output = '';
 
-    public function mount(Server $server, ?Site $site = null): void
+    public function mount(Server $server): void
     {
-        if ($site !== null) {
-            abort_unless($site->server_id === $server->id, 404);
-            abort_unless($server->organization_id === auth()->user()->currentOrganization()?->id, 404);
-            Gate::authorize('view', $site);
-        }
-
         $this->bootWorkspace($server);
 
-        $resolvedSite = $site;
-        if ($resolvedSite === null) {
-            $qSite = request()->query('site');
-            if (is_string($qSite) && $qSite !== '') {
-                $resolvedSite = Site::query()->where('server_id', $server->id)->whereKey($qSite)->first();
-            }
+        // Cron is server-scoped; the dedicated site route was removed. The server
+        // page can still focus a single site via ?site= — links that used to point
+        // at the site Cron page now land here filtered to that site.
+        $resolvedSite = null;
+        $qSite = request()->query('site');
+        if (is_string($qSite) && $qSite !== '') {
+            $resolvedSite = Site::query()->where('server_id', $server->id)->whereKey($qSite)->first();
         }
 
         if ($resolvedSite !== null) {

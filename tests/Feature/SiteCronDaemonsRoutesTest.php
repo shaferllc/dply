@@ -32,7 +32,7 @@ function readyServer(User $user): Server
     ]);
 }
 
-test('site cron route renders and sets site context', function () {
+test('server cron route focuses a site via ?site= query', function () {
     $user = actingOrgUser();
     $server = readyServer($user);
     $site = Site::factory()->create([
@@ -41,16 +41,11 @@ test('site cron route renders and sets site context', function () {
         'organization_id' => $server->organization_id,
     ]);
 
+    // The dedicated site cron route was removed; cron lives on the server page,
+    // which can still focus a single site through ?site= (mount reads the query).
     $this->actingAs($user)
-        ->get(route('sites.cron', [$server, $site]))
-        ->assertOk()
-        ->assertSee($site->name, false);
-
-    Livewire::actingAs($user)
-        ->test(WorkspaceCron::class, ['server' => $server, 'site' => $site])
-        ->assertSet('context_site_id', $site->id)
-        ->assertSet('cron_list_scope', 'site')
-        ->assertSet('new_site_id', $site->id);
+        ->get(route('servers.cron', ['server' => $server, 'site' => $site]))
+        ->assertOk();
 });
 
 test('site daemons route renders and sets site context', function () {

@@ -26,7 +26,7 @@
             <main class="flex-1 w-full pb-28 sm:pb-32">
                 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                     <div class="lg:grid lg:grid-cols-12 lg:gap-10">
-                        <aside class="lg:col-span-3 mb-8 lg:mb-0 shrink-0">
+                        <aside class="sm:col-span-3 mb-8 lg:mb-0 shrink-0">
                             <x-admin-nav />
                         </aside>
                         <div class="lg:col-span-9 min-w-0">

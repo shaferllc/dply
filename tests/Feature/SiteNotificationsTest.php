@@ -96,8 +96,9 @@ test('site notifications section saves channel subscriptions', function () {
 
     Livewire::actingAs($user)
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'notifications'])
-        ->set('site_notification_channel_ids', [(string) $channel->id])
-        ->set('site_notification_event_keys', ['site.deployments', 'site.deployment_started'])
+        ->set('channelEventSelections', [
+            (string) $channel->id => ['site.deployments', 'site.deployment_started'],
+        ])
         ->call('saveSiteNotificationSubscriptions')
         ->assertHasNoErrors();
 
@@ -112,6 +113,71 @@ test('site notifications section saves channel subscriptions', function () {
         'subscribable_type' => Site::class,
         'subscribable_id' => $site->id,
         'event_key' => 'site.deployment_started',
+    ]);
+});
+
+test('site notifications matrix routes different events to different channels and untick removes', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'status' => Site::STATUS_NGINX_ACTIVE,
+    ]);
+
+    $slack = NotificationChannel::factory()->forUser($user)->create();
+    $email = NotificationChannel::factory()->forUser($user)->create();
+
+    // Different events to different channels in one save.
+    Livewire::actingAs($user)
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'notifications'])
+        ->set('channelEventSelections', [
+            (string) $slack->id => ['site.errors.deploy_failed'],
+            (string) $email->id => ['site.uptime.down'],
+        ])
+        ->call('saveSiteNotificationSubscriptions')
+        ->assertHasNoErrors();
+
+    $this->assertDatabaseHas('notification_subscriptions', [
+        'notification_channel_id' => $slack->id,
+        'subscribable_id' => $site->id,
+        'event_key' => 'site.errors.deploy_failed',
+    ]);
+    $this->assertDatabaseHas('notification_subscriptions', [
+        'notification_channel_id' => $email->id,
+        'subscribable_id' => $site->id,
+        'event_key' => 'site.uptime.down',
+    ]);
+    $this->assertDatabaseMissing('notification_subscriptions', [
+        'notification_channel_id' => $slack->id,
+        'subscribable_id' => $site->id,
+        'event_key' => 'site.uptime.down',
+    ]);
+
+    // Unticking Slack's event removes only it; Email is left untouched (it isn't
+    // even in the payload), proving reconcile is per-shown-channel and additive-safe.
+    Livewire::actingAs($user)
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'notifications'])
+        ->set('channelEventSelections', [
+            (string) $slack->id => [],
+        ])
+        ->call('saveSiteNotificationSubscriptions')
+        ->assertHasNoErrors();
+
+    $this->assertDatabaseMissing('notification_subscriptions', [
+        'notification_channel_id' => $slack->id,
+        'subscribable_id' => $site->id,
+        'event_key' => 'site.errors.deploy_failed',
+    ]);
+    $this->assertDatabaseHas('notification_subscriptions', [
+        'notification_channel_id' => $email->id,
+        'subscribable_id' => $site->id,
+        'event_key' => 'site.uptime.down',
     ]);
 });
 
@@ -212,13 +278,13 @@ test('uptime monitor check publishes down then recovered', function () {
     );
 
     $this->assertDatabaseHas('notification_events', [
-        'event_key' => 'site.uptime',
+        'event_key' => 'site.uptime.down',
         'subject_type' => Site::class,
         'subject_id' => $site->id,
     ]);
 
     $downMeta = NotificationEvent::query()
-        ->where('event_key', 'site.uptime')
+        ->where('event_key', 'site.uptime.down')
         ->latest()
         ->first()
         ?->metadata;
@@ -231,7 +297,7 @@ test('uptime monitor check publishes down then recovered', function () {
     );
 
     $uptimeEvents = NotificationEvent::query()
-        ->where('event_key', 'site.uptime')
+        ->where('event_key', 'site.uptime.down')
         ->orderBy('id')
         ->get();
     expect($uptimeEvents)->toHaveCount(2);

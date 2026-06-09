@@ -28,20 +28,6 @@ return [
     | is unavailable so freshly-imported servers still surface everything.
     */
     'nav' => [
-        // Overview leads — operators arriving at the workspace want
-        // the at-a-glance dashboard first, then drill into Sites
-        // from there. The "Deploy" entry was removed because it
-        // /run is the merged surface for executing things on this
-        // server: saved commands (recipes), ad-hoc shell, marketplace
-        // imports. Replaces both /deploy (deleted, was misleadingly
-        // named for what was server-level admin) and /recipes
-        // (renamed). It sits high in the nav because operators who
-        // know their server is healthy come here next to do something.
-        // 'group' clusters items under a small uppercase heading in the sidebar.
-        // Items keep the original flat order — the render walks them once and
-        // emits a heading whenever the group changes from the previous item.
-        // Groups (in order): overview | monitor | stacks | background | access | admin.
-        // overview (alphabetical by label)
         ['key' => 'cluster', 'route' => 'servers.cluster', 'icon' => 'server-stack', 'label' => 'Cluster', 'group' => 'overview', 'only_host_kinds' => ['kubernetes'], 'feature' => 'workspace.cluster'],
         ['key' => 'console', 'route' => 'servers.console', 'preview_route' => 'servers.console-preview', 'icon' => 'command-line', 'label' => 'Console', 'group' => 'overview', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.console', 'preview_feature' => 'workspace.console_preview'],
         ['key' => 'overview', 'route' => 'servers.overview', 'icon' => 'cpu-chip', 'label' => 'Overview', 'group' => 'overview', 'except_host_kinds' => ['kubernetes']],
@@ -90,6 +76,7 @@ return [
         ['key' => 'logs', 'route' => 'servers.logs', 'icon' => 'clipboard-document-list', 'label' => 'Logs', 'group' => 'admin', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'maintenance', 'route' => 'servers.maintenance', 'preview_route' => 'servers.maintenance', 'icon' => 'wrench', 'label' => 'Maintenance', 'group' => 'admin', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.server_maintenance', 'preview_feature' => 'workspace.server_maintenance_preview'],
         ['key' => 'manage', 'route' => 'servers.manage', 'icon' => 'wrench-screwdriver', 'label' => 'Manage', 'group' => 'admin', 'except_host_kinds' => ['kubernetes']],
+        ['key' => 'notifications', 'route' => 'servers.notifications', 'icon' => 'bell', 'label' => 'Notifications', 'group' => 'admin', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'settings', 'route' => 'servers.settings', 'icon' => 'cog-8-tooth', 'label' => 'Settings', 'group' => 'admin'],
     ],
 

@@ -17,7 +17,7 @@
                 <a href="{{ route('sites.daemons', ['server' => $server, 'site' => $site]) }}" wire:navigate class="text-brand-forest hover:text-brand-sage hover:underline">
                     {{ __('Open Workers') }} →
                 </a>
-                <a href="{{ route('sites.cron', ['server' => $server, 'site' => $site]) }}" wire:navigate class="text-brand-forest hover:text-brand-sage hover:underline">
+                <a href="{{ route('servers.cron', ['server' => $server, 'site' => $site]) }}" wire:navigate class="text-brand-forest hover:text-brand-sage hover:underline">
                     {{ __('Open Cron jobs') }} →
                 </a>
                 @if ($site->isLaravelFrameworkDetected())

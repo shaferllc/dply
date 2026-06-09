@@ -35,7 +35,7 @@
             <x-page-header
                 :eyebrow="__('Database')"
                 :title="__('Site databases')"
-                :description="__('Create a database for this site and wire it straight into the .env, or attach one that already lives on this server. Backups, extra users, and dropping a database live on the server-level database manager.')"
+                :description="__('Create a database for this site and wire it into the .env, attach one already on this server, manage users, rotate the password, back it up, or drop it. Backup destinations are configured on the server-level database manager.')"
                 :show-documentation="false"
                 flush
             />
@@ -57,7 +57,22 @@
                 </div>
             @endif
 
-            @if (empty($installedEngines))
+            <x-server-workspace-tablist :aria-label="__('Database sections')" scroll class="sm:min-w-0 sm:flex-1">
+                <x-server-workspace-tab id="db-tab-databases" icon="heroicon-o-circle-stack" :active="$dbTab === 'databases'" wire:click="setDatabaseTab('databases')">
+                    {{ __('Databases') }}
+                </x-server-workspace-tab>
+                <x-server-workspace-tab id="db-tab-create" icon="heroicon-o-plus-circle" :active="$dbTab === 'create'" wire:click="setDatabaseTab('create')">
+                    {{ __('Create') }}
+                </x-server-workspace-tab>
+                <x-server-workspace-tab id="db-tab-notifications" icon="heroicon-o-bell" :active="$dbTab === 'notifications'" wire:click="setDatabaseTab('notifications')">
+                    {{ __('Notifications') }}
+                </x-server-workspace-tab>
+            </x-server-workspace-tablist>
+
+            <div wire:key="db-panel-{{ $dbTab }}" class="space-y-6">
+            @if ($dbTab === 'notifications')
+                @include('livewire.sites.partials.database.notifications-tab')
+            @elseif (empty($installedEngines))
                 {{-- No database engine on the server yet — point at the server-level
                      manager, which owns the (heavy) install flow. --}}
                 <div class="{{ $card }} p-6 text-center">
@@ -74,11 +89,18 @@
                     </x-primary-button>
                 </div>
             @else
+                @if ($dbTab === 'databases')
                 {{-- Linked databases ------------------------------------------------ --}}
-                <div class="{{ $card }}">
-                    <div class="border-b border-brand-ink/10 px-5 py-4">
-                        <h3 class="text-sm font-semibold text-brand-ink">{{ __('Databases for this site') }}</h3>
-                        <p class="mt-0.5 text-xs text-brand-moss">{{ __('Databases linked to :site.', ['site' => $site->name]) }}</p>
+                <section class="{{ $card }}">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <x-icon-badge>
+                            <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
+                        </x-icon-badge>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Databases') }}</p>
+                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Databases for this site') }}</h2>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Databases linked to :site. Manage users, rotate the password, back up, or drop each one.', ['site' => $site->name]) }}</p>
+                        </div>
                     </div>
 
                     @if ($linked->isEmpty())
@@ -88,42 +110,139 @@
                     @else
                         <ul class="divide-y divide-brand-ink/5">
                             @foreach ($linked as $db)
-                                <li class="flex flex-wrap items-center gap-3 px-5 py-4" wire:key="linked-{{ $db->id }}">
-                                    <div class="min-w-0 flex-1">
-                                        <div class="flex items-center gap-2">
-                                            <span class="font-mono text-sm font-semibold text-brand-ink">{{ $db->name }}</span>
-                                            <span class="rounded-md bg-brand-sand/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
-                                                {{ \App\Support\Servers\DatabaseWorkspaceEngines::label($db->engine) }}
-                                            </span>
+                                @php
+                                    $family = \App\Support\Servers\DatabaseWorkspaceEngines::family($db->engine);
+                                    $supportsUsers = in_array($db->engine, ['mysql', 'mariadb', 'postgres'], true);
+                                @endphp
+                                <li class="px-5 py-4" wire:key="linked-{{ $db->id }}">
+                                    <div class="flex flex-wrap items-center gap-3">
+                                        <div class="min-w-0 flex-1">
+                                            <div class="flex items-center gap-2">
+                                                <span class="font-mono text-sm font-semibold text-brand-ink">{{ $db->name }}</span>
+                                                <span class="rounded-md bg-brand-sand/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                                                    {{ \App\Support\Servers\DatabaseWorkspaceEngines::label($db->engine) }}
+                                                </span>
+                                            </div>
+                                            <p class="mt-1 truncate font-mono text-xs text-brand-moss">
+                                                @if ($family === 'sqlite')
+                                                    {{ $db->host }}
+                                                @else
+                                                    {{ $db->username }}@<span>{{ $db->host ?: '127.0.0.1' }}:{{ $db->defaultPort() }}</span>
+                                                @endif
+                                            </p>
                                         </div>
-                                        <p class="mt-1 truncate font-mono text-xs text-brand-moss">
-                                            @if (\App\Support\Servers\DatabaseWorkspaceEngines::family($db->engine) === 'sqlite')
-                                                {{ $db->host }}
-                                            @else
-                                                {{ $db->username }}@<span>{{ $db->host ?: '127.0.0.1' }}:{{ $db->defaultPort() }}</span>
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            @if ($supportsUsers)
+                                                <x-secondary-button size="xs" type="button" wire:click="openAddUserModal('{{ $db->id }}')">
+                                                    <x-heroicon-o-user-plus class="h-4 w-4" />
+                                                    {{ __('Add user') }}
+                                                </x-secondary-button>
+                                                <x-secondary-button
+                                                    size="xs"
+                                                    type="button"
+                                                    wire:click="rotatePassword('{{ $db->id }}')"
+                                                    wire:confirm="{{ __('Rotate the password for :user on :name? You’ll get a new one-time credential link; update the app’s .env afterwards.', ['user' => $db->username, 'name' => $db->name]) }}"
+                                                >
+                                                    <x-heroicon-o-key class="h-4 w-4" />
+                                                    {{ __('Rotate password') }}
+                                                </x-secondary-button>
                                             @endif
-                                        </p>
+                                            <x-secondary-button size="xs" type="button" wire:click="backupDatabase('{{ $db->id }}')" wire:loading.attr="disabled" wire:target="backupDatabase('{{ $db->id }}')">
+                                                <x-heroicon-o-archive-box-arrow-down class="h-4 w-4" />
+                                                {{ __('Back up now') }}
+                                            </x-secondary-button>
+                                            <x-secondary-button
+                                                size="xs"
+                                                type="button"
+                                                wire:click="unlinkDatabase('{{ $db->id }}')"
+                                                wire:confirm="{{ __('Detach :name from this site? The database is NOT dropped on the server.', ['name' => $db->name]) }}"
+                                            >
+                                                <x-heroicon-o-link-slash class="h-4 w-4" />
+                                                {{ __('Detach') }}
+                                            </x-secondary-button>
+                                            <button
+                                                type="button"
+                                                wire:click="dropDatabase('{{ $db->id }}')"
+                                                wire:confirm="{{ __('Drop :name on the server? This permanently deletes the database and its data, and removes it from Dply. This cannot be undone.', ['name' => $db->name]) }}"
+                                                class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
+                                            >
+                                                <x-heroicon-o-trash class="h-4 w-4" />
+                                                {{ __('Drop') }}
+                                            </button>
+                                        </div>
                                     </div>
-                                    <x-secondary-button
-                                        size="xs"
-                                        type="button"
-                                        wire:click="unlinkDatabase('{{ $db->id }}')"
-                                        wire:confirm="{{ __('Detach :name from this site? The database is NOT dropped on the server.', ['name' => $db->name]) }}"
-                                    >
-                                        <x-heroicon-o-link-slash class="h-4 w-4" />
-                                        {{ __('Detach') }}
-                                    </x-secondary-button>
+
+                                    @if ($supportsUsers && $db->extraUsers->isNotEmpty())
+                                        <div class="mt-3 rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2">
+                                            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Extra users') }}</p>
+                                            <ul class="mt-1.5 divide-y divide-brand-ink/5">
+                                                @foreach ($db->extraUsers as $user)
+                                                    <li class="flex items-center justify-between gap-2 py-1.5" wire:key="extra-{{ $user->id }}">
+                                                        <span class="truncate font-mono text-xs text-brand-ink">{{ $user->username }}@<span class="text-brand-moss">{{ $user->host }}</span></span>
+                                                        <button
+                                                            type="button"
+                                                            wire:click="removeExtraUser('{{ $db->id }}', '{{ $user->id }}')"
+                                                            wire:confirm="{{ __('Remove user :user from :name on the server?', ['user' => $user->username, 'name' => $db->name]) }}"
+                                                            class="shrink-0 text-xs font-medium text-rose-700 hover:underline"
+                                                        >{{ __('Remove') }}</button>
+                                                    </li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    @endif
+
+                                    @if ($db->backups->isNotEmpty())
+                                        <div class="mt-3 rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2">
+                                            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Recent backups') }}</p>
+                                            <ul class="mt-1.5 divide-y divide-brand-ink/5">
+                                                @foreach ($db->backups->take(5) as $backup)
+                                                    <li class="flex items-center justify-between gap-2 py-1.5" wire:key="backup-{{ $backup->id }}">
+                                                        <span class="flex items-center gap-2 text-xs text-brand-moss">
+                                                            @if ($backup->status === \App\Models\ServerDatabaseBackup::STATUS_COMPLETED)
+                                                                <span class="inline-block h-1.5 w-1.5 rounded-full bg-green-500"></span>
+                                                            @elseif ($backup->status === \App\Models\ServerDatabaseBackup::STATUS_FAILED)
+                                                                <span class="inline-block h-1.5 w-1.5 rounded-full bg-rose-500"></span>
+                                                            @else
+                                                                <span class="inline-block h-1.5 w-1.5 rounded-full bg-amber-400"></span>
+                                                            @endif
+                                                            <span>{{ $backup->created_at?->diffForHumans() }}</span>
+                                                            <span class="text-brand-mist">· {{ ucfirst($backup->status) }}</span>
+                                                        </span>
+                                                        <span class="flex shrink-0 items-center gap-2">
+                                                            @if ($backup->isDownloadable())
+                                                                <button type="button" wire:click="downloadDatabaseBackup('{{ $backup->id }}')" class="text-xs font-medium text-brand-forest hover:underline">{{ __('Download') }}</button>
+                                                            @endif
+                                                            <button
+                                                                type="button"
+                                                                wire:click="deleteDatabaseBackup('{{ $backup->id }}')"
+                                                                wire:confirm="{{ __('Delete this backup?') }}"
+                                                                class="text-xs font-medium text-rose-700 hover:underline"
+                                                            >{{ __('Delete') }}</button>
+                                                        </span>
+                                                    </li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    @endif
                                 </li>
                             @endforeach
                         </ul>
                     @endif
                 </div>
+                @endif
 
+                @if ($dbTab === 'create')
                 {{-- Create a database ---------------------------------------------- --}}
                 <form wire:submit="createDatabase" class="{{ $card }}">
-                    <div class="border-b border-brand-ink/10 px-5 py-4">
-                        <h3 class="text-sm font-semibold text-brand-ink">{{ __('Create a database') }}</h3>
-                        <p class="mt-0.5 text-xs text-brand-moss">{{ __('A user and password are generated automatically unless you set them.') }}</p>
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <x-icon-badge>
+                            <x-heroicon-o-plus-circle class="h-5 w-5" aria-hidden="true" />
+                        </x-icon-badge>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Provision') }}</p>
+                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Create a database') }}</h2>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('A user and password are generated automatically unless you set them.') }}</p>
+                        </div>
                     </div>
 
                     <div class="space-y-5 px-5 py-5">
@@ -212,9 +331,15 @@
                 {{-- Link an existing database -------------------------------------- --}}
                 @if ($linkable->isNotEmpty())
                     <form wire:submit="linkDatabase" class="{{ $card }}">
-                        <div class="border-b border-brand-ink/10 px-5 py-4">
-                            <h3 class="text-sm font-semibold text-brand-ink">{{ __('Link an existing database') }}</h3>
-                            <p class="mt-0.5 text-xs text-brand-moss">{{ __('Attach a database that already lives on this server but isn’t tied to a site yet.') }}</p>
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <x-icon-badge>
+                                <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
+                            </x-icon-badge>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Attach') }}</p>
+                                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Link an existing database') }}</h2>
+                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Attach a database that already lives on this server but isn’t tied to a site yet.') }}</p>
+                            </div>
                         </div>
                         <div class="flex flex-wrap items-end gap-3 px-5 py-5">
                             <div class="min-w-0 flex-1">
@@ -234,7 +359,9 @@
                         </div>
                     </form>
                 @endif
+                @endif
             @endif
+            </div>
 
             <x-cli-snippet class="mt-6" :commands="[
                 ['label' => __('List databases'), 'command' => 'dply sites:db:list '.$site->slug],
@@ -248,9 +375,13 @@
         <div class="p-6">
             <div class="flex items-start justify-between gap-3">
                 <div>
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Database created') }}</h3>
+                    <h3 class="text-base font-semibold text-brand-ink">{{ $share_context === 'rotated' ? __('Password rotated') : __('Database created') }}</h3>
                     <p class="mt-1 text-sm text-brand-moss">
-                        {{ __(':name is being provisioned in the background — the banner confirms when it’s ready.', ['name' => $share_link_db_name]) }}
+                        @if ($share_context === 'rotated')
+                            {{ __('The new password is being applied on the server — the banner confirms when it’s done.', ['name' => $share_link_db_name]) }}
+                        @else
+                            {{ __(':name is being provisioned in the background — the banner confirms when it’s ready.', ['name' => $share_link_db_name]) }}
+                        @endif
                     </p>
                 </div>
                 <button type="button" x-on:click="$dispatch('close-modal', 'site-db-credentials-modal')" class="shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
@@ -277,6 +408,13 @@
                 </div>
             @endif
 
+            @if ($share_context === 'rotated')
+                <div class="mt-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2.5 text-xs text-amber-900">
+                    <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>{{ __('The app’s .env still has the old password. Update DB_PASSWORD under Environment and redeploy so the site can connect.') }}</span>
+                </div>
+            @endif
+
             <div class="mt-5 flex justify-end">
                 <x-primary-button size="sm" type="button" x-on:click="$dispatch('close-modal', 'site-db-credentials-modal')">
                     {{ __('Done') }}
@@ -284,4 +422,48 @@
             </div>
         </div>
     </x-modal>
+
+    {{-- Add extra database user — provisioned over SSH via the queued admin job. --}}
+    <x-modal name="site-db-add-user-modal" max-width="lg" focusable>
+        <form wire:submit="addExtraUser" class="p-6">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Add database user') }}</h3>
+                    <p class="mt-1 text-sm text-brand-moss">{{ __('Grants a new user full privileges on this database. The user is created on the server in the background.') }}</p>
+                </div>
+                <button type="button" x-on:click="$dispatch('close-modal', 'site-db-add-user-modal')" class="shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
+                    <x-heroicon-o-x-mark class="h-5 w-5" />
+                </button>
+            </div>
+
+            <div class="mt-4 space-y-3">
+                <div>
+                    <label class="{{ $labelCls }}" for="extra_username">{{ __('Username') }}</label>
+                    <input id="extra_username" type="text" wire:model="extra_username" class="{{ $inputCls }} font-mono" placeholder="reporting_ro" />
+                    <x-input-error :messages="$errors->get('extra_username')" class="mt-1" />
+                </div>
+                <div>
+                    <label class="{{ $labelCls }}" for="extra_password">{{ __('Password') }}</label>
+                    <input id="extra_password" type="text" wire:model="extra_password" class="{{ $inputCls }} font-mono" placeholder="{{ __('strong password') }}" />
+                    <x-input-error :messages="$errors->get('extra_password')" class="mt-1" />
+                </div>
+                <div>
+                    <label class="{{ $labelCls }}" for="extra_host">{{ __('Host (MySQL/MariaDB)') }}</label>
+                    <input id="extra_host" type="text" wire:model="extra_host" class="{{ $inputCls }} font-mono" placeholder="localhost" />
+                    <p class="mt-1 text-xs text-brand-mist">{{ __('Use % to allow any host. Ignored for PostgreSQL (roles are global).') }}</p>
+                    <x-input-error :messages="$errors->get('extra_host')" class="mt-1" />
+                </div>
+            </div>
+
+            <div class="mt-5 flex justify-end gap-2">
+                <x-secondary-button size="sm" type="button" x-on:click="$dispatch('close-modal', 'site-db-add-user-modal')">{{ __('Cancel') }}</x-secondary-button>
+                <x-primary-button size="sm" type="submit" wire:loading.attr="disabled" wire:target="addExtraUser">
+                    <span wire:loading.remove wire:target="addExtraUser">{{ __('Add user') }}</span>
+                    <span wire:loading wire:target="addExtraUser">{{ __('Queuing…') }}</span>
+                </x-primary-button>
+            </div>
+        </form>
+    </x-modal>
+
+    @include('livewire.partials.create-notification-channel-modal')
 </div>

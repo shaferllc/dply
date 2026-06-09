@@ -231,18 +231,26 @@ return [
         // deploy_pipeline_visual on to bring the visual builder back.
         'deploy_pipeline_visual' => env('FEATURE_WORKSPACE_DEPLOY_PIPELINE_VISUAL', false),
         'deploy_pipeline_visual_preview' => env('FEATURE_WORKSPACE_DEPLOY_PIPELINE_VISUAL_PREVIEW', true),
-        // Observability surfaces — coming-soon teaser until the real per-site
-        // experience ships. Real flag off, preview flag on (sidebar shows "Soon").
-        'site_logs' => env('FEATURE_WORKSPACE_SITE_LOGS', false),
-        'site_logs_preview' => env('FEATURE_WORKSPACE_SITE_LOGS_PREVIEW', true),
-        'site_notifications' => env('FEATURE_WORKSPACE_SITE_NOTIFICATIONS', false),
-        'site_notifications_preview' => env('FEATURE_WORKSPACE_SITE_NOTIFICATIONS_PREVIEW', true),
-        'site_monitor' => env('FEATURE_WORKSPACE_SITE_MONITOR', false),
-        'site_monitor_preview' => env('FEATURE_WORKSPACE_SITE_MONITOR_PREVIEW', true),
+        // Live: per-site Logs workspace (server logs scoped to one site — live
+        // viewer + app-log stream). Real flag on, preview off.
+        'site_logs' => env('FEATURE_WORKSPACE_SITE_LOGS', true),
+        'site_logs_preview' => env('FEATURE_WORKSPACE_SITE_LOGS_PREVIEW', false),
+        // Live: per-site notifications page (channel × event subscriptions, integration
+        // webhooks, webhook IP security) plus the Errors → Notifications tab. Real flag
+        // on, preview off.
+        'site_notifications' => env('FEATURE_WORKSPACE_SITE_NOTIFICATIONS', true),
+        'site_notifications_preview' => env('FEATURE_WORKSPACE_SITE_NOTIFICATIONS_PREVIEW', false),
+        // Live: uptime/SSL monitors with history, incidents and channel alerts.
+        // Real flag on, preview off.
+        'site_monitor' => env('FEATURE_WORKSPACE_SITE_MONITOR', true),
+        'site_monitor_preview' => env('FEATURE_WORKSPACE_SITE_MONITOR_PREVIEW', false),
         'site_errors' => env('FEATURE_WORKSPACE_SITE_ERRORS', true),
         'site_errors_preview' => env('FEATURE_WORKSPACE_SITE_ERRORS_PREVIEW', false),
-        'site_files' => env('FEATURE_WORKSPACE_SITE_FILES', false),
-        'site_files_preview' => env('FEATURE_WORKSPACE_SITE_FILES_PREVIEW', true),
+        // Live: per-site file browser (read + edit ≤1 MB + download ≤25 MB), hard-locked
+        // to the site directory (see App\Livewire\Sites\Files::siteRoot). Real flag on,
+        // preview off.
+        'site_files' => env('FEATURE_WORKSPACE_SITE_FILES', true),
+        'site_files_preview' => env('FEATURE_WORKSPACE_SITE_FILES_PREVIEW',     ),
         'site_cli' => env('FEATURE_WORKSPACE_SITE_CLI', false),
         'site_cli_preview' => env('FEATURE_WORKSPACE_SITE_CLI_PREVIEW', true),
         'site_system_user' => env('FEATURE_WORKSPACE_SITE_SYSTEM_USER', false),

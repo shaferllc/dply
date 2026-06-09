@@ -5,7 +5,7 @@ namespace App\Support;
 final class ServerDatabaseNotificationKeys
 {
     /** @var list<string> */
-    public const KINDS = ['created', 'removed', 'engine_installed', 'engine_removed', 'user_created', 'user_removed'];
+    public const KINDS = ['created', 'removed', 'engine_installed', 'engine_removed', 'user_created', 'user_removed', 'credential_shared'];
 
     public static function eventKey(string $kind): string
     {

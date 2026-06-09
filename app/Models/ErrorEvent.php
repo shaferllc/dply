@@ -111,6 +111,31 @@ class ErrorEvent extends Model
         static::$undismissedServerCountMemo[$serverId] = $count;
     }
 
+    /**
+     * Request-scoped memo of the undismissed error count per site — the site
+     * mirror of {@see $undismissedServerCountMemo}. The site settings sidebar
+     * "Errors" badge and the Errors stream both want this; sharing it keeps the
+     * same `count(*)` from running twice on a render. Primed by the stream's
+     * paginator when unfiltered (see {@see \App\Livewire\Sites\Errors::shareStreamTotal}).
+     *
+     * @var array<string, int>
+     */
+    protected static array $undismissedSiteCountMemo = [];
+
+    public static function undismissedCountForSite(string $siteId): int
+    {
+        return static::$undismissedSiteCountMemo[$siteId] ??= static::query()
+            ->where('site_id', $siteId)
+            ->whereNull('dismissed_at')
+            ->count();
+    }
+
+    /** Seed the memo from a count computed elsewhere (e.g. the stream paginator). */
+    public static function primeUndismissedCountForSite(string $siteId, int $count): void
+    {
+        static::$undismissedSiteCountMemo[$siteId] = $count;
+    }
+
     public function isDismissed(): bool
     {
         return $this->dismissed_at !== null;

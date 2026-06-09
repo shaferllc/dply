@@ -239,6 +239,10 @@ return [
         'file' => 'VM_SITE_LOGS.md',
         'title' => 'Site logs',
     ],
+    'vm-site-app-logs' => [
+        'file' => 'VM_SITE_APP_LOGS.md',
+        'title' => 'App logs (dply Logs)',
+    ],
     'vm-site-monitor' => [
         'file' => 'VM_SITE_MONITOR.md',
         'title' => 'Site uptime monitor',

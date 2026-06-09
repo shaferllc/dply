@@ -218,7 +218,7 @@
                             @elseif ($schedulerCronLink)
                             <p class="text-sm leading-relaxed text-brand-moss">
                                 {{ __('Need a recurring task for this stack?') }}
-                                <a href="{{ route('sites.cron', [$server, $site]) }}" wire:navigate class="font-semibold text-brand-forest hover:underline">{{ __('Set one up in Cron →') }}</a>
+                                <a href="{{ route('servers.cron', ['server' => $server, 'site' => $site]) }}" wire:navigate class="font-semibold text-brand-forest hover:underline">{{ __('Set one up in Cron →') }}</a>
                             </p>
                             @endif
 

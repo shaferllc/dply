@@ -1,5 +1,11 @@
 @props([
     'items' => [],
+    /**
+     * The site in scope, when this trail is on a site workspace page. Passed
+     * explicitly so the Deploy/Console controls survive Livewire update renders
+     * (where request()->route('site') is the livewire route, not the page route).
+     */
+    'site' => null,
     /** Tailwind classes on the outer wrapper (spacing below the bar). */
     'wrapperClass' => 'mb-6',
     /** Named route for contextual docs (e.g. docs.index, docs.markdown). */
@@ -183,7 +189,7 @@
             </ol>
         </nav>
 
-        @php $breadcrumbSite = request()->route('site'); @endphp
+        @php $breadcrumbSite = $site instanceof \App\Models\Site ? $site : request()->route('site'); @endphp
         @if ($showDocs || isset($trailing) || $breadcrumbSite instanceof \App\Models\Site)
             <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
                 {{-- Deploy from anywhere: a persistent Deploy button + live

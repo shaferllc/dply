@@ -58,10 +58,28 @@ class ErrorEventSyncer
         ConsoleAction::query()
             ->where('status', ConsoleAction::STATUS_FAILED)
             ->where('updated_at', '>=', $since)
-            ->when(! $refresh, fn ($q) => $q->whereNotExists(fn ($sub) => $sub->select(DB::raw(1))
-                ->from('error_events')
-                ->whereColumn('error_events.source_id', 'console_actions.id')
-                ->where('error_events.source_type', $captured)))
+            ->when(! $refresh, fn ($q) => $q
+                ->whereNotExists(fn ($sub) => $sub->select(DB::raw(1))
+                    ->from('error_events')
+                    ->whereColumn('error_events.source_id', 'console_actions.id')
+                    ->where('error_events.source_type', $captured))
+                // Uptime checks re-run every few minutes and write a fresh
+                // console_actions row each time, so the per-source guard above
+                // never collapses them — a site stuck at e.g. HTTP 403 would mint
+                // a new ErrorEvent on every probe (hundreds a day). Fold them: skip
+                // a failed uptime check while the site already has an un-dismissed
+                // uptime ErrorEvent. The first failure of a streak still records
+                // (and notifies); repeats are absorbed until it recovers or the
+                // user dismisses. The job re-opens the stream by clearing these on
+                // recovery (see RunSiteUptimeMonitorCheckJob::resolveOpenUptimeErrors).
+                // Correlated on the outer console_actions.kind so non-uptime rows
+                // are unaffected.
+                ->whereNotExists(fn ($sub) => $sub->select(DB::raw(1))
+                    ->from('error_events')
+                    ->where('console_actions.kind', 'uptime_check')
+                    ->where('error_events.category', 'uptime_check')
+                    ->whereNull('error_events.dismissed_at')
+                    ->whereColumn('error_events.site_id', 'console_actions.subject_id')))
             ->with('subject')
             ->orderBy('id')
             ->chunkById(200, function ($rows) use (&$count, $notify): void {

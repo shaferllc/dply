@@ -172,7 +172,7 @@ final class ServerlessGlueInventory
                 'cron_expression' => (string) $cron->cron_expression,
                 'site_name' => $cron->site !== null ? (string) $cron->site->name : null,
                 'href' => $cron->site_id !== null && $cron->site !== null && $cron->site->server_id !== null
-                    ? route('sites.cron', ['server' => $cron->site->server_id, 'site' => $cron->site_id])
+                    ? route('servers.cron', ['server' => $cron->site->server_id, 'site' => $cron->site_id])
                     : route('servers.cron', ['server' => $server->id]),
             ];
         }

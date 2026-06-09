@@ -202,8 +202,9 @@ TXT;
     }
 
     /**
-     * Papertrail / dply Realtime: a SyslogUdpHandler over TLS to host:port,
-     * both supplied via env().
+     * Papertrail / dply Logs: a Monolog SyslogUdpHandler sending plain UDP syslog
+     * to host:port (both from env()). Transport is cleartext UDP — see
+     * docs/LOG_DRAIN_RECEIVER.md for the security posture.
      *
      * @return array<string, mixed>
      */
@@ -212,10 +213,14 @@ TXT;
         $host = 'env('.$this->str($hostKey).')';
         $port = 'env('.$this->str($portKey).')';
 
+        // SyslogUdpHandler's real constructor is (host, port, facility, level,
+        // bubble, ident, rfc) — there is no `connectionString` param. A previous
+        // `'tls://…'` connectionString here was silently dropped by the container
+        // AND implied an encryption that never happened: this transport is plain
+        // UDP syslog. Keep only the real args; the cleartext posture is documented.
         $handlerWith = [
             'host' => new RawPhp($host),
             'port' => new RawPhp($port),
-            'connectionString' => new RawPhp("'tls://'.".$host.".':'.".$port),
         ];
         if ($identKey !== null) {
             // SyslogUdpHandler's $ident constructor arg — carried in the syslog

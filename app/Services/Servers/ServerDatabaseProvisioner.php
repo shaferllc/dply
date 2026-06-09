@@ -435,6 +435,41 @@ class ServerDatabaseProvisioner
     }
 
     /**
+     * Change an existing user's password (MySQL/MariaDB ALTER USER, PostgreSQL
+     * ALTER ROLE). Used to rotate a credential without recreating the user.
+     */
+    public function setUserPassword(ServerDatabase $db, string $username, string $host, string $newPassword): string
+    {
+        $server = $db->server;
+        if ($server === null) {
+            throw new \RuntimeException('Database has no server.');
+        }
+
+        if ($db->engine === 'postgres') {
+            $user = $this->sanitizePostgresIdentifier($username, 'appuser');
+            $pass = str_replace("'", "''", $newPassword);
+            [$out] = $this->remoteExec->postgresRun($server, "ALTER ROLE {$user} WITH PASSWORD '{$pass}';", 120);
+
+            return $out;
+        }
+
+        if (! DatabaseWorkspaceEngines::isMysqlFamily($db->engine)) {
+            throw new \InvalidArgumentException('Password rotation is supported for MySQL, MariaDB, and PostgreSQL only.');
+        }
+
+        $h = $host !== '' ? $host : 'localhost';
+        $pass = str_replace(['\\', "'"], ['\\\\', "\\'"], $newPassword);
+        $sql = "ALTER USER '{$username}'@'{$h}' IDENTIFIED BY '{$pass}'; FLUSH PRIVILEGES;";
+
+        [$out, $exit] = $this->remoteExec->mysqlRunWithExit($server, $sql, 120);
+        if ($exit !== null && $exit !== 0) {
+            throw new \RuntimeException(Str::limit($out, 800));
+        }
+
+        return $out;
+    }
+
+    /**
      * Move a SQLite database file from its current `host` path to a
      * new path on the server. Both paths are jailed under
      * `config('server_database.sqlite_root')` via {@see safeSqlitePath()}.

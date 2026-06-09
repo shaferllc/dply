@@ -54,12 +54,20 @@ class NotificationWebhookDestinationRouter
             return 'deploy_started';
         }
 
-        if ($event->event_key === 'site.uptime') {
+        if ($event->event_key === 'site.uptime.down') {
             return match ((string) ($event->metadata['state'] ?? '')) {
                 'down' => 'uptime_down',
                 'recovered' => 'uptime_recovered',
                 default => null,
             };
+        }
+
+        if ($event->event_key === 'site.uptime.degraded') {
+            return 'uptime_degraded';
+        }
+
+        if ($event->event_key === 'site.ssl.expiring') {
+            return 'ssl_expiring';
         }
 
         if ($event->event_key === 'server.insights_alerts') {

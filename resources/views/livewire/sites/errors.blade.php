@@ -4,6 +4,7 @@
         'site' => $site,
         'currentLabel' => __('Errors'),
         'currentIcon' => 'exclamation-triangle',
+        'contextualDocSlug' => 'vm-site-errors',
     ])
 
     <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">
@@ -43,11 +44,38 @@
                     <p>{{ __('A dedicated stream of this site’s failed operations — like the logs, but only errors. Dismiss is shared with your team; retry re-runs the original operation where supported, otherwise open the error to act at its source.') }}</p>
                 </x-explainer>
 
-                @include('livewire.partials.error-stream')
-                <x-cli-snippet class="mt-6" :command="'dply sites:errors '.$site->slug" />
+                <x-server-workspace-tablist :aria-label="__('Errors workspace sections')" scroll class="sm:min-w-0 sm:flex-1">
+                    <x-server-workspace-tab
+                        id="errors-tab-stream"
+                        icon="heroicon-o-exclamation-triangle"
+                        :active="$errorsTab === 'stream'"
+                        wire:click="setErrorsWorkspaceTab('stream')"
+                    >
+                        {{ __('Stream') }}
+                    </x-server-workspace-tab>
+                    <x-server-workspace-tab
+                        id="errors-tab-notifications"
+                        icon="heroicon-o-bell"
+                        :active="$errorsTab === 'notifications'"
+                        wire:click="setErrorsWorkspaceTab('notifications')"
+                    >
+                        {{ __('Notifications') }}
+                    </x-server-workspace-tab>
+                </x-server-workspace-tablist>
+
+                @if ($errorsTab === 'stream')
+                    @include('livewire.partials.error-stream')
+                    <x-cli-snippet class="mt-6" :command="'dply sites:errors '.$site->slug" />
+                @endif
+
+                @if ($errorsTab === 'notifications')
+                    @include('livewire.sites.partials.errors.notifications-tab')
+                @endif
             @endif
         </main>
     </div>
 
     @include('livewire.partials.confirm-action-modal')
+
+    @include('livewire.partials.create-notification-channel-modal')
 </div>

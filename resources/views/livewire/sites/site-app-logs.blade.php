@@ -1,4 +1,4 @@
-{{-- dply Realtime "App logs" — received application log records for this site. --}}
+{{-- dply Logs "App logs" — received application log records for this site. --}}
 @php
     $levelColors = [
         'emergency' => 'bg-rose-100 text-rose-800', 'alert' => 'bg-rose-100 text-rose-800',
@@ -14,7 +14,7 @@
                 <x-heroicon-o-signal class="h-5 w-5" aria-hidden="true" />
             </span>
             <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('dply Realtime') }}</p>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('dply Logs') }}</p>
                 <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('App logs') }}</h3>
             </div>
         </div>
@@ -33,7 +33,7 @@
 
     @if ($records->isEmpty())
         <p class="px-6 py-10 text-center text-xs italic text-brand-mist sm:px-8">
-            {{ __('No app logs received yet. Add a dply Realtime channel, deploy, and once the drain receiver is running your logs appear here.') }}
+            {{ __('No app logs received yet. Add a dply Logs channel, deploy, and once the drain receiver is running your logs appear here.') }}
         </p>
     @else
         <ul class="divide-y divide-brand-ink/5">

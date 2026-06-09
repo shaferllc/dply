@@ -294,7 +294,7 @@ test('publisher routes uptime events to integration webhook', function () {
     ]);
 
     app(NotificationPublisher::class)->publish(
-        eventKey: 'site.uptime',
+        eventKey: 'site.uptime.down',
         subject: $site,
         title: 'Monitor down',
         body: 'URL: https://example.com',

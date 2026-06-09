@@ -493,7 +493,11 @@ trait ManagesSupervisorPrograms
      */
     protected function programAttributesFromForm(): array
     {
-        if ($this->supervisorProgramsLockSiteId() && $this->context_site_id !== null) {
+        // Lock NEW programs to the page's context site so a daemon created from a
+        // site page can't be attached to another site. Edits are left alone — the
+        // "all programs on server" peek can surface other sites' programs, and
+        // forcing here would silently re-home one onto the current site.
+        if ($this->supervisorProgramsLockSiteId() && $this->context_site_id !== null && $this->editing_program_id === null) {
             $this->new_sv_site_id = $this->context_site_id;
         }
 

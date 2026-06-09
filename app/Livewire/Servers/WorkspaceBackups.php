@@ -241,8 +241,12 @@ class WorkspaceBackups extends Component
     {
         $this->authorize('update', $this->server);
 
+        // Site context only runs databases linked to the focused site.
+        $siteScope = $this->siteDedicatedContext ? $this->context_site_id : null;
+
         $database = ServerDatabase::query()
             ->where('server_id', $this->server->id)
+            ->when($siteScope !== null, fn ($q) => $q->where('site_id', $siteScope))
             ->whereKey($this->run_database_id)
             ->first();
 
@@ -288,8 +292,13 @@ class WorkspaceBackups extends Component
     {
         $this->authorize('update', $this->server);
 
+        // Site context can only run the focused site (the second whereKey pins
+        // it, so a crafted run_site_id for another site finds no match).
+        $siteScope = $this->siteDedicatedContext ? $this->context_site_id : null;
+
         $site = Site::query()
             ->where('server_id', $this->server->id)
+            ->when($siteScope !== null, fn ($q) => $q->whereKey($siteScope))
             ->whereKey($this->run_site_id)
             ->first();
 
@@ -336,19 +345,28 @@ class WorkspaceBackups extends Component
             'new_backup_configuration_id' => 'nullable|string',
         ]);
 
+        // In site-dedicated context the target must belong to the focused site
+        // (the picker only offers this site + its linked databases) — enforce it
+        // server-side so a crafted request can't schedule another site's backup.
+        $siteScope = $this->siteDedicatedContext ? $this->context_site_id : null;
+
         $exists = match ($this->new_target_type) {
             ServerBackupSchedule::TARGET_DATABASE => ServerDatabase::query()
                 ->where('server_id', $this->server->id)
+                ->when($siteScope !== null, fn ($q) => $q->where('site_id', $siteScope))
                 ->whereKey($this->new_target_id)
                 ->exists(),
             ServerBackupSchedule::TARGET_SITE_FILES => Site::query()
                 ->where('server_id', $this->server->id)
+                ->when($siteScope !== null, fn ($q) => $q->whereKey($siteScope))
                 ->whereKey($this->new_target_id)
                 ->exists(),
             default => false,
         };
         if (! $exists) {
-            $this->toastError(__('Target not found on this server.'));
+            $this->toastError($siteScope !== null
+                ? __('Pick a target that belongs to this site.')
+                : __('Target not found on this server.'));
 
             return;
         }
@@ -831,26 +849,28 @@ class WorkspaceBackups extends Component
         // its own write. A blanket refresh on every render just duplicated the
         // `select * from servers` query that route binding already ran.
 
-        // Note: $databases/$sites are NOT narrowed by context_site_id — the new-schedule form
-        // still needs them all to pick from. The query collections below DO narrow so the
-        // operator only sees runs / schedules / stats for the focused site.
+        // In site-dedicated context every picker (run-now + new-schedule target)
+        // is scoped to the focused site: $sites is just that site, and $databases
+        // only the databases linked to it (server_databases.site_id). The server
+        // workspace still lists the whole fleet. The runs / schedules / stats
+        // collections below narrow the same way.
         $databases = ServerDatabase::query()
             ->where('server_id', $this->server->id)
+            ->when($this->context_site_id !== null, fn ($q) => $q->where('site_id', $this->context_site_id))
             ->orderBy('name')
             ->get();
 
         $sites = Site::query()
             ->where('server_id', $this->server->id)
+            ->when($this->context_site_id !== null, fn ($q) => $q->whereKey($this->context_site_id))
             ->orderBy('name')
             ->get();
 
-        // When filtered to a single site, database backups go away entirely (databases are
-        // server-scoped, not site-scoped) — we narrow $databaseIds to an empty list so the
-        // DB run list reads as "none for this site" rather than the full server fleet.
-        $databaseIds = $this->context_site_id !== null ? [] : $databases->pluck('id')->all();
-        $siteIds = $this->context_site_id !== null
-            ? [$this->context_site_id]
-            : $sites->pluck('id')->all();
+        // $databases / $sites are already scoped to the focused site in site
+        // context, so the id lists follow directly: DB history shows the site's
+        // linked databases (if any), file history shows just this site.
+        $databaseIds = $databases->pluck('id')->all();
+        $siteIds = $sites->pluck('id')->all();
 
         $databaseBackups = ServerDatabaseBackup::query()
             ->whereIn('server_database_id', $databaseIds)

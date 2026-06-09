@@ -21,11 +21,19 @@ class NotificationRoutingResolver
      *                                           this event from a direct fan-out path and should be
      *                                           skipped here to avoid double-dispatch. Empty list
      *                                           preserves the original behaviour.
+     * @param  list<string>  $excludeRecipientUserIds  User ULIDs that have already received this event
+     *                                           in-app from a sibling publish and should be skipped
+     *                                           here so the inbox isn't double-filled. Empty list
+     *                                           preserves the original behaviour.
      */
-    public function route(NotificationEvent $event, array $recipientUserIds = [], array $excludeChannelIds = []): void
+    public function route(NotificationEvent $event, array $recipientUserIds = [], array $excludeChannelIds = [], array $excludeRecipientUserIds = []): void
     {
         if ($event->supports_in_app) {
+            $excludeUserSet = array_flip($excludeRecipientUserIds);
             foreach (array_values(array_unique($recipientUserIds)) as $userId) {
+                if (isset($excludeUserSet[$userId])) {
+                    continue;
+                }
                 NotificationInboxItem::query()->create([
                     'notification_event_id' => $event->id,
                     'user_id' => $userId,

@@ -24,7 +24,7 @@ test('site workspace sidebar shows cdn with soon badge when preview active', fun
     [$user, $server, $site] = siteCdnPreviewFixtures();
 
     $this->actingAs($user)
-        ->get(route('sites.cron', [$server, $site]))
+        ->get(route('sites.daemons', [$server, $site]))
         ->assertOk()
         ->assertSee(__('CDN / Edge'))
         ->assertSee(__('Soon'))

@@ -16,7 +16,7 @@
 @endphp
 
 <div class="lg:grid lg:grid-cols-12 lg:gap-10">
-    <aside class="lg:col-span-3 mb-8 lg:mb-0 shrink-0">
+    <aside class="sm:col-span-3 mb-8 lg:mb-0 shrink-0">
         <div class="dply-surface-nav">
             <p class="text-xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('Organization') }}</p>
             <p class="mt-1 font-semibold text-brand-ink truncate" title="{{ $org->name }}">{{ $org->name }}</p>

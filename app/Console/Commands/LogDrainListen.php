@@ -41,6 +41,13 @@ class LogDrainListen extends Command
     /** @var array<string, string|null> token → site_id (false-y means unknown) */
     private array $tokenCache = [];
 
+    /** @var array<string, array{count: int, window: int}> per-site ingest rate state */
+    private array $rateState = [];
+
+    private int $rateMax = 0;
+
+    private int $rateWindow = 60;
+
     public function handle(): int
     {
         $host = (string) $this->option('host');
@@ -63,6 +70,9 @@ class LogDrainListen extends Command
 
             return self::FAILURE;
         }
+
+        $this->rateMax = max(0, (int) config('log_drains.rate_limit.max_per_window', 0));
+        $this->rateWindow = max(1, (int) config('log_drains.rate_limit.window_seconds', 60));
 
         $this->info(sprintf('dply log drain listening on udp://%s:%d', $host, $port));
 
@@ -108,6 +118,10 @@ class LogDrainListen extends Command
             return; // unknown token
         }
 
+        if (! $this->withinRateLimit($siteId)) {
+            return; // site is over its per-window cap; drop the excess
+        }
+
         AppLogRecord::create([
             'site_id' => $siteId,
             'channel' => 'dply_realtime',
@@ -117,6 +131,28 @@ class LogDrainListen extends Command
             'logged_at' => now(),
             'created_at' => now(),
         ]);
+    }
+
+    /**
+     * Per-site fixed-window cap so one chatty/abusive app can't flood app_logs.
+     * In-process state is fine: a single supervised listener owns the socket.
+     * max_per_window <= 0 disables the limit.
+     */
+    private function withinRateLimit(string $siteId): bool
+    {
+        if ($this->rateMax <= 0) {
+            return true;
+        }
+
+        $now = time();
+        $state = $this->rateState[$siteId] ?? ['count' => 0, 'window' => $now];
+        if ($now - $state['window'] >= $this->rateWindow) {
+            $state = ['count' => 0, 'window' => $now];
+        }
+        $state['count']++;
+        $this->rateState[$siteId] = $state;
+
+        return $state['count'] <= $this->rateMax;
     }
 
     private function extractToken(string $datagram): ?string

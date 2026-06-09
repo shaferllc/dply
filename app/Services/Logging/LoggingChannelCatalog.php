@@ -155,7 +155,7 @@ final class LoggingChannelCatalog
                 ],
             ],
             self::DPLY_REALTIME => [
-                'label' => 'dply Realtime',
+                'label' => 'dply Logs',
                 'supports_level' => true,
                 'supports_format' => false,
                 'is_drain' => true,

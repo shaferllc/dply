@@ -865,7 +865,7 @@ class CommandPalette extends Component
             ['Repository', 'sites.repository', 'code-bracket', 'git repo source branch'],
             ['Monitoring', 'sites.monitor', 'heart', 'monitor uptime metrics'],
             ['Errors', 'sites.errors', 'document-text', 'errors logs exceptions'],
-            ['Scheduler', 'sites.cron', 'command-line', 'cron schedule tasks'],
+            ['Scheduler', 'sites.schedule', 'command-line', 'cron schedule tasks'],
             ['Queue workers', 'sites.workers', 'bolt', 'workers queue horizon'],
             ['Daemons', 'sites.daemons', 'command-line', 'daemons processes'],
             ['Backups', 'sites.backups', 'circle-stack', 'backups restore'],

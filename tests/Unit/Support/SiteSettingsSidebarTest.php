@@ -107,13 +107,14 @@ test('every item has a group key', function () {
         expect($item['group'])->not->toBeEmpty();
     }
 });
-test('cron and daemons link to dedicated routes', function () {
+test('daemons links to a dedicated route; cron is not a site page', function () {
     $server = makeVmServer();
     $site = makeSite($server);
 
     $items = collect(SiteSettingsSidebar::items($site, $server))->keyBy('id');
 
-    expect($items['cron']['route'] ?? null)->toBe('sites.cron');
+    // Site-level cron was removed — crontab is managed on the server Cron page.
+    expect($items)->not->toHaveKey('cron');
     expect($items['daemons']['route'] ?? null)->toBe('sites.daemons');
     expect($items)->not->toHaveKey('queue-workers');
 });

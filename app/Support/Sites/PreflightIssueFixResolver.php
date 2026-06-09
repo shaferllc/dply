@@ -51,9 +51,7 @@ final class PreflightIssueFixResolver
             'database' => $site->usesFunctionsRuntime() || $site->usesDockerRuntime() || $site->usesKubernetesRuntime()
                 ? self::link(__('Open resources'), route('sites.resources', ['server' => $server, 'site' => $site]))
                 : self::link(__('Open server databases'), route('servers.databases', $server)),
-            'scheduler' => $site->usesFunctionsRuntime()
-                ? self::link(__('Open schedule'), route('sites.schedule', ['server' => $server, 'site' => $site]))
-                : self::link(__('Open cron jobs'), route('sites.cron', ['server' => $server, 'site' => $site])),
+            'scheduler' => self::link(__('Open schedule'), route('sites.schedule', ['server' => $server, 'site' => $site])),
             'queue', 'workers' => $site->usesFunctionsRuntime()
                 ? self::link(__('Open workers'), route('sites.workers', ['server' => $server, 'site' => $site]))
                 : self::link(__('Open workers'), route('sites.daemons', ['server' => $server, 'site' => $site])),
@@ -92,9 +90,7 @@ final class PreflightIssueFixResolver
                 route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'environment']),
             ),
             'database' => self::link(__('Open server databases'), route('servers.databases', $server)),
-            'scheduler' => $site->usesFunctionsRuntime()
-                ? self::link(__('Open schedule'), route('sites.schedule', ['server' => $server, 'site' => $site]))
-                : self::link(__('Open cron jobs'), route('sites.cron', ['server' => $server, 'site' => $site])),
+            'scheduler' => self::link(__('Open schedule'), route('sites.schedule', ['server' => $server, 'site' => $site])),
             'queue', 'workers' => $site->usesFunctionsRuntime()
                 ? self::link(__('Open workers'), route('sites.workers', ['server' => $server, 'site' => $site]))
                 : self::link(__('Open workers'), route('sites.daemons', ['server' => $server, 'site' => $site])),

@@ -191,6 +191,17 @@ class WorkspaceDaemons extends Component
         }
     }
 
+    /**
+     * This workspace is only reachable at the site-scoped route
+     * (servers/{server}/sites/{site}/daemons), so a context site is always set.
+     * Lock new programs to it: the "Add program" form drops its site picker and
+     * saves are pinned to this site (see ManagesSupervisorPrograms).
+     */
+    protected function supervisorProgramsLockSiteId(): bool
+    {
+        return $this->context_site_id !== null;
+    }
+
     public function setDaemonsWorkspaceTab(string $tab): void
     {
         $allowed = ['programs', 'service', 'sync', 'logs', 'inspect', 'activity'];
@@ -1093,6 +1104,7 @@ class WorkspaceDaemons extends Component
         // operators know they exist and where to manage them.
         $systemdWorkers = Site::query()
             ->where('server_id', $this->server->id)
+            ->when($this->context_site_id !== null, fn ($q) => $q->whereKey($this->context_site_id))
             ->with(['processes' => fn ($q) => $q->where('is_active', true)->where('type', '!=', \App\Models\SiteProcess::TYPE_WEB)])
             ->orderBy('name')
             ->get(['id', 'name', 'slug', 'server_id'])
@@ -1116,6 +1128,13 @@ class WorkspaceDaemons extends Component
                 'auditLogs' => $auditLogs,
                 'orgServersForCopy' => $orgServersForCopy,
                 'sitesForServer' => $sitesForServer,
+                // Hide the "Related site" picker when the program is (or will be)
+                // this site's: adding always pins to this site, and editing one of
+                // this site's own programs stays locked. Only editing another
+                // site's program (reachable via the "all programs" peek) shows the
+                // picker, so its real site stays visible.
+                'lockSiteId' => $this->context_site_id !== null
+                    && ($this->editing_program_id === null || $this->new_sv_site_id === $this->context_site_id),
                 'sitesForImport' => $sitesForImport,
                 'importSourcePrograms' => $importSourcePrograms,
                 'filteredSupervisorPrograms' => $filteredSupervisorPrograms,

@@ -96,7 +96,7 @@ return [
         'sites.caching' => 'vm-site-caching',
         'sites.cdn' => 'vm-site-cdn',
         'sites.monitor' => 'vm-site-monitor',
-        'sites.cron' => 'vm-site-cron',
+        'sites.logs' => 'vm-site-logs',
         'sites.daemons' => 'vm-site-daemons',
         'sites.services' => 'vm-site-services',
         'sites.queue-workers' => 'vm-site-daemons',

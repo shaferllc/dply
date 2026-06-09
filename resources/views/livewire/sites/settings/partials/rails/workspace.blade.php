@@ -1,5 +1,5 @@
 @php
-    $cronUrl = route('sites.cron', ['server' => $server, 'site' => $site]);
+    $cronUrl = route('servers.cron', ['server' => $server, 'site' => $site]);
     $daemonsUrl = route('sites.daemons', ['server' => $server, 'site' => $site]);
     $sidekiqPresetUrl = $daemonsUrl.'?preset=sidekiq';
     $solidQueuePresetUrl = $daemonsUrl.'?preset=solid-queue';

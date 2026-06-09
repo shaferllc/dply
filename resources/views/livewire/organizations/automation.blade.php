@@ -394,6 +394,8 @@
                                     <div class="mt-1.5 space-y-1.5 text-sm text-brand-ink">
                                         <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_uptime_down" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Monitor down') }}</label>
                                         <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_uptime_recovered" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Monitor recovered') }}</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_uptime_degraded" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('Monitor degraded') }}</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" wire:model="int_evt_ssl_expiring" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" /> {{ __('SSL certificate expiring') }}</label>
                                     </div>
                                     <p class="mt-3 text-[11px] font-medium text-brand-moss">{{ __('Insights') }} <span class="text-brand-mist">{{ __('(org-wide only)') }}</span></p>
                                     <div class="mt-1.5 space-y-1.5 text-sm text-brand-ink">

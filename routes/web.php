@@ -27,6 +27,7 @@ use App\Http\Controllers\ServerlessFunctionProxyController;
 use App\Http\Controllers\Servers\ServerWorkspaceFileDownloadController;
 use App\Http\Controllers\SiteDeployWebhookController;
 use App\Http\Controllers\Sites\SiteFileDownloadController;
+use App\Http\Controllers\SiteScheduleController;
 use App\Http\Controllers\SiteWorkspaceController;
 use App\Http\Controllers\TraefikDashboardProxyController;
 use App\Http\Middleware\RedirectGuestsToComingSoon;
@@ -152,6 +153,7 @@ use App\Livewire\Servers\WorkspaceLogs;
 use App\Livewire\Servers\WorkspaceMaintenance;
 use App\Livewire\Servers\WorkspaceMaintenancePreview;
 use App\Livewire\Servers\WorkspaceManage;
+use App\Livewire\Servers\WorkspaceNotifications;
 use App\Livewire\Servers\WorkspaceMonitor;
 use App\Livewire\Servers\WorkspaceNetworking;
 use App\Livewire\Servers\WorkspaceOverview;
@@ -201,10 +203,10 @@ use App\Livewire\Sites\EnvDiff as SitesEnvDiff;
 use App\Livewire\Sites\Errors as SitesErrors;
 use App\Livewire\Sites\Files;
 use App\Livewire\Sites\Index as SitesIndex;
+use App\Livewire\Sites\Logs as SitesLogs;
 use App\Livewire\Sites\Monitor as SitesMonitor;
 use App\Livewire\Sites\Repository;
 use App\Livewire\Sites\ScaffoldJourney;
-use App\Livewire\Sites\Schedule;
 use App\Livewire\Sites\ServerlessRouting;
 use App\Livewire\Sites\SiteClone as SitesClone;
 use App\Livewire\Sites\SiteEnvironment;
@@ -695,12 +697,15 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites/{site}/webserver-config', SitesWebserverConfig::class)->name('sites.webserver-config');
     Route::livewire('servers/{server}/sites/{site}/monitor', SitesMonitor::class)->name('sites.monitor');
     Route::livewire('servers/{server}/sites/{site}/errors', SitesErrors::class)->name('sites.errors');
+    Route::livewire('servers/{server}/sites/{site}/logs', SitesLogs::class)->name('sites.logs');
     // Commits were merged into the Repository page as a tab. Keep the route
     // name working by redirecting to repository?tab=commits.
     Route::get('servers/{server}/sites/{site}/commits', function (Server $server, Site $site) {
         return redirect()->route('sites.repository', ['server' => $server, 'site' => $site, 'repo_tab' => 'commits']);
     })->name('sites.commits');
-    Route::livewire('servers/{server}/sites/{site}/cron', WorkspaceCron::class)->name('sites.cron');
+    // Site-level crontab management was removed — cron is a host-level concern,
+    // managed on the server Cron page (servers.cron, filterable by ?site=).
+    // Site scheduling lives on Schedule (framework scheduler) + Workers (daemons).
     Route::livewire('servers/{server}/sites/{site}/preview-comments', EdgePreviewComments::class)->name('sites.preview-comments');
     Route::livewire('servers/{server}/sites/{site}/daemons', WorkspaceDaemons::class)->name('sites.daemons');
     Route::livewire('servers/{server}/sites/{site}/services', WorkspaceSystemd::class)->name('sites.services');
@@ -711,7 +716,9 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     // BACKGROUND group for container/serverless workspaces — engine-level
     // schedule + workers (one minute-cadence tick today, list-of-rules in
     // future iterations).
-    Route::livewire('servers/{server}/sites/{site}/schedule', Schedule::class)->name('sites.schedule');
+    // Site-kind dispatch: VM → WorkspaceSchedule, container/serverless → Schedule
+    // (see SiteScheduleController). One canonical /schedule URL for any site.
+    Route::get('servers/{server}/sites/{site}/schedule', SiteScheduleController::class)->name('sites.schedule');
     Route::livewire('servers/{server}/sites/{site}/workers', Workers::class)->name('sites.workers');
     // Unified Resources surface. Routes through the site workspace controller
     // (same chrome + Settings/EdgeSettings dispatch as sites.show) on the
@@ -900,6 +907,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         ->name('servers.envoy.admin');
     Route::livewire('servers/{server}/configuration', WorkspaceConfiguration::class)->name('servers.configuration');
     Route::livewire('servers/{server}/errors', WorkspaceErrors::class)->name('servers.errors');
+    Route::livewire('servers/{server}/notifications', WorkspaceNotifications::class)->name('servers.notifications');
     Route::livewire('servers/{server}/databases', WorkspaceDatabases::class)->name('servers.databases');
     Route::middleware('feature:workspace.caches')->group(function (): void {
         Route::livewire('servers/{server}/caches', WorkspaceCaches::class)->name('servers.caches');

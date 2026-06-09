@@ -24,7 +24,7 @@ test('site workspace sidebar shows caching with soon badge when preview active',
     [$user, $server, $site] = siteCachingPreviewFixtures();
 
     $this->actingAs($user)
-        ->get(route('sites.cron', [$server, $site]))
+        ->get(route('sites.daemons', [$server, $site]))
         ->assertOk()
         ->assertSee(__('Caching'))
         ->assertSee(__('Soon'))

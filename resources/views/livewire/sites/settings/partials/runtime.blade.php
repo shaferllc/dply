@@ -193,7 +193,7 @@
             </p>
             <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm font-semibold">
                 <a href="{{ route('sites.daemons', ['server' => $server, 'site' => $site]) }}" wire:navigate class="text-brand-forest hover:text-brand-sage hover:underline">{{ __('Workers') }} →</a>
-                <a href="{{ route('sites.cron', ['server' => $server, 'site' => $site]) }}" wire:navigate class="text-brand-forest hover:text-brand-sage hover:underline">{{ __('Cron jobs') }} →</a>
+                <a href="{{ route('servers.cron', ['server' => $server, 'site' => $site]) }}" wire:navigate class="text-brand-forest hover:text-brand-sage hover:underline">{{ __('Cron jobs') }} →</a>
                 @if (\App\Models\Site::supportsSystemdServices($site, $server))
                     <a href="{{ route('sites.services', ['server' => $server, 'site' => $site]) }}" wire:navigate class="text-brand-forest hover:text-brand-sage hover:underline">{{ __('Services (systemd)') }} →</a>
                 @endif

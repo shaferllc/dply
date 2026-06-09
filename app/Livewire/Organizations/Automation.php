@@ -48,6 +48,10 @@ class Automation extends Component
 
     public bool $int_evt_uptime_recovered = true;
 
+    public bool $int_evt_uptime_degraded = true;
+
+    public bool $int_evt_ssl_expiring = true;
+
     public bool $int_evt_insight_opened = false;
 
     public bool $int_evt_insight_resolved = false;
@@ -336,6 +340,12 @@ class Automation extends Component
         if ($this->int_evt_uptime_recovered) {
             $events[] = 'uptime_recovered';
         }
+        if ($this->int_evt_uptime_degraded) {
+            $events[] = 'uptime_degraded';
+        }
+        if ($this->int_evt_ssl_expiring) {
+            $events[] = 'ssl_expiring';
+        }
         if ($this->int_evt_insight_opened) {
             $events[] = 'insight_opened';
         }
@@ -361,6 +371,8 @@ class Automation extends Component
         $this->int_evt_deploy_started = false;
         $this->int_evt_uptime_down = true;
         $this->int_evt_uptime_recovered = true;
+        $this->int_evt_uptime_degraded = true;
+        $this->int_evt_ssl_expiring = true;
         $this->int_evt_insight_opened = false;
         $this->int_evt_insight_resolved = false;
         $this->refreshOrganization();

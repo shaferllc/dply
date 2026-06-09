@@ -13,7 +13,7 @@
             <x-site-daemon-suggestions
                 :suggestions="$daemonSuggestions"
                 mode="interactive"
-                :schedule-url="route('sites.cron', ['server' => $server, 'site' => $contextSiteModel])"
+                :schedule-url="route('servers.cron', ['server' => $server, 'site' => $contextSiteModel])"
             />
         </div>
     @endif

@@ -1537,6 +1537,11 @@ class WorkspaceDatabases extends Component
             'server_database_id' => $db->id,
         ], auth()->user());
 
+        $this->dispatchDatabaseNotification('credential_shared', [
+            __('Database: :name', ['name' => $db->name]),
+            __('A one-time credential link was generated.'),
+        ], ['database_id' => $db->id, 'database_name' => $db->name]);
+
         $this->share_link_modal_url = $url;
         $this->share_link_modal_db_name = $db->name;
         $this->toastSuccess(__('Share link created.'));
