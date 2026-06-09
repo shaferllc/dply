@@ -78,6 +78,10 @@ class Resources extends Component
         abort_unless($server->organization_id === auth()->user()->currentOrganization()?->id, 404);
         Gate::authorize('view', $site);
 
+        // A derived worker is a role of its parent app — it has no resources of
+        // its own (it inherits the parent's). Don't expose a Resources surface.
+        abort_if($site->isDerivedWorker(), 404);
+
         // Container (Cloud) sites have CloudWorker rows + CloudDatabase pivots
         // and get the full attach/detach surface. VM sites are admitted too —
         // they show a read-only roll-up of their Supervisor + systemd workers

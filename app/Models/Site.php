@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\SiteType;
 use App\Jobs\CleanupCustomSiteJob;
+use App\Models\Concerns\Site\DerivesWorkerEnvironment;
 use App\Models\Concerns\Site\GuardsSiteAccess;
 use App\Models\Concerns\Site\HasSiteRelationships;
 use App\Models\Concerns\Site\ManagesEdgeHosting;
@@ -23,6 +24,7 @@ use Illuminate\Support\Str;
 
 class Site extends Model
 {
+    use DerivesWorkerEnvironment;
     use GuardsSiteAccess;
     use HasFactory, HasUlids;
     use HasSiteRelationships;
@@ -159,6 +161,7 @@ class Site extends Model
         'deploy_script_id',
         'deploy_strategy',
         'deploy_method',
+        'parent_site_id',
         'releases_to_keep',
         'nginx_extra_raw',
         'engine_http_cache_enabled',
