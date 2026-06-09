@@ -9,6 +9,7 @@ use App\Jobs\InstallCacheServiceJob;
 use App\Jobs\SendBindingTestEmailJob;
 use App\Jobs\SwitchCacheServiceJob;
 use App\Jobs\ValidateBindingConnectivityJob;
+use App\Jobs\ValidateSiteBindingsReachableJob;
 use App\Models\LogDrainCredential;
 use App\Models\MailCredential;
 use App\Models\ObjectStorageCredential;
@@ -144,6 +145,34 @@ trait ManagesSiteBindings
             $run,
             __('Connection verified — the server can reach :name.', ['name' => $binding->name ?: $binding->type]),
             __('Could not reach :name from the server — check it allows connections from this server.', ['name' => $binding->name ?: $binding->type]),
+        );
+    }
+
+    /**
+     * Probe every networked binding (database/redis/storage/mail/broadcasting/
+     * logging) for reachability from the site's server in one pass. Results land
+     * on each binding's config.connectivity for the Resources map to badge.
+     */
+    public function validateReachability(): void
+    {
+        Gate::authorize('update', $this->site);
+
+        if (! method_exists($this, 'seedQueuedConsoleAction') || ! method_exists($this, 'watchConsoleAction')) {
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('bindings_reachable', __('Validating reachability'));
+
+        ValidateSiteBindingsReachableJob::dispatch(
+            (string) $run->id,
+            (string) $this->site->id,
+        );
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            __('Reachability check complete.'),
+            __('Reachability check could not complete — see the console for details.'),
         );
     }
 

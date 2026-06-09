@@ -60,6 +60,12 @@ return [
             'failed' => 'Connection check failed — the server could not reach the resource.',
             'stale' => 'Connection check did not finish.',
         ],
+        'bindings_reachable' => [
+            'running' => 'Checking reachability from :host …',
+            'completed' => 'Reachability check complete.',
+            'failed' => 'Reachability check did not finish.',
+            'stale' => 'Reachability check did not finish.',
+        ],
         'binding_connectivity_fix' => [
             'running' => 'Fixing resource connectivity …',
             'completed' => 'Connectivity fix applied — re-probing the connection.',
@@ -307,6 +313,7 @@ return [
         'basic-auth' => ['basic_auth_sync', 'webserver_config'],
         'webserver-config' => ['webserver_config'],
         'environment' => ['env_sync', 'env_push', 'env_scan', 'binding_connectivity_fix', 'mail_test'],
+        'resources' => ['bindings_reachable', 'binding_validate', 'binding_connectivity_fix', 'mail_test'],
     ],
 
     /*

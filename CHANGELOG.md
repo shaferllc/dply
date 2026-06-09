@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Adds a "Validate reachability" action that probes every networked site resource binding from the site's server and badges each one on the Resources map.
 ### Fixed
 - Resource map connector lines now align correctly with nodes when the topology graph is zoomed on narrow screens.
 ### Added

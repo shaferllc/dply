@@ -7,9 +7,12 @@
      site-binding-modal (or the Logs editor for logging) — same actions as the
      old card stack, just laid out as a graph. VM sites only. --}}
 @php
+    use App\Support\Sites\BindingReachability;
     use App\Support\Sites\SiteBindingCatalog;
+    use Illuminate\Support\Carbon;
     $hubBindings = $site->bindings; // HasMany collection
     $hubGroups = SiteBindingCatalog::grouped('vm', $hubBindings);
+    $networkedAttached = $hubBindings->filter(fn ($b) => BindingReachability::isNetworked($b->type))->count();
     $provisionTypes = ['database', 'redis', 'storage'];
     $configTypes = ['cache', 'queue', 'session', 'mail', 'broadcasting'];
     $statusBadge = [
@@ -46,6 +49,13 @@
             <p class="mt-0.5 text-sm text-brand-moss">{{ __('Everything wired into this site. Click a node to attach, provision or configure it.') }}</p>
         </div>
         <div class="flex flex-wrap items-center gap-3">
+            @if ($networkedAttached > 0)
+                <button type="button" wire:click="validateReachability" wire:loading.attr="disabled" wire:target="validateReachability"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
+                    <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.class="animate-spin" wire:target="validateReachability" />
+                    {{ __('Validate reachability') }}
+                </button>
+            @endif
             <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-forest/10 px-3 py-1 text-xs font-semibold text-brand-forest">
                 <span class="h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
                 {{ $attachedTypes }}/{{ $totalTypes }} {{ __('configured') }}
@@ -59,7 +69,7 @@
 
     {{-- The graph. Horizontally scrollable on narrow screens so the topology
          keeps its shape instead of collapsing. --}}
-    <div class="dply-card overflow-x-auto bg-gradient-to-br from-white to-brand-cream/30 p-6 sm:p-8" style="zoom: 0.95;">
+    <div class="dply-card overflow-x-auto bg-linear-to-br from-white to-brand-cream/30 p-6 sm:p-8" style="zoom: .95;">
         <div
             x-data="{
                 w: 0, h: 0, _ro: null, _zoom: 1,
@@ -69,6 +79,14 @@
                     this._ro.observe(this.$el);
                     setTimeout(() => this.compute(), 150);
                     setTimeout(() => this.compute(), 600);
+                    // Redraw after Livewire DOM updates (modal open, attach/detach)
+                    // so the bus recolors and survives any re-render.
+                    if (window.Livewire && window.Livewire.hook) {
+                        const redraw = () => this.$nextTick(() => this.compute());
+                        ['morph.updated', 'morphed', 'commit'].forEach((h) => {
+                            try { window.Livewire.hook(h, redraw); } catch (e) {}
+                        });
+                    }
                 },
                 point(rect, wrap, side) {
                     const z = this._zoom || 1;
@@ -128,10 +146,10 @@
                         addDot(top, 'trunk');
                         hubBottom[hub.dataset.hub] = this.point(r, wrap, 'bottom');
                     });
-                    // Each hub (bottom) branches into its resource nodes (left side).
+                    // Each hub (bottom) curves into its resource nodes (left side).
                     el.querySelectorAll('[data-resource-node]').forEach((node) => {
                         const from = hubBottom[node.dataset.group];
-                        if (!from) return;
+                        if (! from) return;
                         const to = this.point(node.getBoundingClientRect(), wrap, 'left');
                         const kind = node.dataset.attached === '1' ? 'attached' : 'idle';
                         addEdge(this.curve(from, DOWN, to, LEFT), kind, i++);
@@ -157,8 +175,10 @@
                     </filter>
                 </defs>
 
-                {{-- connectors are drawn here imperatively (see compute()) --}}
-                <g x-ref="layer"></g>
+                {{-- connectors are drawn here imperatively (see compute()).
+                     wire:ignore keeps Livewire's morph from wiping the JS-drawn
+                     children when a modal opens / the component re-renders. --}}
+                <g x-ref="layer" wire:ignore></g>
             </svg>
 
             {{-- Site node (anchors the whole graph, top-centered) --}}
@@ -210,6 +230,8 @@
                             $needsRedis = in_array('redis', $t['needs'] ?? [], true)
                                 && ! $hubBindings->contains(fn ($b) => $b->type === 'redis');
                             $hasAction = $isLogging || $canProvision || $canConfig;
+                            $conn = $attached && is_array($binding->config) ? ($binding->config['connectivity'] ?? null) : null;
+                            $reachTarget = $attached ? BindingReachability::target($binding) : null;
                         @endphp
                         <div
                             wire:key="res-{{ $type }}"
@@ -261,6 +283,20 @@
                                             <span class="truncate font-mono text-[11px] font-medium text-brand-moss">{{ $binding->name ?: $type }}</span>
                                             <span class="rounded-full px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide {{ $statusBadge[$binding->status] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $binding->status }}</span>
                                         </div>
+                                        @if ($conn !== null)
+                                            @php
+                                                $reachOk = (bool) ($conn['ok'] ?? false);
+                                                $reachWhen = ! empty($conn['checked_at']) ? Carbon::parse($conn['checked_at'])->diffForHumans(short: true) : null;
+                                            @endphp
+                                            <span class="mt-1 inline-flex w-fit items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold {{ $reachOk ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800' }}" title="{{ $conn['detail'] ?? ($reachOk ? __('Reachable from the server') : '') }}">
+                                                <span class="h-1.5 w-1.5 rounded-full {{ $reachOk ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
+                                                {{ $reachOk ? __('Reachable') : __('Unreachable') }}@if ($reachWhen) · {{ $reachWhen }}@endif
+                                            </span>
+                                        @elseif ($reachTarget)
+                                            <span class="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-brand-sand/50 px-1.5 py-0.5 text-[9px] font-medium text-brand-moss">
+                                                <span class="h-1.5 w-1.5 rounded-full bg-brand-mist"></span>{{ __('Not checked') }}
+                                            </span>
+                                        @endif
                                     @else
                                         <p class="mt-0.5 line-clamp-2 text-[11px] leading-snug text-brand-moss">{{ $t['purpose'] }}</p>
                                     @endif
@@ -289,18 +325,42 @@
                                         <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" /> {{ $attached ? __('Edit') : __('Configure') }}
                                     </a>
                                 @elseif ($canProvision)
-                                    <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                        <x-heroicon-o-link class="h-3.5 w-3.5" /> {{ __('Attach') }}
-                                    </button>
-                                    <button type="button" wire:click="openBindingModal('{{ $type }}', 'provision')" class="inline-flex items-center gap-1 rounded-md bg-brand-forest px-2 py-1 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
-                                        <x-heroicon-o-plus class="h-3.5 w-3.5" /> {{ __('Provision') }}
-                                    </button>
+                                    @if ($attached)
+                                        {{-- Already wired up: one binding per type, so attach/provision
+                                             both *replace* it. Offer a single "Replace…" that opens the
+                                             modal (where you can re-link an existing one or spin up a new). --}}
+                                        <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" /> {{ __('Replace…') }}
+                                        </button>
+                                    @else
+                                        <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                            <x-heroicon-o-link class="h-3.5 w-3.5" /> {{ __('Attach') }}
+                                        </button>
+                                        <button type="button" wire:click="openBindingModal('{{ $type }}', 'provision')" class="inline-flex items-center gap-1 rounded-md bg-brand-forest px-2 py-1 text-[11px] font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
+                                            <x-heroicon-o-plus class="h-3.5 w-3.5" /> {{ __('Provision') }}
+                                        </button>
+                                    @endif
                                 @elseif ($canConfig)
                                     <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')" class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                         <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" /> {{ $attached ? __('Edit') : __('Configure') }}
                                     </button>
                                 @else
-                                    <span class="text-[11px] italic text-brand-mist">{{ $attached ? __('Active') : __('Not configured') }}</span>
+                                    @php
+                                        $runtimeUrl = match ($type) {
+                                            'scheduler' => route('sites.schedule', ['server' => $server, 'site' => $site]),
+                                            'workers' => route('sites.daemons', ['server' => $server, 'site' => $site]),
+                                            default => null,
+                                        };
+                                    @endphp
+                                    @if ($runtimeUrl)
+                                        <a href="{{ $runtimeUrl }}" wire:navigate class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                            <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" /> {{ __('Configure') }}
+                                        </a>
+                                    @else
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                                            <x-heroicon-o-clock class="h-3 w-3" /> {{ __('Coming soon') }}
+                                        </span>
+                                    @endif
                                 @endif
                             </div>
                         </div>
