@@ -10,6 +10,17 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
+# Hard wall-clock cap so a hung LLM call can't wedge `git push`.
+_to() { # _to <seconds> <cmd...>
+  local s="$1"; shift
+  if command -v timeout >/dev/null 2>&1; then timeout "$s" "$@"
+  elif command -v gtimeout >/dev/null 2>&1; then gtimeout "$s" "$@"
+  else perl -e 'alarm shift; exec @ARGV' "$s" "$@"
+  fi
+}
+
+[ -n "${DPLY_SKIP_AI_HOOKS:-}" ] && { echo "[roadmap] skipped (DPLY_SKIP_AI_HOOKS)."; exit 0; }
+
 RANGE="${DPLY_PUSH_RANGE:-}"
 # Tip being pushed: right side of "a..b", else the lone sha.
 tip="${RANGE##*..}"
@@ -18,7 +29,7 @@ tip="${RANGE##*..}"
 command -v php >/dev/null 2>&1 || { echo "[roadmap] php not found — skipping."; exit 0; }
 
 echo "[roadmap] updating from $tip ..."
-php artisan dply:roadmap:ai-update --sync --commit="$tip" 2>/dev/null \
-  || echo "[roadmap] skipped/failed (non-fatal)."
+_to "${DPLY_ROADMAP_TIMEOUT:-120}" php artisan dply:roadmap:ai-update --sync --commit="$tip" </dev/null 2>/dev/null \
+  || echo "[roadmap] skipped/failed/timed out (non-fatal)."
 
 exit 0

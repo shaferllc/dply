@@ -12,6 +12,20 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
+# Run a command with a hard wall-clock cap so an unresponsive AI CLI can never
+# wedge `git push`. Prefers coreutils timeout; falls back to perl's alarm (always
+# present on macOS). Returns the command's status, or non-zero on timeout.
+_to() { # _to <seconds> <cmd...>
+  local s="$1"; shift
+  if command -v timeout >/dev/null 2>&1; then timeout "$s" "$@"
+  elif command -v gtimeout >/dev/null 2>&1; then gtimeout "$s" "$@"
+  else perl -e 'alarm shift; exec @ARGV' "$s" "$@"
+  fi
+}
+
+# Allow opting out entirely (e.g. DPLY_SKIP_AI_HOOKS=1 git push).
+[ -n "${DPLY_SKIP_AI_HOOKS:-}" ] && { echo "[changelog] skipped (DPLY_SKIP_AI_HOOKS)."; exit 0; }
+
 RANGE="${DPLY_PUSH_RANGE:-}"
 [ -z "$RANGE" ] && exit 0
 command -v claude >/dev/null 2>&1 || { echo "[changelog] claude CLI not found — skipping."; exit 0; }
@@ -28,7 +42,8 @@ CHANGELOG: <one concise sentence describing the user-visible change>
 
 ${diff}"
 
-output="$(claude -p "$prompt" 2>/dev/null)" || { echo "[changelog] claude failed — skipping."; exit 0; }
+output="$(_to "${DPLY_CHANGELOG_TIMEOUT:-90}" claude -p "$prompt" </dev/null 2>/dev/null)" \
+  || { echo "[changelog] claude failed/timed out — skipping."; exit 0; }
 TYPE="$(printf '%s' "$output"  | grep '^TYPE:'      | sed 's/^TYPE: *//')"
 TITLE="$(printf '%s' "$output" | grep '^TITLE:'     | sed 's/^TITLE: *//')"
 ENTRY="$(printf '%s' "$output" | grep '^CHANGELOG:' | sed 's/^CHANGELOG: *//')"
