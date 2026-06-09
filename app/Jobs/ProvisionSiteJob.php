@@ -19,6 +19,16 @@ class ProvisionSiteJob implements ShouldQueue
 
     public int $timeout = 180;
 
+    /**
+     * Reachability is retried until a hostname answers or this many probes have
+     * run. The window has to outlast managed-DNS publish lag: a freshly-created
+     * record can take several minutes to reach a zone's authoritative
+     * nameservers (Hetzner in particular publishes new on-dply.* records on a
+     * multi-minute delay), so a too-short window leaves a correctly-provisioned
+     * testing site stuck at "waiting_for_http" forever.
+     */
+    private const MAX_PROBE_ATTEMPTS = 24;
+
     public function __construct(
         public string $siteId,
         public int $probeAttempt = 0,
@@ -43,6 +53,14 @@ class ProvisionSiteJob implements ShouldQueue
             if ($this->probeAttempt === 0) {
                 $siteProvisioner->begin($site);
                 $site->refresh();
+
+                // Headless sites (webserver=none) finish inside begin() —
+                // no vhost, no testing hostname, nothing to probe. Bail
+                // before checkReadiness schedules an HTTP reachability loop
+                // against a hostname that nobody ever provisioned.
+                if ($site->provisioningState() === 'ready') {
+                    return;
+                }
             }
 
             $result = $siteProvisioner->checkReadiness($site);
@@ -50,19 +68,20 @@ class ProvisionSiteJob implements ShouldQueue
                 return;
             }
 
-            if ($this->probeAttempt >= 9) {
-                $siteProvisioner->markTimedOut($site, 'The site configuration was written, but no testing or primary domain responded before the retry limit was reached.');
+            if ($this->probeAttempt >= self::MAX_PROBE_ATTEMPTS) {
+                $siteProvisioner->markTimedOut($site, 'The site configuration was written, but no testing or primary domain responded before the retry limit was reached. This usually means DNS for the hostname has not propagated to its authoritative nameservers yet — retry once it resolves.');
 
                 return;
             }
 
+            $delaySeconds = $this->reachabilityDelaySeconds($this->probeAttempt);
             $siteProvisioner->appendLog($site, 'info', 'waiting_for_http', 'Scheduling another reachability check.', [
                 'next_probe_attempt' => $this->probeAttempt + 1,
-                'delay_seconds' => 15,
+                'delay_seconds' => $delaySeconds,
             ]);
 
             static::dispatch($site->id, $this->probeAttempt + 1)
-                ->delay(now()->addSeconds(15));
+                ->delay(now()->addSeconds($delaySeconds));
         } catch (\Throwable $e) {
             $siteProvisioner->markFailed($site, $e);
             Log::warning('ProvisionSiteJob failed', [
@@ -73,5 +92,20 @@ class ProvisionSiteJob implements ShouldQueue
 
             throw $e;
         }
+    }
+
+    /**
+     * Backoff for reachability probes: snappy at first so a fast-publishing zone
+     * (DigitalOcean, Cloudflare) finishes in seconds, then widening so the full
+     * window spans ~15 minutes to ride out slow authoritative-NS publishes
+     * without flooding the queue. 6×15s + 9×30s + 9×60s ≈ 900s.
+     */
+    private function reachabilityDelaySeconds(int $attempt): int
+    {
+        return match (true) {
+            $attempt < 6 => 15,
+            $attempt < 15 => 30,
+            default => 60,
+        };
     }
 }

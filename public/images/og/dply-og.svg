@@ -1,0 +1,45 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="'Instrument Sans', 'Helvetica Neue', Arial, sans-serif">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="0%" r="80%">
+      <stop offset="0%" stop-color="#cda942" stop-opacity="0.18"/>
+      <stop offset="55%" stop-color="#cda942" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="band" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#cda942"/>
+      <stop offset="55%" stop-color="#688479"/>
+      <stop offset="100%" stop-color="#32482c"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="#fdfcf9"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+  <rect x="0" y="0" width="1200" height="8" fill="url(#band)"/>
+
+  <!-- Eyebrow pill -->
+  <g transform="translate(80, 96)">
+    <rect x="0" y="0" width="280" height="44" rx="22" fill="#ffffff" stroke="#688479" stroke-opacity="0.3"/>
+    <circle cx="28" cy="22" r="5" fill="#cda942"/>
+    <text x="46" y="29" font-size="17" font-weight="700" letter-spacing="2.5" fill="#32482c">CLOUD · SSH · TEAMS</text>
+  </g>
+
+  <!-- Headline -->
+  <g transform="translate(80, 232)" fill="#171a0e" font-weight="700" letter-spacing="-1.5">
+    <text x="0" y="0" font-size="74">One control plane for</text>
+    <text x="0" y="92" font-size="74">the <tspan fill="#32482c">servers you own</tspan></text>
+    <!-- gold accent under "servers you own" -->
+    <rect x="120" y="104" width="430" height="14" rx="4" fill="#cda942" fill-opacity="0.38"/>
+  </g>
+
+  <!-- Subhead -->
+  <text x="80" y="446" font-size="27" fill="#5d6259" font-weight="500">Provision or bring your own box, deploy from git, and run TLS,</text>
+  <text x="80" y="484" font-size="27" fill="#5d6259" font-weight="500">databases, cron, firewall &amp; backups — with an API behind every action.</text>
+
+  <!-- Footer wordmark -->
+  <g transform="translate(80, 548)">
+    <rect x="0" y="0" width="52" height="52" rx="14" fill="#171a0e"/>
+    <text x="26" y="35" font-size="26" font-weight="700" fill="#fdfcf9" text-anchor="middle">d</text>
+    <text x="70" y="26" font-size="30" font-weight="700" fill="#171a0e">ply</text>
+    <text x="70" y="50" font-size="18" font-weight="500" fill="#a7a69a">Infrastructure operations for the servers you own</text>
+  </g>
+</svg>

@@ -2,11 +2,13 @@
 
 namespace App\Services\Billing;
 
+use Stripe\Price;
+use Stripe\Product;
 use Stripe\StripeClient;
 
 /**
- * Idempotently creates the Stripe products and prices that back the Standard
- * plan committed in [[project_pricing_model]]. Looks objects up by
+ * Idempotently creates the Stripe products and prices that back the flat
+ * plan model in docs/PRICING_AND_REVENUE.md. Looks objects up by
  * `metadata.dply_role` before creating; re-running is a no-op once all roles
  * are present, and rotates anything that's drifted (price amounts, product
  * names/descriptions, the parent product an existing price points at).
@@ -14,29 +16,20 @@ use Stripe\StripeClient;
  * Each Stripe Checkout line item displays its Product's name, so to keep the
  * invoice readable we use *separate Products* for each kind of line item:
  *
- *   - `dply base` — the $15/mo organization fee
- *   - `dply server — XS` … `XL` — the per-server tier fees
+ *   - `dply Starter` / `dply Pro` / `dply Business` — the flat plan fees,
+ *     metered by BYO server count (Free has no Stripe object — a $0 plan
+ *     never creates a subscription)
+ *   - `dply Cloud app` / `dply Edge site` / `dply serverless function` —
+ *     managed products billed a la carte
  *   - `dply Enterprise` — sales-led
- *
- * Old installs that ran an earlier version of this provisioner had a single
- * "dply Standard" product with multiple prices under it. The product-role
- * constant for the base is kept as `standard_product` (its original value)
- * so the metadata lookup matches — the human-facing name/description rotate
- * via {@see upsertProduct}'s drift handling.
  */
 class StripeBillingProvisioner
 {
-    public const ROLE_BASE_PRODUCT = 'standard_product';
+    public const ROLE_PLAN_PRODUCT_PREFIX = 'standard_plan_product_';
 
-    public const ROLE_TIER_PRODUCT_PREFIX = 'standard_tier_product_';
+    public const ROLE_PLAN_PREFIX = 'standard_plan_';
 
-    public const ROLE_BASE_MONTHLY = 'standard_base_monthly';
-
-    public const ROLE_BASE_YEARLY = 'standard_base_yearly';
-
-    public const ROLE_TIER_PREFIX = 'standard_tier_';
-
-    public const ROLE_TIER_YEARLY_SUFFIX = '_yearly';
+    public const ROLE_PLAN_YEARLY_SUFFIX = '_yearly';
 
     public const ROLE_SERVERLESS_PRODUCT = 'standard_serverless_product';
 
@@ -44,15 +37,41 @@ class StripeBillingProvisioner
 
     public const ROLE_SERVERLESS_YEARLY = 'standard_serverless_yearly';
 
-    public const ROLE_ENTERPRISE_PRODUCT = 'enterprise_product';
+    public const ROLE_SERVERLESS_USAGE_PRODUCT = 'standard_serverless_usage_product';
 
-    private const TIER_PRODUCT_INFO = [
-        'xs' => ['name' => 'dply server — XS', 'spec' => '≤1 vCPU · ≤2 GB'],
-        's' => ['name' => 'dply server — S', 'spec' => '2 vCPU · ≤4 GB'],
-        'm' => ['name' => 'dply server — M', 'spec' => '≤4 vCPU · ≤8 GB'],
-        'l' => ['name' => 'dply server — L', 'spec' => '≤8 vCPU · ≤16 GB'],
-        'xl' => ['name' => 'dply server — XL', 'spec' => 'Above L tier — capped'],
-    ];
+    public const ROLE_SERVERLESS_USAGE_MONTHLY = 'standard_serverless_usage';
+
+    public const ROLE_MANAGED_SERVER_PRODUCT = 'standard_managed_server_product';
+
+    public const ROLE_MANAGED_SERVER_MONTHLY = 'standard_managed_server';
+
+    public const ROLE_CLOUD_PRODUCT = 'standard_cloud_product';
+
+    public const ROLE_CLOUD_MONTHLY = 'standard_cloud';
+
+    public const ROLE_CLOUD_YEARLY = 'standard_cloud_yearly';
+
+    public const ROLE_CLOUD_USAGE_PRODUCT = 'standard_cloud_usage_product';
+
+    public const ROLE_CLOUD_USAGE_MONTHLY = 'standard_cloud_usage';
+
+    public const ROLE_EDGE_PRODUCT = 'standard_edge_product';
+
+    public const ROLE_EDGE_MONTHLY = 'standard_edge';
+
+    public const ROLE_EDGE_YEARLY = 'standard_edge_yearly';
+
+    public const ROLE_EDGE_USAGE_PRODUCT = 'standard_edge_usage_product';
+
+    public const ROLE_EDGE_USAGE_MONTHLY = 'standard_edge_usage';
+
+    public const ROLE_REALTIME_PRODUCT = 'standard_realtime_product';
+
+    public const ROLE_REALTIME_MONTHLY = 'standard_realtime';
+
+    public const ROLE_REALTIME_YEARLY = 'standard_realtime_yearly';
+
+    public const ROLE_ENTERPRISE_PRODUCT = 'enterprise_product';
 
     public function __construct(private StripeClient $stripe) {}
 
@@ -63,78 +82,46 @@ class StripeBillingProvisioner
     {
         $result = [];
 
-        // Base product — covers the org-level subscription fee. Existing
-        // installs may have this product still named "dply Standard"; the
-        // drift handler in upsertProduct will rename it to "dply base".
-        $baseProduct = $this->upsertProduct(
-            name: 'dply base',
-            description: 'dply organization base fee. Covers your dply account and the platform features that come with it: command-center console, credentials, deploys, metrics, audit, team management.',
-            role: self::ROLE_BASE_PRODUCT,
-        );
-        $result[self::ROLE_BASE_PRODUCT] = $baseProduct->id;
-
-        // Tier products — one per size so each Checkout line item carries a
-        // self-describing name. Created upfront so the price upserts below
-        // can point at the right parent product.
-        $tierProductIds = [];
-        foreach (self::TIER_PRODUCT_INFO as $tierKey => $info) {
-            $role = self::ROLE_TIER_PRODUCT_PREFIX.$tierKey;
-            $product = $this->upsertProduct(
-                name: $info['name'],
-                description: 'Per-server fee, '.$info['spec'].'. Same fee whether you run on DigitalOcean, Hetzner, AWS, or your own SSH box — dply prices its own work, not your provider invoice.',
-                role: $role,
-            );
-            $tierProductIds[$tierKey] = $product->id;
-            $result[$role] = $product->id;
-        }
-
         $standardConfig = (array) config('subscription.standard', []);
-        $baseCents = (int) ($standardConfig['base_cents'] ?? 1500);
         $annualPct = (int) ($standardConfig['annual_discount_pct'] ?? 20);
-        $tiers = (array) ($standardConfig['tiers'] ?? []);
+        $plans = (array) ($standardConfig['plans'] ?? []);
 
-        $result[self::ROLE_BASE_MONTHLY] = $this->upsertRecurringPrice(
-            productId: $baseProduct->id,
-            amount: $baseCents,
-            interval: 'month',
-            nickname: 'Base — Monthly',
-            role: self::ROLE_BASE_MONTHLY,
-        )->id;
-
-        $result[self::ROLE_BASE_YEARLY] = $this->upsertRecurringPrice(
-            productId: $baseProduct->id,
-            amount: $this->annualAmount($baseCents, $annualPct),
-            interval: 'year',
-            nickname: 'Base — Yearly',
-            role: self::ROLE_BASE_YEARLY,
-        )->id;
-
-        foreach (['xs', 's', 'm', 'l', 'xl'] as $tierKey) {
-            $amount = (int) ($tiers[$tierKey] ?? 0);
+        // One product + monthly/yearly price per *paid* plan. Free ($0) gets
+        // no Stripe object — a $0 plan never starts a subscription.
+        foreach ($plans as $planKey => $plan) {
+            $amount = (int) ($plan['price_cents'] ?? 0);
             if ($amount <= 0) {
                 continue;
             }
 
-            $tierProductId = $tierProductIds[$tierKey] ?? null;
-            if ($tierProductId === null) {
-                continue;
-            }
+            $label = (string) ($plan['label'] ?? ucfirst((string) $planKey));
+            $ceiling = $plan['max_servers'] ?? null;
+            $ceilingText = $ceiling === null
+                ? 'unlimited servers'
+                : 'up to '.$ceiling.' '.($ceiling === 1 ? 'server' : 'servers');
 
-            $monthlyRole = self::ROLE_TIER_PREFIX.$tierKey;
+            $product = $this->upsertProduct(
+                name: 'dply '.$label,
+                description: 'dply '.$label.' plan — flat monthly fee for '.$ceilingText.'. Metered by how many BYO servers dply manages, not their size; you pay your own provider for the hardware. Every feature is included; sites and team members are unlimited.',
+                role: self::ROLE_PLAN_PRODUCT_PREFIX.$planKey,
+            );
+            $result[self::ROLE_PLAN_PRODUCT_PREFIX.$planKey] = $product->id;
+
+            $monthlyRole = self::ROLE_PLAN_PREFIX.$planKey;
             $result[$monthlyRole] = $this->upsertRecurringPrice(
-                productId: $tierProductId,
+                productId: $product->id,
                 amount: $amount,
                 interval: 'month',
-                nickname: strtoupper($tierKey).' — Monthly',
+                nickname: $label.' — Monthly',
                 role: $monthlyRole,
             )->id;
 
-            $yearlyRole = $monthlyRole.self::ROLE_TIER_YEARLY_SUFFIX;
+            $yearlyRole = $monthlyRole.self::ROLE_PLAN_YEARLY_SUFFIX;
             $result[$yearlyRole] = $this->upsertRecurringPrice(
-                productId: $tierProductId,
+                productId: $product->id,
                 amount: $this->annualAmount($amount, $annualPct),
                 interval: 'year',
-                nickname: strtoupper($tierKey).' — Yearly',
+                nickname: $label.' — Yearly',
                 role: $yearlyRole,
             )->id;
         }
@@ -167,6 +154,166 @@ class StripeBillingProvisioner
             )->id;
         }
 
+        // Metered managed-serverless usage — invocations beyond the included
+        // allowance plus marked-up managed DB/cache resources, billed per cent
+        // (quantity = cents) on top of the flat per-function fee. Only accrues
+        // for dply-managed functions (dply pays the provider).
+        $serverlessUsageUnitCents = (int) ($standardConfig['serverless_usage_unit_cents'] ?? 1);
+        if ($serverlessUsageUnitCents > 0) {
+            $serverlessUsageProduct = $this->upsertProduct(
+                name: 'dply serverless usage',
+                description: 'Metered usage for dply-managed serverless functions — invocations beyond the included monthly allowance plus managed databases and caches. Billed monthly in pass-through-plus-margin units on top of the flat per-function fee.',
+                role: self::ROLE_SERVERLESS_USAGE_PRODUCT,
+            );
+            $result[self::ROLE_SERVERLESS_USAGE_PRODUCT] = $serverlessUsageProduct->id;
+
+            $result[self::ROLE_SERVERLESS_USAGE_MONTHLY] = $this->upsertRecurringPrice(
+                productId: $serverlessUsageProduct->id,
+                amount: $serverlessUsageUnitCents,
+                interval: 'month',
+                nickname: 'Serverless usage — Monthly (per cent)',
+                role: self::ROLE_SERVERLESS_USAGE_MONTHLY,
+            )->id;
+        }
+
+        // Metered dply-managed server — all-in cost-plus (Hetzner provider price
+        // × markup) billed per cent (quantity = cents), monthly. Replaces the
+        // per-server tier fee for VMs dply runs on its own infrastructure.
+        $managedServerUnitCents = (int) ($standardConfig['managed_server_usage_unit_cents'] ?? 1);
+        if ($managedServerUnitCents > 0) {
+            $managedServerProduct = $this->upsertProduct(
+                name: 'dply managed server',
+                description: 'All-in monthly fee for a dply-managed server — dply provisions and pays for the VM on its own infrastructure and bills the provider cost plus margin. Billed monthly in per-cent units; replaces the per-server plan fee.',
+                role: self::ROLE_MANAGED_SERVER_PRODUCT,
+            );
+            $result[self::ROLE_MANAGED_SERVER_PRODUCT] = $managedServerProduct->id;
+
+            $result[self::ROLE_MANAGED_SERVER_MONTHLY] = $this->upsertRecurringPrice(
+                productId: $managedServerProduct->id,
+                amount: $managedServerUnitCents,
+                interval: 'month',
+                nickname: 'Managed server — Monthly (per cent)',
+                role: self::ROLE_MANAGED_SERVER_MONTHLY,
+            )->id;
+        }
+
+        $cloudCents = (int) ($standardConfig['cloud_cents'] ?? 500);
+        if ($cloudCents > 0) {
+            $cloudProduct = $this->upsertProduct(
+                name: 'dply Cloud app',
+                description: 'Per-app fee for dply Cloud — long-running container apps on dply-owned infrastructure. Covers builds, deploys, scaling, and console management. Billed per live app, not per VM.',
+                role: self::ROLE_CLOUD_PRODUCT,
+            );
+            $result[self::ROLE_CLOUD_PRODUCT] = $cloudProduct->id;
+
+            $result[self::ROLE_CLOUD_MONTHLY] = $this->upsertRecurringPrice(
+                productId: $cloudProduct->id,
+                amount: $cloudCents,
+                interval: 'month',
+                nickname: 'Cloud app — Monthly',
+                role: self::ROLE_CLOUD_MONTHLY,
+            )->id;
+
+            $result[self::ROLE_CLOUD_YEARLY] = $this->upsertRecurringPrice(
+                productId: $cloudProduct->id,
+                amount: $this->annualAmount($cloudCents, $annualPct),
+                interval: 'year',
+                nickname: 'Cloud app — Yearly',
+                role: self::ROLE_CLOUD_YEARLY,
+            )->id;
+        }
+
+        // Metered Cloud resources — the marked-up DigitalOcean container /
+        // worker / database / bucket cost backing each Cloud app, billed per
+        // cent (quantity = cents) on top of the flat per-app platform fee.
+        $cloudUsageUnitCents = (int) ($standardConfig['cloud_usage_unit_cents'] ?? 1);
+        if ($cloudUsageUnitCents > 0) {
+            $cloudUsageProduct = $this->upsertProduct(
+                name: 'dply Cloud resources',
+                description: 'Metered infrastructure for dply Cloud apps — container compute, background workers, managed databases, and object storage. Billed monthly in pass-through-plus-margin units on top of the flat per-app fee.',
+                role: self::ROLE_CLOUD_USAGE_PRODUCT,
+            );
+            $result[self::ROLE_CLOUD_USAGE_PRODUCT] = $cloudUsageProduct->id;
+
+            $result[self::ROLE_CLOUD_USAGE_MONTHLY] = $this->upsertRecurringPrice(
+                productId: $cloudUsageProduct->id,
+                amount: $cloudUsageUnitCents,
+                interval: 'month',
+                nickname: 'Cloud resources — Monthly (per cent)',
+                role: self::ROLE_CLOUD_USAGE_MONTHLY,
+            )->id;
+        }
+
+        $edgeCents = (int) ($standardConfig['edge_cents'] ?? 200);
+        if ($edgeCents > 0) {
+            $edgeProduct = $this->upsertProduct(
+                name: 'dply Edge site',
+                description: 'Per-site fee for dply Edge — static and SSG sites on dply-owned CDN infrastructure. Covers builds, deploys, previews, and global delivery. Billed per live production site.',
+                role: self::ROLE_EDGE_PRODUCT,
+            );
+            $result[self::ROLE_EDGE_PRODUCT] = $edgeProduct->id;
+
+            $result[self::ROLE_EDGE_MONTHLY] = $this->upsertRecurringPrice(
+                productId: $edgeProduct->id,
+                amount: $edgeCents,
+                interval: 'month',
+                nickname: 'Edge site — Monthly',
+                role: self::ROLE_EDGE_MONTHLY,
+            )->id;
+
+            $result[self::ROLE_EDGE_YEARLY] = $this->upsertRecurringPrice(
+                productId: $edgeProduct->id,
+                amount: $this->annualAmount($edgeCents, $annualPct),
+                interval: 'year',
+                nickname: 'Edge site — Yearly',
+                role: self::ROLE_EDGE_YEARLY,
+            )->id;
+        }
+
+        $edgeUsageUnitCents = (int) ($standardConfig['edge_usage_unit_cents'] ?? 1);
+        if ($edgeUsageUnitCents > 0) {
+            $edgeUsageProduct = $this->upsertProduct(
+                name: 'dply Edge delivery usage',
+                description: 'Metered Edge CDN delivery — HTTP requests, bandwidth, and R2 storage beyond per-site included allowances. Billed monthly in pass-through units.',
+                role: self::ROLE_EDGE_USAGE_PRODUCT,
+            );
+            $result[self::ROLE_EDGE_USAGE_PRODUCT] = $edgeUsageProduct->id;
+
+            $result[self::ROLE_EDGE_USAGE_MONTHLY] = $this->upsertRecurringPrice(
+                productId: $edgeUsageProduct->id,
+                amount: $edgeUsageUnitCents,
+                interval: 'month',
+                nickname: 'Edge delivery usage — Monthly (per cent)',
+                role: self::ROLE_EDGE_USAGE_MONTHLY,
+            )->id;
+        }
+
+        $realtimeCents = (int) ($standardConfig['realtime_cents'] ?? 900);
+        if ($realtimeCents > 0) {
+            $realtimeProduct = $this->upsertProduct(
+                name: 'dply Realtime app',
+                description: 'Per-app fee for dply Realtime — a managed Pusher/Reverb-compatible channel app on dply-owned edge infrastructure. Covers WebSocket connections, presence, and publishing. Billed per active app.',
+                role: self::ROLE_REALTIME_PRODUCT,
+            );
+            $result[self::ROLE_REALTIME_PRODUCT] = $realtimeProduct->id;
+
+            $result[self::ROLE_REALTIME_MONTHLY] = $this->upsertRecurringPrice(
+                productId: $realtimeProduct->id,
+                amount: $realtimeCents,
+                interval: 'month',
+                nickname: 'Realtime app — Monthly',
+                role: self::ROLE_REALTIME_MONTHLY,
+            )->id;
+
+            $result[self::ROLE_REALTIME_YEARLY] = $this->upsertRecurringPrice(
+                productId: $realtimeProduct->id,
+                amount: $this->annualAmount($realtimeCents, $annualPct),
+                interval: 'year',
+                nickname: 'Realtime app — Yearly',
+                role: self::ROLE_REALTIME_YEARLY,
+            )->id;
+        }
+
         $enterpriseProduct = $this->upsertProduct(
             name: 'dply Enterprise',
             description: 'dply for larger fleets and procurement-led rollouts. Includes everything in Standard, plus volume pricing on per-server fees, SSO, audit log access, a custom MSA, dedicated support, and rollout planning. Pricing is negotiated per deal.',
@@ -184,27 +331,40 @@ class StripeBillingProvisioner
      */
     public static function formatEnv(array $result): string
     {
-        $map = [
-            self::ROLE_BASE_MONTHLY => 'STRIPE_PRICE_STANDARD_BASE_MONTHLY',
-            self::ROLE_BASE_YEARLY => 'STRIPE_PRICE_STANDARD_BASE_YEARLY',
-            self::ROLE_TIER_PREFIX.'xs' => 'STRIPE_PRICE_STANDARD_TIER_XS',
-            self::ROLE_TIER_PREFIX.'s' => 'STRIPE_PRICE_STANDARD_TIER_S',
-            self::ROLE_TIER_PREFIX.'m' => 'STRIPE_PRICE_STANDARD_TIER_M',
-            self::ROLE_TIER_PREFIX.'l' => 'STRIPE_PRICE_STANDARD_TIER_L',
-            self::ROLE_TIER_PREFIX.'xl' => 'STRIPE_PRICE_STANDARD_TIER_XL',
-            self::ROLE_TIER_PREFIX.'xs'.self::ROLE_TIER_YEARLY_SUFFIX => 'STRIPE_PRICE_STANDARD_TIER_XS_YEARLY',
-            self::ROLE_TIER_PREFIX.'s'.self::ROLE_TIER_YEARLY_SUFFIX => 'STRIPE_PRICE_STANDARD_TIER_S_YEARLY',
-            self::ROLE_TIER_PREFIX.'m'.self::ROLE_TIER_YEARLY_SUFFIX => 'STRIPE_PRICE_STANDARD_TIER_M_YEARLY',
-            self::ROLE_TIER_PREFIX.'l'.self::ROLE_TIER_YEARLY_SUFFIX => 'STRIPE_PRICE_STANDARD_TIER_L_YEARLY',
-            self::ROLE_TIER_PREFIX.'xl'.self::ROLE_TIER_YEARLY_SUFFIX => 'STRIPE_PRICE_STANDARD_TIER_XL_YEARLY',
+        // Managed products + edge usage map to fixed env var names.
+        $static = [
             self::ROLE_SERVERLESS_MONTHLY => 'STRIPE_PRICE_STANDARD_SERVERLESS',
             self::ROLE_SERVERLESS_YEARLY => 'STRIPE_PRICE_STANDARD_SERVERLESS_YEARLY',
+            self::ROLE_SERVERLESS_USAGE_MONTHLY => 'STRIPE_PRICE_STANDARD_SERVERLESS_USAGE',
+            self::ROLE_MANAGED_SERVER_MONTHLY => 'STRIPE_PRICE_STANDARD_MANAGED_SERVER',
+            self::ROLE_CLOUD_MONTHLY => 'STRIPE_PRICE_STANDARD_CLOUD',
+            self::ROLE_CLOUD_YEARLY => 'STRIPE_PRICE_STANDARD_CLOUD_YEARLY',
+            self::ROLE_CLOUD_USAGE_MONTHLY => 'STRIPE_PRICE_STANDARD_CLOUD_USAGE',
+            self::ROLE_EDGE_MONTHLY => 'STRIPE_PRICE_STANDARD_EDGE',
+            self::ROLE_EDGE_YEARLY => 'STRIPE_PRICE_STANDARD_EDGE_YEARLY',
+            self::ROLE_EDGE_USAGE_MONTHLY => 'STRIPE_PRICE_STANDARD_EDGE_USAGE',
+            self::ROLE_REALTIME_MONTHLY => 'STRIPE_PRICE_STANDARD_REALTIME',
+            self::ROLE_REALTIME_YEARLY => 'STRIPE_PRICE_STANDARD_REALTIME_YEARLY',
         ];
 
         $lines = [];
-        foreach ($map as $role => $envVar) {
-            if (isset($result[$role])) {
-                $lines[] = $envVar.'='.$result[$role];
+        foreach ($result as $role => $id) {
+            $role = (string) $role;
+
+            // Plan price roles → STRIPE_PRICE_STANDARD_{KEY}[_YEARLY]. Skip the
+            // plan *product* roles — operators don't need product IDs at runtime.
+            if (str_starts_with($role, self::ROLE_PLAN_PRODUCT_PREFIX)) {
+                continue;
+            }
+            if (str_starts_with($role, self::ROLE_PLAN_PREFIX)) {
+                $key = substr($role, strlen(self::ROLE_PLAN_PREFIX));
+                $lines[] = 'STRIPE_PRICE_STANDARD_'.strtoupper($key).'='.$id;
+
+                continue;
+            }
+
+            if (isset($static[$role])) {
+                $lines[] = $static[$role].'='.$id;
             }
         }
 
@@ -221,7 +381,7 @@ class StripeBillingProvisioner
      * stored name/description when they drift from what the code declares.
      * Marketing copy can change without spinning up a new Stripe product.
      */
-    private function upsertProduct(string $name, string $description, string $role): \Stripe\Product
+    private function upsertProduct(string $name, string $description, string $role): Product
     {
         $existing = $this->stripe->products->search([
             'query' => sprintf('metadata[\'dply_role\']:\'%s\'', $role),
@@ -266,7 +426,7 @@ class StripeBillingProvisioner
         string $interval,
         string $nickname,
         string $role,
-    ): \Stripe\Price {
+    ): Price {
         $existing = $this->stripe->prices->search([
             'query' => sprintf('metadata[\'dply_role\']:\'%s\' AND active:\'true\'', $role),
             'limit' => 1,

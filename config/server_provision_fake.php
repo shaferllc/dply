@@ -66,10 +66,4 @@ return [
     */
     'log_generated_public_key' => filter_var(env('DPLY_FAKE_CLOUD_LOG_PUBLIC_KEY', true), FILTER_VALIDATE_BOOLEAN),
 
-    /*
-    | Fly.io: no RunSetupScriptJob for Fly hosts; optional stub skips Fly API
-    | and marks the server ready for journey/UI smoke only.
-    */
-    'fly_io_ui_stub' => filter_var(env('DPLY_FAKE_CLOUD_FLY_IO_UI_STUB', false), FILTER_VALIDATE_BOOLEAN),
-
 ];

@@ -2,30 +2,19 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Support;
+namespace Tests\Unit\Support\HostnameValidatorTest;
 
 use App\Support\HostnameValidator;
-use Tests\TestCase;
 
-class HostnameValidatorTest extends TestCase
-{
-    public function test_it_accepts_a_valid_domain_name(): void
-    {
-        $this->assertTrue(HostnameValidator::isValid('app.example.com'));
-    }
-
-    public function test_it_rejects_a_single_label_hostname(): void
-    {
-        $this->assertFalse(HostnameValidator::isValid('test'));
-    }
-
-    public function test_it_rejects_invalid_hostname_characters(): void
-    {
-        $this->assertFalse(HostnameValidator::isValid('bad_host.example.com'));
-    }
-
-    public function test_it_rejects_ip_addresses(): void
-    {
-        $this->assertFalse(HostnameValidator::isValid('127.0.0.1'));
-    }
-}
+test('it accepts a valid domain name', function () {
+    expect(HostnameValidator::isValid('app.example.com'))->toBeTrue();
+});
+test('it rejects a single label hostname', function () {
+    expect(HostnameValidator::isValid('test'))->toBeFalse();
+});
+test('it rejects invalid hostname characters', function () {
+    expect(HostnameValidator::isValid('bad_host.example.com'))->toBeFalse();
+});
+test('it rejects ip addresses', function () {
+    expect(HostnameValidator::isValid('127.0.0.1'))->toBeFalse();
+});

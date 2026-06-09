@@ -2,9 +2,8 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit;
+namespace Tests\Unit\CustomSiteWebserverNoopTest;
 
-use App\Enums\SiteType;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Deploy\DockerRuntimeDockerfileBuilder;
@@ -13,59 +12,39 @@ use App\Services\Sites\CaddySiteConfigBuilder;
 use App\Services\Sites\NginxSiteConfigBuilder;
 use App\Services\Sites\OpenLiteSpeedSiteConfigBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
 
-/**
- * Custom sites have no webserver vhost rendered by dply. These regressions
- * pin that contract — any builder that learns to handle Custom must stay
- * a no-op (empty string), not throw an UnhandledMatchError, and not emit
- * a partial config.
- */
-final class CustomSiteWebserverNoopTest extends TestCase
+uses(RefreshDatabase::class);
+
+test('nginx builder returns empty for custom', function () {
+    $site = customSite();
+    $config = app(NginxSiteConfigBuilder::class)->build($site);
+    expect($config)->toBe('');
+});
+test('apache builder returns empty for custom', function () {
+    $site = customSite();
+    $config = app(ApacheSiteConfigBuilder::class)->build($site);
+    expect($config)->toBe('');
+});
+test('caddy builder returns empty for custom', function () {
+    $site = customSite();
+    $config = app(CaddySiteConfigBuilder::class)->build($site);
+    expect($config)->toBe('');
+});
+test('openlitespeed builder returns empty for custom', function () {
+    $site = customSite();
+    $config = app(OpenLiteSpeedSiteConfigBuilder::class)->build($site);
+    expect($config)->toBe('');
+});
+test('dockerfile builder returns empty for custom', function () {
+    $site = customSite();
+    $dockerfile = app(DockerRuntimeDockerfileBuilder::class)->build($site);
+    expect($dockerfile)->toBe('');
+});
+function customSite(): Site
 {
-    use RefreshDatabase;
+    $server = Server::factory()->ready()->create([
+        'meta' => ['host_kind' => Server::HOST_KIND_VM, 'webserver' => 'nginx'],
+    ]);
 
-    public function test_nginx_builder_returns_empty_for_custom(): void
-    {
-        $site = $this->customSite();
-        $config = app(NginxSiteConfigBuilder::class)->build($site);
-        $this->assertSame('', $config);
-    }
-
-    public function test_apache_builder_returns_empty_for_custom(): void
-    {
-        $site = $this->customSite();
-        $config = app(ApacheSiteConfigBuilder::class)->build($site);
-        $this->assertSame('', $config);
-    }
-
-    public function test_caddy_builder_returns_empty_for_custom(): void
-    {
-        $site = $this->customSite();
-        $config = app(CaddySiteConfigBuilder::class)->build($site);
-        $this->assertSame('', $config);
-    }
-
-    public function test_openlitespeed_builder_returns_empty_for_custom(): void
-    {
-        $site = $this->customSite();
-        $config = app(OpenLiteSpeedSiteConfigBuilder::class)->build($site);
-        $this->assertSame('', $config);
-    }
-
-    public function test_dockerfile_builder_returns_empty_for_custom(): void
-    {
-        $site = $this->customSite();
-        $dockerfile = app(DockerRuntimeDockerfileBuilder::class)->build($site);
-        $this->assertSame('', $dockerfile);
-    }
-
-    private function customSite(): Site
-    {
-        $server = Server::factory()->ready()->create([
-            'meta' => ['host_kind' => Server::HOST_KIND_VM, 'webserver' => 'nginx'],
-        ]);
-
-        return Site::factory()->custom()->create(['server_id' => $server->id]);
-    }
+    return Site::factory()->custom()->create(['server_id' => $server->id]);
 }

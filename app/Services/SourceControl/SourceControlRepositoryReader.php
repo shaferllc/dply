@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace App\Services\SourceControl;
 
+use App\Contracts\SourceControl\GitIdentity;
 use App\Models\Site;
-use App\Models\SocialAccount;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use League\CommonMark\Extension\GithubFlavoredMarkdownExtension;
 use League\CommonMark\Environment\Environment;
-use League\CommonMark\MarkdownConverter;
 use League\CommonMark\Extension\CommonMark\CommonMarkCoreExtension;
+use League\CommonMark\Extension\GithubFlavoredMarkdownExtension;
+use League\CommonMark\MarkdownConverter;
 use Throwable;
 
 /**
@@ -21,14 +21,13 @@ use Throwable;
  * Bitbucket — lists branches, walks directory trees, reads file blobs,
  * fetches the README and renders it.
  *
- * Same dispatch shape as {@see SiteGitCommitsFetcher} (parse remote URL,
- * look up the viewer's `SocialAccount` for the provider, hit the right
- * REST endpoint, normalise the response). Each method's return value is
- * cached for {@see self::CACHE_TTL_SECONDS} keyed by site + branch + path
- * so the Repository page doesn't re-fetch every render. The Livewire
- * action methods that mutate state (branch switch, repo switch) should
- * call {@see self::invalidate()} after writing, so subsequent reads land
- * on the new branch/repo.
+ * Same dispatch shape as {@see SiteGitCommitsFetcher}: parse the remote URL,
+ * resolve the viewer's best {@see GitIdentity} for that provider (OAuth or
+ * PAT, via {@see GitIdentityResolver}), hit the right REST endpoint using
+ * the identity's API base. Each method's return value is cached for
+ * {@see self::CACHE_TTL_SECONDS} keyed by site + branch + path so the
+ * Repository page doesn't re-fetch every render. Mutating actions (branch
+ * switch, repo switch) must call {@see self::invalidate()}.
  */
 final class SourceControlRepositoryReader
 {
@@ -37,29 +36,22 @@ final class SourceControlRepositoryReader
     /** Files larger than this are surfaced as "too large" so the view can fall back to a provider link. */
     private const MAX_FILE_BYTES = 262144;
 
-    /**
-     * @return array{
-     *     ok: bool,
-     *     branches: list<array{name: string, sha: string, committed_at: ?string, committer: ?string, is_default: bool}>,
-     *     error: ?string,
-     *     provider: ?string,
-     * }
-     */
+    public function __construct(
+        private ?GitIdentityResolver $resolver = null,
+    ) {
+        $this->resolver ??= app(GitIdentityResolver::class);
+    }
+
     public function branches(Site $site, User $user): array
     {
         return $this->remember($site, 'branches', '', fn () => $this->branchesUncached($site, $user));
     }
 
-    /**
-     * @return array{
-     *     ok: bool,
-     *     entries: list<array{name: string, path: string, type: 'dir'|'file', size: int, sha: ?string}>,
-     *     error: ?string,
-     *     provider: ?string,
-     *     path: string,
-     *     branch: string,
-     * }
-     */
+    public function tags(Site $site, User $user): array
+    {
+        return $this->remember($site, 'tags', '', fn () => $this->tagsUncached($site, $user));
+    }
+
     public function tree(Site $site, User $user, string $branch, string $path = ''): array
     {
         $branch = $branch !== '' ? $branch : (string) ($site->git_branch ?: 'main');
@@ -68,20 +60,6 @@ final class SourceControlRepositoryReader
         return $this->remember($site, 'tree:'.$branch, $path, fn () => $this->treeUncached($site, $user, $branch, $path));
     }
 
-    /**
-     * @return array{
-     *     ok: bool,
-     *     content: string,
-     *     size: int,
-     *     too_large: bool,
-     *     binary: bool,
-     *     html_url: ?string,
-     *     error: ?string,
-     *     provider: ?string,
-     *     path: string,
-     *     branch: string,
-     * }
-     */
     public function file(Site $site, User $user, string $branch, string $path): array
     {
         $branch = $branch !== '' ? $branch : (string) ($site->git_branch ?: 'main');
@@ -90,17 +68,6 @@ final class SourceControlRepositoryReader
         return $this->remember($site, 'file:'.$branch, $path, fn () => $this->fileUncached($site, $user, $branch, $path));
     }
 
-    /**
-     * @return array{
-     *     ok: bool,
-     *     name: ?string,
-     *     content_html: string,
-     *     content_raw: string,
-     *     error: ?string,
-     *     provider: ?string,
-     *     branch: string,
-     * }
-     */
     public function readme(Site $site, User $user, ?string $branch = null): array
     {
         $branch = $branch !== null && $branch !== '' ? $branch : (string) ($site->git_branch ?: 'main');
@@ -108,51 +75,53 @@ final class SourceControlRepositoryReader
         return $this->remember($site, 'readme:'.$branch, '', fn () => $this->readmeUncached($site, $user, $branch));
     }
 
-    /**
-     * Flush every cached read for this site. Call after `git_branch` or
-     * `git_repository_url` changes — the page should re-hit the provider
-     * APIs on the next render rather than serving stale state.
-     */
     public function invalidate(Site $site): void
     {
-        // Cache::remember keys are not enumerable; we use a per-site
-        // version counter so a single increment invalidates every read
-        // without touching every key by hand.
         Cache::increment($this->versionKey($site));
+    }
+
+    /**
+     * Provider id (github / gitlab / bitbucket) detected from the site's
+     * configured Git remote — null if no remote is set or the host is not
+     * one we know how to browse. Lets UIs gate "browse refs" affordances
+     * before making any HTTP calls.
+     */
+    public function providerForSite(Site $site): ?string
+    {
+        $remote = $this->remoteForSite($site);
+
+        return is_array($remote) ? ($remote['provider'] ?? null) : null;
     }
 
     /* ────────────────────── branches ────────────────────── */
 
     private function branchesUncached(Site $site, User $user): array
     {
-        $remote = $this->parseRemoteUrl($site->git_repository_url);
+        $remote = $this->remoteForSite($site);
         if ($remote === null) {
             return ['ok' => false, 'branches' => [], 'error' => __('Add a Git repository URL first.'), 'provider' => null];
         }
 
         return match ($remote['provider']) {
-            'github' => $this->githubBranches($remote, $user),
-            'gitlab' => $this->gitlabBranches($remote, $user),
-            'bitbucket' => $this->bitbucketBranches($remote, $user),
+            'github' => $this->githubBranches($remote, $site, $user),
+            'gitlab' => $this->gitlabBranches($remote, $site, $user),
+            'bitbucket' => $this->bitbucketBranches($remote, $site, $user),
             default => ['ok' => false, 'branches' => [], 'error' => __('Unsupported Git host.'), 'provider' => $remote['provider']],
         };
     }
 
-    /**
-     * @param  array{provider: string, owner: string, repo: string, label: string}  $remote
-     */
-    private function githubBranches(array $remote, User $user): array
+    private function githubBranches(array $remote, Site $site, User $user): array
     {
-        $account = $this->tokenAccount($user, 'github');
-        if ($account === null) {
-            return ['ok' => false, 'branches' => [], 'error' => __('Link a GitHub account to browse this repo.'), 'provider' => 'github'];
+        $identity = $this->resolver->forSite($site, $user,'github');
+        if ($identity === null) {
+            return ['ok' => false, 'branches' => [], 'error' => __('Link a GitHub account or add a personal access token to browse this repo.'), 'provider' => 'github'];
         }
 
-        $repoMeta = $this->githubRepoMeta($remote, $account);
+        $repoMeta = $this->githubRepoMeta($remote, $identity);
         $defaultBranch = $repoMeta['default_branch'] ?? null;
 
-        $response = $this->githubClient($account)->get(
-            'https://api.github.com/repos/'.$remote['owner'].'/'.$remote['repo'].'/branches',
+        $response = $this->githubClient($identity)->get(
+            $identity->apiBaseUrl().'/repos/'.$remote['owner'].'/'.$remote['repo'].'/branches',
             ['per_page' => 100],
         );
         if (! $response->successful()) {
@@ -182,22 +151,19 @@ final class SourceControlRepositoryReader
         return ['ok' => true, 'branches' => $branches, 'error' => null, 'provider' => 'github'];
     }
 
-    /**
-     * @param  array{provider: string, project_path: string, gitlab_api_base: string, label: string}  $remote
-     */
-    private function gitlabBranches(array $remote, User $user): array
+    private function gitlabBranches(array $remote, Site $site, User $user): array
     {
-        $account = $this->tokenAccount($user, 'gitlab');
-        if ($account === null) {
-            return ['ok' => false, 'branches' => [], 'error' => __('Link a GitLab account to browse this repo.'), 'provider' => 'gitlab'];
+        $identity = $this->resolver->forSite($site, $user,'gitlab');
+        if ($identity === null) {
+            return ['ok' => false, 'branches' => [], 'error' => __('Link a GitLab account or add a personal access token to browse this repo.'), 'provider' => 'gitlab'];
         }
 
-        $projectMeta = $this->gitlabProjectMeta($remote, $account);
+        $projectMeta = $this->gitlabProjectMeta($remote, $identity);
         $defaultBranch = $projectMeta['default_branch'] ?? null;
         $encoded = rawurlencode($remote['project_path']);
-        $url = rtrim($remote['gitlab_api_base'], '/').'/api/v4/projects/'.$encoded.'/repository/branches';
+        $url = $this->gitlabApiBase($identity, $remote).'/api/v4/projects/'.$encoded.'/repository/branches';
 
-        $response = Http::withToken((string) $account->access_token)->acceptJson()->get($url, ['per_page' => 100]);
+        $response = Http::withToken($identity->accessToken())->acceptJson()->get($url, ['per_page' => 100]);
         if (! $response->successful()) {
             return ['ok' => false, 'branches' => [], 'error' => $this->formatApiError($response->status(), $response->body()), 'provider' => 'gitlab'];
         }
@@ -225,24 +191,21 @@ final class SourceControlRepositoryReader
         return ['ok' => true, 'branches' => $branches, 'error' => null, 'provider' => 'gitlab'];
     }
 
-    /**
-     * @param  array{provider: string, workspace: string, repo: string, label: string}  $remote
-     */
-    private function bitbucketBranches(array $remote, User $user): array
+    private function bitbucketBranches(array $remote, Site $site, User $user): array
     {
-        $account = $this->tokenAccount($user, 'bitbucket');
-        if ($account === null) {
-            return ['ok' => false, 'branches' => [], 'error' => __('Link a Bitbucket account to browse this repo.'), 'provider' => 'bitbucket'];
+        $identity = $this->resolver->forSite($site, $user,'bitbucket');
+        if ($identity === null) {
+            return ['ok' => false, 'branches' => [], 'error' => __('Link a Bitbucket account or add a personal access token to browse this repo.'), 'provider' => 'bitbucket'];
         }
 
-        $url = 'https://api.bitbucket.org/2.0/repositories/'.$remote['workspace'].'/'.$remote['repo'].'/refs/branches';
-        $response = Http::withToken((string) $account->access_token)->acceptJson()->get($url, ['pagelen' => 100]);
+        $url = $identity->apiBaseUrl().'/2.0/repositories/'.$remote['workspace'].'/'.$remote['repo'].'/refs/branches';
+        $response = Http::withToken($identity->accessToken())->acceptJson()->get($url, ['pagelen' => 100]);
         if (! $response->successful()) {
             return ['ok' => false, 'branches' => [], 'error' => $this->formatApiError($response->status(), $response->body()), 'provider' => 'bitbucket'];
         }
         $payload = $response->json();
         $rows = is_array($payload['values'] ?? null) ? $payload['values'] : [];
-        $defaultBranch = $this->bitbucketDefaultBranch($remote, $account);
+        $defaultBranch = $this->bitbucketDefaultBranch($remote, $identity);
 
         $branches = [];
         foreach ($rows as $row) {
@@ -266,41 +229,157 @@ final class SourceControlRepositoryReader
         return ['ok' => true, 'branches' => $branches, 'error' => null, 'provider' => 'bitbucket'];
     }
 
+    private function tagsUncached(Site $site, User $user): array
+    {
+        $remote = $this->remoteForSite($site);
+        if ($remote === null) {
+            return ['ok' => false, 'tags' => [], 'error' => __('Add a Git repository URL first.'), 'provider' => null];
+        }
+
+        return match ($remote['provider']) {
+            'github' => $this->githubTags($remote, $site, $user),
+            'gitlab' => $this->gitlabTags($remote, $site, $user),
+            'bitbucket' => $this->bitbucketTags($remote, $site, $user),
+            default => ['ok' => false, 'tags' => [], 'error' => __('Unsupported Git host.'), 'provider' => $remote['provider']],
+        };
+    }
+
+    private function githubTags(array $remote, Site $site, User $user): array
+    {
+        $identity = $this->resolver->forSite($site, $user,'github');
+        if ($identity === null) {
+            return ['ok' => false, 'tags' => [], 'error' => __('Link a GitHub account or add a personal access token to browse this repo.'), 'provider' => 'github'];
+        }
+
+        $response = $this->githubClient($identity)->get(
+            $identity->apiBaseUrl().'/repos/'.$remote['owner'].'/'.$remote['repo'].'/tags',
+            ['per_page' => 100],
+        );
+        if (! $response->successful()) {
+            return ['ok' => false, 'tags' => [], 'error' => $this->formatApiError($response->status(), $response->body()), 'provider' => 'github'];
+        }
+
+        $tags = [];
+        foreach (is_array($response->json()) ? $response->json() : [] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $name = (string) ($row['name'] ?? '');
+            if ($name === '') {
+                continue;
+            }
+            $commit = is_array($row['commit'] ?? null) ? $row['commit'] : [];
+            $tags[] = [
+                'name' => $name,
+                'sha' => (string) ($commit['sha'] ?? ''),
+                'committed_at' => null,
+            ];
+        }
+
+        return ['ok' => true, 'tags' => $tags, 'error' => null, 'provider' => 'github'];
+    }
+
+    private function gitlabTags(array $remote, Site $site, User $user): array
+    {
+        $identity = $this->resolver->forSite($site, $user,'gitlab');
+        if ($identity === null) {
+            return ['ok' => false, 'tags' => [], 'error' => __('Link a GitLab account or add a personal access token to browse this repo.'), 'provider' => 'gitlab'];
+        }
+
+        $encoded = rawurlencode($remote['project_path']);
+        $url = $this->gitlabApiBase($identity, $remote).'/api/v4/projects/'.$encoded.'/repository/tags';
+        $response = Http::withToken($identity->accessToken())->acceptJson()->get($url, ['per_page' => 100]);
+        if (! $response->successful()) {
+            return ['ok' => false, 'tags' => [], 'error' => $this->formatApiError($response->status(), $response->body()), 'provider' => 'gitlab'];
+        }
+
+        $tags = [];
+        foreach (is_array($response->json()) ? $response->json() : [] as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $name = (string) ($row['name'] ?? '');
+            if ($name === '') {
+                continue;
+            }
+            $commit = is_array($row['commit'] ?? null) ? $row['commit'] : [];
+            $tags[] = [
+                'name' => $name,
+                'sha' => (string) ($commit['id'] ?? ''),
+                'committed_at' => isset($commit['committed_date']) ? (string) $commit['committed_date'] : null,
+            ];
+        }
+
+        return ['ok' => true, 'tags' => $tags, 'error' => null, 'provider' => 'gitlab'];
+    }
+
+    private function bitbucketTags(array $remote, Site $site, User $user): array
+    {
+        $identity = $this->resolver->forSite($site, $user,'bitbucket');
+        if ($identity === null) {
+            return ['ok' => false, 'tags' => [], 'error' => __('Link a Bitbucket account or add a personal access token to browse this repo.'), 'provider' => 'bitbucket'];
+        }
+
+        $url = $identity->apiBaseUrl().'/2.0/repositories/'.$remote['workspace'].'/'.$remote['repo'].'/refs/tags';
+        $response = Http::withToken($identity->accessToken())->acceptJson()->get($url, ['pagelen' => 100]);
+        if (! $response->successful()) {
+            return ['ok' => false, 'tags' => [], 'error' => $this->formatApiError($response->status(), $response->body()), 'provider' => 'bitbucket'];
+        }
+
+        $rows = is_array($response->json('values')) ? $response->json('values') : [];
+        $tags = [];
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $name = (string) ($row['name'] ?? '');
+            if ($name === '') {
+                continue;
+            }
+            $target = is_array($row['target'] ?? null) ? $row['target'] : [];
+            $tags[] = [
+                'name' => $name,
+                'sha' => (string) ($target['hash'] ?? ''),
+                'committed_at' => isset($target['date']) ? (string) $target['date'] : null,
+            ];
+        }
+
+        return ['ok' => true, 'tags' => $tags, 'error' => null, 'provider' => 'bitbucket'];
+    }
+
     /* ────────────────────── tree ────────────────────── */
 
     private function treeUncached(Site $site, User $user, string $branch, string $path): array
     {
-        $remote = $this->parseRemoteUrl($site->git_repository_url);
+        $remote = $this->remoteForSite($site);
         if ($remote === null) {
             return ['ok' => false, 'entries' => [], 'error' => __('Add a Git repository URL first.'), 'provider' => null, 'path' => $path, 'branch' => $branch];
         }
 
         $result = match ($remote['provider']) {
-            'github' => $this->githubTree($remote, $user, $branch, $path),
-            'gitlab' => $this->gitlabTree($remote, $user, $branch, $path),
-            'bitbucket' => $this->bitbucketTree($remote, $user, $branch, $path),
+            'github' => $this->githubTree($remote, $site, $user, $branch, $path),
+            'gitlab' => $this->gitlabTree($remote, $site, $user, $branch, $path),
+            'bitbucket' => $this->bitbucketTree($remote, $site, $user, $branch, $path),
             default => ['ok' => false, 'entries' => [], 'error' => __('Unsupported Git host.'), 'provider' => $remote['provider']],
         };
 
         return $result + ['path' => $path, 'branch' => $branch];
     }
 
-    private function githubTree(array $remote, User $user, string $branch, string $path): array
+    private function githubTree(array $remote, Site $site, User $user, string $branch, string $path): array
     {
-        $account = $this->tokenAccount($user, 'github');
-        if ($account === null) {
-            return ['ok' => false, 'entries' => [], 'error' => __('Link a GitHub account.'), 'provider' => 'github'];
+        $identity = $this->resolver->forSite($site, $user,'github');
+        if ($identity === null) {
+            return ['ok' => false, 'entries' => [], 'error' => __('Link a GitHub account or add a personal access token.'), 'provider' => 'github'];
         }
 
-        $url = 'https://api.github.com/repos/'.$remote['owner'].'/'.$remote['repo'].'/contents/'.$this->encodePath($path);
-        $response = $this->githubClient($account)->get($url, ['ref' => $branch]);
+        $url = $identity->apiBaseUrl().'/repos/'.$remote['owner'].'/'.$remote['repo'].'/contents/'.$this->encodePath($path);
+        $response = $this->githubClient($identity)->get($url, ['ref' => $branch]);
         if (! $response->successful()) {
             return ['ok' => false, 'entries' => [], 'error' => $this->formatApiError($response->status(), $response->body()), 'provider' => 'github'];
         }
         $rows = $response->json();
         if (! is_array($rows) || array_keys($rows) !== range(0, count($rows) - 1)) {
-            // The contents endpoint returns an object for a single-file
-            // path; treat that as "not a directory" rather than crashing.
             return ['ok' => false, 'entries' => [], 'error' => __('This path is a file, not a directory.'), 'provider' => 'github'];
         }
 
@@ -322,16 +401,16 @@ final class SourceControlRepositoryReader
         return ['ok' => true, 'entries' => $this->sortEntries($entries), 'error' => null, 'provider' => 'github'];
     }
 
-    private function gitlabTree(array $remote, User $user, string $branch, string $path): array
+    private function gitlabTree(array $remote, Site $site, User $user, string $branch, string $path): array
     {
-        $account = $this->tokenAccount($user, 'gitlab');
-        if ($account === null) {
-            return ['ok' => false, 'entries' => [], 'error' => __('Link a GitLab account.'), 'provider' => 'gitlab'];
+        $identity = $this->resolver->forSite($site, $user,'gitlab');
+        if ($identity === null) {
+            return ['ok' => false, 'entries' => [], 'error' => __('Link a GitLab account or add a personal access token.'), 'provider' => 'gitlab'];
         }
 
         $encoded = rawurlencode($remote['project_path']);
-        $url = rtrim($remote['gitlab_api_base'], '/').'/api/v4/projects/'.$encoded.'/repository/tree';
-        $response = Http::withToken((string) $account->access_token)->acceptJson()->get($url, [
+        $url = $this->gitlabApiBase($identity, $remote).'/api/v4/projects/'.$encoded.'/repository/tree';
+        $response = Http::withToken($identity->accessToken())->acceptJson()->get($url, [
             'ref' => $branch,
             'path' => $path,
             'per_page' => 100,
@@ -351,7 +430,7 @@ final class SourceControlRepositoryReader
                 'name' => (string) ($row['name'] ?? ''),
                 'path' => (string) ($row['path'] ?? ''),
                 'type' => $type,
-                'size' => 0, // GitLab tree endpoint doesn't return sizes
+                'size' => 0,
                 'sha' => isset($row['id']) ? (string) $row['id'] : null,
             ];
         }
@@ -359,16 +438,16 @@ final class SourceControlRepositoryReader
         return ['ok' => true, 'entries' => $this->sortEntries($entries), 'error' => null, 'provider' => 'gitlab'];
     }
 
-    private function bitbucketTree(array $remote, User $user, string $branch, string $path): array
+    private function bitbucketTree(array $remote, Site $site, User $user, string $branch, string $path): array
     {
-        $account = $this->tokenAccount($user, 'bitbucket');
-        if ($account === null) {
-            return ['ok' => false, 'entries' => [], 'error' => __('Link a Bitbucket account.'), 'provider' => 'bitbucket'];
+        $identity = $this->resolver->forSite($site, $user,'bitbucket');
+        if ($identity === null) {
+            return ['ok' => false, 'entries' => [], 'error' => __('Link a Bitbucket account or add a personal access token.'), 'provider' => 'bitbucket'];
         }
 
         $segment = $path === '' ? '' : $this->encodePath($path).'/';
-        $url = 'https://api.bitbucket.org/2.0/repositories/'.$remote['workspace'].'/'.$remote['repo'].'/src/'.rawurlencode($branch).'/'.$segment;
-        $response = Http::withToken((string) $account->access_token)->acceptJson()->get($url);
+        $url = $identity->apiBaseUrl().'/2.0/repositories/'.$remote['workspace'].'/'.$remote['repo'].'/src/'.rawurlencode($branch).'/'.$segment;
+        $response = Http::withToken($identity->accessToken())->acceptJson()->get($url);
         if (! $response->successful()) {
             return ['ok' => false, 'entries' => [], 'error' => $this->formatApiError($response->status(), $response->body()), 'provider' => 'bitbucket'];
         }
@@ -402,7 +481,7 @@ final class SourceControlRepositoryReader
 
     private function fileUncached(Site $site, User $user, string $branch, string $path): array
     {
-        $remote = $this->parseRemoteUrl($site->git_repository_url);
+        $remote = $this->remoteForSite($site);
         if ($remote === null) {
             return ['ok' => false, 'content' => '', 'size' => 0, 'too_large' => false, 'binary' => false, 'html_url' => null, 'error' => __('Add a Git repository URL first.'), 'provider' => null, 'path' => $path, 'branch' => $branch];
         }
@@ -411,25 +490,25 @@ final class SourceControlRepositoryReader
         }
 
         $result = match ($remote['provider']) {
-            'github' => $this->githubFile($remote, $user, $branch, $path),
-            'gitlab' => $this->gitlabFile($remote, $user, $branch, $path),
-            'bitbucket' => $this->bitbucketFile($remote, $user, $branch, $path),
+            'github' => $this->githubFile($remote, $site, $user, $branch, $path),
+            'gitlab' => $this->gitlabFile($remote, $site, $user, $branch, $path),
+            'bitbucket' => $this->bitbucketFile($remote, $site, $user, $branch, $path),
             default => ['ok' => false, 'content' => '', 'size' => 0, 'too_large' => false, 'binary' => false, 'html_url' => null, 'error' => __('Unsupported Git host.'), 'provider' => $remote['provider']],
         };
 
         return $result + ['path' => $path, 'branch' => $branch];
     }
 
-    private function githubFile(array $remote, User $user, string $branch, string $path): array
+    private function githubFile(array $remote, Site $site, User $user, string $branch, string $path): array
     {
-        $account = $this->tokenAccount($user, 'github');
-        if ($account === null) {
-            return ['ok' => false, 'content' => '', 'size' => 0, 'too_large' => false, 'binary' => false, 'html_url' => null, 'error' => __('Link a GitHub account.'), 'provider' => 'github'];
+        $identity = $this->resolver->forSite($site, $user,'github');
+        if ($identity === null) {
+            return ['ok' => false, 'content' => '', 'size' => 0, 'too_large' => false, 'binary' => false, 'html_url' => null, 'error' => __('Link a GitHub account or add a personal access token.'), 'provider' => 'github'];
         }
 
-        $url = 'https://api.github.com/repos/'.$remote['owner'].'/'.$remote['repo'].'/contents/'.$this->encodePath($path);
+        $url = $identity->apiBaseUrl().'/repos/'.$remote['owner'].'/'.$remote['repo'].'/contents/'.$this->encodePath($path);
         $htmlUrl = 'https://github.com/'.$remote['owner'].'/'.$remote['repo'].'/blob/'.rawurlencode($branch).'/'.$this->encodePath($path);
-        $response = $this->githubClient($account)->get($url, ['ref' => $branch]);
+        $response = $this->githubClient($identity)->get($url, ['ref' => $branch]);
         if (! $response->successful()) {
             return ['ok' => false, 'content' => '', 'size' => 0, 'too_large' => false, 'binary' => false, 'html_url' => $htmlUrl, 'error' => $this->formatApiError($response->status(), $response->body()), 'provider' => 'github'];
         }
@@ -450,18 +529,19 @@ final class SourceControlRepositoryReader
         return $this->buildFileResult($raw, $size, $htmlUrl, 'github');
     }
 
-    private function gitlabFile(array $remote, User $user, string $branch, string $path): array
+    private function gitlabFile(array $remote, Site $site, User $user, string $branch, string $path): array
     {
-        $account = $this->tokenAccount($user, 'gitlab');
-        if ($account === null) {
-            return ['ok' => false, 'content' => '', 'size' => 0, 'too_large' => false, 'binary' => false, 'html_url' => null, 'error' => __('Link a GitLab account.'), 'provider' => 'gitlab'];
+        $identity = $this->resolver->forSite($site, $user,'gitlab');
+        if ($identity === null) {
+            return ['ok' => false, 'content' => '', 'size' => 0, 'too_large' => false, 'binary' => false, 'html_url' => null, 'error' => __('Link a GitLab account or add a personal access token.'), 'provider' => 'gitlab'];
         }
 
         $encodedProject = rawurlencode($remote['project_path']);
         $encodedPath = rawurlencode($path);
-        $url = rtrim($remote['gitlab_api_base'], '/').'/api/v4/projects/'.$encodedProject.'/repository/files/'.$encodedPath;
-        $htmlUrl = rtrim($remote['gitlab_api_base'], '/').'/'.$remote['project_path'].'/-/blob/'.rawurlencode($branch).'/'.$this->encodePath($path);
-        $response = Http::withToken((string) $account->access_token)->acceptJson()->get($url, ['ref' => $branch]);
+        $apiBase = $this->gitlabApiBase($identity, $remote);
+        $url = $apiBase.'/api/v4/projects/'.$encodedProject.'/repository/files/'.$encodedPath;
+        $htmlUrl = $apiBase.'/'.$remote['project_path'].'/-/blob/'.rawurlencode($branch).'/'.$this->encodePath($path);
+        $response = Http::withToken($identity->accessToken())->acceptJson()->get($url, ['ref' => $branch]);
         if (! $response->successful()) {
             return ['ok' => false, 'content' => '', 'size' => 0, 'too_large' => false, 'binary' => false, 'html_url' => $htmlUrl, 'error' => $this->formatApiError($response->status(), $response->body()), 'provider' => 'gitlab'];
         }
@@ -481,16 +561,16 @@ final class SourceControlRepositoryReader
         return $this->buildFileResult($raw, $size, $htmlUrl, 'gitlab');
     }
 
-    private function bitbucketFile(array $remote, User $user, string $branch, string $path): array
+    private function bitbucketFile(array $remote, Site $site, User $user, string $branch, string $path): array
     {
-        $account = $this->tokenAccount($user, 'bitbucket');
-        if ($account === null) {
-            return ['ok' => false, 'content' => '', 'size' => 0, 'too_large' => false, 'binary' => false, 'html_url' => null, 'error' => __('Link a Bitbucket account.'), 'provider' => 'bitbucket'];
+        $identity = $this->resolver->forSite($site, $user,'bitbucket');
+        if ($identity === null) {
+            return ['ok' => false, 'content' => '', 'size' => 0, 'too_large' => false, 'binary' => false, 'html_url' => null, 'error' => __('Link a Bitbucket account or add a personal access token.'), 'provider' => 'bitbucket'];
         }
 
-        $url = 'https://api.bitbucket.org/2.0/repositories/'.$remote['workspace'].'/'.$remote['repo'].'/src/'.rawurlencode($branch).'/'.$this->encodePath($path);
+        $url = $identity->apiBaseUrl().'/2.0/repositories/'.$remote['workspace'].'/'.$remote['repo'].'/src/'.rawurlencode($branch).'/'.$this->encodePath($path);
         $htmlUrl = 'https://bitbucket.org/'.$remote['workspace'].'/'.$remote['repo'].'/src/'.rawurlencode($branch).'/'.$this->encodePath($path);
-        $response = Http::withToken((string) $account->access_token)->get($url);
+        $response = Http::withToken($identity->accessToken())->get($url);
         if (! $response->successful()) {
             return ['ok' => false, 'content' => '', 'size' => 0, 'too_large' => false, 'binary' => false, 'html_url' => $htmlUrl, 'error' => $this->formatApiError($response->status(), $response->body()), 'provider' => 'bitbucket'];
         }
@@ -526,30 +606,30 @@ final class SourceControlRepositoryReader
 
     private function readmeUncached(Site $site, User $user, string $branch): array
     {
-        $remote = $this->parseRemoteUrl($site->git_repository_url);
+        $remote = $this->remoteForSite($site);
         if ($remote === null) {
             return ['ok' => false, 'name' => null, 'content_html' => '', 'content_raw' => '', 'error' => __('Add a Git repository URL first.'), 'provider' => null, 'branch' => $branch];
         }
 
         $result = match ($remote['provider']) {
-            'github' => $this->githubReadme($remote, $user, $branch),
-            'gitlab' => $this->probeReadmeViaFile($remote, $user, $branch, 'gitlab'),
-            'bitbucket' => $this->probeReadmeViaFile($remote, $user, $branch, 'bitbucket'),
+            'github' => $this->githubReadme($remote, $site, $user, $branch),
+            'gitlab' => $this->probeReadmeViaFile($remote, $site, $user, $branch, 'gitlab'),
+            'bitbucket' => $this->probeReadmeViaFile($remote, $site, $user, $branch, 'bitbucket'),
             default => ['ok' => false, 'name' => null, 'content_html' => '', 'content_raw' => '', 'error' => __('Unsupported Git host.'), 'provider' => $remote['provider']],
         };
 
         return $result + ['branch' => $branch];
     }
 
-    private function githubReadme(array $remote, User $user, string $branch): array
+    private function githubReadme(array $remote, Site $site, User $user, string $branch): array
     {
-        $account = $this->tokenAccount($user, 'github');
-        if ($account === null) {
-            return ['ok' => false, 'name' => null, 'content_html' => '', 'content_raw' => '', 'error' => __('Link a GitHub account.'), 'provider' => 'github'];
+        $identity = $this->resolver->forSite($site, $user,'github');
+        if ($identity === null) {
+            return ['ok' => false, 'name' => null, 'content_html' => '', 'content_raw' => '', 'error' => __('Link a GitHub account or add a personal access token.'), 'provider' => 'github'];
         }
 
-        $url = 'https://api.github.com/repos/'.$remote['owner'].'/'.$remote['repo'].'/readme';
-        $response = $this->githubClient($account)->get($url, ['ref' => $branch]);
+        $url = $identity->apiBaseUrl().'/repos/'.$remote['owner'].'/'.$remote['repo'].'/readme';
+        $response = $this->githubClient($identity)->get($url, ['ref' => $branch]);
         if ($response->status() === 404) {
             return ['ok' => true, 'name' => null, 'content_html' => '', 'content_raw' => '', 'error' => null, 'provider' => 'github'];
         }
@@ -572,18 +652,12 @@ final class SourceControlRepositoryReader
         ];
     }
 
-    /**
-     * Probe a list of common README names. First hit wins.
-     */
-    private function probeReadmeViaFile(array $remote, User $user, string $branch, string $provider): array
+    private function probeReadmeViaFile(array $remote, Site $site, User $user, string $branch, string $provider): array
     {
-        $site = new Site;
-        $site->git_repository_url = $this->urlFromRemote($remote);
-
         foreach (['README.md', 'readme.md', 'Readme.md', 'README', 'README.rst', 'README.txt'] as $candidate) {
             $file = match ($provider) {
-                'gitlab' => $this->gitlabFile($remote, $user, $branch, $candidate),
-                'bitbucket' => $this->bitbucketFile($remote, $user, $branch, $candidate),
+                'gitlab' => $this->gitlabFile($remote, $site, $user, $branch, $candidate),
+                'bitbucket' => $this->bitbucketFile($remote, $site, $user, $branch, $candidate),
                 default => null,
             };
             if (! is_array($file) || ! ($file['ok'] ?? false) || ($file['too_large'] ?? false) || ($file['binary'] ?? false)) {
@@ -626,15 +700,10 @@ final class SourceControlRepositoryReader
 
     /* ────────────────────── helpers ────────────────────── */
 
-    /**
-     * Repo metadata (most importantly `default_branch`). Fetched once
-     * per branches() call but kept private so other code paths can mark
-     * the right branch without an extra API hit.
-     */
-    private function githubRepoMeta(array $remote, SocialAccount $account): array
+    private function githubRepoMeta(array $remote, GitIdentity $identity): array
     {
         try {
-            $response = $this->githubClient($account)->get('https://api.github.com/repos/'.$remote['owner'].'/'.$remote['repo']);
+            $response = $this->githubClient($identity)->get($identity->apiBaseUrl().'/repos/'.$remote['owner'].'/'.$remote['repo']);
             if ($response->successful()) {
                 $body = $response->json();
 
@@ -647,12 +716,12 @@ final class SourceControlRepositoryReader
         return [];
     }
 
-    private function gitlabProjectMeta(array $remote, SocialAccount $account): array
+    private function gitlabProjectMeta(array $remote, GitIdentity $identity): array
     {
         try {
             $encoded = rawurlencode($remote['project_path']);
-            $url = rtrim($remote['gitlab_api_base'], '/').'/api/v4/projects/'.$encoded;
-            $response = Http::withToken((string) $account->access_token)->acceptJson()->get($url);
+            $url = $this->gitlabApiBase($identity, $remote).'/api/v4/projects/'.$encoded;
+            $response = Http::withToken($identity->accessToken())->acceptJson()->get($url);
             if ($response->successful()) {
                 $body = $response->json();
 
@@ -665,11 +734,11 @@ final class SourceControlRepositoryReader
         return [];
     }
 
-    private function bitbucketDefaultBranch(array $remote, SocialAccount $account): ?string
+    private function bitbucketDefaultBranch(array $remote, GitIdentity $identity): ?string
     {
         try {
-            $url = 'https://api.bitbucket.org/2.0/repositories/'.$remote['workspace'].'/'.$remote['repo'];
-            $response = Http::withToken((string) $account->access_token)->acceptJson()->get($url);
+            $url = $identity->apiBaseUrl().'/2.0/repositories/'.$remote['workspace'].'/'.$remote['repo'];
+            $response = Http::withToken($identity->accessToken())->acceptJson()->get($url);
             if ($response->successful()) {
                 $body = $response->json();
                 $name = $body['mainbranch']['name'] ?? null;
@@ -683,32 +752,38 @@ final class SourceControlRepositoryReader
         return null;
     }
 
-    private function githubClient(SocialAccount $account)
+    private function githubClient(GitIdentity $identity)
     {
         return Http::withHeaders([
             'User-Agent' => 'Dply (repo-reader)',
             'Accept' => 'application/vnd.github+json',
-        ])->withToken((string) $account->access_token)->acceptJson();
-    }
-
-    private function tokenAccount(User $user, string $provider): ?SocialAccount
-    {
-        return SocialAccount::query()
-            ->where('user_id', $user->id)
-            ->where('provider', $provider)
-            ->whereNotNull('access_token')
-            ->where('access_token', '!=', '')
-            ->orderBy('id')
-            ->first();
+        ])->withToken($identity->accessToken())->acceptJson();
     }
 
     /**
-     * Same parsing logic as {@see SiteGitCommitsFetcher::parseRemoteUrl()}
-     * — duplicated here rather than extracting to a shared trait because
-     * the existing fetcher is stable and we want to avoid disturbing it.
-     *
-     * @return array{provider: string, label: string, owner?: string, repo?: string, project_path?: string, workspace?: string, gitlab_api_base?: string}|null
+     * GitLab's REST API is rooted on the host (no /api/v3 prefix), but the
+     * repo's host may differ from a user's PAT base URL (e.g. a cloud
+     * gitlab.com repo with no PAT yet, or a self-hosted PAT pointed at a
+     * different host). Prefer the identity's configured base; fall back
+     * to the host parsed from the repo URL.
      */
+    private function gitlabApiBase(GitIdentity $identity, array $remote): string
+    {
+        $base = $identity->apiBaseUrl();
+        if ($base !== '' && $base !== 'https://gitlab.com') {
+            return rtrim($base, '/');
+        }
+
+        $fromRemote = (string) ($remote['gitlab_api_base'] ?? '');
+
+        return $fromRemote !== '' ? rtrim($fromRemote, '/') : rtrim($base, '/');
+    }
+
+    private function remoteForSite(Site $site): ?array
+    {
+        return $this->parseRemoteUrl($site->sourceControlRepositoryUrl());
+    }
+
     private function parseRemoteUrl(?string $url): ?array
     {
         if ($url === null || trim($url) === '') {
@@ -764,29 +839,11 @@ final class SourceControlRepositoryReader
         return null;
     }
 
-    /**
-     * Reverse of {@see parseRemoteUrl} — only used internally where
-     * {@see probeReadmeViaFile} needs a synthetic Site for cache scoping.
-     */
-    private function urlFromRemote(array $remote): string
-    {
-        return match ($remote['provider']) {
-            'github' => 'https://github.com/'.$remote['owner'].'/'.$remote['repo'],
-            'bitbucket' => 'https://bitbucket.org/'.$remote['workspace'].'/'.$remote['repo'],
-            'gitlab' => rtrim($remote['gitlab_api_base'], '/').'/'.$remote['project_path'],
-            default => '',
-        };
-    }
-
     private function encodePath(string $path): string
     {
         return implode('/', array_map('rawurlencode', explode('/', $path)));
     }
 
-    /**
-     * @param  list<array{name: string, path: string, type: 'dir'|'file', size: int, sha: ?string}>  $entries
-     * @return list<array{name: string, path: string, type: 'dir'|'file', size: int, sha: ?string}>
-     */
     private function sortEntries(array $entries): array
     {
         usort($entries, function (array $a, array $b): int {
@@ -800,11 +857,6 @@ final class SourceControlRepositoryReader
         return array_values($entries);
     }
 
-    /**
-     * Cheap binary sniff — if there's a NUL byte in the first 1024 bytes
-     * we treat the file as binary and skip rendering it. Standard text
-     * formats (UTF-8, ASCII) don't contain NULs.
-     */
     private function looksBinary(string $raw): bool
     {
         if ($raw === '') {
@@ -824,16 +876,6 @@ final class SourceControlRepositoryReader
 
     /* ────────────────────── cache ────────────────────── */
 
-    /**
-     * Wrap a callable in a per-site, version-scoped cache. The version
-     * counter at {@see versionKey} makes {@see invalidate()} one increment
-     * rather than a per-key forget loop.
-     *
-     * @template T
-     *
-     * @param  callable(): T  $resolver
-     * @return T
-     */
     private function remember(Site $site, string $method, string $path, callable $resolver)
     {
         $version = (int) Cache::get($this->versionKey($site), 0);

@@ -12,13 +12,12 @@ use App\Services\Servers\ServerFileBrowserAuditLogger;
 use App\Services\Servers\ServerFileBrowserRemoteReader;
 use App\Support\Servers\FileBrowserListing;
 use App\Support\Servers\FileBrowserPathPolicy;
+use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Site file browser (read + edit text files ≤1 MB + download ≤25 MB).
@@ -90,23 +89,47 @@ class Files extends Component
         $this->server = $server;
         $this->site = $site;
 
-        if ($this->path === '' || $this->path[0] !== '/') {
-            $this->path = FileBrowserPathPolicy::normalize($site->effectiveRepositoryPath());
-        }
+        // Locked to the site directory: an out-of-root ?path (manual URL or a
+        // stale link) snaps back to the repository root rather than exposing
+        // the wider box like the server-wide browser does.
+        $root = $this->siteRoot();
+        $this->path = ($this->path !== '' && $this->path[0] === '/' && FileBrowserPathPolicy::isInside($this->path, $root))
+            ? FileBrowserPathPolicy::normalize($this->path)
+            : $root;
     }
 
     public function render(): View
     {
-        $listing = $this->safeList();
+        // Skip the SSH directory listing entirely while the surface is behind
+        // its coming-soon teaser — the blade renders the teaser, not the tree.
+        $listing = workspace_surface_coming_soon('site_files') ? [] : $this->safeList();
+        $runtimeMode = $this->site->runtimeTargetMode();
+        $runtimeTarget = $this->site->runtimeTarget();
 
         return view('livewire.sites.files', [
             'listing' => $listing,
             'effectiveLoginUser' => $this->effectiveLoginUser(),
-            'siteRoot' => FileBrowserPathPolicy::normalize($this->site->effectiveRepositoryPath()),
+            'siteRoot' => $this->siteRoot(),
             'isAtomic' => $this->site->isAtomicDeploys(),
             'editMaxBytes' => (int) config('server_file_browser.edit_max_bytes', 1_048_576),
             'downloadMaxBytes' => (int) config('server_file_browser.download_max_bytes', 26_214_400),
+            // Settings shell (sidebar + breadcrumb) — same vars the sibling
+            // workspace pages (Monitor, Web server config) feed the partial.
+            'settingsSidebarItems' => SiteSettingsSidebar::items($this->site, $this->server),
+            'resourceNoun' => $runtimeMode === 'vm' ? __('Site') : __('App'),
+            'resourcePlural' => $runtimeMode === 'vm' ? __('sites') : __('apps'),
+            'routingTab' => 'domains',
+            'laravel_tab' => 'commands',
+            'section' => 'files',
+            'runtimeMode' => $runtimeMode,
+            'runtimePublication' => is_array($runtimeTarget['publication'] ?? null) ? $runtimeTarget['publication'] : [],
         ]);
+    }
+
+    /** Normalized repository root — the hard boundary for all navigation. */
+    private function siteRoot(): string
+    {
+        return FileBrowserPathPolicy::normalize($this->site->effectiveRepositoryPath());
     }
 
     public function openEntry(string $name): void
@@ -115,23 +138,36 @@ class Files extends Component
             $this->path = FileBrowserPathPolicy::join($this->path, $name);
             $this->filter = '';
         } catch (\InvalidArgumentException $e) {
-            $this->dispatchToast('error', $e->getMessage());
+            $this->toastError($e->getMessage());
         }
     }
 
     public function jumpTo(string $absolute): void
     {
         try {
-            $this->path = FileBrowserPathPolicy::normalize($absolute);
-            $this->filter = '';
+            $target = FileBrowserPathPolicy::normalize($absolute);
         } catch (\InvalidArgumentException $e) {
-            $this->dispatchToast('error', $e->getMessage());
+            $this->toastError($e->getMessage());
+
+            return;
         }
+
+        if (! FileBrowserPathPolicy::isInside($target, $this->siteRoot())) {
+            $this->toastError(__('That path is outside this site\'s directory.'));
+
+            return;
+        }
+
+        $this->path = $target;
+        $this->filter = '';
     }
 
     public function goUp(): void
     {
-        $this->path = FileBrowserPathPolicy::parent($this->path);
+        // Never climb above the site root — clamp there instead.
+        $root = $this->siteRoot();
+        $parent = FileBrowserPathPolicy::parent($this->path);
+        $this->path = FileBrowserPathPolicy::isInside($parent, $root) ? $parent : $root;
         $this->filter = '';
     }
 
@@ -140,7 +176,7 @@ class Files extends Component
         try {
             $target = FileBrowserPathPolicy::join($this->path, $name);
         } catch (\InvalidArgumentException $e) {
-            $this->dispatchToast('error', $e->getMessage());
+            $this->toastError($e->getMessage());
 
             return;
         }
@@ -177,7 +213,7 @@ class Files extends Component
         try {
             $target = FileBrowserPathPolicy::join($this->path, $name);
         } catch (\InvalidArgumentException $e) {
-            $this->dispatchToast('error', $e->getMessage());
+            $this->toastError($e->getMessage());
 
             return;
         }
@@ -188,19 +224,19 @@ class Files extends Component
         try {
             $read = $reader->read($this->server, $target, $editCap, $this->effectiveLoginUser());
         } catch (\Throwable $e) {
-            $this->dispatchToast('error', $e->getMessage());
+            $this->toastError($e->getMessage());
 
             return;
         }
 
         if ($read->contentTruncated) {
-            $this->dispatchToast('error', __('File is larger than the inline edit cap.'));
+            $this->toastError(__('File is larger than the inline edit cap.'));
 
             return;
         }
 
         if ($read->isBinary) {
-            $this->dispatchToast('error', __('Binary files cannot be edited inline.'));
+            $this->toastError(__('Binary files cannot be edited inline.'));
 
             return;
         }
@@ -271,14 +307,14 @@ class Files extends Component
         }
 
         if ($result->missing()) {
-            $this->dispatchToast('error', __('File no longer exists on the server.'));
+            $this->toastError(__('File no longer exists on the server.'));
             $this->closeEditModal();
 
             return;
         }
 
         if (! $result->ok) {
-            $this->dispatchToast('error', __('Save failed (:reason).', ['reason' => $result->conflictReason ?? 'UNKNOWN']));
+            $this->toastError(__('Save failed (:reason).', ['reason' => $result->conflictReason ?? 'UNKNOWN']));
 
             return;
         }
@@ -302,7 +338,7 @@ class Files extends Component
         $this->editingMtime = $result->newMtime;
         $this->editingSize = $newBytes;
 
-        $this->dispatchToast('success', __('Saved.'));
+        $this->toastSuccess(__('Saved.'));
         $this->closeEditModal();
     }
 
@@ -310,50 +346,6 @@ class Files extends Component
     {
         $this->showConflictModal = false;
         $this->conflictMessage = null;
-    }
-
-    public function download(string $name): StreamedResponse|Response
-    {
-        try {
-            $target = FileBrowserPathPolicy::join($this->path, $name);
-        } catch (\InvalidArgumentException $e) {
-            abort(400, $e->getMessage());
-        }
-
-        $reader = app(ServerFileBrowserRemoteReader::class);
-        $cap = (int) config('server_file_browser.download_max_bytes', 26_214_400);
-
-        $read = $reader->read($this->server, $target, 0, $this->effectiveLoginUser());
-        if ($read->size > $cap) {
-            abort(413, __('File is larger than the download cap.'));
-        }
-
-        $login = $this->effectiveLoginUser();
-        $logger = app(ServerFileBrowserAuditLogger::class);
-
-        $response = new StreamedResponse(function () use ($reader, $target, $cap, $login): void {
-            $reader->streamDownload($this->server, $target, function (string $chunk): void {
-                echo $chunk;
-                @ob_flush();
-                @flush();
-            }, $cap, $login);
-        });
-
-        $response->headers->set('Content-Type', $read->mime ?: 'application/octet-stream');
-        $response->headers->set('Content-Disposition', 'attachment; filename="'.basename($target).'"');
-
-        $logger->recordDownload(
-            $this->server->organization,
-            Auth::user(),
-            $this->server,
-            $this->site,
-            $target,
-            $read->size,
-            $read->sha256,
-            $login,
-        );
-
-        return $response;
     }
 
     protected function effectiveLoginUser(): string
@@ -371,7 +363,7 @@ class Files extends Component
                 $this->filter !== '' ? $this->filter : null,
             );
         } catch (\Throwable $e) {
-            $this->dispatchToast('error', __('Could not list :path: :msg', ['path' => $this->path, 'msg' => $e->getMessage()]));
+            $this->toastError(__('Could not list :path: :msg', ['path' => $this->path, 'msg' => $e->getMessage()]));
 
             return null;
         }

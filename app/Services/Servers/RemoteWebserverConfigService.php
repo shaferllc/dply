@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Services\Servers;
 
 use App\Models\Server;
-use App\Modules\TaskRunner\ProcessOutput;
+use App\Models\Site;
+use App\Services\ConsoleActions\ConsoleEmitter;
+use App\Services\SshConnection;
+use App\Services\Sites\OpenLiteSpeedSiteConfigBuilder;
 
 /**
  * Read / write / backup / restore for webserver config files on a server.
@@ -57,12 +60,10 @@ class RemoteWebserverConfigService
         }
         $script = '{ '.implode('; ', $cmds).'; } 2>/dev/null || true';
 
-        // Tight timeout: this is called inline from render() on every wire:poll,
-        // and a hanging SSH burns the PHP request's 30s execution budget. If
-        // the box is unresponsive we'd rather show an empty picker (the
-        // catch in render() handles RuntimeException from runInlineBash) than
-        // 503 the whole workspace.
-        $output = $this->runScript($server, 'webserver-config:list', $script, 10);
+        // Straight, single-connection SSH pull with a tight timeout — never the
+        // heavy mkdir+scp+bash TaskRunner path (whose mkdir step alone can block
+        // for 30s and wedge the request). Failure falls back to an empty picker.
+        $output = $this->directExec($server, $script, 12);
         $lines = preg_split('/\R+/', trim($output)) ?: [];
 
         $main = (string) $layout['main'];
@@ -101,7 +102,7 @@ class RemoteWebserverConfigService
      *
      * @return array{contents: string, truncated: bool, size: int}
      */
-    public function read(Server $server, string $engine, string $path, ?\App\Services\ConsoleActions\ConsoleEmitter $emitter = null): array
+    public function read(Server $server, string $engine, string $path, ?ConsoleEmitter $emitter = null): array
     {
         $this->assertEngineSupported($engine);
         $this->assertPathAllowed($path);
@@ -115,10 +116,11 @@ class RemoteWebserverConfigService
             $cap,
         );
 
-        // Pass null so the file contents don't stream into the banner — the
-        // line-by-line output would flood the console with the whole config.
-        // The step + summary lines below give the operator enough context.
-        $output = $this->runScript($server, 'webserver-config:read', $script, 60);
+        // Straight, single-connection SSH pull (no queue, no script upload) so a
+        // file editor click reads inline and fast. Capped well under PHP's 30s
+        // request limit so a stalled connection fails cleanly instead of wedging
+        // the request.
+        $output = $this->directExec($server, $script, 15);
         [$head, $body] = array_pad(explode("---\n", $output, 2), 2, '');
         $size = (int) trim($head);
         $truncated = $size > $cap;
@@ -143,7 +145,7 @@ class RemoteWebserverConfigService
      *
      * @return array{backup: ?string, validate_output: string, validate_ok: bool}
      */
-    public function write(Server $server, string $engine, string $path, string $contents, ?\App\Services\ConsoleActions\ConsoleEmitter $emitter = null): array
+    public function write(Server $server, string $engine, string $path, string $contents, ?ConsoleEmitter $emitter = null): array
     {
         $this->assertEngineSupported($engine);
         $this->assertPathAllowed($path);
@@ -243,7 +245,7 @@ BASH;
      *
      * @return array{output: string, ok: bool}
      */
-    public function validateContent(Server $server, string $engine, string $path, string $contents, ?\App\Services\ConsoleActions\ConsoleEmitter $emitter = null): array
+    public function validateContent(Server $server, string $engine, string $path, string $contents, ?ConsoleEmitter $emitter = null): array
     {
         $this->assertEngineSupported($engine);
         $this->assertPathAllowed($path);
@@ -316,7 +318,7 @@ BASH;
      * Regenerate the dply-canonical content for a managed config file. For
      * httpd_config.conf we invoke the {@see OpenLiteSpeedHttpdConfigBuilder}
      * against the server's current sites + active port; for per-site
-     * vhconf.conf we use {@see \App\Services\Sites\OpenLiteSpeedSiteConfigBuilder}.
+     * vhconf.conf we use {@see OpenLiteSpeedSiteConfigBuilder}.
      * Files outside the dply-managed set raise a RuntimeException — there's
      * no canonical "default" to fall back to.
      *
@@ -330,28 +332,28 @@ BASH;
 
         if ($engine === 'openlitespeed') {
             if ($path === '/usr/local/lsws/conf/httpd_config.conf') {
-                $sites = \App\Models\Site::query()
+                $sites = Site::query()
                     ->where('server_id', $server->id)
                     ->with(['domains', 'domainAliases', 'tenantDomains'])
                     ->get();
                 $port = 80;
 
-                return app(\App\Services\Servers\OpenLiteSpeedHttpdConfigBuilder::class)->build($sites, $port);
+                return app(OpenLiteSpeedHttpdConfigBuilder::class)->build($sites, $port);
             }
 
             // Per-site vhconf at /usr/local/lsws/conf/vhosts/<basename>/vhconf.conf.
             if (preg_match('#^/usr/local/lsws/conf/vhosts/([^/]+)/vhconf\.conf$#', $path, $m) === 1) {
                 $basename = $m[1];
-                $site = \App\Models\Site::query()
+                $site = Site::query()
                     ->where('server_id', $server->id)
                     ->get(['id', 'slug'])
                     ->first(fn ($s) => 'dply-'.$s->id.'-'.$s->slug === $basename);
                 if ($site === null) {
                     throw new \RuntimeException('No Site found for vhost basename `'.$basename.'`. The provisioner can\'t regenerate a default.');
                 }
-                $full = \App\Models\Site::query()->with(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers', 'webserverConfigProfile', 'server'])->find($site->id);
+                $full = Site::query()->with(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers', 'webserverConfigProfile', 'server'])->find($site->id);
 
-                return app(\App\Services\Sites\OpenLiteSpeedSiteConfigBuilder::class)->build($full);
+                return app(OpenLiteSpeedSiteConfigBuilder::class)->build($full);
             }
         }
 
@@ -399,7 +401,7 @@ BASH;
             escapeshellarg($backupDir),
             $this->bashGlobLiteral($slug),
         );
-        $output = $this->runScript($server, 'webserver-config:list-backups', $script, 15);
+        $output = $this->directExec($server, $script, 12);
         $lines = preg_split('/\R+/', trim($output)) ?: [];
 
         $rows = [];
@@ -422,7 +424,7 @@ BASH;
      *
      * @return array{validate_output: string, validate_ok: bool}
      */
-    public function restoreBackup(Server $server, string $engine, string $backupPath, string $targetPath, ?\App\Services\ConsoleActions\ConsoleEmitter $emitter = null): array
+    public function restoreBackup(Server $server, string $engine, string $backupPath, string $targetPath, ?ConsoleEmitter $emitter = null): array
     {
         $this->assertEngineSupported($engine);
         $this->assertPathAllowed($targetPath);
@@ -501,6 +503,7 @@ BASH;
             'openlitespeed' => '/usr/local/lsws/conf/_dply_backups',
             'traefik' => '/etc/traefik/_dply_backups',
             'haproxy' => '/etc/haproxy/_dply_backups',
+            'envoy' => '/etc/envoy/_dply_backups',
             default => throw new \InvalidArgumentException("No backup dir mapped for {$engine}"),
         };
     }
@@ -535,7 +538,7 @@ BASH;
         return $this->bashLiteral($s);
     }
 
-    private function runScript(Server $server, string $task, string $script, int $timeout, ?\App\Services\ConsoleActions\ConsoleEmitter $emitter = null): string
+    private function runScript(Server $server, string $task, string $script, int $timeout, ?ConsoleEmitter $emitter = null): string
     {
         // When an emitter is passed (Livewire's manage_action banner path),
         // stream every newline-terminated chunk from the SSH pipe straight
@@ -543,18 +546,37 @@ BASH;
         // the callback is a no-op and the buffer is captured at the end.
         $onOutput = $emitter === null
             ? function (string $type, string $buffer): void {}
-            : function (string $type, string $buffer) use ($emitter): void {
-                foreach (preg_split('/\R/', rtrim($buffer, "\n")) ?: [] as $line) {
-                    $line = trim($line);
-                    if ($line !== '') {
-                        $emitter($line);
-                    }
+        : function (string $type, string $buffer) use ($emitter): void {
+            foreach (preg_split('/\R/', rtrim($buffer, "\n")) ?: [] as $line) {
+                $line = trim($line);
+                if ($line !== '') {
+                    $emitter($line);
                 }
-            };
+            }
+        };
 
         $out = $this->executor->runInlineBash($server, $task, $script, $timeout, $onOutput);
 
         return ServerManageSshExecutor::stripSshClientNoise($out->getBuffer());
+    }
+
+    /**
+     * Read-only "straight pull": run a script over a single phpseclib SSH
+     * connection as root and return its stdout. Unlike {@see runScript} this
+     * does NOT upload a script (no mkdir/scp/bash dance, no 30s mkdir timeout)
+     * and never queues — so file-editor reads (list / read / list-backups) are a
+     * fast, inline, single round-trip. Read-only by design; mutations still go
+     * through runScript for the atomic backup/install/validate flow.
+     */
+    private function directExec(Server $server, string $script, int $timeout): string
+    {
+        $ssh = new SshConnection($server, 'root', SshConnection::ROLE_RECOVERY);
+
+        try {
+            return $ssh->exec($script, $timeout);
+        } finally {
+            $ssh->disconnect();
+        }
     }
 
     /**
@@ -582,6 +604,7 @@ BASH;
             // and "[ALERT]" prefixed lines on failure. Match the success
             // string explicitly; an empty output (exit 0) also counts.
             'haproxy' => str_contains($output, 'configuration file is valid') || (! str_contains($output, '[alert]') && ! str_contains($output, 'error')),
+            'envoy' => str_contains(strtolower($output), 'configuration is valid') || (! str_contains(strtolower($output), 'error') && ! str_contains(strtolower($output), 'failed')),
             default => ! str_contains($output, 'error'),
         };
     }

@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Feature;
+namespace Tests\Feature\ProviderOAuthTest;
 
 use App\Models\Organization;
 use App\Models\ProviderCredential;
@@ -9,144 +9,135 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
-use Tests\TestCase;
 
-class ProviderOAuthTest extends TestCase
+uses(RefreshDatabase::class);
+
+function ownerWithOrg(): User
 {
-    use RefreshDatabase;
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $org->id]);
 
-    protected function ownerWithOrg(): User
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'owner']);
-        session(['current_organization_id' => $org->id]);
+    return $user;
+}
 
-        return $user;
-    }
+test('digital ocean oauth redirect requires auth', function () {
+    config([
+        'services.digitalocean_oauth.client_id' => 'do-client',
+        'services.digitalocean_oauth.client_secret' => 'do-secret',
+    ]);
 
-    public function test_digital_ocean_oauth_redirect_requires_auth(): void
-    {
-        config([
-            'services.digitalocean_oauth.client_id' => 'do-client',
-            'services.digitalocean_oauth.client_secret' => 'do-secret',
-        ]);
+    $response = $this->get(route('credentials.oauth.digitalocean.redirect'));
 
-        $response = $this->get(route('credentials.oauth.digitalocean.redirect'));
+    $response->assertRedirect(route('login', absolute: false));
+});
 
-        $response->assertRedirect(route('login', absolute: false));
-    }
+test('digital ocean oauth redirect goes to digital ocean when configured', function () {
+    config([
+        'services.digitalocean_oauth.client_id' => 'do-client',
+        'services.digitalocean_oauth.client_secret' => 'do-secret',
+    ]);
 
-    public function test_digital_ocean_oauth_redirect_goes_to_digital_ocean_when_configured(): void
-    {
-        config([
-            'services.digitalocean_oauth.client_id' => 'do-client',
-            'services.digitalocean_oauth.client_secret' => 'do-secret',
-        ]);
+    $user = ownerWithOrg();
 
-        $user = $this->ownerWithOrg();
+    $response = $this->actingAs($user)->get(route('credentials.oauth.digitalocean.redirect'));
 
-        $response = $this->actingAs($user)->get(route('credentials.oauth.digitalocean.redirect'));
+    $response->assertRedirect();
+    $target = $response->headers->get('Location');
+    expect($target)->toStartWith('https://cloud.digitalocean.com/v1/oauth/authorize?');
+    $this->assertStringContainsString('client_id=do-client', $target);
+    $this->assertStringContainsString('scope=read+write', $target);
+});
 
-        $response->assertRedirect();
-        $target = $response->headers->get('Location');
-        $this->assertStringStartsWith('https://cloud.digitalocean.com/v1/oauth/authorize?', $target);
-        $this->assertStringContainsString('client_id=do-client', $target);
-        $this->assertStringContainsString('scope=read+write', $target);
-    }
+test('digital ocean oauth redirect redirects back when not configured', function () {
+    config([
+        'services.digitalocean_oauth.client_id' => '',
+        'services.digitalocean_oauth.client_secret' => '',
+    ]);
 
-    public function test_digital_ocean_oauth_redirect_redirects_back_when_not_configured(): void
-    {
-        config([
-            'services.digitalocean_oauth.client_id' => '',
-            'services.digitalocean_oauth.client_secret' => '',
-        ]);
+    $user = ownerWithOrg();
 
-        $user = $this->ownerWithOrg();
+    $response = $this->actingAs($user)->get(route('credentials.oauth.digitalocean.redirect'));
 
-        $response = $this->actingAs($user)->get(route('credentials.oauth.digitalocean.redirect'));
+    $response->assertRedirect(route('credentials.index', ['provider' => 'digitalocean'], false));
+    $response->assertSessionHas('error');
+});
 
-        $response->assertRedirect(route('credentials.index', ['provider' => 'digitalocean'], false));
-        $response->assertSessionHas('error');
-    }
+test('digital ocean oauth callback creates credential', function () {
+    config([
+        'services.digitalocean_oauth.client_id' => 'do-client',
+        'services.digitalocean_oauth.client_secret' => 'do-secret',
+    ]);
 
-    public function test_digital_ocean_oauth_callback_creates_credential(): void
-    {
-        config([
-            'services.digitalocean_oauth.client_id' => 'do-client',
-            'services.digitalocean_oauth.client_secret' => 'do-secret',
-        ]);
+    $user = ownerWithOrg();
+    $org = $user->currentOrganization();
+    expect($org)->not->toBeNull();
 
-        $user = $this->ownerWithOrg();
-        $org = $user->currentOrganization();
-        $this->assertNotNull($org);
+    $nonce = Str::random(40);
+    $oauthState = [
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'label' => 'OAuth test',
+        'issued_at' => now()->timestamp,
+    ];
 
-        $nonce = Str::random(40);
-        $oauthState = [
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-            'label' => 'OAuth test',
-            'issued_at' => now()->timestamp,
-        ];
+    Http::fake(function (Request $request) {
+        if (str_contains($request->url(), 'cloud.digitalocean.com/v1/oauth/token')) {
+            return Http::response([
+                'access_token' => 'oauth-access-test',
+                'refresh_token' => 'refresh-test',
+                'expires_in' => 7200,
+                'token_type' => 'bearer',
+            ], 200);
+        }
+        if (str_contains($request->url(), 'api.digitalocean.com/v2/droplets')) {
+            return Http::response(['droplets' => []], 200);
+        }
 
-        Http::fake(function (Request $request) {
-            if (str_contains($request->url(), 'cloud.digitalocean.com/v1/oauth/token')) {
-                return Http::response([
-                    'access_token' => 'oauth-access-test',
-                    'refresh_token' => 'refresh-test',
-                    'expires_in' => 7200,
-                    'token_type' => 'bearer',
-                ], 200);
-            }
-            if (str_contains($request->url(), 'api.digitalocean.com/v2/droplets')) {
-                return Http::response(['droplets' => []], 200);
-            }
+        return Http::response('unexpected URL in test: '.$request->url(), 500);
+    });
 
-            return Http::response('unexpected URL in test: '.$request->url(), 500);
-        });
-
-        $response = $this->actingAs($user)
-            ->withSession([
-                'current_organization_id' => $org->id,
-                'credentials_oauth_digitalocean_'.$nonce => $oauthState,
-            ])
-            ->get(route('credentials.oauth.digitalocean.callback', [
-                'code' => 'auth-code-xyz',
-                'state' => $nonce,
-            ]));
-
-        $response->assertRedirect(route('organizations.credentials', ['organization' => $org, 'provider' => 'digitalocean'], false));
-        $response->assertSessionHas('success');
-
-        $this->assertDatabaseHas('provider_credentials', [
-            'user_id' => $user->id,
-            'organization_id' => $org->id,
-            'provider' => 'digitalocean',
-            'name' => 'OAuth test',
-        ]);
-
-        $cred = ProviderCredential::query()->where('user_id', $user->id)->first();
-        $this->assertNotNull($cred);
-        $this->assertSame('oauth', $cred->credentials['auth'] ?? null);
-        $this->assertSame('oauth-access-test', $cred->credentials['access_token'] ?? null);
-    }
-
-    public function test_digital_ocean_oauth_callback_rejects_invalid_state(): void
-    {
-        config([
-            'services.digitalocean_oauth.client_id' => 'do-client',
-            'services.digitalocean_oauth.client_secret' => 'do-secret',
-        ]);
-
-        $user = $this->ownerWithOrg();
-
-        $response = $this->actingAs($user)->get(route('credentials.oauth.digitalocean.callback', [
-            'code' => 'x',
-            'state' => Str::random(40),
+    $response = $this->actingAs($user)
+        ->withSession([
+            'current_organization_id' => $org->id,
+            'credentials_oauth_digitalocean_'.$nonce => $oauthState,
+        ])
+        ->get(route('credentials.oauth.digitalocean.callback', [
+            'code' => 'auth-code-xyz',
+            'state' => $nonce,
         ]));
 
-        $response->assertRedirect(route('credentials.index', ['provider' => 'digitalocean'], false));
-        $response->assertSessionHas('error');
-        $this->assertDatabaseCount('provider_credentials', 0);
-    }
-}
+    $response->assertRedirect(route('organizations.credentials', ['organization' => $org, 'provider' => 'digitalocean'], false));
+    $response->assertSessionHas('success');
+
+    $this->assertDatabaseHas('provider_credentials', [
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'provider' => 'digitalocean',
+        'name' => 'OAuth test',
+    ]);
+
+    $cred = ProviderCredential::query()->where('user_id', $user->id)->first();
+    expect($cred)->not->toBeNull();
+    expect($cred->credentials['auth'] ?? null)->toBe('oauth');
+    expect($cred->credentials['access_token'] ?? null)->toBe('oauth-access-test');
+});
+
+test('digital ocean oauth callback rejects invalid state', function () {
+    config([
+        'services.digitalocean_oauth.client_id' => 'do-client',
+        'services.digitalocean_oauth.client_secret' => 'do-secret',
+    ]);
+
+    $user = ownerWithOrg();
+
+    $response = $this->actingAs($user)->get(route('credentials.oauth.digitalocean.callback', [
+        'code' => 'x',
+        'state' => Str::random(40),
+    ]));
+
+    $response->assertRedirect(route('credentials.index', ['provider' => 'digitalocean'], false));
+    $response->assertSessionHas('error');
+    $this->assertDatabaseCount('provider_credentials', 0);
+});

@@ -18,7 +18,7 @@ class Dashboard extends Component
     {
         $user = auth()->user();
         $serverQuery = $user->servers()->latest();
-        $servers = (clone $serverQuery)->take(5)->get();
+        $servers = (clone $serverQuery)->withCount('sites')->take(5)->get();
         $serverCount = (clone $serverQuery)->count();
         $org = $user->currentOrganization();
         $fleetInsights = $insightsMetrics->fleetSummary($org);

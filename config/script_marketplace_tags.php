@@ -126,6 +126,11 @@ return [
     'docker-stats-snapshot' => ['docker', 'performance'],
     'docker-volume-ls' => ['docker', 'disk'],
 
+    'container-inner-artisan-migrate' => ['container-inner', 'laravel'],
+    'container-inner-composer-install' => ['container-inner', 'laravel'],
+    'container-inner-npm-ci-build' => ['container-inner', 'nodejs'],
+    'container-inner-env' => ['container-inner'],
+
     // Security & access
     'sshd-config-test' => ['security'],
     'sshd-effective-config' => ['security'],

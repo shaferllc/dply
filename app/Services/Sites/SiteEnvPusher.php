@@ -10,20 +10,32 @@ class SiteEnvPusher
 {
     public function __construct(
         protected DotEnvFileParser $parser,
+        protected DotEnvFileWriter $writer,
     ) {}
 
     /**
-     * Writes the site's encrypted env cache to the server's `.env` file
-     * verbatim. The cache IS the desired contents — we don't compose
-     * project-level vars in here anymore (Laravel reads project defaults
-     * separately; the deployment contract is what merges them).
+     * Writes the site's `.env` to the server, composed from the editable env
+     * cache PLUS the connection variables of any attached resource bindings
+     * (database, redis, …). The bindings inject under the cache: a real .env
+     * key the operator set still wins (that's the per-key override), but keys a
+     * binding owns and the cache doesn't carry (because "adopt" moved them out
+     * of the editable list) are written here so the deployed app actually
+     * receives DB_HOST/REDIS_HOST/… — otherwise the binding would only ever
+     * live in the deploy contract and never reach a VM's on-disk .env.
      *
      * Validates the blob via DotEnvFileParser before SSHing. Rejecting
      * malformed input here keeps the operator from pushing a file that
      * will silently break the app on the server — they get a per-line
      * error message they can fix in the UI.
      */
-    public function push(Site $site): string
+    /**
+     * @param  string|null  $overridePath  Absolute path to write the .env to,
+     *   instead of {@see Site::effectiveEnvFilePath()}. Used by the atomic
+     *   deployer to seed a fresh release directory's `.env` (the git checkout
+     *   has none) BEFORE build/release steps run — otherwise artisan reads
+     *   Laravel's defaults (pgsql 127.0.0.1:5432) and migrations fail.
+     */
+    public function push(Site $site, ?string $overridePath = null): string
     {
         $server = $site->server;
         if (! $server->hostCapabilities()->supportsEnvPushToHost()) {
@@ -40,10 +52,52 @@ class SiteEnvPusher
             throw new \RuntimeException('.env has parse errors — fix and retry: '.implode('; ', $parsed['errors']));
         }
 
-        $path = $site->effectiveEnvFilePath();
+        // Compose attached-resource bindings under the cache (cache/override
+        // wins). When a binding contributes keys the cache lacks, re-render the
+        // file so they're physically written to the server's .env.
+        $bindingEnv = $this->bindingEnv($site);
+        if ($bindingEnv !== []) {
+            $merged = array_merge($bindingEnv, $parsed['variables']);
+            if ($merged !== $parsed['variables']) {
+                $content = $this->writer->render($merged, $parsed['comments']);
+            }
+        }
+
+        $path = $overridePath ?? $site->effectiveEnvFilePath();
         $parent = dirname($path);
         $ssh = new SshConnection($server);
         $tmp = '/tmp/dply-env-'.Str::lower(Str::random(20));
+
+        try {
+            return $this->writeViaTmp($ssh, $site, $content, $tmp, $path, $parent, $overridePath === null);
+        } finally {
+            // Defence-in-depth: the success path rm's $tmp inside the sudo
+            // script below, but any throw before that point would otherwise
+            // leave a world-readable (644) copy of the .env in /tmp. The tmp
+            // is owned by the SSH user (putFile created it), so this plain rm
+            // can remove it. Best-effort — never mask the original error.
+            try {
+                $ssh->exec('rm -f '.escapeshellarg($tmp));
+            } catch (\Throwable) {
+                // ignore — cleanup is best-effort
+            }
+        }
+    }
+
+    /**
+     * Stages the env blob to $tmp and copies it into place as root. Split out
+     * so {@see push()} can guarantee tmp cleanup in a finally regardless of
+     * where this throws.
+     */
+    private function writeViaTmp(
+        SshConnection $ssh,
+        Site $site,
+        string $content,
+        string $tmp,
+        string $path,
+        string $parent,
+        bool $updateCacheOrigin = true,
+    ): string {
         $ssh->putFile($tmp, $content);
         // Stage the tmp file world-readable so root's `cp` (below) can read
         // it regardless of who owns /tmp/<file>. Exit-code-checked so a
@@ -71,16 +125,21 @@ class SiteEnvPusher
         // If the site has no effective system user, fall back to root (the
         // file ends up root:root 640 — only root can read, which is fine for
         // root-run runtimes and surfaces clearly when it isn't).
-        $siteUser = trim($site->effectiveSystemUser($server));
+        $siteUser = trim($site->effectiveSystemUser($site->server));
         if ($siteUser === '') {
             $siteUser = 'root';
         }
+        // System usernames are [a-z0-9_-] — safe to embed directly inside a
+        // double-quoted string. escapeshellarg would add single quotes that
+        // land inside the outer double quotes and corrupt the chown argument.
+        $safeUser = preg_replace('/[^a-zA-Z0-9_\-]/', '', $siteUser);
         $inner = sprintf(
-            'set -e; mkdir -p %s; cp %s %s; chown "root:$(id -gn %s)" %s; chmod 640 %s; rm -f %s',
+            'set -e; mkdir -p %s; cp %s %s; chown "%s:$(id -gn %s)" %s; chmod 640 %s; rm -f %s',
             escapeshellarg($parent),
             escapeshellarg($tmp),
             escapeshellarg($path),
-            escapeshellarg($siteUser),
+            $safeUser,
+            $safeUser,
             escapeshellarg($path),
             escapeshellarg($path),
             escapeshellarg($tmp),
@@ -93,10 +152,33 @@ class SiteEnvPusher
         // After a successful push, the cache reflects "what's on disk per
         // the most recent push" — but the bits came from the operator's
         // edits, not from a server read. The "edited :time" pill is the
-        // accurate label for this state.
-        $site->forceFill(['env_cache_origin' => 'local-edit'])->save();
+        // accurate label for this state. Skip when seeding a release dir
+        // during deploy (override path) — that's not an operator edit.
+        if ($updateCacheOrigin) {
+            $site->forceFill(['env_cache_origin' => 'local-edit'])->save();
+        }
 
         return $path;
+    }
+
+    /**
+     * Flattened connection variables from every attached resource binding,
+     * later keys winning ties between bindings (rare). Returns [] when the site
+     * has no bindings — leaving the cache content untouched.
+     *
+     * @return array<string, string>
+     */
+    private function bindingEnv(Site $site): array
+    {
+        $env = [];
+        $site->loadMissing('bindings');
+        foreach ($site->bindings as $binding) {
+            foreach ($binding->connectionEnv() as $key => $value) {
+                $env[(string) $key] = (string) $value;
+            }
+        }
+
+        return $env;
     }
 
     /**

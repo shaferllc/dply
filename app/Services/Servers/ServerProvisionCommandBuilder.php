@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
+use App\Jobs\RunSetupScriptJob;
 use App\Models\Server;
+use App\Models\UserSshKey;
+use App\Support\Servers\DedicatedCacheServerProvisionConfig;
+use App\Support\Servers\DedicatedDatabaseServerProvisionConfig;
 
 /**
  * Builds a bash script (list of lines) from servers.meta stack fields set at create time.
@@ -66,6 +70,9 @@ final class ServerProvisionCommandBuilder
         $php = $this->coalesceId('php_versions', $meta['php_version'] ?? null, '8.3');
         $database = $this->coalesceId('databases', $meta['database'] ?? null, 'mysql84');
         $cache = $this->coalesceId('cache_services', $meta['cache_service'] ?? null, 'redis');
+        if ($role === 'database') {
+            $cache = 'none';
+        }
         $layout = $this->deployLayout($server);
 
         $lines = [];
@@ -85,21 +92,26 @@ final class ServerProvisionCommandBuilder
 
         $lines = array_merge($lines, $this->dplyDeployUserBootstrap($server));
         $lines = array_merge($lines, $this->bootstrap());
+        $lines = array_merge($lines, $this->prefetchPackages($web, $php, $database, $cache));
         $lines = array_merge($lines, $this->createDeployLayout($layout));
         $lines = array_merge($lines, match ($role) {
             'application' => $this->roleApplication($web, $php, $database, $cache, $layout),
             'docker' => $this->roleDocker($web, $php, $database, $cache, $layout),
-            'worker' => $this->roleWorker($php, $database, $layout),
+            'worker' => $this->roleWorker($web, $php, $database, $layout),
             'database' => $this->roleDatabase($database, $layout),
-            'redis' => $this->roleRedis(),
-            'valkey' => $this->roleValkey(),
+            'redis' => $this->roleCacheHost($cache),
+            'valkey' => $this->roleCacheHost('valkey'),
             'load_balancer' => $this->roleLoadBalancer($layout),
             'plain' => $this->rolePlain($layout),
             default => [],
         });
 
+        // Join any background runtime installs (parallel_runtimes) before we
+        // verify — node/etc. must be present for verification + first deploy.
+        $lines = array_merge($lines, $this->waitForBackgroundRuntimes());
         $lines = array_merge($lines, $this->metricsAgent($server));
         $lines = array_merge($lines, $this->verificationCommands($role, $web, $php, $database, $cache));
+        $lines = array_merge($lines, $this->deployGitIdentity($server));
         $lines = array_merge($lines, $this->finalize($role));
         $lines = array_merge($lines, $this->emitInstalledStack());
 
@@ -122,12 +134,14 @@ final class ServerProvisionCommandBuilder
             return [];
         }
 
-        // Default: skip inline metrics install. RunSetupScriptJob's
-        // success path dispatches InstallMetricsAgentJob which runs the
-        // same install bash via SSH after the journey reads "ready" —
-        // shaves 30–60s off the journey wall-clock without losing the
-        // capability. Override with DPLY_SERVER_INSTALL_METRICS_AGENT_INLINE=true.
-        if (! (bool) config('server_provision.install_metrics_agent_inline', false)) {
+        // Default: install the metrics agent inline so the server starts
+        // collecting the moment the journey reads "ready" (RunSetupScriptJob's
+        // success path then writes the env + crontab synchronously). Set
+        // DPLY_SERVER_INSTALL_METRICS_AGENT_INLINE=false to defer the install
+        // to InstallMetricsAgentJob over SSH after the journey completes —
+        // shaves 30–60s off the journey wall-clock at the cost of monitoring
+        // being unavailable for ~1 minute afterward.
+        if (! (bool) config('server_provision.install_metrics_agent_inline', true)) {
             return [];
         }
 
@@ -271,7 +285,7 @@ final class ServerProvisionCommandBuilder
      * operator's laptop (etc.) lands on first boot instead of having to wait
      * for the post-provision authorized_keys sync. The matching panel rows
      * (ServerAuthorizedKey) are pre-created by
-     * {@see \App\Jobs\RunSetupScriptJob::applyProvisionOutcomeToServer()} so
+     * {@see RunSetupScriptJob::applyProvisionOutcomeToServer()} so
      * the workspace SSH Keys page reflects what's on the box from day zero —
      * a later Sync would otherwise rewrite authorized_keys to whatever the
      * panel currently knows and silently remove the bootstrap-installed keys.
@@ -350,7 +364,7 @@ final class ServerProvisionCommandBuilder
         $lines = [];
         foreach ($rows as $row) {
             $pk = trim((string) $row->public_key);
-            if ($pk === '' || ! \App\Models\UserSshKey::publicKeyLooksValid($pk)) {
+            if ($pk === '' || ! UserSshKey::publicKeyLooksValid($pk)) {
                 continue;
             }
             $lines[] = $pk;
@@ -364,6 +378,14 @@ final class ServerProvisionCommandBuilder
     {
         $lines = [
             'export DEBIAN_FRONTEND=noninteractive',
+            // If a cloud-init boot head-start is mid-flight (BootHeadStartScript),
+            // wait for it to finish (bounded) before we pre-empt/kill cloud-init
+            // below — otherwise we'd cut off the apt warmup it's doing. No-op when
+            // the head-start feature is off (markers never exist).
+            'if [ -f /var/lib/dply/headstart.running ] && [ ! -f /var/lib/dply/headstart.done ]; then '
+                .'echo "[dply] boot head-start in progress — waiting up to 240s for it to finish."; '
+                .'for _ in $(seq 1 80); do [ -f /var/lib/dply/headstart.done ] && break; sleep 3; done; '
+                .'fi',
         ];
 
         // Pre-empt cloud-init's apt-daily / unattended-upgrades AND
@@ -445,7 +467,17 @@ final class ServerProvisionCommandBuilder
             // v4 globally via apt.conf.d sidesteps both issues for
             // every subsequent apt-get call (no per-call flag thread).
             'mkdir -p /etc/apt/apt.conf.d',
-            'printf \'Acquire::ForceIPv4 "true";\nAcquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n\' > /etc/apt/apt.conf.d/99dply',
+            // --force-unsafe-io skips the per-file fsync dpkg does during unpack
+            // — safe on a fresh throwaway-until-ready provision and a meaningful
+            // speedup on package-heavy installs (mysql/php). Install-Suggests off
+            // avoids pulling optional suggested packages we never asked for.
+            'printf \'Acquire::ForceIPv4 "true";\nAcquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAPT::Install-Suggests "false";\nDpkg::Options:: "--force-unsafe-io";\n\' > /etc/apt/apt.conf.d/99dply',
+            // Optional regional apt mirror (config: server_provision.apt_mirror).
+            // Provider mirrors are much faster than archive.ubuntu.com. No-op when
+            // unset. Rewrites both the classic sources.list and noble's deb822
+            // ubuntu.sources. Must run before the first apt update below.
+            'DPLY_APT_MIRROR='.escapeshellarg((string) config('server_provision.apt_mirror', '')),
+            'if [ -n "${DPLY_APT_MIRROR}" ]; then echo "[dply] pointing apt sources at ${DPLY_APT_MIRROR}"; for _src in /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources; do [ -f "$_src" ] && sed -i -E "s@https?://(archive|security)\\.ubuntu\\.com/ubuntu@${DPLY_APT_MIRROR}@g" "$_src" || true; done; fi',
             // Silence needrestart. On Ubuntu 24.04 (noble) it's enabled
             // by default and runs after every dpkg install. Its
             // service-restart probe occasionally fails on non-interactive
@@ -617,14 +649,27 @@ final class ServerProvisionCommandBuilder
             // Now that locale + mysqld runtime dir are set up, the
             // repair has a chance of actually succeeding.
             'dply_repair_dpkg_state',
-            'apt-get update -y',
+            'dply_apt_update',
             $this->stepMarker('Installing base packages'),
             'dply_wait_for_apt_locks',
             ...$this->ensurePackagesInstalled(
-                ['ca-certificates', 'curl', 'gnupg', 'lsb-release', 'locales', 'software-properties-common', 'ufw', 'unattended-upgrades'],
+                ['ca-certificates', 'curl', 'git', 'gnupg', 'lsb-release', 'locales', 'software-properties-common', 'ufw', 'unattended-upgrades'],
                 '[dply] base packages already installed; skipping package install.'
             ),
         ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function deployGitIdentity(Server $server): array
+    {
+        $inner = app(ServerDeployGitIdentity::class)->bootstrapLinesForServer($server);
+        if ($inner === []) {
+            return [];
+        }
+
+        return $this->withStep('Configuring deploy user Git identity', $inner);
     }
 
     /**
@@ -643,6 +688,30 @@ final class ServerProvisionCommandBuilder
             $lines[] = 'systemctl enable --now fail2ban || true';
         }
 
+        if (config('server_provision.install_unattended_upgrades', true)) {
+            $lines[] = $this->stepMarker('Enabling automatic security updates');
+            // The package ships in the base bootstrap; make sure it is present,
+            // write our security-only policy, then (re)enable the apt timers.
+            // Provisioning preempts cloud-init's copy earlier to avoid apt-lock
+            // contention, so we own the final, enabled state here.
+            $lines = array_merge($lines, $this->ensurePackagesInstalled(
+                ['unattended-upgrades'],
+                '[dply] unattended-upgrades already installed; skipping package install.'
+            ));
+            $lines[] = $this->writeFileWithRollback(
+                '/etc/apt/apt.conf.d/20auto-upgrades',
+                "APT::Periodic::Update-Package-Lists \"1\";\nAPT::Periodic::Unattended-Upgrade \"1\";\nAPT::Periodic::AutocleanInterval \"7\";\n"
+            );
+            // Sorts after the distro's 50unattended-upgrades so our keys win,
+            // without clobbering (and being rollback-safe for) the original.
+            $lines[] = $this->writeFileWithRollback(
+                '/etc/apt/apt.conf.d/52dply-unattended-upgrades',
+                $this->unattendedUpgradesPolicy()
+            );
+            $lines[] = 'systemctl enable --now unattended-upgrades.service >/dev/null 2>&1 || true';
+            $lines[] = 'systemctl enable --now apt-daily.timer apt-daily-upgrade.timer >/dev/null 2>&1 || true';
+        }
+
         $lines = array_merge($lines, $this->roleHardening($role));
         $lines[] = $this->stepMarker('Finalizing server');
         $lines[] = 'ufw --force enable || true';
@@ -652,28 +721,76 @@ final class ServerProvisionCommandBuilder
     }
 
     /**
+     * Security-only unattended-upgrades policy. Reboots stay manual (dply owns
+     * maintenance windows); unused kernels and deps are cleaned up. The apt
+     * `${distro_id}` / `${distro_codename}` variables are resolved by APT at
+     * runtime — they are written verbatim (the content is base64-encoded, so
+     * the shell never expands them).
+     */
+    private function unattendedUpgradesPolicy(): string
+    {
+        return <<<'CONF'
+        Unattended-Upgrade::Allowed-Origins {
+            "${distro_id}:${distro_codename}-security";
+            "${distro_id}ESMApps:${distro_codename}-apps-security";
+            "${distro_id}ESM:${distro_codename}-infra-security";
+        };
+        Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+        Unattended-Upgrade::Remove-Unused-Dependencies "true";
+        Unattended-Upgrade::Automatic-Reboot "false";
+
+        CONF;
+    }
+
+    /**
      * @return list<string>
      */
     private function roleApplication(string $web, string $php, string $database, string $cache, array $layout): array
     {
+        $miseParallel = (bool) config('server_provision.parallel_runtimes', false);
+
         $lines = [];
         $lines = array_merge($lines, $this->ufwSsh());
         $lines = array_merge($lines, $this->installWebserver($web));
+        // Parallel mode: launch mise + its (lock-free) runtime downloads BEFORE
+        // the apt-heavy PHP/DB/cache steps so they overlap. Sequential mode keeps
+        // mise in its original late position (no behaviour change).
+        if ($miseParallel) {
+            $lines = array_merge($lines, $this->maybeInstallMise());
+        }
         $lines = array_merge($lines, $this->installPhpIfNeeded($web, $php, $database));
         $lines = array_merge($lines, $this->installDatabaseIfNeeded($database));
         $lines = array_merge($lines, $this->installAppCache($cache));
         $lines = array_merge($lines, $this->maybeInstallSupervisor());
-        $lines = array_merge($lines, $this->maybeInstallMise());
-        $lines = array_merge($lines, $this->writeRenderedConfigs('application', $web, $php, $layout));
-
-        if (config('server_provision.install_composer', true) && $php !== 'none') {
-            $lines[] = $this->stepMarker('Installing Composer');
-            $lines[] = $this->forceReinstall()
-                ? 'curl -fsSL https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer'
-                : 'if command -v composer >/dev/null 2>&1; then echo "[dply] composer already installed; skipping installer."; else curl -fsSL https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer; fi';
+        if (! $miseParallel) {
+            $lines = array_merge($lines, $this->maybeInstallMise());
         }
+        $lines = array_merge($lines, $this->writeRenderedConfigs('application', $web, $php, $layout));
+        $lines = array_merge($lines, $this->installComposerIfNeeded($php));
 
         return $lines;
+    }
+
+    /**
+     * Install Composer system-wide when PHP is present. Shared by every role
+     * that installs PHP (application, worker) so deploys never land on a box
+     * with PHP but no Composer — otherwise the deploy-time self-heal kicks in
+     * and installs it per-user under ~/.local/bin instead.
+     *
+     * @return list<string>
+     */
+    private function installComposerIfNeeded(string $php): array
+    {
+        if (! config('server_provision.install_composer', true) || $php === 'none') {
+            return [];
+        }
+
+        return [
+            $this->stepMarker('Installing Composer'),
+            $this->forceReinstall()
+                ? 'curl -fsSL https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer'
+                : 'if command -v composer >/dev/null 2>&1; then echo "[dply] composer already installed; skipping installer."; else curl -fsSL https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer; fi',
+        ];
     }
 
     /**
@@ -697,15 +814,28 @@ final class ServerProvisionCommandBuilder
     /**
      * @return list<string>
      */
-    private function roleWorker(string $php, string $database, array $layout): array
+    private function roleWorker(string $web, string $php, string $database, array $layout): array
     {
+        // Worker hosts install Caddy so sites deploy through the same
+        // vhost-and-FPM pipeline as application hosts. The server-default
+        // Caddyfile is a placeholder catch-all — per-site vhosts under
+        // /etc/caddy/sites-enabled/ take over for real hostnames.
+        $miseParallel = (bool) config('server_provision.parallel_runtimes', false);
+
         $lines = [];
         $lines = array_merge($lines, $this->ufwSsh());
-        $lines = array_merge($lines, $this->installPhpIfNeeded('none', $php, $database));
+        $lines = array_merge($lines, $this->installWebserver($web));
+        if ($miseParallel) {
+            $lines = array_merge($lines, $this->maybeInstallMise());
+        }
+        $lines = array_merge($lines, $this->installPhpIfNeeded($web, $php, $database));
         $lines = array_merge($lines, $this->installDatabaseIfNeeded($database));
         $lines = array_merge($lines, $this->maybeInstallSupervisor());
-        $lines = array_merge($lines, $this->maybeInstallMise());
-        $lines = array_merge($lines, $this->writeRenderedConfigs('worker', 'none', $php, $layout));
+        if (! $miseParallel) {
+            $lines = array_merge($lines, $this->maybeInstallMise());
+        }
+        $lines = array_merge($lines, $this->writeRenderedConfigs('worker', $web, $php, $layout));
+        $lines = array_merge($lines, $this->installComposerIfNeeded($php));
 
         return $lines;
     }
@@ -715,48 +845,65 @@ final class ServerProvisionCommandBuilder
      */
     private function roleDatabase(string $database, array $layout): array
     {
+        $config = DedicatedDatabaseServerProvisionConfig::fromServer($this->server, $database);
+
         $lines = [];
         $lines = array_merge($lines, $this->ufwSsh());
         $lines = array_merge($lines, $this->installDatabaseIfNeeded($database));
-        $lines[] = 'ufw deny 3306/tcp || true';
-        $lines[] = 'ufw deny 5432/tcp || true';
+
+        if ($config->remoteAccess && DedicatedDatabaseServerProvisionConfig::engineSupportsRemoteAccess($database)) {
+            $lines = array_merge($lines, $config->bootstrapLines());
+            $lines = array_merge($lines, $config->ufwAllowLines());
+        } else {
+            $lines[] = 'ufw deny 3306/tcp || true';
+            $lines[] = 'ufw deny 5432/tcp || true';
+            if (DedicatedDatabaseServerProvisionConfig::supportsBootstrapCredentials($database)) {
+                $lines = array_merge($lines, $config->bootstrapLines());
+            }
+        }
+
         $lines = array_merge($lines, $this->writeRenderedConfigs('database', 'none', 'none', $layout));
 
         return $lines;
     }
 
     /** @return list<string> */
+    private function roleCacheHost(string $cache): array
+    {
+        $engine = $cache === '' || $cache === 'none' ? 'redis' : $cache;
+        $config = DedicatedCacheServerProvisionConfig::fromServer($this->server, $engine);
+
+        return array_merge(
+            $this->ufwSsh(),
+            $this->installAppCache($engine, $config),
+            $config->ufwAllowLines(),
+        );
+    }
+
+    /** @return list<string> */
     private function roleRedis(): array
     {
-        $lines = $this->ufwSsh();
-        $lines = array_merge($lines, $this->ensurePackagesInstalled(
-            ['redis-server'],
-            '[dply] redis-server already installed; skipping package install.'
-        ));
-        $lines[] = $this->writeFileWithRollback('/etc/redis/redis.conf', "bind 127.0.0.1 -::1\nprotected-mode yes\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\n");
-        $lines[] = 'systemctl enable --now redis-server';
-
-        return $lines;
+        return $this->roleCacheHost('redis');
     }
 
     /** @return list<string> */
     private function roleValkey(): array
     {
-        $lines = $this->ufwSsh();
-        $lines[] = 'if dpkg -s valkey-server >/dev/null 2>&1 || dpkg -s valkey >/dev/null 2>&1; then echo "[dply] valkey already installed; skipping package install."; else apt-get install -y --no-install-recommends valkey-server || apt-get install -y --no-install-recommends valkey; fi';
-        $lines[] = $this->writeFileWithRollback('/etc/valkey/valkey.conf', "bind 127.0.0.1 ::1\nprotected-mode yes\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\n");
-        $lines[] = 'systemctl enable --now valkey-server 2>/dev/null || systemctl enable --now valkey 2>/dev/null || true';
-
-        return $lines;
+        return $this->roleCacheHost('valkey');
     }
 
     /** @return list<string> */
     private function roleLoadBalancer(array $layout): array
     {
         $lines = $this->ufwSsh();
+        // certbot deferred off the critical path when configured (issuance
+        // ensures it on first use); haproxy itself always installs here.
+        $lbPackages = (bool) config('server_provision.defer_certbot', false)
+            ? ['haproxy']
+            : ['haproxy', 'certbot'];
         $lines = array_merge($lines, $this->ensurePackagesInstalled(
-            ['haproxy', 'certbot'],
-            '[dply] haproxy and certbot already installed; skipping package install.'
+            $lbPackages,
+            '[dply] load balancer packages already installed; skipping package install.'
         ));
         $lines = array_merge($lines, $this->writeRenderedConfigs('load_balancer', 'none', 'none', $layout));
         $lines[] = 'systemctl enable --now haproxy';
@@ -821,21 +968,136 @@ final class ServerProvisionCommandBuilder
         $mise = app(MiseInstallScriptBuilder::class);
         $deployUser = (string) config('server_provision.deploy_ssh_user', 'dply');
 
+        // mise itself installs via apt (must be sequential — holds the dpkg
+        // lock). The per-runtime installs below (`mise use …`) download
+        // language binaries from github/nodejs.org and DON'T touch the dpkg
+        // lock, so they can run concurrently with the apt-heavy PHP/MySQL steps.
         $lines = array_merge(
             [$this->stepMarker('Installing mise (Node / Python / Ruby / Go manager)')],
             $mise->installLines($this->forceReinstall()),
             $mise->activateForUserLines($deployUser),
         );
 
+        $runtimeLines = [];
         $defaults = $this->serverRuntimeDefaults();
         foreach ($defaults as $runtime => $version) {
-            $lines = array_merge(
-                $lines,
+            $runtimeLines = array_merge(
+                $runtimeLines,
                 $mise->installRuntimeForUserLines($deployUser, $runtime, $version),
             );
         }
 
+        if ($runtimeLines === []) {
+            return $lines;
+        }
+
+        // Sequential (default): install runtimes inline.
+        if (! (bool) config('server_provision.parallel_runtimes', false)) {
+            return array_merge($lines, $runtimeLines);
+        }
+
+        // Parallel (opt-in): run the runtime downloads in a background subshell
+        // and record its PID so waitForBackgroundRuntimes() (emitted before
+        // verification) can join + report. Best-effort: a runtime failure warns
+        // rather than aborting the whole provision.
+        $bg = implode("\n", $runtimeLines);
+        $lines[] = 'mkdir -p /var/lib/dply';
+        $lines[] = "(\n".$bg."\n) > /var/lib/dply/mise-runtimes.log 2>&1 &";
+        $lines[] = 'echo $! > /var/lib/dply/mise-runtimes.pid';
+        $lines[] = 'echo "[dply] runtime installs (node/python/…) running in background to overlap apt steps."';
+
         return $lines;
+    }
+
+    /**
+     * Join background runtime installs started by maybeInstallMise() under the
+     * parallel_runtimes flag. No-op when nothing ran in the background (the PID
+     * file only exists when the flag is on and runtimes were queued). A failed
+     * background install warns (with its log) rather than aborting — the runtime
+     * can be reinstalled via the workspace later.
+     *
+     * @return list<string>
+     */
+    private function waitForBackgroundRuntimes(): array
+    {
+        return [
+            'if [ -f /var/lib/dply/mise-runtimes.pid ]; then '
+                .'_dply_rt_pid=$(cat /var/lib/dply/mise-runtimes.pid 2>/dev/null || echo ""); '
+                .'echo "[dply] waiting for background runtime installs (pid ${_dply_rt_pid})…"; '
+                .'if [ -n "${_dply_rt_pid}" ] && wait "${_dply_rt_pid}"; then '
+                    .'echo "[dply] background runtime installs finished."; '
+                .'else '
+                    .'echo "[dply] WARNING: background runtime install reported a failure — see log:" >&2; '
+                    .'cat /var/lib/dply/mise-runtimes.log >&2 2>/dev/null || true; '
+                .'fi; '
+                .'rm -f /var/lib/dply/mise-runtimes.pid; '
+            .'fi',
+        ];
+    }
+
+    /**
+     * Combined parallel download (prefetch_packages flag): pre-download the
+     * stack's stock-repo packages in ONE apt transaction after the base update,
+     * so apt fetches them in parallel and the per-component installs are
+     * disk-only. Runtime-filtered to packages apt can actually resolve at this
+     * point (third-party repos like pgdg/ondrej may not be added yet), and
+     * fully best-effort — anything not prefetched simply downloads at install
+     * time as before. No-op when the flag is off.
+     *
+     * @return list<string>
+     */
+    private function prefetchPackages(string $web, string $php, string $database, string $cache): array
+    {
+        if (! (bool) config('server_provision.prefetch_packages', false)) {
+            return [];
+        }
+
+        $candidates = [];
+
+        if ($php !== 'none') {
+            $stem = $this->phpStem($php);
+            foreach (['-cli', '-fpm', '-common', '-mbstring', '-xml', '-curl', '-mysql', '-pgsql', '-sqlite3', '-redis', '-gd', '-bcmath', '-intl', '-zip', '-opcache'] as $ext) {
+                $candidates[] = $stem.$ext;
+            }
+        }
+
+        if (in_array($database, ['mysql84', 'mysql80', 'mysql57', 'mariadb114', 'mariadb11', 'mariadb1011'], true)) {
+            $candidates[] = 'mysql-server';
+        }
+
+        $candidates[] = match ($cache) {
+            'redis' => 'redis-server',
+            'valkey' => 'valkey-server',
+            default => '',
+        };
+
+        $candidates[] = match ($web) {
+            'nginx' => 'nginx',
+            'apache' => 'apache2',
+            default => '',
+        };
+
+        $candidates = array_values(array_filter($candidates, fn (string $p): bool => $p !== ''));
+        if ($candidates === []) {
+            return [];
+        }
+
+        $list = implode(' ', $candidates);
+
+        return [
+            implode("\n", [
+                'echo "[dply] prefetching stock packages (one parallel download pass)…"',
+                '_dply_prefetch=""',
+                'for _dply_pf in '.$list.'; do',
+                '  if apt-cache show "$_dply_pf" >/dev/null 2>&1; then _dply_prefetch="$_dply_prefetch $_dply_pf"; fi',
+                'done',
+                'if [ -n "$_dply_prefetch" ]; then',
+                '  dply_wait_for_apt_locks || true',
+                '  DEBIAN_FRONTEND=noninteractive apt-get install -y --download-only --no-install-recommends $_dply_prefetch >/dev/null 2>&1 || true',
+                '  echo "[dply] prefetch complete:$_dply_prefetch"',
+                'fi',
+            ]),
+        ];
     }
 
     /**
@@ -868,6 +1130,16 @@ final class ServerProvisionCommandBuilder
             $clean[$runtime] = $version;
         }
 
+        // A PHP application server almost always builds front-end assets
+        // (`npm run build`), and the laravel_app profile advertises "NPM" — so
+        // default Node when PHP is installed and no node was pinned, instead of
+        // silently shipping a server with no npm. Operators who truly don't want
+        // it can still pin runtime_defaults without node.
+        $php = trim((string) ($meta['php_version'] ?? 'none'));
+        if (! isset($clean['node']) && $php !== '' && $php !== 'none') {
+            $clean['node'] = (string) config('server_provision.default_node_version', '22');
+        }
+
         return $clean;
     }
 
@@ -882,53 +1154,60 @@ final class ServerProvisionCommandBuilder
     /**
      * @return list<string>
      */
-    private function installAppCache(string $cache): array
+    private function installAppCache(string $cache, ?DedicatedCacheServerProvisionConfig $config = null): array
     {
+        $redisConf = $config?->configFileContent('redis') ?? "bind 127.0.0.1 -::1\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\n";
+        $valkeyConf = $config?->configFileContent('valkey') ?? "bind 127.0.0.1 ::1\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\n";
+        $keydbConf = $config?->configFileContent('keydb') ?? "bind 127.0.0.1 ::1\nprotected-mode yes\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\nport 6379\n";
+        $memcachedConf = $config?->configFileContent('memcached') ?? "-d\nlogfile /var/log/memcached.log\n-m 256\n-p 11211\n-l 127.0.0.1\n-U 0\n";
+
+        // `systemctl enable --now` is a no-op when the unit is already running
+        // — it does NOT pick up a freshly-written config. apt-get install for
+        // redis/valkey/keydb/memcached auto-starts the daemon on the package's
+        // default config (loopback only), so the dply config we write next is
+        // only applied after an explicit restart. Without the restart step
+        // operators provisioning a remote-access cache box end up with bind
+        // 127.0.0.1 in the file but a process listening on 127.0.0.1 only —
+        // exactly the bug we saw on dply-redis-1.
         return match ($cache) {
             'none' => [],
             'valkey' => $this->withStep('Installing Valkey', [
                 'if dpkg -s valkey-server >/dev/null 2>&1 || dpkg -s valkey >/dev/null 2>&1; then echo "[dply] valkey already installed; skipping package install."; else apt-get install -y --no-install-recommends valkey-server || apt-get install -y --no-install-recommends valkey; fi',
-                $this->writeFileWithRollback('/etc/valkey/valkey.conf', "bind 127.0.0.1 ::1\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\n"),
-                'systemctl enable --now valkey-server 2>/dev/null || systemctl enable --now valkey 2>/dev/null || true',
+                'if command -v redis-cli >/dev/null 2>&1; then echo "[dply] redis-cli already available."; else apt-get install -y --no-install-recommends redis-tools || true; fi',
+                $this->writeFileWithRollback('/etc/valkey/valkey.conf', $valkeyConf),
+                'systemctl enable valkey-server 2>/dev/null || systemctl enable valkey 2>/dev/null || true',
+                'systemctl restart valkey-server 2>/dev/null || systemctl restart valkey 2>/dev/null || true',
             ]),
             'memcached' => $this->withStep('Installing Memcached', [
                 ...$this->ensurePackagesInstalled(
                     ['memcached', 'libmemcached-tools'],
                     '[dply] memcached already installed; skipping package install.'
                 ),
-                $this->writeFileWithRollback('/etc/memcached.conf', "-d\nlogfile /var/log/memcached.log\n-m 256\n-p 11211\n-l 127.0.0.1\n-U 0\n"),
-                'systemctl enable --now memcached',
+                $this->writeFileWithRollback('/etc/memcached.conf', $memcachedConf),
+                'systemctl enable memcached',
+                'systemctl restart memcached',
             ]),
-            'keydb' => $this->installKeyDb(),
+            'keydb' => $this->withStep('Installing KeyDB', [
+                'if dpkg -s keydb-server >/dev/null 2>&1 || dpkg -s keydb >/dev/null 2>&1; then echo "[dply] keydb already installed; skipping repository + package install."; else '
+                    .'apt-get install -y --no-install-recommends software-properties-common ca-certificates && '
+                    .'add-apt-repository -y ppa:eq-alpha/keydb 2>/dev/null || true; '
+                    .'dply_apt_update && '
+                    .'apt-get install -y --no-install-recommends keydb-server keydb-tools; fi',
+                $this->writeFileWithRollback('/etc/keydb/keydb.conf', $keydbConf),
+                'systemctl enable keydb-server 2>/dev/null || systemctl enable keydb 2>/dev/null || true',
+                'systemctl restart keydb-server 2>/dev/null || systemctl restart keydb 2>/dev/null || true',
+            ]),
             'dragonfly' => $this->installDragonfly(),
             default => $this->withStep('Installing Redis', [
                 ...$this->ensurePackagesInstalled(
-                    ['redis-server'],
+                    ['redis-server', 'redis-tools'],
                     '[dply] redis-server already installed; skipping package install.'
                 ),
-                $this->writeFileWithRollback('/etc/redis/redis.conf', "bind 127.0.0.1 -::1\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\n"),
-                'systemctl enable --now redis-server',
+                $this->writeFileWithRollback('/etc/redis/redis.conf', $redisConf),
+                'systemctl enable redis-server',
+                'systemctl restart redis-server',
             ]),
         };
-    }
-
-    /**
-     * Install KeyDB from the project's launchpad PPA. Drop-in Redis replacement;
-     * provides redis-cli compatibility and a `keydb-server` systemd unit.
-     *
-     * @return list<string>
-     */
-    private function installKeyDb(): array
-    {
-        return $this->withStep('Installing KeyDB', [
-            'if dpkg -s keydb-server >/dev/null 2>&1 || dpkg -s keydb >/dev/null 2>&1; then echo "[dply] keydb already installed; skipping repository + package install."; else '
-                .'apt-get install -y --no-install-recommends software-properties-common ca-certificates && '
-                .'add-apt-repository -y ppa:eq-alpha/keydb 2>/dev/null || true; '
-                .'apt-get update -y && '
-                .'apt-get install -y --no-install-recommends keydb-server keydb-tools; fi',
-            $this->writeFileWithRollback('/etc/keydb/keydb.conf', "bind 127.0.0.1 ::1\nprotected-mode yes\nmaxmemory 256mb\nmaxmemory-policy allkeys-lru\nport 6379\n"),
-            'systemctl enable --now keydb-server 2>/dev/null || systemctl enable --now keydb 2>/dev/null || true',
-        ]);
     }
 
     /**
@@ -946,7 +1225,7 @@ final class ServerProvisionCommandBuilder
                 .'chmod 0644 /etc/apt/keyrings/dragonfly.gpg && '
                 .'. /etc/os-release && '
                 .'echo "deb [signed-by=/etc/apt/keyrings/dragonfly.gpg] https://packages.dragonflydb.io/dragonfly/ubuntu ${VERSION_CODENAME:-jammy} main" > /etc/apt/sources.list.d/dragonfly.list && '
-                .'apt-get update -y && '
+                .'dply_apt_update && '
                 .'apt-get install -y --no-install-recommends dragonfly; fi',
             // Dragonfly ships its own systemd unit; just ensure it's enabled.
             'systemctl enable --now dragonfly 2>/dev/null || true',
@@ -985,8 +1264,11 @@ final class ServerProvisionCommandBuilder
         } elseif ($web === 'openlitespeed') {
             $lines[] = $this->stepMarker('Installing webserver');
             $lines[] = 'wget -qO - https://repo.litespeed.sh | bash';
-            $lines[] = 'apt-get update -y';
-            $lines[] = 'apt-get install -y --no-install-recommends openlitespeed';
+            $lines[] = 'dply_apt_update';
+            $lines = array_merge($lines, $this->ensurePackagesInstalled(
+                ['openlitespeed'],
+                '[dply] openlitespeed already installed; skipping package install.'
+            ));
             $lines[] = 'ufw allow 80/tcp';
             $lines[] = 'ufw allow 443/tcp';
             $lines[] = '/usr/local/lsws/bin/lswsctrl start || true';
@@ -995,14 +1277,20 @@ final class ServerProvisionCommandBuilder
             $lines[] = 'install -d /usr/share/keyrings';
             $lines[] = 'curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key | gpg --batch --yes --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg';
             $lines[] = 'curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt | tee /etc/apt/sources.list.d/caddy-stable.list';
-            $lines[] = 'apt-get update -y';
-            $lines[] = 'apt-get install -y --no-install-recommends caddy';
+            $lines[] = 'dply_apt_update';
+            $lines = array_merge($lines, $this->ensurePackagesInstalled(
+                ['caddy'],
+                '[dply] caddy already installed; skipping package install.'
+            ));
             $lines[] = 'ufw allow 80/tcp';
             $lines[] = 'ufw allow 443/tcp';
             $lines[] = 'systemctl enable --now caddy';
         } elseif ($web === 'traefik') {
             $lines[] = $this->stepMarker('Installing webserver');
-            $lines[] = 'apt-get install -y --no-install-recommends traefik caddy';
+            $lines = array_merge($lines, $this->ensurePackagesInstalled(
+                ['traefik', 'caddy'],
+                '[dply] traefik + caddy already installed; skipping package install.'
+            ));
             $lines[] = 'install -d -m 0755 /etc/traefik/dynamic /etc/caddy/sites-enabled /var/log/traefik';
             $lines[] = $this->writeFileWithRollback('/etc/traefik/traefik.yml', "entryPoints:\n  web:\n    address: \":80\"\nproviders:\n  file:\n    directory: \"/etc/traefik/dynamic\"\n    watch: true\nlog:\n  filePath: \"/var/log/traefik/traefik.log\"\naccessLog:\n  filePath: \"/var/log/traefik/access.log\"\n");
             $lines[] = 'ufw allow 80/tcp';
@@ -1017,6 +1305,13 @@ final class ServerProvisionCommandBuilder
     /** @return list<string> */
     private function certbotForWeb(string $web): array
     {
+        // Optionally defer certbot off the provision critical path — the cert
+        // issuance builder ensures certbot is present on first use, so this is
+        // correctness-preserving. Off by default (installs here as before).
+        if ((bool) config('server_provision.defer_certbot', false)) {
+            return [];
+        }
+
         if ($web === 'nginx') {
             return $this->ensurePackagesInstalled(
                 ['certbot', 'python3-certbot-nginx'],
@@ -1043,36 +1338,99 @@ final class ServerProvisionCommandBuilder
         }
 
         $stem = $this->phpStem($php);
+
+        // Only set up the ondrej/sury PPA when the distro repo can't already
+        // provide the requested PHP. Ubuntu 24.04 ships php8.3 natively, so for
+        // the default version this skips the upstream probe + keyring + an extra
+        // apt-get update (~90s) entirely. Gated at runtime on `apt-cache show`
+        // (after the base update) rather than a hardcoded codename→version map,
+        // so it stays correct as newer Ubuntu releases ship newer PHP. When the
+        // requested version isn't in the distro repo (e.g. 8.4 on noble), the
+        // PPA is added as before.
+        $cliPkg = $stem.'-cli';
         $lines = [
             $this->stepMarker('Installing PHP '.$php),
-            ...$this->ensureOndrejPhpRepository(),
+            implode("\n", [
+                'if apt-cache show '.escapeshellarg($cliPkg).' >/dev/null 2>&1; then',
+                '  echo "[dply] '.$cliPkg.' is available from the distro repository — skipping ondrej/sury PPA setup."',
+                'else',
+                '  echo "[dply] '.$cliPkg.' not in the distro repository — adding ondrej/sury PPA."',
+                implode("\n", $this->ensureOndrejPhpRepository()),
+                'fi',
+            ]),
         ];
 
-        $pkgs = [
+        // Core PHP packages — the runtime, the FPM unit, the shared module
+        // bundle, the must-have string/markup/HTTP extensions, the selected DB
+        // driver, and SQLite for the test suite. These all exist in both
+        // Ubuntu's stock repo and ondrej/sury, so a missing one here is a
+        // genuine failure that SHOULD abort the provision (strict install).
+        $requiredPkgs = [
             $stem.'-cli',
             $stem.'-fpm',
             $stem.'-common',
             $stem.'-mbstring',
             $stem.'-xml',
             $stem.'-curl',
-            $stem.'-zip',
-            $stem.'-intl',
-            $stem.'-bcmath',
-            $stem.'-opcache',
         ];
 
         if (str_starts_with($database, 'postgres')) {
-            $pkgs[] = $stem.'-pgsql';
-        } elseif (in_array($database, ['mysql84', 'mysql80', 'mysql57', 'mariadb114', 'mariadb11', 'mariadb1011'], true)) {
-            $pkgs[] = $stem.'-mysql';
-        } elseif ($database === 'sqlite3') {
-            $pkgs[] = $stem.'-sqlite3';
+            $requiredPkgs[] = $stem.'-pgsql';
         } else {
-            $pkgs[] = $stem.'-mysql';
+            // Default / MySQL / MariaDB / unrecognised → MySQL driver.
+            $requiredPkgs[] = $stem.'-mysql';
         }
 
-        $lines = array_merge($lines, $this->ensurePackagesInstalled(
-            $pkgs,
+        // SQLite is always installed regardless of the chosen primary database:
+        // virtually every Laravel app uses SQLite for the test suite (RefreshDatabase
+        // with :memory: or a tmp file), even when production runs MySQL or Postgres.
+        // The setup-script presets already bundle it unconditionally; this aligns
+        // the apt-provisioned path so `php artisan test` works out of the box.
+        $requiredPkgs[] = $stem.'-sqlite3';
+
+        // Optional extensions — these improve compatibility/performance but a
+        // Laravel app boots fine without any of them, and crucially NOT every
+        // one is packaged in every repo. Ubuntu noble ships php8.3 but builds
+        // sodium into the core (there is no separate php8.3-sodium package), and
+        // ondrej/sury can be briefly unreachable from a fresh droplet. Installed
+        // best-effort (any package apt can't see is skipped with a log line) so
+        // a single unavailable extension can't abort the whole provision — which
+        // is exactly what wedged servers on `E: Unable to locate package
+        // php8.3-sodium`.
+        $optionalPkgs = [
+            // phpredis client extension. Provisioning installs the Redis *daemon*
+            // (see roleCacheHost/roleRedis); the PHP client default is phpredis,
+            // so without it a Laravel app hits `Class "Redis" not found`.
+            $stem.'-redis',
+            // GD image library — spatie/media-library, intervention/image, QR/avatar libs.
+            $stem.'-gd',
+            // Sodium cryptography — Laravel prefers ext-sodium (falls back to openssl).
+            $stem.'-sodium',
+            // GNU Multiple Precision — ramsey/uuid, moneyphp/money, league/uri, web-auth.
+            $stem.'-gmp',
+            // APCu in-memory user cache — the `apcu` cache driver.
+            $stem.'-apcu',
+            // igbinary serializer — compact payloads for phpredis cache/session/queue.
+            $stem.'-igbinary',
+            // Archive handling (Composer), i18n formatting, arbitrary-precision math.
+            $stem.'-zip',
+            $stem.'-intl',
+            $stem.'-bcmath',
+        ];
+
+        // OPcache is a standalone phpX.Y-opcache package up to 8.4; from 8.5 it
+        // ships bundled with the core build (no separate package), so on 8.5+
+        // the best-effort filter below simply skips it.
+        if (version_compare($php, '8.5', '<')) {
+            $optionalPkgs[] = $stem.'-opcache';
+        }
+
+        // Core + optional extensions in ONE apt transaction (was two): core is
+        // strict, optional is filtered to what's available, so a single dpkg run
+        // installs everything that exists without a missing optional aborting it.
+        $lines = array_merge($lines, $this->ensureMixedPackagesInstalled(
+            $requiredPkgs,
+            $optionalPkgs,
             '[dply] PHP packages already installed; skipping package install.'
         ));
 
@@ -1099,15 +1457,24 @@ final class ServerProvisionCommandBuilder
             $stem = $this->phpStem($php);
 
             return [
-                'apt-get install -y --no-install-recommends libapache2-mod-'.$stem,
+                ...$this->ensurePackagesInstalled(
+                    ['libapache2-mod-'.$stem],
+                    '[dply] apache PHP module already installed; skipping package install.'
+                ),
                 'a2enmod '.$stem,
                 'systemctl reload apache2',
             ];
         }
 
         if ($web === 'openlitespeed') {
+            // OpenLiteSpeed runs its own lsphp build, separate from the phpX.Y-fpm
+            // packages above — so it needs lsphpNN-redis explicitly, or OLS-served
+            // Laravel apps still hit `Class "Redis" not found` even though the
+            // phpX.Y CLI has the extension.
+            $lsphp = 'lsphp'.str_replace('.', '', $php);
+
             return [
-                'apt-get install -y --no-install-recommends lsphp'.str_replace('.', '', $php).' lsphp'.str_replace('.', '', $php).'-mysql lsphp'.str_replace('.', '', $php).'-pgsql || true',
+                'apt-get install -y --no-install-recommends '.$lsphp.' '.$lsphp.'-mysql '.$lsphp.'-pgsql '.$lsphp.'-redis || true',
                 '/usr/local/lsws/bin/lswsctrl restart || true',
             ];
         }
@@ -1351,15 +1718,16 @@ final class ServerProvisionCommandBuilder
                     .'exit 1; '
                 .'}; '
             .'fi',
-            // Wait up to 30s for the daemon to actually accept
-            // connections — systemctl returns when the unit is active,
-            // but mysqld can still be running internal init.
+            // Wait for the daemon to actually accept connections — systemctl
+            // returns when the unit is active, but mysqld can still be running
+            // internal init. Poll at 1s (was 3s) so we proceed the moment it's
+            // ready instead of overshooting by up to ~3s; same ~60s ceiling.
             'echo "[dply] waiting for mysqld socket..."',
-            'for i in 1 2 3 4 5 6 7 8 9 10; do '
+            'for i in $(seq 1 60); do '
                 .'if mysqladmin --protocol=socket -uroot ping >/dev/null 2>&1; then '
-                    .'echo "[dply] MySQL is accepting connections."; break; '
+                    .'echo "[dply] MySQL is accepting connections (after ${i}s)."; break; '
                 .'fi; '
-                .'sleep 3; '
+                .'sleep 1; '
             .'done',
             'echo "[dply] MySQL variants (5.7/8.0/8.4) use distro mysql-server package where applicable; pin versions in follow-up automation if required."',
             // Reconciliation marker: normal-path mysql install, snapshot
@@ -1410,7 +1778,7 @@ final class ServerProvisionCommandBuilder
             'curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc',
             'chmod 644 /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc',
             '. /etc/os-release && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main" > /etc/apt/sources.list.d/pgdg.list',
-            'apt-get update -y',
+            'dply_apt_update',
             ...$this->ensurePackagesInstalled(
                 ['postgresql-'.$ver],
                 '[dply] postgresql-'.$ver.' already installed; skipping package install.'
@@ -1462,6 +1830,9 @@ final class ServerProvisionCommandBuilder
         // server provisioning. The legacy "apps/<server-slug>" tree +
         // dply-prepare-layout systemd unit baked single-app-per-server
         // assumptions into the bare-server pipeline; both come out here.
+        $homeDir = dirname($layout['web_root']); // /home/dply
+        $webGroup = (string) config('site_settings.vm_site_file_web_group', 'www-data');
+
         return $this->withStep('Preparing server filesystem', [
             'install -d -m 0755 '.implode(' ', array_map('escapeshellarg', [
                 $layout['web_root'],
@@ -1470,7 +1841,72 @@ final class ServerProvisionCommandBuilder
             // Render a dply-branded landing page so port 80 returns
             // something honest until the operator creates a site.
             'cat > '.escapeshellarg($layout['web_root'].'/index.html').' <<\'EOF\'
-<!doctype html><html lang="en"><head><meta charset="utf-8"><title>dply server ready</title><style>body{font-family:system-ui,sans-serif;max-width:36rem;margin:6rem auto;padding:0 1.5rem;color:#171a0e}h1{font-size:1.5rem;margin:0 0 .5rem}p{color:#5a6354}code{background:#f6f4ee;padding:.15rem .35rem;border-radius:.25rem}</style></head><body><h1>dply server ready</h1><p>This server is provisioned but has no sites yet. Create one from your dply dashboard or via <code>dply:site:create</code>.</p></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>dply &middot; server ready</title>
+<style>
+:root{--ink:#171a0e;--moss:#5a6354;--mist:#8b9382;--cream:#f7f5ef;--line:rgba(23,26,14,.08);--forest:#1f3d2b;--sage:#7e9b5b;--gold:#c8a13a}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:radial-gradient(55rem 38rem at 88% -12%,rgba(126,155,91,.18),transparent 60%),radial-gradient(48rem 34rem at -12% 112%,rgba(200,161,58,.15),transparent 60%),linear-gradient(180deg,var(--cream),#fff 62%);display:flex;align-items:center;justify-content:center;padding:1.5rem;-webkit-font-smoothing:antialiased}
+.card{width:100%;max-width:40rem;background:rgba(255,255,255,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:1.5rem;box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 28px 64px -30px rgba(23,26,14,.3)}
+.top{padding:2.4rem 2.4rem 0}
+.row{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:2rem}
+.mark{display:inline-flex;align-items:center;gap:.6rem;font-weight:800;letter-spacing:-.03em;font-size:1.1rem}
+.glyph{width:1.8rem;height:1.8rem;border-radius:.55rem;background:linear-gradient(150deg,var(--forest),#35684a);color:#eef3e8;display:inline-flex;align-items:center;justify-content:center;font-size:1.05rem;font-weight:800;box-shadow:0 8px 20px -10px rgba(31,61,43,.9)}
+.pill{display:inline-flex;align-items:center;gap:.5rem;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:var(--forest);background:rgba(126,155,91,.15);border:1px solid rgba(126,155,91,.32);padding:.42rem .72rem;border-radius:999px}
+.live{position:relative;display:inline-block;width:.5rem;height:.5rem}
+.live i{position:absolute;inset:0;border-radius:999px;background:var(--sage)}
+.live i.p{animation:ping 1.6s cubic-bezier(0,0,.2,1) infinite}
+@keyframes ping{75%,100%{transform:scale(2.6);opacity:0}}
+h1{font-size:2.1rem;line-height:1.08;letter-spacing:-.03em;margin:.2rem 0 .65rem}
+.sub{color:var(--moss);font-size:1.02rem;line-height:1.62;margin:0;max-width:33rem}
+.term{margin:2rem 2.4rem 0}
+.tbar{display:flex;align-items:center;gap:.45rem;padding:.7rem .85rem;background:#10160f;border:1px solid #0a0e09;border-bottom:0;border-radius:.9rem .9rem 0 0}
+.tbar b{width:.62rem;height:.62rem;border-radius:999px;display:inline-block}
+.tbar span{margin-left:auto;color:#5d6b58;font:600 .66rem/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase}
+.tbody{background:#0c110b;border:1px solid #0a0e09;border-radius:0 0 .9rem .9rem;padding:1rem 1.1rem;font:.86rem/1.7 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.tbody .c{color:#5d6b58}
+.tbody .p{color:#7e9b5b}
+.tbody .cmd{color:#e9efe1}
+.cur{display:inline-block;width:.55rem;height:1.05rem;background:#7e9b5b;vertical-align:-.15rem;margin-left:.15rem;animation:blink 1.1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.steps{display:flex;flex-wrap:wrap;gap:.55rem;padding:1.6rem 2.4rem 0}
+.chip{display:inline-flex;align-items:center;gap:.5rem;font-size:.82rem;font-weight:600;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:.7rem;padding:.55rem .8rem;box-shadow:0 1px 2px rgba(23,26,14,.04)}
+.chip i{width:.5rem;height:.5rem;border-radius:999px;background:var(--sage)}
+.foot{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-top:2rem;padding:1.1rem 2.4rem;border-top:1px solid var(--line);color:var(--mist);font-size:.78rem}
+.foot a{color:var(--moss);text-decoration:none;font-weight:600}
+@media (max-width:480px){.top,.term,.steps,.foot{padding-left:1.5rem;padding-right:1.5rem}h1{font-size:1.7rem}}
+@media (prefers-color-scheme:dark){body{color:#eef3e8;background:radial-gradient(55rem 38rem at 88% -12%,rgba(126,155,91,.14),transparent 60%),linear-gradient(180deg,#0c110b,#0e140d)}.card{background:rgba(20,26,18,.72);border-color:rgba(255,255,255,.08);box-shadow:0 28px 64px -30px #000}h1{color:#f3f7ee}.sub{color:#aeb8a4}.chip{background:rgba(255,255,255,.04);color:#eef3e8;border-color:rgba(255,255,255,.08)}.foot{border-color:rgba(255,255,255,.08)}.pill{color:#aac083}}
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="top">
+    <div class="row">
+      <span class="mark"><span class="glyph">d</span>dply</span>
+      <span class="pill"><span class="live"><i class="p"></i><i></i></span>Server ready</span>
+    </div>
+    <h1>Your server is provisioned.</h1>
+    <p class="sub">It is wired up and listening on port 80 &mdash; there are just no sites on it yet. Spin up your first one from the dply dashboard, or straight from the CLI.</p>
+  </div>
+  <div class="term">
+    <div class="tbar"><b style="background:#f1645c"></b><b style="background:#f5c14e"></b><b style="background:#5fcf80"></b><span>dply</span></div>
+    <div class="tbody"><span class="c"># create your first site</span><br><span class="p">~ $</span> <span class="cmd">dply:site:create</span><span class="cur"></span></div>
+  </div>
+  <div class="steps">
+    <span class="chip"><i></i>Connect a repository</span>
+    <span class="chip"><i></i>Install WordPress</span>
+    <span class="chip"><i></i>Start from blank</span>
+  </div>
+  <div class="foot"><span>Powered by dply</span><a href="https://dply.io">dply.io &rarr;</a></div>
+</main>
+</body>
+</html>
 EOF',
             // Owned by dply:dply since the docroot now lives under
             // /home/dply/. Nginx (running as www-data) needs read +
@@ -1480,6 +1916,16 @@ EOF',
             // nginx serves them.
             'chown -R dply:dply '.escapeshellarg($layout['web_root']).' || true',
             'chmod 755 '.escapeshellarg($layout['web_root']),
+            // The dply user's HOME must itself be traversable by the web server,
+            // or every docroot under it 404s — nginx (www-data) / Caddy (caddy ∈
+            // www-data) can't reach /home/dply/<site>/public. `useradd` can create
+            // the home 0750 dply:dply (no traversal for the web group); set it to
+            // 2750 dply:<webgroup> to match the deploy file model (see
+            // RelocateSiteFilesJob), falling back to 0755 if the group is absent.
+            'getent group '.escapeshellarg($webGroup).' >/dev/null 2>&1 '
+                .'&& chgrp '.escapeshellarg($webGroup).' '.escapeshellarg($homeDir).' '
+                .'&& chmod 2750 '.escapeshellarg($homeDir).' '
+                .'|| chmod 0755 '.escapeshellarg($homeDir),
         ]);
     }
 
@@ -1680,16 +2126,18 @@ APACHE,
             $checks['mysql'] = 'systemctl is-active mysql || systemctl is-active mariadb';
         }
 
-        if ($cache === 'redis') {
-            $checks['redis'] = 'redis-cli ping';
-        } elseif ($cache === 'valkey') {
-            $checks['valkey'] = 'valkey-cli ping || redis-cli ping';
-        } elseif ($cache === 'memcached') {
-            $checks['memcached'] = 'systemctl is-active memcached';
-        } elseif ($cache === 'keydb') {
-            $checks['keydb'] = 'keydb-cli ping 2>/dev/null || redis-cli ping';
-        } elseif ($cache === 'dragonfly') {
-            $checks['dragonfly'] = 'systemctl is-active dragonfly && redis-cli ping';
+        if ($role !== 'database') {
+            if ($cache === 'redis') {
+                $checks['redis'] = 'redis-cli ping';
+            } elseif ($cache === 'valkey') {
+                $checks['valkey'] = 'valkey-cli ping || redis-cli ping';
+            } elseif ($cache === 'memcached') {
+                $checks['memcached'] = 'systemctl is-active memcached';
+            } elseif ($cache === 'keydb') {
+                $checks['keydb'] = 'keydb-cli ping 2>/dev/null || redis-cli ping';
+            } elseif ($cache === 'dragonfly') {
+                $checks['dragonfly'] = 'systemctl is-active dragonfly && redis-cli ping';
+            }
         }
 
         if ($role === 'load_balancer') {
@@ -1866,12 +2314,103 @@ APACHE,
 
         if ($this->forceReinstall()) {
             return [
-                'apt-get install -y --no-install-recommends '.implode(' ', $packages),
+                'dply_wait_for_apt_locks || exit 100',
+                'for _dply_apt_attempt in 1 2 3 4 5 6; do',
+                '  dply_wait_for_apt_locks || exit 100',
+                '  _dply_apt_log=$(DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends '.implode(' ', $packages).' 2>&1) || true',
+                '  echo "$_dply_apt_log"',
+                '  if echo "$_dply_apt_log" | grep -qE "Could not get lock|Unable to acquire the dpkg frontend lock|is held by process"; then',
+                '    echo "[dply] apt lock during install — sleeping 15s before retry $_dply_apt_attempt/6."',
+                '    sleep 15',
+                '    continue',
+                '  fi',
+                '  if ! echo "$_dply_apt_log" | grep -qE "^E: "; then break; fi',
+                '  if [ "$_dply_apt_attempt" -eq 6 ]; then exit 100; fi',
+                '  sleep 15',
+                'done',
             ];
         }
 
+        $installBlock = implode(' ', [
+            'dply_wait_for_apt_locks || exit 100;',
+            'for _dply_apt_attempt in 1 2 3 4 5 6; do',
+            'dply_wait_for_apt_locks || exit 100;',
+            '_dply_apt_log=$(DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends '.implode(' ', $packages).' 2>&1) || true;',
+            'echo "$_dply_apt_log";',
+            'if echo "$_dply_apt_log" | grep -qE "Could not get lock|Unable to acquire the dpkg frontend lock|is held by process"; then',
+            'echo "[dply] apt lock during install — sleeping 15s before retry $_dply_apt_attempt/6.";',
+            'sleep 15;',
+            'continue;',
+            'fi;',
+            'if ! echo "$_dply_apt_log" | grep -qE "^E: "; then break; fi;',
+            'if [ "$_dply_apt_attempt" -eq 6 ]; then exit 100; fi;',
+            'sleep 15;',
+            'done',
+        ]);
+
         return [
-            'if '.implode(' && ', $checks).'; then echo '.escapeshellarg($alreadyInstalledMessage).'; else apt-get install -y --no-install-recommends '.implode(' ', $packages).'; fi',
+            'if '.implode(' && ', $checks).'; then echo '.escapeshellarg($alreadyInstalledMessage).'; else '.$installBlock.'; fi',
+        ];
+    }
+
+    /**
+     * Install REQUIRED packages (strict — abort on any missing) and OPTIONAL
+     * packages (best-effort — filtered to what apt can resolve) in a SINGLE
+     * apt-get transaction. This merges what was two separate dpkg runs (e.g.
+     * PHP core + PHP extensions) into one, saving a full lock-wait + dpkg cycle.
+     * Required-missing still trips exit 100; optional-missing are pre-filtered
+     * out so they can't.
+     *
+     * @param  list<string>  $required
+     * @param  list<string>  $optional
+     * @return list<string>
+     */
+    private function ensureMixedPackagesInstalled(array $required, array $optional, string $alreadyInstalledMessage): array
+    {
+        $required = array_values(array_filter($required, fn (string $p): bool => trim($p) !== ''));
+        $optional = array_values(array_filter($optional, fn (string $p): bool => trim($p) !== ''));
+        if ($required === [] && $optional === []) {
+            return [];
+        }
+
+        // Skip-fast only on the REQUIRED set. Optional extensions may legitimately
+        // have no package on the distro (e.g. php8.3-sodium on noble — built into
+        // core), so dpkg -s would always fail for them and the "already installed"
+        // short-circuit could never fire on a resume/baked-snapshot re-run.
+        $checks = array_map(
+            fn (string $p): string => 'dpkg -s '.escapeshellarg($p).' >/dev/null 2>&1',
+            $required,
+        );
+
+        $requiredList = implode(' ', $required);
+        $optionalList = implode(' ', $optional);
+
+        $install = implode("\n", [
+            '_dply_opt_avail=""',
+            $optional === [] ? ': # no optional packages' : 'for _dply_opt_pkg in '.$optionalList.'; do',
+            $optional === [] ? '' : '  if apt-cache show "$_dply_opt_pkg" >/dev/null 2>&1; then _dply_opt_avail="$_dply_opt_avail $_dply_opt_pkg"; else echo "[dply] optional PHP extension $_dply_opt_pkg not available in configured repos — skipping."; fi',
+            $optional === [] ? '' : 'done',
+            'dply_wait_for_apt_locks || exit 100',
+            'for _dply_apt_attempt in 1 2 3 4 5 6; do',
+            '  dply_wait_for_apt_locks || exit 100',
+            '  _dply_apt_log=$(DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends '.$requiredList.' $_dply_opt_avail 2>&1) || true',
+            '  echo "$_dply_apt_log"',
+            '  if echo "$_dply_apt_log" | grep -qE "Could not get lock|Unable to acquire the dpkg frontend lock|is held by process"; then',
+            '    echo "[dply] apt lock during install — sleeping 15s before retry $_dply_apt_attempt/6."',
+            '    sleep 15',
+            '    continue',
+            '  fi',
+            '  if ! echo "$_dply_apt_log" | grep -qE "^E: "; then break; fi',
+            '  if [ "$_dply_apt_attempt" -eq 6 ]; then exit 100; fi',
+            '  sleep 15',
+            'done',
+        ]);
+
+        // Drop the empty placeholder lines we may have inserted for the no-optional case.
+        $install = implode("\n", array_values(array_filter(explode("\n", $install), fn (string $l): bool => $l !== '')));
+
+        return [
+            'if '.implode(' && ', $checks).'; then echo '.escapeshellarg($alreadyInstalledMessage).'; else'."\n".$install."\n".'fi',
         ];
     }
 
@@ -1909,7 +2448,7 @@ APACHE,
             '  echo "[dply] apt-get update attempt $attempt/6 (refreshing ondrej/php sources)..."',
             '  update_log=$(timeout 300s apt-get update -y -o Acquire::Retries=3 -o Acquire::http::Timeout=30 2>&1 || true)',
             '  echo "$update_log"',
-            '  if echo "$update_log" | grep -qE "Could not get lock|is held by process"; then',
+            '  if echo "$update_log" | grep -qE "Could not get lock|Unable to acquire the dpkg frontend lock|is held by process"; then',
             '    if [ "$lock_retries" -lt 6 ]; then',
             '      lock_retries=$((lock_retries + 1))',
             '      echo "[dply] another apt-get acquired the lock during our update — re-waiting (lock-retry $lock_retries/6)."',
@@ -1917,7 +2456,8 @@ APACHE,
             '      attempt=$((attempt - 1))',
             '      continue',
             '    fi',
-            '    echo "[dply] WARNING: lock contention persisted across 6 attempts; treating this as a real failure." >&2',
+            '    echo "[dply] ERROR: apt lock contention persisted across 6 retries during ondrej/php update." >&2',
+            '    exit 100',
             '  fi',
             // Real success check: did an InRelease file actually land?
             // ls returns empty if no file matches; -A1 keeps it on one

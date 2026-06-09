@@ -63,7 +63,14 @@ HAPROXY;
         $useBackendBlock = $useBackendLines !== [] ? implode("\n", $useBackendLines)."\n" : '';
         $backendSection = $backendBlocks !== [] ? "\n".implode("\n\n", $backendBlocks) : '';
 
-        return <<<HAPROXY
+        $unmatchedBackend = <<<'HAPROXY'
+
+backend dply_unmatched
+    mode http
+    http-request return status 503 content-type "text/plain" string "dply: no backend matches this host\n"
+HAPROXY;
+
+        $config = <<<HAPROXY
 # Managed by Dply — do NOT hand-edit. Regenerated on every webserver switch.
 global
     log /dev/log local0
@@ -87,12 +94,12 @@ defaults
 frontend dply_http
     bind *:{$listenPort}
     mode http
-{$aclBlock}{$useBackendBlock}    # No matching ACL → return a clear 503 instead of HAProxy's default
-    # blank-page error. Operator can spot misconfigured DNS / missing host
-    # rules from the response body.
-    http-request return status 503 content-type "text/plain" string "dply: no backend matches this host\\n"
-{$backendSection}
+{$aclBlock}{$useBackendBlock}    default_backend dply_unmatched
+{$backendSection}{$unmatchedBackend}
+
 HAPROXY;
+
+        return rtrim($config)."\n";
     }
 
     /**

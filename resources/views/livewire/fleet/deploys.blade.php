@@ -1,42 +1,29 @@
-<div class="mx-auto max-w-6xl px-6 py-10">
-    @include('livewire.fleet._tabs')
-    <header class="mb-6 border-b border-slate-200 pb-4">
-        <h1 class="text-2xl font-semibold text-slate-900">{{ __('Fleet deploys') }}</h1>
-        <p class="mt-1 text-sm text-slate-600">{{ __('In-flight, failed, and stagnant deploy activity across the fleet.') }}</p>
-    </header>
-
-    <nav class="mb-6 flex flex-wrap gap-2 border-b border-slate-200 pb-3" aria-label="{{ __('Deploy activity tabs') }}">
-        <button type="button" wire:click="setTab('running')" @class([
-            'rounded-xl px-3 py-1.5 text-sm font-medium transition',
-            'bg-slate-900 text-white' => $tab === 'running',
-            'border border-slate-200 text-slate-700 hover:bg-slate-50' => $tab !== 'running',
-        ])>
-            {{ __('Running') }} <span class="ml-1 text-xs text-slate-400">({{ $counts['running'] }})</span>
-        </button>
-        <button type="button" wire:click="setTab('failed-latest')" @class([
-            'rounded-xl px-3 py-1.5 text-sm font-medium transition',
-            'bg-rose-700 text-white' => $tab === 'failed-latest',
-            'border border-slate-200 text-slate-700 hover:bg-slate-50' => $tab !== 'failed-latest',
-        ])>
-            {{ __('Failed latest') }} <span class="ml-1 text-xs text-rose-200">({{ $counts['failed-latest'] }})</span>
-        </button>
-        <button type="button" wire:click="setTab('stale')" @class([
-            'rounded-xl px-3 py-1.5 text-sm font-medium transition',
-            'bg-amber-600 text-white' => $tab === 'stale',
-            'border border-slate-200 text-slate-700 hover:bg-slate-50' => $tab !== 'stale',
-        ])>
-            {{ __('Stale') }} <span class="ml-1 text-xs text-amber-200">({{ $counts['stale'] }})</span>
-        </button>
+<div>
+    <x-fleet-shell
+        :title="__('Fleet deploys')"
+        :description="__('In-flight, failed, and stagnant deploy activity across the fleet.')"
+        :section="__('Deploys')"
+    >
+    <nav class="mb-6 flex flex-wrap items-center gap-2" aria-label="{{ __('Deploy activity tabs') }}">
+        <x-fleet-pill :active="$tab === 'running'" wire:click="setTab('running')">
+            {{ __('Running') }} <span class="text-xs opacity-70">({{ $counts['running'] }})</span>
+        </x-fleet-pill>
+        <x-fleet-pill :active="$tab === 'failed-latest'" wire:click="setTab('failed-latest')">
+            {{ __('Failed latest') }} <span class="text-xs opacity-70">({{ $counts['failed-latest'] }})</span>
+        </x-fleet-pill>
+        <x-fleet-pill :active="$tab === 'stale'" wire:click="setTab('stale')">
+            {{ __('Stale') }} <span class="text-xs opacity-70">({{ $counts['stale'] }})</span>
+        </x-fleet-pill>
         @if ($tab === 'stale')
             <div class="ml-auto flex items-center gap-2">
-                <label for="stale_days" class="text-xs text-slate-600">{{ __('Days') }}</label>
-                <input id="stale_days" type="number" min="1" wire:model.live.debounce.250ms="staleDays" class="w-20 rounded-md border-slate-300 text-sm shadow-sm focus:border-slate-500 focus:ring-slate-500" />
+                <label for="stale_days" class="text-xs font-medium text-brand-moss">{{ __('Days') }}</label>
+                <input id="stale_days" type="number" min="1" wire:model.live.debounce.250ms="staleDays" class="dply-input w-20 py-1.5 text-sm" />
             </div>
         @endif
     </nav>
 
     @if ($rows === [])
-        <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-600">
+        <x-fleet-empty>
             @if ($tab === 'running')
                 {{ __('No deploys are currently running.') }}
             @elseif ($tab === 'failed-latest')
@@ -44,11 +31,11 @@
             @else
                 {{ __('No sites with stale deploys (threshold: :days days).', ['days' => $staleDays]) }}
             @endif
-        </div>
+        </x-fleet-empty>
     @else
-        <div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <table class="min-w-full divide-y divide-slate-200 text-sm">
-                <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+        <div class="overflow-x-auto rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
+            <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
+                <thead class="bg-brand-sand/30 text-left text-xs font-semibold uppercase tracking-[0.12em] text-brand-moss">
                     <tr>
                         <th class="px-4 py-3">{{ __('Site') }}</th>
                         <th class="px-4 py-3">{{ __('Runtime') }}</th>
@@ -58,22 +45,22 @@
                         <th class="px-4 py-3">{{ __('Deploy ID') }}</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100">
+                <tbody class="divide-y divide-brand-ink/5">
                     @foreach ($rows as $row)
                         <tr @class([
-                            'hover:bg-slate-50',
+                            'hover:bg-brand-sand/20',
                             'bg-rose-50/50' => $row['severity'] === 'danger',
                             'bg-amber-50/50' => $row['severity'] === 'warning',
                         ])>
-                            <td class="px-4 py-3 text-slate-700">
-                                <a href="{{ route('sites.show', ['server' => $row['site']->server_id, 'site' => $row['site']]) }}" wire:navigate class="hover:underline">{{ $row['site']->name }}</a>
+                            <td class="px-4 py-3 text-brand-ink">
+                                <a href="{{ route('sites.show', ['server' => $row['site']->server_id, 'site' => $row['site']]) }}" wire:navigate class="font-medium hover:text-brand-forest">{{ $row['site']->name }}</a>
                             </td>
-                            <td class="px-4 py-3 text-slate-600">{{ $row['site']->runtime ?: '—' }}</td>
-                            <td class="px-4 py-3 text-slate-600">{{ $row['when'] ?? '—' }}</td>
-                            <td class="px-4 py-3 font-mono text-xs text-slate-700">{{ $row['age_label'] }}</td>
-                            <td class="px-4 py-3 text-slate-600">{{ $row['trigger'] ?? '—' }}</td>
+                            <td class="px-4 py-3 text-brand-moss">{{ $row['site']->runtime ?: '—' }}</td>
+                            <td class="px-4 py-3 text-brand-moss">{{ $row['when'] ?? '—' }}</td>
+                            <td class="px-4 py-3 font-mono text-xs text-brand-ink">{{ $row['age_label'] }}</td>
+                            <td class="px-4 py-3 text-brand-moss">{{ $row['trigger'] ?? '—' }}</td>
                             <td class="px-4 py-3">
-                                <a href="{{ route('sites.deployments.show', ['server' => $row['site']->server_id, 'site' => $row['site'], 'deployment' => $row['deployment_id']]) }}" wire:navigate class="select-all rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-500 hover:bg-slate-200 hover:text-slate-700">{{ $row['deployment_id'] }}</a>
+                                <a href="{{ route('sites.deployments.show', ['server' => $row['site']->server_id, 'site' => $row['site'], 'deployment' => $row['deployment_id']]) }}" wire:navigate class="select-all rounded bg-brand-sand/40 px-1.5 py-0.5 font-mono text-[10px] text-brand-moss hover:bg-brand-sand/60 hover:text-brand-ink">{{ $row['deployment_id'] }}</a>
                             </td>
                         </tr>
                     @endforeach
@@ -84,10 +71,11 @@
 
     @php
         $fleetDeploysCommand = match ($tab) {
-            'running' => 'dply:fleet:running-deploys',
-            'failed-latest' => 'dply:fleet:failed-deploys',
-            default => 'dply:fleet:stale-deploys --days='.$staleDays,
+            'running' => 'dply fleet:deploys:running',
+            'failed-latest' => 'dply fleet:deploys:failed',
+            default => 'dply fleet:deploys:stale --days='.$staleDays,
         };
     @endphp
     <x-cli-snippet class="mt-8" :command="$fleetDeploysCommand" />
+    </x-fleet-shell>
 </div>

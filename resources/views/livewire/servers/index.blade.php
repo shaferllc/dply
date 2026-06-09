@@ -51,6 +51,37 @@
 
         return 'bg-brand-mist';
     };
+    // Single source of truth for the per-server status pill: tone (for
+    // <x-badge>) + a health-aware label so list + grid agree. A fully-ready
+    // server shows reachability (Ready / Unreachable); anything mid-build or
+    // failed falls back to the raw display status.
+    $statusTone = function (\App\Models\Server $server) use ($isFullyReady, $isSetupFailed): string {
+        if ($isSetupFailed($server)) {
+            return 'danger';
+        }
+        if ($isFullyReady($server)) {
+            return match ($server->health_status) {
+                \App\Models\Server::HEALTH_REACHABLE => 'success',
+                \App\Models\Server::HEALTH_UNREACHABLE => 'danger',
+                default => 'warning',
+            };
+        }
+        if ($server->status === \App\Models\Server::STATUS_ERROR) {
+            return 'danger';
+        }
+
+        return 'info';
+    };
+    $statusLabel = function (\App\Models\Server $server) use ($isFullyReady, $displayStatus): string {
+        if ($isFullyReady($server)) {
+            return match ($server->health_status) {
+                \App\Models\Server::HEALTH_UNREACHABLE => __('Unreachable'),
+                default => __('Ready'),
+            };
+        }
+
+        return $displayStatus($server);
+    };
     $insightBadgeClass = function (string $serverId) use ($insightRollup): string {
         $worst = $insightRollup[$serverId]['worst'] ?? null;
 
@@ -75,8 +106,14 @@
         wire:poll.10s
     @endif
 >
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        <x-dashboard-breadcrumb :current="__('Servers')" current-icon="server-stack" />
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        <x-breadcrumb-trail :items="array_values(array_filter([
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            multi_surface_active()
+                ? ['label' => __('Infrastructure'), 'href' => route('infrastructure.index'), 'icon' => 'rectangle-group']
+                : null,
+            ['label' => __('Servers'), 'icon' => 'server-stack'],
+        ]))" />
 
         @if (session('success'))
             <x-alert tone="success">{{ session('success') }}</x-alert>
@@ -144,7 +181,6 @@
         <x-page-header
             :title="__('Servers')"
             :description="__('Provision hosts, watch readiness, and drill into each machine from one fleet view.')"
-            doc-route="docs.index"
             flush
             compact
             toolbar
@@ -156,33 +192,97 @@
             </x-slot>
             <x-slot name="actions">
                 @can('create', App\Models\Server::class)
-                    <a
-                        href="{{ route('launches.create') }}"
-                        wire:navigate
-                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest"
-                    >
-                        <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Open launchpad') }}
-                    </a>
-                    <a
-                        href="{{ route('docs.create-first-server') }}"
-                        wire:navigate
-                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
-                    >
-                        <x-heroicon-o-document-text class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
-                        {{ __('First server guide') }}
-                    </a>
-                    <a
-                        href="{{ route('servers.import.digitalocean') }}"
-                        wire:navigate
-                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
-                    >
-                        <x-heroicon-o-cloud-arrow-down class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
-                        {{ __('Import from DigitalOcean') }}
-                    </a>
+                    @if (multi_surface_active())
+                        <a
+                            href="{{ route('launches.create') }}"
+                            wire:navigate
+                            class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest"
+                        >
+                            <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Open launchpad') }}
+                        </a>
+                    @else
+                        <a
+                            href="{{ route('servers.create') }}"
+                            wire:navigate
+                            class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest"
+                        >
+                            <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Create a server') }}
+                        </a>
+                    @endif
                 @endcan
+
+                {{-- Secondary actions collapse into one menu so the top bar stays
+                     a single primary CTA + overflow, not a wall of equal buttons. --}}
+                <x-dropdown align="right" width="w-64">
+                    <x-slot name="trigger">
+                        <button type="button" class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                            <x-heroicon-o-ellipsis-horizontal class="h-4 w-4 shrink-0 text-brand-moss" aria-hidden="true" />
+                            {{ __('More') }}
+                        </button>
+                    </x-slot>
+                    <x-slot name="content">
+                        @can('create', App\Models\Server::class)
+                            @feature('surface.managed_servers')
+                                <a href="{{ route('servers.create.managed') }}" wire:navigate class="flex w-full items-center gap-2.5 px-4 py-2 text-start text-sm font-medium text-brand-ink transition hover:bg-brand-sand/40">
+                                    <x-heroicon-o-sparkles class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                                    {{ __('Dply-hosted server') }}
+                                </a>
+                            @endfeature
+                            <a href="{{ route('servers.import.digitalocean') }}" wire:navigate class="flex w-full items-center gap-2.5 px-4 py-2 text-start text-sm font-medium text-brand-ink transition hover:bg-brand-sand/40">
+                                <x-heroicon-o-cloud-arrow-down class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
+                                {{ __('Import from DigitalOcean') }}
+                            </a>
+                            <div class="my-1.5 border-t border-brand-ink/10" role="presentation"></div>
+                        @endcan
+                        <a href="{{ route('docs.create-first-server') }}" wire:navigate class="flex w-full items-center gap-2.5 px-4 py-2 text-start text-sm font-medium text-brand-ink transition hover:bg-brand-sand/40">
+                            <x-heroicon-o-academic-cap class="h-4 w-4 shrink-0 text-brand-moss" aria-hidden="true" />
+                            {{ __('First server guide') }}
+                        </a>
+                        <a href="{{ route('docs.index') }}" wire:navigate class="flex w-full items-center gap-2.5 px-4 py-2 text-start text-sm font-medium text-brand-ink transition hover:bg-brand-sand/40">
+                            <x-heroicon-o-document-text class="h-4 w-4 shrink-0 text-brand-moss" aria-hidden="true" />
+                            {{ __('Documentation') }}
+                        </a>
+                    </x-slot>
+                </x-dropdown>
             </x-slot>
         </x-page-header>
+
+        @feature('surface.fleet')
+            @php
+                $serversPillOrg = auth()->user()?->currentOrganization();
+                $serversPillCanTimeline = $serversPillOrg !== null && $serversPillOrg->hasAdminAccess(auth()->user());
+                $serversPillTiles = [
+                    ['url' => route('fleet.health'), 'label' => __('Health'), 'icon' => 'heroicon-o-heart'],
+                    ['url' => route('fleet.deploys'), 'label' => __('Deploys'), 'icon' => 'heroicon-o-rocket-launch'],
+                    ['url' => route('fleet.domains'), 'label' => __('Domains'), 'icon' => 'heroicon-o-globe-alt'],
+                    ['url' => route('fleet.env-search'), 'label' => __('Env search'), 'icon' => 'heroicon-o-key'],
+                    ['url' => route('fleet.env-drift'), 'label' => __('Env drift'), 'icon' => 'heroicon-o-arrows-right-left'],
+                    ['url' => route('fleet.intelligence'), 'label' => __('Intelligence'), 'icon' => 'heroicon-o-light-bulb'],
+                ];
+                if ($serversPillCanTimeline) {
+                    $serversPillTiles[] = [
+                        'url' => route('organizations.activity', $serversPillOrg),
+                        'label' => __('Timeline'),
+                        'icon' => 'heroicon-o-clock',
+                    ];
+                }
+            @endphp
+            <nav class="-mt-2 flex flex-wrap items-center gap-1.5 text-sm" aria-label="{{ __('Fleet ops') }}">
+                <span class="text-xs font-semibold uppercase tracking-[0.16em] text-brand-moss me-1">{{ __('Fleet ops') }}</span>
+                @foreach ($serversPillTiles as $fleetTile)
+                    <a
+                        href="{{ $fleetTile['url'] }}"
+                        wire:navigate
+                        class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 bg-white px-3 py-1 text-xs font-semibold text-brand-moss shadow-sm transition hover:border-brand-sage/45 hover:text-brand-ink"
+                    >
+                        <x-dynamic-component :component="$fleetTile['icon']" class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                        {{ $fleetTile['label'] }}
+                    </a>
+                @endforeach
+            </nav>
+        @endfeature
 
         @php
             $summaryStats = [
@@ -218,6 +318,16 @@
                             <option value="{{ $value }}">{{ $label }}</option>
                         @endforeach
                     </x-select>
+
+                    @if (count($tagOptions) > 0)
+                        <label for="servers_tag" class="sr-only">{{ __('Tag') }}</label>
+                        <x-select id="servers_tag" wire:model.live="tagFilter" class="mt-0 w-auto min-w-[10rem]">
+                            <option value="">{{ __('All tags') }}</option>
+                            @foreach ($tagOptions as $tag)
+                                <option value="{{ $tag }}">{{ $tag }}</option>
+                            @endforeach
+                        </x-select>
+                    @endif
 
                     <label for="servers_sort" class="sr-only">{{ __('Order by') }}</label>
                     <x-select id="servers_sort" wire:model.live="sort" class="mt-0 w-auto min-w-[10rem]">
@@ -257,20 +367,27 @@
         </div>
 
         @unless ($hasProviderCredentials)
-            <section class="mb-8 rounded-[1.75rem] border border-amber-200 bg-amber-50/90 p-5 shadow-sm shadow-amber-100/40 sm:p-6">
-                <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-amber-800">{{ __('Set up a provider') }}</p>
-                        <h2 class="mt-2 text-xl font-semibold text-amber-950">{{ __('Add provider credentials before you provision infrastructure.') }}</h2>
-                        <p class="mt-2 max-w-3xl text-sm leading-6 text-amber-900/80">
-                            {{ __('This fleet can show guidance and empty states, but you will need a connected provider before you can provision cloud infrastructure from the workspace.') }}
-                        </p>
+            <section class="dply-card overflow-hidden border-amber-200">
+                <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-7">
+                    <div class="flex items-start gap-3">
+                        <x-icon-badge tone="amber">
+                            <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
+                        </x-icon-badge>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Add provider credentials before you provision infrastructure.') }}</h3>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                {{ __('This fleet can show guidance and empty states, but you will need a connected provider before you can provision cloud infrastructure from the workspace.') }}
+                            </p>
+                        </div>
                     </div>
-                    <div class="flex flex-wrap gap-3">
-                        <a href="{{ route('credentials.index') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-semibold text-amber-950 transition hover:bg-amber-400">
+                    <div class="flex shrink-0 flex-wrap gap-2 sm:items-center">
+                        <a href="{{ route('credentials.index') }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest">
+                            <x-heroicon-m-key class="h-4 w-4 shrink-0" aria-hidden="true" />
                             {{ __('Provider credentials') }}
                         </a>
-                        <a href="{{ route('docs.connect-provider') }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-sm font-semibold text-amber-900 transition hover:bg-amber-50">
+                        <a href="{{ route('docs.connect-provider') }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                            <x-heroicon-m-document-text class="h-4 w-4 shrink-0" aria-hidden="true" />
                             {{ __('Setup guide') }}
                         </a>
                     </div>
@@ -300,14 +417,24 @@
                                     {{ __('Fast path to provision when credentials are ready.') }}
                                 </span>
                             </li>
-                            <li class="flex gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                                <x-heroicon-o-squares-2x2 class="mt-0.5 h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
-                                <span>
-                                    <span class="font-semibold text-brand-ink">{{ __('Open launchpad') }}</span>
-                                    <span class="text-brand-mist"> — </span>
-                                    {{ __('Explore BYO, Docker, serverless, Kubernetes, and more.') }}
-                                </span>
-                            </li>
+                            @if (multi_surface_active())
+                                <li class="flex gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                                    <x-heroicon-o-rectangle-group class="mt-0.5 h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
+                                    <span>
+                                        <span class="font-semibold text-brand-ink">{{ __('Browse infrastructure') }}</span>
+                                        <span class="text-brand-mist"> — </span>
+                                        {{ __('See servers, cloud apps, and serverless in one place.') }}
+                                    </span>
+                                </li>
+                                <li class="flex gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                                    <x-heroicon-o-squares-2x2 class="mt-0.5 h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
+                                    <span>
+                                        <span class="font-semibold text-brand-ink">{{ __('Open launchpad') }}</span>
+                                        <span class="text-brand-mist"> — </span>
+                                        {{ __('Explore BYO, Docker, serverless, Kubernetes, and more.') }}
+                                    </span>
+                                </li>
+                            @endif
                             <li class="flex gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
                                 <x-heroicon-o-link class="mt-0.5 h-5 w-5 shrink-0 text-brand-sage" aria-hidden="true" />
                                 <span>
@@ -326,6 +453,14 @@
                                 >
                                     <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     {{ __('Create a server') }}
+                                </a>
+                                <a
+                                    href="{{ route('infrastructure.index') }}"
+                                    wire:navigate
+                                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-5 py-3 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                                >
+                                    <x-heroicon-o-rectangle-group class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                    {{ __('Browse infrastructure') }}
                                 </a>
                                 <a
                                     href="{{ route('launches.create') }}"
@@ -398,55 +533,7 @@
                                 </div>
                                 <ul class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                                     @foreach ($groupServers as $server)
-                                        <li wire:key="server-grid-{{ $server->id }}" class="flex rounded-xl border border-brand-ink/10 bg-white overflow-hidden shadow-sm hover:border-brand-ink/20 transition-colors">
-                                            <div class="w-1 shrink-0 {{ $stripe($server) }}" aria-hidden="true"></div>
-                                            <div class="flex flex-1 flex-col gap-3 p-4 min-w-0">
-                                                <div class="min-w-0">
-                                                    <div class="flex flex-wrap items-center gap-2 min-w-0">
-                                                        <a href="{{ route('servers.show', $server) }}" wire:navigate class="font-semibold text-brand-ink hover:text-brand-sage truncate block">{{ $server->name }}</a>
-                                                        @php $insOpen = (int) ($insightRollup[$server->id]['open'] ?? 0); @endphp
-                                                        @if ($insOpen > 0)
-                                                            <a href="{{ route('servers.insights', $server) }}" wire:navigate title="{{ __('Open insights') }}" class="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-semibold leading-none {{ $insightBadgeClass($server->id) }}">{{ trans_choice(':count insight|:count insights', $insOpen, ['count' => $insOpen]) }}</a>
-                                                        @endif
-                                                    </div>
-                                                    <p class="mt-1 font-mono text-sm text-brand-moss truncate">{{ $server->ip_address ?? __('Provisioning…') }}</p>
-                                                    <div class="mt-2">
-                                                        <x-server-metric-pulse :snapshot="$latestSnapshots[$server->id] ?? null" />
-                                                    </div>
-                                                    @if ($server->workspace)
-                                                        <p class="mt-1 text-xs text-brand-moss">
-                                                            {{ __('Project:') }}
-                                                            <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:text-brand-sage">
-                                                                {{ $server->workspace->name }}
-                                                            </a>
-                                                        </p>
-                                                    @endif
-                                                    @if ($server->scheduled_deletion_at)
-                                                        <p class="mt-1 text-xs font-medium text-amber-800">
-                                                            {{ __('Removal scheduled :date', ['date' => $server->scheduled_deletion_at->timezone(config('app.timezone'))->toFormattedDateString()]) }}
-                                                            <button type="button" wire:click="cancelScheduledServerRemoval(@js($server->id))" class="ml-1 font-semibold underline hover:no-underline">{{ __('Cancel') }}</button>
-                                                        </p>
-                                                    @endif
-                                                </div>
-                                                <p class="text-xs text-brand-moss leading-relaxed">
-                                                    {{ trans_choice(':count site|:count sites', $server->sites_count, ['count' => $server->sites_count]) }}
-                                                    @if ($isFullyReady($server))
-                                                        <span class="text-brand-mist"> · </span>
-                                                        {{ __('Online for :days days', ['days' => max(0, (int) $server->created_at->diffInDays(now()))]) }}
-                                                    @endif
-                                                </p>
-                                                <div class="flex items-center justify-end gap-2 pt-1 mt-auto">
-                                                    <a href="{{ route('servers.show', $server) }}" wire:navigate class="inline-flex items-center justify-center rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/50" title="{{ __('Manage') }}">
-                                                        <x-heroicon-o-bars-3 class="h-4 w-4" aria-hidden="true" />
-                                                    </a>
-                                                    @can('delete', $server)
-                                                        <button type="button" wire:click="openRemoveServerModal(@js($server->id))" class="text-xs font-semibold text-red-600 hover:text-red-800">
-                                                            {{ __('Remove') }}
-                                                        </button>
-                                                    @endcan
-                                                </div>
-                                            </div>
-                                        </li>
+                                        @include('livewire.servers.partials.server-grid-card', ['server' => $server])
                                     @endforeach
                                 </ul>
                             </div>
@@ -465,121 +552,7 @@
                                 </div>
                                 <ul>
                                     @foreach ($groupServers as $server)
-                                        <li wire:key="server-list-{{ $server->id }}" class="flex items-stretch border-b border-brand-ink/10 last:border-b-0 hover:bg-brand-sand/15 transition-colors">
-                                            <div class="w-1 shrink-0 {{ $stripe($server) }}" aria-hidden="true"></div>
-                                            <div class="flex flex-1 flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-4 sm:px-6 min-w-0">
-                                                <div class="min-w-0">
-                                                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                                        <a href="{{ route('servers.show', $server) }}" wire:navigate class="font-semibold text-brand-ink hover:text-brand-sage">
-                                                            {{ $server->name }}
-                                                            <span class="text-brand-mist font-normal">·</span>
-                                                            <span class="font-mono text-sm font-normal text-brand-moss">{{ $server->ip_address ?? __('Provisioning…') }}</span>
-                                                        </a>
-                                                        @php $insOpenList = (int) ($insightRollup[$server->id]['open'] ?? 0); @endphp
-                                                        @if ($insOpenList > 0)
-                                                            <a href="{{ route('servers.insights', $server) }}" wire:navigate title="{{ __('Open insights') }}" class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold leading-none {{ $insightBadgeClass($server->id) }}">{{ trans_choice(':count insight|:count insights', $insOpenList, ['count' => $insOpenList]) }}</a>
-                                                        @endif
-                                                        <span class="hidden sm:inline-flex">
-                                                            <x-server-metric-pulse :snapshot="$latestSnapshots[$server->id] ?? null" />
-                                                        </span>
-                                                    </div>
-                                                    <div class="mt-2 sm:hidden">
-                                                        <x-server-metric-pulse :snapshot="$latestSnapshots[$server->id] ?? null" />
-                                                    </div>
-                                                    <p class="mt-1 text-sm text-brand-moss">
-                                                        {{ trans_choice(':count site|:count sites', $server->sites_count, ['count' => $server->sites_count]) }}
-                                                        @if ($server->workspace)
-                                                            <span class="text-brand-mist"> · </span>
-                                                            {{ __('Project:') }}
-                                                            <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:text-brand-sage">
-                                                                {{ $server->workspace->name }}
-                                                            </a>
-                                                        @endif
-                                                        @if ($isFullyReady($server))
-                                                            <span class="text-brand-mist"> · </span>
-                                                            {{ __('Online for :days days', ['days' => max(0, (int) $server->created_at->diffInDays(now()))]) }}
-                                                        @endif
-                                                        <span class="text-brand-mist"> · </span>
-                                                        {{ $server->provider->label() }}
-                                                        <span class="text-brand-mist"> · </span>
-                                                        {{ $displayStatus($server) }}
-                                                        @if ($server->scheduled_deletion_at)
-                                                            <span class="text-brand-mist"> · </span>
-                                                            <span class="text-amber-800 font-medium">{{ __('Removal :date', ['date' => $server->scheduled_deletion_at->timezone(config('app.timezone'))->toFormattedDateString()]) }}</span>
-                                                        @endif
-                                                        @if ($isFullyReady($server))
-                                                            @if ($server->health_status === 'reachable')
-                                                                <span class="text-emerald-600"> · {{ __('Reachable') }}</span>
-                                                            @elseif ($server->health_status === 'unreachable')
-                                                                <span class="text-red-600"> · {{ __('Unreachable') }}</span>
-                                                            @endif
-                                                        @endif
-                                                    </p>
-
-                                                    {{-- Setup-failed detail: red chip + journey link. Shown instead of
-                                                         the live progress block when applyProvisionOutcomeToServer
-                                                         flipped setup_status to failed. Without this branch the card
-                                                         keeps ticking the elapsed counter on a dead provision. --}}
-                                                    @if ($isSetupFailed($server))
-                                                        <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-moss">
-                                                            <span class="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-red-700 ring-1 ring-red-200">
-                                                                <x-heroicon-m-exclamation-triangle class="h-3 w-3" />
-                                                                {{ __('Setup failed') }}
-                                                            </span>
-                                                            <span class="text-brand-ink">{{ __('Provisioning did not finish — open the journey to see the failing step.') }}</span>
-                                                            <a href="{{ route('servers.journey', $server) }}" wire:navigate class="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-red-700 hover:text-red-900">
-                                                                {{ __('Open journey') }}
-                                                                <x-heroicon-m-arrow-right class="h-3 w-3" />
-                                                            </a>
-                                                        </div>
-                                                    @endif
-
-                                                    {{-- Live provisioning detail: phase + current step + elapsed + a
-                                                         thin progress bar. Mirrors the journey page's headline so an
-                                                         operator scanning the fleet sees "where is this in the build"
-                                                         without clicking through. Only renders for in-flight VMs and
-                                                         is suppressed once setup_status hits failed (see above). --}}
-                                                    @php $digest = $provisioningDigests[$server->id] ?? null; @endphp
-                                                    @if ($digest && ! $isSetupFailed($server))
-                                                        <div class="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand-moss">
-                                                            <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-800 ring-1 ring-sky-200">
-                                                                <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-sky-500"></span>
-                                                                {{ $digest->phaseLabel }}
-                                                            </span>
-                                                            <span class="font-medium text-brand-ink">{{ $digest->stepLabel }}</span>
-                                                            @if ($digest->stepIndex && $digest->stepTotal)
-                                                                <span class="text-brand-mist">·</span>
-                                                                <span class="tabular-nums">{{ __('Step :i of :t', ['i' => $digest->stepIndex, 't' => $digest->stepTotal]) }}</span>
-                                                            @endif
-                                                            @if ($digest->elapsedHuman())
-                                                                <span class="text-brand-mist">·</span>
-                                                                <span class="tabular-nums">{{ __(':elapsed elapsed', ['elapsed' => $digest->elapsedHuman()]) }}</span>
-                                                            @endif
-                                                            <a href="{{ route('servers.journey', $server) }}" wire:navigate class="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold text-sky-700 hover:text-sky-900">
-                                                                {{ __('Open journey') }}
-                                                                <x-heroicon-m-arrow-right class="h-3 w-3" />
-                                                            </a>
-                                                        </div>
-                                                        @if ($digest->stepIndex && $digest->stepTotal)
-                                                            @php $pct = max(0, min(100, (int) round(100 * $digest->stepIndex / $digest->stepTotal))); @endphp
-                                                            <div class="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-brand-ink/5">
-                                                                <div class="h-full rounded-full bg-sky-500 transition-[width] duration-500" style="width: {{ $pct }}%"></div>
-                                                            </div>
-                                                        @endif
-                                                    @endif
-                                                </div>
-                                                <div class="flex items-center gap-2 shrink-0">
-                                                    <a href="{{ route('servers.show', $server) }}" wire:navigate class="inline-flex items-center justify-center rounded-lg bg-brand-ink px-3 py-2 text-xs font-semibold text-brand-cream hover:bg-brand-forest">
-                                                        {{ __('Manage') }}
-                                                    </a>
-                                                    @can('delete', $server)
-                                                        <button type="button" wire:click="openRemoveServerModal(@js($server->id))" class="text-xs font-semibold text-red-600 hover:text-red-800 px-2 py-2">
-                                                            {{ __('Remove') }}
-                                                        </button>
-                                                    @endcan
-                                                </div>
-                                            </div>
-                                        </li>
+                                        @include('livewire.servers.partials.server-list-row', ['server' => $server])
                                     @endforeach
                                 </ul>
                             </div>

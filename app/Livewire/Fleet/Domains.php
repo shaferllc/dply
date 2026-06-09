@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Livewire\Fleet;
 
+use App\Livewire\Concerns\RequiresFeature;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDomain;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Url;
-use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 /**
@@ -25,6 +25,7 @@ class Domains extends Component
     use RequiresFeature;
 
     protected string $requiredFeature = 'surface.fleet';
+
     #[Url(as: 'q', except: '')]
     public string $search = '';
 

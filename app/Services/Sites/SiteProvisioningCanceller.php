@@ -9,7 +9,7 @@ class SiteProvisioningCanceller
 {
     public function __construct(
         private readonly TestingHostnameProvisioner $testingHostnameProvisioner,
-        private readonly SiteWebserverProvisionerRegistry $provisionerRegistry,
+        private readonly SiteWebserverConfigApplier $webserverConfigApplier,
         private readonly SiteProvisioner $siteProvisioner,
         private readonly CertificateRequestService $certificateRequestService,
     ) {}
@@ -39,7 +39,7 @@ class SiteProvisioningCanceller
         }
 
         try {
-            $this->provisionerRegistry->for($site->webserver())->remove($site);
+            $this->webserverConfigApplier->remove($site);
         } catch (\Throwable $e) {
             $this->siteProvisioner->appendLog($site, 'warning', 'cancelled', 'Server config cleanup failed.', [
                 'webserver' => $site->webserver(),

@@ -150,6 +150,45 @@ class SiteSystemdProvisioner
     }
 
     /**
+     * start / stop / restart all of a site's WORKER (non-web) systemd units in
+     * one call — the operator-facing "run the queue daemon on this box" control.
+     * Returns the combined command output plus an is-active readout so the
+     * caller can show whether the daemon ended up running.
+     *
+     * @param  (Closure(Server): RemoteShell)|null  $shellFactory
+     */
+    public function controlWorkerUnits(Site $site, string $action, ?Closure $shellFactory = null): string
+    {
+        $action = in_array($action, ['start', 'stop', 'restart'], true) ? $action : 'restart';
+
+        $server = $site->server;
+        if ($server === null || ! $server->isReady() || empty($server->ssh_private_key)) {
+            throw new \RuntimeException('Server must be ready with an SSH key.');
+        }
+
+        $site->loadMissing('processes');
+        $units = [];
+        foreach ($site->processes as $process) {
+            if ($process->type === SiteProcess::TYPE_WEB || ! $process->is_active) {
+                continue;
+            }
+            $units[] = $this->builder->processUnitName($site, $process);
+        }
+
+        if ($units === []) {
+            return "No worker units are defined for this site — add a worker process (e.g. Horizon) first.\n";
+        }
+
+        $shell = $shellFactory !== null ? $shellFactory($server) : new SshConnection($server);
+        $esc = implode(' ', array_map('escapeshellarg', $units));
+
+        return $shell->exec(
+            sprintf('sudo systemctl %s %s 2>&1; echo "--- status ---"; sudo systemctl is-active %s 2>&1 || true', $action, $esc, $esc),
+            120
+        );
+    }
+
+    /**
      * @return array<string, string> unit filename => content
      */
     private function collectUnits(Site $site, string $deployUser): array

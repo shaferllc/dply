@@ -224,7 +224,15 @@
                                 $autoRetryAttempt = $server->meta['auto_retry_attempt'] ?? null;
                                 $autoRetryMax = $server->meta['auto_retry_max'] ?? null;
                                 $autoRetryPending = $autoRetryAt && $autoRetryAt->isFuture();
-                                $journeyHasFailed = $server->setup_status === \App\Models\Server::SETUP_STATUS_FAILED || $server->status === \App\Models\Server::STATUS_ERROR;
+                                // Key the failed banner/headline off the resolved failed step too,
+                                // not just the server-status flags — the journey now detects a
+                                // terminally-failed provision task even when those flags were never
+                                // updated (dead setup job / missing callback). Without this the
+                                // header would still read "updating automatically" while the red
+                                // failed-step banner shows below.
+                                $journeyHasFailed = $server->setup_status === \App\Models\Server::SETUP_STATUS_FAILED
+                                    || $server->status === \App\Models\Server::STATUS_ERROR
+                                    || $failedStep !== null;
                                 $journeyIsDone = $server->status === \App\Models\Server::STATUS_READY && $server->setup_status === \App\Models\Server::SETUP_STATUS_DONE;
                             @endphp
                             <div class="flex flex-wrap items-center gap-2">
@@ -294,7 +302,11 @@
                             </p>
                         </div>
                         <div class="flex shrink-0 flex-wrap gap-2 sm:justify-end">
-                        @if ($canCancelProvision)
+                        {{-- Suppress the cancel button once a failure has been
+                             detected — there's no active task left to cancel
+                             (clicking it would just toast "nothing to cancel"),
+                             and Resume install is the relevant action instead. --}}
+                        @if ($canCancelProvision && ! $failedStep)
                             <button
                                 type="button"
                                 wire:click="openCancelProvisionModal"
@@ -313,7 +325,7 @@
                              render alongside Open server workspace on a
                              healthy completed server. Gating on FAILED
                              specifically is the actual intent. --}}
-                        @if ($server->setup_status === \App\Models\Server::SETUP_STATUS_FAILED && \App\Jobs\RunSetupScriptJob::shouldDispatch($server))
+                        @if (($server->setup_status === \App\Models\Server::SETUP_STATUS_FAILED || $failedStep !== null) && \App\Jobs\RunSetupScriptJob::shouldDispatch($server))
                             <button
                                 type="button"
                                 wire:click="openResumeInstallModal"
@@ -321,6 +333,38 @@
                             >
                                 <x-heroicon-o-arrow-path class="h-4 w-4" />
                                 {{ __('Resume install') }}
+                            </button>
+                        @endif
+                        @if ($canRetryCloudProvision)
+                            <button
+                                type="button"
+                                wire:click="editAndRetry"
+                                wire:loading.attr="disabled"
+                                wire:target="editAndRetry,retryCloudProvision"
+                                class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:border-brand-sage hover:text-brand-sage disabled:cursor-wait disabled:opacity-60"
+                            >
+                                <x-heroicon-o-pencil-square class="h-4 w-4" wire:loading.remove wire:target="editAndRetry" />
+                                <svg wire:loading wire:target="editAndRetry" class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                </svg>
+                                <span wire:loading.remove wire:target="editAndRetry">{{ __('Edit configuration') }}</span>
+                                <span wire:loading wire:target="editAndRetry">{{ __('Restoring wizard…') }}</span>
+                            </button>
+                            <button
+                                type="button"
+                                wire:click="retryCloudProvision"
+                                wire:loading.attr="disabled"
+                                wire:target="retryCloudProvision,editAndRetry"
+                                class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:border-brand-sage hover:text-brand-sage disabled:cursor-wait disabled:opacity-60"
+                            >
+                                <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="retryCloudProvision" />
+                                <svg wire:loading wire:target="retryCloudProvision" class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                </svg>
+                                <span wire:loading.remove wire:target="retryCloudProvision">{{ __('Retry as-is') }}</span>
+                                <span wire:loading wire:target="retryCloudProvision">{{ __('Queueing…') }}</span>
                             </button>
                         @endif
                         @if ($server->status === \App\Models\Server::STATUS_READY && ! in_array($server->setup_status, [\App\Models\Server::SETUP_STATUS_PENDING, \App\Models\Server::SETUP_STATUS_RUNNING], true))
@@ -437,6 +481,36 @@
                                                         </details>
                                                     @endif
                                                 </div>
+                                            @elseif ($cloudProvisionError)
+                                                @php
+                                                    $cloudReasonMessage = trim((string) ($cloudProvisionError['message'] ?? ''))
+                                                        ?: __('The provider rejected the request before any resource was created.');
+                                                    $cloudReasonMeta = array_values(array_filter([
+                                                        filled($cloudProvisionError['provider'] ?? null) ? __('Provider: :v', ['v' => $cloudProvisionError['provider']]) : null,
+                                                        filled($cloudProvisionError['region'] ?? null) ? __('Region: :v', ['v' => $cloudProvisionError['region']]) : null,
+                                                        filled($cloudProvisionError['size'] ?? null) ? __('Size: :v', ['v' => $cloudProvisionError['size']]) : null,
+                                                    ]));
+                                                @endphp
+                                                <div class="mt-2 rounded-xl border border-red-300 bg-white/80 px-4 py-3">
+                                                    <div class="flex items-start justify-between gap-3">
+                                                        <p class="text-[11px] font-semibold uppercase tracking-wide text-red-700">
+                                                            {{ __('What the provider said') }}
+                                                        </p>
+                                                        <button
+                                                            type="button"
+                                                            x-data="{ copied: false }"
+                                                            x-on:click="navigator.clipboard.writeText(@js($cloudReasonMessage)); copied = true; setTimeout(() => copied = false, 1500)"
+                                                            class="shrink-0 rounded-md border border-red-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 hover:border-red-300 hover:bg-red-50"
+                                                        >
+                                                            <span x-show="!copied">{{ __('Copy') }}</span>
+                                                            <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
+                                                        </button>
+                                                    </div>
+                                                    <p class="mt-1 break-words font-mono text-sm leading-6 text-red-900">{{ $cloudReasonMessage }}</p>
+                                                    @if ($cloudReasonMeta !== [])
+                                                        <p class="mt-2 text-xs text-red-700/80">{{ implode(' · ', $cloudReasonMeta) }}</p>
+                                                    @endif
+                                                </div>
                                             @else
                                                 <p class="mt-1 text-sm leading-6 text-red-800">{{ $failedStep['detail'] ?: __('The setup script aborted before this step finished. The server is in an unknown state — review the captured output and the rollback summary below before retrying.') }}</p>
                                             @endif
@@ -462,7 +536,7 @@
                                                 </div>
                                                 @if ($rollbackSummary['triggered'])
                                                     <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700 ring-1 ring-emerald-200">
-                                                        <x-heroicon-m-check-circle class="h-3.5 w-3.5" />
+                                                        <x-heroicon-m-check-circle class="h-4 w-4" />
                                                         {{ __('Restored') }}
                                                     </span>
                                                 @endif
@@ -503,6 +577,44 @@
                                         </div>
                                     @endif
 
+                                    @if ($canRetryCloudProvision)
+                                        <div class="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-red-200 bg-white/70 px-4 py-3">
+                                            <button
+                                                type="button"
+                                                wire:click="editAndRetry"
+                                                wire:loading.attr="disabled"
+                                                wire:target="editAndRetry,retryCloudProvision"
+                                                class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream shadow-sm transition-colors hover:bg-brand-forest disabled:cursor-wait disabled:opacity-60"
+                                            >
+                                                <x-heroicon-o-pencil-square class="h-4 w-4" wire:loading.remove wire:target="editAndRetry" />
+                                                <svg wire:loading wire:target="editAndRetry" class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                                </svg>
+                                                <span wire:loading.remove wire:target="editAndRetry">{{ __('Edit configuration') }}</span>
+                                                <span wire:loading wire:target="editAndRetry">{{ __('Restoring wizard…') }}</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                wire:click="retryCloudProvision"
+                                                wire:loading.attr="disabled"
+                                                wire:target="retryCloudProvision,editAndRetry"
+                                                class="inline-flex items-center justify-center gap-2 rounded-xl border border-red-300 bg-white px-4 py-2.5 text-sm font-semibold text-red-800 shadow-sm transition-colors hover:bg-red-50 disabled:cursor-wait disabled:opacity-60"
+                                            >
+                                                <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="retryCloudProvision" />
+                                                <svg wire:loading wire:target="retryCloudProvision" class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                                </svg>
+                                                <span wire:loading.remove wire:target="retryCloudProvision">{{ __('Retry as-is') }}</span>
+                                                <span wire:loading wire:target="retryCloudProvision">{{ __('Queueing…') }}</span>
+                                            </button>
+                                            <p class="basis-full text-xs leading-5 text-red-900/80">
+                                                {{ __('No provider resource was created. Edit configuration takes you back to the wizard with your picks pre-filled so you can change the bad region/size, then re-submit. Retry as-is queues the same config again.') }}
+                                            </p>
+                                        </div>
+                                    @endif
+
                                     @if ($failedStep['output'])
                                         <div x-data="{ open: false, copied: false }" class="mt-4 overflow-hidden rounded-xl border border-red-200/70 bg-slate-950 shadow-inner">
                                             <div class="flex items-center justify-between gap-3 border-b border-white/5 bg-red-950/50 px-4 py-2.5">
@@ -523,7 +635,13 @@
                                                     <span x-show="copied" x-cloak class="text-emerald-300">{{ __('Copied') }}</span>
                                                 </button>
                                             </div>
-                                            <pre x-show="open" x-cloak class="max-h-96 overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-[12px] leading-5 text-red-200 selection:bg-emerald-500/30">{{ $failedStep['output'] }}</pre>
+                                            <pre
+                                                x-show="open"
+                                                x-cloak
+                                                x-data="provisionConsoleScroll()"
+                                                x-on:scroll.throttle.100ms="onScroll()"
+                                                class="max-h-96 overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-[12px] leading-5 text-red-200 selection:bg-emerald-500/30"
+                                            >{{ $failedStep['output'] }}</pre>
                                         </div>
                                     @endif
                                 </div>
@@ -555,7 +673,11 @@
                                             $isStreamingDetail = str_starts_with($activeStep['key'] ?? '', 'script_') || ($activeStep['key'] ?? '') === 'setup';
                                         @endphp
                                         @if ($isStreamingDetail)
-                                            <pre class="mt-3 max-h-32 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-brand-ink/10 bg-slate-950 px-3 py-2 font-mono text-[12px] leading-5 text-slate-200 selection:bg-emerald-500/30">{{ $activeStep['detail'] }}</pre>
+                                            <pre
+                                                x-data="provisionConsoleScroll()"
+                                                x-on:scroll.throttle.100ms="onScroll()"
+                                                class="mt-3 max-h-32 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-brand-ink/10 bg-slate-950 px-3 py-2 font-mono text-[12px] leading-5 text-slate-200 selection:bg-emerald-500/30"
+                                            >{{ $activeStep['detail'] }}</pre>
                                         @else
                                             <p class="mt-3 text-sm leading-6 text-brand-moss whitespace-pre-line">{{ $activeStep['detail'] }}</p>
                                         @endif
@@ -618,7 +740,8 @@
                                             </summary>
                                             <pre
                                                 x-ref="pre"
-                                                x-effect="open && $nextTick(() => $refs.pre.scrollTop = $refs.pre.scrollHeight)"
+                                                x-data="provisionConsoleScroll()"
+                                                x-on:scroll.throttle.100ms="onScroll()"
                                                 class="max-h-96 overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-[12px] leading-5 text-slate-200 selection:bg-emerald-500/30"
                                             >{{ $activeStep['output'] }}</pre>
                                         </details>
@@ -627,7 +750,11 @@
                                         {{-- Step-specific output is the primary view; offer the raw task tail
                                              behind a toggle for users who want the full firehose. --}}
                                         <details
-                                            x-data="{ copied: false, copy() { navigator.clipboard?.writeText(this.$refs.pre.textContent); this.copied = true; clearTimeout(this._t); this._t = setTimeout(() => this.copied = false, 1500); } }"
+                                            wire:key="full-task-tail"
+                                            wire:ignore.self
+                                            x-data="{ open: false, copied: false, copy() { navigator.clipboard?.writeText(this.$refs.pre.textContent); this.copied = true; clearTimeout(this._t); this._t = setTimeout(() => this.copied = false, 1500); } }"
+                                            x-bind:open="open"
+                                            @toggle.stop="open = $event.target.open; open && $nextTick(() => $refs.pre.scrollTop = $refs.pre.scrollHeight)"
                                             class="group mt-4 overflow-hidden rounded-xl border border-brand-ink/10 bg-slate-950 shadow-inner"
                                         >
                                             <summary class="flex cursor-pointer flex-wrap items-center justify-between gap-3 border-b border-white/5 bg-slate-900/80 px-4 py-2.5">
@@ -650,8 +777,8 @@
                                             </summary>
                                             <pre
                                                 x-ref="pre"
-                                                x-init="$nextTick(() => $el.scrollTop = $el.scrollHeight)"
-                                                x-effect="$nextTick(() => $el.scrollTop = $el.scrollHeight)"
+                                                x-data="provisionConsoleScroll()"
+                                                x-on:scroll.throttle.100ms="onScroll()"
                                                 class="max-h-96 overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-[12px] leading-5 text-slate-200 selection:bg-emerald-500/30"
                                             >{{ $liveTaskOutput }}</pre>
                                         </details>
@@ -688,12 +815,13 @@
                                             </summary>
                                             <pre
                                                 x-ref="pre"
-                                                x-effect="open && $nextTick(() => $refs.pre.scrollTop = $refs.pre.scrollHeight)"
+                                                x-data="provisionConsoleScroll()"
+                                                x-on:scroll.throttle.100ms="onScroll()"
                                                 class="max-h-96 overflow-auto whitespace-pre-wrap break-words px-4 py-3 font-mono text-[12px] leading-5 text-slate-200 selection:bg-emerald-500/30"
                                             >{{ $liveTaskOutput }}</pre>
                                         </details>
                                     @elseif ($task && ! $activeStep['output'])
-                                        <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-white/70 p-4">
+                                        <div class="mt-4 rounded-xl border border-brand-ink/10 bg-white/90 p-4">
                                             <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Live task output') }}</p>
                                             <p class="mt-2 text-sm text-brand-moss">{{ __('No output received from the server yet. The bootstrap script may still be initialising or the webhook callback is unreachable from the target host.') }}</p>
                                             @if ($taskUpdatedAt)
@@ -890,10 +1018,10 @@
                                 <code class="rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-xs text-brand-ink">{{ $server->region ?: '—' }}</code>
                             </dd>
                         </div>
-                        <div>
+                        <div class="sm:col-span-2">
                             <dt class="text-xs font-medium uppercase tracking-wide text-brand-mist">{{ __('Size') }}</dt>
-                            <dd class="mt-1">
-                                <code class="break-all rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-xs text-brand-ink">{{ $server->size ?: '—' }}</code>
+                            <dd class="mt-1 min-w-0">
+                                <code class="inline-block max-w-full overflow-x-auto whitespace-nowrap rounded-md bg-brand-sand/40 px-1.5 py-0.5 font-mono text-xs text-brand-ink">{{ $server->size ?: '—' }}</code>
                             </dd>
                         </div>
                         @if ($server->setup_status)
@@ -1069,7 +1197,7 @@
                                             class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/30"
                                             @click="navigator.clipboard.writeText(@js($hints['ssh'])); copied = 'ssh'; clearTimeout(window._dplyJourneyCopyT); window._dplyJourneyCopyT = setTimeout(() => copied = null, 2000)"
                                         >
-                                            <x-heroicon-o-clipboard class="h-3.5 w-3.5" />
+                                            <x-heroicon-o-clipboard class="h-4 w-4" />
                                             <span x-show="copied !== 'ssh'">{{ __('Copy') }}</span>
                                             <span x-cloak x-show="copied === 'ssh'" class="text-emerald-700">{{ __('Copied') }}</span>
                                         </button>
@@ -1087,7 +1215,7 @@
                                         class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/30"
                                         @click="navigator.clipboard.writeText(@js($hints['docker_exec'])); copied = 'docker'; clearTimeout(window._dplyJourneyCopyT); window._dplyJourneyCopyT = setTimeout(() => copied = null, 2000)"
                                     >
-                                        <x-heroicon-o-clipboard class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-clipboard class="h-4 w-4" />
                                         <span x-show="copied !== 'docker'">{{ __('Copy') }}</span>
                                         <span x-cloak x-show="copied === 'docker'" class="text-emerald-700">{{ __('Copied') }}</span>
                                     </button>
@@ -1278,14 +1406,19 @@
                     </section>
                 @endif
 
-                {{-- Divergence banner: fires when the reconciled snapshot
-                     reports a different database engine than the wizard
-                     requested (e.g., low-memory mode swapped MySQL → SQLite).
-                     The wizard request lives in $requestedDatabase; the
-                     installed reality lives in $installedStack. We use the
-                     `installedStackDiverges` precomputed bool from the
-                     component to keep view logic minimal. --}}
-                @if ($installedStackDiverges)
+                {{-- Low-memory / divergence banner.
+
+                     Fires in two cases:
+                       1. Low-memory mode engaged ($installedStack->lowMemoryMode) —
+                          the droplet was under the 1 GB threshold, so the script
+                          substituted lighter services. This is the important one:
+                          we explain *what* changed and *why*, plus the fix, even
+                          when the database itself didn't diverge (e.g. the user
+                          already picked SQLite).
+                       2. The stack diverged for some other reason
+                          ($installedStackDiverges without low-memory mode) — rare,
+                          falls through to the generic substitution message. --}}
+                @if ($installedStack->lowMemoryMode || $installedStackDiverges)
                     <section class="{{ $card }} overflow-hidden border-amber-200 p-0">
                         <div class="border-b border-amber-200 bg-amber-50/70 px-5 py-4 sm:px-6">
                             <div class="flex items-start gap-3">
@@ -1293,18 +1426,44 @@
                                     <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                                 </span>
                                 <div class="min-w-0 flex-1">
-                                    <p class="text-sm font-semibold text-amber-900">{{ __('Server stack differs from your request') }}</p>
-                                    <p class="mt-1 text-sm text-amber-800">
-                                        {{ __('You picked :requested, but the droplet was too small to run it safely. The provisioning script substituted :installed to keep the server functional.', [
-                                            'requested' => $requestedDatabase ?? '—',
-                                            'installed' => $installedStack->database ?? '—',
-                                        ]) }}
-                                    </p>
-                                    @if ($installedStack->lowMemoryMode && $installedStack->totalMemoryMb)
-                                        <p class="mt-1 text-xs text-amber-700">
-                                            {{ __('Detected :memMb MB total RAM (low-memory mode threshold: 1024 MB). Re-provision on a 2 GB+ droplet to install :requested.', [
-                                                'memMb' => $installedStack->totalMemoryMb,
+                                    @if ($installedStack->lowMemoryMode)
+                                        <p class="text-sm font-semibold text-amber-900">{{ __('Provisioned in low-memory mode') }}</p>
+                                        <p class="mt-1 text-sm text-amber-800">
+                                            @if ($installedStack->totalMemoryMb)
+                                                {{ __('This server has :memMb MB of RAM — below the 1 GB (1024 MB) threshold dply needs to run MySQL 8.0 or PostgreSQL safely. To keep it stable, lighter services were substituted during provisioning:', ['memMb' => $installedStack->totalMemoryMb]) }}
+                                            @else
+                                                {{ __('This server is below the 1 GB (1024 MB) threshold dply needs to run MySQL 8.0 or PostgreSQL safely. To keep it stable, lighter services were substituted during provisioning:', []) }}
+                                            @endif
+                                        </p>
+                                        <ul class="mt-2 space-y-1 text-sm text-amber-800">
+                                            @if ($installedStackDiverges)
+                                                <li class="flex gap-2">
+                                                    <span aria-hidden="true">•</span>
+                                                    <span>{{ __('SQLite was installed in place of :requested. Your app works, but on a single-file database instead of a dedicated server.', ['requested' => str($requestedDatabase ?? 'a database server')->headline()]) }}</span>
+                                                </li>
+                                            @endif
+                                            @if ($installedStack->cacheService && $installedStack->cacheService !== 'none')
+                                                <li class="flex gap-2">
+                                                    <span aria-hidden="true">•</span>
+                                                    <span>{{ __(':cache was kept as the cache — it is lightweight enough for this tier.', ['cache' => str($installedStack->cacheService)->headline()]) }}</span>
+                                                </li>
+                                            @endif
+                                            @if ($installedStack->swapMb)
+                                                <li class="flex gap-2">
+                                                    <span aria-hidden="true">•</span>
+                                                    <span>{{ __(':swapMb MB of swap was added as a safety margin against out-of-memory crashes.', ['swapMb' => $installedStack->swapMb]) }}</span>
+                                                </li>
+                                            @endif
+                                        </ul>
+                                        <p class="mt-2 text-xs text-amber-700">
+                                            {{ __('To run a full Laravel or WordPress stack with a real database server, re-provision on a 2 GB+ droplet (the s-1vcpu-2gb tier on DigitalOcean, or equivalent).') }}
+                                        </p>
+                                    @else
+                                        <p class="text-sm font-semibold text-amber-900">{{ __('Server stack differs from your request') }}</p>
+                                        <p class="mt-1 text-sm text-amber-800">
+                                            {{ __('You picked :requested, but the droplet was too small to run it safely. The provisioning script substituted :installed to keep the server functional.', [
                                                 'requested' => $requestedDatabase ?? '—',
+                                                'installed' => $installedStack->database ?? '—',
                                             ]) }}
                                         </p>
                                     @endif
@@ -1587,4 +1746,31 @@
             ])
         </x-slot>
     </x-server-workspace-layout>
+
+    @once
+        @script
+            <script>
+                Alpine.data('provisionConsoleScroll', () => ({
+                    pinned: true,
+                    onScroll() {
+                        const el = this.$el;
+                        this.pinned = (el.scrollHeight - el.scrollTop - el.clientHeight) < 16;
+                    },
+                    init() {
+                        this.scrollToBottom();
+                        Livewire.hook('morph.updated', () => {
+                            if (this.pinned) {
+                                this.scrollToBottom();
+                            }
+                        });
+                    },
+                    scrollToBottom() {
+                        this.$nextTick(() => {
+                            this.$el.scrollTop = this.$el.scrollHeight;
+                        });
+                    },
+                }));
+            </script>
+        @endscript
+    @endonce
 </div>

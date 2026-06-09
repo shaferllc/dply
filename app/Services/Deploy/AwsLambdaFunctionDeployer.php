@@ -65,6 +65,16 @@ final class AwsLambdaFunctionDeployer
             'function_url' => null,
         ]);
         $site->forceFill(['meta' => $siteMeta])->save();
+
+        // Lambda has no on-disk rollback path (it records only the latest
+        // artifact_path, not a history), so keep just the latest zip locally.
+        // Best-effort; never fail a completed deploy on cleanup.
+        try {
+            $this->artifactBuilder->pruneArtifactsExcept($site, [$buildResult['artifact_path']]);
+        } catch (\Throwable) {
+            // ignore — the daily prune is the backstop
+        }
+
         $this->revisionTracker->markApplied($site->fresh(), $this->contractBuilder->build($site->fresh())->revision(), 'runtime');
 
         return [

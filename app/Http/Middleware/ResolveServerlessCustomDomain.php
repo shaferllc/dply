@@ -6,6 +6,7 @@ namespace App\Http\Middleware;
 
 use App\Http\Controllers\ServerlessFunctionProxyController;
 use App\Models\Site;
+use App\Services\Serverless\ServerlessRoutingResolver;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -19,7 +20,7 @@ use Symfony\Component\HttpFoundation\Response;
  * the marketing welcome route (which has no host constraint).
  *
  * Custom-domain matches are cached per-host for 30s. The cache is
- * invalidated by {@see \App\Services\Serverless\ServerlessRoutingResolver}
+ * invalidated by {@see ServerlessRoutingResolver}
  * on every routing mutation so newly-added domains begin resolving within
  * one TTL window — usually instantly because the resolver clears the
  * map outright rather than per-host.

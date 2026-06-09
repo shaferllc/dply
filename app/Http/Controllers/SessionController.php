@@ -11,7 +11,7 @@ class SessionController extends Controller
 {
     /**
      * List the current user's sessions (for display). Only non-sensitive fields.
-     * Used by ProfileController; not a standalone page.
+     * Used by Settings\Hub for the Active sessions card; not a standalone page.
      *
      * @return array<int, array{id: string, ip_address: string|null, user_agent: string|null, last_activity: int, device_label: string, is_current: bool}>
      */
@@ -51,7 +51,7 @@ class SessionController extends Controller
         $currentId = $request->session()->getId();
 
         if ($sessionId === $currentId) {
-            return redirect()->route('profile.edit')->with('error', __('You cannot revoke your current session.'));
+            return redirect()->route('settings.profile')->with('error', __('You cannot revoke your current session.'));
         }
 
         $deleted = DB::table($table)
@@ -60,10 +60,10 @@ class SessionController extends Controller
             ->delete();
 
         if ($deleted) {
-            return redirect()->route('profile.edit')->with('status', 'session-revoked');
+            return redirect()->route('settings.profile')->with('status', 'session-revoked');
         }
 
-        return redirect()->route('profile.edit')->with('error', __('Session not found or already revoked.'));
+        return redirect()->route('settings.profile')->with('error', __('Session not found or already revoked.'));
     }
 
     /**
@@ -84,6 +84,6 @@ class SessionController extends Controller
             ->where('id', '!=', $currentId)
             ->delete();
 
-        return redirect()->route('profile.edit')->with('status', 'sessions-revoked');
+        return redirect()->route('settings.profile')->with('status', 'sessions-revoked');
     }
 }

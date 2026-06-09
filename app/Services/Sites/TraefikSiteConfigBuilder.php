@@ -4,12 +4,13 @@ namespace App\Services\Sites;
 
 use App\Models\Site;
 use App\Models\SiteBasicAuthUser;
+use App\Support\Sites\SiteAccessGateConfigSupport;
 
 class TraefikSiteConfigBuilder
 {
     public function build(Site $site, int $backendPort): string
     {
-        $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'basicAuthUsers']);
+        $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'basicAuthUsers', 'accessGate']);
 
         $hostnames = collect($site->webserverHostnames())
             ->filter()
@@ -24,7 +25,10 @@ class TraefikSiteConfigBuilder
             ->map(fn (string $hostname): string => sprintf('Host(`%s`)', $hostname))
             ->implode(' || ');
 
-        $authGroups = $this->traefikBasicAuthGroups($site, $basename);
+        $formGateGroups = SiteAccessGateConfigSupport::traefikFormGateGroups($site, $basename);
+        $authGroups = $formGateGroups === []
+            ? $this->traefikBasicAuthGroups($site, $basename)
+            : [];
 
         $rootMiddlewareName = null;
         $prefixGroups = [];
@@ -36,7 +40,11 @@ class TraefikSiteConfigBuilder
             }
         }
 
-        $middlewaresYaml = $this->renderMiddlewaresYaml($authGroups);
+        if ($formGateGroups !== []) {
+            $rootMiddlewareName = $formGateGroups[0]['middleware'];
+        }
+
+        $middlewaresYaml = $this->renderMiddlewaresYaml($authGroups, $formGateGroups, $backendPort);
         $extraRoutersYaml = $this->renderPrefixRoutersYaml($prefixGroups, $basename, $hostRule);
         $defaultRouterMiddlewaresYaml = $rootMiddlewareName !== null
             ? "      middlewares:\n        - {$rootMiddlewareName}\n"
@@ -67,6 +75,10 @@ YAML;
      */
     protected function traefikBasicAuthGroups(Site $site, string $basename): array
     {
+        if (SiteAccessGateConfigSupport::usesFormPasswordGate($site)) {
+            return [];
+        }
+
         $users = $site->enforceableBasicAuthUsers();
         if ($users->isEmpty()) {
             return [];
@@ -100,10 +112,11 @@ YAML;
 
     /**
      * @param  array<int, array{path: string, middleware: string, users_file: string}>  $groups
+     * @param  array<int, array{middleware: string, address: string}>  $formGateGroups
      */
-    private function renderMiddlewaresYaml(array $groups): string
+    private function renderMiddlewaresYaml(array $groups, array $formGateGroups, int $backendPort): string
     {
-        if ($groups === []) {
+        if ($groups === [] && $formGateGroups === []) {
             return '';
         }
 
@@ -113,6 +126,13 @@ YAML;
                 ."      basicAuth:\n"
                 ."        usersFile: \"{$g['users_file']}\"\n"
                 ."        realm: \"Restricted\"\n";
+        }
+
+        foreach ($formGateGroups as $g) {
+            $lines .= "    {$g['middleware']}:\n"
+                ."      forwardAuth:\n"
+                ."        address: \"http://127.0.0.1:{$backendPort}/__dply/access/verify\"\n"
+                ."        trustForwardHeader: true\n";
         }
 
         return $lines;

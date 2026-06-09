@@ -48,11 +48,23 @@
             @else
                 <ul class="divide-y divide-brand-ink/10">
                     @foreach ($scripts as $script)
-                        <li wire:key="script-{{ $script->id }}">
-                            <a href="{{ route('scripts.edit', $script) }}" wire:navigate class="flex items-center justify-between gap-4 px-4 py-4 hover:bg-brand-sand/20 sm:px-6">
-                                <span class="font-medium text-brand-ink">{{ $script->displayName() }}</span>
-                                <span class="text-xs text-brand-mist shrink-0">{{ $script->updated_at->diffForHumans() }}</span>
+                        <li wire:key="script-{{ $script->id }}" class="flex flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6">
+                            <a href="{{ route('scripts.edit', $script) }}" wire:navigate class="min-w-0 flex-1 font-medium text-brand-ink hover:text-brand-sage">
+                                {{ $script->displayName() }}
                             </a>
+                            <div class="flex shrink-0 items-center gap-3">
+                                <span class="text-xs text-brand-mist">{{ $script->updated_at->diffForHumans() }}</span>
+                                @if ($vmServers->isNotEmpty())
+                                    <button
+                                        type="button"
+                                        wire:click="openApplyModal('{{ $script->id }}')"
+                                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                                    >
+                                        <x-heroicon-o-server-stack class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
+                                        {{ __('Apply to server') }}
+                                    </button>
+                                @endif
+                            </div>
                         </li>
                     @endforeach
                 </ul>
@@ -61,5 +73,58 @@
                 </div>
             @endif
         </div>
+
+        @if ($vmServers->isNotEmpty())
+            <x-modal name="apply-script-to-server" maxWidth="lg" overlayClass="bg-brand-ink/40">
+                <div class="relative border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-5 sm:px-7">
+                    <div class="flex items-start gap-3 pr-10">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                            <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Saved commands') }}</p>
+                            <h2 class="mt-0.5 text-xl font-semibold text-brand-ink">{{ __('Apply script to a server') }}</h2>
+                            <p class="mt-2 text-sm leading-relaxed text-brand-moss">
+                                {{ __('Copies this organization script into the server Run workspace as a saved command. Existing commands with the same name are updated.') }}
+                            </p>
+                        </div>
+                    </div>
+                    <button type="button" wire:click="closeApplyModal" class="absolute right-4 top-4 rounded-lg p-1.5 text-brand-moss transition hover:bg-brand-sand/50 hover:text-brand-ink" aria-label="{{ __('Close') }}">
+                        <x-heroicon-o-x-mark class="h-5 w-5" />
+                    </button>
+                </div>
+                <div class="space-y-4 px-6 py-5 sm:px-7">
+                    <div>
+                        <x-input-label for="apply_server_id" :value="__('Server')" />
+                        <x-select id="apply_server_id" wire:model="applyServerId" class="mt-1 block w-full">
+                            <option value="">{{ __('Choose a VM server…') }}</option>
+                            @foreach ($vmServers as $vmServer)
+                                <option value="{{ $vmServer->id }}">{{ $vmServer->name }}</option>
+                            @endforeach
+                        </x-select>
+                        <x-input-error :messages="$errors->get('applyServerId')" class="mt-2" />
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
+                    <button type="button" wire:click="closeApplyModal" class="inline-flex items-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                        {{ __('Cancel') }}
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="confirmApplyToServer"
+                        wire:loading.attr="disabled"
+                        wire:target="confirmApplyToServer"
+                        @disabled($applyServerId === '')
+                        class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-sm transition hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        <span wire:loading.remove wire:target="confirmApplyToServer">{{ __('Apply to server') }}</span>
+                        <span wire:loading wire:target="confirmApplyToServer" class="inline-flex items-center gap-2">
+                            <x-spinner variant="cream" size="sm" />
+                            {{ __('Applying…') }}
+                        </span>
+                    </button>
+                </div>
+            </x-modal>
+        @endif
     </div>
 </div>

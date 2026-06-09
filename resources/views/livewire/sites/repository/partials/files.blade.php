@@ -1,7 +1,28 @@
-<section class="space-y-4">
-    <div class="dply-card p-4 sm:p-6">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-            <nav aria-label="{{ __('Repository path') }}" class="min-w-0 flex-1">
+<section class="space-y-6">
+    <div class="dply-card overflow-hidden">
+        <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
+            <div class="flex min-w-0 items-start gap-3">
+                <x-icon-badge>
+                    <x-heroicon-o-folder class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Browse') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Files') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Browse the repository tree at the selected ref. Click a file to preview it inline.') }}</p>
+                </div>
+            </div>
+            <label class="flex shrink-0 items-center gap-2 text-xs text-brand-moss">
+                <span class="font-semibold uppercase tracking-[0.12em]">{{ __('Ref') }}</span>
+                <input
+                    type="text"
+                    wire:model.live.debounce.400ms="branchOverride"
+                    placeholder="{{ $currentBranch }}"
+                    class="w-32 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 font-mono text-xs shadow-sm focus:border-brand-ink focus:ring-1 focus:ring-brand-ink"
+                />
+            </label>
+        </div>
+        <div class="bg-brand-cream/40 px-6 py-3 sm:px-7">
+            <nav aria-label="{{ __('Repository path') }}" class="min-w-0">
                 <ol class="flex flex-wrap items-center gap-1 text-sm">
                     @foreach ($filesBreadcrumb as $crumb)
                         @if ($loop->last)
@@ -16,15 +37,6 @@
                     @endforeach
                 </ol>
             </nav>
-            <label class="flex items-center gap-2 text-xs text-brand-moss">
-                <span class="font-semibold uppercase tracking-[0.12em]">{{ __('Ref') }}</span>
-                <input
-                    type="text"
-                    wire:model.live.debounce.400ms="branchOverride"
-                    placeholder="{{ $currentBranch }}"
-                    class="w-32 rounded-lg border border-brand-ink/15 bg-white px-2 py-1 font-mono text-xs shadow-sm focus:border-brand-ink focus:ring-1 focus:ring-brand-ink"
-                />
-            </label>
         </div>
     </div>
 
@@ -37,7 +49,7 @@
             {{ __('Empty directory.') }}
         </div>
     @else
-        <ul class="divide-y divide-brand-ink/10 rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
+        <ul class="dply-card divide-y divide-brand-ink/10 overflow-hidden">
             @foreach ($filesTree['entries'] as $entry)
                 <li class="flex items-center justify-between gap-3 px-4 py-2 hover:bg-brand-sand/20" wire:key="entry-{{ $entry['path'] }}">
                     @if ($entry['type'] === 'dir')
@@ -61,8 +73,8 @@
     @endif
 
     @if ($filesView !== null)
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
-            <header class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 px-4 py-3">
+        <div class="dply-card overflow-hidden">
+            <header class="flex flex-wrap items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-6 py-4 sm:px-7">
                 <div class="min-w-0">
                     <p class="truncate font-mono text-sm font-semibold text-brand-ink">{{ $filesOpenFile }}</p>
                     <p class="mt-0.5 text-xs text-brand-moss">
@@ -78,7 +90,7 @@
                     @if (! empty($filesView['html_url']))
                         <a href="{{ $filesView['html_url'] }}" target="_blank" rel="noopener noreferrer"
                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                            <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5" />
+                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" />
                             {{ __('Open on provider') }}
                         </a>
                     @endif
@@ -96,7 +108,7 @@
                     {{ ($filesView['binary'] ?? false) ? __('Binary file — preview suppressed. Open on the provider to download.') : __('File exceeds the preview size limit. Open on the provider to download.') }}
                 </div>
             @else
-                <pre class="max-h-[40rem] overflow-auto bg-slate-900 p-4 font-mono text-[11px] leading-relaxed text-slate-100">{{ $filesView['content'] }}</pre>
+                <pre class="max-h-[40rem] overflow-auto bg-brand-ink p-4 font-mono text-[11px] leading-relaxed text-brand-cream/90">{{ $filesView['content'] }}</pre>
             @endif
         </div>
     @endif

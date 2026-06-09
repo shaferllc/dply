@@ -1,10 +1,12 @@
 @php
-    $btnPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50';
-    $btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors';
     $actionSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors';
     $actionPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50 w-full sm:w-auto';
     $canEdit = auth()->user()->can('update', $site);
-    $isNginxLayeredUi = $site->webserver() === 'nginx' && $mode === \App\Models\SiteWebserverConfigProfile::MODE_LAYERED;
+    // Only nginx has before/main/after snippet layers; every other engine edits
+    // a single managed file, so the Layered/Full-file toggle + layer pipeline are
+    // hidden for them (see WebserverConfig::supportsLayeredSnippets()).
+    $supportsLayers = $site->webserver() === 'nginx';
+    $isNginxLayeredUi = $supportsLayers && $mode === \App\Models\SiteWebserverConfigProfile::MODE_LAYERED;
     $showNginxLayerPipeline = $isNginxLayeredUi;
     $editingPath = $mode === \App\Models\SiteWebserverConfigProfile::MODE_FULL_OVERRIDE
         ? $config_paths['main_vhost']
@@ -30,19 +32,12 @@
 @endphp
 
 <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-    <nav class="mb-6 text-sm text-slate-500" aria-label="{{ __('Breadcrumb') }}">
-        <ol class="flex flex-wrap items-center gap-2">
-            <li><a href="{{ route('dashboard') }}" wire:navigate class="transition-colors hover:text-slate-900">{{ __('Dashboard') }}</a></li>
-            <li class="text-slate-400" aria-hidden="true">/</li>
-            <li><a href="{{ route('servers.index') }}" wire:navigate class="transition-colors hover:text-slate-900">{{ __('Servers') }}</a></li>
-            <li class="text-slate-400" aria-hidden="true">/</li>
-            <li><a href="{{ route('servers.sites', $server) }}" wire:navigate class="transition-colors hover:text-slate-900">{{ $server->name }}</a></li>
-            <li class="text-slate-400" aria-hidden="true">/</li>
-            <li><a href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']) }}" wire:navigate class="transition-colors hover:text-slate-900">{{ $site->name }}</a></li>
-            <li class="text-slate-400" aria-hidden="true">/</li>
-            <li class="font-medium text-slate-900">{{ __('Web server config') }}</li>
-        </ol>
-    </nav>
+    @include('livewire.sites.partials.workspace-breadcrumb-bar', [
+        'server' => $server,
+        'site' => $site,
+        'currentLabel' => __('Web server config'),
+        'currentIcon' => 'globe-alt',
+    ])
 
     <div class="space-y-6 lg:grid lg:grid-cols-12 lg:gap-10 lg:space-y-0">
         @include('livewire.sites.settings.partials.sidebar')
@@ -52,33 +47,91 @@
         :eyebrow="__('Web server config')"
         :title="$config_paths['engine_label']"
         :description="__('Managed configuration for :site', ['site' => $site->name])"
-        doc-route="docs.index"
+        :show-documentation="false"
         flush
         compact
     />
 
     @if ($core_changed_warning)
-        <div class="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-            {{ __('Site settings changed the managed core since the last apply. Review the diff before applying.') }}
+        <div class="mb-6 dply-card overflow-hidden">
+            <div class="flex items-start gap-3 bg-amber-50/60 px-6 py-5 sm:px-7">
+                <x-icon-badge tone="amber">
+                    <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Out of sync') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-amber-950">{{ __('Managed core changed') }}</h2>
+                    <p class="mt-1 text-sm leading-relaxed text-amber-900">{{ __('Site settings changed the managed core since the last apply. Review the diff before applying.') }}</p>
+                </div>
+            </div>
         </div>
     @endif
 
     @if ($health_hint)
-        <div class="mb-6 rounded-xl border border-brand-ink/10 bg-brand-sand/40 px-4 py-3 text-sm text-brand-ink">{{ $health_hint }}</div>
+        <div class="mb-6 dply-card overflow-hidden">
+            <div class="flex items-start gap-3 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <x-icon-badge>
+                    <x-heroicon-o-information-circle class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Health') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Webserver status') }}</h2>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $health_hint }}</p>
+                </div>
+            </div>
+        </div>
     @endif
 
     {{-- 75% / 25%: plain 4-column grid, main spans 3, pipeline spans 1 (md+). --}}
     <div class="grid grid-cols-1 gap-8 md:grid-cols-4 md:items-start md:gap-x-6 lg:gap-x-8">
         <div class="min-w-0 space-y-5 md:col-span-3">
-            <div class="dply-card overflow-hidden min-w-0">
-                <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <div
+                class="dply-card overflow-hidden min-w-0"
+                x-data="{
+                    insertAtCursor(text, block = true) {
+                        const el = $refs.cfgEditor;
+                        if (! el) return;
+                        el.focus();
+                        const start = el.selectionStart ?? el.value.length;
+                        const before = el.value.slice(0, start);
+                        // Block snippets get blank-line padding; inline tokens are spliced as-is.
+                        const lead = (block && before && ! before.endsWith('\n')) ? '\n' : '';
+                        const trail = block ? (text.endsWith('\n') ? '' : '\n') : '';
+                        const chunk = lead + text + trail;
+                        // execCommand('insertText') keeps the native undo/redo stack intact
+                        // (assigning el.value directly wipes it). Fall back if unsupported.
+                        let ok = false;
+                        try { ok = document.execCommand('insertText', false, chunk); } catch (e) { ok = false; }
+                        if (! ok) {
+                            const end = el.selectionEnd ?? start;
+                            el.value = before + chunk + el.value.slice(end);
+                            const caret = (before + chunk).length;
+                            el.setSelectionRange(caret, caret);
+                            el.dispatchEvent(new Event('input', { bubbles: true }));
+                        }
+                    },
+                    saveShortcut(e) {
+                        // ⌘/Ctrl+S → save draft (undo/redo are handled natively by the
+                        // textarea now that inserts go through execCommand). Only when an
+                        // editable editor is present (read-only viewers have no cfgEditor ref).
+                        if (! $refs.cfgEditor) return;
+                        if ((e.metaKey || e.ctrlKey) && ! e.shiftKey && e.key.toLowerCase() === 's') {
+                            e.preventDefault();
+                            $wire.saveDraft();
+                        }
+                    }
+                }"
+                x-on:insert-snippet-text.window="insertAtCursor($event.detail.text, $event.detail.block ?? true)"
+                x-on:keydown.window="saveShortcut($event)"
+            >
+                <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-cream/40 px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                     <div class="flex flex-wrap items-center gap-2 sm:gap-3">
                         <div class="flex flex-wrap gap-1 rounded-lg bg-white/80 p-0.5 border border-brand-ink/10">
                             <button type="button" wire:click="$set('content_tab', 'edit')" class="{{ $tabBtn }} {{ $content_tab === 'edit' ? $tabActive : $tabIdle }}">{{ __('Content') }}</button>
                             <button type="button" wire:click="$set('content_tab', 'preview')" class="{{ $tabBtn }} {{ $content_tab === 'preview' ? $tabActive : $tabIdle }}">{{ __('Effective preview') }}</button>
                             <button type="button" wire:click="$set('content_tab', 'compare')" class="{{ $tabBtn }} {{ $content_tab === 'compare' ? $tabActive : $tabIdle }}">{{ __('Compare') }}</button>
                         </div>
-                        @if ($canEdit)
+                        @if ($canEdit && $supportsLayers)
                             <div class="flex items-center gap-2">
                                 <span class="text-[10px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Mode') }}</span>
                                 <div class="inline-flex rounded-lg border border-brand-ink/10 bg-white/90 p-0.5">
@@ -88,7 +141,7 @@
                             </div>
                         @endif
                     </div>
-                    @if ($canEdit && $content_tab === 'edit')
+                    @if ($canEdit && $content_tab === 'edit' && $supportsLayers)
                         <span class="text-[11px] text-brand-moss md:hidden">{{ __('Use the pipeline to pick a layer.') }}</span>
                         <span class="text-[11px] text-brand-moss hidden md:inline">{{ __('Choose a layer in the pipeline →') }}</span>
                     @endif
@@ -106,6 +159,20 @@
                     @if ($content_tab === 'edit')
                         @if (! $canEdit)
                             <p class="text-sm text-brand-moss mb-4">{{ __('You can preview configuration. Ask an admin for site update access to edit.') }}</p>
+                        @else
+                            <div class="mb-3 flex items-center justify-between gap-2">
+                                <p class="hidden text-[11px] text-brand-moss sm:block">
+                                    <kbd class="rounded border border-brand-ink/15 bg-white px-1 font-mono text-[10px]">⌘/Ctrl+S</kbd> {{ __('save draft') }}
+                                    <span class="text-brand-mist">·</span>
+                                    <kbd class="rounded border border-brand-ink/15 bg-white px-1 font-mono text-[10px]">⌘/Ctrl+Z</kbd> {{ __('undo') }}
+                                    <span class="text-brand-mist">·</span>
+                                    <kbd class="rounded border border-brand-ink/15 bg-white px-1 font-mono text-[10px]">⇧+Z</kbd> {{ __('redo') }}
+                                </p>
+                                <button type="button" x-on:click="$dispatch('open-modal', 'webserver-snippet-modal')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                    <x-heroicon-o-puzzle-piece class="h-4 w-4" aria-hidden="true" />
+                                    {{ __('Insert snippet') }}
+                                </button>
+                            </div>
                         @endif
 
                         <div wire:key="editor-{{ $mode }}-{{ $active_layer }}">
@@ -113,6 +180,7 @@
                                 <label class="block text-xs font-semibold text-brand-moss mb-2">{{ __('Content') }}</label>
                                 @if ($canEdit)
                                     <textarea
+                                        x-ref="cfgEditor"
                                         wire:model="full_override_body"
                                         rows="22"
                                         class="w-full rounded-lg border border-brand-ink/15 font-mono text-xs leading-relaxed text-brand-ink bg-white shadow-inner focus:border-brand-forest focus:ring-brand-forest min-h-[28rem]"
@@ -124,30 +192,41 @@
                                         class="w-full rounded-lg border border-brand-ink/15 font-mono text-xs leading-relaxed text-brand-ink bg-brand-sand/20 min-h-[28rem]"
                                     >{{ $full_override_body }}</textarea>
                                 @endif
-                            @else
+                            @elseif ($active_layer === 'before')
                                 <label class="block text-xs font-semibold text-brand-moss mb-2">{{ __('Content') }}</label>
-                                @if ($active_layer === 'before')
-                                    <textarea wire:model.live="before_body" rows="22" @if (! $canEdit) readonly @endif class="w-full rounded-lg border border-brand-ink/15 font-mono text-xs leading-relaxed text-brand-ink bg-white shadow-inner focus:border-brand-forest focus:ring-brand-forest min-h-[28rem] @if (! $canEdit) bg-brand-sand/20 @endif"></textarea>
-                                @elseif ($active_layer === 'after')
-                                    <textarea wire:model.live="after_body" rows="22" @if (! $canEdit) readonly @endif class="w-full rounded-lg border border-brand-ink/15 font-mono text-xs leading-relaxed text-brand-ink bg-white shadow-inner focus:border-brand-forest focus:ring-brand-forest min-h-[28rem] @if (! $canEdit) bg-brand-sand/20 @endif"></textarea>
-                                @else
-                                    <textarea wire:model.live="main_snippet_body" rows="22" @if (! $canEdit) readonly @endif class="w-full rounded-lg border border-brand-ink/15 font-mono text-xs leading-relaxed text-brand-ink bg-white shadow-inner focus:border-brand-forest focus:ring-brand-forest min-h-[28rem] @if (! $canEdit) bg-brand-sand/20 @endif"></textarea>
-                                @endif
+                                <textarea x-ref="cfgEditor" wire:model.live="before_body" rows="22" @if (! $canEdit) readonly @endif class="w-full rounded-lg border border-brand-ink/15 font-mono text-xs leading-relaxed text-brand-ink bg-white shadow-inner focus:border-brand-forest focus:ring-brand-forest min-h-[28rem] @if (! $canEdit) bg-brand-sand/20 @endif"></textarea>
+                            @elseif ($active_layer === 'after')
+                                <label class="block text-xs font-semibold text-brand-moss mb-2">{{ __('Content') }}</label>
+                                <textarea x-ref="cfgEditor" wire:model.live="after_body" rows="22" @if (! $canEdit) readonly @endif class="w-full rounded-lg border border-brand-ink/15 font-mono text-xs leading-relaxed text-brand-ink bg-white shadow-inner focus:border-brand-forest focus:ring-brand-forest min-h-[28rem] @if (! $canEdit) bg-brand-sand/20 @endif"></textarea>
+                            @else
+                                {{-- Server / main layer: show the ENTIRE generated vhost (read-only)
+                                     so the user sees the whole file, then the editable main snippet
+                                     that dply merges into it. The full file updates live as the
+                                     snippet changes (render() recomputes the effective preview). --}}
+                                <div class="flex items-center justify-between mb-2">
+                                    <label class="block text-xs font-semibold text-brand-moss">{{ __('Full virtual host file') }}</label>
+                                    <span class="inline-flex items-center gap-1 text-[11px] text-brand-moss">{{ __('Generated by dply · read-only') }}</span>
+                                </div>
+                                <textarea readonly rows="18" id="server-full-file" class="w-full rounded-lg border border-brand-ink/10 font-mono text-xs leading-relaxed text-brand-ink bg-brand-sand/20 min-h-[20rem]">{{ $effective_config_preview }}</textarea>
+                                <p class="mt-1.5 text-[11px] text-brand-moss leading-relaxed">{{ __('This is the complete vhost dply writes to :path. The managed sections are generated from your site settings; edit your additions in the main snippet below.', ['path' => $config_paths['main_vhost']]) }}</p>
+
+                                <label class="block text-xs font-semibold text-brand-moss mt-5 mb-2">{{ __('Main snippet — merged into the file above') }}</label>
+                                <textarea x-ref="cfgEditor" wire:model.live="main_snippet_body" rows="10" @if (! $canEdit) readonly @endif class="w-full rounded-lg border border-brand-ink/15 font-mono text-xs leading-relaxed text-brand-ink bg-white shadow-inner focus:border-brand-forest focus:ring-brand-forest min-h-[14rem] @if (! $canEdit) bg-brand-sand/20 @endif"></textarea>
                             @endif
                         </div>
                     @elseif ($content_tab === 'preview')
                         <label class="block text-xs font-semibold text-brand-moss mb-2">{{ __('Effective configuration (pending apply)') }}</label>
                         <textarea readonly rows="22" id="pending-effective" class="w-full rounded-lg border border-brand-ink/10 bg-brand-sand/30 font-mono text-xs leading-relaxed text-brand-ink min-h-[28rem]">{{ $effective_config_preview }}</textarea>
                         <div class="mt-3 flex flex-wrap gap-2">
-                            <button type="button" wire:click="downloadEffective" class="{{ $btnSecondary }}">{{ __('Download') }}</button>
-                            <button type="button" x-data @click="navigator.clipboard.writeText(document.getElementById('pending-effective').value)" class="{{ $btnSecondary }}">{{ __('Copy') }}</button>
+                            <x-secondary-button size="sm" type="button" wire:click="downloadEffective">{{ __('Download') }}</x-secondary-button>
+                            <x-secondary-button size="sm" type="button" x-data x-on:click="navigator.clipboard.writeText(document.getElementById('pending-effective').value)">{{ __('Copy') }}</x-secondary-button>
                         </div>
                     @else
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <p class="text-xs font-semibold text-brand-moss mb-2">{{ __('Live on server') }}</p>
                                 <textarea readonly rows="14" class="w-full rounded-lg border border-brand-ink/10 bg-white font-mono text-[11px] leading-relaxed text-brand-ink min-h-[18rem]">{{ $remote_live_config ?? __('Not loaded — use Fetch.') }}</textarea>
-                                <button type="button" wire:click="fetchRemoteConfig" wire:loading.attr="disabled" class="mt-2 {{ $btnSecondary }}">{{ __('Fetch from server') }}</button>
+                                <x-secondary-button size="sm" type="button" wire:click="fetchRemoteConfig" wire:loading.attr="disabled" class="mt-2">{{ __('Fetch from server') }}</x-secondary-button>
                                 @error('remote_fetch')
                                     <p class="mt-1 text-xs text-red-700">{{ $message }}</p>
                                 @enderror
@@ -160,15 +239,21 @@
                     @endif
                 </div>
 
-                <div class="px-4 py-2.5 border-t border-brand-ink/10 bg-brand-sand/15 text-xs text-brand-moss leading-relaxed">
+                <div class="px-6 py-4 border-t border-brand-ink/10 bg-brand-sand/25 text-xs text-brand-moss leading-relaxed sm:px-7">
                     {{ __('Edits are not live until you apply. Prefer validating on the server before applying.') }}
                 </div>
             </div>
 
             <div class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 bg-brand-sand/25 px-5 py-4">
-                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Check & publish') }}</h2>
-                    <p class="mt-1 text-xs text-brand-moss leading-relaxed">{{ __('Validate the pending config, then save or roll out to the server.') }}</p>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <x-icon-badge>
+                        <x-heroicon-o-check-badge class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Release') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Check & publish') }}</h2>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Validate the pending config, then save or roll out to the server.') }}</p>
+                    </div>
                 </div>
 
                 <div class="px-5 py-5 space-y-5">
@@ -216,7 +301,7 @@
         </div>
 
         <aside class="min-w-0 w-full space-y-0 md:col-span-1 md:sticky md:top-6" aria-label="{{ __('Configuration pipeline') }}">
-            <p class="text-xs font-semibold uppercase tracking-wider text-brand-moss mb-4">{{ __('Config pipeline') }}</p>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist mb-4">{{ __('Config pipeline') }}</p>
 
             @php
                 $flowActive = 'ring-2 ring-brand-forest border-brand-forest/40 bg-brand-sand/50';
@@ -337,40 +422,126 @@
                 </div>
             </div>
 
-            <div class="mt-6 rounded-xl border border-brand-ink/10 bg-brand-sand/30 p-4 text-xs text-brand-moss space-y-2">
-                <p class="font-semibold text-brand-ink text-sm">{{ __('Runbook') }}</p>
-                <a href="{{ route('scripts.marketplace') }}" wire:navigate class="text-brand-ink font-medium underline">{{ __('Script marketplace') }}</a>
-                <span class="text-brand-mist">·</span>
-                <a href="{{ route('servers.run', $server) }}" wire:navigate class="text-brand-ink font-medium underline">{{ __('Server commands') }}</a>
-            </div>
         </aside>
     </div>
 
-    @if ($show_history_modal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" wire:click.self="$set('show_history_modal', false)">
-            <div class="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[80vh] overflow-hidden flex flex-col" @click.stop>
-                <div class="px-5 py-4 border-b border-brand-ink/10 flex justify-between items-center">
-                    <h3 class="font-semibold text-brand-ink">{{ __('Revision history') }}</h3>
-                    <button type="button" wire:click="$set('show_history_modal', false)" class="text-brand-moss hover:text-brand-ink">&times;</button>
-                </div>
-                <ul class="overflow-y-auto divide-y divide-brand-ink/10">
-                    @forelse ($revisions as $rev)
-                        <li class="px-5 py-3 flex justify-between gap-2 items-start">
-                            <div class="min-w-0">
-                                <p class="text-sm font-medium text-brand-ink">{{ $rev->summary ?? __('Snapshot') }}</p>
-                                <p class="text-xs text-brand-moss">{{ $rev->created_at?->timezone(config('app.timezone'))->format('Y-m-d H:i') }}</p>
-                            </div>
-                            <button type="button" wire:click="restoreRevision('{{ $rev->id }}')" class="{{ $btnSecondary }} shrink-0">{{ __('Restore') }}</button>
-                        </li>
-                    @empty
-                        <li class="px-5 py-8 text-sm text-brand-moss text-center">{{ __('No revisions yet.') }}</li>
-                    @endforelse
-                </ul>
-            </div>
+    <x-modal name="webserver-history-modal" :show="$show_history_modal" maxWidth="lg" overlayClass="bg-brand-ink/40" wire:model.live="show_history_modal">
+        <div class="relative border-b border-brand-ink/10 px-6 py-5">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('History') }}</p>
+            <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Revision history') }}</h2>
+            <p class="mt-2 pr-10 text-sm leading-6 text-brand-moss">{{ __('Restore any prior saved revision back into the editor.') }}</p>
+            <button type="button" x-on:click="$dispatch('close')" class="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist transition-colors hover:bg-brand-sand/40 hover:text-brand-ink focus:outline-none focus:ring-2 focus:ring-brand-sage/40" aria-label="{{ __('Close') }}" title="{{ __('Close') }}">
+                <x-heroicon-o-x-mark class="h-5 w-5" />
+            </button>
         </div>
-    @endif
+
+        <div class="max-h-[60vh] overflow-y-auto">
+            <ul class="divide-y divide-brand-ink/10">
+                @forelse ($revisions as $rev)
+                    <li class="flex items-start justify-between gap-2 px-6 py-4">
+                        <div class="min-w-0">
+                            <p class="text-sm font-medium text-brand-ink">{{ $rev->summary ?? __('Snapshot') }}</p>
+                            <p class="mt-1 text-xs text-brand-moss">{{ $rev->created_at?->timezone(config('app.timezone'))->format('Y-m-d H:i') }}</p>
+                        </div>
+                        <x-secondary-button size="sm" type="button" wire:click="restoreRevision('{{ $rev->id }}')" class="shrink-0">{{ __('Restore') }}</x-secondary-button>
+                    </li>
+                @empty
+                    <li class="px-6 py-10 text-center text-sm text-brand-moss">{{ __('No revisions yet.') }}</li>
+                @endforelse
+            </ul>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+            <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Close') }}</x-secondary-button>
+        </div>
+    </x-modal>
 
     <x-cli-snippet tone="stub" />
         </main>
     </div>
+
+    {{-- Config-snippet picker — inserts an engine-specific block into the editor. --}}
+    <x-modal name="webserver-snippet-modal" max-width="2xl" focusable>
+        <div class="flex flex-col" style="max-height: 80vh;">
+            <div class="flex items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5">
+                <div class="flex min-w-0 items-start gap-3">
+                    <x-icon-badge>
+                        <x-heroicon-o-puzzle-piece class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Config snippets') }}</p>
+                        <div class="mt-0.5 flex items-center gap-2">
+                            <h2 class="text-base font-semibold text-brand-ink">{{ __('Insert a snippet') }}</h2>
+                            <span class="inline-flex items-center rounded-full bg-brand-ink/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-moss">{{ $config_paths['engine_label'] }}</span>
+                        </div>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Drops a ready-made block into the config you’re editing. Review and adjust values (ports, paths) before applying.') }}</p>
+                    </div>
+                </div>
+                <button type="button" x-on:click="$dispatch('close-modal', 'webserver-snippet-modal')" class="shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40">
+                    <x-heroicon-o-x-mark class="h-5 w-5" />
+                </button>
+            </div>
+
+            <div class="border-b border-brand-ink/10 px-6 py-3">
+                <div class="relative">
+                    <x-heroicon-o-magnifying-glass class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-mist" aria-hidden="true" />
+                    <input type="search" wire:model.live.debounce.250ms="snippetSearch" placeholder="{{ __('Filter snippets…') }}" class="w-full rounded-lg border border-brand-ink/15 bg-white py-2 pl-9 pr-3 text-sm shadow-sm focus:border-brand-ink focus:ring-1 focus:ring-brand-ink" />
+                </div>
+            </div>
+
+            <div class="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+                {{-- Placeholder tokens: inserted literally ({{TOKEN}}); the
+                     resolved value is shown only as a hint to fill in later. --}}
+                @if ($snippetSearch === '')
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Placeholders') }}</p>
+                    <div class="mt-2 flex flex-wrap gap-2">
+                        @foreach ($configPlaceholders as $ph)
+                            <button
+                                type="button"
+                                x-on:click="$dispatch('insert-snippet-text', { text: @js($ph['token']), block: false })"
+                                title="{{ $ph['label'] }}{{ $ph['example'] !== '' ? ' — '.$ph['example'] : '' }}"
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 font-mono text-[11px] text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                            >
+                                <x-heroicon-o-plus class="h-3 w-3 text-brand-mist" aria-hidden="true" />
+                                {{ $ph['token'] }}
+                            </button>
+                        @endforeach
+                    </div>
+                    <p class="mt-2 text-[11px] text-brand-moss">{{ __('Inserts the token at your cursor — replace it before applying. Hover for this site’s value.') }}</p>
+                    <hr class="my-4 border-brand-ink/10" />
+                @endif
+
+                @if ($webserverSnippets->isEmpty())
+                    <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/20 px-4 py-10 text-center text-sm text-brand-moss">
+                        {{ __('No snippets match.') }}
+                    </div>
+                @else
+                    <ul class="divide-y divide-brand-ink/10">
+                        @foreach ($webserverSnippets as $snippet)
+                            <li class="flex flex-wrap items-center justify-between gap-3 py-3" wire:key="snippet-{{ $snippet['key'] }}">
+                                <div class="min-w-0">
+                                    <p class="truncate text-sm font-semibold text-brand-ink">{{ $snippet['name'] }}</p>
+                                    @if ($snippet['description'] !== '')
+                                        <p class="mt-0.5 text-xs text-brand-moss">{{ $snippet['description'] }}</p>
+                                    @endif
+                                </div>
+                                <button
+                                    type="button"
+                                    x-on:click="$dispatch('insert-snippet-text', { text: @js($snippet['content']), block: true }); $dispatch('close-modal', 'webserver-snippet-modal')"
+                                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                >
+                                    <x-heroicon-o-arrow-down-tray class="h-4 w-4" aria-hidden="true" />
+                                    {{ __('Insert at cursor') }}
+                                </button>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+            </div>
+
+            <div class="flex items-center justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-3">
+                <button type="button" x-on:click="$dispatch('close-modal', 'webserver-snippet-modal')" class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Done') }}</button>
+            </div>
+        </div>
+    </x-modal>
 </div>

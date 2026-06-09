@@ -16,12 +16,11 @@ final class FakeCloudProvision
         ServerProvider::DigitalOcean,
         ServerProvider::Hetzner,
         ServerProvider::Linode,
-        ServerProvider::Akamai,
         ServerProvider::Vultr,
-        ServerProvider::Scaleway,
         ServerProvider::UpCloud,
-        ServerProvider::EquinixMetal,
         ServerProvider::Aws,
+        ServerProvider::Azure,
+        ServerProvider::Oracle,
     ];
 
     public static function enabled(): bool
@@ -159,19 +158,6 @@ final class FakeCloudProvision
         }
 
         return in_array($server->provider, self::VM_POLL_PROVIDERS, true);
-    }
-
-    public static function shouldInterceptFlyIoUiStub(Server $server): bool
-    {
-        if (! self::enabled()) {
-            return false;
-        }
-
-        if (! config('server_provision_fake.fly_io_ui_stub')) {
-            return false;
-        }
-
-        return $server->provider === ServerProvider::FlyIo;
     }
 
     /**

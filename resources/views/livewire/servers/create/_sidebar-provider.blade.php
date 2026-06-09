@@ -2,6 +2,7 @@
   Sidebar for Step 2 / provider mode.
   Shows: provider health, region/size summary, cost teaser.
   Required: $preflight, $catalog, $form
+  Optional: $selectedServerRole, $roleSizingTip
 --}}
 <div class="space-y-4">
     @php
@@ -16,6 +17,7 @@
             'warning' => __('Needs review'),
             default => __('Blocked'),
         };
+        $roleSizingTip = $roleSizingTip ?? null;
     @endphp
 
     @php
@@ -67,6 +69,16 @@
         @endif
     </div>
 
+    @if ($selectedServerRole ?? null)
+        <div class="rounded-2xl border border-slate-200 bg-white p-4">
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Server purpose') }}</p>
+            <p class="mt-1 text-sm font-semibold text-slate-900">{{ $selectedServerRole['label'] ?? $form->server_role }}</p>
+            @if (! empty($selectedServerRole['summary']))
+                <p class="mt-1 text-xs leading-relaxed text-slate-600">{{ $selectedServerRole['summary'] }}</p>
+            @endif
+        </div>
+    @endif
+
     @if ($costPreview)
         <div class="rounded-2xl border border-slate-200 bg-white p-4">
             <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Estimated cost') }}</p>
@@ -95,8 +107,11 @@
         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Tips') }}</p>
         <ul class="mt-2 space-y-1.5">
             <li>• {{ __('Pick a region close to your users.') }}</li>
-            <li>• {{ __('Smaller plans deploy faster, but watch RAM headroom for app + database.') }}</li>
-            <li>• {{ __('Recommendations are tuned to your selected role.') }}</li>
+            @if ($selectedServerRole ?? null)
+                <li>• {{ $roleSizingTip ?? __('Recommendations are tuned to your selected server purpose.') }}</li>
+            @else
+                <li>• {{ __('Choose a server purpose above to tune size recommendations.') }}</li>
+            @endif
         </ul>
     </div>
 </div>

@@ -2,7 +2,8 @@
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <x-breadcrumb-trail :items="[
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-            ['label' => __('Serverless'), 'icon' => 'sparkles'],
+            ['label' => __('Infrastructure'), 'href' => route('infrastructure.index'), 'icon' => 'rectangle-group'],
+            ['label' => __('Serverless'), 'icon' => 'bolt'],
         ]" />
 
         <div class="flex flex-wrap items-end justify-between gap-3">
@@ -10,10 +11,16 @@
                 <h1 class="text-xl font-bold text-brand-ink">{{ __('Serverless functions') }}</h1>
                 <p class="mt-1 text-sm text-brand-moss">{{ __('HTTP-triggered functions deployed to DigitalOcean Functions.') }}</p>
             </div>
-            <a href="{{ route('serverless.create') }}" wire:navigate
-               class="inline-flex items-center rounded-xl bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream hover:bg-brand-forest">
-                {{ __('New function') }}
-            </a>
+            <div class="flex flex-wrap items-center gap-2">
+                <a href="{{ route('serverless.glue') }}" wire:navigate
+                   class="inline-flex items-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink hover:border-brand-sage/40">
+                    {{ __('Glue') }}
+                </a>
+                <a href="{{ route('serverless.create') }}" wire:navigate
+                   class="inline-flex items-center rounded-xl bg-brand-ink px-4 py-2.5 text-sm font-semibold text-brand-cream hover:bg-brand-forest">
+                    {{ __('New function') }}
+                </a>
+            </div>
         </div>
 
         @if ($functions->isEmpty())

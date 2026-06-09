@@ -9,42 +9,65 @@ use Illuminate\Support\Collection;
 
 class DeployHookRunner
 {
+    public function __construct(
+        private readonly DeployPipelineHookExecutor $hookExecutor,
+    ) {}
+
     public function runPhase(RemoteShell $ssh, Site $site, string $phase, string $workingDirectory): string
     {
         $site->loadMissing('deployHooks');
         /** @var Collection<int, SiteDeployHook> $hooks */
-        $hooks = $site->deployHooks->where('phase', $phase)->sortBy('sort_order')->values();
+        $hooks = $site->deployHooks
+            ->where('anchor', $phase)
+            ->whereNull('anchor_step_id')
+            ->sortBy('sort_order')
+            ->values();
+
+        return $this->runHookCollection($hooks, $site, $workingDirectory, $ssh);
+    }
+
+    /**
+     * @param  Collection<int, SiteDeployHook>  $hooks
+     */
+    public function runHookCollection(
+        Collection $hooks,
+        Site $site,
+        string $workingDirectory,
+        ?RemoteShell $ssh = null,
+    ): string {
         $log = '';
         foreach ($hooks as $hook) {
-            $script = trim((string) $hook->script);
-            if ($script === '') {
-                continue;
+            $log .= $this->hookExecutor->run($hook, $site, $workingDirectory, $ssh);
+            if ($hook->hook_kind === SiteDeployHook::KIND_SHELL) {
+                $this->assertShellOutputSucceeded($log, $hook->anchor);
             }
-            $script = app(DeployHookScriptExpander::class)->expand($script, $site);
-            $default = (int) config('dply.default_deploy_hook_timeout_seconds', 900);
-            $timeout = max(30, min(3600, (int) ($hook->timeout_seconds ?? $default)));
-            $log .= "\n--- hook {$phase} #{$hook->id} ---\n";
-            $log .= $this->runScript($ssh, $workingDirectory, $script, $timeout);
         }
 
         return $log;
     }
 
-    protected function runScript(RemoteShell $ssh, string $cwd, string $script, int $timeoutSeconds): string
-    {
-        $b64 = base64_encode($script);
+    public function runAfterStep(
+        RemoteShell $ssh,
+        Site $site,
+        string $stepId,
+        string $workingDirectory,
+    ): string {
+        $site->loadMissing('deployHooks');
+        $hooks = $site->deployHooks
+            ->where('anchor', SiteDeployHook::ANCHOR_AFTER_STEP)
+            ->where('anchor_step_id', $stepId)
+            ->sortBy('sort_order')
+            ->values();
 
-        return $ssh->exec(
-            sprintf(
-                'cd %s && echo %s | base64 -d | /usr/bin/env bash 2>&1; printf "\\nDPLY_HOOK_EXIT:%%s" "$?"',
-                escapeshellarg($cwd),
-                escapeshellarg($b64)
-            ),
-            $timeoutSeconds
-        );
+        return $this->runHookCollection($hooks, $site, $workingDirectory, $ssh);
     }
 
     public function assertHooksSucceeded(string $output, string $label): void
+    {
+        $this->assertShellOutputSucceeded($output, $label);
+    }
+
+    public function assertShellOutputSucceeded(string $output, string $label): void
     {
         if (preg_match_all('/DPLY_HOOK_EXIT:(\d+)/', $output, $m)) {
             foreach ($m[1] as $code) {

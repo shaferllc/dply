@@ -51,4 +51,76 @@ class ServerFactory extends Factory
             'size' => 's-1vcpu-1gb',
         ]);
     }
+
+    public function hetzner(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'provider' => ServerProvider::Hetzner,
+            'region' => 'fsn1',
+            'size' => 'cx22',
+        ]);
+    }
+
+    public function linode(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'provider' => ServerProvider::Linode,
+            'region' => 'us-east',
+            'size' => 'g6-nanode-1',
+        ]);
+    }
+
+    public function vultr(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'provider' => ServerProvider::Vultr,
+            'region' => 'ewr',
+            'size' => 'vc2-1c-1gb',
+        ]);
+    }
+
+    public function upcloud(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'provider' => ServerProvider::UpCloud,
+            'region' => 'fi-hel1',
+            'size' => '1xCPU-1GB',
+        ]);
+    }
+
+    public function aws(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'provider' => ServerProvider::Aws,
+            'region' => 'us-east-1',
+            'size' => 't3.micro',
+        ]);
+    }
+
+    public function gcp(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'provider' => ServerProvider::Gcp,
+            'region' => 'us-central1-a',
+            'size' => 'e2-micro',
+        ]);
+    }
+
+    public function azure(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'provider' => ServerProvider::Azure,
+            'region' => 'eastus',
+            'size' => 'Standard_B1s',
+        ]);
+    }
+
+    public function oracle(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'provider' => ServerProvider::Oracle,
+            'region' => 'us-ashburn-1',
+            'size' => 'VM.Standard.E2.1.Micro',
+        ]);
+    }
 }

@@ -3,7 +3,7 @@
 
     <x-breadcrumb-trail :items="[
         ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-        ['label' => __('Profile'), 'href' => route('profile.edit'), 'icon' => 'user-circle'],
+        ['label' => __('Profile'), 'href' => route('settings.profile'), 'icon' => 'user-circle'],
         ['label' => __('Notification channels'), 'href' => route('profile.notification-channels'), 'icon' => 'bell-alert'],
         ['label' => __('Bulk assign notifications'), 'icon' => 'rectangle-stack'],
     ]" />
@@ -58,13 +58,17 @@
         @endif
 
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8 flex flex-wrap justify-between gap-3 items-start">
-                <div>
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Notification channels') }}</h2>
-                    <p class="mt-1 text-sm text-brand-moss">{{ __('Select which channels to attach to the chosen events and targets.') }}</p>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <x-icon-badge>
+                    <x-heroicon-o-bell-alert class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0 flex-1">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Channels') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Notification channels') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Select which channels to attach to the chosen events and targets.') }}</p>
                 </div>
                 @if ($assignableChannels->isNotEmpty())
-                    <div class="flex gap-2">
+                    <div class="flex shrink-0 gap-2">
                         <button type="button" wire:click="selectAllChannels" class="text-sm font-medium text-brand-sage hover:underline">{{ __('Select all') }}</button>
                         <button type="button" wire:click="deselectAllChannels" class="text-sm font-medium text-brand-moss hover:underline">{{ __('Deselect all') }}</button>
                     </div>
@@ -110,12 +114,16 @@
         </section>
 
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8 flex flex-wrap justify-between gap-3 items-start">
-                <div>
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Notification type') }}</h2>
-                    <p class="mt-1 text-sm text-brand-moss">{{ __('Choose which events should trigger notifications on the selected channels.') }}</p>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <x-icon-badge>
+                    <x-heroicon-o-bell class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0 flex-1">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Events') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Notification type') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Choose which events should trigger notifications on the selected channels.') }}</p>
                 </div>
-                <div class="flex gap-2">
+                <div class="flex shrink-0 gap-2">
                     <button type="button" wire:click="selectAllEvents" class="text-sm font-medium text-brand-sage hover:underline">{{ __('Select all') }}</button>
                     <button type="button" wire:click="deselectAllEvents" class="text-sm font-medium text-brand-moss hover:underline">{{ __('Deselect all') }}</button>
                 </div>
@@ -143,12 +151,16 @@
         </section>
 
         <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 px-6 py-4 sm:px-8 flex flex-wrap justify-between gap-3 items-start">
-                <div>
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Select targets') }}</h2>
-                    <p class="mt-1 text-sm text-brand-moss">{{ __('Servers apply to server events; sites apply to site and backup events.') }}</p>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <x-icon-badge>
+                    <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0 flex-1">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Targets') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Select targets') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Servers apply to server events; sites apply to site and backup events.') }}</p>
                 </div>
-                <div class="flex flex-wrap gap-2">
+                <div class="flex shrink-0 flex-wrap gap-2">
                     <button type="button" wire:click="selectAllServers" class="text-sm font-medium text-brand-sage hover:underline">{{ __('All servers') }}</button>
                     <button type="button" wire:click="deselectAllServers" class="text-sm font-medium text-brand-moss hover:underline">{{ __('No servers') }}</button>
                     <button type="button" wire:click="selectAllSites" class="text-sm font-medium text-brand-sage hover:underline">{{ __('All sites') }}</button>

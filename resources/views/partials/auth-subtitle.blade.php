@@ -1,6 +1,6 @@
 @php
     $line = match ($variant ?? 'default') {
-        'login' => __('Sign in with your email or use a connected provider below.'),
+        'login' => __('Enter your email and password to access your workspace.'),
         'register' => __('Create your workspace—no credit card required to get started.'),
         'forgot-password' => __('We will send a secure link to reset your password.'),
         'reset-password' => __('Pick a new password you have not used on other sites.'),

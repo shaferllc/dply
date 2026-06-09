@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Mail\NotificationChannelMail;
 use Database\Factories\NotificationChannelFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -226,21 +227,22 @@ class NotificationChannel extends Model
             return ['ok' => false, 'message' => __('Valid email address is required.')];
         }
 
-        $body = __('[:app] Test notification (:label) from :actor', [
-            'app' => config('app.name'),
-            'label' => $this->label,
-            'actor' => $actorLabel,
-        ]);
+        $subject = __('[:app] Notification channel test', ['app' => config('app.name')]);
 
         try {
-            Mail::raw($body, function ($message) use ($to): void {
-                $message->to($to)->subject(__('[:app] Notification channel test', ['app' => config('app.name')]));
-            });
+            Mail::to($to)->queue(new NotificationChannelMail(
+                heading: __('Notification channel test'),
+                bodyLines: [
+                    __('This confirms the “:label” channel can receive :app alerts.', ['label' => $this->label, 'app' => config('app.name')]),
+                    __('Triggered by :actor.', ['actor' => $actorLabel]),
+                ],
+                subjectLine: $subject,
+            ));
         } catch (\Throwable $e) {
             return ['ok' => false, 'message' => $e->getMessage()];
         }
 
-        return ['ok' => true, 'message' => __('Test email sent.')];
+        return ['ok' => true, 'message' => __('Test email queued — it will arrive shortly.')];
     }
 
     /**
@@ -461,7 +463,7 @@ class NotificationChannel extends Model
             match ($this->type) {
                 self::TYPE_SLACK => $this->deliverSlackPlain($full),
                 self::TYPE_DISCORD => $this->deliverDiscordPlain($full),
-                self::TYPE_EMAIL => $this->deliverEmailPlain($subject, $full),
+                self::TYPE_EMAIL => $this->deliverEmail($subject, $text, $actionUrl, $actionLabel),
                 self::TYPE_TELEGRAM => $this->deliverTelegramPlain($full),
                 self::TYPE_PUSHOVER => $this->deliverPushoverPlain($subject, $full),
                 self::TYPE_MICROSOFT_TEAMS => $this->deliverTeamsPlain($subject, $full),
@@ -505,16 +507,27 @@ class NotificationChannel extends Model
         Http::timeout(10)->asJson()->post($url, ['content' => mb_substr($text, 0, 1900)]);
     }
 
-    protected function deliverEmailPlain(string $subject, string $body): void
+    protected function deliverEmail(string $subject, string $body, ?string $actionUrl = null, ?string $actionLabel = null): void
     {
         $to = $this->config['email'] ?? null;
         if (! is_string($to) || $to === '' || ! filter_var($to, FILTER_VALIDATE_EMAIL)) {
             return;
         }
 
-        Mail::raw($body, function ($message) use ($to, $subject): void {
-            $message->to($to)->subject($subject);
-        });
+        // The body arrives as newline-separated lines (e.g. "Server: x\nAccount: y");
+        // render each as its own paragraph in the branded template.
+        $lines = array_values(array_filter(array_map(
+            static fn (string $line): string => trim($line),
+            explode("\n", $body),
+        ), static fn (string $line): bool => $line !== ''));
+
+        Mail::to($to)->queue(new NotificationChannelMail(
+            heading: $subject,
+            bodyLines: $lines,
+            actionUrl: $actionUrl,
+            actionLabel: $actionLabel,
+            subjectLine: $subject,
+        ));
     }
 
     protected function deliverTelegramPlain(string $text): void

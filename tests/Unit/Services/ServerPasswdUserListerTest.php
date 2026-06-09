@@ -1,25 +1,18 @@
 <?php
 
-namespace Tests\Unit\Services;
+namespace Tests\Unit\Services\ServerPasswdUserListerTest;
 
 use App\Models\Server;
 use App\Services\Servers\ServerPasswdUserLister;
-use PHPUnit\Framework\Attributes\Test;
-use Tests\TestCase;
 
-class ServerPasswdUserListerTest extends TestCase
-{
-    #[Test]
-    public function it_requires_a_ready_server_with_ssh_key(): void
-    {
-        $server = new Server([
-            'status' => Server::STATUS_READY,
-            'ssh_private_key' => '',
-        ]);
+it('requires a ready server with ssh key', function () {
+    $server = new Server([
+        'status' => Server::STATUS_READY,
+        'ssh_private_key' => '',
+    ]);
 
-        $lister = new ServerPasswdUserLister;
+    $lister = new ServerPasswdUserLister;
 
-        $this->expectException(\RuntimeException::class);
-        $lister->listUsernames($server);
-    }
-}
+    $this->expectException(\RuntimeException::class);
+    $lister->listUsernames($server);
+});

@@ -5,7 +5,10 @@ namespace App\Livewire\Servers;
 use App\Jobs\ApplyInsightFixJob;
 use App\Jobs\RevertInsightFixJob;
 use App\Jobs\RunServerInsightsJob;
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
+use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\ManagesInsightsNotifications;
 use App\Models\InsightFinding;
 use App\Models\Organization;
 use App\Models\Server;
@@ -18,18 +21,29 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
-use App\Livewire\Concerns\RequiresFeature;
+use Livewire\Attributes\On;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceInsights extends Component
 {
+    use RendersWorkspacePlaceholder;
     use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.insights';
+
     use InteractsWithServerWorkspace;
+    use CreatesNotificationChannelInline;
+    use ManagesInsightsNotifications;
+
+    /** When true, render the coming-soon teaser instead of the full workspace. */
+    public bool $comingSoonPreview = false;
 
     public string $tab = 'overview';
 
@@ -53,8 +67,32 @@ class WorkspaceInsights extends Component
 
     public function mount(Server $server): void
     {
+        if (! Feature::active('workspace.insights')) {
+            if (workspace_insights_preview_active()) {
+                $this->comingSoonPreview = true;
+                $this->bootWorkspace($server);
+
+                return;
+            }
+
+            abort(404);
+        }
+
+        $this->comingSoonPreview = false;
         $this->bootWorkspace($server);
         $this->loadSettings();
+    }
+
+    public function bootedRequiresFeature(): void
+    {
+        if ($this->comingSoonPreview) {
+            return;
+        }
+
+        $flag = $this->requiredFeature ?? '';
+        if ($flag !== '' && ! Feature::active($flag)) {
+            abort(404);
+        }
     }
 
     protected function loadSettings(): void
@@ -78,6 +116,18 @@ class WorkspaceInsights extends Component
     public function setTab(string $tab): void
     {
         $this->tab = in_array($tab, ['overview', 'dismissed', 'notifications', 'settings'], true) ? $tab : 'overview';
+    }
+
+    /**
+     * Fired by {@see CreatesNotificationChannelInline} after the inline modal
+     * creates a channel. Jump to the Notifications tab and pre-select the new
+     * channel so the operator can finish wiring it to the insights alert.
+     */
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId): void
+    {
+        $this->tab = 'notifications';
+        $this->notif_channel_id = $channelId;
     }
 
     public function saveSettings(): void
@@ -1003,6 +1053,10 @@ class WorkspaceInsights extends Component
 
     public function render(): View
     {
+        if ($this->comingSoonPreview) {
+            return view('livewire.servers.workspace-insights-preview');
+        }
+
         $org = $this->server->organization;
         $orgHasPro = $org?->onAnyPaidPlan() ?? false;
 
@@ -1121,6 +1175,9 @@ class WorkspaceInsights extends Component
             'selectedFixFinding' => $this->applyFixFindingId === null
                 ? null
                 : $findings->firstWhere('id', $this->applyFixFindingId),
+            'notifChannels' => $this->tab === 'notifications' ? $this->assignableInsightsNotificationChannels() : collect(),
+            'notifSubscriptions' => $this->tab === 'notifications' ? $this->insightsNotificationSubscriptions() : collect(),
+            'notifEventLabels' => $this->tab === 'notifications' ? $this->insightsEventLabels() : [],
         ]);
     }
 }

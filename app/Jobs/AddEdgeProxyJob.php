@@ -11,20 +11,30 @@ use App\Models\ServerWebserverAuditEvent;
 use App\Models\Site;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\RemoteCli\RiskLevel;
+use App\Services\Servers\EnvoyEdgeConfigBuilder;
+use App\Services\Servers\EnvoyStaticConfigOptions;
 use App\Services\Servers\HAProxyEdgeConfigBuilder;
+use App\Services\Servers\OpenRestyEdgeConfigBuilder;
+use App\Services\Servers\OpenRestyStaticConfigOptions;
+use App\Services\Servers\TraefikStaticConfigOptions;
 use App\Services\Sites\CaddySiteConfigBuilder;
 use App\Services\Sites\TraefikSiteConfigBuilder;
 use App\Services\SshConnection;
+use App\Support\Servers\CaddyEdgeBackendLayout;
+use App\Support\Servers\CaddyRuntimeOwnership;
+use App\Support\Servers\EnvoyAdminScript;
 use Illuminate\Bus\Queueable;
+use Illuminate\Bus\UniqueLock;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Install an L7 edge proxy (Traefik or HAProxy) in front of the server's
+ * Install an L7 edge proxy (Traefik, HAProxy, or Envoy) in front of the server's
  * webserver. dply's architecture for edge proxies is:
  *
  *   client → Traefik/HAProxy on :80 → Caddy on per-site high ports → app/static
@@ -59,7 +69,7 @@ class AddEdgeProxyJob implements ShouldBeUnique, ShouldQueue
 
     public function __construct(
         public string $serverId,
-        public string $target,   // 'traefik' | 'haproxy'
+        public string $target,   // 'traefik' | 'haproxy' | 'envoy' | 'openresty'
         public ?string $userId = null,
     ) {}
 
@@ -100,13 +110,14 @@ class AddEdgeProxyJob implements ShouldBeUnique, ShouldQueue
         if ($server === null) {
             return;
         }
-        if (! in_array($this->target, ['traefik', 'haproxy'], true)) {
+        if (! in_array($this->target, ['traefik', 'haproxy', 'envoy', 'openresty'], true)) {
             return;
         }
 
         $emitter = $this->beginConsoleAction();
         $startedAt = microtime(true);
         $previousWebserver = strtolower(trim((string) ($server->meta['webserver'] ?? 'nginx')));
+        $previousEdgeProxy = $server->edgeProxy();
 
         try {
             $emitter->info(sprintf('[install]    installing %s + caddy backend…', $this->target));
@@ -114,7 +125,7 @@ class AddEdgeProxyJob implements ShouldBeUnique, ShouldQueue
 
             $sites = Site::query()
                 ->where('server_id', $server->id)
-                ->with(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers', 'server'])
+                ->with(['domains', 'domainAliases', 'tenantDomains', 'previewDomains', 'redirects', 'basicAuthUsers', 'server'])
                 ->get();
 
             $emitter->info(sprintf('[provision]  writing %d caddy backend(s) + edge config', $sites->count()));
@@ -128,20 +139,23 @@ class AddEdgeProxyJob implements ShouldBeUnique, ShouldQueue
 
             $meta = is_array($server->meta) ? $server->meta : [];
             $meta['edge_proxy'] = $this->target;
-            $meta['edge_proxy_previous_webserver'] = $previousWebserver;
+            if ($previousEdgeProxy === null) {
+                $meta['edge_proxy_previous_webserver'] = $previousWebserver;
+            }
             $server->update(['meta' => $meta]);
 
             // Re-probe systemd inventory so meta.manage_units picks up the
             // new edge-proxy unit (traefik / haproxy) + the freshly-restarted
             // caddy backend's state. See SwitchServerWebserverJob's matching
             // dispatch for the rationale.
-            \App\Jobs\SyncServerSystemdServicesJob::dispatch($server->id);
+            SyncServerSystemdServicesJob::dispatch($server->id);
 
             $emitter->info('Done.');
             $this->completeConsoleAction();
             $this->recordAudit($server, ServerWebserverAuditEvent::ACTION_EDGE_PROXY_ADDED, [
                 'edge_proxy' => $this->target,
                 'previous_webserver' => $previousWebserver,
+                'previous_edge_proxy' => $previousEdgeProxy,
                 'sites_affected' => $sites->count(),
             ], $startedAt, ServerWebserverAuditEvent::RESULT_SUCCESS);
         } catch (\Throwable $e) {
@@ -156,33 +170,14 @@ class AddEdgeProxyJob implements ShouldBeUnique, ShouldQueue
 
     public function failed(\Throwable $e): void
     {
-        app(\Illuminate\Bus\UniqueLock::class)->release($this);
+        app(UniqueLock::class)->release($this);
     }
 
     protected function executeStageInstall(Server $server, ConsoleEmitter $emitter): void
     {
         $ssh = new SshConnection($server);
         $script = $this->installerScriptFor($this->target);
-        $prelude = <<<'BASH'
-i=0
-while command -v fuser >/dev/null 2>&1 && (fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || fuser /var/lib/dpkg/lock >/dev/null 2>&1); do
-  i=$((i+1))
-  if [ "$i" -gt 60 ]; then
-    echo "[dply] dpkg lock held by another process for >5 minutes; aborting." >&2
-    exit 100
-  fi
-  HOLDERS=$(fuser /var/lib/dpkg/lock-frontend 2>/dev/null | tr -d ' ')
-  echo "[dply] waiting for dpkg lock to free (held by PID(s): ${HOLDERS:-?}) — attempt $i/60…"
-  sleep 5
-done
-mkdir -p /etc/apt/apt.conf.d
-cat > /etc/apt/apt.conf.d/99dply-noninteractive <<'APTCONF'
-Dpkg::Options { "--force-confdef"; "--force-confold"; };
-APT::Get::Assume-Yes "true";
-DPkg::Lock::Timeout "300";
-APTCONF
-dpkg --force-confdef --force-confold --configure -a 2>&1 || true
-BASH;
+        $prelude = $this->installPreludeScript();
         $cmd = $this->privilegedCommand($server, 'export DEBIAN_FRONTEND=noninteractive; '.$prelude.'; '.$script.' 2>&1');
 
         $pending = '';
@@ -211,15 +206,22 @@ BASH;
     }
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Collection<int, Site>  $sites
+     * @param  Collection<int, Site>  $sites
      */
     protected function executeStageProvision(Server $server, $sites): void
     {
         $ssh = new SshConnection($server);
 
+        $this->writeRemoteFile(
+            $server,
+            $ssh,
+            CaddyEdgeBackendLayout::CADDYFILE_PATH,
+            CaddyEdgeBackendLayout::canonicalCaddyfile(),
+        );
+
         $ssh->exec($this->privilegedCommand(
             $server,
-            'mkdir -p /etc/caddy/sites-enabled /var/log/caddy /etc/traefik/dynamic /etc/haproxy && touch /etc/caddy/Caddyfile && (grep -Fq \'import /etc/caddy/sites-enabled/*.caddy\' /etc/caddy/Caddyfile || printf "\nimport /etc/caddy/sites-enabled/*.caddy\n" >> /etc/caddy/Caddyfile)'
+            'mkdir -p /etc/caddy/sites-enabled /var/log/caddy /var/log/openresty /etc/traefik/dynamic /etc/haproxy /etc/envoy && '.CaddyRuntimeOwnership::shell(),
         ), 30);
 
         foreach ($sites as $site) {
@@ -230,6 +232,17 @@ BASH;
             // the only difference is the listen port.
             $backend = app(CaddySiteConfigBuilder::class)->build($site, $port);
             $this->writeRemoteFile($server, $ssh, '/etc/caddy/sites-enabled/'.$basename.'-backend.caddy', $backend);
+
+            $tlsFront = app(CaddySiteConfigBuilder::class)->buildEdgeTlsFront($site, $port);
+            $tlsPath = '/etc/caddy/sites-enabled/'.$basename.'-tls.caddy';
+            if ($tlsFront === '') {
+                $ssh->exec($this->privilegedCommand($server, 'rm -f '.escapeshellarg($tlsPath)), 15);
+            } else {
+                $this->writeRemoteFile($server, $ssh, $tlsPath, $tlsFront);
+            }
+
+            $legacyPath = '/etc/caddy/sites-enabled/'.$basename.'.caddy';
+            $ssh->exec($this->privilegedCommand($server, 'rm -f '.escapeshellarg($legacyPath)), 15);
 
             if ($this->target === 'traefik') {
                 // Traefik dynamic config: routers + services. The Host header
@@ -246,16 +259,31 @@ BASH;
         if ($this->target === 'haproxy') {
             $this->writeHAProxyEdgeConfig($server, $ssh, $sites, listenPort: 8080);
         }
+        if ($this->target === 'envoy') {
+            $this->writeEnvoyEdgeConfig($server, $ssh, $sites, listenPort: 8080);
+        }
+        if ($this->target === 'openresty') {
+            $this->writeOpenRestyEdgeConfig($server, $ssh, $sites, listenPort: 8080);
+        }
     }
 
     protected function executeStageValidate(Server $server): void
     {
+        $ssh = new SshConnection($server);
+        $ssh->exec($this->privilegedCommand(
+            $server,
+            CaddyEdgeBackendLayout::stripLegacySiteFragmentsShell()
+            .'; '.CaddyEdgeBackendLayout::stripPort80ListenerFragmentsShell()
+            .'; dply_strip_legacy_caddy_site_fragments; dply_strip_port80_caddy_site_fragments',
+        ), 30);
+
         $cmd = match ($this->target) {
             'traefik' => 'caddy validate --config /etc/caddy/Caddyfile',
             'haproxy' => 'haproxy -c -f /etc/haproxy/haproxy.cfg && caddy validate --config /etc/caddy/Caddyfile',
+            'envoy' => 'envoy --mode validate -c /etc/envoy/envoy.yaml && caddy validate --config /etc/caddy/Caddyfile',
+            'openresty' => 'mkdir -p /var/log/openresty && openresty -t && caddy validate --config /etc/caddy/Caddyfile',
         };
 
-        $ssh = new SshConnection($server);
         $out = $ssh->exec($this->privilegedCommand($server, $cmd.' 2>&1'), 60);
         $exit = $ssh->lastExecExitCode();
         if ($exit !== null && $exit !== 0) {
@@ -269,7 +297,7 @@ BASH;
     }
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Collection<int, Site>  $sites
+     * @param  Collection<int, Site>  $sites
      */
     protected function executeStageCutover(Server $server, $sites, string $previousWebserver): void
     {
@@ -278,21 +306,21 @@ BASH;
         // If the previous webserver was Caddy, its per-site :80 configs
         // collide with the new -backend.caddy files (both would bind on
         // caddy reload). Remove them so Caddy reloads cleanly to backend
-        // ports only.
-        if ($previousWebserver === 'caddy') {
-            foreach ($sites as $site) {
-                $basename = $this->basenameFor($site);
-                $oldPath = '/etc/caddy/sites-enabled/'.$basename.'.caddy';
-                $ssh->exec($this->privilegedCommand($server, 'rm -f '.escapeshellarg($oldPath)), 15);
-            }
+        // ports only. Also strip legacy per-site :80 files on every edge
+        // cutover — they prevent Envoy/HAProxy/Traefik from binding :80.
+        foreach ($sites as $site) {
+            $basename = $this->basenameFor($site);
+            $oldPath = '/etc/caddy/sites-enabled/'.$basename.'.caddy';
+            $ssh->exec($this->privilegedCommand($server, 'rm -f '.escapeshellarg($oldPath)), 15);
         }
 
         // Land the edge proxy config bound to :80.
-        if ($this->target === 'traefik') {
-            $this->writeTraefikStaticConfig($server, $ssh, listenPort: 80);
-        } else {
-            $this->writeHAProxyEdgeConfig($server, $ssh, $sites, listenPort: 80);
-        }
+        match ($this->target) {
+            'traefik' => $this->writeTraefikStaticConfig($server, $ssh, listenPort: 80),
+            'haproxy' => $this->writeHAProxyEdgeConfig($server, $ssh, $sites, listenPort: 80),
+            'envoy' => $this->writeEnvoyEdgeConfig($server, $ssh, $sites, listenPort: 80),
+            'openresty' => $this->writeOpenRestyEdgeConfig($server, $ssh, $sites, listenPort: 80),
+        };
 
         // Stop the previous webserver (free :80) — except when it's Caddy,
         // since Caddy is the backend now and we just want it to keep running
@@ -304,11 +332,72 @@ BASH;
             }
         }
 
-        // Ensure Caddy is up + has the new backend configs loaded.
-        $ssh->exec($this->privilegedCommand($server, '(systemctl is-active --quiet caddy && systemctl reload caddy) || systemctl enable --now caddy'), 30);
+        $currentEdge = $server->edgeProxy();
+        if ($currentEdge !== null && $currentEdge !== $this->target) {
+            $this->stopEdgeProxyUnit($ssh, $server, $currentEdge);
+        }
+
+        // Canonical Caddyfile + strip :80 fragments before restart — releasePort80Shell
+        // restarts Caddy and fails when :80 is still held (blocks Envoy bind).
+        $this->writeRemoteFile(
+            $server,
+            $ssh,
+            CaddyEdgeBackendLayout::CADDYFILE_PATH,
+            CaddyEdgeBackendLayout::canonicalCaddyfile(),
+        );
+
+        $ssh->exec($this->privilegedCommand(
+            $server,
+            CaddyEdgeBackendLayout::stripLegacySiteFragmentsShell()
+            .'; '.CaddyEdgeBackendLayout::stripPort80ListenerFragmentsShell()
+            .'; dply_strip_legacy_caddy_site_fragments; dply_strip_port80_caddy_site_fragments',
+        ), 30);
+
+        $releaseOut = $ssh->exec($this->privilegedCommand(
+            $server,
+            CaddyEdgeBackendLayout::releasePort80Shell().' 2>&1',
+        ), 60);
+        $releaseExit = $ssh->lastExecExitCode();
+        if ($releaseExit !== null && $releaseExit !== 0) {
+            throw new \RuntimeException(sprintf(
+                'Failed to release Caddy from port :80 (exit %d): %s',
+                $releaseExit,
+                trim(substr($releaseOut, -800)),
+            ));
+        }
 
         // Start the edge proxy on :80.
-        $edgeUnit = $this->target === 'traefik' ? 'traefik' : 'haproxy';
+        $edgeUnit = match ($this->target) {
+            'traefik' => 'traefik',
+            'haproxy' => 'haproxy',
+            'envoy' => 'envoy',
+            'openresty' => 'openresty',
+        };
+
+        if ($this->target === 'envoy') {
+            $prepOut = $ssh->exec($this->privilegedCommand($server, EnvoyAdminScript::prepareForCutoverScript().' 2>&1'), 30);
+            $prepExit = $ssh->lastExecExitCode();
+            if ($prepExit !== null && $prepExit !== 0) {
+                throw new \RuntimeException(sprintf(
+                    'Cannot start Envoy — port :80 is not free (exit %d): %s',
+                    $prepExit,
+                    trim(substr($prepOut, -800)),
+                ));
+            }
+            $startOut = $ssh->exec($this->privilegedCommand($server, 'systemctl enable --now envoy 2>&1'), 60);
+            $startExit = $ssh->lastExecExitCode();
+            if ($startExit !== null && $startExit !== 0) {
+                throw new \RuntimeException(sprintf(
+                    'Failed to start envoy during cutover (exit %d): %s',
+                    $startExit,
+                    trim(substr($startOut, -500)),
+                ));
+            }
+            $this->assertEnvoyAdminReady($server, $ssh);
+
+            return;
+        }
+
         // `enable --now` brings the unit up fresh with the new on-disk
         // config; a subsequent reload would be redundant. We attempt it
         // anyway so an existing-and-already-running daemon (rare retry
@@ -329,6 +418,19 @@ BASH;
         }
     }
 
+    private function assertEnvoyAdminReady(Server $server, SshConnection $ssh): void
+    {
+        $out = $ssh->exec($this->privilegedCommand($server, EnvoyAdminScript::waitUntilReady().' 2>&1'), 60);
+        $exit = $ssh->lastExecExitCode();
+        if ($exit !== null && $exit !== 0) {
+            throw new \RuntimeException(sprintf(
+                'Envoy started but admin API at 127.0.0.1:9901 did not become ready (exit %d): %s',
+                $exit,
+                trim(substr($out, -800)),
+            ));
+        }
+    }
+
     /**
      * Apt + repo install script for the chosen edge proxy. Chains the
      * Caddy installer first since Caddy is the per-site backend in every
@@ -340,8 +442,44 @@ BASH;
 
         return match ($target) {
             'traefik' => $caddy."\n".$this->traefikInstallScript(),
-            'haproxy' => $caddy."\n".$this->aptInstallIdempotent('haproxy'),
+            'haproxy' => $caddy."\n".$this->aptInstallIdempotent('haproxy')."\n".$this->aptInstallIdempotent('socat'),
+            'envoy' => $caddy."\n".$this->envoyInstallScript(),
+            'openresty' => $caddy."\n".OpenRestyStaticConfigOptions::installScript(),
         };
+    }
+
+    /**
+     * Apt lock wait + dpkg configure prelude. OpenResty gets a placeholder
+     * nginx.conf and policy-rc.d shim so postinst does not bind :80.
+     */
+    private function installPreludeScript(): string
+    {
+        $common = <<<'BASH'
+i=0
+while command -v fuser >/dev/null 2>&1 && (fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || fuser /var/lib/dpkg/lock >/dev/null 2>&1); do
+  i=$((i+1))
+  if [ "$i" -gt 60 ]; then
+    echo "[dply] dpkg lock held by another process for >5 minutes; aborting." >&2
+    exit 100
+  fi
+  HOLDERS=$(fuser /var/lib/dpkg/lock-frontend 2>/dev/null | tr -d ' ')
+  echo "[dply] waiting for dpkg lock to free (held by PID(s): ${HOLDERS:-?}) — attempt $i/60…"
+  sleep 5
+done
+mkdir -p /etc/apt/apt.conf.d
+printf '%s\n' \
+  'Dpkg::Options { "--force-confdef"; "--force-confold"; };' \
+  'APT::Get::Assume-Yes "true";' \
+  'DPkg::Lock::Timeout "300";' \
+  > /etc/apt/apt.conf.d/99dply-noninteractive
+
+BASH;
+
+        if ($this->target === 'openresty') {
+            return $common.OpenRestyStaticConfigOptions::preDpkgConfigureScript();
+        }
+
+        return $common.'dpkg --force-confdef --force-confold --configure -a 2>&1 || true'."\n";
     }
 
     private function caddyInstallScript(): string
@@ -378,72 +516,12 @@ BASH;
 
     private function traefikInstallScript(): string
     {
-        return <<<'BASH'
-set -euo pipefail
-DPLY_ARCH=$(uname -m)
-case "$DPLY_ARCH" in
-  x86_64|amd64) DPLY_ARCH=amd64 ;;
-  aarch64|arm64) DPLY_ARCH=arm64 ;;
-  armv7l) DPLY_ARCH=armv7 ;;
-  *) echo "[dply] unsupported arch: $DPLY_ARCH" >&2; exit 127 ;;
-esac
+        return TraefikStaticConfigOptions::installScript();
+    }
 
-if [ -x /usr/local/bin/traefik ] && systemctl list-unit-files | grep -q '^traefik\.service'; then
-  echo "[dply] traefik already installed; skipping."
-else
-  apt-get install -y --no-install-recommends curl ca-certificates
-  TRAEFIK_VERSION="${TRAEFIK_VERSION:-v3.1.0}"
-  TRAEFIK_URL="https://github.com/traefik/traefik/releases/download/${TRAEFIK_VERSION}/traefik_${TRAEFIK_VERSION}_linux_${DPLY_ARCH}.tar.gz"
-  echo "[dply] downloading traefik ${TRAEFIK_VERSION} (linux/${DPLY_ARCH})…"
-  curl -fSL "$TRAEFIK_URL" -o /tmp/traefik.tgz
-  echo "[dply] extracting traefik binary…"
-  # Defensive against tarball-layout shifts between releases (some bundle
-  # the binary at root, some inside a version-subdir). Extract everything
-  # to a scratch dir then `find` the executable.
-  rm -rf /tmp/traefik-extract
-  mkdir -p /tmp/traefik-extract
-  tar -xzf /tmp/traefik.tgz -C /tmp/traefik-extract
-  TRAEFIK_BIN=$(find /tmp/traefik-extract -type f -name traefik | head -n 1)
-  if [ -z "$TRAEFIK_BIN" ] || [ ! -f "$TRAEFIK_BIN" ]; then
-    echo "[dply] traefik binary not found in tarball; archive contents:" >&2
-    find /tmp/traefik-extract -maxdepth 3 -ls >&2
-    exit 127
-  fi
-  install -m 0755 "$TRAEFIK_BIN" /usr/local/bin/traefik
-  rm -rf /tmp/traefik.tgz /tmp/traefik-extract
-  echo "[dply] traefik installed at /usr/local/bin/traefik"
-fi
-mkdir -p /etc/traefik /etc/traefik/dynamic
-cat > /etc/systemd/system/traefik.service <<'UNIT'
-[Unit]
-Description=Traefik
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/traefik --configFile=/etc/traefik/traefik.yml
-# Traefik reloads dynamic provider configs (file/Docker/Consul/etc.) on
-# SIGHUP — that covers /etc/traefik/dynamic/*.yml edits without dropping
-# active connections. Static-config (traefik.yml) changes still require
-# a full restart since the binary parses it once at startup.
-ExecReload=/bin/kill -HUP $MAINPID
-Restart=on-failure
-RestartSec=5s
-
-[Install]
-WantedBy=multi-user.target
-UNIT
-systemctl daemon-reload
-[ -x /usr/local/bin/traefik ] || { echo "[dply] traefik binary missing at /usr/local/bin/traefik" >&2; exit 127; }
-# Direct file-existence check beats `systemctl list-unit-files | grep` —
-# we just wrote the file ourselves, and list-unit-files output format
-# varies across systemd versions (leading whitespace, alias suffixes,
-# column padding) which makes a regex match fragile. `systemctl cat`
-# confirms systemd has it registered post daemon-reload.
-[ -f /etc/systemd/system/traefik.service ] || { echo "[dply] traefik.service file missing at /etc/systemd/system/traefik.service" >&2; exit 127; }
-systemctl cat traefik.service >/dev/null 2>&1 || { echo "[dply] traefik.service not picked up by systemd; daemon-reload + cat failed" >&2; systemctl cat traefik.service >&2 || true; exit 127; }
-BASH;
+    private function envoyInstallScript(): string
+    {
+        return EnvoyStaticConfigOptions::installScript();
     }
 
     private function aptInstallIdempotent(string $package): string
@@ -469,42 +547,12 @@ BASH;
             escapeshellarg($path),
         )), 15);
 
-        $contents = <<<YAML
-# Managed by Dply — do NOT hand-edit.
-entryPoints:
-  web:
-    address: ":{$listenPort}"
-  # Localhost-only metrics endpoint scraped by the dply metrics agent.
-  # Bound to 127.0.0.1 so it never reaches the public network.
-  metrics:
-    address: "127.0.0.1:9093"
-  # Localhost-only API/dashboard endpoint scraped by the dply live-state
-  # probe (TraefikLiveStateProbe). The entry-point MUST be named `traefik`
-  # — that's the magic name Traefik routes `api.insecure: true` traffic
-  # through. `insecure: true` is acceptable ONLY because this entrypoint
-  # binds 127.0.0.1; the public-network `web` entrypoint never serves
-  # /api or /dashboard.
-  traefik:
-    address: "127.0.0.1:9094"
-providers:
-  file:
-    directory: /etc/traefik/dynamic
-    watch: true
-api:
-  dashboard: true
-  insecure: true
-metrics:
-  prometheus:
-    entryPoint: metrics
-    addServicesLabels: true
-    addEntryPointsLabels: true
-    addRoutersLabels: true
-YAML;
+        $contents = app(TraefikStaticConfigOptions::class)->renderCanonicalStaticYaml($listenPort);
         $this->writeRemoteFile($server, $ssh, $path, $contents);
     }
 
     /**
-     * @param  \Illuminate\Database\Eloquent\Collection<int, Site>  $sites
+     * @param  Collection<int, Site>  $sites
      */
     private function writeHAProxyEdgeConfig(Server $server, SshConnection $ssh, $sites, int $listenPort): void
     {
@@ -523,7 +571,48 @@ YAML;
     }
 
     /**
-     * Stable per-site Caddy backend port. Reuses any value already pinned
+     * @param  Collection<int, Site>  $sites
+     */
+    private function writeEnvoyEdgeConfig(Server $server, SshConnection $ssh, $sites, int $listenPort): void
+    {
+        $path = '/etc/envoy/envoy.yaml';
+        $ssh->exec($this->privilegedCommand($server, sprintf(
+            '[ -f %1$s ] && [ ! -f %1$s.dply-bak ] && cp %1$s %1$s.dply-bak || true',
+            escapeshellarg($path),
+        )), 15);
+
+        $contents = app(EnvoyEdgeConfigBuilder::class)->buildForServer(
+            $server,
+            $sites,
+            $listenPort,
+            fn (Site $s): int => $this->backendPort($s),
+        );
+        $this->writeRemoteFile($server, $ssh, $path, $contents);
+    }
+
+    /**
+     * @param  Collection<int, Site>  $sites
+     */
+    private function writeOpenRestyEdgeConfig(Server $server, SshConnection $ssh, $sites, int $listenPort): void
+    {
+        $path = '/etc/openresty/nginx.conf';
+        $ssh->exec($this->privilegedCommand($server, 'mkdir -p /var/log/openresty'), 15);
+        $ssh->exec($this->privilegedCommand($server, sprintf(
+            '[ -f %1$s ] && [ ! -f %1$s.dply-bak ] && cp %1$s %1$s.dply-bak || true',
+            escapeshellarg($path),
+        )), 15);
+
+        $contents = app(OpenRestyEdgeConfigBuilder::class)->buildForServer(
+            $server,
+            $sites,
+            $listenPort,
+            fn (Site $s): int => $this->backendPort($s),
+        );
+        $this->writeRemoteFile($server, $ssh, $path, $contents);
+    }
+
+    /**
+     * Stable per-site Caddy backend port.
      * in site meta by SiteTraefikProvisioner; falls back to a deterministic
      * crc32-derived port in the 20000-40000 range.
      */
@@ -554,6 +643,27 @@ YAML;
             'openlitespeed' => 'lshttpd',
             default => null,
         };
+    }
+
+    private function stopEdgeProxyUnit(SshConnection $ssh, Server $server, string $edge): void
+    {
+        $unit = match ($edge) {
+            'traefik' => 'traefik',
+            'haproxy' => 'haproxy',
+            'envoy' => 'envoy',
+            'openresty' => 'openresty',
+            default => null,
+        };
+
+        if ($unit === null) {
+            return;
+        }
+
+        $cmd = sprintf(
+            'systemctl disable --now %1$s 2>/dev/null || systemctl stop %1$s 2>/dev/null || true',
+            escapeshellarg($unit),
+        );
+        $ssh->exec($this->privilegedCommand($server, $cmd), 30);
     }
 
     /**

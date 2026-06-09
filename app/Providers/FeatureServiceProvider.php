@@ -11,16 +11,14 @@ use Laravel\Pennant\Feature;
  * Naming convention is dot-namespaced: "{namespace}.{leaf}" where the two
  * levels come straight from the config keys.
  *
- * Resolution model is hybrid: the closure returns the config default;
- * Pennant's database store caches that value per-scope on first read; the
- * `feature:set` artisan command writes per-scope overrides directly into
- * that store. When flipping a default broadly, run `php artisan pennant:purge`
- * to drop cached rows so the new default takes effect for orgs that
- * never explicitly overrode.
+ * Resolution model is config-first:
+ * - config/features.php is the single global default for every scope.
+ * - The features table holds only explicit per-org overrides, which Pennant
+ *   applies before the resolver runs (an org row beats the config default).
+ * - There is no null-scope "platform default" layer; admins change the global
+ *   default via config/env, not by writing DB rows.
  *
- * Default scope: `auth()->user()?->currentOrganization()`. Flags named
- * `global.*` are app-wide and should be checked with `Feature::for(null)`
- * (the @feature directive accepts the same name).
+ * Default scope: auth()->user()?->currentOrganization().
  */
 class FeatureServiceProvider extends ServiceProvider
 {
@@ -29,8 +27,18 @@ class FeatureServiceProvider extends ServiceProvider
         Feature::resolveScopeUsing(fn () => auth()->user()?->currentOrganization());
 
         foreach (config('features', []) as $namespace => $flags) {
-            foreach ($flags as $leaf => $default) {
-                Feature::define("$namespace.$leaf", fn () => (bool) $default);
+            // `beta_bundle` is a reserved list (the beta-invite override set),
+            // not a flag namespace — see config/features.php.
+            if ($namespace === 'beta_bundle') {
+                continue;
+            }
+
+            foreach (array_keys($flags) as $leaf) {
+                $name = "$namespace.$leaf";
+
+                // Resolve from config at check time so the global default always
+                // reflects current config/env (and stays overridable in tests).
+                Feature::define($name, fn () => (bool) config("features.{$namespace}.{$leaf}", false));
             }
         }
     }

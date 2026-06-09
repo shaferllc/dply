@@ -1,0 +1,35 @@
+# Env keys that intentionally live ONLY on worker boxes.
+#
+# Used by deploy/check-env-drift.sh to suppress false positives: a key listed
+# here is expected to be absent from the web/app server. Everything NOT in this
+# file (and not in app-only.keys) is treated as SHARED and must exist on every
+# role.
+#
+# One key name per line. Blank lines and # comments are ignored.
+
+# --- ClickHouse log store connection (the worker is the log-aggregation role;
+#     see project_dply_logs_clickhouse_box) ---
+CLICKHOUSE_CA_CERT_B64
+CLICKHOUSE_DATABASE
+CLICKHOUSE_HOST
+CLICKHOUSE_HTTP_PORT
+CLICKHOUSE_PASSWORD
+CLICKHOUSE_SCHEME
+CLICKHOUSE_USERNAME
+
+# --- Log-drain TLS receiver + server-logs mTLS aggregator (worker-hosted) ---
+DPLY_LOG_DRAIN_TLS_CERT
+DPLY_LOG_DRAIN_TLS_KEY
+SERVER_LOGS_AGGREGATOR_ENDPOINT
+SERVER_LOGS_CA_CERT_B64
+SERVER_LOGS_CLIENT_CERT_B64
+SERVER_LOGS_CLIENT_KEY_B64
+
+# --- Role marker ---
+DPLY_RUNTIME
+
+# NOTE: PUSHER_* is deliberately NOT listed here. Broadcasting must be
+# configured identically on web + workers (BROADCAST_CONNECTION=pusher +
+# PUSHER_* pointing at the managed relay), so those keys are SHARED. If the
+# drift checker reports PUSHER_* missing on the web box, that is a real bug to
+# fix, not drift to suppress.

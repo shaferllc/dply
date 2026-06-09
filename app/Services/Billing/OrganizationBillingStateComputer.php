@@ -5,33 +5,40 @@ namespace App\Services\Billing;
 use App\Enums\ServerTier;
 use App\Models\FunctionAction;
 use App\Models\Organization;
+use App\Models\RealtimeApp;
 use App\Models\Server;
 use App\Models\Site;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Builds a {@see DesiredBillingState} for an organization by scanning its
- * currently *billable* units. Two kinds:
+ * currently *billable* units. Four kinds:
  *
- * - **Spec-tiered servers** — ready VM/container hosts, classified XS–XL via
- *   the server's billingTier() accessor.
- * - **Serverless functions** — code actions on active function-Sites (FaaS
- *   hosts), billed at a flat per-action fee. A Site is an OpenWhisk package
- *   that may hold several code actions; sequences and triggers bill nothing.
+ * - **Spec-tiered BYO servers** — ready VM hosts the customer SSHs into,
+ *   classified XS–XL via billingTier(). dply-managed logical hosts (Cloud,
+ *   Edge, serverless namespaces) are excluded from this scan.
+ * - **Serverless functions** — code actions on active function-Sites.
+ * - **dply Cloud apps** — container_active sites on container_backend
+ *   `dply_cloud`, excluding branch previews.
+ * - **dply Edge sites** — edge_active sites with edge_backend set, excluding
+ *   branch previews.
  *
- * Two filters apply on top of fleet-membership, to both kinds:
- *
- * - **Status:** only operational units count — `ready` servers,
- *   `functions_active` function-Sites. Provisioning/error/disconnected
- *   states are excluded so the customer isn't billed for transient artifacts.
- * - **Age:** units younger than `subscription.standard.min_billable_age_days`
- *   are excluded — absorbs "spin up + test + kill" cases.
- *
- * Serverless *host* servers (DO Functions / Lambda namespaces) are NOT
- * spec-tiered — they have no vCPU/RAM. They're skipped from the server scan;
- * their function-Sites are what bills.
+ * Age filter: units younger than min_billable_age_days are excluded.
  */
 class OrganizationBillingStateComputer
 {
+    public function __construct(
+        private EdgeOrganizationUsageReader $usageReader,
+        private EdgeUsageCostCalculator $usageCostCalculator,
+        private SubscriptionPlanResolver $planResolver,
+        private CloudResourceCostCalculator $cloudResourceCalculator,
+        private ServerlessOrganizationUsageReader $serverlessUsageReader,
+        private ServerlessUsageCostCalculator $serverlessUsageCostCalculator,
+        private ServerlessResourceCostCalculator $serverlessResourceCalculator,
+        private ServerResourceCostCalculator $serverResourceCalculator,
+    ) {}
+
     public function compute(Organization $organization): DesiredBillingState
     {
         $tierQuantities = array_fill_keys(
@@ -42,14 +49,24 @@ class OrganizationBillingStateComputer
         $minAgeDays = max(0, (int) config('subscription.standard.min_billable_age_days', 1));
         $ageCutoff = now()->subDays($minAgeDays);
 
+        // dply-managed VMs run on dply-owned Hetzner infra and are billed all-in
+        // cost-plus, so they are excluded from the plan-tier scan and collected
+        // separately. BYO servers continue to drive the flat plan.
+        /** @var Collection<int, Server> $managedServers */
+        $managedServers = collect();
+
         $organization->servers()
             ->where('status', Server::STATUS_READY)
             ->where('created_at', '<=', $ageCutoff)
             ->get()
-            ->each(function (Server $server) use (&$tierQuantities): void {
-                // Serverless hosts aren't spec-tiered servers — their
-                // function-Sites bill separately, below.
-                if ($server->isServerlessHost()) {
+            ->each(function (Server $server) use (&$tierQuantities, $managedServers): void {
+                if ($server->isManagedProductHost()) {
+                    return;
+                }
+
+                if ($server->usesManagedHosting()) {
+                    $managedServers->push($server);
+
                     return;
                 }
 
@@ -57,28 +74,122 @@ class OrganizationBillingStateComputer
                 $tierQuantities[$tier] = ($tierQuantities[$tier] ?? 0) + 1;
             });
 
-        // Serverless billing is metered per *code* action. A function-Site
-        // is an OpenWhisk package that may hold several actions; sequences
-        // (kind != code) and triggers bill nothing. A billable function-Site
-        // always counts at least once, even before its actions have been
-        // enumerated into `function_actions`, so the meter never regresses.
+        // Comped managed servers (the beta free-CX22 grant, support credits) are
+        // excluded from both the billed count and subtotal — the localized comp
+        // decision lives on Server::isComped() / the comped_until column.
+        $billableManagedServers = $managedServers->reject(fn (Server $server) => $server->isComped());
+        $managedServerCount = $billableManagedServers->count();
+        $managedServerSubtotalCents = $this->serverResourceCalculator->subtotalCents($billableManagedServers);
+
         $serverlessCount = 0;
-        $organization->sites()
-            ->where('status', Site::STATUS_FUNCTIONS_ACTIVE)
-            ->where('created_at', '<=', $ageCutoff)
-            ->withCount(['functionActions as code_action_count' => fn ($query) => $query->where('kind', FunctionAction::KIND_CODE)])
-            ->get()
-            ->each(function (Site $site) use (&$serverlessCount): void {
-                $serverlessCount += max(1, (int) $site->code_action_count);
+        $cloudCount = 0;
+        $edgeCount = 0;
+
+        // Billable Cloud apps are collected so their backing DigitalOcean
+        // resources (containers, workers, databases, buckets) can be metered.
+        /** @var Collection<int, Site> $billableCloudSites */
+        $billableCloudSites = collect();
+
+        // dply-managed serverless functions are collected so their usage
+        // (metered) and managed DB/cache resources (cost-plus) can be billed
+        // on top of the flat per-function fee. BYO functions are excluded.
+        /** @var Collection<int, Site> $managedServerlessSites */
+        $managedServerlessSites = collect();
+
+        $siteQuery = $organization->sites()
+            ->where('created_at', '<=', $ageCutoff);
+
+        if (Schema::hasTable('function_actions')) {
+            $siteQuery->withCount(['functionActions as code_action_count' => fn ($query) => $query->where('kind', FunctionAction::KIND_CODE)]);
+        }
+
+        $siteQuery->get()
+            ->each(function (Site $site) use (&$serverlessCount, &$cloudCount, &$edgeCount, $billableCloudSites, $managedServerlessSites): void {
+                if ($site->status === Site::STATUS_FUNCTIONS_ACTIVE) {
+                    $serverlessCount += max(1, (int) $site->code_action_count);
+
+                    if ($site->usesManagedServerless()) {
+                        $managedServerlessSites->push($site);
+                    }
+
+                    return;
+                }
+
+                if ($site->status === Site::STATUS_CONTAINER_ACTIVE && $site->isDplyCloudSite() && ! $site->isCloudPreview()) {
+                    $cloudCount++;
+                    $billableCloudSites->push($site);
+
+                    return;
+                }
+
+                if (
+                    $site->status === Site::STATUS_EDGE_ACTIVE
+                    && $site->edge_backend === 'dply_edge'
+                    && ! $site->isEdgePreview()
+                ) {
+                    $edgeCount++;
+                }
             });
 
-        return DesiredBillingState::fromCounts(
+        $cloudResourceSubtotalCents = $this->cloudResourceCalculator->subtotalCents($billableCloudSites);
+
+        // Managed Realtime apps — flat per active app. No metered usage in v1.
+        $realtimeCount = $organization->realtimeApps()
+            ->where('status', RealtimeApp::STATUS_ACTIVE)
+            ->where('created_at', '<=', $ageCutoff)
+            ->count();
+
+        [$usagePeriodStart, $usagePeriodEnd] = $this->usageReader->currentMonthWindow();
+        $usageTotals = $this->usageReader->totalsForOrganization($organization, $usagePeriodStart, $usagePeriodEnd);
+        $edgeUsageEstimate = $this->usageCostCalculator->estimate($usageTotals, $edgeCount);
+        $edgeUsageEstimate = array_merge($edgeUsageEstimate, [
+            'period_start' => $usagePeriodStart->toDateString(),
+            'period_end' => $usagePeriodEnd->toDateString(),
+            'requests' => $usageTotals->requests,
+            'bytes_egress' => $usageTotals->bytesEgress,
+            'r2_storage_bytes' => $usageTotals->r2StorageBytes,
+        ]);
+        $edgeUsageSubtotalCents = (int) ($edgeUsageEstimate['subtotal_cents'] ?? 0);
+
+        // Managed-serverless usage (metered invocations above the included
+        // allowance) + managed DB/cache resources, both cost-plus. BYO
+        // functions contribute nothing here.
+        $managedServerlessCount = $managedServerlessSites->count();
+        [$slPeriodStart, $slPeriodEnd] = $this->serverlessUsageReader->currentMonthWindow();
+        $serverlessUsageTotals = $this->serverlessUsageReader->totalsForOrganization($organization, $slPeriodStart, $slPeriodEnd);
+        $serverlessUsageEstimate = $this->serverlessUsageCostCalculator->estimate($serverlessUsageTotals, $managedServerlessCount);
+        $serverlessUsageSubtotalCents = (int) ($serverlessUsageEstimate['subtotal_cents'] ?? 0)
+            + $this->serverlessResourceCalculator->subtotalCents($managedServerlessSites);
+
+        // The flat plan is chosen by billable BYO server count; size only
+        // feeds the display-only breakdown carried in $tierQuantities.
+        // The canonical fleet bill carries the TRUE plan price (chosen by BYO
+        // server count) even for beta orgs — it's what "subscribe early" charges
+        // and what the fleet preview shows as post-beta value. The beta $0
+        // experience is a lifecycle/display concern, not baked in here: beta
+        // orgs simply have no Stripe subscription and are never paused (see
+        // Organization::trialState / betaFeeWaived). The free CX22 is the one
+        // genuine waiver and is already excluded above via comped_until.
+        $serverCount = array_sum($tierQuantities);
+        $plan = $this->planResolver->resolveForServerCount($serverCount);
+
+        return DesiredBillingState::fromPlanAndUsage(
+            plan: $plan,
             tierQuantities: $tierQuantities,
-            baseCents: (int) config('subscription.standard.base_cents', 2500),
-            creditCents: (int) config('subscription.standard.included_credit_cents', 1000),
-            tierPricesCents: (array) config('subscription.standard.tiers', []),
             serverlessCount: $serverlessCount,
             serverlessUnitCents: (int) config('subscription.standard.serverless_cents', 200),
+            serverlessUsageSubtotalCents: $serverlessUsageSubtotalCents,
+            managedServerCount: $managedServerCount,
+            managedServerSubtotalCents: $managedServerSubtotalCents,
+            cloudCount: $cloudCount,
+            cloudUnitCents: (int) config('subscription.standard.cloud_cents', 500),
+            cloudResourceSubtotalCents: $cloudResourceSubtotalCents,
+            edgeCount: $edgeCount,
+            edgeUnitCents: (int) config('subscription.standard.edge_cents', 200),
+            edgeUsageSubtotalCents: $edgeUsageSubtotalCents,
+            edgeUsageEstimate: $edgeUsageEstimate,
+            realtimeCount: $realtimeCount,
+            realtimeUnitCents: (int) config('subscription.standard.realtime_cents', 900),
         );
     }
 }

@@ -1,302 +1,280 @@
 <?php
 
-namespace Tests\Unit\Services;
+namespace Tests\Unit\Services\ServerlessRuntimeDetectorTest;
 
 use App\Services\Deploy\ServerlessRuntimeDetector;
 use Illuminate\Support\Facades\File;
-use Tests\TestCase;
 
-class ServerlessRuntimeDetectorTest extends TestCase
-{
-    public function test_ruby_repo_falls_through_to_unknown_since_do_functions_has_no_ruby_runtime(): void
-    {
-        // DigitalOcean Functions (managed OpenWhisk) ships no Ruby runtime,
-        // so a Rails repo must not claim a `rails` framework it can never
-        // deploy — it falls through to `unknown` like any unrecognized repo.
-        $dir = storage_path('framework/testing/serverless-detector-'.uniqid());
-        File::makeDirectory($dir, 0755, true);
-        File::makeDirectory($dir.'/config', 0755, true);
-        File::put($dir.'/Gemfile', "source 'https://rubygems.org'\n");
-        File::put($dir.'/config/application.rb', "module App\nend\n");
+test('ruby repo falls through to unknown since do functions has no ruby runtime', function () {
+    // DigitalOcean Functions (managed OpenWhisk) ships no Ruby runtime,
+    // so a Rails repo must not claim a `rails` framework it can never
+    // deploy — it falls through to `unknown` like any unrecognized repo.
+    $dir = storage_path('framework/testing/serverless-detector-'.uniqid());
+    File::makeDirectory($dir, 0755, true);
+    File::makeDirectory($dir.'/config', 0755, true);
+    File::put($dir.'/Gemfile', "source 'https://rubygems.org'\n");
+    File::put($dir.'/config/application.rb', "module App\nend\n");
 
-        try {
-            $detector = new ServerlessRuntimeDetector;
-            $result = $detector->detect($dir, [
-                'supports_php_runtime' => true,
-                'supports_node_runtime' => true,
-                'default_runtime' => 'nodejs:18',
-                'default_entrypoint' => 'main',
-                'default_package' => 'default',
-            ]);
+    try {
+        $detector = new ServerlessRuntimeDetector;
+        $result = $detector->detect($dir, [
+            'supports_php_runtime' => true,
+            'supports_node_runtime' => true,
+            'default_runtime' => 'nodejs:18',
+            'default_entrypoint' => 'main',
+            'default_package' => 'default',
+        ]);
 
-            $this->assertSame('unknown', $result['framework']);
-            $this->assertSame('unknown', $result['language']);
-        } finally {
-            File::deleteDirectory($dir);
-        }
+        expect($result['framework'])->toBe('unknown');
+        expect($result['language'])->toBe('unknown');
+    } finally {
+        File::deleteDirectory($dir);
     }
+});
 
-    public function test_detects_symfony_via_framework_bundle(): void
-    {
-        $dir = storage_path('framework/testing/serverless-detector-'.uniqid());
-        File::makeDirectory($dir, 0755, true);
-        File::put($dir.'/composer.json', json_encode([
-            'require' => [
-                'symfony/framework-bundle' => '^7.0',
-            ],
-        ], JSON_THROW_ON_ERROR));
+test('detects symfony via framework bundle', function () {
+    $dir = storage_path('framework/testing/serverless-detector-'.uniqid());
+    File::makeDirectory($dir, 0755, true);
+    File::put($dir.'/composer.json', json_encode([
+        'require' => [
+            'symfony/framework-bundle' => '^7.0',
+        ],
+    ], JSON_THROW_ON_ERROR));
 
-        try {
-            $detector = new ServerlessRuntimeDetector;
-            $result = $detector->detect($dir, [
-                'supports_php_runtime' => true,
-                'supports_node_runtime' => true,
-                'default_runtime' => 'php:8.3',
-                'default_entrypoint' => 'public/index.php',
-                'default_package' => 'default',
-            ]);
+    try {
+        $detector = new ServerlessRuntimeDetector;
+        $result = $detector->detect($dir, [
+            'supports_php_runtime' => true,
+            'supports_node_runtime' => true,
+            'default_runtime' => 'php:8.3',
+            'default_entrypoint' => 'public/index.php',
+            'default_package' => 'default',
+        ]);
 
-            $this->assertSame('symfony', $result['framework']);
-            $this->assertSame('php', $result['language']);
-            $this->assertSame('medium', $result['confidence']);
-        } finally {
-            File::deleteDirectory($dir);
-        }
+        expect($result['framework'])->toBe('symfony');
+        expect($result['language'])->toBe('php');
+        expect($result['confidence'])->toBe('medium');
+    } finally {
+        File::deleteDirectory($dir);
     }
+});
 
-    public function test_detects_django_with_manage_py(): void
-    {
-        $dir = storage_path('framework/testing/serverless-detector-'.uniqid());
-        File::makeDirectory($dir, 0755, true);
-        File::put($dir.'/manage.py', "# Django\n");
-        File::put($dir.'/requirements.txt', "Django>=4.2\n");
+test('detects django with manage py', function () {
+    $dir = storage_path('framework/testing/serverless-detector-'.uniqid());
+    File::makeDirectory($dir, 0755, true);
+    File::put($dir.'/manage.py', "# Django\n");
+    File::put($dir.'/requirements.txt', "Django>=4.2\n");
 
-        try {
-            $detector = new ServerlessRuntimeDetector;
-            $result = $detector->detect($dir, [
-                'supports_php_runtime' => true,
-                'supports_node_runtime' => true,
-                'supports_python_runtime' => true,
-                'default_python_runtime' => 'python3.12',
-                'default_runtime' => 'nodejs:20',
-                'default_entrypoint' => 'index',
-                'default_package' => 'default',
-            ]);
-
-            $this->assertSame('django', $result['framework']);
-            $this->assertSame('python', $result['language']);
-            $this->assertSame('high', $result['confidence']);
-        } finally {
-            File::deleteDirectory($dir);
-        }
-    }
-
-    public function test_detects_fastapi_from_requirements(): void
-    {
-        $dir = storage_path('framework/testing/serverless-detector-'.uniqid());
-        File::makeDirectory($dir, 0755, true);
-        File::put($dir.'/requirements.txt', "fastapi>=0.100\nuvicorn[standard]\n");
-
-        try {
-            $detector = new ServerlessRuntimeDetector;
-            $result = $detector->detect($dir, [
-                'supports_php_runtime' => true,
-                'supports_node_runtime' => true,
-                'supports_python_runtime' => true,
-                'default_python_runtime' => 'python3.12',
-                'default_runtime' => 'nodejs:20',
-                'default_entrypoint' => 'index',
-                'default_package' => 'default',
-            ]);
-
-            $this->assertSame('fastapi', $result['framework']);
-            $this->assertSame('python', $result['language']);
-        } finally {
-            File::deleteDirectory($dir);
-        }
-    }
-
-    public function test_detects_laravel_octane_flag_from_composer(): void
-    {
-        $dir = storage_path('framework/testing/serverless-detector-laravel-octane-'.uniqid());
-        File::makeDirectory($dir, 0755, true);
-        File::makeDirectory($dir.'/bootstrap', 0755, true);
-        File::makeDirectory($dir.'/routes', 0755, true);
-        File::makeDirectory($dir.'/public', 0755, true);
-        File::put($dir.'/artisan', "#!/usr/bin/env php\n");
-        File::put($dir.'/bootstrap/app.php', "<?php\n");
-        File::put($dir.'/routes/web.php', "<?php\n");
-        File::put($dir.'/public/index.php', "<?php\n");
-        File::put($dir.'/composer.json', json_encode([
-            'require' => [
-                'laravel/framework' => '^12.0',
-                'laravel/octane' => '^2.0',
-            ],
-        ], JSON_THROW_ON_ERROR));
-
-        try {
-            $detector = new ServerlessRuntimeDetector;
-            $result = $detector->detect($dir, [
-                'supports_php_runtime' => true,
-                'supports_node_runtime' => true,
-                'default_runtime' => 'php:8.3',
-                'default_entrypoint' => 'public/index.php',
-                'default_package' => 'default',
-            ]);
-
-            $this->assertSame('laravel', $result['framework']);
-            $this->assertTrue($result['laravel_octane']);
-        } finally {
-            File::deleteDirectory($dir);
-        }
-    }
-
-    /** Capabilities advertising all four DigitalOcean Functions runtimes. */
-    private function doCapabilities(array $overrides = []): array
-    {
-        return array_merge([
+    try {
+        $detector = new ServerlessRuntimeDetector;
+        $result = $detector->detect($dir, [
             'supports_php_runtime' => true,
             'supports_node_runtime' => true,
             'supports_python_runtime' => true,
-            'supports_go_runtime' => true,
-            'default_runtime' => 'nodejs:18',
-            'default_python_runtime' => 'python:3.11',
-            'default_entrypoint' => 'main',
+            'default_python_runtime' => 'python3.12',
+            'default_runtime' => 'nodejs:20',
+            'default_entrypoint' => 'index',
             'default_package' => 'default',
-        ], $overrides);
+        ]);
+
+        expect($result['framework'])->toBe('django');
+        expect($result['language'])->toBe('python');
+        expect($result['confidence'])->toBe('high');
+    } finally {
+        File::deleteDirectory($dir);
     }
+});
 
-    /**
-     * Detect a repo built from a map of relative path => file contents.
-     */
-    private function detectRepo(array $files, array $capabilityOverrides = []): array
-    {
-        $dir = storage_path('framework/testing/serverless-detector-'.uniqid());
-        File::makeDirectory($dir, 0755, true);
+test('detects fastapi from requirements', function () {
+    $dir = storage_path('framework/testing/serverless-detector-'.uniqid());
+    File::makeDirectory($dir, 0755, true);
+    File::put($dir.'/requirements.txt', "fastapi>=0.100\nuvicorn[standard]\n");
 
-        try {
-            foreach ($files as $relative => $contents) {
-                $path = $dir.'/'.$relative;
-                File::ensureDirectoryExists(dirname($path));
-                File::put($path, $contents);
-            }
+    try {
+        $detector = new ServerlessRuntimeDetector;
+        $result = $detector->detect($dir, [
+            'supports_php_runtime' => true,
+            'supports_node_runtime' => true,
+            'supports_python_runtime' => true,
+            'default_python_runtime' => 'python3.12',
+            'default_runtime' => 'nodejs:20',
+            'default_entrypoint' => 'index',
+            'default_package' => 'default',
+        ]);
 
-            return (new ServerlessRuntimeDetector)->detect($dir, $this->doCapabilities($capabilityOverrides));
-        } finally {
-            File::deleteDirectory($dir);
+        expect($result['framework'])->toBe('fastapi');
+        expect($result['language'])->toBe('python');
+    } finally {
+        File::deleteDirectory($dir);
+    }
+});
+
+test('detects laravel octane flag from composer', function () {
+    $dir = storage_path('framework/testing/serverless-detector-laravel-octane-'.uniqid());
+    File::makeDirectory($dir, 0755, true);
+    File::makeDirectory($dir.'/bootstrap', 0755, true);
+    File::makeDirectory($dir.'/routes', 0755, true);
+    File::makeDirectory($dir.'/public', 0755, true);
+    File::put($dir.'/artisan', "#!/usr/bin/env php\n");
+    File::put($dir.'/bootstrap/app.php', "<?php\n");
+    File::put($dir.'/routes/web.php', "<?php\n");
+    File::put($dir.'/public/index.php', "<?php\n");
+    File::put($dir.'/composer.json', json_encode([
+        'require' => [
+            'laravel/framework' => '^12.0',
+            'laravel/octane' => '^2.0',
+        ],
+    ], JSON_THROW_ON_ERROR));
+
+    try {
+        $detector = new ServerlessRuntimeDetector;
+        $result = $detector->detect($dir, [
+            'supports_php_runtime' => true,
+            'supports_node_runtime' => true,
+            'default_runtime' => 'php:8.3',
+            'default_entrypoint' => 'public/index.php',
+            'default_package' => 'default',
+        ]);
+
+        expect($result['framework'])->toBe('laravel');
+        expect($result['laravel_octane'])->toBeTrue();
+    } finally {
+        File::deleteDirectory($dir);
+    }
+});
+
+/** Capabilities advertising all four DigitalOcean Functions runtimes. */
+function doCapabilities(array $overrides = []): array
+{
+    return array_merge([
+        'supports_php_runtime' => true,
+        'supports_node_runtime' => true,
+        'supports_python_runtime' => true,
+        'supports_go_runtime' => true,
+        'default_runtime' => 'nodejs:18',
+        'default_python_runtime' => 'python:3.11',
+        'default_entrypoint' => 'main',
+        'default_package' => 'default',
+    ], $overrides);
+}
+
+/**
+ * Detect a repo built from a map of relative path => file contents.
+ */
+function detectRepo(array $files, array $capabilityOverrides = []): array
+{
+    $dir = storage_path('framework/testing/serverless-detector-'.uniqid());
+    File::makeDirectory($dir, 0755, true);
+
+    try {
+        foreach ($files as $relative => $contents) {
+            $path = $dir.'/'.$relative;
+            File::ensureDirectoryExists(dirname($path));
+            File::put($path, $contents);
         }
-    }
 
-    public function test_detects_a_raw_node_action_from_main_js(): void
-    {
-        $result = $this->detectRepo(['main.js' => "exports.main = function (args) {\n  return { body: 'ok' };\n};\n"]);
-
-        $this->assertSame('raw', $result['framework']);
-        $this->assertSame('raw', $result['deploy_kind']);
-        $this->assertSame('node', $result['language']);
-        $this->assertSame('main.js', $result['entry_file']);
-        $this->assertSame('main', $result['entrypoint']);
-        $this->assertSame('nodejs:18', $result['runtime']);
-        $this->assertFalse($result['unsupported_for_target']);
-    }
-
-    public function test_detects_a_raw_python_action_from_main_py(): void
-    {
-        $result = $this->detectRepo(['main.py' => "def main(args):\n    return {'body': 'ok'}\n"]);
-
-        $this->assertSame('raw', $result['framework']);
-        $this->assertSame('python', $result['language']);
-        $this->assertSame('main.py', $result['entry_file']);
-        $this->assertSame('python:3.11', $result['runtime']);
-    }
-
-    public function test_detects_a_raw_php_action_from_main_php(): void
-    {
-        $result = $this->detectRepo(['main.php' => "<?php\nfunction main(array \$args): array\n{\n    return ['body' => 'ok'];\n}\n"]);
-
-        $this->assertSame('raw', $result['framework']);
-        $this->assertSame('php', $result['language']);
-        $this->assertSame('main.php', $result['entry_file']);
-        $this->assertSame('php:8.3', $result['runtime']);
-    }
-
-    public function test_detects_a_raw_go_action_from_main_go(): void
-    {
-        $result = $this->detectRepo(['main.go' => "package main\n\nfunc Main(args map[string]interface{}) map[string]interface{} {\n  return args\n}\n"]);
-
-        $this->assertSame('raw', $result['framework']);
-        $this->assertSame('go', $result['language']);
-        $this->assertSame('main.go', $result['entry_file']);
-        $this->assertSame('go:1.22', $result['runtime']);
-    }
-
-    public function test_a_file_without_a_main_symbol_is_not_a_raw_action(): void
-    {
-        $result = $this->detectRepo(['main.js' => "console.log('not an action');\n"]);
-
-        $this->assertSame('unknown', $result['framework']);
-        $this->assertSame('unknown', $result['deploy_kind']);
-    }
-
-    public function test_detects_an_openwhisk_project_yml_as_a_raw_multi_action_package(): void
-    {
-        $result = $this->detectRepo(['project.yml' => "packages:\n  default:\n    actions:\n      hello:\n        function: hello.js\n"]);
-
-        $this->assertSame('raw', $result['framework']);
-        $this->assertSame('raw', $result['deploy_kind']);
-        $this->assertSame('mixed', $result['language']);
-        $this->assertSame('high', $result['confidence']);
-    }
-
-    public function test_framework_markers_win_over_a_raw_main_file(): void
-    {
-        // A Laravel repo that also happens to carry a root main.php must
-        // still be classified as the framework — ladder step 1 beats step 4.
-        $result = $this->detectRepo([
-            'artisan' => "#!/usr/bin/env php\n",
-            'bootstrap/app.php' => "<?php\n",
-            'composer.json' => json_encode(['require' => ['laravel/framework' => '^12.0']]),
-            'main.php' => "<?php\nfunction main(\$args) { return \$args; }\n",
-        ]);
-
-        $this->assertSame('laravel', $result['framework']);
-        $this->assertSame('framework', $result['deploy_kind']);
-    }
-
-    public function test_detects_an_express_app_as_a_framework(): void
-    {
-        $result = $this->detectRepo([
-            'package.json' => json_encode(['dependencies' => ['express' => '^4.19.0']]),
-            'index.js' => "const express = require('express');\nmodule.exports = express();\n",
-        ]);
-
-        $this->assertSame('express', $result['framework']);
-        $this->assertSame('framework', $result['deploy_kind']);
-        $this->assertSame('node', $result['language']);
-    }
-
-    public function test_detects_a_gin_app_as_a_framework(): void
-    {
-        $result = $this->detectRepo([
-            'go.mod' => "module example.com/api\n\ngo 1.22\n\nrequire github.com/gin-gonic/gin v1.10.0\n",
-            'main.go' => "package main\nfunc main() {}\n",
-        ]);
-
-        $this->assertSame('gin', $result['framework']);
-        $this->assertSame('framework', $result['deploy_kind']);
-        $this->assertSame('go', $result['language']);
-        $this->assertSame('go:1.22', $result['runtime']);
-    }
-
-    public function test_a_raw_action_is_unsupported_when_the_target_lacks_that_runtime(): void
-    {
-        $result = $this->detectRepo(
-            ['main.go' => "package main\nfunc Main(a map[string]interface{}) map[string]interface{} { return a }\n"],
-            ['supports_go_runtime' => false],
-        );
-
-        $this->assertSame('raw', $result['framework']);
-        $this->assertTrue($result['unsupported_for_target']);
-        $this->assertSame('', $result['runtime']);
+        return (new ServerlessRuntimeDetector)->detect($dir, doCapabilities($capabilityOverrides));
+    } finally {
+        File::deleteDirectory($dir);
     }
 }
+
+test('detects a raw node action from main js', function () {
+    $result = detectRepo(['main.js' => "exports.main = function (args) {\n  return { body: 'ok' };\n};\n"]);
+
+    expect($result['framework'])->toBe('raw');
+    expect($result['deploy_kind'])->toBe('raw');
+    expect($result['language'])->toBe('node');
+    expect($result['entry_file'])->toBe('main.js');
+    expect($result['entrypoint'])->toBe('main');
+    expect($result['runtime'])->toBe('nodejs:18');
+    expect($result['unsupported_for_target'])->toBeFalse();
+});
+
+test('detects a raw python action from main py', function () {
+    $result = detectRepo(['main.py' => "def main(args):\n    return {'body': 'ok'}\n"]);
+
+    expect($result['framework'])->toBe('raw');
+    expect($result['language'])->toBe('python');
+    expect($result['entry_file'])->toBe('main.py');
+    expect($result['runtime'])->toBe('python:3.11');
+});
+
+test('detects a raw php action from main php', function () {
+    $result = detectRepo(['main.php' => "<?php\nfunction main(array \$args): array\n{\n    return ['body' => 'ok'];\n}\n"]);
+
+    expect($result['framework'])->toBe('raw');
+    expect($result['language'])->toBe('php');
+    expect($result['entry_file'])->toBe('main.php');
+    expect($result['runtime'])->toBe('php:8.3');
+});
+
+test('detects a raw go action from main go', function () {
+    $result = detectRepo(['main.go' => "package main\n\nfunc Main(args map[string]interface{}) map[string]interface{} {\n  return args\n}\n"]);
+
+    expect($result['framework'])->toBe('raw');
+    expect($result['language'])->toBe('go');
+    expect($result['entry_file'])->toBe('main.go');
+    expect($result['runtime'])->toBe('go:1.22');
+});
+
+test('a file without a main symbol is not a raw action', function () {
+    $result = detectRepo(['main.js' => "console.log('not an action');\n"]);
+
+    expect($result['framework'])->toBe('unknown');
+    expect($result['deploy_kind'])->toBe('unknown');
+});
+
+test('detects an openwhisk project yml as a raw multi action package', function () {
+    $result = detectRepo(['project.yml' => "packages:\n  default:\n    actions:\n      hello:\n        function: hello.js\n"]);
+
+    expect($result['framework'])->toBe('raw');
+    expect($result['deploy_kind'])->toBe('raw');
+    expect($result['language'])->toBe('mixed');
+    expect($result['confidence'])->toBe('high');
+});
+
+test('framework markers win over a raw main file', function () {
+    // A Laravel repo that also happens to carry a root main.php must
+    // still be classified as the framework — ladder step 1 beats step 4.
+    $result = detectRepo([
+        'artisan' => "#!/usr/bin/env php\n",
+        'bootstrap/app.php' => "<?php\n",
+        'composer.json' => json_encode(['require' => ['laravel/framework' => '^12.0']]),
+        'main.php' => "<?php\nfunction main(\$args) { return \$args; }\n",
+    ]);
+
+    expect($result['framework'])->toBe('laravel');
+    expect($result['deploy_kind'])->toBe('framework');
+});
+
+test('detects an express app as a framework', function () {
+    $result = detectRepo([
+        'package.json' => json_encode(['dependencies' => ['express' => '^4.19.0']]),
+        'index.js' => "const express = require('express');\nmodule.exports = express();\n",
+    ]);
+
+    expect($result['framework'])->toBe('express');
+    expect($result['deploy_kind'])->toBe('framework');
+    expect($result['language'])->toBe('node');
+});
+
+test('detects a gin app as a framework', function () {
+    $result = detectRepo([
+        'go.mod' => "module example.com/api\n\ngo 1.22\n\nrequire github.com/gin-gonic/gin v1.10.0\n",
+        'main.go' => "package main\nfunc main() {}\n",
+    ]);
+
+    expect($result['framework'])->toBe('gin');
+    expect($result['deploy_kind'])->toBe('framework');
+    expect($result['language'])->toBe('go');
+    expect($result['runtime'])->toBe('go:1.22');
+});
+
+test('a raw action is unsupported when the target lacks that runtime', function () {
+    $result = detectRepo(['main.go' => "package main\nfunc Main(a map[string]interface{}) map[string]interface{} { return a }\n"], ['supports_go_runtime' => false]);
+
+    expect($result['framework'])->toBe('raw');
+    expect($result['unsupported_for_target'])->toBeTrue();
+    expect($result['runtime'])->toBe('');
+});

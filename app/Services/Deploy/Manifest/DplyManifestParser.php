@@ -6,6 +6,7 @@ namespace App\Services\Deploy\Manifest;
 
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
+use Yosymfony\Toml\Toml;
 
 /**
  * Parses a `dply.yaml` manifest into a {@see DplyManifest} value object.
@@ -24,18 +25,69 @@ use Symfony\Component\Yaml\Yaml;
  */
 class DplyManifestParser
 {
+    /** Manifest base names, in discovery precedence order. */
+    public const FILE_NAMES = ['dply.yaml', 'dply.yml', 'dply.json', 'dply.toml'];
+
     public function parseFile(string $path): DplyManifest
     {
         if (! is_file($path)) {
-            throw new DplyManifestException("dply.yaml not found at: {$path}");
+            throw new DplyManifestException("dply manifest not found at: {$path}");
         }
 
         $contents = @file_get_contents($path);
         if ($contents === false) {
-            throw new DplyManifestException("Could not read dply.yaml at: {$path}");
+            throw new DplyManifestException("Could not read dply manifest at: {$path}");
         }
 
-        return $this->parseYaml($contents);
+        return $this->parseRaw($contents, $path);
+    }
+
+    /**
+     * Parse raw manifest contents, choosing the format from the source path's
+     * extension (falls back to YAML, which also accepts JSON). Use this when the
+     * bytes were fetched from a remote box (the file name is known but it's not
+     * on the local disk).
+     */
+    public function parseRaw(string $raw, string $sourcePath): DplyManifest
+    {
+        $ext = strtolower(pathinfo($sourcePath, PATHINFO_EXTENSION));
+
+        return match ($ext) {
+            'json' => $this->parseJson($raw),
+            'toml' => $this->parseToml($raw),
+            default => $this->parseYaml($raw), // yaml/yml (YAML is a JSON superset)
+        };
+    }
+
+    public function parseJson(string $json): DplyManifest
+    {
+        $trimmed = trim($json);
+        if ($trimmed === '') {
+            return DplyManifest::empty();
+        }
+
+        $data = json_decode($json, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw DplyManifestException::invalidYaml('invalid JSON: '.json_last_error_msg());
+        }
+
+        return $this->fromDecoded($data);
+    }
+
+    public function parseToml(string $toml): DplyManifest
+    {
+        $trimmed = trim($toml);
+        if ($trimmed === '') {
+            return DplyManifest::empty();
+        }
+
+        try {
+            $data = Toml::parse($toml);
+        } catch (\Throwable $e) {
+            throw DplyManifestException::invalidYaml('invalid TOML: '.$e->getMessage(), $e);
+        }
+
+        return $this->fromDecoded($data);
     }
 
     public function parseYaml(string $yaml): DplyManifest
@@ -51,6 +103,15 @@ class DplyManifestParser
             throw DplyManifestException::invalidYaml($e->getMessage(), $e);
         }
 
+        return $this->fromDecoded($data);
+    }
+
+    /**
+     * Validate a decoded payload (from any format) is a top-level map and parse
+     * it. Null/empty → empty manifest; list/scalar → error.
+     */
+    private function fromDecoded(mixed $data): DplyManifest
+    {
         if ($data === null) {
             return DplyManifest::empty();
         }
@@ -77,7 +138,33 @@ class DplyManifestParser
             release: $this->parseStringOrList('release', $data['release'] ?? null),
             processes: $this->parseProcesses($data['processes'] ?? null),
             warnings: $this->collectWarnings($data),
+            healthcheck: $this->parseHealthcheck($data['healthcheck'] ?? null),
         );
+    }
+
+    private function parseHealthcheck(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        // Accept a bare path string (`healthcheck: /up`) or a map with a
+        // `path` key (`healthcheck: { path: /up }`).
+        if (is_array($value) && ! array_is_list($value)) {
+            $value = $value['path'] ?? null;
+        }
+
+        if ($value === null) {
+            return null;
+        }
+
+        if (! is_string($value)) {
+            throw DplyManifestException::invalidField('healthcheck', 'must be a path string or a map with a `path`');
+        }
+
+        $trimmed = trim($value);
+
+        return $trimmed === '' ? null : $trimmed;
     }
 
     private function parseRuntime(mixed $value): ?string

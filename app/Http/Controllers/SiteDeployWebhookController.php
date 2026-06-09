@@ -8,6 +8,7 @@ use App\Models\SiteDeployment;
 use App\Models\WebhookDeliveryLog;
 use App\Services\Sites\SiteDeploySyncCoordinator;
 use App\Services\Sites\SiteWebhookSignatureValidator;
+use App\Support\ProductLine\ProductLineKillSwitches;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -48,6 +49,10 @@ class SiteDeployWebhookController extends Controller
 
         if (! $this->shouldQueueDeployFromProviderPayload($request, $site, $result)) {
             return response()->json(['message' => 'Ignored.'], 200);
+        }
+
+        if (ProductLineKillSwitches::blocksVmSiteDeploy($site)) {
+            return response()->json(['message' => 'VM deploys are temporarily disabled.'], 503);
         }
 
         $site->loadMissing('organization');

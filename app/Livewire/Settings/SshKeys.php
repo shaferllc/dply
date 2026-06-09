@@ -93,6 +93,13 @@ class SshKeys extends Component
             'provision_on_new_servers' => $this->new_provision_on_new_servers,
         ]);
 
+        if ($org = $user->currentOrganization()) {
+            audit_log($org, $user, 'user.ssh_key_added', $key, null, [
+                'name' => $key->name,
+                'provision_on_new_servers' => (bool) $key->provision_on_new_servers,
+            ]);
+        }
+
         $this->new_name = '';
         $this->new_public_key = '';
         $this->new_provision_on_new_servers = false;
@@ -167,6 +174,11 @@ class SshKeys extends Component
             return;
         }
 
+        $before = [
+            'name' => $key->name,
+            'provision_on_new_servers' => (bool) $key->provision_on_new_servers,
+        ];
+
         $key->update([
             'name' => $this->edit_name,
             'public_key' => trim($this->edit_public_key),
@@ -174,6 +186,14 @@ class SshKeys extends Component
         ]);
 
         $key->refresh();
+
+        if ($org = Auth::user()->currentOrganization()) {
+            audit_log($org, Auth::user(), 'user.ssh_key_updated', $key, $before, [
+                'name' => $key->name,
+                'provision_on_new_servers' => (bool) $key->provision_on_new_servers,
+            ]);
+        }
+
         $deployment->syncLinkedServerRows($key);
 
         foreach ($key->serverAuthorizedKeys()->pluck('server_id')->unique() as $serverId) {
@@ -237,7 +257,17 @@ class SshKeys extends Component
 
         $serverIds = $key->serverAuthorizedKeys()->pluck('server_id')->unique()->values()->all();
 
+        $snapshot = [
+            'name' => $key->name,
+            'key_id' => (string) $key->getKey(),
+            'server_count' => count($serverIds),
+        ];
+
         $key->delete();
+
+        if ($org = Auth::user()->currentOrganization()) {
+            audit_log($org, Auth::user(), 'user.ssh_key_removed', null, $snapshot, null);
+        }
 
         foreach ($serverIds as $serverId) {
             SyncServerAuthorizedKeysJob::dispatch($serverId);

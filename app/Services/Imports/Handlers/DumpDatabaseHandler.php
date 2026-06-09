@@ -8,6 +8,7 @@ use App\Models\ImportMigrationStep;
 use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
 use App\Models\ProviderCredential;
+use App\Services\Imports\SourceDriverFactory;
 use App\Services\Imports\SourceSshConnectionFactory;
 use App\Services\Imports\StepHandler;
 use RuntimeException;
@@ -54,7 +55,7 @@ class DumpDatabaseHandler implements StepHandler
             throw new RuntimeException('Provider credential missing.');
         }
 
-        $driver = app(\App\Services\Imports\SourceDriverFactory::class)->for($credential);
+        $driver = app(SourceDriverFactory::class)->for($credential);
         $dbs = $driver->listSiteDatabases($migration->source_server_id, $child->source_site_id);
 
         if ($dbs === []) {

@@ -7,9 +7,12 @@ use App\Livewire\Concerns\StreamsRemoteSshLivewire;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Servers\ServerSystemLogReader;
+use App\Support\Servers\AccessLogVisitorClassifier;
 use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Livewire\Attributes\Url;
 
 trait ManagesServerSystemLogs
 {
@@ -22,6 +25,23 @@ trait ManagesServerSystemLogs
     public bool $logFilterUseRegex = false;
 
     public bool $logFilterInvert = false;
+
+    /** Access-log visitor bucket: all, humans, crawlers, bots, ai, noise (humans + unknown). */
+    #[Url(as: 'traffic', except: 'all')]
+    public string $logTrafficFilter = 'all';
+
+    /**
+     * Per-bucket counts for the current access-log fetch (before text/regex filter).
+     *
+     * @var array{human: int, crawler: int, bot: int, ai: int, unknown: int}
+     */
+    public array $logTrafficBreakdown = [
+        'human' => 0,
+        'crawler' => 0,
+        'bot' => 0,
+        'ai' => 0,
+        'unknown' => 0,
+    ];
 
     /** Client-side validation message for invalid regex (when regex mode is on). */
     public ?string $logFilterError = null;
@@ -67,11 +87,18 @@ trait ManagesServerSystemLogs
     /** When set, the log viewer only lists this site’s platform + access/error sources. */
     public ?Site $scopedSite = null;
 
+    /** @var array<string, array<string, mixed>>|null */
+    private ?array $cachedAvailableLogSources = null;
+
     /**
      * @return array<string, array<string, mixed>>
      */
     public function availableLogSources(): array
     {
+        if ($this->cachedAvailableLogSources !== null) {
+            return $this->cachedAvailableLogSources;
+        }
+
         $sources = config('server_system_logs.sources', []);
         $server = $this->server ?? null;
         if ($server === null) {
@@ -87,6 +114,9 @@ trait ManagesServerSystemLogs
 
         if ($this->scopedSite !== null) {
             $site = $this->scopedSite;
+            if ($server !== null && ! $site->relationLoaded('server')) {
+                $site->setRelation('server', $server);
+            }
             $id = (string) $site->getKey();
             $logDirectory = $site->webserverLogDirectory();
             $basename = $site->webserverConfigBasename();
@@ -129,12 +159,15 @@ trait ManagesServerSystemLogs
                 ];
             }
 
+            $this->cachedAvailableLogSources = $sources;
+
             return $sources;
         }
 
         $server->loadMissing('sites');
 
         foreach ($server->sites as $site) {
+            $site->setRelation('server', $server);
             $id = (string) $site->getKey();
             $logDirectory = $site->webserverLogDirectory();
             $basename = $site->webserverConfigBasename();
@@ -151,6 +184,8 @@ trait ManagesServerSystemLogs
                 'group' => 'sites',
             ];
         }
+
+        $this->cachedAvailableLogSources = $sources;
 
         return $sources;
     }
@@ -199,7 +234,31 @@ trait ManagesServerSystemLogs
         }
 
         $this->logKey = $key;
+        $this->logTrafficFilter = 'all';
+        $this->cachedAvailableLogSources = null;
         $this->loadSystemLog();
+    }
+
+    public function setLogTrafficFilter(string $filter): void
+    {
+        $this->logTrafficFilter = AccessLogVisitorClassifier::normalizeFilter($filter);
+        $this->applyLogFilterToOutput();
+    }
+
+    public function updatedLogTrafficFilter(): void
+    {
+        $this->logTrafficFilter = AccessLogVisitorClassifier::normalizeFilter($this->logTrafficFilter);
+        $this->applyLogFilterToOutput();
+    }
+
+    public function resetLogViewerFilters(): void
+    {
+        $this->logFilter = '';
+        $this->logFilterUseRegex = false;
+        $this->logFilterInvert = false;
+        $this->logFilterError = null;
+        $this->logTrafficFilter = 'all';
+        $this->applyLogFilterToOutput();
     }
 
     public function updatedLogFilter(): void
@@ -258,6 +317,13 @@ trait ManagesServerSystemLogs
         $this->remoteLogError = null;
         $this->logTotalLines = 0;
         $this->logFilteredLines = 0;
+        $this->logTrafficBreakdown = [
+            'human' => 0,
+            'crawler' => 0,
+            'bot' => 0,
+            'ai' => 0,
+            'unknown' => 0,
+        ];
         $this->logLastFetchedAt = null;
         $this->logLastFetchTruncated = false;
         $this->logLastFetchRawBytes = 0;
@@ -376,7 +442,7 @@ trait ManagesServerSystemLogs
             $this->resetRemoteSshStreamTargets();
             $reader = app(ServerSystemLogReader::class);
             $result = $reader->fetch(
-                $this->server->fresh(),
+                $this->server,
                 $this->logKey,
                 function (string $summary): void {
                     $this->remoteSshStreamSetMeta(__('Remote command'), $summary);
@@ -445,7 +511,6 @@ trait ManagesServerSystemLogs
         }
 
         $this->syncLogViewerPreferencesFromServer();
-        $this->loadSystemLog();
     }
 
     protected function syncLogViewerPreferencesFromServer(): void
@@ -607,8 +672,8 @@ trait ManagesServerSystemLogs
             return;
         }
 
-        $server = $this->server->fresh();
-        if ($server->organization_id && $server->organization?->userIsDeployer($user)) {
+        $this->server->loadMissing('organization');
+        if ($this->server->organization_id && $this->server->organization?->userIsDeployer($user)) {
             return;
         }
 
@@ -620,17 +685,30 @@ trait ManagesServerSystemLogs
             $broadcastPayloadTruncated = true;
         }
 
-        broadcast(new ServerWorkspaceLogSnapshotBroadcast(
-            serverId: (string) $server->id,
-            logKey: $this->logKey,
-            remoteLogRaw: is_string($raw) ? $raw : null,
-            remoteLogError: $this->remoteLogError,
-            logLastFetchedAt: (string) ($this->logLastFetchedAt ?? now()->toIso8601String()),
-            logLastFetchTruncated: $this->logLastFetchTruncated,
-            logLastFetchRawBytes: $this->logLastFetchRawBytes,
-            broadcastPayloadTruncated: $broadcastPayloadTruncated,
-            siteId: $this->scopedSite !== null ? (string) $this->scopedSite->getKey() : null,
-        ))->toOthers();
+        // Best-effort fan-out to the operator's other open tabs. This is a
+        // ShouldBroadcastNow event, so it publishes to Reverb inline within
+        // the Livewire request — a down or misconfigured broadcaster must not
+        // take the log page down with it (cURL timeouts otherwise surface as
+        // a 500). Degrade to "no live peer update" instead.
+        try {
+            broadcast(new ServerWorkspaceLogSnapshotBroadcast(
+                serverId: (string) $this->server->id,
+                logKey: $this->logKey,
+                remoteLogRaw: is_string($raw) ? $raw : null,
+                remoteLogError: $this->remoteLogError,
+                logLastFetchedAt: (string) ($this->logLastFetchedAt ?? now()->toIso8601String()),
+                logLastFetchTruncated: $this->logLastFetchTruncated,
+                logLastFetchRawBytes: $this->logLastFetchRawBytes,
+                broadcastPayloadTruncated: $broadcastPayloadTruncated,
+                siteId: $this->scopedSite !== null ? (string) $this->scopedSite->getKey() : null,
+            ))->toOthers();
+        } catch (\Throwable $e) {
+            Log::warning('server_system_logs.broadcast_failed', [
+                'server_id' => (string) $this->server->id,
+                'log_key' => $this->logKey,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function applyLogFilterToOutput(): void
@@ -652,6 +730,25 @@ trait ManagesServerSystemLogs
         }
 
         $this->logTotalLines = count($lines);
+
+        if ($this->currentLogIsAccessLog()) {
+            $this->logTrafficBreakdown = AccessLogVisitorClassifier::breakdown($lines);
+            $trafficFilter = AccessLogVisitorClassifier::normalizeFilter($this->logTrafficFilter);
+            if ($trafficFilter !== 'all') {
+                $lines = array_values(array_filter(
+                    $lines,
+                    static fn (string $line): bool => AccessLogVisitorClassifier::lineMatchesFilter($line, $trafficFilter),
+                ));
+            }
+        } else {
+            $this->logTrafficBreakdown = [
+                'human' => 0,
+                'crawler' => 0,
+                'bot' => 0,
+                'ai' => 0,
+                'unknown' => 0,
+            ];
+        }
 
         $f = trim($this->logFilter);
         if ($f === '') {
@@ -740,6 +837,13 @@ trait ManagesServerSystemLogs
 
             return false;
         });
+    }
+
+    protected function currentLogIsAccessLog(): bool
+    {
+        $def = $this->availableLogSources()[$this->logKey] ?? [];
+
+        return AccessLogVisitorClassifier::isAccessLogSource($this->logKey, $def);
     }
 
     private function buildSafeRegexPattern(string $body): ?string

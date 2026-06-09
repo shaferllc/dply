@@ -6,8 +6,10 @@ use App\Livewire\Concerns\AuthorsBackupDestinations;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\BackupConfiguration;
+use App\Models\Organization;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -45,15 +47,36 @@ class BackupConfigurations extends Component
         $this->validate($this->destinationFormRules('createForm', $this->createForm['provider'] ?? ''));
         $this->validateDestinationFormExtras('createForm', $this->createForm);
 
-        $org->backupConfigurations()->create([
+        $config = $org->backupConfigurations()->create([
             'name' => $this->createForm['name'],
             'provider' => $this->createForm['provider'],
             'config' => $this->extractDestinationConfig($this->createForm),
             'created_by_user_id' => Auth::id(),
         ]);
 
+        audit_log($org, Auth::user(), 'backup.destination.created', $config, null, [
+            'name' => $config->name,
+            'provider' => $config->provider,
+        ]);
+
         $this->createForm = $this->emptyDestinationForm();
+        $this->dispatch('close-modal', 'backup-destination-modal');
         $this->toastSuccess(__('Backup destination saved.'));
+    }
+
+    public function openCreateModal(): void
+    {
+        $this->authorize('create', BackupConfiguration::class);
+        $this->resetErrorBag();
+        $this->createForm = $this->emptyDestinationForm();
+        $this->dispatch('open-modal', 'backup-destination-modal');
+    }
+
+    public function closeCreateModal(): void
+    {
+        $this->resetErrorBag();
+        $this->createForm = $this->emptyDestinationForm();
+        $this->dispatch('close-modal', 'backup-destination-modal');
     }
 
     public function startEdit(string $id): void
@@ -89,11 +112,23 @@ class BackupConfigurations extends Component
         $this->validate($this->destinationFormRules('editForm', $this->editForm['provider'] ?? ''));
         $this->validateDestinationFormExtras('editForm', $this->editForm);
 
+        $before = [
+            'name' => $model->name,
+            'provider' => $model->provider,
+        ];
+
         $model->update([
             'name' => $this->editForm['name'],
             'provider' => $this->editForm['provider'],
             'config' => $this->extractDestinationConfig($this->editForm),
         ]);
+
+        if ($org = $model->organization ?? Auth::user()?->currentOrganization()) {
+            audit_log($org, Auth::user(), 'backup.destination.updated', $model, $before, [
+                'name' => $model->name,
+                'provider' => $model->provider,
+            ]);
+        }
 
         $this->cancelEdit();
         $this->toastSuccess(__('Backup destination updated.'));
@@ -105,7 +140,18 @@ class BackupConfigurations extends Component
 
         $this->authorize('delete', $config);
 
+        $org = $config->organization ?? Auth::user()?->currentOrganization();
+        $snapshot = [
+            'configuration_id' => (string) $config->id,
+            'name' => $config->name,
+            'provider' => $config->provider,
+        ];
+
         $config->delete();
+
+        if ($org) {
+            audit_log($org, Auth::user(), 'backup.destination.deleted', null, $snapshot, null);
+        }
 
         if ($this->editing_id === $id) {
             $this->cancelEdit();
@@ -141,12 +187,12 @@ class BackupConfigurations extends Component
      * login-flush could land here without one). Throwing the validation error
      * surfaces the right message in the UI rather than 500ing on a null call.
      */
-    private function requireCurrentOrganization(): \App\Models\Organization
+    private function requireCurrentOrganization(): Organization
     {
         $org = Auth::user()?->currentOrganization();
         if ($org === null) {
             $this->toastError(__('Pick an organization before adding a backup destination.'));
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'createForm.name' => __('No active organization.'),
             ]);
         }

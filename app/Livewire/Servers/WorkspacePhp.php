@@ -2,22 +2,32 @@
 
 namespace App\Livewire\Servers;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\RunsServerConsoleActions;
 use App\Models\ConfigRevision;
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Services\ConfigRevisions\Diff\ConfigRevisionDiffRegistry;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\ServerPhpConfigEditor;
 use App\Services\Servers\ServerPhpConfigValidationException;
 use App\Services\Servers\ServerPhpManager;
+use App\Support\Servers\ServerPhpMutationLock;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspacePhp extends Component
 {
+    use RendersWorkspacePlaceholder;
+    use ConfirmsActionWithModal;
     use DismissesServerConsoleActionRun;
     use InteractsWithServerWorkspace;
     use RunsServerConsoleActions;
@@ -70,7 +80,7 @@ class WorkspacePhp extends Component
 
     public ?string $phpConfigEditorCompareB = null;
 
-    public function runPhpPackageAction(string $action, string $version): void
+    public function runPhpPackageAction(string $action, string $version, bool $migrateSitesBeforeUninstall = false): void
     {
         $this->authorize('update', $this->server);
 
@@ -87,6 +97,14 @@ class WorkspacePhp extends Component
 
         $actionVerb = str_replace('_', ' ', $action);
 
+        if (ServerPhpMutationLock::isHeld($this->server)) {
+            $msg = __('Another PHP action is already running for this server. Wait for it to finish.');
+            $this->remote_error = $msg;
+            $this->toastError($msg);
+
+            return;
+        }
+
         try {
             $result = $this->runConsoleAction(
                 $this->server,
@@ -94,17 +112,54 @@ class WorkspacePhp extends Component
                 __(':verb PHP :version on :host', [
                     'verb' => ucfirst($actionVerb), 'version' => $version, 'host' => $this->server->name,
                 ]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($action, $version, $actionVerb): array {
-                    $emit->step('php', sprintf('apt %s php%s', $actionVerb, $version));
-                    $result = app(ServerPhpManager::class)->applyPackageAction($this->server, $action, $version);
+                function (ConsoleEmitter $emit) use ($action, $version, $migrateSitesBeforeUninstall): array {
+                    $result = app(ServerPhpManager::class)->applyPackageAction(
+                        $this->server,
+                        $action,
+                        $version,
+                        function (string $step) use ($emit, $action, $version): void {
+                            if ($step === 'sync_inventory') {
+                                $emit->step('php', __('Refreshing PHP inventory'));
+
+                                return;
+                            }
+
+                            if ($step === 'migrate_sites') {
+                                $emit->step('php', __('Moving sites to the latest installed PHP version'));
+
+                                return;
+                            }
+
+                            if ($step === 'reassign_cli_default') {
+                                $emit->step('php', __('Moving CLI default to another installed PHP version'));
+
+                                return;
+                            }
+
+                            if ($step === 'reassign_new_site_default') {
+                                $emit->step('php', __('Moving new-site default to another installed PHP version'));
+
+                                return;
+                            }
+
+                            $command = match ($action) {
+                                'install' => "apt install php{$version}",
+                                'patch' => "apt upgrade php{$version}",
+                                'uninstall' => __('Purging PHP :version packages and config', ['version' => $version]),
+                                'set_cli_default' => "update-alternatives --set php /usr/bin/php{$version}",
+                                'set_new_site_default' => __('Saving new-site default'),
+                                default => "{$action} php{$version}",
+                            };
+                            $emit->step('php', is_string($command) ? $command : (string) $command);
+                        },
+                        $migrateSitesBeforeUninstall,
+                        auth()->id(),
+                    );
                     foreach (preg_split("/\r?\n/", (string) ($result['output'] ?? '')) ?: [] as $line) {
                         if ($line !== '') {
-                            $emit($line, \App\Models\ConsoleAction::LEVEL_INFO, 'php');
+                            $emit($line, ConsoleAction::LEVEL_INFO, 'php');
                         }
                     }
-                    // The manager surfaces a `stale` status when inventory readback diverges
-                    // from the cached snapshot — bubble that up as a failure so the banner
-                    // reflects it; the calling Livewire branch reads $result and toasts.
                     if (($result['status'] ?? null) === 'stale') {
                         throw new \RuntimeException((string) ($result['message'] ?? __('PHP inventory may be stale.')));
                     }
@@ -116,13 +171,33 @@ class WorkspacePhp extends Component
 
             $this->server->refresh();
             $this->toastSuccess($result['message'] ?? __('PHP action completed.'));
-            $this->remote_output = $result['output'] ?? null;
         } catch (\Throwable $e) {
             $this->server->refresh();
             $msg = $e->getMessage();
             $this->remote_error = $msg;
             $this->toastError($msg);
         }
+    }
+
+    public function openMigrateAndUninstallPhpModal(string $version, int $siteCount, string $targetVersion): void
+    {
+        $this->openConfirmActionModal(
+            'runPhpMigrateAndUninstall',
+            [$version],
+            __('Migrate sites and uninstall PHP :version?', ['version' => $version]),
+            trans_choice(
+                'This moves :count site to PHP :target, queues a webserver config apply for each site, then uninstalls PHP :version from the server.|This moves :count sites to PHP :target, queues a webserver config apply for each site, then uninstalls PHP :version from the server.',
+                $siteCount,
+                ['count' => $siteCount, 'target' => $targetVersion, 'version' => $version],
+            ),
+            __('Migrate sites and uninstall'),
+            true,
+        );
+    }
+
+    public function runPhpMigrateAndUninstall(string $version): void
+    {
+        $this->runPhpPackageAction('uninstall', $version, migrateSitesBeforeUninstall: true);
     }
 
     public function refreshPhpInventory(): void
@@ -145,12 +220,12 @@ class WorkspacePhp extends Component
                 $this->server,
                 'php_refresh_inventory',
                 __('Refresh PHP inventory on :host', ['host' => $this->server->name]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit): array {
+                function (ConsoleEmitter $emit): array {
                     $emit->step('php', 'Probing installed PHP versions');
                     $result = app(ServerPhpManager::class)->refreshInventory($this->server);
                     foreach (preg_split("/\r?\n/", (string) ($result['output'] ?? '')) ?: [] as $line) {
                         if ($line !== '') {
-                            $emit($line, \App\Models\ConsoleAction::LEVEL_INFO, 'php');
+                            $emit($line, ConsoleAction::LEVEL_INFO, 'php');
                         }
                     }
                     if (($result['status'] ?? null) === 'stale') {
@@ -164,7 +239,6 @@ class WorkspacePhp extends Component
 
             $this->server->refresh();
             $this->toastSuccess($result['message'] ?? __('PHP inventory refreshed.'));
-            $this->remote_output = $result['output'] ?? null;
         } catch (\Throwable $e) {
             $this->server->refresh();
             $msg = $e->getMessage();
@@ -180,20 +254,33 @@ class WorkspacePhp extends Component
         $this->phpConfigEditorValidationOutput = null;
         $this->phpConfigEditorErrorLines = [];
         $this->remote_error = null;
-        $this->remote_output = __('Loading PHP config from the server…');
 
         if (! $this->serverOpsReady()) {
             $msg = __('Provisioning and SSH must be ready before editing PHP config.');
             $this->remote_error = $msg;
             $this->toastError($msg);
-            $this->remote_output = null;
 
             return;
         }
 
         try {
-            $editor = app(ServerPhpConfigEditor::class);
-            $result = $editor->openTarget($this->server, $version, $target);
+            $result = $this->runConsoleAction(
+                $this->server,
+                'php_load_config',
+                __('Load PHP :target for :version on :host', [
+                    'target' => $target,
+                    'version' => $version,
+                    'host' => $this->server->name,
+                ]),
+                function (ConsoleEmitter $emit) use ($version, $target): array {
+                    $emit->step('php', 'Reading config from the server');
+                    $result = app(ServerPhpConfigEditor::class)->openTarget($this->server, $version, $target);
+                    $emit($result['path'], ConsoleAction::LEVEL_INFO, 'php');
+                    $emit->success('php', __('Loaded :label.', ['label' => $result['label']]));
+
+                    return $result;
+                },
+            );
 
             $this->phpConfigEditorOpen = true;
             $this->phpConfigEditorVersion = $result['version'];
@@ -210,12 +297,7 @@ class WorkspacePhp extends Component
             $this->phpConfigEditorCompareB = null;
             $this->phpConfigEditorRevisionsLimit = 50;
 
-            $this->refreshRevisionState($editor);
-
-            $this->remote_output = __('Loaded :label from :path', [
-                'label' => $result['label'],
-                'path' => $result['path'],
-            ]);
+            $this->refreshRevisionState(app(ServerPhpConfigEditor::class));
         } catch (\Throwable $e) {
             $msg = $e->getMessage();
             $this->remote_error = $msg;
@@ -418,13 +500,11 @@ class WorkspacePhp extends Component
         $this->phpConfigEditorValidationOutput = null;
         $this->phpConfigEditorErrorLines = [];
         $this->remote_error = null;
-        $this->remote_output = __('Saving PHP config on the server…');
 
         if (! $this->serverOpsReady()) {
             $msg = __('Provisioning and SSH must be ready before editing PHP config.');
             $this->remote_error = $msg;
             $this->toastError($msg);
-            $this->remote_output = null;
 
             return;
         }
@@ -433,23 +513,57 @@ class WorkspacePhp extends Component
             $msg = __('Choose a PHP config target before saving.');
             $this->remote_error = $msg;
             $this->toastError($msg);
-            $this->remote_output = null;
+
+            return;
+        }
+
+        $version = $this->phpConfigEditorVersion;
+        $target = $this->phpConfigEditorTarget;
+        $content = $this->phpConfigEditorContent;
+        $summary = trim($this->phpConfigEditorSummary) !== '' ? trim($this->phpConfigEditorSummary) : null;
+
+        if (ServerPhpMutationLock::isHeld($this->server)) {
+            $msg = __('Another PHP action is already running for this server. Wait for it to finish.');
+            $this->remote_error = $msg;
+            $this->toastError($msg);
 
             return;
         }
 
         try {
-            $editor = app(ServerPhpConfigEditor::class);
-            $summary = trim($this->phpConfigEditorSummary) !== '' ? trim($this->phpConfigEditorSummary) : null;
-            $result = $editor->saveTarget(
+            $result = $this->runConsoleAction(
                 $this->server,
-                $this->phpConfigEditorVersion,
-                $this->phpConfigEditorTarget,
-                $this->phpConfigEditorContent,
-                auth()->user(),
-                $summary,
+                'php_save_config',
+                __('Save PHP :target for :version on :host', [
+                    'target' => $target,
+                    'version' => $version,
+                    'host' => $this->server->name,
+                ]),
+                function (ConsoleEmitter $emit) use ($version, $target, $content, $summary): array {
+                    $result = app(ServerPhpConfigEditor::class)->saveTarget(
+                        $this->server,
+                        $version,
+                        $target,
+                        $content,
+                        auth()->user(),
+                        $summary,
+                        function () use ($emit): void {
+                            $emit->step('php', 'Validating and saving config');
+                        },
+                    );
+                    $output = trim((string) ($result['output'] ?? $result['verification_output'] ?? ''));
+                    foreach (preg_split("/\r?\n/", $output) ?: [] as $line) {
+                        if ($line !== '') {
+                            $emit($line, ConsoleAction::LEVEL_INFO, 'php');
+                        }
+                    }
+                    $emit->success('php', (string) ($result['message'] ?? __('PHP config saved.')));
+
+                    return $result;
+                },
             );
 
+            $editor = app(ServerPhpConfigEditor::class);
             $this->phpConfigEditorOriginalContent = $this->phpConfigEditorContent;
             $this->phpConfigEditorSummary = '';
             $this->refreshRevisionState($editor);
@@ -457,13 +571,11 @@ class WorkspacePhp extends Component
             $this->toastSuccess($result['message'] ?? __('PHP config saved.'));
             $this->phpConfigEditorReloadGuidance = $result['reload_guidance'] ?? null;
             $this->phpConfigEditorValidationOutput = $result['verification_output'] ?? null;
-            $this->remote_output = $result['output'] ?? $this->phpConfigEditorValidationOutput ?? $this->remote_output;
         } catch (ServerPhpConfigValidationException $e) {
             $this->phpConfigEditorValidationOutput = $e->validationOutput();
             $this->phpConfigEditorErrorLines = $this->parseValidationErrorLines($e->validationOutput());
             $this->remote_error = $e->getMessage();
             $this->toastError($e->getMessage());
-            $this->remote_output = $e->validationOutput();
         } catch (\Throwable $e) {
             $msg = $e->getMessage();
             $this->remote_error = $msg;
@@ -505,8 +617,9 @@ class WorkspacePhp extends Component
 
     public function render(): View
     {
-        $this->server->refresh();
-
+        // No $this->server->refresh() here: route binding (first load) and Livewire's
+        // Eloquent synthesizer (subsequent requests) already provide a current row.
+        // Action handlers that mutate the server refresh it themselves.
         $phpData = app(ServerPhpManager::class)->workspaceData($this->server);
         $meta = is_array($this->server->meta) ? $this->server->meta : [];
         $refreshMeta = is_array($meta['php_inventory_refresh'] ?? null) ? $meta['php_inventory_refresh'] : [];
@@ -555,8 +668,8 @@ class WorkspacePhp extends Component
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, ConfigRevision>  $revisions
-     * @return array{0: ?string, 1: ?string}  [diff text, header label]
+     * @param  Collection<int, ConfigRevision>  $revisions
+     * @return array{0: ?string, 1: ?string} [diff text, header label]
      */
     protected function buildDiffForView(ServerPhpConfigEditor $editor, $revisions): array
     {

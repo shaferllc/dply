@@ -54,6 +54,7 @@ class DigitalOceanFunctionsArtifactBuilder
             isset($resolvedConfig['source_control_account_id']) && is_string($resolvedConfig['source_control_account_id'])
                 ? $resolvedConfig['source_control_account_id']
                 : null,
+            $site->gitRefKind(),
         );
         $this->progress->done($site, 'checkout', 'Cloned repository');
 
@@ -278,6 +279,48 @@ class DigitalOceanFunctionsArtifactBuilder
                 ]
             )))),
         ];
+    }
+
+    /**
+     * Delete built artifact zips for the site that aren't in $keepPaths — the
+     * retained rollback set (DO Functions keeps the last few in
+     * artifact_history; Lambda keeps only the latest). Called after a
+     * successful deploy so serverless-artifacts/<site> stops growing by one
+     * zip per deploy. Best-effort: returns the count removed, never throws.
+     *
+     * @param  list<string|null>  $keepPaths
+     */
+    public function pruneArtifactsExcept(Site $site, array $keepPaths): int
+    {
+        $dir = storage_path('app/serverless-artifacts/'.$site->id);
+        if (! File::isDirectory($dir)) {
+            return 0;
+        }
+
+        $keep = [];
+        foreach ($keepPaths as $path) {
+            if (! is_string($path) || $path === '') {
+                continue;
+            }
+            $keep[realpath($path) ?: $path] = true;
+        }
+
+        $removed = 0;
+        foreach (File::files($dir) as $file) {
+            $real = realpath($file->getPathname()) ?: $file->getPathname();
+            if (isset($keep[$real])) {
+                continue;
+            }
+
+            try {
+                File::delete($file->getPathname());
+                $removed++;
+            } catch (\Throwable) {
+                // best-effort — a stuck file shouldn't disturb the deploy
+            }
+        }
+
+        return $removed;
     }
 
     /**

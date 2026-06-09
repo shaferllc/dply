@@ -1,7 +1,15 @@
 @if (! $site->isLaravelFrameworkDetected())
-    <section class="space-y-6 rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm sm:p-8">
-        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Laravel') }}</h2>
-        <p class="text-sm text-brand-moss">{{ __('This section appears when your site is detected as a Laravel application from repository inspection.') }}</p>
+    <section class="dply-card overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <x-icon-badge>
+                <x-heroicon-o-cube-transparent class="h-5 w-5" aria-hidden="true" />
+            </x-icon-badge>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Laravel') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Laravel') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('This section appears when your site is detected as a Laravel application from repository inspection.') }}</p>
+            </div>
+        </div>
     </section>
 @else
     @include('livewire.sites.settings.partials.laravel.workspace')

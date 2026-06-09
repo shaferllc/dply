@@ -18,22 +18,28 @@ use App\Services\Servers\ServerCronSynchronizer;
 use App\Services\Servers\ServerCrontabReader;
 use App\Services\Servers\ServerPasswdUserLister;
 use App\Services\Servers\ServerRemovalAdvisor;
+use App\Support\Servers\CronWorkspaceViewData;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceCron extends Component
 {
+    use RendersWorkspacePlaceholder;
     use ConfirmsActionWithModal;
     use EmitsPanelEvent;
+    use WithPagination;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
 
@@ -122,22 +128,17 @@ class WorkspaceCron extends Component
 
     public string $cron_run_output = '';
 
-    public function mount(Server $server, ?Site $site = null): void
+    public function mount(Server $server): void
     {
-        if ($site !== null) {
-            abort_unless($site->server_id === $server->id, 404);
-            abort_unless($server->organization_id === auth()->user()->currentOrganization()?->id, 404);
-            Gate::authorize('view', $site);
-        }
-
         $this->bootWorkspace($server);
 
-        $resolvedSite = $site;
-        if ($resolvedSite === null) {
-            $qSite = request()->query('site');
-            if (is_string($qSite) && $qSite !== '') {
-                $resolvedSite = Site::query()->where('server_id', $server->id)->whereKey($qSite)->first();
-            }
+        // Cron is server-scoped; the dedicated site route was removed. The server
+        // page can still focus a single site via ?site= — links that used to point
+        // at the site Cron page now land here filtered to that site.
+        $resolvedSite = null;
+        $qSite = request()->query('site');
+        if (is_string($qSite) && $qSite !== '') {
+            $resolvedSite = Site::query()->where('server_id', $server->id)->whereKey($qSite)->first();
         }
 
         if ($resolvedSite !== null) {
@@ -190,6 +191,97 @@ class WorkspaceCron extends Component
         $this->new_cron_user = $site->effectiveSystemUser($this->server);
     }
 
+    /**
+     * Sets the Command field from a common-command preset (mostly Laravel artisan).
+     * Pure form-fill: it only touches {@see $new_cron_command} so the user can keep editing.
+     */
+    public function applyArtisanCommandPreset(string $key): void
+    {
+        $this->authorize('update', $this->server);
+
+        // Presets are grouped ($group => [['key'=>…, 'command'=>…], …]), so find
+        // the entry by its key across every group.
+        foreach ($this->artisanCommandPresets() as $items) {
+            foreach ($items as $item) {
+                if (($item['key'] ?? null) === $key) {
+                    $this->new_cron_command = $item['command'];
+
+                    return;
+                }
+            }
+        }
+    }
+
+    /**
+     * Prefix that runs an artisan command for the in-context site, fully resolved when we
+     * know the site path + PHP version (e.g. `php8.3 /home/dply/app/current/artisan`), or a
+     * clear editable template (`php /home/dply/<site>/artisan`) when no site is selected.
+     */
+    protected function artisanInvocationPrefix(): string
+    {
+        $site = $this->schedulerHelperTargetSite();
+
+        if ($site !== null && $site->isLaravelFrameworkDetected()) {
+            $version = $site->phpVersion();
+            $php = ($version !== null && $version !== '') ? 'php'.$version : 'php';
+            $artisan = rtrim($site->effectiveRepositoryPath(), '/').'/current/artisan';
+
+            return $php.' '.escapeshellarg($artisan);
+        }
+
+        return 'php /home/dply/<site>/current/artisan';
+    }
+
+    /**
+     * Common commands offered under the Command field. Primarily Laravel artisan tasks
+     * grouped into scheduler / queues / maintenance, plus a couple of generic entries.
+     * Each command is the full string written into {@see $new_cron_command}; artisan
+     * entries are prefixed by {@see artisanInvocationPrefix()} (resolved path + PHP binary
+     * when a Laravel site is in context, otherwise an editable template).
+     *
+     * @return array<string, array<int, array{key: string, label: string, command: string}>>
+     */
+    protected function artisanCommandPresets(): array
+    {
+        $artisan = $this->artisanInvocationPrefix();
+
+        $make = fn (string $key, string $label, string $args): array => [
+            'key' => $key,
+            'label' => $label,
+            'command' => $artisan.' '.$args,
+        ];
+
+        return [
+            __('Laravel scheduler') => [
+                $make('schedule_run', __('schedule:run (per-minute scheduler)'), 'schedule:run >> /dev/null 2>&1'),
+            ],
+            __('Queues') => [
+                $make('queue_work', __('queue:work --stop-when-empty'), 'queue:work --stop-when-empty'),
+                $make('queue_restart', __('queue:restart'), 'queue:restart'),
+                $make('horizon_snapshot', __('horizon:snapshot'), 'horizon:snapshot'),
+            ],
+            __('Maintenance') => [
+                $make('backup_run', __('backup:run'), 'backup:run'),
+                $make('model_prune', __('model:prune'), 'model:prune'),
+                $make('cache_prune_tags', __('cache:prune-stale-tags'), 'cache:prune-stale-tags'),
+                $make('sanctum_prune', __('sanctum:prune-expired'), 'sanctum:prune-expired --hours=24'),
+                $make('telescope_prune', __('telescope:prune'), 'telescope:prune --hours=48'),
+            ],
+            __('Generic') => [
+                [
+                    'key' => 'curl_health',
+                    'label' => __('curl health check (HTTP ping)'),
+                    'command' => 'curl -fsS -o /dev/null https://example.com/health',
+                ],
+                [
+                    'key' => 'shell_script',
+                    'label' => __('run a shell script'),
+                    'command' => '/home/dply/<site>/current/scripts/task.sh',
+                ],
+            ],
+        ];
+    }
+
     public function updatedFrequencyPreset(string $value): void
     {
         if ($value !== 'custom' && isset($this->presetExpressions[$value])) {
@@ -227,7 +319,7 @@ class WorkspaceCron extends Component
         $sshUser = trim((string) $this->server->ssh_user);
         $laravelHomeUser = ($sshUser === '' || $sshUser === 'root') ? 'deploy' : $sshUser;
 
-        return [
+        $presets = [
             'laravel_schedule' => [
                 'label' => __('Laravel — `schedule:run`'),
                 'cron_expression' => '* * * * *',
@@ -262,6 +354,13 @@ class WorkspaceCron extends Component
                 'user' => 'root',
             ],
         ];
+
+        $site = $this->schedulerHelperTargetSite();
+        if ($site === null || ! $site->isLaravelFrameworkDetected()) {
+            unset($presets['laravel_schedule']);
+        }
+
+        return $presets;
     }
 
     public function updatedNewCronExpression(): void
@@ -571,6 +670,7 @@ class WorkspaceCron extends Component
                 $expr = trim((string) ($entry['cron_expression'] ?? ''));
                 if ($cmd === '' || $expr === '') {
                     $allApplied = false;
+
                     continue;
                 }
                 $user = trim((string) ($entry['user'] ?? '')) ?: $defaultSshUser;
@@ -1020,9 +1120,20 @@ class WorkspaceCron extends Component
             ->all();
     }
 
+    public function updatedInspectCrontabUser(): void
+    {
+        // Auto-reload the crontab when the operator picks a different user from
+        // the dropdown — no separate Reload click needed.
+        if (trim($this->inspect_crontab_user) !== '') {
+            $this->loadInspectCrontab(app(ServerCrontabReader::class));
+        }
+    }
+
     public function loadInspectCrontab(ServerCrontabReader $reader): void
     {
-        $this->authorize('update', $this->server);
+        // Read-only (crontab -l) — mirrors the daemons/schedule read actions and
+        // lets the Inspect tab auto-load for view-only users without a 403.
+        $this->authorize('view', $this->server);
         $this->inspect_crontab_body = null;
         $this->inspect_crontab_exit_code = null;
 
@@ -1389,39 +1500,7 @@ class WorkspaceCron extends Component
 
     public function render(): View
     {
-        $this->server->loadMissing(['cronJobs.site.domains', 'sites', 'organization.cronJobTemplates']);
-
-        $jobsQuery = ServerCronJob::query()
-            ->where('server_id', $this->server->id)
-            ->with(['dependsOn', 'site.domains']);
-
-        if (trim($this->cron_job_search) !== '') {
-            $term = '%'.trim($this->cron_job_search).'%';
-            $jobsQuery->where(function ($q) use ($term): void {
-                $q->where('command', 'like', $term)
-                    ->orWhere('description', 'like', $term);
-            });
-        }
-
-        if ($this->context_site_id !== null && $this->cron_list_scope === 'site') {
-            $jobsQuery->where('site_id', $this->context_site_id);
-        }
-
-        $filteredCronJobs = $jobsQuery
-            ->orderBy('description')
-            ->orderBy('id')
-            ->get();
-
-        $contextSiteModel = $this->context_site_id !== null
-            ? Site::query()->where('server_id', $this->server->id)->whereKey($this->context_site_id)->first()
-            : null;
-
-        $recentCronRuns = ServerCronJobRun::query()
-            ->whereHas('cronJob', fn ($q) => $q->where('server_id', $this->server->id))
-            ->with(['cronJob'])
-            ->orderByDesc('started_at')
-            ->limit(100)
-            ->get();
+        $this->server->loadMissing(['organization', 'cronJobs']);
 
         $org = $this->server->organization;
         $canUpdateOrg = $org !== null && auth()->user()?->can('update', $org);
@@ -1431,39 +1510,107 @@ class WorkspaceCron extends Component
             $this->cron_workspace_tab = 'jobs';
         }
 
-        // Always compute the invalid-expressions list so the operator sees the
-        // problem before they try to sync — the warning banner above the cron
-        // table renders from this regardless of whether they've clicked Sync.
-        $invalidExpressionJobs = app(ServerCronSynchronizer::class)
-            ->invalidExpressions($filteredCronJobs);
+        $tab = $this->cron_workspace_tab;
+        $needsJobs = $tab === 'jobs';
+        $needsHistory = $tab === 'history';
+        $needsInspect = $tab === 'inspect';
+        $needsTemplates = $tab === 'templates';
+        $needsJobsModal = $needsJobs || $this->editing_job_id !== null;
+        $opsReady = $this->server->isReady() && $this->server->ssh_private_key;
 
-        return view('livewire.servers.workspace-cron', [
-            'contextSiteModel' => $contextSiteModel,
-            'invalidExpressionJobs' => $invalidExpressionJobs,
-            'deletionSummary' => $this->showRemoveServerModal
-                ? ServerRemovalAdvisor::summary($this->server)
-                : null,
-            'viewingLogJob' => $this->viewing_logs_job_id
-                ? ServerCronJob::query()
-                    ->where('server_id', $this->server->id)
-                    ->find($this->viewing_logs_job_id)
-                : null,
-            'commandInstallPresets' => $this->commandInstallPresets(),
-            'bundledCronJobs' => $this->bundledCronJobsForView(),
-            'crontabInspectUserChoices' => $this->crontabInspectUserChoices(),
-            'runAsUserDatalistChoices' => $this->runAsUserDatalistChoices(),
-            'cronRunEchoSubscribable' => $this->cronRunEchoSubscribable(),
-            'filteredCronJobs' => $filteredCronJobs,
-            'recentCronRuns' => $recentCronRuns,
-            'canUpdateOrg' => $canUpdateOrg,
-            'orgCronTemplates' => $org?->cronJobTemplates ?? collect(),
-            'dependsJobChoices' => ServerCronJob::query()
+        if ($needsJobs) {
+            $this->server->loadMissing(['cronJobs.site.domains', 'sites']);
+        }
+
+        if ($needsTemplates) {
+            $this->server->loadMissing(['organization.cronJobTemplates']);
+        }
+
+        $contextSiteModel = $this->context_site_id !== null
+            ? Site::query()->where('server_id', $this->server->id)->whereKey($this->context_site_id)->first()
+            : null;
+
+        $filteredCronJobs = collect();
+        $invalidExpressionJobs = [];
+
+        if ($needsJobs) {
+            $jobsQuery = ServerCronJob::query()
                 ->where('server_id', $this->server->id)
-                ->when($this->editing_job_id, fn ($q) => $q->whereKeyNot($this->editing_job_id))
+                ->with(['dependsOn', 'site.domains']);
+
+            if (trim($this->cron_job_search) !== '') {
+                $term = '%'.trim($this->cron_job_search).'%';
+                $jobsQuery->where(function ($q) use ($term): void {
+                    $q->where('command', 'like', $term)
+                        ->orWhere('description', 'like', $term);
+                });
+            }
+
+            if ($this->context_site_id !== null && $this->cron_list_scope === 'site') {
+                $jobsQuery->where('site_id', $this->context_site_id);
+            }
+
+            $filteredCronJobs = $jobsQuery
                 ->orderBy('description')
-                ->get(),
-            'schedulerSiteIsLaravel' => $this->schedulerHelperTargetSite()?->isLaravelFrameworkDetected() ?? false,
-        ]);
+                ->orderBy('id')
+                ->get();
+
+            $invalidExpressionJobs = app(ServerCronSynchronizer::class)
+                ->invalidExpressions($filteredCronJobs);
+        }
+
+        $recentCronRuns = $needsHistory
+            ? ServerCronJobRun::query()
+                ->whereHas('cronJob', fn ($q) => $q->where('server_id', $this->server->id))
+                ->with(['cronJob'])
+                ->orderByDesc('started_at')
+                ->paginate(25)
+            : collect();
+
+        $runAsUserDatalistChoices = ($needsJobs || $needsInspect)
+            ? $this->runAsUserDatalistChoices()
+            : [];
+
+        return view('livewire.servers.workspace-cron', array_merge(
+            CronWorkspaceViewData::for(
+                $this->server,
+                $this,
+                includeBannerContext: $opsReady,
+                includeSummaryContext: $opsReady,
+            ),
+            [
+                'contextSiteModel' => $contextSiteModel,
+                'invalidExpressionJobs' => $invalidExpressionJobs,
+                'deletionSummary' => $this->showRemoveServerModal
+                    ? ServerRemovalAdvisor::summary($this->server)
+                    : null,
+                'viewingLogJob' => $this->viewing_logs_job_id
+                    ? ServerCronJob::query()
+                        ->where('server_id', $this->server->id)
+                        ->find($this->viewing_logs_job_id)
+                    : null,
+                'commandInstallPresets' => $needsJobsModal ? $this->commandInstallPresets() : [],
+                'artisanCommandPresets' => $needsJobsModal ? $this->artisanCommandPresets() : [],
+                'bundledCronJobs' => $needsTemplates ? $this->bundledCronJobsForView() : [],
+                'crontabInspectUserChoices' => $needsInspect ? $this->crontabInspectUserChoices() : [],
+                'runAsUserDatalistChoices' => $runAsUserDatalistChoices,
+                'cronRunEchoSubscribable' => $opsReady ? $this->cronRunEchoSubscribable() : false,
+                'filteredCronJobs' => $filteredCronJobs,
+                'recentCronRuns' => $recentCronRuns,
+                'canUpdateOrg' => $canUpdateOrg,
+                'orgCronTemplates' => $needsTemplates ? ($org?->cronJobTemplates ?? collect()) : collect(),
+                'dependsJobChoices' => $needsJobsModal
+                    ? ServerCronJob::query()
+                        ->where('server_id', $this->server->id)
+                        ->when($this->editing_job_id, fn ($q) => $q->whereKeyNot($this->editing_job_id))
+                        ->orderBy('description')
+                        ->get()
+                    : collect(),
+                'schedulerSiteIsLaravel' => $needsJobsModal
+                    ? ($this->schedulerHelperTargetSite()?->isLaravelFrameworkDetected() ?? false)
+                    : false,
+            ],
+        ));
     }
 
     protected function schedulerHelperTargetSite(): ?Site

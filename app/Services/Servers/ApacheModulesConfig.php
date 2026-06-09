@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\SshConnection;
@@ -71,7 +72,7 @@ BASH;
             return ['modules' => [], 'unreadable' => true];
         }
 
-        [$availableBlob, $enabledBlob] = array_pad(explode("---ENABLED---", $output, 2), 2, '');
+        [$availableBlob, $enabledBlob] = array_pad(explode('---ENABLED---', $output, 2), 2, '');
         $available = $this->splitNames($availableBlob);
         $enabled = array_flip($this->splitNames($enabledBlob));
 
@@ -116,7 +117,7 @@ BASH;
         foreach (preg_split('/\R/', trim($stripped)) ?: [] as $line) {
             $line = trim($line);
             if ($line !== '') {
-                $emit($line, $exit !== 0 ? \App\Models\ConsoleAction::LEVEL_WARN : \App\Models\ConsoleAction::LEVEL_INFO);
+                $emit($line, $exit !== 0 ? ConsoleAction::LEVEL_WARN : ConsoleAction::LEVEL_INFO);
             }
         }
         if ($exit !== 0) {
@@ -132,7 +133,7 @@ BASH;
         foreach (preg_split('/\R/', trim($vstripped)) ?: [] as $line) {
             $line = trim($line);
             if ($line !== '') {
-                $emit($line, $vexit !== 0 ? \App\Models\ConsoleAction::LEVEL_WARN : \App\Models\ConsoleAction::LEVEL_INFO);
+                $emit($line, $vexit !== 0 ? ConsoleAction::LEVEL_WARN : ConsoleAction::LEVEL_INFO);
             }
         }
         $isInvalid = $vexit !== 0 || (stripos($vstripped, 'syntax error') !== false && stripos($vstripped, 'syntax ok') === false);
@@ -188,8 +189,11 @@ BASH;
         if (str_starts_with($name, 'proxy') || str_starts_with($name, 'lbmethod')) {
             return 'proxy';
         }
-        if (str_starts_with($name, 'cache') || str_contains($name, 'compress') || str_contains($name, 'deflate') || str_contains($name, 'brotli')) {
+        if (str_starts_with($name, 'cache') || str_contains($name, 'compress') || str_contains($name, 'deflate') || str_contains($name, 'brotli') || str_contains($name, 'expires')) {
             return 'perf';
+        }
+        if (str_contains($name, 'security') || str_contains($name, 'evasive') || str_contains($name, 'ratelimit')) {
+            return 'security';
         }
         if (str_starts_with($name, 'log') || str_contains($name, 'status')) {
             return 'observability';

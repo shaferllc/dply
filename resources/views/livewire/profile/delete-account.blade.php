@@ -3,7 +3,7 @@
 
     <x-breadcrumb-trail :items="[
         ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-        ['label' => __('Profile'), 'href' => route('profile.edit'), 'icon' => 'user-circle'],
+        ['label' => __('Profile'), 'href' => route('settings.profile'), 'icon' => 'user-circle'],
         ['label' => __('Delete account'), 'icon' => 'trash'],
     ]" />
 
@@ -57,7 +57,7 @@
                             </span>
                         </x-danger-button>
                         <a
-                            href="{{ route('profile.edit') }}"
+                            href="{{ route('settings.profile') }}"
                             wire:navigate
                             class="text-sm font-medium text-brand-moss hover:text-brand-ink"
                         >{{ __('Cancel') }}</a>

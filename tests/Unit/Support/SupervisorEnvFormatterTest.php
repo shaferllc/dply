@@ -2,26 +2,19 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Support;
+namespace Tests\Unit\Support\SupervisorEnvFormatterTest;
 
 use App\Support\SupervisorEnvFormatter;
-use Tests\TestCase;
 
-class SupervisorEnvFormatterTest extends TestCase
-{
-    public function test_parse_lines_handles_comments_and_blanks(): void
-    {
-        $raw = "# c\nAPP_ENV=production\n\nFOO=bar baz\n";
-        $this->assertSame([
-            'APP_ENV' => 'production',
-            'FOO' => 'bar baz',
-        ], SupervisorEnvFormatter::parseLines($raw));
-    }
-
-    public function test_to_ini_fragment_escapes_quotes(): void
-    {
-        $s = SupervisorEnvFormatter::toIniFragment(['X' => 'say "hi"']);
-        $this->assertStringContainsString('environment=', $s);
-        $this->assertStringContainsString('say \\"hi\\"', $s);
-    }
-}
+test('parse lines handles comments and blanks', function () {
+    $raw = "# c\nAPP_ENV=production\n\nFOO=bar baz\n";
+    expect(SupervisorEnvFormatter::parseLines($raw))->toBe([
+        'APP_ENV' => 'production',
+        'FOO' => 'bar baz',
+    ]);
+});
+test('to ini fragment escapes quotes', function () {
+    $s = SupervisorEnvFormatter::toIniFragment(['X' => 'say "hi"']);
+    $this->assertStringContainsString('environment=', $s);
+    $this->assertStringContainsString('say \\"hi\\"', $s);
+});

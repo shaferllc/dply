@@ -7,28 +7,100 @@
     'saveDisabled' => false,
     'saveLabel' => null,
     'discardLabel' => null,
+    /**
+     * Livewire bool property (e.g. pipeline_form_edits_pending) for modal / conditional forms.
+     * Uses Alpine x-bind alongside wire:dirty so the bar is not hidden when only the modal is dirty.
+     */
+    'formPendingWire' => null,
+    /**
+     * Track dirtiness fully client-side by diffing the targeted wire:model inputs
+     * against their last-saved DOM values. Far more reliable than wire:dirty for
+     * deferred checkboxes / selects (wire:dirty does not surface those here).
+     * Requires `targets`; ORs in `formPendingWire` when set.
+     */
+    'clientDirty' => false,
 ])
 
 @php
     $saveLabel = $saveLabel ?? __('Save');
     $discardLabel = $discardLabel ?? __('Discard');
+    $useClientDirty = $clientDirty && filled($targets);
+    $targetList = filled($targets)
+        ? array_values(array_filter(array_map('trim', explode(',', (string) $targets))))
+        : [];
 @endphp
 
 {{--
-    Outer node: keep `hidden` + wire:dirty.remove.class until dirty (avoids FOUC). Do not use flex/display
-    utilities here—they fight Livewire dirty CSS. Prefer leaf paths in `targets` so JSON.stringify compares
-    primitives; whole nested objects vs Alpine proxies often read “dirty” on first paint.
+    Default `hidden` keeps the bar off until something is dirty.
+
+    Two ways to flip it visible:
+      • clientDirty: a SELF-CONTAINED inline Alpine tracker (config read from the
+        data-* attributes below) diffs the targeted wire:model inputs against
+        their last-saved values — reliable for deferred checkboxes/selects, which
+        wire:dirty does not catch on this page. Inline x-data avoids any
+        alpine:init registration-ordering race.
+      • otherwise: Livewire wire:dirty.class for field edits + Alpine for modal
+        forms (formPendingWire), each owning a SEPARATE show class so they never
+        clobber one another.
+
+    z-[110] sits above app modals (z-[100]) so the bar stays visible while editing in a modal.
 --}}
 <div
     {{ $attributes->class([
+        'dply-unsaved-bar',
         'hidden',
-        'pointer-events-auto fixed left-1/2 z-40 w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 rounded-2xl border border-brand-mist/80 bg-white shadow-lg shadow-brand-forest/10',
+        'pointer-events-auto fixed left-1/2 z-[110] w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 rounded-2xl border border-brand-mist/80 bg-white shadow-lg shadow-brand-forest/10',
         'bottom-24 sm:bottom-28',
     ]) }}
-    @if (filled($targets))
-        wire:target="{{ $targets }}"
+    @if ($useClientDirty)
+        {{-- Plain comma-separated list (field names are safe identifiers). NOT
+             @json — Blade's @json hex-escapes quotes, which silently breaks
+             JSON.parse and leaves the tracker watching nothing. --}}
+        data-unsaved-targets="{{ implode(',', $targetList) }}"
+        @if (filled($formPendingWire)) data-unsaved-pending-prop="{{ $formPendingWire }}" @endif
+        {{-- Dead-simple, can't-miss tracker: ANY input/change on a watched
+             wire:model field flips `dirty`. Listens on `document` (capture) so
+             root resolution is never a factor; resets after a Livewire commit
+             (save/discard re-render). x-effect toggles the built `…-visible`
+             class (display:block !important) over the base `hidden`. --}}
+        x-data="{
+            targets: '{{ implode(',', $targetList) }}'.split(',').filter(Boolean),
+            pendingProp: '{{ $formPendingWire }}',
+            dirty: false,
+            init() {
+                document.addEventListener('input', (e) => this.mark(e), true);
+                document.addEventListener('change', (e) => this.mark(e), true);
+                if (window.Livewire) {
+                    window.Livewire.hook('commit', ({ succeed }) => { succeed(() => { this.dirty = false; }); });
+                }
+            },
+            modelName(el) {
+                if (! el || ! el.attributes) { return null; }
+                for (let i = 0; i < el.attributes.length; i++) {
+                    let a = el.attributes[i];
+                    if (a.name === 'wire:model' || a.name.indexOf('wire:model.') === 0) { return a.value; }
+                }
+                return null;
+            },
+            mark(e) {
+                let n = this.modelName(e.target);
+                if (n && this.targets.includes(n)) { this.dirty = true; }
+            }
+        }"
+        x-effect="$el.classList.toggle('dply-unsaved-bar-visible', dirty || (pendingProp ? !! $wire[pendingProp] : false))"
+    @else
+        @if (filled($targets))
+            wire:target="{{ $targets }}"
+            wire:dirty.class="dply-unsaved-bar-visible"
+        @endif
+        @if (filled($formPendingWire))
+            {{-- Alpine drives its OWN show class (…-pending) so its object binding
+                 never clobbers the wire:dirty.class (…-visible) that field/checkbox
+                 edits set — both classes independently un-hide the bar. --}}
+            x-data
+            x-bind:class="{ 'dply-unsaved-bar-pending': $wire.{{ $formPendingWire }} }"
+        @endif
     @endif
-    wire:dirty.remove.class="hidden"
     role="region"
     aria-label="{{ __('Unsaved changes') }}"
 >

@@ -85,11 +85,19 @@ class PersonalSshKeyModal extends Component
             return;
         }
 
-        Auth::user()->sshKeys()->create([
+        $key = Auth::user()->sshKeys()->create([
             'name' => trim($this->name),
             'public_key' => trim($this->public_key),
             'provision_on_new_servers' => $this->provision_on_new_servers,
         ]);
+
+        if ($org = Auth::user()->currentOrganization()) {
+            audit_log($org, Auth::user(), 'user.ssh_key_added', $key, null, [
+                'name' => $key->name,
+                'provision_on_new_servers' => (bool) $key->provision_on_new_servers,
+                'source' => $this->source,
+            ]);
+        }
 
         $message = $this->source === 'servers.create'
             ? __('SSH key saved. Preflight below updates automatically—you can continue here.')

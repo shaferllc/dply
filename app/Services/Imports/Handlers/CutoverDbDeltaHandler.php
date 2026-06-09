@@ -10,6 +10,7 @@ use App\Models\ImportSiteMigration;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
+use App\Services\Imports\SourceDriverFactory;
 use App\Services\Imports\SourceSshConnectionFactory;
 use App\Services\SshConnectionFactory;
 use RuntimeException;
@@ -50,7 +51,7 @@ class CutoverDbDeltaHandler extends SshDependentHandler
             throw new RuntimeException('Provider credential missing.');
         }
 
-        $driver = app(\App\Services\Imports\SourceDriverFactory::class)->for($credential);
+        $driver = app(SourceDriverFactory::class)->for($credential);
         $dbs = $driver->listSiteDatabases($migration->source_server_id, $child->source_site_id);
         if ($dbs === []) {
             $step->status = ImportMigrationStep::STATUS_SKIPPED;
@@ -85,8 +86,10 @@ class CutoverDbDeltaHandler extends SshDependentHandler
         $dplyDb = str_replace('-', '_', $site->slug);
         $dplyShell->putFile($dplyDumpPath, $dump);
 
+        // `; rm -f` (not `&& rm -f`) so a failed restore still clears the
+        // staged delta dump from /tmp; `( exit $rc )` keeps mysql's status.
         $restore = sprintf(
-            'mysql --defaults-extra-file=/root/.my.cnf %s < %s 2>&1 && rm -f %s',
+            'mysql --defaults-extra-file=/root/.my.cnf %s < %s 2>&1; __dply_rc=$?; rm -f %s; ( exit $__dply_rc )',
             escapeshellarg($dplyDb),
             escapeshellarg($dplyDumpPath),
             escapeshellarg($dplyDumpPath),

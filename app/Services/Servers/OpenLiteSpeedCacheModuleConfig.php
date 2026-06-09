@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
+use App\Models\ConsoleAction;
 use App\Models\Server;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\SshConnection;
 
 /**
@@ -111,6 +113,17 @@ class OpenLiteSpeedCacheModuleConfig
     ];
 
     /**
+     * @return array<string, string>
+     */
+    public static function defaultValues(): array
+    {
+        return array_map(
+            fn (array $meta): string => (string) $meta['default'],
+            self::PARAMS,
+        );
+    }
+
+    /**
      * Read the cache module block from the server. Returns a defaults-filled
      * array keyed by the PARAMS keys above. Missing directives use the
      * declared defaults so the UI always renders a populated form.
@@ -196,11 +209,12 @@ class OpenLiteSpeedCacheModuleConfig
      * banner instead of staring at a spinner.
      *
      * @param  array<string, string>  $values
+     *
      * @throws \RuntimeException when validate or reload fails
      */
-    public function save(Server $server, array $values, ?\App\Services\ConsoleActions\ConsoleEmitter $emitter = null): void
+    public function save(Server $server, array $values, ?ConsoleEmitter $emitter = null): void
     {
-        $emit = $emitter ?? new \App\Services\ConsoleActions\ConsoleEmitter(null);
+        $emit = $emitter ?? new ConsoleEmitter(null);
 
         $ssh = new SshConnection($server);
 
@@ -261,7 +275,7 @@ class OpenLiteSpeedCacheModuleConfig
             foreach (preg_split('/\R/', $validateOutput) ?: [] as $line) {
                 $line = trim($line);
                 if ($line !== '') {
-                    $emit($line, $exit !== 0 ? \App\Models\ConsoleAction::LEVEL_WARN : \App\Models\ConsoleAction::LEVEL_INFO);
+                    $emit($line, $exit !== 0 ? ConsoleAction::LEVEL_WARN : ConsoleAction::LEVEL_INFO);
                 }
             }
         }

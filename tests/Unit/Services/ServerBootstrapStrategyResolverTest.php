@@ -1,61 +1,50 @@
 <?php
 
-namespace Tests\Unit\Services;
+namespace Tests\Unit\Services\ServerBootstrapStrategyResolverTest;
 
 use App\Models\Server;
 use App\Services\Servers\Bootstrap\DockerHostBootstrapStrategy;
 use App\Services\Servers\Bootstrap\KubernetesClusterBootstrapStrategy;
 use App\Services\Servers\Bootstrap\ServerBootstrapStrategyResolver;
 use App\Services\Servers\Bootstrap\VmServerBootstrapStrategy;
-use PHPUnit\Framework\MockObject\MockObject;
-use Tests\TestCase;
 
-class ServerBootstrapStrategyResolverTest extends TestCase
+test('resolver returns vm strategy for vm hosts', function () {
+    $resolver = makeResolver();
+    $server = new Server(['meta' => ['host_kind' => Server::HOST_KIND_VM]]);
+
+    expect($resolver->for($server))->toBeInstanceOf(VmServerBootstrapStrategy::class);
+});
+
+test('resolver returns docker strategy for docker hosts', function () {
+    $resolver = makeResolver();
+    $server = new Server(['meta' => ['host_kind' => Server::HOST_KIND_DOCKER]]);
+
+    expect($resolver->for($server))->toBeInstanceOf(DockerHostBootstrapStrategy::class);
+});
+
+test('resolver returns kubernetes strategy for kubernetes hosts', function () {
+    $resolver = makeResolver();
+    $server = new Server(['meta' => ['host_kind' => Server::HOST_KIND_KUBERNETES]]);
+
+    expect($resolver->for($server))->toBeInstanceOf(KubernetesClusterBootstrapStrategy::class);
+});
+
+function makeResolver(): ServerBootstrapStrategyResolver
 {
-    public function test_resolver_returns_vm_strategy_for_vm_hosts(): void
-    {
-        $resolver = $this->makeResolver();
-        $server = new Server(['meta' => ['host_kind' => Server::HOST_KIND_VM]]);
+    $vm = \Mockery::mock(VmServerBootstrapStrategy::class);
+    $vm->shouldReceive('supports')->andReturnUsing(
+        fn (Server $server): bool => $server->isVmHost()
+    );
 
-        $this->assertInstanceOf(VmServerBootstrapStrategy::class, $resolver->for($server));
-    }
+    $docker = \Mockery::mock(DockerHostBootstrapStrategy::class);
+    $docker->shouldReceive('supports')->andReturnUsing(
+        fn (Server $server): bool => $server->isDockerHost()
+    );
 
-    public function test_resolver_returns_docker_strategy_for_docker_hosts(): void
-    {
-        $resolver = $this->makeResolver();
-        $server = new Server(['meta' => ['host_kind' => Server::HOST_KIND_DOCKER]]);
+    $kubernetes = \Mockery::mock(KubernetesClusterBootstrapStrategy::class);
+    $kubernetes->shouldReceive('supports')->andReturnUsing(
+        fn (Server $server): bool => $server->isKubernetesCluster()
+    );
 
-        $this->assertInstanceOf(DockerHostBootstrapStrategy::class, $resolver->for($server));
-    }
-
-    public function test_resolver_returns_kubernetes_strategy_for_kubernetes_hosts(): void
-    {
-        $resolver = $this->makeResolver();
-        $server = new Server(['meta' => ['host_kind' => Server::HOST_KIND_KUBERNETES]]);
-
-        $this->assertInstanceOf(KubernetesClusterBootstrapStrategy::class, $resolver->for($server));
-    }
-
-    private function makeResolver(): ServerBootstrapStrategyResolver
-    {
-        /** @var VmServerBootstrapStrategy&MockObject $vm */
-        $vm = $this->createMock(VmServerBootstrapStrategy::class);
-        $vm->method('supports')->willReturnCallback(
-            fn (Server $server): bool => $server->isVmHost()
-        );
-
-        /** @var DockerHostBootstrapStrategy&MockObject $docker */
-        $docker = $this->createMock(DockerHostBootstrapStrategy::class);
-        $docker->method('supports')->willReturnCallback(
-            fn (Server $server): bool => $server->isDockerHost()
-        );
-
-        /** @var KubernetesClusterBootstrapStrategy&MockObject $kubernetes */
-        $kubernetes = $this->createMock(KubernetesClusterBootstrapStrategy::class);
-        $kubernetes->method('supports')->willReturnCallback(
-            fn (Server $server): bool => $server->isKubernetesCluster()
-        );
-
-        return new ServerBootstrapStrategyResolver([$vm, $docker, $kubernetes]);
-    }
+    return new ServerBootstrapStrategyResolver([$vm, $docker, $kubernetes]);
 }

@@ -1,8 +1,3 @@
-@php
-    $btnPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50';
-    $btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors';
-@endphp
-
 <x-server-workspace-layout
     :server="$server"
     active="insights"
@@ -11,31 +6,47 @@
     :pageHeaderToolbar="true"
 >
     <x-slot name="headerActions">
-        <button type="button" wire:click="runChecksNow" wire:loading.attr="disabled" class="{{ $btnPrimary }}">
+        <x-primary-button size="sm" type="button" wire:click="runChecksNow" wire:loading.attr="disabled">
             <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0" wire:loading.class="animate-spin" wire:target="runChecksNow" aria-hidden="true" />
             <span wire:loading.remove wire:target="runChecksNow">{{ __('Refresh') }}</span>
             <span wire:loading wire:target="runChecksNow">{{ __('Queueing…') }}</span>
-        </button>
+        </x-primary-button>
     </x-slot>
 
     @include('livewire.servers.partials.workspace-flashes')
 
-    <x-explainer class="mb-4">
+    <x-explainer>
         <p>{{ __('Insights runs a battery of read-only health checks against the server (config sanity, package versions, log signals, resource pressure) and groups the findings into a prioritized list. Each finding may have an associated "Apply fix" action that dply can run for you over SSH.') }}</p>
         <p>{{ __('"Run checks now" re-runs the full battery on demand. Otherwise checks run on a slow background cadence so the page stays responsive — opening this tab uses the most recent cached results.') }}</p>
     </x-explainer>
 
     @if ($server->workspace)
-        <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-5 py-4 text-sm text-brand-ink">
-            <p class="font-semibold">{{ __('Project insight context') }}</p>
-            <p class="mt-1 leading-relaxed text-brand-moss">
-                {{ __('These findings are scoped to this server. For shared incident context, runbooks, and grouped notifications, use the linked project pages for the broader project view.') }}
-            </p>
-            <div class="mt-3 flex flex-wrap gap-3">
-                <a href="{{ route('projects.operations', $server->workspace) }}" wire:navigate class="text-sm font-medium text-brand-ink hover:text-brand-sage">{{ __('Open project operations') }}</a>
-                <a href="{{ route('projects.access', $server->workspace) }}" wire:navigate class="text-sm font-medium text-brand-ink hover:text-brand-sage">{{ __('Open project access') }}</a>
-            </div>
-        </div>
+        @feature('surface.projects')
+            <section class="dply-card overflow-hidden">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <x-icon-badge>
+                        <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Project') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Project insight context') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('These findings are scoped to this server. For shared incident context, runbooks, and grouped notifications, use the linked project pages for the broader project view.') }}</p>
+                    </div>
+                </div>
+                <div class="px-6 py-6 sm:px-7">
+                    <div class="flex flex-wrap gap-2">
+                        <a href="{{ route('projects.operations', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                            <x-heroicon-m-bolt class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Open project operations') }}
+                        </a>
+                        <a href="{{ route('projects.access', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
+                            <x-heroicon-m-shield-check class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Open project access') }}
+                        </a>
+                    </div>
+                </div>
+            </section>
+        @endfeature
     @endif
 
     {{-- Workspace console banner. Three banner sources share one slot — `run` (full
@@ -225,14 +236,27 @@
 
     @if ($tab === 'overview')
         <div class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 px-5 py-4">
-                <h2 class="text-sm font-semibold text-brand-ink">{{ __('Open findings') }}</h2>
-                <p class="mt-1 text-xs text-brand-moss">{{ __('Server-scoped open findings appear here. Site-specific items are on each site’s Insights page.') }}</p>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <x-icon-badge>
+                    <x-heroicon-o-list-bullet class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Findings') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Open findings') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Server-scoped open findings appear here. Site-specific items are on each site’s Insights page.') }}</p>
+                </div>
             </div>
             @if ($findings->isEmpty())
                 <div class="px-5 py-10 text-center">
                     <p class="text-sm font-medium text-brand-ink">{{ __('No open findings right now.') }}</p>
                     <p class="mt-2 text-sm text-brand-moss">{{ __('Run a refresh, wait for the scheduled job, or review settings if you expected a signal here.') }}</p>
+                    <div class="mt-4">
+                        <x-primary-button size="sm" type="button" wire:click="runChecksNow" wire:loading.attr="disabled" wire:target="runChecksNow">
+                            <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0" wire:loading.class="animate-spin" wire:target="runChecksNow" aria-hidden="true" />
+                            <span wire:loading.remove wire:target="runChecksNow">{{ __('Refresh') }}</span>
+                            <span wire:loading wire:target="runChecksNow">{{ __('Queueing…') }}</span>
+                        </x-primary-button>
+                    </div>
                     <div class="mt-4 inline-flex flex-wrap items-center justify-center gap-2 text-xs text-brand-mist">
                         <span class="rounded-full border border-brand-ink/10 bg-brand-sand/20 px-3 py-1.5">
                             {{ trans_choice('{1} :count enabled check|[2,*] :count enabled checks', $enabledChecks, ['count' => $enabledChecks]) }}
@@ -339,14 +363,14 @@
                                         <div class="mt-3">
                                             @if ($fixInFlight)
                                                 <span class="pointer-events-auto relative z-10 inline-flex items-center justify-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-amber-900">
-                                                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5 shrink-0 animate-spin" aria-hidden="true" />
+                                                    <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0 animate-spin" aria-hidden="true" />
                                                     {{ __('Fix queued…') }}
                                                 </span>
                                             @else
-                                                <button type="button" wire:click="openApplyFixModal({{ $f->id }})" class="pointer-events-auto relative z-10 {{ $btnSecondary }}">
-                                                    <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                <x-secondary-button size="sm" type="button" wire:click="openApplyFixModal({{ $f->id }})" class="pointer-events-auto relative z-10">
+                                                    <x-heroicon-o-wrench-screwdriver class="h-4 w-4 shrink-0" aria-hidden="true" />
                                                     {{ __('Apply fix') }}
-                                                </button>
+                                                </x-secondary-button>
                                             @endif
                                         </div>
                                     @endif
@@ -360,9 +384,15 @@
 
         @if ($suggestionFindings->isNotEmpty())
             <div class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 px-5 py-4">
-                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Recommendations') }}</h2>
-                    <p class="mt-1 text-xs text-brand-moss">{{ __('Tuning suggestions based on observed signals. Nothing is broken — these are opportunities to improve.') }}</p>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <x-icon-badge>
+                        <x-heroicon-o-light-bulb class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Suggestions') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recommendations') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Tuning suggestions based on observed signals. Nothing is broken — these are opportunities to improve.') }}</p>
+                    </div>
                 </div>
                 <ul class="divide-y divide-brand-ink/10">
                     @foreach ($suggestionFindings as $f)
@@ -394,15 +424,15 @@
                                         @include('livewire.partials.insight-correlation', ['finding' => $f])
                                         <div class="mt-3 flex flex-wrap gap-2">
                                             @if ($sCanFix)
-                                                <button type="button" wire:click="openApplyFixModal({{ $f->id }})" class="pointer-events-auto relative z-10 {{ $btnSecondary }}">
-                                                    <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                                <x-secondary-button size="sm" type="button" wire:click="openApplyFixModal({{ $f->id }})" class="pointer-events-auto relative z-10">
+                                                    <x-heroicon-o-wrench-screwdriver class="h-4 w-4 shrink-0" aria-hidden="true" />
                                                     {{ __('Apply fix') }}
-                                                </button>
+                                                </x-secondary-button>
                                             @endif
-                                            <button type="button" wire:click="ignoreFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="ignoreFinding({{ $f->id }})" class="pointer-events-auto relative z-10 {{ $btnSecondary }}">
-                                                <x-heroicon-o-eye-slash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            <x-secondary-button size="sm" type="button" wire:click="ignoreFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="ignoreFinding({{ $f->id }})" class="pointer-events-auto relative z-10">
+                                                <x-heroicon-o-eye-slash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                                 {{ __('Ignore') }}
-                                            </button>
+                                            </x-secondary-button>
                                         </div>
                                     </div>
                                 </div>
@@ -424,9 +454,15 @@
 
         @if ($recentlyAppliedFindings->isNotEmpty())
             <div class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 px-5 py-4">
-                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Recently applied fixes') }}</h2>
-                    <p class="mt-1 text-xs text-brand-moss">{{ __('Fixes Dply applied where an on-disk backup is still recorded. Revert reads the backup, validates the prior config, and reloads the affected service.') }}</p>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <x-icon-badge>
+                        <x-heroicon-o-arrow-uturn-left class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('History') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recently applied fixes') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Fixes Dply applied where an on-disk backup is still recorded. Revert reads the backup, validates the prior config, and reloads the affected service.') }}</p>
+                    </div>
                 </div>
                 <ul class="divide-y divide-brand-ink/10">
                     @foreach ($recentlyAppliedFindings as $f)
@@ -452,17 +488,18 @@
                                     {{ __('Backup') }}: <span class="font-mono">{{ $f->meta['backup_path'] }}</span>
                                 </p>
                             </div>
-                            <button
+                            <x-secondary-button
+                                size="sm"
                                 type="button"
                                 wire:click="revertFix({{ $f->id }})"
                                 wire:loading.attr="disabled"
                                 wire:target="revertFix({{ $f->id }})"
                                 wire:confirm="{{ __('Restore the previous configuration from backup and reload the affected service?') }}"
-                                class="{{ $btnSecondary }} shrink-0"
+                                class="shrink-0"
                             >
-                                <x-heroicon-o-arrow-uturn-left class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <x-heroicon-o-arrow-uturn-left class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Revert') }}
-                            </button>
+                            </x-secondary-button>
                         </li>
                     @endforeach
                 </ul>
@@ -473,9 +510,15 @@
     @if ($tab === 'dismissed')
         @if ($dismissedFindings->isNotEmpty())
             <div class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 px-5 py-4">
-                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Dismissed findings') }}</h2>
-                    <p class="mt-1 text-xs text-brand-moss">{{ __('Findings you acknowledged. Silenced from the banner and Overview. Restore one to bring it back to the open list.') }}</p>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <x-icon-badge>
+                        <x-heroicon-o-eye-slash class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Dismissed') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Dismissed findings') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Findings you acknowledged. Silenced from the banner and Overview. Restore one to bring it back to the open list.') }}</p>
+                    </div>
                 </div>
                 <ul class="divide-y divide-brand-ink/10">
                     @foreach ($dismissedFindings as $f)
@@ -528,9 +571,15 @@
 
         @if ($ignoredSuggestions->isNotEmpty())
             <div class="dply-card overflow-hidden">
-                <div class="border-b border-brand-ink/10 px-5 py-4">
-                    <h2 class="text-sm font-semibold text-brand-ink">{{ __('Ignored recommendations') }}</h2>
-                    <p class="mt-1 text-xs text-brand-moss">{{ __('Suggestions you dismissed. Restore one to bring it back into Recommendations on the next scheduled run.') }}</p>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <x-icon-badge>
+                        <x-heroicon-o-light-bulb class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Ignored') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Ignored recommendations') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Suggestions you dismissed. Restore one to bring it back into Recommendations on the next scheduled run.') }}</p>
+                    </div>
                 </div>
                 <ul class="divide-y divide-brand-ink/10">
                     @foreach ($ignoredSuggestions as $f)
@@ -545,9 +594,9 @@
                                     {{ $fmt($f->ignored_at) ?? '—' }}
                                 </p>
                             </div>
-                            <button type="button" wire:click="unignoreFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="unignoreFinding({{ $f->id }})" class="{{ $btnSecondary }} shrink-0">
+                            <x-secondary-button size="sm" type="button" wire:click="unignoreFinding({{ $f->id }})" wire:loading.attr="disabled" wire:target="unignoreFinding({{ $f->id }})" class="shrink-0">
                                 {{ __('Restore') }}
-                            </button>
+                            </x-secondary-button>
                         </li>
                     @endforeach
                 </ul>
@@ -566,29 +615,25 @@
     @endif
 
     @if ($tab === 'notifications')
-        <div class="rounded-2xl border border-brand-ink/10 bg-white shadow-sm p-6 space-y-3 text-sm text-brand-moss">
-            <p>{{ __('Subscribe to “Insights alerts” on this server from your notification channels. When new findings open (or a resolved issue recurs), subscribed channels receive a short message with a link back here.') }}</p>
-            <p>
-                <a href="{{ route('profile.notification-channels') }}" wire:navigate class="font-medium text-brand-forest underline">{{ __('Manage notification channels') }}</a>
-                ·
-                <a href="{{ route('profile.notification-channels.bulk-assign') }}" wire:navigate class="font-medium text-brand-forest underline">{{ __('Bulk-assign event types') }}</a>
-            </p>
-            <p class="text-xs text-brand-mist">{{ __('Event key: server.insights_alerts') }}</p>
-        </div>
+        @include('livewire.servers.partials.insights._tab-notifications')
     @endif
 
     @if ($tab === 'settings')
         @include('livewire.partials.insights-settings-form', ['catalog' => $insightsCatalog, 'orgHasPro' => $orgHasPro])
         <div class="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-brand-ink/10">
             <div class="flex flex-wrap gap-2">
-                <button type="button" wire:click="enableAll" class="{{ $btnSecondary }}">{{ __('Enable all') }}</button>
-                <button type="button" wire:click="disableAll" class="{{ $btnSecondary }}">{{ __('Disable all') }}</button>
+                <x-secondary-button size="sm" type="button" wire:click="enableAll">{{ __('Enable all') }}</x-secondary-button>
+                <x-secondary-button size="sm" type="button" wire:click="disableAll">{{ __('Disable all') }}</x-secondary-button>
             </div>
-            <button type="button" wire:click="saveSettings" class="{{ $btnPrimary }}">{{ __('Save settings') }}</button>
+            <x-primary-button size="sm" type="button" wire:click="saveSettings">{{ __('Save settings') }}</x-primary-button>
         </div>
     @endif
 
     <x-slot name="modals">
+        {{-- Reusable inline channel-create modal (CreatesNotificationChannelInline trait),
+             shared with the Notifications tab so an operator can add a channel without
+             leaving the page; the new channel is auto-selected on success. --}}
+        @include('livewire.partials.create-notification-channel-modal')
         @php($detail = $this->selectedFindingDetail)
         @if ($detailFindingId !== null && $detail)
             @php($a = $detail['actions'])

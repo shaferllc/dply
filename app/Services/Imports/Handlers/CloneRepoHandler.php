@@ -63,13 +63,28 @@ class CloneRepoHandler extends SshDependentHandler
             return;
         }
 
-        $clone = sprintf(
-            'sudo -u %s git clone --branch %s --single-branch %s %s 2>&1',
-            escapeshellarg($sshUser),
-            escapeshellarg($branch),
-            escapeshellarg($repoUrl),
-            escapeshellarg($siteRoot),
-        );
+        if ($site->gitRefKind() === 'commit') {
+            // SHAs require full history; clone then checkout detached.
+            $clone = sprintf(
+                'sudo -u %s sh -c %s 2>&1',
+                escapeshellarg($sshUser),
+                escapeshellarg(sprintf(
+                    'git clone %s %s && git -C %s checkout %s',
+                    escapeshellarg($repoUrl),
+                    escapeshellarg($siteRoot),
+                    escapeshellarg($siteRoot),
+                    escapeshellarg($branch),
+                )),
+            );
+        } else {
+            $clone = sprintf(
+                'sudo -u %s git clone --branch %s --single-branch %s %s 2>&1',
+                escapeshellarg($sshUser),
+                escapeshellarg($branch),
+                escapeshellarg($repoUrl),
+                escapeshellarg($siteRoot),
+            );
+        }
         $output = $shell->exec($clone, timeoutSeconds: 600);
 
         // Verify success — git clone exits non-zero on failure; phpseclib's exec
@@ -77,7 +92,7 @@ class CloneRepoHandler extends SshDependentHandler
         $verify = $shell->exec('sudo -u '.escapeshellarg($sshUser).' git -C '.escapeshellarg($siteRoot).' rev-parse HEAD 2>&1');
         $head = trim($verify);
         if (! preg_match('/^[0-9a-f]{40}$/', $head)) {
-            throw new RuntimeException("git clone failed: ".mb_substr($output, 0, 1000));
+            throw new RuntimeException('git clone failed: '.mb_substr($output, 0, 1000));
         }
 
         $step->result_data = [

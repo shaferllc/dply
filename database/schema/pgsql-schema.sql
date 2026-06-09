@@ -862,7 +862,7 @@ CREATE TABLE public.organizations (
     services_preferences json,
     database_workspace_settings json,
     email_server_credentials_enabled boolean DEFAULT false NOT NULL,
-    email_database_credentials_enabled boolean DEFAULT false NOT NULL
+    email_database_credentials_enabled boolean DEFAULT true NOT NULL
 );
 
 
@@ -2430,7 +2430,7 @@ CREATE TABLE public.sites (
     ssl_installed_at timestamp(0) without time zone,
     last_deploy_at timestamp(0) without time zone,
     git_repository_url character varying(255),
-    git_branch character varying(255) DEFAULT 'main'::character varying NOT NULL,
+    git_branch character varying(255) DEFAULT 'main'::character varying,
     git_deploy_key_private text,
     git_deploy_key_public text,
     webhook_secret text,

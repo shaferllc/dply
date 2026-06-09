@@ -14,23 +14,34 @@
     $sidebarAvatarStyle = "background-image: linear-gradient(135deg, hsl({$sidebarHueA}deg 65% 56%) 0%, hsl({$sidebarHueB}deg 65% 42%) 100%);";
 @endphp
 
-<aside class="lg:col-span-3 mb-8 lg:mb-0"
+<aside class="sm:col-span-3 mb-8 lg:mb-0"
     x-data="{
         copiedUrl: false,
     }"
 >
     <div class="{{ $card }}">
         <div class="border-b border-brand-ink/10 p-4 sm:p-5">
+            <a href="{{ route('servers.sites', $server) }}" wire:navigate
+                class="-ms-1 mb-3 inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium text-brand-moss transition-colors hover:bg-brand-sand/50 hover:text-brand-ink">
+                <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" aria-hidden="true" />
+                {{ __('Back to sites') }}
+            </a>
             <div class="flex items-start gap-3">
-                <span class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white font-semibold text-base shadow-sm ring-1 ring-brand-ink/10" style="{{ $sidebarAvatarStyle }}">
-                    {{ $sidebarInitials }}
-                </span>
+                @if ($site->logoUrl())
+                    <img src="{{ $site->logoUrl() }}" alt="{{ $site->name }}" class="h-12 w-12 shrink-0 rounded-2xl object-cover bg-white shadow-sm ring-1 ring-brand-ink/10" />
+                @else
+                    <span class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white font-semibold text-base shadow-sm ring-1 ring-brand-ink/10" style="{{ $sidebarAvatarStyle }}">
+                        {{ $sidebarInitials }}
+                    </span>
+                @endif
                 <div class="min-w-0 flex-1">
                     <p class="truncate text-base font-semibold text-brand-ink">{{ $sidebarPrimaryHostname }}</p>
                     @if ($server->workspace)
-                        <p class="mt-0.5 truncate text-xs text-brand-moss">
-                            <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:text-brand-sage">{{ $server->workspace->name }}</a>
-                        </p>
+                        @feature('surface.projects')
+                            <p class="mt-0.5 truncate text-xs text-brand-moss">
+                                <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:text-brand-sage">{{ $server->workspace->name }}</a>
+                            </p>
+                        @endfeature
                     @endif
                 </div>
             </div>
@@ -48,7 +59,7 @@
                         title="{{ __('Copy URL') }}"
                         @click="navigator.clipboard.writeText(@js($sidebarDisplayUrl)); copiedUrl = true; setTimeout(() => copiedUrl = false, 2000)"
                     >
-                        <x-heroicon-o-clipboard class="h-3.5 w-3.5" />
+                        <x-heroicon-o-clipboard class="h-4 w-4" />
                     </button>
                     @if ($sidebarVisitUrl)
                         <a
@@ -58,7 +69,7 @@
                             title="{{ __('Open site') }}"
                             class="rounded-md p-1 text-brand-mist hover:bg-brand-sand/50 hover:text-brand-ink"
                         >
-                            <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5" />
+                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" />
                         </a>
                     @endif
                     <span x-show="copiedUrl" x-cloak class="text-[10px] font-medium text-brand-forest">{{ __('Copied') }}</span>
@@ -93,10 +104,15 @@
                     @php
                         $isChild = ! empty($item['parent'] ?? null);
                         if (! empty($item['route'] ?? null)) {
-                            $routeArgs = ($item['route_params'] ?? null) === 'server_only'
-                                ? ['server' => $server]
-                                : ['server' => $server, 'site' => $site];
-                            $href = route($item['route'], $routeArgs);
+                            $routeArgs = match ($item['route_params'] ?? null) {
+                                'server_only' => ['server' => $server],
+                                // server-level route, but carry the site as a query
+                                // param so the target can render in site context.
+                                'server_with_site' => ['server' => $server, 'site' => $site->id],
+                                'organization' => ['organization' => $site->organization_id ?? auth()->user()?->currentOrganization()?->id],
+                                default => ['server' => $server, 'site' => $site],
+                            };
+                            $href = route($item['route'], $routeArgs + ($item['route_query'] ?? []));
                         } else {
                             $href = route('sites.show', array_merge([
                                 'server' => $server,
@@ -110,7 +126,10 @@
                         wire:navigate
                         @class([
                             $navLink,
-                            'pl-9' => $isChild,
+                            // Children indent as a whole pill (margin, not padding) so the
+                            // active highlight hugs the content instead of leaving a wide
+                            // empty gutter on the left.
+                            'ms-4 !w-auto' => $isChild,
                             'bg-brand-sand/60 text-brand-ink' => $section === $item['id'],
                             'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $section !== $item['id'],
                         ])
@@ -121,6 +140,19 @@
                             <x-dynamic-component :component="$item['icon']" class="h-5 w-5 shrink-0 opacity-90" />
                         @endif
                         <span class="flex-1 truncate">{{ $item['label'] }}</span>
+                        {{-- Only show the open-error count when Errors is actually
+                             live — not while it's a "Soon" (preview_only) item. --}}
+                        @if ($item['id'] === 'errors' && empty($item['preview_only']))
+                            @php $openErrorCount = \App\Models\ErrorEvent::undismissedCountForSite((string) $site->id); @endphp
+                            @if ($openErrorCount > 0)
+                                <span class="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">{{ $openErrorCount > 99 ? '99+' : $openErrorCount }}</span>
+                            @endif
+                        @endif
+                        @if (! empty($item['preview_only']))
+                            <span class="shrink-0 rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-moss">
+                                {{ __('Soon') }}
+                            </span>
+                        @endif
                         @if (! empty($item['needs_setup']))
                             <span
                                 class="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
@@ -134,14 +166,25 @@
             @endforeach
         </nav>
         <div class="border-t border-brand-ink/10 p-3">
-            <a
-                href="{{ route('servers.sites', $server) }}"
-                wire:navigate
-                class="flex items-center gap-2 text-xs font-medium text-brand-moss hover:text-brand-ink"
-            >
-                <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" />
-                {{ __('Back to :resources', ['resources' => $resourcePlural]) }}
-            </a>
+            @if ($site->usesEdgeRuntime())
+                <a
+                    href="{{ route('edge.index') }}"
+                    wire:navigate
+                    class="flex items-center gap-2 text-xs font-medium text-brand-moss hover:text-brand-ink"
+                >
+                    <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" />
+                    {{ __('Back to Edge sites') }}
+                </a>
+            @else
+                <a
+                    href="{{ route('servers.sites', $server) }}"
+                    wire:navigate
+                    class="flex items-center gap-2 text-xs font-medium text-brand-moss hover:text-brand-ink"
+                >
+                    <x-heroicon-o-arrow-left class="h-4 w-4 shrink-0" />
+                    {{ __('Back to :resources', ['resources' => $resourcePlural]) }}
+                </a>
+            @endif
         </div>
     </div>
 </aside>

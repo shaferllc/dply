@@ -4,9 +4,13 @@ namespace App\Livewire\Sites;
 
 use App\Enums\SiteType;
 use App\Jobs\ProvisionCustomSiteJob;
+use App\Livewire\Concerns\EnforcesSiteQuota;
+use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
+use App\Livewire\Concerns\Sites\ConfiguresGitRepository;
 use App\Models\Script;
 use App\Models\Server;
 use App\Models\Site;
+use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
@@ -16,17 +20,22 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class CreateCustom extends Component
 {
+    use ConfiguresGitRepository;
+    use EnforcesSiteQuota;
+    use RefreshesLinkedSourceControlAccounts;
+
     public Server $server;
 
     public string $name = '';
 
-    public string $git_repository_url = '';
-
-    public string $git_branch = 'main';
-
     public string $system_user_override = '';
 
-    public function mount(Server $server): void
+    // The Git-repository picker state (repo_source, source_control_account_id,
+    // repository_selection, git_repository_url, git_branch, availableRepositories,
+    // linkedSourceControlAccounts) + its updated* hooks live in the
+    // ConfiguresGitRepository trait.
+
+    public function mount(Server $server, SourceControlRepositoryBrowser $repositoryBrowser): void
     {
         if ($server->hostKind() !== Server::HOST_KIND_VM) {
             throw new AuthorizationException(
@@ -36,11 +45,31 @@ class CreateCustom extends Component
 
         $this->server = $server;
         $this->system_user_override = (string) $server->ssh_user;
+
+        // Preload connected accounts; default to the provider picker when the
+        // user already has one linked, otherwise fall back to manual URL entry.
+        $user = auth()->user();
+        $this->linkedSourceControlAccounts = $user ? $repositoryBrowser->accountsForUser($user) : [];
+        if ($this->linkedSourceControlAccounts !== []) {
+            $this->repo_source = 'provider';
+            $this->source_control_account_id = (string) $this->linkedSourceControlAccounts[0]['id'];
+            $this->refreshRepositories($repositoryBrowser);
+        }
     }
 
-    public function updatedGitRepositoryUrl(): void
+    protected function afterLinkedSourceControlAccountsRefreshed(): void
     {
-        $this->git_repository_url = trim($this->git_repository_url);
+        // A provider was just linked via the modal — switch to the picker and
+        // load its repos so the new account is immediately usable.
+        if ($this->linkedSourceControlAccounts === []) {
+            return;
+        }
+
+        $this->repo_source = 'provider';
+        if ($this->source_control_account_id === '') {
+            $this->source_control_account_id = (string) $this->linkedSourceControlAccounts[0]['id'];
+        }
+        $this->refreshRepositories(app(SourceControlRepositoryBrowser::class));
     }
 
     public function store(): mixed
@@ -50,14 +79,26 @@ class CreateCustom extends Component
         $rules = [
             'name' => ['required', 'string', 'max:120', 'regex:/^[a-zA-Z0-9_\-\.]+$/'],
             'system_user_override' => ['nullable', 'string', 'max:64', 'regex:/^[a-z_][a-z0-9_-]*$/i'],
+            'repo_source' => ['required', 'in:manual,provider'],
         ];
 
         if ($hasRepo) {
             $rules['git_repository_url'] = ['required', 'string', 'max:500'];
             $rules['git_branch'] = ['required', 'string', 'max:120'];
+
+            // In provider mode a repository must actually be picked (the picker
+            // mirrors its URL into git_repository_url, but guard the empty case).
+            if ($this->repo_source === 'provider') {
+                $rules['source_control_account_id'] = ['required', 'string', 'max:26'];
+                $rules['repository_selection'] = ['required', 'string', 'max:500'];
+            }
         }
 
         $this->validate($rules);
+
+        if ($this->siteQuotaReached($this->server->organization)) {
+            return null;
+        }
 
         $slug = $this->buildSlug();
         $systemUser = trim($this->system_user_override) !== ''

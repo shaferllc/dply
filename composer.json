@@ -7,15 +7,13 @@
     "license": "MIT",
     "repositories": [
         {
-            "type": "path",
-            "url": "../dply-php-lambda",
-            "options": { "symlink": true }
+            "type": "vcs",
+            "url": "https://github.com/shaferllc/dply-php-lambda.git"
         }
     ],
     "require": {
         "php": "^8.3",
         "aws/aws-sdk-php": "^3.373",
-        "shaferllc/dply-php-lambda": "@dev",
         "bacon/bacon-qr-code": "^3.0",
         "blade-ui-kit/blade-heroicons": "^2.7",
         "blade-ui-kit/blade-icons": "^1.9",
@@ -28,12 +26,16 @@
         "laravel/reverb": "^1.9",
         "laravel/socialite": "^5.25",
         "laravel/tinker": "^3.0",
+        "league/flysystem-aws-s3-v3": "^3.34",
+        "livewire/blaze": "^1.0",
         "livewire/livewire": "^4.0",
         "phpseclib/phpseclib": "^3.0",
         "pragmarx/google2fa": "^9.0",
         "sebastian/diff": "^7.0",
+        "shaferllc/dply-php-lambda": "@dev",
         "spatie/temporary-directory": "^2.3",
-        "symfony/yaml": "^8.0"
+        "symfony/yaml": "^8.0",
+        "yosymfony/toml": "^1.0"
     },
     "require-dev": {
         "barryvdh/laravel-debugbar": "^4.2",
@@ -46,6 +48,8 @@
         "laravel/pint": "^1.27",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.6",
+        "pestphp/pest": "^4.7",
+        "pestphp/pest-plugin-drift": "^4.1",
         "phpunit/phpunit": "^12.5.12",
         "soloterm/solo": "dev-main"
     },
@@ -74,13 +78,21 @@
             "npm install",
             "npm run build"
         ],
-        "dev": [
+        "dev:all": [
             "Composer\\Config::disableProcessTimeout",
             "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74,#34d399\" \"php artisan serve\" \"php artisan queue:listen --tries=1 --timeout=0\" \"php artisan pail --timeout=0\" \"npm run dev\" \"php artisan reverb:start\" --names=server,queue,logs,vite,reverb --kill-others"
         ],
+        "dev": [
+            "Composer\\Config::disableProcessTimeout",
+            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74,#34d399\" \"php artisan serve\" \"php artisan queue:listen --tries=1 --timeout=0\" \"php artisan pail --timeout=0\" \"php artisan reverb:start\" --names=queue,logs,reverb --kill-others"
+        ],
+        "dev:horizon:all": [
+            "Composer\\Config::disableProcessTimeout",
+            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74,#34d399\" \"php artisan serve\" \"php artisan horizon:listen\" \"php artisan pail --timeout=0\" \"npm run dev\" \"php artisan reverb:start\" --names=server,horizon,vite,logs,reverb --kill-others"
+        ],
         "dev:horizon": [
             "Composer\\Config::disableProcessTimeout",
-            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74,#34d399\" \"php artisan serve\" \"php artisan horizon:listen\" \"php artisan pail --timeout=0\" \"npm run dev\" \"php artisan reverb:start\" --names=server,horizon,logs,vite,reverb --kill-others"
+            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74,#34d399\" \"php artisan serve\" \"php artisan horizon:listen\" \"php artisan pail --timeout=0\" \"php artisan reverb:start\" --names=horizon,logs,reverb --kill-others"
         ],
         "test": [
             "@php artisan config:clear --ansi",

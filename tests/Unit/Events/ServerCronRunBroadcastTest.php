@@ -1,39 +1,28 @@
 <?php
 
-namespace Tests\Unit\Events;
+namespace Tests\Unit\Events\ServerCronRunBroadcastTest;
 
 use App\Events\Servers\ServerCronRunCompletedBroadcast;
 use App\Events\Servers\ServerCronRunMetaBroadcast;
 use App\Events\Servers\ServerCronRunOutputChunkBroadcast;
 use Illuminate\Broadcasting\PrivateChannel;
-use PHPUnit\Framework\Attributes\Test;
-use Tests\TestCase;
 
-class ServerCronRunBroadcastTest extends TestCase
-{
-    #[Test]
-    public function meta_broadcasts_on_private_server_channel(): void
-    {
-        $e = new ServerCronRunMetaBroadcast('srv1', 'run1', '<p>x</p>');
-        $channels = $e->broadcastOn();
+test('meta broadcasts on private server channel', function () {
+    $e = new ServerCronRunMetaBroadcast('srv1', 'run1', '<p>x</p>');
+    $channels = $e->broadcastOn();
 
-        $this->assertCount(1, $channels);
-        $this->assertInstanceOf(PrivateChannel::class, $channels[0]);
-        $this->assertSame('server.cron.run.meta', $e->broadcastAs());
-    }
+    expect($channels)->toHaveCount(1);
+    expect($channels[0])->toBeInstanceOf(PrivateChannel::class);
+    expect($e->broadcastAs())->toBe('server.cron.run.meta');
+});
 
-    #[Test]
-    public function chunk_broadcast_name(): void
-    {
-        $e = new ServerCronRunOutputChunkBroadcast('srv1', 'run1', 'out');
-        $this->assertSame('server.cron.run.chunk', $e->broadcastAs());
-    }
+test('chunk broadcast name', function () {
+    $e = new ServerCronRunOutputChunkBroadcast('srv1', 'run1', 'out');
+    expect($e->broadcastAs())->toBe('server.cron.run.chunk');
+});
 
-    #[Test]
-    public function completed_broadcast_name(): void
-    {
-        $e = new ServerCronRunCompletedBroadcast('srv1', 'run1', true, null, 'ok', 'full');
-        $this->assertSame('server.cron.run.completed', $e->broadcastAs());
-        $this->assertArrayHasKey('final_output', $e->broadcastWith());
-    }
-}
+test('completed broadcast name', function () {
+    $e = new ServerCronRunCompletedBroadcast('srv1', 'run1', true, null, 'ok', 'full');
+    expect($e->broadcastAs())->toBe('server.cron.run.completed');
+    expect($e->broadcastWith())->toHaveKey('final_output');
+});

@@ -52,12 +52,21 @@ class MonitorOperationalState
             return self::UNKNOWN;
         }
 
-        $minutes = max(1, (int) config('site_uptime.check_interval_minutes', 5));
+        // Use the monitor's effective cadence (down monitors are probed on the
+        // slower down-interval), so a backed-off outage doesn't read as stale.
+        $minutes = $monitor->effectiveCheckIntervalMinutes();
         $mult = max(1, (int) config('site_uptime.stale_check_multiplier', 2));
         $staleAfterMinutes = $minutes * $mult;
 
         if ($checked->lt(now()->subMinutes($staleAfterMinutes))) {
             return self::UNKNOWN;
+        }
+
+        // last_state carries the finer operational state (a slow-but-up monitor
+        // reads DEGRADED while last_ok stays true); fall back to last_ok for
+        // rows checked before last_state existed.
+        if (in_array($monitor->last_state, [self::OPERATIONAL, self::DEGRADED, self::OUTAGE], true)) {
+            return $monitor->last_state;
         }
 
         if ($monitor->last_ok) {

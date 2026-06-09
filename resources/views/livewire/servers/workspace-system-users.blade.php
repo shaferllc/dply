@@ -20,17 +20,47 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-explainer class="mb-4" tone="info">
+    <x-explainer tone="info">
         <p>{{ __('Each row is a Linux user the server already has in /etc/passwd. The site count shows how many Dply-managed sites are currently set to run as that user — those sites must be reassigned before you can remove the account.') }}</p>
         <p>{{ __('root, dply, and the configured deploy user are protected — Dply refuses to remove them. UID below 1000 (system accounts) is also blocked.') }}</p>
     </x-explainer>
 
     @if (! $opsReady)
-        <div class="rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-900">
-            {{ __('System users management requires an SSH-ready server. Finish provisioning before managing accounts.') }}
-        </div>
+        <section class="dply-card overflow-hidden border-amber-200">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                <x-icon-badge tone="amber">
+                    <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Waiting on provisioning') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('System users management requires an SSH-ready server. Finish provisioning before managing accounts.') }}</p>
+                </div>
+            </div>
+        </section>
     @else
-        <div class="space-y-6">
+        {{-- In-page sub-tabs: the /etc/passwd account list vs. notification routing
+             for this server's system_user.* events. Keeps "set up alerts" one click
+             away instead of bouncing the operator out to global settings. --}}
+        <div class="mb-6 border-b border-brand-ink/10">
+            <nav class="-mb-px flex gap-6" aria-label="{{ __('System users sections') }}">
+                @php
+                    $tabBase = 'inline-flex items-center gap-1.5 border-b-2 px-1 py-3 text-sm font-medium transition-colors';
+                    $tabOn = 'border-brand-forest text-brand-ink';
+                    $tabOff = 'border-transparent text-brand-moss hover:border-brand-sage/40 hover:text-brand-ink';
+                @endphp
+                <button type="button" wire:click="$set('activeTab', 'accounts')" @class([$tabBase, $activeTab === 'accounts' ? $tabOn : $tabOff])>
+                    <x-heroicon-o-users class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Accounts') }}
+                </button>
+                <button type="button" wire:click="$set('activeTab', 'notifications')" @class([$tabBase, $activeTab === 'notifications' ? $tabOn : $tabOff])>
+                    <x-heroicon-o-bell class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Notifications') }}
+                </button>
+            </nav>
+        </div>
+
+        <div @class(['space-y-6', 'hidden' => $activeTab !== 'accounts'])>
             {{-- Server-scoped console-actions banner. Surfaces the in-flight + most-recent
                  system_user run (create, remove) for this server. --}}
             @include('livewire.partials.console-action-banner-static', [
@@ -39,13 +69,14 @@
             ])
 
             <section class="{{ $card }} overflow-hidden">
-                <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+                <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
                     <div class="flex min-w-0 items-start gap-3">
-                        <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                            <x-heroicon-o-users class="h-5 w-5" />
-                        </span>
+                        <x-icon-badge>
+                            <x-heroicon-o-users class="h-5 w-5" aria-hidden="true" />
+                        </x-icon-badge>
                         <div class="min-w-0">
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Accounts on this server') }}</h2>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Accounts') }}</p>
+                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Accounts on this server') }}</h2>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                                 {{ __('Loaded from /etc/passwd over SSH. Click a row to expand UID, home, shell, groups, and assigned sites.') }}
                             </p>
@@ -70,7 +101,7 @@
                             wire:click="openCreateModal"
                             class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90"
                         >
-                            <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                            <x-heroicon-o-plus class="h-4 w-4" />
                             {{ __('Add a user') }}
                         </button>
                         <span class="hidden h-5 w-px bg-brand-ink/10 sm:block" aria-hidden="true"></span>
@@ -81,8 +112,8 @@
                             wire:target="loadUsers"
                             class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="loadUsers" />
-                            <span wire:loading wire:target="loadUsers" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                            <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="loadUsers" />
+                            <span wire:loading wire:target="loadUsers" class="inline-flex h-4 w-4 items-center justify-center">
                                 <x-spinner variant="forest" size="sm" />
                             </span>
                             <span wire:loading.remove wire:target="loadUsers">{{ __('Sync now') }}</span>
@@ -108,7 +139,7 @@
                             wire:target="openRemoveOrphansConfirm,queueRemoveOrphans"
                             class="inline-flex h-8 shrink-0 items-center gap-1.5 self-start rounded-lg border border-red-200 bg-white px-3 text-xs font-semibold text-red-800 shadow-sm hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 sm:self-center"
                         >
-                            <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                            <x-heroicon-o-trash class="h-4 w-4" />
                             {{ __('Remove all orphans') }}
                         </button>
                     </div>
@@ -181,15 +212,19 @@
                                             @endif
                                         </p>
 
-                                        <details class="mt-2 group">
-                                            <summary class="cursor-pointer list-none text-[11px] font-medium uppercase tracking-wide text-brand-mist hover:text-brand-ink">
-                                                <span class="inline-flex items-center gap-1">
-                                                    <x-heroicon-o-chevron-down class="h-3 w-3 transition-transform group-open:rotate-180" />
-                                                    <span class="group-open:hidden">{{ __('Show details') }}</span>
-                                                    <span class="hidden group-open:inline">{{ __('Hide details') }}</span>
-                                                </span>
-                                            </summary>
-                                            <div class="mt-2 space-y-3 rounded-lg bg-brand-sand/15 px-4 py-3">
+                                        {{-- Alpine toggle (not native <details>): the open state lives in
+                                             Alpine so Livewire's banner self-poll morph doesn't collapse it. --}}
+                                        <div class="mt-2" x-data="{ open: false }">
+                                            <button
+                                                type="button"
+                                                x-on:click="open = ! open"
+                                                class="inline-flex cursor-pointer items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-brand-mist hover:text-brand-ink"
+                                            >
+                                                <x-heroicon-o-chevron-down class="h-3 w-3 transition-transform" x-bind:class="open ? 'rotate-180' : ''" />
+                                                <span x-show="! open">{{ __('Show details') }}</span>
+                                                <span x-show="open" x-cloak>{{ __('Hide details') }}</span>
+                                            </button>
+                                            <div x-show="open" x-collapse x-cloak class="mt-2 space-y-3 rounded-lg bg-brand-sand/15 px-4 py-3">
                                                 <dl class="grid gap-x-6 gap-y-3 sm:grid-cols-2">
                                                     <div>
                                                         <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('UID') }}</dt>
@@ -234,7 +269,7 @@
                                                     </div>
                                                 </dl>
                                             </div>
-                                        </details>
+                                        </div>
                                     </div>
 
                                     <div class="flex flex-wrap items-center gap-2 self-start sm:self-center">
@@ -249,7 +284,7 @@
                                                 <x-spinner variant="forest" size="sm" />
                                                 {{ __('Removing…') }}
                                             @else
-                                                <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                                                <x-heroicon-o-trash class="h-4 w-4" />
                                                 {{ __('Remove') }}
                                             @endif
                                         </button>
@@ -260,6 +295,15 @@
                     </ul>
                 @endif
             </section>
+        </div>
+
+        <div @class(['space-y-6', 'hidden' => $activeTab !== 'notifications'])>
+            @include('livewire.servers.partials.system-users.notifications-tab', [
+                'card' => $card,
+                'notifChannels' => $notifChannels,
+                'notifSubscriptions' => $notifSubscriptions,
+                'notifEventLabels' => $notifEventLabels,
+            ])
         </div>
 
         {{-- Create modal --}}
@@ -406,6 +450,12 @@
                 </x-danger-button>
             </div>
         </x-modal>
+
+        {{-- Reusable inline channel-create modal (CreatesNotificationChannelInline trait),
+             shared with the server Monitor page. Lets the operator add a channel from the
+             Notifications tab without leaving the page; on success the new channel is
+             auto-selected via the notification-channel-created listener. --}}
+        @include('livewire.partials.create-notification-channel-modal')
 
         @include('livewire.partials.confirm-action-modal')
     @endif

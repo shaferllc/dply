@@ -36,6 +36,18 @@ trait WritesConsoleAction
     private ?string $consoleRunId = null;
 
     /**
+     * Pin the worker to a ConsoleAction row the UI seeded before dispatch
+     * (e.g. Livewire's seedQueuedConsoleAction) so the banner label and output
+     * stay on the same run the operator just triggered.
+     */
+    protected function bindConsoleRunId(?string $runId): void
+    {
+        if ($runId !== null && $runId !== '') {
+            $this->consoleRunId = $runId;
+        }
+    }
+
+    /**
      * The model whose page should host the banner. Sites and Servers are the
      * obvious candidates today.
      */
@@ -100,7 +112,8 @@ trait WritesConsoleAction
         $subject = $this->consoleSubject();
 
         // Reuse a row if the dispatcher already seeded one — we identify it
-        // by (subject, kind, status in [queued, running], not dismissed).
+        // by (subject, kind, status in [queued, running], not dismissed), or
+        // by an explicit bindConsoleRunId() from the dispatch site.
         if ($this->consoleRunId === null) {
             $existing = ConsoleAction::query()
                 ->forSubject($subject)
@@ -113,11 +126,14 @@ trait WritesConsoleAction
             $this->consoleRunId = $existing?->id ?? $this->seedQueuedConsoleAction();
         }
 
-        DB::table('console_actions')->where('id', $this->consoleRunId)->update([
-            'status' => ConsoleAction::STATUS_RUNNING,
-            'started_at' => DB::raw('coalesce(started_at, now())'),
-            'updated_at' => now(),
-        ]);
+        DB::table('console_actions')->where('id', $this->consoleRunId)
+            ->where('subject_type', $subject->getMorphClass())
+            ->where('subject_id', $subject->getKey())
+            ->update([
+                'status' => ConsoleAction::STATUS_RUNNING,
+                'started_at' => DB::raw('coalesce(started_at, now())'),
+                'updated_at' => now(),
+            ]);
 
         return new ConsoleEmitter($this->consoleRunId);
     }

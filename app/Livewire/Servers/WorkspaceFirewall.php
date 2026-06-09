@@ -4,14 +4,17 @@ namespace App\Livewire\Servers;
 
 use App\Jobs\ApplyFirewallJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\EmitsPanelEvent;
 use App\Livewire\Forms\FirewallRuleForm;
 use App\Livewire\Servers\Concerns\GuardsDisruptiveActions;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\ManagesFirewallNotifications;
 use App\Livewire\Servers\Concerns\ManagesFirewallWorkspaceAdvanced;
 use App\Models\FirewallRuleTemplate;
 use App\Models\Server;
+use App\Models\ServerFirewallApplyLog;
 use App\Models\ServerFirewallAuditEvent;
 use App\Models\ServerFirewallRule;
 use App\Models\User;
@@ -20,6 +23,7 @@ use App\Services\Servers\ServerFirewallAuditLogger;
 use App\Services\Servers\ServerFirewallProvisioner;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\SshConnection;
+use App\Support\Servers\FirewallWorkspaceViewData;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -27,16 +31,24 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceFirewall extends Component
 {
+    use RendersWorkspacePlaceholder;
     use ConfirmsActionWithModal;
     use EmitsPanelEvent;
+    use CreatesNotificationChannelInline;
     use GuardsDisruptiveActions;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use ManagesFirewallNotifications;
     use ManagesFirewallWorkspaceAdvanced;
 
     public FirewallRuleForm $form;
@@ -77,6 +89,24 @@ class WorkspaceFirewall extends Component
     {
         $this->bootWorkspace($server);
         $this->form->resetForNew();
+    }
+
+    public function setFirewallWorkspaceTab(string $tab): void
+    {
+        $allowed = ['rules', 'templates', 'activity', 'notifications'];
+        $this->firewall_workspace_tab = in_array($tab, $allowed, true) ? $tab : 'rules';
+    }
+
+    /**
+     * Fired by {@see CreatesNotificationChannelInline} after the inline modal
+     * creates a channel. Jump to the Notifications tab and pre-select the new
+     * channel so the operator can finish wiring it to events in one motion.
+     */
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId): void
+    {
+        $this->firewall_workspace_tab = 'notifications';
+        $this->notif_channel_id = $channelId;
     }
 
     protected function opsReady(): bool
@@ -206,9 +236,16 @@ class WorkspaceFirewall extends Component
                 array_values(array_filter([
                     sprintf('> Updated "%s" in the panel.', $rule->name ?: ($rule->action.' '.$rule->protocol.' '.($rule->port ?? '*'))),
                     sprintf('  %s %s/%s from %s', strtoupper($rule->action), $rule->port ?? '*', strtoupper($rule->protocol), $rule->source),
-                    $this->lastUfwHostSyncError ? '> Host sync failed: '.\Illuminate\Support\Str::limit($this->lastUfwHostSyncError, 200) : '> Host sync attempted automatically.',
+                    $this->lastUfwHostSyncError ? '> Host sync failed: '.Str::limit($this->lastUfwHostSyncError, 200) : '> Host sync attempted automatically.',
                 ])),
             );
+            $this->dispatchFirewallNotification('updated', [$this->firewallRuleLabel($rule)], [
+                'rule_id' => $rule->id,
+                'port' => $rule->port,
+                'protocol' => $rule->protocol,
+                'source' => $rule->source,
+                'action' => $rule->action,
+            ]);
             $this->editing_rule_id = null;
             $this->form->resetForNew();
             $this->dispatch('close-modal', 'add-firewall-rule-modal');
@@ -258,10 +295,18 @@ class WorkspaceFirewall extends Component
                         ? '> Rule is enabled. Click "Apply rules" to reconcile the host firewall.'
                         : '> Rule is disabled — Apply will skip it until you toggle it on.',
                     isset($this->lastUfwHostSyncError) && $this->lastUfwHostSyncError !== null
-                        ? '> Inline host apply failed: '.\Illuminate\Support\Str::limit($this->lastUfwHostSyncError, 200)
+                        ? '> Inline host apply failed: '.Str::limit($this->lastUfwHostSyncError, 200)
                         : null,
                 ])),
             );
+            $this->dispatchFirewallNotification('created', [$this->firewallRuleLabel($rule)], [
+                'rule_id' => $rule->id,
+                'port' => $rule->port,
+                'protocol' => $rule->protocol,
+                'source' => $rule->source,
+                'action' => $rule->action,
+                'enabled' => (bool) $rule->enabled,
+            ]);
             $this->form->resetForNew();
             $this->dispatch('close-modal', 'add-firewall-rule-modal');
         }
@@ -321,6 +366,11 @@ class WorkspaceFirewall extends Component
             ],
             auth()->user(),
         );
+
+        $this->dispatchFirewallNotification('updated', [$this->firewallRuleLabel($rule)], [
+            'rule_id' => (string) $rule->id,
+            'change' => $rule->enabled ? 'enabled' : 'disabled',
+        ]);
 
         if (! $this->opsReady()) {
             $this->toastSuccess($rule->enabled
@@ -389,10 +439,13 @@ class WorkspaceFirewall extends Component
             __('Rule removed — apply to push to the server'),
             array_values(array_filter([
                 sprintf('> Removed "%s" from the panel.', $rule->name ?: ($rule->action.' '.$rule->protocol.' '.($rule->port ?? '*'))),
-                $remote !== null && $remote !== '' ? '  ufw output: '.\Illuminate\Support\Str::limit(trim($remote), 200) : null,
+                $remote !== null && $remote !== '' ? '  ufw output: '.Str::limit(trim($remote), 200) : null,
                 '> Click "Apply rules" to reconcile the host firewall.',
             ])),
         );
+        $this->dispatchFirewallNotification('deleted', [$this->firewallRuleLabel($rule)], [
+            'rule_id' => $id,
+        ]);
         $this->toastSuccess($removedMsg);
     }
 
@@ -557,6 +610,9 @@ class WorkspaceFirewall extends Component
             'bulk' => 'enable',
             'count' => $n,
         ], auth()->user());
+        if ($n > 0) {
+            $this->dispatchFirewallNotification('updated', [trans_choice('{1} :count rule|[2,*] :count rules', $n, ['count' => $n])], ['bulk' => 'enable', 'count' => $n]);
+        }
         $this->toastSuccess(__('Enabled :n rule(s) in the panel. Use “Apply firewall rules” to sync the host.', ['n' => $n]));
     }
 
@@ -578,6 +634,9 @@ class WorkspaceFirewall extends Component
             'bulk' => 'disable',
             'count' => $n,
         ], auth()->user());
+        if ($n > 0) {
+            $this->dispatchFirewallNotification('updated', [trans_choice('{1} :count rule|[2,*] :count rules', $n, ['count' => $n])], ['bulk' => 'disable', 'count' => $n]);
+        }
         $this->toastSuccess(__('Disabled :n rule(s) in the panel. Use “Apply firewall rules” to sync the host.', ['n' => $n]));
     }
 
@@ -619,6 +678,7 @@ class WorkspaceFirewall extends Component
             'rule_ids' => $ruleIds,
             'count' => count($ruleIds),
         ], auth()->user());
+        $this->dispatchFirewallNotification('deleted', [trans_choice('{1} :count rule|[2,*] :count rules', count($ruleIds), ['count' => count($ruleIds)])], ['bulk' => true, 'rule_ids' => $ruleIds, 'count' => count($ruleIds)]);
         $this->toastSuccess(__('Removed :n rule(s).', ['n' => count($ruleIds)]));
     }
 
@@ -1263,7 +1323,7 @@ class WorkspaceFirewall extends Component
      * server" — drop the file into a new server's template upload (or feed it to the template
      * applicator directly) and you get the same rules without retyping.
      */
-    public function exportFirewallRulesJson(): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function exportFirewallRulesJson(): StreamedResponse
     {
         $this->authorize('update', $this->server);
         $this->server->load(['firewallRules' => fn ($q) => $q->orderBy('sort_order')]);
@@ -1289,7 +1349,7 @@ class WorkspaceFirewall extends Component
             ])->values()->all(),
         ];
 
-        $filename = sprintf('firewall-rules-%s-%s.json', \Illuminate\Support\Str::slug($this->server->name), now()->format('Ymd-His'));
+        $filename = sprintf('firewall-rules-%s-%s.json', Str::slug($this->server->name), now()->format('Ymd-His'));
 
         return response()->streamDownload(function () use ($payload): void {
             echo json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
@@ -1300,13 +1360,13 @@ class WorkspaceFirewall extends Component
      * CSV export — operator-friendly columns, no app_profile/iface_direction (which CSV-flatten
      * poorly). Use the JSON export for round-trip imports; CSV is for spreadsheet audits.
      */
-    public function exportFirewallRulesCsv(): \Symfony\Component\HttpFoundation\StreamedResponse
+    public function exportFirewallRulesCsv(): StreamedResponse
     {
         $this->authorize('update', $this->server);
         $this->server->load(['firewallRules' => fn ($q) => $q->orderBy('sort_order')]);
 
         $rules = $this->server->firewallRules;
-        $filename = sprintf('firewall-rules-%s-%s.csv', \Illuminate\Support\Str::slug($this->server->name), now()->format('Ymd-His'));
+        $filename = sprintf('firewall-rules-%s-%s.csv', Str::slug($this->server->name), now()->format('Ymd-His'));
 
         return response()->streamDownload(function () use ($rules): void {
             $fh = fopen('php://output', 'w');
@@ -1334,61 +1394,167 @@ class WorkspaceFirewall extends Component
 
     public function render(): View
     {
-        $this->server->loadMissing(['firewallRules', 'organization', 'sites']);
-
         // Backwards compatibility: the History and Audit tabs were merged into a single
         // Activity timeline. Snap stale tab values forward so deep links still land somewhere.
         if (in_array($this->firewall_workspace_tab, ['history', 'audit'], true)) {
             $this->firewall_workspace_tab = 'activity';
         }
 
-        $org = $this->server->organization;
-        $savedTemplates = $org
-            ? FirewallRuleTemplate::query()
-                ->where('organization_id', $org->id)
-                ->where(function ($q) {
-                    $q->whereNull('server_id')->orWhere('server_id', $this->server->id);
-                })
-                ->orderBy('name')
-                ->get()
-            : collect();
+        $allowedTabs = ['rules', 'templates', 'activity', 'notifications'];
+        if (! in_array($this->firewall_workspace_tab, $allowedTabs, true)) {
+            $this->firewall_workspace_tab = 'rules';
+        }
+
+        $tab = $this->firewall_workspace_tab;
+        $needsRules = $tab === 'rules';
+        $needsTemplates = $tab === 'templates';
+        $needsActivity = $tab === 'activity';
+        $needsNotifications = $tab === 'notifications';
+
+        $this->server->loadMissing(['organization']);
+
+        if ($needsRules || $needsTemplates || $this->apply_preview_open) {
+            $this->server->loadMissing(['firewallRules', 'sites']);
+        }
 
         $provisioner = app(ServerFirewallProvisioner::class);
 
-        // Build a normalized "key" for every panel rule so we can fast-check whether each
-        // bundled template's rules are already present. We compare on (port, protocol, action,
-        // source) — the operator-facing label intentionally isn't part of the match because
-        // they may have edited it after applying the bundle.
-        $appliedKeys = $this->server->firewallRules
-            ->mapWithKeys(fn ($r) => [$this->ruleMatchKey($r->port, $r->protocol, $r->action, $r->source) => true])
-            ->all();
-
-        $bundledTemplates = config('server_firewall.bundled_templates', []);
+        $savedTemplates = collect();
+        $bundledTemplates = [];
         $bundledAppliedMap = [];
-        foreach ($bundledTemplates as $key => $bundle) {
-            $rules = $bundle['rules'] ?? [];
-            if ($rules === []) {
-                $bundledAppliedMap[$key] = false;
-                continue;
+        $activityItems = [];
+
+        if ($needsTemplates) {
+            $org = $this->server->organization;
+            $savedTemplates = $org
+                ? FirewallRuleTemplate::query()
+                    ->where('organization_id', $org->id)
+                    ->where(function ($q) {
+                        $q->whereNull('server_id')->orWhere('server_id', $this->server->id);
+                    })
+                    ->orderBy('name')
+                    ->get()
+                : collect();
+
+            $bundledTemplates = config('server_firewall.bundled_templates', []);
+
+            $appliedKeys = $this->server->firewallRules
+                ->mapWithKeys(fn ($r) => [$this->ruleMatchKey($r->port, $r->protocol, $r->action, $r->source) => true])
+                ->all();
+
+            $sshPort = (int) ($this->server->ssh_port ?: 22);
+
+            foreach ($bundledTemplates as $key => $bundle) {
+                $rules = $bundle['rules'] ?? [];
+                if ($rules === []) {
+                    $bundledAppliedMap[$key] = [
+                        'state' => 'none',
+                        'present_count' => 0,
+                        'total' => 0,
+                        'removable_count' => 0,
+                        'has_ssh' => false,
+                        'chips' => [],
+                    ];
+
+                    continue;
+                }
+
+                $chips = [];
+                $presentCount = 0;
+                $removableCount = 0;
+                $hasSsh = false;
+
+                foreach ($rules as $r) {
+                    $rPort = isset($r['port']) ? (is_numeric($r['port']) ? (int) $r['port'] : null) : null;
+                    $rProto = strtolower((string) ($r['protocol'] ?? 'tcp'));
+                    $rAction = strtolower((string) ($r['action'] ?? 'allow'));
+                    $rSource = strtolower(trim((string) ($r['source'] ?? 'any')));
+                    $present = isset($appliedKeys[$this->ruleMatchKey($r['port'] ?? null, $r['protocol'] ?? null, $r['action'] ?? null, $r['source'] ?? null)]);
+                    // An SSH allow rule on the server's configured SSH port from
+                    // any source is the management lifeline — never auto-removable.
+                    $isSsh = $rAction === 'allow'
+                        && $rProto === 'tcp'
+                        && $rPort === $sshPort
+                        && in_array($rSource, ['any', '0.0.0.0/0', '::/0'], true);
+
+                    if ($present) {
+                        $presentCount++;
+                    }
+                    if ($present && ! $isSsh) {
+                        $removableCount++;
+                    }
+                    if ($isSsh) {
+                        $hasSsh = true;
+                    }
+
+                    $label = $rPort === null
+                        ? $rProto
+                        : $rPort.'/'.$rProto;
+                    if ($rSource !== 'any' && $rSource !== '') {
+                        $label .= ' ← '.($r['source'] ?? '');
+                    }
+
+                    $chips[] = [
+                        'label' => $label,
+                        'name' => (string) ($r['name'] ?? ''),
+                        'present' => $present,
+                        'is_ssh' => $isSsh,
+                    ];
+                }
+
+                $total = count($rules);
+                $state = $presentCount === 0 ? 'none' : ($presentCount >= $total ? 'all' : 'partial');
+
+                $bundledAppliedMap[$key] = [
+                    'state' => $state,
+                    'present_count' => $presentCount,
+                    'total' => $total,
+                    'removable_count' => $removableCount,
+                    'has_ssh' => $hasSsh,
+                    'chips' => $chips,
+                ];
             }
-            $bundledAppliedMap[$key] = collect($rules)->every(fn ($r) => isset($appliedKeys[
-                $this->ruleMatchKey($r['port'] ?? null, $r['protocol'] ?? null, $r['action'] ?? null, $r['source'] ?? null)
-            ]));
         }
 
-        return view('livewire.servers.workspace-firewall', [
-            'deletionSummary' => $this->showRemoveServerModal
-                ? ServerRemovalAdvisor::summary($this->server)
-                : null,
-            'bundledTemplates' => $bundledTemplates,
-            'bundledAppliedMap' => $bundledAppliedMap,
-            'savedTemplates' => $savedTemplates,
-            'activityItems' => $this->buildActivityItems(),
-            'sshNotCovered' => $provisioner->sshAccessNotExplicitlyAllowed($this->server),
-            'applyFirewallConfirmMessage' => $this->disruptiveConfirmMessage(__('Apply firewall rules')),
-            'defaultPolicies' => $provisioner->defaultPoliciesFromMeta($this->server),
-            'loggingLevel' => $provisioner->loggingLevelFromMeta($this->server),
-        ]);
+        if ($needsActivity) {
+            $activityItems = $this->buildActivityItems();
+        }
+
+        $sshNotCovered = false;
+        $defaultPolicies = [];
+        $loggingLevel = null;
+
+        if ($needsRules || $this->apply_preview_open) {
+            $sshNotCovered = $provisioner->sshAccessNotExplicitlyAllowed($this->server);
+            $defaultPolicies = $provisioner->defaultPoliciesFromMeta($this->server);
+            $loggingLevel = $provisioner->loggingLevelFromMeta($this->server);
+        }
+
+        return view('livewire.servers.workspace-firewall', array_merge(
+            FirewallWorkspaceViewData::for(
+                $this->server,
+                $this,
+                $needsRules,
+                $needsActivity,
+                $activityItems,
+            ),
+            [
+                'deletionSummary' => $this->showRemoveServerModal
+                    ? ServerRemovalAdvisor::summary($this->server)
+                    : null,
+                'bundledTemplates' => $bundledTemplates,
+                'bundledAppliedMap' => $bundledAppliedMap,
+                'savedTemplates' => $savedTemplates,
+                'activityItems' => $activityItems,
+                'sshNotCovered' => $sshNotCovered,
+                'applyFirewallConfirmMessage' => $this->disruptiveConfirmMessage(__('Apply firewall rules')),
+                'defaultPolicies' => $defaultPolicies,
+                'loggingLevel' => $loggingLevel,
+                'notifChannels' => $needsNotifications ? $this->assignableFirewallNotificationChannels() : collect(),
+                'notifSubscriptions' => $needsNotifications ? $this->firewallNotificationSubscriptions() : collect(),
+                'notifEventLabels' => $needsNotifications ? $this->firewallEventLabels() : [],
+            ],
+        ));
     }
 
     /**
@@ -1398,7 +1564,7 @@ class WorkspaceFirewall extends Component
      * shape the view can branch on: `kind=apply` (expandable, with output) vs `kind=audit`
      * (compact one-liner).
      *
-     * @return list<array{kind: string, at: \Carbon\Carbon|null, key: string, log?: \App\Models\ServerFirewallApplyLog, event?: \App\Models\ServerFirewallAuditEvent}>
+     * @return list<array{kind: string, at: \Carbon\Carbon|null, key: string, log?: ServerFirewallApplyLog, event?: ServerFirewallAuditEvent}>
      */
     /**
      * Activity timeline window size. Grows by {@see ACTIVITY_PAGE_SIZE} each time the operator

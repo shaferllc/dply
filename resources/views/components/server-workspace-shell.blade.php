@@ -71,6 +71,10 @@
         },
     }"
 >
+    @isset($breadcrumb)
+        <div class="mb-6">{{ $breadcrumb }}</div>
+    @endisset
+
     <div @class([
         'lg:grid lg:gap-10' => $showNavigation,
         'lg:grid-cols-12' => $showNavigation,
@@ -87,7 +91,7 @@
             $avatarInitials = mb_strtoupper(mb_substr(preg_replace('/[^A-Za-z0-9]/', '', $avatarSeed) ?: 'S', 0, 2));
             $avatarStyle = "background-image: linear-gradient(135deg, hsl({$avatarHueA}deg 65% 56%) 0%, hsl({$avatarHueB}deg 65% 42%) 100%);";
         @endphp
-        <aside class="lg:col-span-3 mb-8 lg:mb-0">
+        <aside class="sm:col-span-3 mb-8 lg:mb-0">
             <div class="{{ $card }}">
                 <div class="border-b border-brand-ink/10 p-4 sm:p-5">
                     <div class="flex items-center gap-3">
@@ -97,9 +101,11 @@
                         <div class="min-w-0 flex-1 leading-tight">
                             <p class="truncate text-base font-semibold text-brand-ink">{{ $server->name }}</p>
                             @if ($server->workspace)
-                                <p class="mt-0.5 truncate text-xs text-brand-moss">
-                                    <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:text-brand-sage">{{ $server->workspace->name }}</a>
-                                </p>
+                                @feature('surface.projects')
+                                    <p class="mt-0.5 truncate text-xs text-brand-moss">
+                                        <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="font-medium text-brand-ink hover:text-brand-sage">{{ $server->workspace->name }}</a>
+                                    </p>
+                                @endfeature
                             @endif
                         </div>
                     </div>
@@ -187,6 +193,8 @@
                             $label = __($item['label']);
                             $navHref = server_workspace_nav_item_url($server, $item);
                             $needsSetup = (bool) ($item['needs_setup'] ?? false);
+                            $previewOnly = (bool) ($item['preview_only'] ?? false);
+                            $soonBadge = (bool) ($item['soon_badge'] ?? false);
                         @endphp
                         <a
                             href="{{ $navHref }}"
@@ -195,6 +203,7 @@
                                 $navLink,
                                 'bg-brand-sand/60 text-brand-ink' => $active === $key,
                                 'text-brand-moss hover:bg-brand-sand/40 hover:text-brand-ink' => $active !== $key,
+                                'opacity-90' => $previewOnly && $active !== $key,
                             ])
                         >
                             @switch($icon)
@@ -264,8 +273,62 @@
                                 @case('folder')
                                     <x-heroicon-o-folder class="h-5 w-5 shrink-0 opacity-90" />
                                     @break
+                                @case('heart')
+                                    <x-heroicon-o-heart class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('document-duplicate')
+                                    <x-heroicon-o-document-duplicate class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('wrench')
+                                    <x-heroicon-o-wrench class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('exclamation-triangle')
+                                    <x-heroicon-o-exclamation-triangle class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('camera')
+                                    <x-heroicon-o-camera class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('shield-exclamation')
+                                    <x-heroicon-o-shield-exclamation class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('signal')
+                                    <x-heroicon-o-signal class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('square-3-stack-3d')
+                                    <x-heroicon-o-square-3-stack-3d class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('arrow-path-rounded-square')
+                                    <x-heroicon-o-arrow-path-rounded-square class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('arrows-right-left')
+                                    <x-heroicon-o-arrows-right-left class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('finger-print')
+                                    <x-heroicon-o-finger-print class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('lock-closed')
+                                    <x-heroicon-o-lock-closed class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @case('share')
+                                    <x-heroicon-o-share class="h-5 w-5 shrink-0 opacity-90" />
+                                    @break
+                                @default
+                                    <x-heroicon-o-square-2-stack class="h-5 w-5 shrink-0 opacity-90" />
                             @endswitch
                             <span class="flex-1 truncate">{{ $label }}</span>
+                            @if ($previewOnly || $soonBadge)
+                                <span class="shrink-0 rounded-full bg-brand-sand/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-moss">
+                                    {{ __('Soon') }}
+                                </span>
+                            @endif
+                            {{-- Only show the open-error count when Errors is live —
+                                 not while it's a "Soon" (preview_only) item. --}}
+                            @if ($key === 'errors' && ! ($previewOnly || $soonBadge))
+                                @php $openErrorCount = \App\Models\ErrorEvent::undismissedCountForServer((string) $server->id); @endphp
+                                @if ($openErrorCount > 0)
+                                    <span class="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">{{ $openErrorCount > 99 ? '99+' : $openErrorCount }}</span>
+                                @endif
+                            @endif
                             @if ($needsSetup)
                                 <span
                                     class="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"

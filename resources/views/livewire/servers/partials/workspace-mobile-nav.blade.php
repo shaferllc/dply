@@ -14,7 +14,7 @@
             <option
                 value="{{ server_workspace_nav_item_url($server, $item) }}"
                 @selected($active === $item['key'])
-            >{{ __($item['label']) }}@if (! empty($item['needs_setup'])) &nbsp;•@endif</option>
+            >{{ __($item['label']) }}@if (! empty($item['preview_only']) || ! empty($item['soon_badge'])) — {{ __('coming soon') }}@endif @if (! empty($item['needs_setup'])) &nbsp;•@endif</option>
         @endforeach
     </select>
 </div>

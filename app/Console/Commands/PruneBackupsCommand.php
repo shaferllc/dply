@@ -6,15 +6,16 @@ namespace App\Console\Commands;
 
 use App\Models\ServerDatabaseBackup;
 use App\Models\SiteFileBackup;
+use App\Services\Servers\DatabaseBackupExporter;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
 
 /**
  * Prune backup runs older than the configured retention period. Removes both the
- * database row AND the file on disk so storage doesn't accumulate forever.
+ * database row AND the artifact (remote file, S3 object, or legacy control-plane file).
  *
  * Failed and pending rows older than the cutoff are also pruned — they typically
- * have no disk file, so the disk-delete step is a noop for them.
+ * have no artifact, so delete steps are no-ops for them.
  */
 class PruneBackupsCommand extends Command
 {
@@ -22,16 +23,16 @@ class PruneBackupsCommand extends Command
 
     protected $description = 'Delete backup runs older than the configured retention period (server_database.run_retention_days, site_file_backup.run_retention_days).';
 
-    public function handle(): int
+    public function handle(DatabaseBackupExporter $exporter): int
     {
         $dryRun = (bool) $this->option('dry-run');
 
         $dbDays = max(7, (int) config('server_database.run_retention_days', 90));
         $fileDays = max(7, (int) config('site_file_backup.run_retention_days', 90));
 
-        $dbCount = $this->prune(
+        $dbCount = $this->pruneDatabaseBackups(
             ServerDatabaseBackup::query()->where('created_at', '<', now()->subDays($dbDays))->get(),
-            config('server_database.backup_disk', 'local'),
+            $exporter,
             $dryRun,
         );
 
@@ -49,7 +50,24 @@ class PruneBackupsCommand extends Command
     }
 
     /**
-     * @param  iterable<ServerDatabaseBackup|SiteFileBackup>  $rows
+     * @param  iterable<ServerDatabaseBackup>  $rows
+     */
+    private function pruneDatabaseBackups(iterable $rows, DatabaseBackupExporter $exporter, bool $dryRun): int
+    {
+        $count = 0;
+        foreach ($rows as $row) {
+            if (! $dryRun) {
+                $exporter->deleteArtifact($row);
+                $row->delete();
+            }
+            $count++;
+        }
+
+        return $count;
+    }
+
+    /**
+     * @param  iterable<SiteFileBackup>  $rows
      */
     private function prune(iterable $rows, string $diskName, bool $dryRun): int
     {

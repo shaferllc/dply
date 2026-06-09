@@ -1,42 +1,26 @@
 <?php
 
-use App\Console\Commands\CheckSupervisorHealthCommand;
-use App\Console\Commands\EdgePollStatusCommand;
-use App\Console\Commands\FlushDeployDigestCommand;
-use App\Console\Commands\FlushServerSystemdNotificationDigestCommand;
-use App\Console\Commands\ProcessInsightDigestQueueCommand;
-use App\Console\Commands\ProcessScheduledServerDeletionsCommand;
-use App\Console\Commands\ProcessSshKeyRotationRemindersCommand;
-use App\Console\Commands\PruneServerCreateDraftsCommand;
-use App\Console\Commands\PruneServerCronJobRunsCommand;
-use App\Console\Commands\PruneTestingHostnameRecordsCommand;
+use App\Console\Scheduling\DplySchedule;
 use App\Http\Middleware\AuthenticateApiToken;
 use App\Http\Middleware\CaptureReferralCode;
 use App\Http\Middleware\EnforceMaintenanceMode;
 use App\Http\Middleware\EnsureApiTokenAbility;
 use App\Http\Middleware\EnsureServerServiceInstalled;
+use App\Http\Middleware\EnsureVmPlatformEnabled;
 use App\Http\Middleware\RedirectGuestsToComingSoon;
+use App\Http\Middleware\ResolveEdgeCustomDomain;
 use App\Http\Middleware\ResolveServerlessCustomDomain;
 use App\Http\Middleware\SetCurrentOrganization;
 use App\Http\Middleware\ValidateFleetOperatorToken;
 use App\Http\Middleware\ValidateMetricsIngestToken;
-use App\Jobs\CheckServerHealthJob;
-use App\Jobs\CheckSiteUrlHealthJob;
-use App\Jobs\RunServerInsightsJob;
-use App\Jobs\RunSiteInsightsJob;
-use App\Jobs\RunSiteUptimeMonitorCheckJob;
-use App\Jobs\ScanServerSshLoginsJob;
-use App\Jobs\SyncServerSystemdServicesJob;
-use App\Jobs\UpgradeGuestMetricsScriptJob;
-use App\Models\Server;
-use App\Models\Site;
-use App\Models\SiteUptimeMonitor;
-use App\Services\Servers\ServerMetricsGuestScript;
+use App\Support\DplyRuntime;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
 use Laravel\Pennant\Middleware\EnsureFeaturesAreActive;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -47,154 +31,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withSchedule(function (Schedule $schedule): void {
-        $schedule->call(function (): void {
-            Server::query()
-                ->where('status', Server::STATUS_READY)
-                ->whereNotNull('ip_address')
-                ->each(fn (Server $server) => CheckServerHealthJob::dispatch($server));
-        })->everyFiveMinutes();
+        if (! DplyRuntime::runsScheduler()) {
+            return;
+        }
 
-        $schedule->call(function (): void {
-            if (! config('dply.site_health_check_enabled', true)) {
-                return;
-            }
-            Site::query()
-                ->whereIn('status', [
-                    Site::STATUS_NGINX_ACTIVE,
-                    Site::STATUS_APACHE_ACTIVE,
-                    Site::STATUS_CADDY_ACTIVE,
-                    Site::STATUS_OPENLITESPEED_ACTIVE,
-                    Site::STATUS_TRAEFIK_ACTIVE,
-                ])
-                ->whereHas('domains')
-                ->pluck('id')
-                ->each(fn (int $id) => CheckSiteUrlHealthJob::dispatch($id));
-        })->everyTenMinutes();
-
-        $schedule->call(function (): void {
-            if (! config('site_uptime.enabled', true)) {
-                return;
-            }
-            SiteUptimeMonitor::query()
-                ->pluck('id')
-                ->each(fn (string $id) => RunSiteUptimeMonitorCheckJob::dispatch($id));
-        })->everyFiveMinutes();
-
-        // SSH login notifications. Dispatches a per-server scan job only for
-        // servers that actually have a `server.ssh_login` subscriber — there's
-        // no point paying the SSH cost when nothing is listening. The job
-        // diffs `last -F` against meta.ssh_login_last_seen_at and publishes
-        // a NotificationEvent per new entry.
-        $schedule->call(function (): void {
-            ScanServerSshLoginsJob::eligibleServers()
-                ->each(fn (Server $server) => ScanServerSshLoginsJob::dispatch((string) $server->id));
-        })->everyFiveMinutes();
-
-        $schedule->command(FlushDeployDigestCommand::class)
-            ->hourly()
-            ->when(fn (): bool => (int) config('dply.deploy_digest_hours', 0) > 0);
-
-        $schedule->command(ProcessScheduledServerDeletionsCommand::class)->everyMinute();
-
-        // Sweep edge sites for backend status updates. Runs every
-        // minute so an active deploy reaches "active" within ~60s
-        // of the backend reporting ready.
-        $schedule->command(EdgePollStatusCommand::class)->everyMinute();
-
-        // Drive the Laravel scheduler + queue worker on serverless functions
-        // — DigitalOcean Functions has no long-running process of its own.
-        $schedule->command(\App\Console\Commands\ServerlessTickCommand::class)
-            ->everyMinute()
-            ->withoutOverlapping();
-
-        $schedule->command(\App\Console\Commands\SyncAllOrganizationBillingCommand::class)->dailyAt('02:30');
-
-        $schedule->command(PruneServerCronJobRunsCommand::class)->dailyAt('03:15');
-        $schedule->command(PruneTestingHostnameRecordsCommand::class)->dailyAt('03:30');
-        $schedule->command(PruneServerCreateDraftsCommand::class)->dailyAt('03:45');
-        $schedule->command(\App\Console\Commands\PruneFunctionInvocationsCommand::class)->dailyAt('03:50');
-        // Q17 trust-window enforcement: revoke ephemeral SSH keys for migrations
-        // paused beyond 168h. Hourly cadence so the trust window doesn't quietly
-        // extend during scheduler downtime.
-        $schedule->command(\App\Console\Commands\ExpirePausedImportMigrationsCommand::class)->hourly();
-
-        $schedule->command(CheckSupervisorHealthCommand::class)
-            ->everyFifteenMinutes()
-            ->when(fn (): bool => (bool) config('dply.supervisor_health_check_enabled', true));
-
-        $schedule->command(ProcessSshKeyRotationRemindersCommand::class)->dailyAt('08:30');
-
-        $schedule->command(ProcessInsightDigestQueueCommand::class)->dailyAt('08:00');
-        $schedule->command(ProcessInsightDigestQueueCommand::class, ['--weekly' => true])->weeklyOn(1, '08:15');
-
-        $schedule->call(function (): void {
-            Server::query()
-                ->where('status', Server::STATUS_READY)
-                ->whereNotNull('ip_address')
-                ->pluck('id')
-                ->each(fn (string $id) => RunServerInsightsJob::dispatch($id));
-        })->hourly();
-
-        $schedule->call(function (): void {
-            Site::query()
-                ->whereIn('status', [
-                    Site::STATUS_NGINX_ACTIVE,
-                    Site::STATUS_APACHE_ACTIVE,
-                    Site::STATUS_CADDY_ACTIVE,
-                    Site::STATUS_OPENLITESPEED_ACTIVE,
-                    Site::STATUS_TRAEFIK_ACTIVE,
-                ])
-                ->pluck('id')
-                ->each(fn (string $id) => RunSiteInsightsJob::dispatch($id));
-        })->everyTwoHours();
-
-        $schedule->call(function (): void {
-            if (! (bool) config('server_services.systemd_inventory_schedule_enabled', true)) {
-                return;
-            }
-            if (! (bool) config('server_services.systemd_inventory_job_enabled', true)) {
-                return;
-            }
-            Server::query()
-                ->where('status', Server::STATUS_READY)
-                ->whereNotNull('ip_address')
-                ->whereNotNull('ssh_private_key')
-                ->pluck('id')
-                ->each(fn (string $id) => SyncServerSystemdServicesJob::dispatch($id));
-        })->everyFiveMinutes();
-
-        $schedule->command(FlushServerSystemdNotificationDigestCommand::class)
-            ->hourlyAt(12)
-            ->when(fn (): bool => (bool) config('server_services.systemd_digest_flush_enabled', true));
-
-        // Sweep ready servers and push the bundled metrics script when
-        // its SHA differs from what's recorded as deployed. Job is
-        // ShouldBeUnique on serverId, so a slow droplet won't pile up
-        // duplicate upgrade attempts. The job itself re-checks the
-        // bundled SHA at runtime so a queue backlog can't push a stale
-        // script. Hourly cadence is the cheapest "new release reaches
-        // every droplet within an hour" without making this the
-        // queue's primary tenant.
-        $schedule->call(function (): void {
-            if (! (bool) config('server_metrics.guest_script.scheduled_upgrades_enabled', true)) {
-                return;
-            }
-            $bundledSha = app(ServerMetricsGuestScript::class)->bundledSha256();
-            if ($bundledSha === '') {
-                return;
-            }
-            Server::query()
-                ->where('status', Server::STATUS_READY)
-                ->whereNotNull('ip_address')
-                ->whereNotNull('ssh_private_key')
-                ->each(function (Server $server) use ($bundledSha): void {
-                    $deployedSha = (string) ($server->meta['monitoring_guest_script_sha'] ?? $server->meta['monitoring_guest_script_sha256'] ?? '');
-                    if ($deployedSha === $bundledSha) {
-                        return;
-                    }
-                    UpgradeGuestMetricsScriptJob::dispatch($server->id, $bundledSha);
-                });
-        })->hourly();
+        DplySchedule::register($schedule);
     })
     ->withMiddleware(function (Middleware $middleware): void {
         $trustedProxies = trim((string) env('TRUSTED_PROXIES', ''));
@@ -213,27 +54,90 @@ return Application::configure(basePath: dirname(__DIR__))
             'metrics.ingest' => ValidateMetricsIngestToken::class,
             'server.service.installed' => EnsureServerServiceInstalled::class,
             'feature' => EnsureFeaturesAreActive::class,
+            'vm.platform' => EnsureVmPlatformEnabled::class,
         ]);
-        $middleware->validateCsrfTokens(except: [
-            'hooks/*',
-            'webhook/*',
-            'webauthn/*',
-            'fn/*',
-        ]);
+        // Machine/external callback paths come from the single canonical list
+        // (App\Support\MachineCallbackPaths) the guest gates also use, so a new
+        // webhook can't be CSRF-exempt-but-gate-blocked (or vice-versa). The `up`
+        // health route in that list is a harmless extra here (GETs aren't CSRF
+        // checked); webauthn is CSRF-specific so it's appended separately.
+        $middleware->preventRequestForgery(except: array_merge(
+            \App\Support\MachineCallbackPaths::PATTERNS,
+            [
+                // Passkey ceremony endpoints (cross-origin, token-auth'd).
+                'webauthn/*',
+            ],
+        ));
 
         // Custom-domain short-circuit MUST run before the normal web stack
         // so a request to `api.acme.com/` doesn't fall through to the
         // marketing welcome view (which has no host constraint on /).
         $middleware->prependToGroup('web', [
             ResolveServerlessCustomDomain::class,
+            ResolveEdgeCustomDomain::class,
         ]);
 
         $middleware->appendToGroup('web', [
             EnforceMaintenanceMode::class,
             CaptureReferralCode::class,
             RedirectGuestsToComingSoon::class,
+            // Workspace deep-link guard: 404s requests for workspace routes the
+            // bound server can't reach (tag-gated rows that lack the required
+            // installed-service tag; role-gated rows hidden by role_nav_keys).
+            // Short-circuits for non-server routes via an `instanceof` check,
+            // so the cost is one route-binding lookup per web request.
+            EnsureServerServiceInstalled::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Friendly handler for cache/queue backend connection failures. With
+        // CACHE_STORE=redis (or QUEUE_CONNECTION=redis) pointing at a managed
+        // Redis box, an outage means every page render touches a dead Redis
+        // connection. config/database.php sets a 2s timeout so this surfaces
+        // FAST as a RedisException — without this render handler the operator
+        // sees a raw stack trace; with it they get a diagnostic page that
+        // names which env vars to inspect.
+        $exceptions->render(function (RedisException $e, Request $request) {
+            $payload = [
+                'error' => 'redis_unreachable',
+                'message' => $e->getMessage(),
+                'host' => (string) env('REDIS_HOST', '127.0.0.1'),
+                'port' => (string) env('REDIS_PORT', '6379'),
+                'cacheStore' => (string) env('CACHE_STORE', 'database'),
+                'queueConnection' => (string) env('QUEUE_CONNECTION', 'sync'),
+                'timeout' => (string) env('REDIS_TIMEOUT', '2.0'),
+            ];
+
+            // True API callers (Accept: application/json, no X-Livewire) get
+            // the raw payload so they can act programmatically. Everything
+            // else — GET pages, plain POSTs, AND Livewire updates — gets the
+            // rendered HTML diagnostic. Livewire's POST returning HTML 503
+            // surfaces in the browser as a navigation to the response body,
+            // which is what we want here: a self-contained error page the
+            // operator can read regardless of how the request originated.
+            $isApiClient = $request->expectsJson() && ! $request->hasHeader('X-Livewire');
+
+            if ($isApiClient) {
+                return response()->json($payload, 503);
+            }
+
+            return response()->view('errors.redis-unreachable', $payload, 503);
+        });
+
+        // A 404 raised inside a Livewire request must NOT render the full-page
+        // errors.layout: that view carries <x-site-header />, so when Livewire
+        // morphs (wire:navigate) or injects (update overlay) it into a page that
+        // already has the header, you get a duplicated header and a broken-looking
+        // nested 404. Serve a chrome-less variant to Livewire requests instead —
+        // it morphs in cleanly and offers a Refresh, since the usual cause is a
+        // stale snapshot pointing at a route/resource that has since moved.
+        // (API callers still fall through to Laravel's JSON 404.)
+        $exceptions->render(function (NotFoundHttpException $e, Request $request) {
+            // X-Livewire = component update (POST); X-Livewire-Navigate = the
+            // wire:navigate SPA fetch (GET) — the latter is what morphed the
+            // duplicated header in. Catch both.
+            if ($request->hasHeader('X-Livewire') || $request->hasHeader('X-Livewire-Navigate')) {
+                return response()->view('errors.livewire-404', [], 404);
+            }
+        });
     })->create();

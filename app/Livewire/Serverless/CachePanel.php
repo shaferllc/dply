@@ -7,6 +7,7 @@ namespace App\Livewire\Serverless;
 use App\Jobs\ProvisionServerlessCacheJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Site;
+use App\Services\Serverless\ServerlessCostEstimator;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
@@ -75,7 +76,7 @@ class CachePanel extends Component
         return view('livewire.serverless.cache-panel', [
             'cache' => $cache,
             'state' => (string) ($cache['status'] ?? ''),
-            'estimate' => app(\App\Services\Serverless\ServerlessCostEstimator::class)->cacheMonthly($this->size),
+            'estimate' => app(ServerlessCostEstimator::class)->cacheMonthly($this->size),
         ]);
     }
 }

@@ -1,3 +1,15 @@
+@php
+    $tonePalette = [
+        'sage' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
+        'sand' => 'bg-brand-sand/55 text-brand-forest ring-brand-ink/10',
+    ];
+
+    $isAdmin = $organization->hasAdminAccess(auth()->user());
+    $teamCount = $organization->teams->count();
+    $totalMemberSlots = $organization->teams->sum(fn ($t) => $t->users->count());
+    $orgMemberCount = $organization->users->count();
+@endphp
+
 <div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <x-organization-shell :organization="$organization" section="teams">
@@ -9,130 +21,213 @@
                 ['label' => __('Teams'), 'icon' => 'rectangle-group'],
             ]" />
 
-            <div class="space-y-8">
-                <div class="dply-card overflow-hidden">
-                    <div class="grid lg:grid-cols-12 gap-6 lg:gap-10 lg:items-center p-6 sm:p-8">
-                        <div class="lg:col-span-5 xl:col-span-4">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Collaboration') }}</p>
-                            <h2 class="mt-2 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Teams') }}</h2>
-                            <p class="mt-3 max-w-xl text-sm leading-relaxed text-brand-moss">
-                                {{ __('Group members to scope servers, sites, and notifications. Organization members can be added to multiple teams.') }}
-                            </p>
-                        </div>
-                        <div class="lg:col-span-7 xl:col-span-8">
-                            <div class="flex flex-col gap-4 sm:ml-auto sm:max-w-lg lg:max-w-none">
-                                <div class="flex flex-wrap items-center justify-end gap-2 rounded-2xl p-2 sm:p-2.5 ">
-                                    <a
-                                        href="{{ route('docs.markdown', ['slug' => 'org-roles-and-limits']) }}"
-                                        wire:navigate
-                                        class="inline-flex items-center gap-2 rounded-xl border border-transparent bg-white/90 px-3 py-2 text-sm font-medium text-brand-ink shadow-sm ring-1 ring-brand-ink/10 transition hover:bg-white hover:ring-brand-sage/35 dark:bg-zinc-900/80 dark:ring-brand-mist/20 dark:hover:bg-zinc-900"
-                                    >
-                                        <x-heroicon-o-queue-list class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
-                                        {{ __('Roles & limits') }}
-                                    </a>
-                                    <a
-                                        href="{{ route('docs.index') }}"
-                                        wire:navigate
-                                        class="inline-flex items-center gap-2 rounded-xl border border-transparent bg-white/90 px-3 py-2 text-sm font-medium text-brand-ink shadow-sm ring-1 ring-brand-ink/10 transition hover:bg-white hover:ring-brand-sage/35 dark:bg-zinc-900/80 dark:ring-brand-mist/20 dark:hover:bg-zinc-900"
-                                    >
-                                        <x-heroicon-o-book-open class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
-                                        {{ __('Documentation') }}
-                                    </a>
-                                </div>
+            {{-- Hero: positioning + at-a-glance counts. --}}
+            <section class="dply-card overflow-hidden">
+                <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
+                    <div class="lg:col-span-7">
+                        <div class="flex items-start gap-3">
+                            <x-icon-badge size="md">
+                                <x-heroicon-o-rectangle-group class="h-6 w-6" aria-hidden="true" />
+                            </x-icon-badge>
+                            <div class="min-w-0">
+                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Collaboration') }}</p>
+                                <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Teams') }}</h2>
+                                <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
+                                    {{ __('Group members to scope servers, sites, and notifications. Each member can belong to multiple teams.') }}
+                                </p>
                             </div>
                         </div>
-                    </div>
-                </div>
-
-                <div class="dply-card overflow-hidden">
-                    <div class="grid lg:grid-cols-12 gap-6 lg:gap-10 p-6 sm:p-8">
-                        <div class="lg:col-span-4">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Team directory') }}</p>
-                            <h3 class="mt-2 text-lg font-semibold text-brand-ink">{{ __('Your teams') }}</h3>
-                            <p class="mt-2 text-sm leading-relaxed text-brand-moss">{{ __('Rename teams, manage membership, or open per-team notification channels.') }}</p>
-                            <p class="mt-4">
-                                <a href="{{ route('docs.markdown', ['slug' => 'org-roles-and-limits']) }}" wire:navigate class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-sage underline decoration-brand-sage/35 underline-offset-2 transition hover:text-brand-ink hover:decoration-brand-ink/30">{{ __('Roles & limits') }} <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden="true" /></a>
-                            </p>
-                        </div>
-                        <div class="lg:col-span-8 min-w-0 space-y-5">
-                            @if ($organization->hasAdminAccess(auth()->user()))
-                                <div class="flex justify-end">
-                                    <x-primary-button type="button" wire:click="openCreateTeamModal">
-                                        <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                        {{ __('Create team') }}
-                                    </x-primary-button>
-                                </div>
+                        <div class="mt-4 flex flex-wrap items-center gap-2">
+                            <x-outline-link href="{{ route('docs.markdown', ['slug' => 'org-roles-and-limits']) }}" wire:navigate>
+                                <x-heroicon-o-queue-list class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                {{ __('Roles & limits') }}
+                            </x-outline-link>
+                            <x-outline-link href="{{ route('docs.index') }}" wire:navigate>
+                                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                {{ __('Documentation') }}
+                            </x-outline-link>
+                            <x-outline-link href="{{ route('organizations.members', $organization) }}" wire:navigate>
+                                <x-heroicon-o-user-group class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                {{ __('Members') }}
+                            </x-outline-link>
+                            @if ($isAdmin)
+                                <button
+                                    type="button"
+                                    wire:click="openCreateTeamModal"
+                                    class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                                >
+                                    <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                    {{ __('Create team') }}
+                                </button>
                             @endif
+                        </div>
+                    </div>
+                    <dl class="grid grid-cols-3 gap-2 lg:col-span-5">
+                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Teams') }}</dt>
+                            <dd class="mt-1 flex items-baseline gap-1.5">
+                                <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $teamCount }}</span>
+                                <span class="text-[11px] text-brand-moss">{{ trans_choice('total|total', $teamCount) }}</span>
+                            </dd>
+                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('In this organization') }}</p>
+                        </div>
+                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Memberships') }}</dt>
+                            <dd class="mt-1 flex items-baseline gap-1.5">
+                                <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $totalMemberSlots }}</span>
+                                <span class="text-[11px] text-brand-moss">{{ trans_choice('slot|slots', $totalMemberSlots) }}</span>
+                            </dd>
+                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Across all teams') }}</p>
+                        </div>
+                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Members') }}</dt>
+                            <dd class="mt-1 flex items-baseline gap-1.5">
+                                <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $orgMemberCount }}</span>
+                                <span class="text-[11px] text-brand-moss">{{ trans_choice('available|available', $orgMemberCount) }}</span>
+                            </dd>
+                            <a href="{{ route('organizations.members', $organization) }}" wire:navigate class="mt-1 inline-flex text-[11px] font-semibold text-brand-sage hover:text-brand-ink">{{ __('Manage') }} →</a>
+                        </div>
+                    </dl>
+                </div>
+            </section>
 
-                            @if ($organization->teams->isEmpty())
-                                <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/10 px-6 py-12 text-center text-sm text-brand-moss dark:border-brand-mist/20 dark:bg-zinc-800/40">
-                                    {{ __('No teams yet.') }}
-                                </div>
-                            @else
-                                <ul class="space-y-4">
+            <div class="mt-6 space-y-6">
+                <section class="dply-card overflow-hidden">
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                        <x-icon-badge>
+                            <x-heroicon-o-user-group class="h-5 w-5" aria-hidden="true" />
+                        </x-icon-badge>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Directory') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Your teams') }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Rename teams, manage membership, or open per-team notification channels.') }}</p>
+                        </div>
+                        @if ($isAdmin)
+                                <button
+                                    type="button"
+                                    wire:click="openCreateTeamModal"
+                                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                                >
+                                    <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                    {{ __('New team') }}
+                                </button>
+                            @endif
+                    </div>
+
+                    <div class="p-6 sm:p-7">
+                        @if ($organization->teams->isEmpty())
+                            <div class="rounded-2xl border border-dashed border-brand-ink/15 bg-brand-cream/30 px-6 py-12 text-center">
+                                <span class="mx-auto inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
+                                    <x-heroicon-o-rectangle-group class="h-5 w-5" aria-hidden="true" />
+                                </span>
+                                <p class="mt-3 text-sm font-medium text-brand-ink">{{ __('No teams yet.') }}</p>
+                                <p class="mt-1 text-xs text-brand-mist">{{ __('Teams let you scope notifications and group access.') }}</p>
+                                @if ($isAdmin)
+                                    <button type="button" wire:click="openCreateTeamModal" class="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-sage hover:text-brand-ink">
+                                        <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                        {{ __('Create your first team') }}
+                                    </button>
+                                @endif
+                            </div>
+                        @else
+                            <ul class="space-y-4">
                                     @foreach ($organization->teams as $team)
                                         @php
                                             $membersAvailableToAdd = $organization->users->diff($team->users);
+                                            $isAdmin = $organization->hasAdminAccess(auth()->user());
                                         @endphp
-                                        <li class="rounded-xl border border-brand-mist bg-white p-4 shadow-sm dark:border-brand-mist/25 dark:bg-zinc-900/80">
-                                            <div class="flex justify-between items-start gap-4">
-                                                <div class="min-w-0 flex-1">
-                                                    <input
-                                                        type="text"
-                                                        wire:model="teamNames.{{ $team->id }}"
-                                                        wire:blur='promptSaveTeamNameOnBlur(@js($team->id))'
-                                                        class="w-full max-w-md border-0 border-b border-transparent bg-transparent font-medium text-brand-ink hover:border-brand-mist focus:border-brand-forest focus:ring-0 text-sm p-0"
-                                                    />
-                                                    @error('teamNames.'.$team->id)
-                                                        <span class="block text-xs text-red-600">{{ $message }}</span>
-                                                    @enderror
-                                                    <p class="text-brand-moss text-sm mt-1">{{ trans_choice(':count member|:count members', $team->users->count()) }}</p>
-                                                    <p class="mt-2">
-                                                        <a href="{{ route('teams.notification-channels', [$organization, $team]) }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('Team notification channels') }} →</a>
-                                                    </p>
+                                        <li class="overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm dark:border-brand-mist/20 dark:bg-zinc-900/80">
+                                            {{-- Header strip: team name (editable inline) + delete.
+                                                 Mirrors the sandy "MEMBERS" bar on the member directory
+                                                 so both cards read as the same primitive. --}}
+                                            <div class="border-b border-brand-ink/10 bg-brand-sand/35 px-4 py-2.5 dark:border-brand-mist/15 dark:bg-zinc-800/60">
+                                                <div class="flex items-center justify-between gap-3">
+                                                    <div class="min-w-0 flex-1">
+                                                        <p class="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ __('Team') }}</p>
+                                                        <input
+                                                            type="text"
+                                                            wire:model="teamNames.{{ $team->id }}"
+                                                            wire:blur='promptSaveTeamNameOnBlur(@js($team->id))'
+                                                            class="mt-0.5 w-full max-w-md border-0 bg-transparent p-0 text-sm font-semibold text-brand-ink focus:ring-0"
+                                                            aria-label="{{ __('Team name') }}"
+                                                        />
+                                                        @error('teamNames.'.$team->id)
+                                                            <span class="mt-1 block text-xs text-red-600">{{ $message }}</span>
+                                                        @enderror
+                                                    </div>
+                                                    @if ($isAdmin)
+                                                        <button
+                                                            type="button"
+                                                            wire:click='promptDeleteTeam(@js($team->id))'
+                                                            class="shrink-0 text-sm font-medium text-red-600 hover:text-red-700 hover:underline dark:text-red-400"
+                                                        >{{ __('Delete') }}</button>
+                                                    @endif
                                                 </div>
-                                                @if ($organization->hasAdminAccess(auth()->user()))
-                                                    <button
-                                                        type="button"
-                                                        wire:click='promptDeleteTeam(@js($team->id))'
-                                                        class="shrink-0 text-sm font-medium text-red-600 hover:underline dark:text-red-400"
-                                                    >{{ __('Delete') }}</button>
-                                                @endif
                                             </div>
-                                            <div class="mt-3 flex flex-wrap gap-2 items-center">
-                                                @foreach ($team->users as $member)
-                                                    <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/60 px-2 py-0.5 text-xs text-brand-ink dark:bg-zinc-800 dark:text-brand-mist">
-                                                        {{ $member->name }}
-                                                        @if ($organization->hasAdminAccess(auth()->user()))
-                                                            <button type="button" wire:click='promptRemoveTeamMember(@js($team->id), @js($member->id))' class="text-brand-moss hover:text-red-600" aria-label="{{ __('Remove from team') }}">&times;</button>
+
+                                            {{-- Section header: member count --}}
+                                            <div class="border-b border-brand-ink/10 bg-brand-sand/35 px-4 py-2.5 dark:border-brand-mist/15 dark:bg-zinc-800/60">
+                                                <p class="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-brand-moss">{{ trans_choice(':count member|:count members', $team->users->count()) }}</p>
+                                            </div>
+
+                                            {{-- Member rows. Same shape as the member directory rows
+                                                 (name · email · trailing chip) but the chip is the
+                                                 remove action on team membership. --}}
+                                            <ul class="divide-y divide-brand-ink/10 dark:divide-brand-mist/15">
+                                                @forelse ($team->users as $member)
+                                                    <li class="flex items-center justify-between gap-4 px-4 py-3.5 transition-colors hover:bg-brand-sand/25 dark:hover:bg-zinc-800/50">
+                                                        <div class="min-w-0">
+                                                            <span class="font-medium text-brand-ink">{{ $member->name }}</span>
+                                                            <span class="mt-0.5 block text-sm text-brand-moss sm:mt-0 sm:ml-2 sm:inline">{{ $member->email }}</span>
+                                                        </div>
+                                                        @if ($isAdmin)
+                                                            <button
+                                                                type="button"
+                                                                wire:click='promptRemoveTeamMember(@js($team->id), @js($member->id))'
+                                                                class="shrink-0 text-xs font-medium text-red-600 hover:text-red-700 hover:underline dark:text-red-400"
+                                                                aria-label="{{ __('Remove :name from team', ['name' => $member->name]) }}"
+                                                            >{{ __('Remove') }}</button>
                                                         @endif
-                                                    </span>
-                                                @endforeach
-                                                @if ($organization->hasAdminAccess(auth()->user()) && $membersAvailableToAdd->isNotEmpty())
-                                                    <div class="inline-flex flex-wrap items-center gap-1">
-                                                        <select wire:model.live="addMemberSelected.{{ $team->id }}" class="rounded-lg border border-brand-mist bg-white text-xs py-1 dark:border-brand-mist/30 dark:bg-zinc-900">
+                                                    </li>
+                                                @empty
+                                                    <li class="px-4 py-4 text-sm text-brand-moss">{{ __('No members yet.') }}</li>
+                                                @endforelse
+                                            </ul>
+
+                                            {{-- Footer: add-member control + notification channels link --}}
+                                            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-brand-ink/10 bg-brand-sand/20 px-4 py-3 dark:border-brand-mist/15 dark:bg-zinc-800/40">
+                                                @if ($isAdmin && $membersAvailableToAdd->isNotEmpty())
+                                                    <div class="inline-flex items-center gap-2">
+                                                        <select wire:model.live="addMemberSelected.{{ $team->id }}" class="rounded-lg border-brand-ink/15 bg-white py-1.5 text-xs dark:border-brand-mist/30 dark:bg-zinc-900">
                                                             <option value="">{{ __('Add member…') }}</option>
                                                             @foreach ($membersAvailableToAdd as $u)
                                                                 <option value="{{ $u->id }}">{{ $u->name }}</option>
                                                             @endforeach
                                                         </select>
-                                                        <button type="button" wire:click='addTeamMember(@js($team->id))' class="text-brand-sage hover:text-brand-ink text-xs font-medium">{{ __('Add') }}</button>
+                                                        <button type="button" wire:click='addTeamMember(@js($team->id))' class="inline-flex items-center gap-1 text-xs font-semibold text-brand-sage hover:text-brand-ink">
+                                                            <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                                            {{ __('Add') }}
+                                                        </button>
                                                     </div>
+                                                @else
+                                                    <span></span>
                                                 @endif
-                                                @error('team_'.$team->id)
-                                                    <span class="w-full text-xs text-red-600">{{ $message }}</span>
-                                                @enderror
+                                                <a href="{{ route('teams.notification-channels', [$organization, $team]) }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-ink">
+                                                    {{ __('Team notification channels') }} →
+                                                </a>
                                             </div>
+                                            @error('team_'.$team->id)
+                                                <p class="border-t border-red-200 bg-red-50/60 px-4 py-2 text-xs text-red-700">{{ $message }}</p>
+                                            @enderror
                                         </li>
                                     @endforeach
                                 </ul>
                             @endif
                         </div>
-                    </div>
+                    </section>
                 </div>
-            </div>
-        </x-organization-shell>
-    </div>
+            </x-organization-shell>
+        </div>
 
     @if ($organization->hasAdminAccess(auth()->user()))
         <x-modal
@@ -144,12 +239,17 @@
             focusable
         >
             <form wire:submit="createTeam">
-                <div class="border-b border-brand-ink/10 px-6 py-5 dark:border-brand-mist/20">
-                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Create team') }}</p>
-                    <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Name your team') }}</h2>
-                    <p class="mt-2 text-sm leading-6 text-brand-moss">
-                        {{ __('Teams help you scope notifications and access. You can add organization members after the team is created.') }}
-                    </p>
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+                    <x-icon-badge>
+                        <x-heroicon-o-rectangle-group class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Create team') }}</p>
+                        <h2 class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Name your team') }}</h2>
+                        <p class="mt-1 text-sm leading-6 text-brand-moss">
+                            {{ __('Teams help you scope notifications and access. You can add organization members after the team is created.') }}
+                        </p>
+                    </div>
                 </div>
 
                 <div class="space-y-5 px-6 py-6">
@@ -169,14 +269,17 @@
                     </div>
                 </div>
 
-                <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 px-6 py-4 dark:border-brand-mist/20">
+                <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
                     <x-secondary-button type="button" wire:click="closeCreateTeamModal">
                         {{ __('Cancel') }}
                     </x-secondary-button>
                     <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="createTeam">
-                        <span wire:loading.remove wire:target="createTeam">{{ __('Create team') }}</span>
+                        <span wire:loading.remove wire:target="createTeam" class="inline-flex items-center gap-2">
+                            <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ __('Create team') }}
+                        </span>
                         <span wire:loading wire:target="createTeam" class="inline-flex items-center gap-2">
-                            <x-spinner variant="cream" />
+                            <x-spinner variant="cream" size="sm" />
                             {{ __('Creating…') }}
                         </span>
                     </x-primary-button>

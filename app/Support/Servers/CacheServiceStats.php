@@ -7,6 +7,8 @@ namespace App\Support\Servers;
 use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -55,6 +57,146 @@ class CacheServiceStats
     public function forget(Server $server, string $engine): void
     {
         Cache::forget('server.'.$server->id.'.cache_stats_v1.'.$engine);
+        Cache::forget('server.'.$server->id.'.cache_overview_v1.'.$engine);
+    }
+
+    /**
+     * Richer, structured snapshot tuned for the dedicated-cache server Overview page tiles
+     * (server_role redis/valkey). Returns numeric/typed fields instead of pre-formatted
+     * label/value pairs so the view can compute ratios, bars, and relative timestamps.
+     *
+     * Short TTL (60s default) — the Overview is the "is my Redis healthy right now" page;
+     * the 24h cache used by {@see snapshot()} is too stale. Memcached returns null because
+     * memcached doesn't expose the redis-family fields the tile pack expects.
+     *
+     * @return array{
+     *     reachable: bool,
+     *     engine: string,
+     *     version: ?string,
+     *     uptime_seconds: ?int,
+     *     uptime_human: ?string,
+     *     connected_clients: ?int,
+     *     ops_per_sec: ?int,
+     *     used_memory_human: ?string,
+     *     maxmemory_human: ?string,
+     *     used_memory_pct: ?float,
+     *     keyspace_hits: ?int,
+     *     keyspace_misses: ?int,
+     *     hit_rate: ?float,
+     *     total_keys: ?int,
+     *     rdb_last_save_at: ?CarbonInterface,
+     *     aof_enabled: ?bool,
+     *     role: ?string,
+     *     connected_replicas: ?int,
+     * }|null
+     */
+    public function overviewSnapshot(Server $server, ServerCacheService $cacheService): ?array
+    {
+        if (! ServerCacheService::engineSupportsAuth($cacheService->engine)) {
+            return null;
+        }
+
+        $ttl = max(0, (int) config('server_cache.overview_cache_ttl_seconds', 60));
+        $key = 'server.'.$server->id.'.cache_overview_v1.'.$cacheService->engine;
+
+        $compute = function () use ($server, $cacheService): array {
+            $raw = $this->rawInfo($server, $cacheService);
+            if ($raw === null) {
+                return $this->emptyOverviewPayload($cacheService->engine, reachable: false);
+            }
+
+            return $this->buildOverviewPayload($cacheService->engine, $this->parseRedisInfo($raw));
+        };
+
+        // Fail open if the cache backend itself is down — common foot-gun is the
+        // dply app's own CACHE_STORE pointing at the very Redis box being managed.
+        // Without this guard the page 502s the moment that box goes unreachable.
+        try {
+            return $ttl === 0 ? $compute() : Cache::remember($key, $ttl, $compute);
+        } catch (\Throwable) {
+            return $compute();
+        }
+    }
+
+    /**
+     * @param  array<string, string>  $parsed
+     * @return array<string, mixed>
+     */
+    private function buildOverviewPayload(string $engine, array $parsed): array
+    {
+        $hits = isset($parsed['keyspace_hits']) ? (int) $parsed['keyspace_hits'] : null;
+        $misses = isset($parsed['keyspace_misses']) ? (int) $parsed['keyspace_misses'] : null;
+        $hitTotal = ($hits ?? 0) + ($misses ?? 0);
+        $hitRate = $hitTotal > 0 ? ($hits ?? 0) / $hitTotal : null;
+
+        // INFO emits `db0:keys=12,expires=3,avg_ttl=0` lines — sum the keys= component
+        // across all databases so the tile reads "total keys on this box" not "db0 only".
+        $totalKeys = null;
+        foreach ($parsed as $k => $v) {
+            if (! preg_match('/^db\d+$/', $k)) {
+                continue;
+            }
+            if (preg_match('/keys=(\d+)/', (string) $v, $m)) {
+                $totalKeys = ($totalKeys ?? 0) + (int) $m[1];
+            }
+        }
+
+        $maxMemory = isset($parsed['maxmemory']) ? (int) $parsed['maxmemory'] : 0;
+        $usedMemory = isset($parsed['used_memory']) ? (int) $parsed['used_memory'] : 0;
+        $usedPct = $maxMemory > 0 ? min(100.0, ($usedMemory / $maxMemory) * 100) : null;
+
+        $lastSave = isset($parsed['rdb_last_save_time']) ? (int) $parsed['rdb_last_save_time'] : null;
+        $lastSaveAt = $lastSave !== null && $lastSave > 0 ? CarbonImmutable::createFromTimestamp($lastSave) : null;
+
+        return [
+            'reachable' => true,
+            'engine' => $engine,
+            'version' => isset($parsed['redis_version']) ? (string) $parsed['redis_version'] : null,
+            'uptime_seconds' => isset($parsed['uptime_in_seconds']) ? (int) $parsed['uptime_in_seconds'] : null,
+            'uptime_human' => isset($parsed['uptime_in_seconds']) ? $this->formatUptime((int) $parsed['uptime_in_seconds']) : null,
+            'connected_clients' => isset($parsed['connected_clients']) ? (int) $parsed['connected_clients'] : null,
+            'ops_per_sec' => isset($parsed['instantaneous_ops_per_sec']) ? (int) $parsed['instantaneous_ops_per_sec'] : null,
+            'used_memory_human' => isset($parsed['used_memory_human']) ? (string) $parsed['used_memory_human'] : null,
+            // INFO returns maxmemory_human as "0B" when unlimited; surface as null so the
+            // view can render "—" rather than a misleading "0B" cap.
+            'maxmemory_human' => $maxMemory > 0 && isset($parsed['maxmemory_human']) ? (string) $parsed['maxmemory_human'] : null,
+            'used_memory_pct' => $usedPct,
+            'keyspace_hits' => $hits,
+            'keyspace_misses' => $misses,
+            'hit_rate' => $hitRate,
+            'total_keys' => $totalKeys,
+            'rdb_last_save_at' => $lastSaveAt,
+            'aof_enabled' => isset($parsed['aof_enabled']) ? ((int) $parsed['aof_enabled']) === 1 : null,
+            'role' => isset($parsed['role']) ? (string) $parsed['role'] : null,
+            'connected_replicas' => isset($parsed['connected_slaves']) ? (int) $parsed['connected_slaves'] : null,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function emptyOverviewPayload(string $engine, bool $reachable): array
+    {
+        return [
+            'reachable' => $reachable,
+            'engine' => $engine,
+            'version' => null,
+            'uptime_seconds' => null,
+            'uptime_human' => null,
+            'connected_clients' => null,
+            'ops_per_sec' => null,
+            'used_memory_human' => null,
+            'maxmemory_human' => null,
+            'used_memory_pct' => null,
+            'keyspace_hits' => null,
+            'keyspace_misses' => null,
+            'hit_rate' => null,
+            'total_keys' => null,
+            'rdb_last_save_at' => null,
+            'aof_enabled' => null,
+            'role' => null,
+            'connected_replicas' => null,
+        ];
     }
 
     /**
@@ -85,15 +227,21 @@ class CacheServiceStats
         }
 
         $cli = self::binaryFor($cacheService->engine);
+        // AUTH flag must come AFTER the cli binary — `-a 'pw' valkey-cli …`
+        // makes bash treat `-a` as the program. `--no-auth-warning` keeps the
+        // safety message off stderr (which we 2>&1 below) so the parser
+        // doesn't see "Warning: …" prefixed onto the INFO buffer.
         $authFlag = filled($cacheService->auth_password ?? null)
-            ? '-a '.escapeshellarg((string) $cacheService->auth_password).' '
+            ? ' -a '.escapeshellarg((string) $cacheService->auth_password).' --no-auth-warning'
             : '';
+        $cliPath = escapeshellarg($cli);
+        $port = (int) $cacheService->port;
 
         try {
             $output = $this->executor->runInlineBash(
                 $server,
                 'cache-service:info-raw:'.$cacheService->engine,
-                'command -v '.escapeshellarg($cli).' >/dev/null && '.$authFlag.escapeshellarg($cli).' -p '.(int) $cacheService->port.' INFO 2>/dev/null || '.$authFlag.'redis-cli -p '.(int) $cacheService->port.' INFO 2>/dev/null',
+                'command -v '.$cliPath.' >/dev/null && '.$cliPath.$authFlag.' -p '.$port.' INFO 2>/dev/null || redis-cli'.$authFlag.' -p '.$port.' INFO 2>/dev/null',
                 timeoutSeconds: 30,
                 asRoot: false,
             );
@@ -129,14 +277,16 @@ class CacheServiceStats
         $cli = self::binaryFor($cacheService->engine);
 
         $authFlag = filled($cacheService->auth_password ?? null)
-            ? '-a '.escapeshellarg((string) $cacheService->auth_password).' '
+            ? ' -a '.escapeshellarg((string) $cacheService->auth_password).' --no-auth-warning'
             : '';
+        $cliPath = escapeshellarg($cli);
+        $port = (int) $cacheService->port;
 
         try {
             $output = $this->executor->runInlineBash(
                 $server,
                 'cache-service:clients:'.$cacheService->engine,
-                'command -v '.escapeshellarg($cli).' >/dev/null && '.$authFlag.escapeshellarg($cli).' -p '.(int) $cacheService->port.' CLIENT LIST 2>/dev/null || '.$authFlag.'redis-cli -p '.(int) $cacheService->port.' CLIENT LIST 2>/dev/null',
+                'command -v '.$cliPath.' >/dev/null && '.$cliPath.$authFlag.' -p '.$port.' CLIENT LIST 2>/dev/null || redis-cli'.$authFlag.' -p '.$port.' CLIENT LIST 2>/dev/null',
                 timeoutSeconds: 30,
                 asRoot: false,
             );
@@ -188,11 +338,19 @@ class CacheServiceStats
     private function redisInfo(Server $server, ServerCacheService $cacheService): array
     {
         $cli = self::binaryFor($cacheService->engine);
+        // Missing AUTH here is why the Status-grid `snapshot()` row used to
+        // come back empty whenever requirepass was set — the INFO call hit
+        // NOAUTH and we silently dropped the buffer on the floor.
+        $authFlag = filled($cacheService->auth_password ?? null)
+            ? ' -a '.escapeshellarg((string) $cacheService->auth_password).' --no-auth-warning'
+            : '';
+        $cliPath = escapeshellarg($cli);
+        $port = (int) $cacheService->port;
 
         $output = $this->executor->runInlineBash(
             $server,
             'cache-service:info:'.$cacheService->engine,
-            'command -v '.escapeshellarg($cli).' >/dev/null && '.escapeshellarg($cli).' -p '.(int) $cacheService->port.' INFO 2>/dev/null || redis-cli -p '.(int) $cacheService->port.' INFO 2>/dev/null',
+            'command -v '.$cliPath.' >/dev/null && '.$cliPath.$authFlag.' -p '.$port.' INFO 2>/dev/null || redis-cli'.$authFlag.' -p '.$port.' INFO 2>/dev/null',
             timeoutSeconds: 30,
             asRoot: false,
         );

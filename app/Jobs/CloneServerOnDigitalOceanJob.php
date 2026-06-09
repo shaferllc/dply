@@ -15,6 +15,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -69,7 +70,7 @@ class CloneServerOnDigitalOceanJob implements ShouldQueue
         $consoleRow = $this->latestCloneConsoleAction($clone);
         $emitter = $consoleRow !== null ? new ConsoleEmitter((string) $consoleRow->id) : null;
         if ($consoleRow !== null) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleRow->id)->update([
+            DB::table('console_actions')->where('id', $consoleRow->id)->update([
                 'status' => ConsoleAction::STATUS_RUNNING,
                 'started_at' => now(),
                 'updated_at' => now(),
@@ -210,7 +211,7 @@ class CloneServerOnDigitalOceanJob implements ShouldQueue
             // READY and pings ServerProvisionDispatch (which is a no-op for
             // clones because we deliberately did NOT copy server_role into
             // the clone's meta — see CloneServerOnDigitalOcean::cloneableMeta).
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleRow->id)->update([
+            DB::table('console_actions')->where('id', $consoleRow->id)->update([
                 'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'updated_at' => now(),
@@ -289,7 +290,7 @@ class CloneServerOnDigitalOceanJob implements ShouldQueue
         if ($consoleRow !== null) {
             try {
                 $emitter?->error($message, 'dply');
-                \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleRow->id)->update([
+                DB::table('console_actions')->where('id', $consoleRow->id)->update([
                     'status' => ConsoleAction::STATUS_FAILED,
                     'finished_at' => now(),
                     'error' => mb_substr($message, 0, 2000),

@@ -14,6 +14,10 @@
 /.claude/scheduled_tasks.lock
 /auth.json
 /node_modules
+/packages/*/node_modules
+/packages/*/.wrangler
+/packages/edge-worker/wrangler.generated.toml
+/packages/*/.dev.vars
 /public/build
 /public/hot
 /public/storage
@@ -23,3 +27,9 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+.deploy.env
+
+# Real per-role env files (secrets) — examples (.env.*.example) stay committed
+.env.prod
+.env.worker
+.env.*.local

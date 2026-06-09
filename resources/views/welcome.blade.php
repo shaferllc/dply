@@ -3,8 +3,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ config('app.name') }} – Enterprise infrastructure operations</title>
-    <meta name="description" content="Connect your cloud, govern credentials, and run commands across servers—with organizations, teams, and audit-ready workflows.">
+    <x-seo-meta
+        full-title="{{ config('app.name') }} – Enterprise infrastructure operations"
+        description="Connect your cloud, govern credentials, and run commands across servers—with organizations, teams, and audit-ready workflows." />
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     @include('partials.theme-head')
@@ -88,8 +89,8 @@
                                     src="{{ asset('images/dply-logo.svg') }}"
                                     alt="{{ config('app.name') }}"
                                     class="w-48 sm:w-56 mx-auto drop-shadow-sm"
-                                    width="224"
-                                    height="254"
+                                    width="148"
+                                    height="96"
                                 />
                                 <p class="mt-8 text-center text-sm text-brand-moss leading-relaxed">
                                     Your mark for disciplined deploys—olive, gold, and sage tones signal stability and precision across every customer touchpoint.

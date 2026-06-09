@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers;
 
+use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\Server;
@@ -12,13 +13,13 @@ use App\Services\Servers\ServerFileBrowserRemoteReader;
 use App\Support\Servers\FileBrowserListing;
 use App\Support\Servers\FileBrowserPathPolicy;
 use Illuminate\Contracts\View\View;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
-use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 /**
  * Server file browser (read-only + download in v1).
@@ -28,11 +29,17 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * on this surface entirely (sysadmin tool, not a deployer one).
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceFiles extends Component
 {
+    use RendersWorkspacePlaceholder;
     use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.files';
+
+    /** When true, render the coming-soon teaser instead of the full workspace. */
+    public bool $comingSoonPreview = false;
+
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
 
@@ -66,6 +73,18 @@ class WorkspaceFiles extends Component
 
     public function mount(Server $server): void
     {
+        if (! Feature::active('workspace.files')) {
+            if (workspace_files_preview_active()) {
+                $this->comingSoonPreview = true;
+                $this->bootWorkspace($server);
+
+                return;
+            }
+
+            abort(404);
+        }
+
+        $this->comingSoonPreview = false;
         $this->bootWorkspace($server);
         $this->denyDeployer();
 
@@ -74,8 +93,24 @@ class WorkspaceFiles extends Component
         }
     }
 
+    public function bootedRequiresFeature(): void
+    {
+        if ($this->comingSoonPreview) {
+            return;
+        }
+
+        $flag = $this->requiredFeature ?? '';
+        if ($flag !== '' && ! Feature::active($flag)) {
+            abort(404);
+        }
+    }
+
     public function render(): View
     {
+        if ($this->comingSoonPreview) {
+            return view('livewire.servers.workspace-files-preview');
+        }
+
         $listing = $this->serverOpsReady() ? $this->safeList() : null;
 
         return view('livewire.servers.workspace-files', [
@@ -96,7 +131,7 @@ class WorkspaceFiles extends Component
             $this->path = FileBrowserPathPolicy::join($this->path, $name);
             $this->filter = '';
         } catch (\InvalidArgumentException $e) {
-            $this->dispatchToast('error', $e->getMessage());
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -107,7 +142,7 @@ class WorkspaceFiles extends Component
             $this->path = FileBrowserPathPolicy::normalize($absolute);
             $this->filter = '';
         } catch (\InvalidArgumentException $e) {
-            $this->dispatchToast('error', $e->getMessage());
+            $this->toastError($e->getMessage());
         }
     }
 
@@ -122,7 +157,7 @@ class WorkspaceFiles extends Component
     public function toggleViewAsRoot(): void
     {
         if (! $this->canViewAsRoot()) {
-            $this->dispatchToast('error', __('Only org owners or admins can view as root.'));
+            $this->toastError(__('Only org owners or admins can view as root.'));
 
             return;
         }
@@ -142,7 +177,7 @@ class WorkspaceFiles extends Component
         try {
             $target = FileBrowserPathPolicy::join($this->path, $name);
         } catch (\InvalidArgumentException $e) {
-            $this->dispatchToast('error', $e->getMessage());
+            $this->toastError($e->getMessage());
 
             return;
         }
@@ -180,53 +215,6 @@ class WorkspaceFiles extends Component
         $this->viewingPath = null;
         $this->viewingContent = null;
         $this->viewingError = null;
-    }
-
-    /** Stream a file as an HTTP download (under the download cap). */
-    public function download(string $name): StreamedResponse|Response
-    {
-        try {
-            $target = FileBrowserPathPolicy::join($this->path, $name);
-        } catch (\InvalidArgumentException $e) {
-            abort(400, $e->getMessage());
-        }
-
-        $reader = app(ServerFileBrowserRemoteReader::class);
-        $cap = (int) config('server_file_browser.download_max_bytes', 26_214_400);
-
-        $read = $reader->read($this->server, $target, 0, $this->effectiveLoginUser());
-        if ($read->size > $cap) {
-            abort(413, __('File is larger than the download cap; use Manage → Run instead.'));
-        }
-
-        $login = $this->effectiveLoginUser();
-        $logger = app(ServerFileBrowserAuditLogger::class);
-
-        $streamed = '';
-        $response = new StreamedResponse(function () use ($reader, $target, $cap, $login, &$streamed): void {
-            $reader->streamDownload($this->server, $target, function (string $chunk) use (&$streamed): void {
-                echo $chunk;
-                $streamed .= $chunk;
-                @ob_flush();
-                @flush();
-            }, $cap, $login);
-        });
-
-        $response->headers->set('Content-Type', $read->mime ?: 'application/octet-stream');
-        $response->headers->set('Content-Disposition', 'attachment; filename="'.basename($target).'"');
-
-        $logger->recordDownload(
-            $this->server->organization,
-            Auth::user(),
-            $this->server,
-            null,
-            $target,
-            $read->size,
-            $read->sha256,
-            $login,
-        );
-
-        return $response;
     }
 
     protected function effectiveLoginUser(): string
@@ -276,7 +264,7 @@ class WorkspaceFiles extends Component
                 $this->filter !== '' ? $this->filter : null,
             );
         } catch (\Throwable $e) {
-            $this->dispatchToast('error', __('Could not list :path: :msg', ['path' => $this->path, 'msg' => $e->getMessage()]));
+            $this->toastError(__('Could not list :path: :msg', ['path' => $this->path, 'msg' => $e->getMessage()]));
 
             return null;
         }

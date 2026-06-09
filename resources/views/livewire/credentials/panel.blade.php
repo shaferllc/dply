@@ -2,26 +2,33 @@
     $link = 'text-brand-sage hover:text-brand-ink underline underline-offset-2';
     $hint = 'mt-1 text-sm text-brand-moss leading-relaxed';
     $code = 'rounded-md bg-brand-sand/60 px-1.5 py-0.5 text-xs font-mono text-brand-ink';
+    // Capability chips share one neutral pill (brand-cream + ink ring) and use
+    // a small colored leading dot for differentiation, so the row stays calm
+    // even when a credential picks up several capabilities.
     $capabilityChip = function (string $cap): array {
         return match ($cap) {
-            'compute' => ['label' => __('compute'), 'class' => 'bg-brand-sand/60 text-brand-moss ring-brand-ink/10'],
-            'dns' => ['label' => __('DNS'), 'class' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/30'],
-            'cdn' => ['label' => __('CDN'), 'class' => 'bg-sky-100 text-sky-900 ring-sky-200'],
-            'import' => ['label' => __('import'), 'class' => 'bg-amber-100 text-amber-900 ring-amber-200'],
-            default => ['label' => $cap, 'class' => 'bg-brand-sand/40 text-brand-mist ring-brand-ink/10'],
+            'compute' => ['label' => __('Compute'), 'dot' => 'bg-brand-moss'],
+            'dns' => ['label' => __('DNS'), 'dot' => 'bg-brand-sage'],
+            'cdn' => ['label' => __('CDN'), 'dot' => 'bg-sky-500'],
+            'app_platform' => ['label' => __('App Platform'), 'dot' => 'bg-violet-500'],
+            'import' => ['label' => __('Import'), 'dot' => 'bg-amber-500'],
+            default => ['label' => ucfirst(str_replace('_', ' ', $cap)), 'dot' => 'bg-brand-mist'],
         };
     };
 @endphp
 
 @if ($credentials->isNotEmpty())
     <section class="dply-card overflow-hidden">
-        <div class="px-5 py-4 border-b border-brand-ink/10 bg-brand-cream/50 flex flex-wrap items-center justify-between gap-2">
-            <h3 class="inline-flex items-center gap-2 text-sm font-semibold text-brand-ink">
-                <x-heroicon-o-archive-box class="h-4 w-4 shrink-0 text-brand-moss" aria-hidden="true" />
-                {{ __('Saved in this organization') }}
-            </h3>
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <x-icon-badge>
+                <x-heroicon-o-archive-box class="h-5 w-5" aria-hidden="true" />
+            </x-icon-badge>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Credentials') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Saved in this organization') }}</h3>
+            </div>
             <span
-                class="inline-flex max-w-[min(100%,18rem)] items-start gap-1.5 text-xs leading-snug text-brand-moss sm:text-end"
+                class="ml-auto inline-flex max-w-[min(100%,18rem)] shrink-0 items-start gap-1.5 text-xs leading-snug text-brand-moss sm:text-end"
                 title="{{ __('Tokens and keys are encrypted in the database before they are stored on disk (encryption at rest).') }}"
             >
                 <x-heroicon-o-lock-closed class="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden="true" />
@@ -30,42 +37,54 @@
         </div>
         <ul class="divide-y divide-brand-ink/10">
             @foreach ($credentials as $cred)
-                <li class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-5 py-4" wire:key="cred-{{ $cred->id }}">
-                    <div class="min-w-0">
-                        <div class="flex flex-wrap items-center gap-2">
-                            <span class="font-medium text-brand-ink">{{ $cred->name }}</span>
-                            <span class="text-brand-mist font-mono text-xs">{{ $cred->provider }}</span>
-                            @foreach ($cred->capabilities() as $cap)
-                                @php $chip = $capabilityChip($cap); @endphp
-                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 {{ $chip['class'] }}">{{ $chip['label'] }}</span>
-                            @endforeach
+                @php $verifyingThis = $verifyingCredentialId === (string) $cred->id; @endphp
+                <li
+                    class="group flex flex-col gap-3 px-5 py-4 transition-colors hover:bg-brand-cream/30 sm:flex-row sm:items-center sm:justify-between sm:gap-6"
+                    wire:key="cred-{{ $cred->id }}"
+                >
+                    <div class="min-w-0 flex-1 space-y-1.5">
+                        <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                            <span class="truncate font-semibold text-brand-ink">{{ $cred->name }}</span>
+                            <span class="font-mono text-[11px] uppercase tracking-wide text-brand-mist">{{ $cred->provider }}</span>
                         </div>
+                        @if (count($cred->capabilities()))
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                @foreach ($cred->capabilities() as $cap)
+                                    @php $chip = $capabilityChip($cap); @endphp
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-cream/70 px-2 py-0.5 text-[10px] font-medium text-brand-moss ring-1 ring-brand-ink/10">
+                                        <span class="inline-block h-1.5 w-1.5 shrink-0 rounded-full {{ $chip['dot'] }}" aria-hidden="true"></span>
+                                        {{ $chip['label'] }}
+                                    </span>
+                                @endforeach
+                            </div>
+                        @endif
                     </div>
-                    <div class="flex flex-wrap items-center gap-3 shrink-0">
+                    <div class="flex shrink-0 items-center gap-1">
                         @if ($this->canVerifyCredentialProvider($cred->provider))
-                            @php $verifyingThis = $verifyingCredentialId === (string) $cred->id; @endphp
                             <button
                                 type="button"
                                 wire:click="verifyCredential('{{ $cred->id }}')"
                                 @if ($verifyingCredentialId !== null) disabled @endif
-                                class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-sage hover:text-brand-ink disabled:pointer-events-none disabled:opacity-60"
+                                title="{{ __('Verify with provider') }}"
+                                class="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-brand-moss transition hover:bg-brand-sand/40 hover:text-brand-ink disabled:pointer-events-none disabled:opacity-50"
                             >
                                 @if ($verifyingThis)
-                                    <span class="inline-flex items-center gap-2">
-                                        <x-spinner variant="forest" size="sm" />
-                                        {{ __('Verifying…') }}
-                                    </span>
+                                    <x-spinner variant="forest" size="sm" />
+                                    <span>{{ __('Verifying…') }}</span>
                                 @else
-                                    <span class="inline-flex items-center gap-1.5">
-                                        <x-heroicon-o-check-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                        {{ __('Verify with provider') }}
-                                    </span>
+                                    <x-heroicon-o-check-badge class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                    <span class="hidden sm:inline">{{ __('Verify') }}</span>
                                 @endif
                             </button>
                         @endif
-                        <button type="button" wire:click="openConfirmActionModal('destroy', ['{{ $cred->id }}'], @js(__('Remove credential')), @js(__('Remove this credential?')), @js(__('Remove')), true)" class="inline-flex items-center gap-1.5 text-sm font-medium text-red-700 hover:text-red-900">
-                            <x-heroicon-o-trash class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                            {{ __('Remove') }}
+                        <button
+                            type="button"
+                            wire:click="openConfirmActionModal('destroy', ['{{ $cred->id }}'], @js(__('Remove credential')), @js(__('Remove this credential?')), @js(__('Remove')), true)"
+                            title="{{ __('Remove credential') }}"
+                            aria-label="{{ __('Remove credential') }}"
+                            class="inline-flex items-center justify-center rounded-lg p-1.5 text-brand-mist transition hover:bg-red-50 hover:text-red-700 focus-visible:bg-red-50 focus-visible:text-red-700"
+                        >
+                            <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
                         </button>
                     </div>
                 </li>
@@ -81,17 +100,6 @@
                 @if (! empty($digitalOceanOAuthConfigured))
                     <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-3">
                         <p class="text-sm text-brand-moss leading-relaxed">{{ __('Sign in with DigitalOcean to connect without pasting a personal access token. Requires a DigitalOcean OAuth app on this deployment.') }}</p>
-                        @env('local')
-                            <p class="text-xs text-brand-moss leading-relaxed">
-                                {{ __('OAuth needs a URL DigitalOcean can redirect to. For local dev use a tunnel (e.g. :expose), set :app and :proxy in :env, and register the callback URL in your DO OAuth app.', [
-                                    'expose' => 'Expose',
-                                    'app' => 'APP_URL',
-                                    'proxy' => 'TRUSTED_PROXIES=*',
-                                    'env' => '.env',
-                                ]) }}
-                                {{ __('Creating droplets does not use inbound webhooks; an API token below works without a tunnel.') }}
-                            </p>
-                        @endenv
                         <a
                             href="{{ route('credentials.oauth.digitalocean.redirect') }}"
                             class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0080FF] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#0066CC] transition-colors"
@@ -102,7 +110,7 @@
                     </div>
                     <p class="text-xs text-brand-mist text-center">{{ __('or use an API token') }}</p>
                 @else
-                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Paste a read/write token from DigitalOcean. We verify it before saving.') }}</p>
+                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Paste a read/write token from DigitalOcean. We verify it before saving. The same token powers Droplets, DNS, and App Platform — dply uses it everywhere DigitalOcean is selected.') }}</p>
                 @endif
                 <div class="space-y-5">
                     <div>
@@ -177,6 +185,19 @@
     @case('hetzner')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-3">
+                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Hetzner Cloud uses project API tokens — there is no OAuth sign-in for third-party apps. Sign in to the Hetzner Console, create a read/write token, then paste it below.') }}</p>
+                    <a
+                        href="https://console.hetzner.cloud/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#D50C2D] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#B00A26] transition-colors"
+                    >
+                        <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0 opacity-95" aria-hidden="true" />
+                        {{ __('Open Hetzner Console') }}
+                    </a>
+                </div>
+                <p class="text-xs text-brand-mist text-center">{{ __('then paste your API token') }}</p>
                 <div class="space-y-5">
                     <div>
                         <x-input-label for="hetzner_name" :value="__('Label (optional)')" />
@@ -185,7 +206,7 @@
                     <div>
                         <x-input-label for="hetzner_api_token" :value="__('API token')" />
                         <x-text-input id="hetzner_api_token" wire:model="hetzner_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                        <p class="{{ $hint }}">{!! __('Create a token in :link.', ['link' => '<a href="https://console.hetzner.cloud/" target="_blank" rel="noopener" class="'.$link.'">Hetzner Cloud Console → Security → API Tokens</a>']) !!}</p>
+                        <p class="{{ $hint }}">{!! __('Create a token at :link (Project → Security → API Tokens). The same token powers servers and DNS zones in that project.', ['link' => '<a href="https://console.hetzner.cloud/" target="_blank" rel="noopener" class="'.$link.'">Hetzner Cloud Console</a>']) !!}</p>
                         <x-input-error :messages="$errors->get('hetzner_api_token')" class="mt-2" />
                     </div>
                     <x-primary-button type="button" wire:click="storeHetzner" wire:loading.attr="disabled" wire:target="storeHetzner">
@@ -203,15 +224,28 @@
     @case('linode')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-3">
+                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Linode uses personal access tokens — there is no OAuth sign-in for third-party apps. Sign in to Cloud Manager, create a token with Linodes and Domains access, then paste it below.') }}</p>
+                    <a
+                        href="https://cloud.linode.com/profile/tokens"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#009A44] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#007A36] transition-colors"
+                    >
+                        <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0 opacity-95" aria-hidden="true" />
+                        {{ __('Open Linode Cloud Manager') }}
+                    </a>
+                </div>
+                <p class="text-xs text-brand-mist text-center">{{ __('then paste your API token') }}</p>
                 <div class="space-y-5">
                     <div>
                         <x-input-label for="linode_name" :value="__('Label (optional)')" />
-                        <x-text-input id="linode_name" wire:model="linode_name" type="text" class="mt-1 block w-full" />
+                        <x-text-input id="linode_name" wire:model="linode_name" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Production account') }}" />
                     </div>
                     <div>
                         <x-input-label for="linode_api_token" :value="__('API token')" />
                         <x-text-input id="linode_api_token" wire:model="linode_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                        <p class="{{ $hint }}">{!! __('Create a token in :link.', ['link' => '<a href="https://cloud.linode.com/profile/tokens" target="_blank" rel="noopener" class="'.$link.'">Linode Cloud Manager → Profile → API Tokens</a>']) !!}</p>
+                        <p class="{{ $hint }}">{!! __('Create a token at :link with read/write access to Linodes and Domains. The same token powers compute and DNS.', ['link' => '<a href="https://cloud.linode.com/profile/tokens" target="_blank" rel="noopener" class="'.$link.'">Linode → Profile → API Tokens</a>']) !!}</p>
                         <x-input-error :messages="$errors->get('linode_api_token')" class="mt-2" />
                     </div>
                     <x-primary-button type="button" wire:click="storeLinode" wire:loading.attr="disabled" wire:target="storeLinode">
@@ -229,78 +263,33 @@
     @case('vultr')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-3">
+                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Vultr uses personal API keys — there is no OAuth sign-in for third-party apps. Sign in to the customer portal, create a key with compute and DNS access, then paste it below.') }}</p>
+                    <a
+                        href="https://my.vultr.com/settings/#settingsapi"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#007BFC] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#0062C9] transition-colors"
+                    >
+                        <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0 opacity-95" aria-hidden="true" />
+                        {{ __('Open Vultr Customer Portal') }}
+                    </a>
+                </div>
+                <p class="text-xs text-brand-mist text-center">{{ __('then paste your API key') }}</p>
                 <div class="space-y-5">
                     <div>
                         <x-input-label for="vultr_name" :value="__('Label (optional)')" />
-                        <x-text-input id="vultr_name" wire:model="vultr_name" type="text" class="mt-1 block w-full" />
+                        <x-text-input id="vultr_name" wire:model="vultr_name" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Production account') }}" />
                     </div>
                     <div>
-                        <x-input-label for="vultr_api_token" :value="__('API token')" />
+                        <x-input-label for="vultr_api_token" :value="__('API key')" />
                         <x-text-input id="vultr_api_token" wire:model="vultr_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                        <p class="{{ $hint }}">{!! __('Create a token in :link.', ['link' => '<a href="https://my.vultr.com/settings/#settingsapi" target="_blank" rel="noopener" class="'.$link.'">Vultr → Account → API</a>']) !!}</p>
+                        <p class="{{ $hint }}">{!! __('Create a key at :link. Enable access to Instances and DNS — the same key powers compute and DNS.', ['link' => '<a href="https://my.vultr.com/settings/#settingsapi" target="_blank" rel="noopener" class="'.$link.'">Vultr → Account → API</a>']) !!}</p>
                         <x-input-error :messages="$errors->get('vultr_api_token')" class="mt-2" />
                     </div>
                     <x-primary-button type="button" wire:click="storeVultr" wire:loading.attr="disabled" wire:target="storeVultr">
                         <span wire:loading.remove wire:target="storeVultr">{{ __('Connect Vultr') }}</span>
                         <span wire:loading wire:target="storeVultr" class="inline-flex items-center justify-center gap-2">
-                            <x-spinner variant="cream" />
-                            {{ __('Connecting…') }}
-                        </span>
-                    </x-primary-button>
-                </div>
-            </div>
-        </div>
-        @break
-
-    @case('akamai')
-        <div class="dply-card overflow-hidden">
-            <div class="p-6 sm:p-8 space-y-6">
-                <p class="text-sm text-brand-moss leading-relaxed">{{ __('Uses the same API as Linode. Your Linode Cloud token works here.') }}</p>
-                <div class="space-y-5">
-                    <div>
-                        <x-input-label for="akamai_name" :value="__('Label (optional)')" />
-                        <x-text-input id="akamai_name" wire:model="akamai_name" type="text" class="mt-1 block w-full" />
-                    </div>
-                    <div>
-                        <x-input-label for="akamai_api_token" :value="__('API token')" />
-                        <x-text-input id="akamai_api_token" wire:model="akamai_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                        <p class="{{ $hint }}">{!! __('Use your Linode Cloud token. :link', ['link' => '<a href="https://cloud.linode.com/profile/tokens" target="_blank" rel="noopener" class="'.$link.'">Linode → Profile → API Tokens</a>']) !!}</p>
-                        <x-input-error :messages="$errors->get('akamai_api_token')" class="mt-2" />
-                    </div>
-                    <x-primary-button type="button" wire:click="storeAkamai" wire:loading.attr="disabled" wire:target="storeAkamai">
-                        <span wire:loading.remove wire:target="storeAkamai">{{ __('Connect Akamai') }}</span>
-                        <span wire:loading wire:target="storeAkamai" class="inline-flex items-center justify-center gap-2">
-                            <x-spinner variant="cream" />
-                            {{ __('Connecting…') }}
-                        </span>
-                    </x-primary-button>
-                </div>
-            </div>
-        </div>
-        @break
-
-    @case('equinix_metal')
-        <div class="dply-card overflow-hidden">
-            <div class="p-6 sm:p-8 space-y-6">
-                <div class="space-y-5">
-                    <div>
-                        <x-input-label for="equinix_metal_name" :value="__('Label (optional)')" />
-                        <x-text-input id="equinix_metal_name" wire:model="equinix_metal_name" type="text" class="mt-1 block w-full" />
-                    </div>
-                    <div>
-                        <x-input-label for="equinix_metal_api_token" :value="__('API token')" />
-                        <x-text-input id="equinix_metal_api_token" wire:model="equinix_metal_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                        <p class="{{ $hint }}">{!! __('Create a token: :link', ['link' => '<a href="https://cloud.equinix.com/developers/api" target="_blank" rel="noopener" class="'.$link.'">Equinix Metal → API</a>']) !!}</p>
-                        <x-input-error :messages="$errors->get('equinix_metal_api_token')" class="mt-2" />
-                    </div>
-                    <div>
-                        <x-input-label for="equinix_metal_project_id" :value="__('Project ID')" />
-                        <x-text-input id="equinix_metal_project_id" wire:model="equinix_metal_project_id" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="{{ __('UUID') }}" required />
-                        <x-input-error :messages="$errors->get('equinix_metal_project_id')" class="mt-2" />
-                    </div>
-                    <x-primary-button type="button" wire:click="storeEquinixMetal" wire:loading.attr="disabled" wire:target="storeEquinixMetal">
-                        <span wire:loading.remove wire:target="storeEquinixMetal">{{ __('Connect Equinix Metal') }}</span>
-                        <span wire:loading wire:target="storeEquinixMetal" class="inline-flex items-center justify-center gap-2">
                             <x-spinner variant="cream" />
                             {{ __('Connecting…') }}
                         </span>
@@ -341,136 +330,43 @@
         </div>
         @break
 
-    @case('scaleway')
-        <div class="dply-card overflow-hidden">
-            <div class="p-6 sm:p-8 space-y-6">
-                <div class="space-y-5">
-                    <div>
-                        <x-input-label for="scaleway_name" :value="__('Label (optional)')" />
-                        <x-text-input id="scaleway_name" wire:model="scaleway_name" type="text" class="mt-1 block w-full" />
-                    </div>
-                    <div>
-                        <x-input-label for="scaleway_api_token" :value="__('Secret key')" />
-                        <x-text-input id="scaleway_api_token" wire:model="scaleway_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                        <p class="{{ $hint }}">{!! __('Create an API key: :link', ['link' => '<a href="https://console.scaleway.com/iam/credentials" target="_blank" rel="noopener" class="'.$link.'">Scaleway Console → IAM → API Keys</a>']) !!}</p>
-                        <x-input-error :messages="$errors->get('scaleway_api_token')" class="mt-2" />
-                    </div>
-                    <div>
-                        <x-input-label for="scaleway_project_id" :value="__('Project ID')" />
-                        <x-text-input id="scaleway_project_id" wire:model="scaleway_project_id" type="text" class="mt-1 block w-full font-mono text-sm" required />
-                        <x-input-error :messages="$errors->get('scaleway_project_id')" class="mt-2" />
-                    </div>
-                    <x-primary-button type="button" wire:click="storeScaleway" wire:loading.attr="disabled" wire:target="storeScaleway">
-                        <span wire:loading.remove wire:target="storeScaleway">{{ __('Connect Scaleway') }}</span>
-                        <span wire:loading wire:target="storeScaleway" class="inline-flex items-center justify-center gap-2">
-                            <x-spinner variant="cream" />
-                            {{ __('Connecting…') }}
-                        </span>
-                    </x-primary-button>
-                </div>
-            </div>
-        </div>
-        @break
-
     @case('ovh')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
-                <div class="rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
-                    {{ __('Credential is stored for future use. Automated server creation via this provider is not available yet.') }}
-                </div>
                 <div class="space-y-5">
+                    <p class="text-sm leading-relaxed text-brand-moss">
+                        {{ __('Create application credentials at') }}
+                        <a href="https://api.ovh.com/createToken/" target="_blank" rel="noopener" class="font-medium text-brand-ink underline">api.ovh.com/createToken</a>.
+                    </p>
                     <div>
                         <x-input-label for="ovh_name" :value="__('Label (optional)')" />
                         <x-text-input id="ovh_name" wire:model="ovh_name" type="text" class="mt-1 block w-full" />
                     </div>
                     <div>
-                        <x-input-label for="ovh_api_token" :value="__('API token')" />
-                        <x-text-input id="ovh_api_token" wire:model="ovh_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                        <x-input-error :messages="$errors->get('ovh_api_token')" class="mt-2" />
+                        <x-input-label for="ovh_endpoint" :value="__('API endpoint')" />
+                        <x-select id="ovh_endpoint" wire:model="ovh_endpoint" class="mt-1 block w-full">
+                            <option value="ovh-eu">{{ __('OVH Europe (ovh-eu)') }}</option>
+                            <option value="ovh-us">{{ __('OVH US (ovh-us)') }}</option>
+                            <option value="ovh-ca">{{ __('OVH Canada (ovh-ca)') }}</option>
+                        </x-select>
+                        <x-input-error :messages="$errors->get('ovh_endpoint')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="ovh_application_key" :value="__('Application Key')" />
+                        <x-text-input id="ovh_application_key" wire:model="ovh_application_key" type="text" class="mt-1 block w-full" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('ovh_application_key')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="ovh_application_secret" :value="__('Application Secret')" />
+                        <x-text-input id="ovh_application_secret" wire:model="ovh_application_secret" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('ovh_application_secret')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="ovh_consumer_key" :value="__('Consumer Key')" />
+                        <x-text-input id="ovh_consumer_key" wire:model="ovh_consumer_key" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('ovh_consumer_key')" class="mt-2" />
                     </div>
                     <x-primary-button type="button" wire:click="storeOvh" wire:loading.attr="disabled" wire:target="storeOvh">{{ __('Save credential') }}</x-primary-button>
-                </div>
-            </div>
-        </div>
-        @break
-
-    @case('rackspace')
-        <div class="dply-card overflow-hidden">
-            <div class="p-6 sm:p-8 space-y-6">
-                <div class="rounded-xl border border-amber-200/80 bg-amber-50/80 px-4 py-3 text-sm text-amber-950">
-                    {{ __('Credential is stored for future use. Automated server creation via this provider is not available yet.') }}
-                </div>
-                <div class="space-y-5">
-                    <div>
-                        <x-input-label for="rackspace_name" :value="__('Label (optional)')" />
-                        <x-text-input id="rackspace_name" wire:model="rackspace_name" type="text" class="mt-1 block w-full" />
-                    </div>
-                    <div>
-                        <x-input-label for="rackspace_api_token" :value="__('API key')" />
-                        <x-text-input id="rackspace_api_token" wire:model="rackspace_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                        <x-input-error :messages="$errors->get('rackspace_api_token')" class="mt-2" />
-                    </div>
-                    <x-primary-button type="button" wire:click="storeRackspace" wire:loading.attr="disabled" wire:target="storeRackspace">{{ __('Save credential') }}</x-primary-button>
-                </div>
-            </div>
-        </div>
-        @break
-
-    @case('fly_io')
-        <div class="dply-card overflow-hidden">
-            <div class="p-6 sm:p-8 space-y-6">
-                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-2">
-                    <p class="text-sm font-semibold text-brand-ink">{{ __('What Fly.io adds to Dply') }}</p>
-                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Connect a Fly.io API token to deploy your Node and static sites globally on Fly\'s edge platform. Best fit for stateless workloads where you want sub-100ms response times in 30+ regions for ~$3/mo per app.') }}</p>
-                    <p class="text-xs text-brand-moss leading-relaxed">{{ __('Your existing VM-hosted PHP/Ruby/Python sites stay where they are — Fly.io is purely additive.') }}</p>
-                </div>
-                <div class="space-y-5">
-                    <div>
-                        <x-input-label for="fly_io_name" :value="__('Label (optional)')" />
-                        <x-text-input id="fly_io_name" wire:model="fly_io_name" type="text" class="mt-1 block w-full" />
-                    </div>
-                    <div>
-                        <x-input-label for="fly_io_api_token" :value="__('API token')" />
-                        <x-text-input id="fly_io_api_token" wire:model="fly_io_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                        <p class="{{ $hint }}">{!! __('Use :cmd or :link.', ['cmd' => '<code class="'.$code.'">fly tokens create</code>', 'link' => '<a href="https://fly.io/dashboard" target="_blank" rel="noopener" class="'.$link.'">Fly.io Dashboard → Tokens</a>']) !!}</p>
-                        <x-input-error :messages="$errors->get('fly_io_api_token')" class="mt-2" />
-                    </div>
-                    <div>
-                        <x-input-label for="fly_io_org_slug" :value="__('Organization slug')" />
-                        <x-text-input id="fly_io_org_slug" wire:model="fly_io_org_slug" type="text" class="mt-1 block w-full" placeholder="personal" required />
-                        <x-input-error :messages="$errors->get('fly_io_org_slug')" class="mt-2" />
-                    </div>
-                    <x-primary-button type="button" wire:click="storeFlyIo" wire:loading.attr="disabled" wire:target="storeFlyIo">
-                        <span wire:loading.remove wire:target="storeFlyIo">{{ __('Connect Fly.io') }}</span>
-                        <span wire:loading wire:target="storeFlyIo" class="inline-flex items-center justify-center gap-2">
-                            <x-spinner variant="cream" />
-                            {{ __('Connecting…') }}
-                        </span>
-                    </x-primary-button>
-                </div>
-            </div>
-        </div>
-        @break
-
-    @case('digitalocean_app_platform')
-        <div class="dply-card overflow-hidden">
-            <div class="p-6 sm:p-8 space-y-6">
-                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-2">
-                    <p class="text-sm font-semibold text-brand-ink">{{ __('Container backend') }}</p>
-                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Connect a DigitalOcean API token (the same one as DigitalOcean droplets — both APIs share scopes). Dply uses this to deploy your container apps to DigitalOcean App Platform.') }}</p>
-                </div>
-                <div class="space-y-5">
-                    <div>
-                        <x-input-label for="do_app_platform_name" :value="__('Label (optional)')" />
-                        <x-text-input id="do_app_platform_name" wire:model="do_app_platform_name" type="text" class="mt-1 block w-full" />
-                    </div>
-                    <div>
-                        <x-input-label for="do_app_platform_api_token" :value="__('API token')" />
-                        <x-text-input id="do_app_platform_api_token" wire:model="do_app_platform_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                        <p class="{{ $hint }}">{!! __('Create at :link with read+write scope.', ['link' => '<a href="https://cloud.digitalocean.com/account/api/tokens" target="_blank" rel="noopener" class="'.$link.'">DigitalOcean → API → Tokens</a>']) !!}</p>
-                        <x-input-error :messages="$errors->get('do_app_platform_api_token')" class="mt-2" />
-                    </div>
-                    <x-primary-button type="button" wire:click="storeDigitalOceanAppPlatform" wire:loading.attr="disabled" wire:target="storeDigitalOceanAppPlatform">{{ __('Save credential') }}</x-primary-button>
                 </div>
             </div>
         </div>
@@ -510,87 +406,30 @@
         </div>
         @break
 
-    @case('render')
+    @case('ghcr')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
-                <p class="text-sm text-brand-moss">{{ __('Saved for future integrations. Not used for VM provisioning in Dply today.') }}</p>
-                <div class="space-y-5">
-                    <div>
-                        <x-input-label for="render_name" :value="__('Label (optional)')" />
-                        <x-text-input id="render_name" wire:model="render_name" type="text" class="mt-1 block w-full" />
-                    </div>
-                    <div>
-                        <x-input-label for="render_api_token" :value="__('API key')" />
-                        <x-text-input id="render_api_token" wire:model="render_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                    </div>
-                    <x-primary-button type="button" wire:click="storeRender" wire:loading.attr="disabled" wire:target="storeRender">{{ __('Save') }}</x-primary-button>
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-2">
+                    <p class="text-sm font-semibold text-brand-ink">{{ __('Private images') }}</p>
+                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Pull private images from GitHub Container Registry (ghcr.io) when deploying Cloud apps. Use a GitHub Personal Access Token with read:packages scope.') }}</p>
                 </div>
-            </div>
-        </div>
-        @break
-
-    @case('railway')
-        <div class="dply-card overflow-hidden">
-            <div class="p-6 sm:p-8 space-y-6">
-                <p class="text-sm text-brand-moss">{{ __('Saved for future integrations.') }}</p>
                 <div class="space-y-5">
                     <div>
-                        <x-input-label for="railway_name" :value="__('Label (optional)')" />
-                        <x-text-input id="railway_name" wire:model="railway_name" type="text" class="mt-1 block w-full" />
+                        <x-input-label for="ghcr_name" :value="__('Label (optional)')" />
+                        <x-text-input id="ghcr_name" wire:model="ghcr_name" type="text" class="mt-1 block w-full" placeholder="GHCR — acme" />
                     </div>
                     <div>
-                        <x-input-label for="railway_api_token" :value="__('API token')" />
-                        <x-text-input id="railway_api_token" wire:model="railway_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                    </div>
-                    <x-primary-button type="button" wire:click="storeRailway" wire:loading.attr="disabled" wire:target="storeRailway">{{ __('Save') }}</x-primary-button>
-                </div>
-            </div>
-        </div>
-        @break
-
-    @case('coolify')
-        <div class="dply-card overflow-hidden">
-            <div class="p-6 sm:p-8 space-y-6">
-                <div class="space-y-5">
-                    <div>
-                        <x-input-label for="coolify_name" :value="__('Label (optional)')" />
-                        <x-text-input id="coolify_name" wire:model="coolify_name" type="text" class="mt-1 block w-full" />
+                        <x-input-label for="ghcr_username" :value="__('GitHub username')" />
+                        <x-text-input id="ghcr_username" wire:model="ghcr_username" type="text" class="mt-1 block w-full font-mono" required autocomplete="off" placeholder="acme-bot" />
+                        <x-input-error :messages="$errors->get('ghcr_username')" class="mt-2" />
                     </div>
                     <div>
-                        <x-input-label for="coolify_api_url" :value="__('Coolify URL')" />
-                        <x-text-input id="coolify_api_url" wire:model="coolify_api_url" type="url" class="mt-1 block w-full font-mono text-sm" placeholder="https://coolify.example.com" required />
-                        <x-input-error :messages="$errors->get('coolify_api_url')" class="mt-2" />
+                        <x-input-label for="ghcr_token" :value="__('Personal access token')" />
+                        <x-text-input id="ghcr_token" wire:model="ghcr_token" type="password" class="mt-1 block w-full" required autocomplete="off" placeholder="ghp_…" />
+                        <p class="{{ $hint }}">{!! __('Create at :link with read:packages scope.', ['link' => '<a href="https://github.com/settings/tokens" target="_blank" rel="noopener" class="'.$link.'">GitHub → Settings → Developer settings</a>']) !!}</p>
+                        <x-input-error :messages="$errors->get('ghcr_token')" class="mt-2" />
                     </div>
-                    <div>
-                        <x-input-label for="coolify_api_token" :value="__('API token')" />
-                        <x-text-input id="coolify_api_token" wire:model="coolify_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                        <x-input-error :messages="$errors->get('coolify_api_token')" class="mt-2" />
-                    </div>
-                    <x-primary-button type="button" wire:click="storeCoolify" wire:loading.attr="disabled" wire:target="storeCoolify">{{ __('Save') }}</x-primary-button>
-                </div>
-            </div>
-        </div>
-        @break
-
-    @case('cap_rover')
-        <div class="dply-card overflow-hidden">
-            <div class="p-6 sm:p-8 space-y-6">
-                <div class="space-y-5">
-                    <div>
-                        <x-input-label for="cap_rover_name" :value="__('Label (optional)')" />
-                        <x-text-input id="cap_rover_name" wire:model="cap_rover_name" type="text" class="mt-1 block w-full" />
-                    </div>
-                    <div>
-                        <x-input-label for="cap_rover_api_url" :value="__('Captain URL')" />
-                        <x-text-input id="cap_rover_api_url" wire:model="cap_rover_api_url" type="url" class="mt-1 block w-full font-mono text-sm" placeholder="https://captain.example.com" required />
-                        <x-input-error :messages="$errors->get('cap_rover_api_url')" class="mt-2" />
-                    </div>
-                    <div>
-                        <x-input-label for="cap_rover_api_token" :value="__('API token')" />
-                        <x-text-input id="cap_rover_api_token" wire:model="cap_rover_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
-                        <x-input-error :messages="$errors->get('cap_rover_api_token')" class="mt-2" />
-                    </div>
-                    <x-primary-button type="button" wire:click="storeCapRover" wire:loading.attr="disabled" wire:target="storeCapRover">{{ __('Save') }}</x-primary-button>
+                    <x-primary-button type="button" wire:click="storeGhcr" wire:loading.attr="disabled" wire:target="storeGhcr">{{ __('Save credential') }}</x-primary-button>
                 </div>
             </div>
         </div>
@@ -599,10 +438,23 @@
     @case('aws')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-3">
+                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Create an IAM user with EC2 and Route 53 permissions, then paste the access key ID and secret. The same credential powers EC2 server provisioning and Route 53 DNS automation.') }}</p>
+                    <a
+                        href="https://console.aws.amazon.com/iam/home#/users"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#232F3E] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#1a232e] transition-colors"
+                    >
+                        <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0 opacity-95" aria-hidden="true" />
+                        {{ __('Open AWS IAM console') }}
+                    </a>
+                </div>
+                <p class="text-xs text-brand-mist text-center">{{ __('then paste your access keys') }}</p>
                 <div class="space-y-5">
                     <div>
                         <x-input-label for="aws_name" :value="__('Label (optional)')" />
-                        <x-text-input id="aws_name" wire:model="aws_name" type="text" class="mt-1 block w-full" />
+                        <x-text-input id="aws_name" wire:model="aws_name" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Production account') }}" />
                     </div>
                     <div>
                         <x-input-label for="aws_access_key_id" :value="__('Access key ID')" />
@@ -612,9 +464,16 @@
                     <div>
                         <x-input-label for="aws_secret_access_key" :value="__('Secret access key')" />
                         <x-text-input id="aws_secret_access_key" wire:model="aws_secret_access_key" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <p class="{{ $hint }}">{!! __('Use least-privilege IAM policies for EC2 and Route 53. Create keys under :link.', ['link' => '<a href="https://console.aws.amazon.com/iam/home#/users" target="_blank" rel="noopener" class="'.$link.'">AWS IAM</a>']) !!}</p>
                         <x-input-error :messages="$errors->get('aws_secret_access_key')" class="mt-2" />
                     </div>
-                    <x-primary-button type="button" wire:click="storeAws" wire:loading.attr="disabled" wire:target="storeAws">{{ __('Save') }}</x-primary-button>
+                    <x-primary-button type="button" wire:click="storeAws" wire:loading.attr="disabled" wire:target="storeAws">
+                        <span wire:loading.remove wire:target="storeAws">{{ __('Connect AWS') }}</span>
+                        <span wire:loading wire:target="storeAws" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Connecting…') }}
+                        </span>
+                    </x-primary-button>
                 </div>
             </div>
         </div>
@@ -623,16 +482,45 @@
     @case('gcp')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-3">
+                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Google Cloud uses service account JSON keys. Create a service account with Compute Engine and Cloud DNS access, download the key JSON, then paste it below.') }}</p>
+                    <a
+                        href="https://console.cloud.google.com/iam-admin/serviceaccounts"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#1A73E8] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#155DC1] transition-colors"
+                    >
+                        <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0 opacity-95" aria-hidden="true" />
+                        {{ __('Open Google Cloud Console') }}
+                    </a>
+                </div>
+                <p class="text-xs text-brand-mist text-center">{{ __('then paste your service account JSON') }}</p>
                 <div class="space-y-5">
                     <div>
                         <x-input-label for="gcp_name" :value="__('Label (optional)')" />
-                        <x-text-input id="gcp_name" wire:model="gcp_name" type="text" class="mt-1 block w-full" />
+                        <x-text-input id="gcp_name" wire:model="gcp_name" type="text" class="mt-1 block w-full" placeholder="{{ __('e.g. Production project') }}" />
                     </div>
                     <div>
-                        <x-input-label for="gcp_api_token" :value="__('API token / key material')" />
-                        <x-text-input id="gcp_api_token" wire:model="gcp_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <x-input-label for="gcp_api_token" :value="__('Service account JSON')" />
+                        <textarea
+                            id="gcp_api_token"
+                            wire:model="gcp_api_token"
+                            rows="10"
+                            class="mt-1 block w-full rounded-xl border-brand-ink/15 bg-brand-cream/30 px-3 py-2 font-mono text-xs text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage"
+                            placeholder='{"type":"service_account","project_id":"..."}'
+                            required
+                            autocomplete="off"
+                        ></textarea>
+                        <p class="{{ $hint }}">{!! __('Create and download a key from :link (IAM & Admin → Service Accounts). Use least-privilege roles needed for Compute and Cloud DNS automation.', ['link' => '<a href="https://console.cloud.google.com/iam-admin/serviceaccounts" target="_blank" rel="noopener" class="'.$link.'">Google Cloud Console</a>']) !!}</p>
+                        <x-input-error :messages="$errors->get('gcp_api_token')" class="mt-2" />
                     </div>
-                    <x-primary-button type="button" wire:click="storeGcp" wire:loading.attr="disabled" wire:target="storeGcp">{{ __('Save') }}</x-primary-button>
+                    <x-primary-button type="button" wire:click="storeGcp" wire:loading.attr="disabled" wire:target="storeGcp">
+                        <span wire:loading.remove wire:target="storeGcp">{{ __('Connect Google Cloud') }}</span>
+                        <span wire:loading wire:target="storeGcp" class="inline-flex items-center justify-center gap-2">
+                            <x-spinner variant="cream" />
+                            {{ __('Connecting…') }}
+                        </span>
+                    </x-primary-button>
                 </div>
             </div>
         </div>
@@ -641,14 +529,43 @@
     @case('azure')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/40 px-4 py-4 space-y-3">
+                    <p class="text-sm text-brand-moss leading-relaxed">{{ __('Azure uses an Entra app (service principal) for API automation. Create an app registration, grant it VM + DNS permissions, then paste Tenant ID, Client ID, Client Secret, and Subscription ID below.') }}</p>
+                    <a
+                        href="https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0078D4] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#005EA2] transition-colors"
+                    >
+                        <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4 shrink-0 opacity-95" aria-hidden="true" />
+                        {{ __('Open Azure Portal') }}
+                    </a>
+                </div>
+                <p class="text-xs text-brand-mist text-center">{{ __('then paste service principal details') }}</p>
                 <div class="space-y-5">
                     <div>
                         <x-input-label for="azure_name" :value="__('Label (optional)')" />
                         <x-text-input id="azure_name" wire:model="azure_name" type="text" class="mt-1 block w-full" />
                     </div>
                     <div>
-                        <x-input-label for="azure_api_token" :value="__('API token')" />
-                        <x-text-input id="azure_api_token" wire:model="azure_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <x-input-label for="azure_tenant_id" :value="__('Tenant ID')" />
+                        <x-text-input id="azure_tenant_id" wire:model="azure_tenant_id" type="text" class="mt-1 block w-full font-mono text-sm" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('azure_tenant_id')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="azure_client_id" :value="__('Client ID')" />
+                        <x-text-input id="azure_client_id" wire:model="azure_client_id" type="text" class="mt-1 block w-full font-mono text-sm" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('azure_client_id')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="azure_client_secret" :value="__('Client secret')" />
+                        <x-text-input id="azure_client_secret" wire:model="azure_client_secret" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('azure_client_secret')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="azure_subscription_id" :value="__('Subscription ID')" />
+                        <x-text-input id="azure_subscription_id" wire:model="azure_subscription_id" type="text" class="mt-1 block w-full font-mono text-sm" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('azure_subscription_id')" class="mt-2" />
                     </div>
                     <x-primary-button type="button" wire:click="storeAzure" wire:loading.attr="disabled" wire:target="storeAzure">{{ __('Save') }}</x-primary-button>
                 </div>
@@ -659,14 +576,43 @@
     @case('oracle')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
+                <p class="text-sm text-brand-moss leading-relaxed">
+                    {{ __('Connect Oracle Cloud Infrastructure using your tenancy/user OCIDs and API signing key. The compartment defaults to your tenancy OCID when left blank.') }}
+                </p>
                 <div class="space-y-5">
                     <div>
                         <x-input-label for="oracle_name" :value="__('Label (optional)')" />
                         <x-text-input id="oracle_name" wire:model="oracle_name" type="text" class="mt-1 block w-full" />
                     </div>
                     <div>
-                        <x-input-label for="oracle_api_token" :value="__('API token')" />
-                        <x-text-input id="oracle_api_token" wire:model="oracle_api_token" type="password" class="mt-1 block w-full" required autocomplete="off" />
+                        <x-input-label for="oracle_tenancy_ocid" :value="__('Tenancy OCID')" />
+                        <x-text-input id="oracle_tenancy_ocid" wire:model="oracle_tenancy_ocid" type="text" class="mt-1 block w-full font-mono text-sm" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('oracle_tenancy_ocid')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="oracle_user_ocid" :value="__('User OCID')" />
+                        <x-text-input id="oracle_user_ocid" wire:model="oracle_user_ocid" type="text" class="mt-1 block w-full font-mono text-sm" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('oracle_user_ocid')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="oracle_fingerprint" :value="__('API key fingerprint')" />
+                        <x-text-input id="oracle_fingerprint" wire:model="oracle_fingerprint" type="text" class="mt-1 block w-full font-mono text-sm" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('oracle_fingerprint')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="oracle_private_key" :value="__('Private key (PEM)')" />
+                        <textarea id="oracle_private_key" wire:model="oracle_private_key" rows="8" class="mt-1 block w-full rounded-xl border-brand-ink/20 bg-white/90 font-mono text-xs text-brand-ink shadow-sm focus:border-brand-sky focus:ring-brand-sky" required autocomplete="off"></textarea>
+                        <x-input-error :messages="$errors->get('oracle_private_key')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="oracle_region" :value="__('Region')" />
+                        <x-text-input id="oracle_region" wire:model="oracle_region" type="text" class="mt-1 block w-full font-mono text-sm" placeholder="us-ashburn-1" required autocomplete="off" />
+                        <x-input-error :messages="$errors->get('oracle_region')" class="mt-2" />
+                    </div>
+                    <div>
+                        <x-input-label for="oracle_compartment_id" :value="__('Compartment OCID (optional)')" />
+                        <x-text-input id="oracle_compartment_id" wire:model="oracle_compartment_id" type="text" class="mt-1 block w-full font-mono text-sm" autocomplete="off" />
+                        <x-input-error :messages="$errors->get('oracle_compartment_id')" class="mt-2" />
                     </div>
                     <x-primary-button type="button" wire:click="storeOracle" wire:loading.attr="disabled" wire:target="storeOracle">{{ __('Save') }}</x-primary-button>
                 </div>
@@ -803,10 +749,20 @@
     @case('forge')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
-                <div class="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
-                    <p class="font-semibold">{{ __('Migrate sites from Laravel Forge to dply') }}</p>
-                    <p class="mt-1 leading-relaxed">{{ __('Connect your Forge account to see your existing servers and sites in dply. From there you can launch a guided migration onto a new dply-managed server — code, env, databases, scheduled jobs, daemons, SSL.') }}</p>
-                </div>
+                <section class="dply-card overflow-hidden border-amber-200">
+                    <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
+                                <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Migrate sites from Laravel Forge to dply') }}</h3>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Connect your Forge account to see your existing servers and sites in dply. From there you can launch a guided migration onto a new dply-managed server — code, env, databases, scheduled jobs, daemons, SSL.') }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
                 <div class="space-y-5">
                     <div>
                         <x-input-label for="forge_name" :value="__('Label (optional)')" />
@@ -834,10 +790,20 @@
     @case('ploi')
         <div class="dply-card overflow-hidden">
             <div class="p-6 sm:p-8 space-y-6">
-                <div class="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
-                    <p class="font-semibold">{{ __('Migrate sites from Ploi to dply') }}</p>
-                    <p class="mt-1 leading-relaxed">{{ __('Connect your Ploi account to see your existing servers and sites in dply. From there you can launch a guided migration onto a new dply-managed server — code, env, databases, crons, SSL.') }}</p>
-                </div>
+                <section class="dply-card overflow-hidden border-amber-200">
+                    <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                        <div class="flex items-start gap-3">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
+                                <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
+                            </span>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Migrate sites from Ploi to dply') }}</h3>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Connect your Ploi account to see your existing servers and sites in dply. From there you can launch a guided migration onto a new dply-managed server — code, env, databases, crons, SSL.') }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
                 <div class="space-y-5">
                     <div>
                         <x-input-label for="ploi_name" :value="__('Label (optional)')" />

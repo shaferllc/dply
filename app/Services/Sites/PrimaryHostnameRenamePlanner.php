@@ -6,7 +6,7 @@ namespace App\Services\Sites;
 
 use App\Models\Site;
 use App\Models\SiteCertificate;
-use App\Services\Edge\EdgeRouter;
+use App\Services\Cloud\CloudRouter;
 
 /**
  * Pure read-only previewer for the cascade triggered when an operator
@@ -67,7 +67,7 @@ final class PrimaryHostnameRenamePlanner
             ];
         }
 
-        $backend = EdgeRouter::backendFor($site);
+        $backend = CloudRouter::backendFor($site);
         if ($backend !== null) {
             $optIn[] = [
                 'key' => 'cycle_backend',
@@ -111,6 +111,7 @@ final class PrimaryHostnameRenamePlanner
         if (! empty($plan['optIn'])) {
             return false;
         }
+
         // 2 = the two unconditional auto rows (nginx + audit). Anything beyond
         // that (dns_zone re-suggest) is a state change worth surfacing.
         return count($plan['auto']) <= 2;

@@ -1,0 +1,44 @@
+# Local ClickHouse for the dply Logs add-on (development only).
+#
+#   docker compose -f docker-compose.clickhouse.yml up -d
+#   php artisan dply:logs:schema-sync
+#
+# Then point .env at it (these match config/server_logs.php defaults):
+#   CLICKHOUSE_HOST=127.0.0.1
+#   CLICKHOUSE_HTTP_PORT=8123
+#   CLICKHOUSE_DATABASE=dply_logs
+#   CLICKHOUSE_USERNAME=default
+#   CLICKHOUSE_PASSWORD=
+#
+# Prod uses managed ClickHouse (ClickHouse Cloud / Altinity / Aiven), NOT this.
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: dply-logs-clickhouse
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB: dply_logs
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+      # Allow the default user to run DDL/grants in local dev.
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports:
+      # Host ports are overridable to avoid colliding with another local ClickHouse;
+      # keep CLICKHOUSE_HTTP_PORT in .env in sync with the host HTTP port you pick.
+      - "${CLICKHOUSE_HTTP_PORT:-8123}:8123"   # HTTP interface (ClickHouseClient + Vector aggregator)
+      - "${CLICKHOUSE_NATIVE_PORT:-9000}:9000" # native protocol (optional, for clickhouse-client)
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - dply_clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  dply_clickhouse_data:
+    driver: local

@@ -42,7 +42,14 @@ class SupervisorProvisioner
             throw new \RuntimeException('Server must be ready with an SSH key.');
         }
 
-        $inner = 'export DEBIAN_FRONTEND=noninteractive && apt-get update -y && apt-get install -y --no-install-recommends supervisor && systemctl enable --now supervisor';
+        // After install, patch the main supervisord.conf to add user=root so the
+        // "Supervisor is running as root" CRIT is suppressed on every start.
+        $inner = 'export DEBIAN_FRONTEND=noninteractive'
+            .' && apt-get update -y'
+            .' && apt-get install -y --no-install-recommends supervisor'
+            .' && grep -qxF "user=root" /etc/supervisor/supervisord.conf'
+            .'    || sed -i "/^\[supervisord\]/a user=root" /etc/supervisor/supervisord.conf'
+            .' && systemctl enable --now supervisor';
         $cmd = $this->privilegedBash($server, $inner);
 
         return app(ServerSshConnectionRunner::class)->run(
@@ -68,7 +75,7 @@ class SupervisorProvisioner
         }
 
         $dir = rtrim(config('sites.supervisor_conf_d'), '/');
-        $programs = $server->supervisorPrograms()->where('is_active', true)->get();
+        $programs = $server->supervisorPrograms()->with('site')->where('is_active', true)->get();
         $rereadUpdate = $this->supervisorRereadUpdateExecLine($server);
 
         return app(ServerSshConnectionRunner::class)->run(
@@ -87,8 +94,7 @@ class SupervisorProvisioner
                     /** @var SupervisorProgram $program */
                     $ini = $this->buildIni($program);
                     $path = $dir.'/dply-sv-'.$program->id.'.conf';
-                    $ssh->putFile($path, $ini);
-                    $log .= "Wrote {$path}\n";
+                    $log .= $this->writeConfFile($ssh, $server, $path, $ini);
                 }
 
                 $log .= $ssh->exec($rereadUpdate, 180);
@@ -202,6 +208,207 @@ class SupervisorProvisioner
     public function startProgramGroup(Server $server, string $programId): string
     {
         return $this->supervisorctlProgramAction($server, $programId, 'start');
+    }
+
+    /**
+     * Re-register a single Dply-managed program on the host: (re)write its
+     * supervisor conf file, then `supervisorctl reread && supervisorctl update`
+     * so supervisord learns the program. This is the remediation for programs
+     * that exist in Dply but are "NOT REPORTED" by supervisorctl (the conf was
+     * never applied, or was removed on the box) and therefore fail start/stop
+     * with "no such process". Reuses the same conf path and reread/update line
+     * as {@see sync()} — this is sync() scoped to one program.
+     */
+    public function syncProgram(Server $server, string $programId): string
+    {
+        if (! $server->isReady() || empty($server->ssh_private_key)) {
+            throw new \RuntimeException('Server must be ready with an SSH key.');
+        }
+
+        $packagePresent = $server->supervisor_package_status === Server::SUPERVISOR_PACKAGE_INSTALLED
+            || $this->isSupervisorPackageInstalled($server);
+        if (! $packagePresent) {
+            throw new \RuntimeException(
+                'Supervisor is not installed on this server. Install it from Server → Daemons first.'
+            );
+        }
+
+        $program = SupervisorProgram::query()->where('server_id', $server->id)->whereKey($programId)->first();
+        if (! $program) {
+            throw new \RuntimeException('Program not found.');
+        }
+        if (! $program->is_active) {
+            throw new \RuntimeException('This program is inactive — activate it before syncing.');
+        }
+
+        return $this->syncProgramResult($server, $programId)['log'];
+    }
+
+    /**
+     * Re-register a single program AND ensure it is actually started, capturing
+     * + classifying the real outcome so the UI can show registered / running /
+     * FATAL-with-reason instead of a silent no-op.
+     *
+     * Why an explicit start: `supervisorctl update` only (re)starts a group when
+     * its config changed; if the program was already known to supervisord (or
+     * `update` adds it but the autostart spawn fails) it can sit STOPPED/FATAL.
+     * We therefore run reread → update → start → status and parse the status
+     * line. `exec()` ignores exit codes in this codebase, so we rely on the
+     * stdout/stderr text (and the trailing status line) to know what happened.
+     *
+     * @return array{log: string, state: string, status_line: string, message: string, ok: bool}
+     */
+    public function syncProgramResult(Server $server, string $programId): array
+    {
+        if (! $server->isReady() || empty($server->ssh_private_key)) {
+            throw new \RuntimeException('Server must be ready with an SSH key.');
+        }
+
+        $packagePresent = $server->supervisor_package_status === Server::SUPERVISOR_PACKAGE_INSTALLED
+            || $this->isSupervisorPackageInstalled($server);
+        if (! $packagePresent) {
+            throw new \RuntimeException(
+                'Supervisor is not installed on this server. Install it from Server → Daemons first.'
+            );
+        }
+
+        $program = SupervisorProgram::query()->where('server_id', $server->id)->whereKey($programId)->first();
+        if (! $program) {
+            throw new \RuntimeException('Program not found.');
+        }
+        if (! $program->is_active) {
+            throw new \RuntimeException('This program is inactive — activate it before syncing.');
+        }
+
+        $dir = rtrim(config('sites.supervisor_conf_d'), '/');
+        $rereadUpdate = $this->supervisorRereadUpdateExecLine($server);
+        $group = 'dply-sv-'.$program->id;
+
+        $raw = app(ServerSshConnectionRunner::class)->run(
+            $server,
+            function ($ssh) use ($server, $program, $dir, $rereadUpdate, $group): array {
+                $ini = $this->buildIni($program);
+                $path = $dir.'/dply-sv-'.$program->id.'.conf';
+
+                // Write the conf into the include dir. If the SSH user can't write
+                // there directly (root-owned /etc/supervisor/conf.d), surface it
+                // rather than letting reread silently not see the file.
+                try {
+                    $writeLog = $this->writeConfFile($ssh, $server, $path, $ini);
+                } catch (\Throwable $e) {
+                    $writeLog = "Failed to write {$path}: ".$e->getMessage()."\n";
+                }
+
+                $log = $writeLog;
+                $log .= $ssh->exec($rereadUpdate, 180)."\n";
+
+                $sc = $this->supervisorctlInv($server);
+                // Explicitly (re)start; `update` alone may leave it STOPPED/FATAL.
+                $startOut = trim((string) $ssh->exec($sc.' start '.escapeshellarg($group).' 2>&1', 120));
+                $log .= '$ supervisorctl start '.$group."\n".$startOut."\n";
+
+                // Re-probe this program's status line so the result reflects reality.
+                $statusOut = trim((string) $ssh->exec($sc.' status '.escapeshellarg($group).' 2>&1', 60));
+                $log .= '$ supervisorctl status '.$group."\n".$statusOut."\n";
+
+                return ['log' => $log, 'start' => $startOut, 'status' => $statusOut];
+            },
+            $this->useRootSsh(),
+            $this->fallbackToDeployUserSsh()
+        );
+
+        return $this->classifySyncProgramResult($group, $raw['log'], $raw['start'], $raw['status']);
+    }
+
+    /**
+     * Turn the reread/update/start/status text into a single clear outcome.
+     *
+     * @return array{log: string, state: string, status_line: string, message: string, ok: bool}
+     */
+    protected function classifySyncProgramResult(string $group, string $log, string $startOut, string $statusOut): array
+    {
+        $state = $this->classifySupervisorStatusLine($statusOut);
+        $alreadyStarted = (bool) preg_match('/already started/i', $startOut);
+
+        // A status line like "no such process/group" means the conf still isn't
+        // registered — the write or reread didn't take (path/permissions).
+        if ($this->indicatesUnregisteredProgram($statusOut)) {
+            return [
+                'log' => $log,
+                'state' => 'unknown',
+                'status_line' => $statusOut,
+                'message' => 'Supervisor still does not see this program after reread/update. The conf file may not be in supervisord’s include directory, or could not be written. Check Inspect for details.',
+                'ok' => false,
+            ];
+        }
+
+        if ($state === 'running') {
+            return [
+                'log' => $log,
+                'state' => $state,
+                'status_line' => $statusOut,
+                'message' => $alreadyStarted
+                    ? 'Re-registered. Program was already running.'
+                    : 'Re-registered and started — program is RUNNING.',
+                'ok' => true,
+            ];
+        }
+
+        if (in_array($state, ['fatal', 'backoff', 'exited'], true)) {
+            $reason = $this->extractSpawnFailureReason($statusOut.' '.$startOut);
+
+            return [
+                'log' => $log,
+                'state' => $state,
+                'status_line' => $statusOut,
+                'message' => 'Re-registered but the program failed to stay up ('.strtoupper($state).'). '
+                    .($reason !== '' ? $reason.' ' : '')
+                    .'Check the command, the working directory, and the run-as user, then view the program logs.',
+                'ok' => false,
+            ];
+        }
+
+        // starting/stopped/unknown but registered.
+        return [
+            'log' => $log,
+            'state' => $state === 'unknown' ? 'starting' : $state,
+            'status_line' => $statusOut,
+            'message' => 'Re-registered on the server. Current state: '.strtoupper($state === 'unknown' ? 'starting' : $state).'.',
+            'ok' => true,
+        ];
+    }
+
+    /**
+     * Pull a human-readable cause out of supervisorctl start/status text for
+     * common spawn failures (bad command/dir/user, exited too quickly).
+     */
+    protected function extractSpawnFailureReason(string $text): string
+    {
+        if (preg_match('/spawn error/i', $text)) {
+            return 'Spawn error — supervisord could not exec the command (check the binary path, directory, and user).';
+        }
+        if (preg_match('/too quickly|exited too quickly/i', $text)) {
+            return 'The process exited too quickly to be considered started (it likely errored on launch).';
+        }
+        if (preg_match('/(?:ENOENT|No such file or directory)/i', $text)) {
+            return 'A path does not exist (command or working directory).';
+        }
+        if (preg_match('/Permission denied/i', $text)) {
+            return 'Permission denied (the run-as user may not be able to run the command or enter the directory).';
+        }
+
+        return '';
+    }
+
+    /**
+     * Whether a supervisorctl output/error string indicates the program group
+     * is unknown to supervisord (config never applied / removed on the box).
+     * Drives the friendly "not registered — use Sync" message instead of leaking
+     * the raw `ERROR (no such process)`.
+     */
+    public function indicatesUnregisteredProgram(string $output): bool
+    {
+        return (bool) preg_match('/no such (process|group)/i', $output);
     }
 
     protected function supervisorctlProgramAction(Server $server, string $programId, string $verb): string
@@ -407,6 +614,43 @@ class SupervisorProvisioner
         }
 
         return 'sudo -n env PATH=/usr/sbin:/usr/bin:/sbin:/bin '.$binary;
+    }
+
+    /**
+     * Write a Supervisor program conf into the (root-owned) include dir reliably.
+     *
+     * SFTP putFile runs AS THE SSH USER, so when dply connects as a non-root
+     * deploy user it cannot write /etc/supervisor/conf.d directly — the file
+     * silently never lands and supervisorctl then reports "no such process"
+     * (the program looks like it "didn't install"). For non-root users we stage
+     * the file in a writable temp path and move it into place with
+     * `sudo -n install` (a harmless no-op elevation for root SSH users, which
+     * keep using a direct putFile). Returns a log line; on a sudo/install
+     * failure the line is marked so the caller surfaces it instead of pretending
+     * the write succeeded.
+     */
+    protected function writeConfFile($ssh, Server $server, string $path, string $contents): string
+    {
+        $user = trim((string) $server->ssh_user);
+        if ($user === '' || $user === 'root') {
+            $ssh->putFile($path, $contents);
+
+            return "Wrote {$path}\n";
+        }
+
+        $tmp = '/tmp/'.basename($path);
+        $ssh->putFile($tmp, $contents);
+        $out = trim((string) $ssh->exec(
+            'sudo -n install -o root -g root -m 0644 '.escapeshellarg($tmp).' '.escapeshellarg($path).' 2>&1; '
+            .'printf "DPLY_CONF_EXIT:%s" "$?"; rm -f '.escapeshellarg($tmp),
+            60
+        ));
+
+        if (! str_contains($out, 'DPLY_CONF_EXIT:0')) {
+            return "Failed to install {$path} as root (sudo): ".$out."\n";
+        }
+
+        return "Wrote {$path}\n";
     }
 
     /**
@@ -695,7 +939,10 @@ class SupervisorProvisioner
     {
         $name = 'dply-sv-'.$program->id;
         $cmd = $program->command;
-        $cwd = $program->directory;
+        // Resolve the working dir from the site for site-scoped programs so an
+        // imported/stale stored path (e.g. a Forge "apps/<x>/current" that does
+        // not exist on a dply box) can't make supervisord FATAL on a bad chdir.
+        $cwd = $program->effectiveDirectory();
         $user = $program->user ?: 'www-data';
         $num = max(1, (int) $program->numprocs);
         $logPath = $program->stdout_logfile !== null && $program->stdout_logfile !== ''

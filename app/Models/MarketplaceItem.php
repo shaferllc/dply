@@ -23,11 +23,15 @@ class MarketplaceItem extends Model
 
     public const CATEGORY_GUIDES = 'guides';
 
+    public const CATEGORY_RUNBOOKS = 'runbooks';
+
     public const RECIPE_WEBSERVER_TEMPLATE = 'webserver_template';
 
     public const RECIPE_DEPLOY_COMMAND = 'deploy_command';
 
     public const RECIPE_SERVER_RECIPE = 'server_recipe';
+
+    public const RECIPE_WORKSPACE_RUNBOOK = 'workspace_runbook';
 
     public const RECIPE_EXTERNAL_LINK = 'external_link';
 
@@ -117,6 +121,7 @@ class MarketplaceItem extends Model
             self::CATEGORY_WEBSERVER => __('Webserver'),
             self::CATEGORY_INTEGRATIONS => __('Integrations'),
             self::CATEGORY_GUIDES => __('Guides'),
+            self::CATEGORY_RUNBOOKS => __('Runbooks'),
         ];
     }
 }

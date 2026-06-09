@@ -71,11 +71,7 @@ class SiteLogViewer extends Component
 
     public function resetLogFilterAndCloseMenu(): void
     {
-        $this->logFilter = '';
-        $this->logFilterUseRegex = false;
-        $this->logFilterInvert = false;
-        $this->logFilterError = null;
-        $this->applyLogFilterToOutput();
+        $this->resetLogViewerFilters();
         $this->closeLogOptionsMenu();
     }
 

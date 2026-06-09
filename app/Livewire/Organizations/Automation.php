@@ -48,11 +48,22 @@ class Automation extends Component
 
     public bool $int_evt_uptime_recovered = true;
 
+    public bool $int_evt_uptime_degraded = true;
+
+    public bool $int_evt_ssl_expiring = true;
+
     public bool $int_evt_insight_opened = false;
 
     public bool $int_evt_insight_resolved = false;
 
     public bool $deploy_email_notifications_enabled = true;
+
+    public string $edge_data_region = 'default';
+
+    public string $alert_slack_webhook_url = '';
+
+    /** Comma- or newline-separated emails for the destinations textarea. */
+    public string $alert_extra_emails_input = '';
 
     public bool $email_server_credentials_enabled = false;
 
@@ -83,6 +94,89 @@ class Automation extends Component
         $this->deploy_email_notifications_enabled = (bool) $this->organization->deploy_email_notifications_enabled;
         $this->email_server_credentials_enabled = (bool) $this->organization->email_server_credentials_enabled;
         $this->email_database_credentials_enabled = (bool) $this->organization->email_database_credentials_enabled;
+        $this->edge_data_region = (string) ($this->organization->edge_data_region ?: 'default');
+        $this->alert_slack_webhook_url = (string) ($this->organization->alert_slack_webhook_url ?: '');
+        $emails = is_array($this->organization->alert_extra_emails) ? $this->organization->alert_extra_emails : [];
+        $this->alert_extra_emails_input = implode("\n", array_filter($emails, 'is_string'));
+    }
+
+    public function saveAlertDestinations(): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $this->validate([
+            'alert_slack_webhook_url' => ['nullable', 'url', 'max:500', 'starts_with:https://'],
+            'alert_extra_emails_input' => ['nullable', 'string', 'max:2000'],
+        ], [
+            'alert_slack_webhook_url.starts_with' => __('Slack webhook URLs start with https://'),
+        ]);
+
+        // Parse the textarea: one email per line or comma-separated.
+        $raw = preg_split('/[\s,]+/', $this->alert_extra_emails_input) ?: [];
+        $emails = [];
+        foreach ($raw as $candidate) {
+            $candidate = trim((string) $candidate);
+            if ($candidate === '') {
+                continue;
+            }
+            if (filter_var($candidate, FILTER_VALIDATE_EMAIL) === false) {
+                $this->addError('alert_extra_emails_input', __('Invalid email: :email', ['email' => $candidate]));
+
+                return;
+            }
+            $emails[$candidate] = true;
+        }
+        $emails = array_keys($emails);
+
+        $previous = [
+            'alert_slack_webhook_url' => $this->organization->alert_slack_webhook_url,
+            'alert_extra_emails' => $this->organization->alert_extra_emails,
+        ];
+
+        $this->organization->update([
+            'alert_slack_webhook_url' => trim($this->alert_slack_webhook_url) ?: null,
+            'alert_extra_emails' => $emails,
+        ]);
+
+        audit_log(
+            $this->organization,
+            auth()->user(),
+            'organization.alert_destinations_updated',
+            null,
+            $previous,
+            [
+                'alert_slack_webhook_url' => $this->organization->alert_slack_webhook_url,
+                'alert_extra_emails' => $this->organization->alert_extra_emails,
+            ],
+        );
+
+        $this->refreshOrganization();
+        $this->dispatch('toast', message: __('Alert destinations saved.'), type: 'success');
+    }
+
+    public function updatedEdgeDataRegion(): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $allowed = ['default', 'eu', 'weur', 'eeur', 'wnam', 'enam', 'apac', 'oc'];
+        if (! in_array($this->edge_data_region, $allowed, true)) {
+            $this->edge_data_region = 'default';
+        }
+
+        $previous = (string) ($this->organization->edge_data_region ?: 'default');
+        $this->organization->update(['edge_data_region' => $this->edge_data_region]);
+
+        audit_log(
+            $this->organization,
+            auth()->user(),
+            'organization.edge_data_region_updated',
+            null,
+            ['edge_data_region' => $previous],
+            ['edge_data_region' => $this->edge_data_region],
+        );
+
+        $this->refreshOrganization();
+        $this->dispatch('notify', message: 'Edge data region updated.');
     }
 
     public function updatedDeployEmailNotificationsEnabled(): void
@@ -246,6 +340,12 @@ class Automation extends Component
         if ($this->int_evt_uptime_recovered) {
             $events[] = 'uptime_recovered';
         }
+        if ($this->int_evt_uptime_degraded) {
+            $events[] = 'uptime_degraded';
+        }
+        if ($this->int_evt_ssl_expiring) {
+            $events[] = 'ssl_expiring';
+        }
         if ($this->int_evt_insight_opened) {
             $events[] = 'insight_opened';
         }
@@ -271,6 +371,8 @@ class Automation extends Component
         $this->int_evt_deploy_started = false;
         $this->int_evt_uptime_down = true;
         $this->int_evt_uptime_recovered = true;
+        $this->int_evt_uptime_degraded = true;
+        $this->int_evt_ssl_expiring = true;
         $this->int_evt_insight_opened = false;
         $this->int_evt_insight_resolved = false;
         $this->refreshOrganization();

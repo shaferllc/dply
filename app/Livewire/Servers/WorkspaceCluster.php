@@ -6,6 +6,7 @@ namespace App\Livewire\Servers;
 
 use App\Jobs\PollDoksClusterStatusJob;
 use App\Jobs\PollEksClusterStatusJob;
+use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\BuildsContainerLaunchSummary;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
@@ -13,8 +14,9 @@ use App\Models\Server;
 use App\Services\DigitalOceanService;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
-use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 use Throwable;
 
 /**
@@ -28,11 +30,14 @@ use Throwable;
  * reflects the latest job-written state without the user reloading.
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceCluster extends Component
 {
+    use RendersWorkspacePlaceholder;
     use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.cluster';
+
     use BuildsContainerLaunchSummary;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;

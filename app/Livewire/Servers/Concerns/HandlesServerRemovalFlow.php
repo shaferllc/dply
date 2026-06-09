@@ -123,12 +123,14 @@ trait HandlesServerRemovalFlow
         $this->closeRemoveServerModal();
         $deleteServer->execute($server, $actor, $auditExtras, $emailContext);
 
-        // Hard redirect (no navigate: true) — Livewire's SPA-style
-        // soft navigation re-hydrates the current component before
-        // the redirect URL takes over, and that re-hydration tries
-        // to look up the just-deleted Server model → 404 modal. A
-        // plain redirect avoids the round-trip entirely.
-        return redirect()->route('servers.index');
+        // navigate: true uses Alpine.navigate() which aborts in-flight fetch
+        // requests (via AbortController) before navigating. Without it, any
+        // lazy-load AJAX request for the #[Lazy] workspace component that fired
+        // on page-load would still be in-flight after the delete, arrive at the
+        // server, try to hydrate the now-missing Server model → 404 modal flash.
+        $this->redirectRoute('servers.index', navigate: true);
+
+        return null;
     }
 
     /**

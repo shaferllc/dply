@@ -115,4 +115,22 @@ return [
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Markdown Mail Settings
+    |--------------------------------------------------------------------------
+    |
+    | Branded theme for all markdown mail (notifications + Mailables). The `dply`
+    | theme recolors Laravel's default to the brand palette; published components
+    | live under resources/views/vendor/mail.
+    |
+    */
+
+    'markdown' => [
+        'theme' => 'dply',
+        'paths' => [
+            resource_path('views/vendor/mail'),
+        ],
+    ],
+
 ];

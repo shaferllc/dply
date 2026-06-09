@@ -97,10 +97,10 @@ class SiteSystemdUnitBuilder
     {
         $base = trim((string) ($site->repository_path ?? ''));
         if ($base === '') {
-            // Falls back to the conventional /var/www/{slug} when the path
-            // hasn't been set explicitly on the row. The provisioner will
-            // make sure this exists on disk before starting the unit.
-            $base = '/var/www/'.$site->slug;
+            // Falls back to the conventional /home/dply/{domain} when the
+            // path hasn't been set explicitly on the row. The provisioner
+            // will make sure this exists on disk before starting the unit.
+            $base = $site->conventionalRepositoryPath();
         }
 
         // Atomic-deploy sites run their command from the active release
@@ -137,7 +137,12 @@ Wants=network-online.target
 Type=simple
 {$userLine}WorkingDirectory={$workingDirectory}
 {$portLine}ExecStart={$execStart}
-Restart=on-failure
+# `always`, not `on-failure`: these are long-running daemons (Horizon, queue
+# workers, web server). A deploy runs `horizon:terminate`, which exits 0 — a
+# clean exit that `on-failure` would NOT restart, leaving the daemon dead after
+# every deploy. `always` brings it back; an explicit `systemctl stop` still
+# stops it (stop is not a restart trigger). RestartSec throttles crash loops.
+Restart=always
 RestartSec=5s
 KillMode=mixed
 TimeoutStopSec=20

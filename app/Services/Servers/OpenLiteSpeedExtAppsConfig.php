@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\SshConnection;
@@ -194,6 +195,7 @@ class OpenLiteSpeedExtAppsConfig
      * are never touched.
      *
      * @param  array<string, array<string, string>>  $updates
+     *
      * @throws \RuntimeException on read/install/validate failure
      */
     public function save(Server $server, array $updates, ?ConsoleEmitter $emitter = null): void
@@ -251,6 +253,7 @@ class OpenLiteSpeedExtAppsConfig
      *
      * @param  array{name: string, type: string, address: string, path?: string}  $identity
      * @param  array<string, string>  $values  Tunables keyed by PARAMS keys; missing keys take defaults.
+     *
      * @throws \RuntimeException
      */
     public function addApp(Server $server, array $identity, array $values, ?ConsoleEmitter $emitter = null): void
@@ -375,7 +378,7 @@ class OpenLiteSpeedExtAppsConfig
         foreach (preg_split('/\R/', trim($stripped)) ?: [] as $line) {
             $line = trim($line);
             if ($line !== '') {
-                $emit($line, $exit !== 0 ? \App\Models\ConsoleAction::LEVEL_WARN : \App\Models\ConsoleAction::LEVEL_INFO);
+                $emit($line, $exit !== 0 ? ConsoleAction::LEVEL_WARN : ConsoleAction::LEVEL_INFO);
             }
         }
         if ($exit !== 0) {

@@ -44,18 +44,26 @@
             </section>
         </div>
 
-        <div class="mb-6 rounded-2xl border border-brand-gold/35 bg-brand-sand/50 px-5 py-4 shadow-sm">
-            <p class="text-sm font-semibold text-brand-ink">{{ __('Good file backup hygiene') }}</p>
-            <ul class="mt-2 space-y-1 text-sm leading-relaxed text-brand-moss list-disc list-inside">
-                <li>{{ __('List the paths you would miss in the first hour of an outage.') }}</li>
-                <li>{{ __('Keep exclusions explicit so archives stay small and predictable.') }}</li>
-                <li>{{ __('Store the restore destination and verification step with the same site.') }}</li>
-            </ul>
-        </div>
+        <section class="dply-card overflow-hidden mb-6">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <x-icon-badge>
+                        <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Checklist') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Good file backup hygiene') }}</h3>
+                        <ul class="mt-1 max-w-2xl space-y-1 text-sm leading-relaxed text-brand-moss list-disc list-inside">
+                            <li>{{ __('List the paths you would miss in the first hour of an outage.') }}</li>
+                            <li>{{ __('Keep exclusions explicit so archives stay small and predictable.') }}</li>
+                            <li>{{ __('Store the restore destination and verification step with the same site.') }}</li>
+                        </ul>
+                    </div>
+            </div>
+        </section>
 
         <div class="grid gap-4 lg:grid-cols-3 mb-6">
             <section class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm lg:col-span-2">
-                <h2 class="text-sm font-semibold text-brand-ink">{{ __('Available storage destinations') }}</h2>
+                <h2 class="text-base font-semibold text-brand-ink">{{ __('Available storage destinations') }}</h2>
                 @if ($storageDestinations->isEmpty())
                     <p class="mt-2 text-sm leading-relaxed text-brand-moss">
                         {{ __('No storage destinations yet. Add one before you expect repeatable file recovery.') }}
@@ -83,7 +91,7 @@
                 @endif
             </section>
             <section class="rounded-2xl border border-brand-ink/10 bg-white p-5 shadow-sm">
-                <h2 class="text-sm font-semibold text-brand-ink">{{ __('Recovery drill') }}</h2>
+                <h2 class="text-base font-semibold text-brand-ink">{{ __('Recovery drill') }}</h2>
                 <ul class="mt-3 space-y-2 text-sm leading-relaxed text-brand-moss list-disc list-inside">
                     <li>{{ __('Confirm the writable paths that matter for each site.') }}</li>
                     <li>{{ __('Write down where restored files should land.') }}</li>
@@ -94,14 +102,18 @@
 
         <div class="dply-card overflow-hidden">
             <div class="px-4 py-3 sm:px-6 border-b border-brand-ink/10 bg-brand-sand/30">
-                <h2 class="text-sm font-semibold text-brand-ink">{{ __('Sites in this organization') }}</h2>
+                <h2 class="text-base font-semibold text-brand-ink">{{ __('Sites in this organization') }}</h2>
                     <p class="text-xs text-brand-moss mt-0.5">{{ __('Use each site as the source of truth for what should be archived, excluded, and restored.') }}</p>
             </div>
             @if ($sites->isEmpty())
                 <div class="px-6 py-12 text-center">
                     <p class="text-sm text-brand-moss">{{ __('No sites yet. Create a server and add a site to enable file backups.') }}</p>
                     <div class="mt-4 flex flex-wrap justify-center gap-3">
-                        <a href="{{ route('launches.create') }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('Open launchpad') }}</a>
+                        @if (multi_surface_active())
+                            <a href="{{ route('launches.create') }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('Open launchpad') }}</a>
+                        @else
+                            <a href="{{ route('servers.create') }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('Add a server') }}</a>
+                        @endif
                         <span class="text-brand-mist" aria-hidden="true">·</span>
                         <a href="{{ route('sites.index') }}" wire:navigate class="text-sm font-medium text-brand-sage hover:text-brand-ink">{{ __('View sites') }}</a>
                     </div>

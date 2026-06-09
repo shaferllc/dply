@@ -2,15 +2,18 @@
     <div class="dply-page-shell py-12 lg:py-14">
         <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-10">
             <div class="max-w-sm">
-                <a href="{{ url('/') }}" class="inline-flex items-center gap-3">
+                <a href="{{ url('/') }}" class="inline-flex items-center gap-1.5">
+                    {{-- Dark-background mark (inverse of the light header lockup): gold
+                         square + ink "d". The mark's "d" is the word's first letter,
+                         so the wordmark beside it is "ply" (reads "dply"). --}}
                     <img
-                        src="{{ asset('images/dply-logo.svg') }}"
-                        alt=""
-                        class="h-9 w-auto opacity-95"
-                        width="50"
-                        height="58"
+                        src="{{ asset('images/dply-mark-dark.svg') }}"
+                        alt="{{ config('app.name') }}"
+                        class="h-9 w-9 shrink-0"
+                        width="36"
+                        height="36"
                     />
-                    <span class="text-lg font-semibold tracking-tight text-brand-cream">{{ config('app.name') }}</span>
+                    <span class="text-lg font-semibold tracking-tight text-brand-cream">ply</span>
                 </a>
                 <p class="mt-4 text-sm leading-relaxed text-brand-mist">
                     Infrastructure control for teams that ship. Start with a real trial on your own servers, then move to flat organization pricing when you are ready to standardize.
@@ -22,7 +25,10 @@
                     <ul class="space-y-2.5 text-brand-sand/80">
                         <li><a href="{{ url('/') }}" class="hover:text-brand-cream transition-colors">Overview</a></li>
                         <li><a href="{{ route('features') }}" class="hover:text-brand-cream transition-colors">Features</a></li>
+                        <li><a href="{{ route('roadmap') }}" class="hover:text-brand-cream transition-colors">Roadmap</a></li>
+                        <li><a href="{{ route('changelog') }}" class="hover:text-brand-cream transition-colors">Changelog</a></li>
                         <li><a href="{{ route('pricing') }}" class="hover:text-brand-cream transition-colors">Pricing</a></li>
+                        <li><a href="{{ route('migrate.index') }}" class="hover:text-brand-cream transition-colors">Migrate</a></li>
                         <li><a href="{{ route('docs.index') }}" class="hover:text-brand-cream transition-colors">Docs</a></li>
                         @auth
                             <li><a href="{{ route('dashboard') }}" class="hover:text-brand-cream transition-colors">Dashboard</a></li>
@@ -42,9 +48,21 @@
                 </div>
             </div>
         </div>
+        @php($homeVersion = in_array(request()->query('v'), ['1', '2'], true)
+            ? request()->query('v')
+            : (request()->cookie('home_version') === '2' ? '2' : '1'))
         <div class="mt-12 pt-8 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-brand-mist">
             <span>&copy; {{ date('Y') }} {{ config('app.name') }}. All rights reserved.</span>
-            <span class="text-brand-sand/50">Built for regulated teams and growing engineering orgs.</span>
+            <div class="flex items-center gap-3">
+                <div class="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1">
+                    <span class="px-2 text-[10px] font-medium uppercase tracking-wider text-brand-mist">Homepage</span>
+                    <a href="{{ url('/?v=1') }}"
+                       class="rounded-full px-3 py-1 font-medium transition-colors {{ $homeVersion === '1' ? 'bg-brand-gold text-brand-ink' : 'text-brand-sand/80 hover:text-brand-cream' }}">Classic</a>
+                    <a href="{{ url('/?v=2') }}"
+                       class="rounded-full px-3 py-1 font-medium transition-colors {{ $homeVersion === '2' ? 'bg-brand-gold text-brand-ink' : 'text-brand-sand/80 hover:text-brand-cream' }}">Animated</a>
+                </div>
+                <span class="hidden sm:inline text-brand-sand/50">Built for regulated teams and growing engineering orgs.</span>
+            </div>
         </div>
     </div>
 </footer>

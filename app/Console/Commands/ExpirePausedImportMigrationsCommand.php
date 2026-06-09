@@ -9,6 +9,7 @@ use App\Models\ImportServerMigration;
 use App\Models\ImportSiteMigration;
 use App\Models\ProviderCredential;
 use App\Models\User;
+use App\Services\Imports\Forge\ForgeImportDriver;
 use App\Services\Imports\Ploi\PloiImportDriver;
 use App\Services\Notifications\NotificationPublisher;
 use Illuminate\Console\Command;
@@ -147,6 +148,7 @@ class ExpirePausedImportMigrationsCommand extends Command
         if (is_string($latest) && $latest !== '') {
             return Carbon::parse($latest);
         }
+
         // Fallback to push-time when no step has finished yet.
         return $migration->ssh_key_pushed_at;
     }
@@ -172,7 +174,7 @@ class ExpirePausedImportMigrationsCommand extends Command
                 match ($migration->source) {
                     'ploi' => PloiImportDriver::for($credential)
                         ->revokeSshKey($migration->source_server_id, $migration->ssh_key_source_id),
-                    'forge' => \App\Services\Imports\Forge\ForgeImportDriver::for($credential)
+                    'forge' => ForgeImportDriver::for($credential)
                         ->revokeSshKey($migration->source_server_id, $migration->ssh_key_source_id),
                     default => null,
                 };

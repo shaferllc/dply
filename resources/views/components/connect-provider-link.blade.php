@@ -1,8 +1,7 @@
 {{--
-    Opens the shared "Connect a repository provider" modal. Drop next to a
-    repo / account picker so an operator can link a missing GitHub / GitLab /
-    Bitbucket account without leaving the page. Pair with one
-    <x-connect-provider-modal /> per page.
+    Opens the shared "Connect a repository provider" modal (layout-mounted).
+    Drop next to a repo / account picker so an operator can link a missing
+    GitHub / GitLab / Bitbucket account without leaving the page.
 --}}
 <button
     type="button"

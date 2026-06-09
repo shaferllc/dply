@@ -23,6 +23,15 @@
         <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             {{ __('This site\'s runtime does not have a server-side .env file (container or serverless). The cached env IS the source of truth — no diff to compute.') }}
         </div>
+    @elseif (! $serverEnvLoaded)
+        {{-- Reading the live .env is a synchronous SSH round-trip; defer it to wire:init so
+             the page paints immediately, then the diff fills in. --}}
+        <div wire:init="loadServerEnv" class="rounded-2xl border border-slate-200 bg-white p-6 text-center text-sm text-slate-600">
+            <div class="flex items-center justify-center gap-3">
+                <x-spinner variant="forest" size="sm" />
+                {{ __('Reading the server .env over SSH…') }}
+            </div>
+        </div>
     @elseif ($serverError !== '')
         <div class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
             <p class="font-semibold">{{ __('Could not read .env from server.') }}</p>
@@ -84,5 +93,5 @@
         @endif
     @endif
 
-    <x-cli-snippet class="mt-8" :command="'dply:site:env-diff '.$site->slug" />
+    <x-cli-snippet class="mt-8" :command="'dply sites:env:diff '.$site->slug" />
 </div>

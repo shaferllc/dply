@@ -1,11 +1,36 @@
 <div>
     @php($functionsHost = $server->hostCapabilities()->supportsFunctionDeploy())
-    <div class="border-b border-slate-200 bg-white">
+    {{-- Headless host (webserver=none, e.g. a worker): no domain / web root / SSL —
+         deploys code through the standard pipeline only. --}}
+    @php($isHeadlessHost = ! $functionsHost
+        && $server->hostKind() === \App\Models\Server::HOST_KIND_VM
+        && ($server->meta['webserver'] ?? 'nginx') === 'none')
+    @if ($siteCreateBlockedReason !== '')
+        <div class="border-b border-slate-200 bg-white">
+            <div class="dply-page-shell py-8">
+                <x-page-header
+                    :title="__('Create site')"
+                    :description="__('Create a new site on :server.', ['server' => $server->name])"
+                    flush
+                >
+                    <x-slot name="actions">
+                        <a href="{{ route('servers.sites', $server) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">{{ __('Cancel') }}</a>
+                    </x-slot>
+                </x-page-header>
+            </div>
+        </div>
+        <div class="py-10">
+            <div class="dply-page-shell">
+                @include('livewire.sites._create-blocked')
+            </div>
+        </div>
+    @else
+    <div @class(['border-b border-slate-200 bg-white', 'hidden' => $usesChooseAppBareCreate])>
         <div class="dply-page-shell py-8">
             <x-page-header
                 :title="__('Create site')"
                 :description="$functionsHost ? __('Set up the domain, runtime, and artifact details for a new site on :server. This host deploys through a serverless target instead of an SSH machine.', ['server' => $server->name]) : __('Set up the domain, stack, and deploy paths for a new site on :server. Dply will wire a temporary testing hostname during provisioning so you can verify the install before customer DNS is switched.', ['server' => $server->name])"
-                doc-route="docs.index"
+                doc-contextual
                 flush
             >
                 <x-slot name="actions">
@@ -19,10 +44,32 @@
         <div class="dply-page-shell space-y-8">
             @if ($isContainerMode)
                 @include('livewire.sites._create-container-mode')
+            @elseif ($usesChooseAppBareCreate)
+                @include('livewire.sites._create-bare')
             @else
+            @if ($dockerDeployRequestedButMissing)
+                <div class="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 text-sm text-amber-900">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div class="flex min-w-0 items-start gap-3">
+                            <x-heroicon-o-exclamation-triangle class="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+                            <p class="leading-relaxed">
+                                {{ __('Docker was not detected on this server during the last inventory probe. Install Docker from the Docker workspace before creating a container site here.') }}
+                            </p>
+                        </div>
+                        <a
+                            href="{{ route('servers.docker', $server) }}"
+                            wire:navigate
+                            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-forest/90"
+                        >
+                            {{ __('Open Docker workspace') }}
+                            <x-heroicon-o-arrow-right class="h-4 w-4" aria-hidden="true" />
+                        </a>
+                    </div>
+                </div>
+            @endif
             @if (config('dply.scaffold_v1_enabled'))
                 @include('livewire.sites._create-mode-toggle')
-            @elseif ($server->hostKind() === \App\Models\Server::HOST_KIND_VM)
+            @elseif ($server->hostKind() === \App\Models\Server::HOST_KIND_VM && ! $isHeadlessHost)
                 <div class="rounded-2xl border border-dashed border-brand-ink/15 bg-brand-sand/20 p-4 text-sm text-brand-moss">
                     <div class="flex items-start gap-3">
                         <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-brand-forest shadow-sm">
@@ -99,16 +146,48 @@
                             <x-input-error :messages="$errors->get('form.name')" class="mt-1" />
                         </div>
 
+                        @unless ($isHeadlessHost)
                         <div>
-                            <x-input-label for="primary_hostname" :value="__('Primary domain')" />
-                            <x-text-input id="primary_hostname" wire:model.live.debounce.300ms="form.primary_hostname" placeholder="app.example.com" class="mt-1 block w-full font-mono text-sm" required autocomplete="off" />
+                            <x-input-label for="primary_hostname" :value="__('Primary domain (optional)')" />
+                            <x-text-input id="primary_hostname" wire:model.live.debounce.300ms="form.primary_hostname" placeholder="app.example.com" class="mt-1 block w-full font-mono text-sm" autocomplete="off" />
                             <p class="mt-2 text-sm text-slate-600">
                                 {{ $functionsHost
-                                    ? __('Use the real customer-facing domain here. Dply tracks the domain, repository, and runtime metadata for the first publish.')
-                                    : __('Use the real customer-facing domain here. Dply can still provision a temporary testing hostname on one of your owned zones while you finish setup.') }}
+                                    ? __('Optional. Add the real customer-facing domain when you have one — Dply tracks the domain, repository, and runtime metadata for the first publish.')
+                                    : __('Optional. Dply provisions a testing hostname automatically so you can deploy without a customer domain. Add your real domain here whenever you’re ready.') }}
                             </p>
                             <x-input-error :messages="$errors->get('form.primary_hostname')" class="mt-1" />
                         </div>
+                        @else
+                        <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 px-4 py-3 text-sm text-brand-moss">
+                            {{ __('This is a headless host (no web server) — no domain or SSL needed. Connect a repository below and deploy; your workers run from the deployed code.') }}
+                        </div>
+                        @endunless
+
+                        @if (! $functionsHost && ! $isContainerMode && $server->dockerEnginePresent())
+                            <div>
+                                <x-input-label :value="__('Deploy target')" />
+                                <div class="mt-2 grid gap-3 sm:grid-cols-2">
+                                    <label @class([
+                                        'cursor-pointer rounded-xl border p-4 shadow-sm transition',
+                                        'border-sky-500 bg-sky-50/60 ring-1 ring-sky-500' => $form->deploy_stack === 'native',
+                                        'border-slate-200 bg-white hover:border-slate-300' => $form->deploy_stack !== 'native',
+                                    ])>
+                                        <input type="radio" wire:model.live="form.deploy_stack" value="native" class="sr-only" />
+                                        <p class="text-sm font-semibold text-slate-900">{{ __('Native stack') }}</p>
+                                        <p class="mt-1 text-xs leading-relaxed text-slate-600">{{ __('PHP-FPM, static files, or a Node process on the VM — routed by the server webserver.') }}</p>
+                                    </label>
+                                    <label @class([
+                                        'cursor-pointer rounded-xl border p-4 shadow-sm transition',
+                                        'border-sky-500 bg-sky-50/60 ring-1 ring-sky-500' => $form->deploy_stack === 'docker',
+                                        'border-slate-200 bg-white hover:border-slate-300' => $form->deploy_stack !== 'docker',
+                                    ])>
+                                        <input type="radio" wire:model.live="form.deploy_stack" value="docker" class="sr-only" />
+                                        <p class="text-sm font-semibold text-slate-900">{{ __('Docker container') }}</p>
+                                        <p class="mt-1 text-xs leading-relaxed text-slate-600">{{ __('Build and run via compose on a host port. Caddy/Nginx on the VM reverse-proxies to the container.') }}</p>
+                                    </label>
+                                </div>
+                            </div>
+                        @endif
 
                         <div>
                             <x-input-label for="type" :value="__('Stack')" />
@@ -118,7 +197,9 @@
                                 <option value="node">{{ __('Node (Nginx → reverse proxy)') }}</option>
                             </select>
                             <p class="mt-2 text-sm text-slate-600">
-                                @if ($form->type === 'php')
+                                @if ($form->deploy_stack === 'docker')
+                                    {{ __('Used to generate the Dockerfile/compose recipe. The container listens internally; Dply publishes it on a host port for the webserver proxy.') }}
+                                @elseif ($form->type === 'php')
                                     {{ __('Best for Laravel, WordPress, and other PHP apps that serve from a public web root.') }}
                                 @elseif ($form->type === 'static')
                                     {{ __('Best for HTML, CSS, JS, or a prebuilt frontend that should be served directly from disk.') }}
@@ -347,7 +428,7 @@
                             </details>
                         @endif
 
-                        @if ($form->type === 'php')
+                        @if ($form->type === 'php' && $form->deploy_stack !== 'docker')
                             <div>
                                 <x-input-label for="php_version" :value="__('PHP-FPM version')" />
                                 <select id="php_version" wire:model="form.php_version" class="mt-1 block w-full max-w-xs rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
@@ -371,7 +452,13 @@
                             <div>
                                 <x-input-label for="app_port" :value="__('App listens on (localhost)')" />
                                 <x-text-input id="app_port" type="number" wire:model="form.app_port" class="mt-1 block w-full max-w-[8rem]" />
-                                <p class="mt-2 text-sm text-slate-600">{{ __('Nginx will proxy requests to this port on the server.') }}</p>
+                                <p class="mt-2 text-sm text-slate-600">
+                                    @if ($form->deploy_stack === 'docker')
+                                        {{ __('Port inside the container. Compose maps this to a host port in the 30000–39999 range for the webserver proxy.') }}
+                                    @else
+                                        {{ __('Nginx will proxy requests to this port on the server.') }}
+                                    @endif
+                                </p>
                             </div>
                         @endif
 
@@ -416,6 +503,5 @@
             @endif {{-- @if ($isContainerMode) ... @else ... --}}
         </div>
     </div>
-
-    <x-connect-provider-modal />
+    @endif
 </div>

@@ -2,12 +2,15 @@
 
 namespace App\Jobs;
 
+use App\Models\BillingSubscriptionSyncEvent;
 use App\Models\Organization;
+use App\Services\Billing\BillingSubscriptionSyncEventRecorder;
 use App\Services\Billing\OrganizationBillingStateComputer;
 use App\Services\Billing\StripeSubscriptionSyncer;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Throwable;
 
 /**
  * Reconciles an organization's Stripe subscription against its current
@@ -24,7 +27,10 @@ class SyncOrganizationBillingJob implements ShouldBeUnique, ShouldQueue
 
     public int $uniqueFor = 120;
 
-    public function __construct(public string $organizationId) {}
+    public function __construct(
+        public string $organizationId,
+        public string $trigger = 'manual',
+    ) {}
 
     public function uniqueId(): string
     {
@@ -34,6 +40,7 @@ class SyncOrganizationBillingJob implements ShouldBeUnique, ShouldQueue
     public function handle(
         OrganizationBillingStateComputer $computer,
         StripeSubscriptionSyncer $syncer,
+        BillingSubscriptionSyncEventRecorder $eventRecorder,
     ): void {
         $organization = Organization::find($this->organizationId);
         if (! $organization) {
@@ -47,6 +54,31 @@ class SyncOrganizationBillingJob implements ShouldBeUnique, ShouldQueue
         }
 
         $desired = $computer->compute($organization);
-        $syncer->reconcile($organization, $desired);
+
+        try {
+            $changes = $syncer->reconcile($organization, $desired);
+            $eventRecorder->record(
+                organization: $organization,
+                trigger: $this->trigger,
+                status: $changes === []
+                    ? BillingSubscriptionSyncEvent::STATUS_NO_OP
+                    : BillingSubscriptionSyncEvent::STATUS_SUCCESS,
+                changes: $changes,
+                desiredState: $desired->toArray(),
+                monthlyTotalCents: $desired->monthlyTotalCents,
+            );
+        } catch (Throwable $e) {
+            $eventRecorder->record(
+                organization: $organization,
+                trigger: $this->trigger,
+                status: BillingSubscriptionSyncEvent::STATUS_FAILED,
+                changes: [],
+                desiredState: $desired->toArray(),
+                monthlyTotalCents: $desired->monthlyTotalCents,
+                errorMessage: $e->getMessage(),
+            );
+
+            throw $e;
+        }
     }
 }

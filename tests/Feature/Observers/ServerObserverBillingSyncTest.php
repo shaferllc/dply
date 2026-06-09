@@ -1,92 +1,83 @@
 <?php
 
-namespace Tests\Feature\Observers;
+namespace Tests\Feature\Observers\ServerObserverBillingSyncTest;
 
 use App\Jobs\SyncOrganizationBillingJob;
 use App\Models\Organization;
 use App\Models\Server;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
-use Tests\TestCase;
 
-class ServerObserverBillingSyncTest extends TestCase
-{
-    use RefreshDatabase;
+uses(RefreshDatabase::class);
 
-    public function test_dispatches_sync_when_server_transitions_into_ready(): void
-    {
-        Bus::fake();
-        $org = Organization::factory()->create();
-        $server = Server::factory()->create([
-            'organization_id' => $org->id,
-            'status' => Server::STATUS_PROVISIONING,
-        ]);
+test('dispatches sync when server transitions into ready', function () {
+    Bus::fake();
+    $org = Organization::factory()->create();
+    $server = Server::factory()->create([
+        'organization_id' => $org->id,
+        'status' => Server::STATUS_PROVISIONING,
+    ]);
 
-        $server->update(['status' => Server::STATUS_READY]);
+    $server->update(['status' => Server::STATUS_READY]);
 
-        Bus::assertDispatched(
-            SyncOrganizationBillingJob::class,
-            fn (SyncOrganizationBillingJob $job) => $job->organizationId === $org->id,
-        );
-    }
+    Bus::assertDispatched(
+        SyncOrganizationBillingJob::class,
+        fn (SyncOrganizationBillingJob $job) => $job->organizationId === $org->id,
+    );
+});
 
-    public function test_dispatches_sync_when_server_leaves_ready(): void
-    {
-        Bus::fake();
-        $org = Organization::factory()->create();
-        $server = Server::factory()->create([
-            'organization_id' => $org->id,
-            'status' => Server::STATUS_READY,
-        ]);
+test('dispatches sync when server leaves ready', function () {
+    Bus::fake();
+    $org = Organization::factory()->create();
+    $server = Server::factory()->create([
+        'organization_id' => $org->id,
+        'status' => Server::STATUS_READY,
+    ]);
 
-        $server->update(['status' => Server::STATUS_DISCONNECTED]);
+    $server->update(['status' => Server::STATUS_DISCONNECTED]);
 
-        Bus::assertDispatched(SyncOrganizationBillingJob::class);
-    }
+    Bus::assertDispatched(SyncOrganizationBillingJob::class);
+});
 
-    public function test_dispatches_sync_when_server_is_deleted(): void
-    {
-        Bus::fake();
-        $org = Organization::factory()->create();
-        $server = Server::factory()->create([
-            'organization_id' => $org->id,
-            'status' => Server::STATUS_READY,
-        ]);
+test('dispatches sync when server is deleted', function () {
+    Bus::fake();
+    $org = Organization::factory()->create();
+    $server = Server::factory()->create([
+        'organization_id' => $org->id,
+        'status' => Server::STATUS_READY,
+    ]);
 
-        $server->delete();
+    $server->delete();
 
-        Bus::assertDispatched(
-            SyncOrganizationBillingJob::class,
-            fn (SyncOrganizationBillingJob $job) => $job->organizationId === $org->id,
-        );
-    }
+    Bus::assertDispatched(
+        SyncOrganizationBillingJob::class,
+        fn (SyncOrganizationBillingJob $job) => $job->organizationId === $org->id,
+    );
+});
 
-    public function test_does_not_dispatch_when_status_stays_outside_ready(): void
-    {
-        Bus::fake();
-        $org = Organization::factory()->create();
-        $server = Server::factory()->create([
-            'organization_id' => $org->id,
-            'status' => Server::STATUS_PROVISIONING,
-        ]);
+test('does not dispatch when status stays outside ready', function () {
+    Bus::fake();
+    $org = Organization::factory()->create();
+    $server = Server::factory()->create([
+        'organization_id' => $org->id,
+        'status' => Server::STATUS_PROVISIONING,
+    ]);
 
-        $server->update(['status' => Server::STATUS_ERROR]);
+    $server->update(['status' => Server::STATUS_ERROR]);
 
-        Bus::assertNotDispatched(SyncOrganizationBillingJob::class);
-    }
+    Bus::assertNotDispatched(SyncOrganizationBillingJob::class);
+});
 
-    public function test_does_not_dispatch_when_unrelated_field_changes(): void
-    {
-        Bus::fake();
-        $org = Organization::factory()->create();
-        $server = Server::factory()->create([
-            'organization_id' => $org->id,
-            'status' => Server::STATUS_READY,
-            'name' => 'old-name',
-        ]);
+test('does not dispatch when unrelated field changes', function () {
+    Bus::fake();
+    $org = Organization::factory()->create();
+    $server = Server::factory()->create([
+        'organization_id' => $org->id,
+        'status' => Server::STATUS_READY,
+        'name' => 'old-name',
+    ]);
 
-        $server->update(['name' => 'new-name']);
+    $server->update(['name' => 'new-name']);
 
-        Bus::assertNotDispatched(SyncOrganizationBillingJob::class);
-    }
-}
+    Bus::assertNotDispatched(SyncOrganizationBillingJob::class);
+});

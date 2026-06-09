@@ -10,6 +10,10 @@
         $activeLogTitle = (string) $logKey;
     }
     $currentLogIsDply = in_array(($currentLogDef['type'] ?? ''), ['dply', 'dply_site'], true);
+    $currentLogIsAccessLog = \App\Support\Servers\AccessLogVisitorClassifier::isAccessLogSource($logKey, $currentLogDef);
+    $trafficBreakdown = $logTrafficBreakdown ?? ['human' => 0, 'crawler' => 0, 'bot' => 0, 'ai' => 0, 'unknown' => 0];
+    $activeTrafficFilter = \App\Support\Servers\AccessLogVisitorClassifier::normalizeFilter($logTrafficFilter ?? 'all');
+    $realTrafficCount = ($trafficBreakdown['human'] ?? 0) + ($trafficBreakdown['unknown'] ?? 0);
     $logFetchedHuman = $logLastFetchedAt
         ? \Illuminate\Support\Carbon::parse($logLastFetchedAt)->timezone(config('app.timezone'))->format('Y-m-d H:i:s T')
         : null;
@@ -314,6 +318,45 @@
                     </div>
                     @if ($logFilterError)
                         <p class="mt-2 text-xs font-medium text-amber-800">{{ $logFilterError }}</p>
+                    @endif
+                    @if ($currentLogIsAccessLog && $logTotalLines > 0)
+                        <div class="mt-3 border-t border-brand-ink/10 pt-3">
+                            <p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Visitor traffic') }}</p>
+                            <div class="flex flex-wrap gap-2">
+                                @php
+                                    $trafficFilters = [
+                                        'all' => ['label' => __('All'), 'count' => $logTotalLines],
+                                        'humans' => ['label' => __('Humans'), 'count' => $trafficBreakdown['human'] ?? 0],
+                                        'crawlers' => ['label' => __('Crawlers'), 'count' => $trafficBreakdown['crawler'] ?? 0],
+                                        'bots' => ['label' => __('Bots'), 'count' => $trafficBreakdown['bot'] ?? 0],
+                                        'ai' => ['label' => __('AI fetchers'), 'count' => $trafficBreakdown['ai'] ?? 0],
+                                        'noise' => ['label' => __('Real traffic'), 'count' => $realTrafficCount],
+                                    ];
+                                @endphp
+                                @foreach ($trafficFilters as $filterKey => $filterMeta)
+                                    <button
+                                        type="button"
+                                        wire:click="setLogTrafficFilter('{{ $filterKey }}')"
+                                        wire:key="log-traffic-{{ $filterKey }}"
+                                        @class([
+                                            'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-medium transition-colors',
+                                            'border-brand-sage/30 bg-brand-sage text-white shadow-sm' => $activeTrafficFilter === $filterKey,
+                                            'border-brand-ink/10 bg-white/80 text-brand-moss hover:border-brand-ink/15 hover:bg-brand-sand/40 hover:text-brand-ink' => $activeTrafficFilter !== $filterKey,
+                                        ])
+                                    >
+                                        <span>{{ $filterMeta['label'] }}</span>
+                                        <span @class([
+                                            'tabular-nums',
+                                            'text-white/90' => $activeTrafficFilter === $filterKey,
+                                            'text-brand-mist' => $activeTrafficFilter !== $filterKey,
+                                        ])>{{ $filterMeta['count'] }}</span>
+                                    </button>
+                                @endforeach
+                            </div>
+                            <p class="mt-2 text-[11px] leading-5 text-brand-mist">
+                                {{ __('Classifies access-log user agents into humans, search crawlers, generic bots, and AI training/scraping fetchers. Counts reflect the current fetch before your text filter.') }}
+                            </p>
+                        </div>
                     @endif
                 </div>
             </div>

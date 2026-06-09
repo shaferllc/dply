@@ -1,217 +1,265 @@
 <?php
 
-namespace Tests\Unit;
+namespace Tests\Unit\OrganizationModelTest;
 
 use App\Models\Organization;
+use App\Models\Server;
+use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
 
-class OrganizationModelTest extends TestCase
-{
-    use RefreshDatabase;
+uses(RefreshDatabase::class);
 
-    public function test_has_member_returns_true_for_attached_user(): void
+test('has member returns true for attached user', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'member']);
+
+    expect($org->hasMember($user))->toBeTrue();
+});
+
+test('has member returns false for non attached user', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+
+    expect($org->hasMember($user))->toBeFalse();
+});
+
+test('has admin access returns true for owner', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+
+    expect($org->hasAdminAccess($user))->toBeTrue();
+});
+
+test('wants deploy email notifications defaults true', function () {
+    $org = Organization::factory()->create();
+
+    expect($org->fresh()->wantsDeployEmailNotifications())->toBeTrue();
+});
+
+test('wants deploy email notifications respects disabled column', function () {
+    $org = Organization::factory()->create(['deploy_email_notifications_enabled' => false]);
+
+    expect($org->wantsDeployEmailNotifications())->toBeFalse();
+});
+
+test('has admin access returns true for admin', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'admin']);
+
+    expect($org->hasAdminAccess($user))->toBeTrue();
+});
+
+test('has admin access returns false for member', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'member']);
+
+    expect($org->hasAdminAccess($user))->toBeFalse();
+});
+
+test('user is deployer', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'deployer']);
+
+    expect($org->userIsDeployer($user))->toBeTrue();
+    expect($org->hasMember($user))->toBeTrue();
+    expect($org->hasAdminAccess($user))->toBeFalse();
+});
+
+test('plan tier label defaults to trial without a pro subscription', function () {
+    $org = new Organization;
+
+    expect($org->planTierLabel())->toBe('Trial');
+});
+
+test('plan tier label returns standard when org is on standard', function () {
+    $org = new class extends Organization
     {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'member']);
-
-        $this->assertTrue($org->hasMember($user));
-    }
-
-    public function test_has_member_returns_false_for_non_attached_user(): void
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-
-        $this->assertFalse($org->hasMember($user));
-    }
-
-    public function test_has_admin_access_returns_true_for_owner(): void
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'owner']);
-
-        $this->assertTrue($org->hasAdminAccess($user));
-    }
-
-    public function test_wants_deploy_email_notifications_defaults_true(): void
-    {
-        $org = Organization::factory()->create();
-
-        $this->assertTrue($org->fresh()->wantsDeployEmailNotifications());
-    }
-
-    public function test_wants_deploy_email_notifications_respects_disabled_column(): void
-    {
-        $org = Organization::factory()->create(['deploy_email_notifications_enabled' => false]);
-
-        $this->assertFalse($org->wantsDeployEmailNotifications());
-    }
-
-    public function test_has_admin_access_returns_true_for_admin(): void
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'admin']);
-
-        $this->assertTrue($org->hasAdminAccess($user));
-    }
-
-    public function test_has_admin_access_returns_false_for_member(): void
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'member']);
-
-        $this->assertFalse($org->hasAdminAccess($user));
-    }
-
-    public function test_user_is_deployer(): void
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'deployer']);
-
-        $this->assertTrue($org->userIsDeployer($user));
-        $this->assertTrue($org->hasMember($user));
-        $this->assertFalse($org->hasAdminAccess($user));
-    }
-
-    public function test_plan_tier_label_defaults_to_trial_without_a_pro_subscription(): void
-    {
-        $org = new Organization;
-
-        $this->assertSame('Trial', $org->planTierLabel());
-    }
-
-    public function test_plan_tier_label_returns_standard_when_org_is_on_standard(): void
-    {
-        $org = new class extends Organization
+        public function onStandardSubscription(): bool
         {
-            public function onStandardSubscription(): bool
-            {
-                return true;
-            }
-        };
+            return true;
+        }
+    };
 
-        $this->assertSame('Standard', $org->planTierLabel());
-    }
+    expect($org->planTierLabel())->toBe('Standard');
+});
 
-    public function test_plan_tier_label_returns_enterprise_when_org_is_on_enterprise(): void
+test('plan tier label returns enterprise when org is on enterprise', function () {
+    $org = new class extends Organization
     {
-        $org = new class extends Organization
+        public function onEnterpriseSubscription(): bool
         {
-            public function onEnterpriseSubscription(): bool
-            {
-                return true;
-            }
-        };
+            return true;
+        }
+    };
 
-        $this->assertSame('Enterprise', $org->planTierLabel());
-    }
+    expect($org->planTierLabel())->toBe('Enterprise');
+});
 
-    public function test_enterprise_takes_precedence_over_standard(): void
+test('enterprise takes precedence over standard', function () {
+    $org = new class extends Organization
     {
-        $org = new class extends Organization
+        public function onEnterpriseSubscription(): bool
         {
-            public function onEnterpriseSubscription(): bool
-            {
-                return true;
-            }
+            return true;
+        }
 
-            public function onStandardSubscription(): bool
-            {
-                return true;
-            }
-        };
-
-        $this->assertSame('Enterprise', $org->planTierLabel());
-    }
-
-    public function test_on_any_paid_plan_is_true_for_each_paid_plan(): void
-    {
-        $trialOrg = new Organization;
-        $this->assertFalse($trialOrg->onAnyPaidPlan());
-
-        $standardOrg = new class extends Organization
+        public function onStandardSubscription(): bool
         {
-            public function onStandardSubscription(): bool
-            {
-                return true;
-            }
-        };
-        $this->assertTrue($standardOrg->onAnyPaidPlan());
+            return true;
+        }
+    };
 
-        $enterpriseOrg = new class extends Organization
+    expect($org->planTierLabel())->toBe('Enterprise');
+});
+
+test('on any paid plan is true for each paid plan', function () {
+    $trialOrg = new Organization;
+    expect($trialOrg->onAnyPaidPlan())->toBeFalse();
+
+    $standardOrg = new class extends Organization
+    {
+        public function onStandardSubscription(): bool
         {
-            public function onEnterpriseSubscription(): bool
-            {
-                return true;
-            }
-        };
-        $this->assertTrue($enterpriseOrg->onAnyPaidPlan());
-    }
+            return true;
+        }
+    };
+    expect($standardOrg->onAnyPaidPlan())->toBeTrue();
 
-    public function test_max_servers_is_unlimited_on_any_paid_plan(): void
+    $enterpriseOrg = new class extends Organization
     {
-        $standardOrg = new class extends Organization
+        public function onEnterpriseSubscription(): bool
         {
-            public function onStandardSubscription(): bool
-            {
-                return true;
-            }
-        };
+            return true;
+        }
+    };
+    expect($enterpriseOrg->onAnyPaidPlan())->toBeTrue();
+});
 
-        $this->assertSame(PHP_INT_MAX, $standardOrg->maxServers());
-        $this->assertSame(PHP_INT_MAX, $standardOrg->maxSites());
-        $this->assertSame('Unlimited', $standardOrg->maxServersDisplay());
-        $this->assertSame('Unlimited', $standardOrg->maxSitesDisplay());
-    }
-
-    public function test_max_servers_and_sites_are_unlimited_for_all_orgs(): void
+test('max servers is unlimited on any paid plan', function () {
+    $standardOrg = new class extends Organization
     {
-        // Under the Standard model there is no server/site cap — trial-state
-        // gating (canDeploy / acceptsMetrics) does the abuse-protection work.
-        $trialOrg = new Organization;
+        public function onStandardSubscription(): bool
+        {
+            return true;
+        }
+    };
 
-        $this->assertSame(PHP_INT_MAX, $trialOrg->maxServers());
-        $this->assertSame(PHP_INT_MAX, $trialOrg->maxSites());
-        $this->assertSame('Unlimited', $trialOrg->maxServersDisplay());
-        $this->assertSame('Unlimited', $trialOrg->maxSitesDisplay());
-    }
+    expect($standardOrg->maxServers())->toBe(PHP_INT_MAX);
+    expect($standardOrg->maxServersDisplay())->toBe('Unlimited');
+});
 
-    public function test_org_creation_starts_a_14_day_trial(): void
-    {
-        config(['subscription.standard.trial_days' => 14]);
-        $org = Organization::factory()->create();
+test('max servers is unlimited for all orgs', function () {
+    // Server count is uncapped — trial-state gating (canDeploy / acceptsMetrics)
+    // does the abuse-protection work; the plan is just metered by count.
+    $trialOrg = new Organization;
 
-        $this->assertNotNull($org->trial_ends_at);
-        $this->assertTrue($org->trial_ends_at->isFuture());
-        $this->assertEqualsWithDelta(14 * 86400, now()->diffInSeconds($org->trial_ends_at, false), 5);
-    }
+    expect($trialOrg->maxServers())->toBe(PHP_INT_MAX);
+    expect($trialOrg->maxServersDisplay())->toBe('Unlimited');
+});
 
-    public function test_org_creation_respects_explicitly_set_trial(): void
-    {
-        $explicit = now()->addDays(30);
-        $org = Organization::factory()->create(['trial_ends_at' => $explicit]);
+test('site ceiling follows the plan resolved from billable server count', function () {
+    config(['subscription.standard.min_billable_age_days' => 1]);
+    config(['subscription.standard.plans' => [
+        'free' => ['label' => 'Free', 'price_cents' => 0, 'max_servers' => 1, 'max_sites' => 1],
+        'starter' => ['label' => 'Starter', 'price_cents' => 900, 'max_servers' => 3, 'max_sites' => 10],
+        'pro' => ['label' => 'Pro', 'price_cents' => 1900, 'max_servers' => 10, 'max_sites' => 30],
+        'business' => ['label' => 'Business', 'price_cents' => 3900, 'max_servers' => null, 'max_sites' => null],
+    ]]);
 
-        $this->assertEqualsWithDelta($explicit->timestamp, $org->trial_ends_at->timestamp, 2);
-    }
+    $org = Organization::factory()->create();
 
-    public function test_on_dply_trial_is_true_while_trial_is_future(): void
-    {
-        $org = Organization::factory()->create(['trial_ends_at' => now()->addDay()]);
+    // No billable servers -> Free plan -> single site ceiling.
+    expect($org->planSiteLimit())->toBe(1);
+    expect($org->maxSites())->toBe(1);
+    expect($org->maxSitesDisplay())->toBe('1');
 
-        $this->assertTrue($org->onDplyTrial());
-    }
+    // Two aged, ready VM servers move the org onto Starter (≤3 servers).
+    Server::factory()->count(2)->create([
+        'organization_id' => $org->id,
+        'status' => Server::STATUS_READY,
+        'created_at' => now()->subDays(3),
+    ]);
 
-    public function test_on_dply_trial_is_false_after_trial_expires(): void
-    {
-        $org = Organization::factory()->create(['trial_ends_at' => now()->subDay()]);
+    $org->refresh();
+    expect($org->currentSubscriptionPlan()['key'])->toBe('starter');
+    expect($org->planSiteLimit())->toBe(10);
+    expect($org->maxSites())->toBe(10);
+});
 
-        $this->assertFalse($org->onDplyTrial());
-    }
-}
+test('canCreateSite hard-blocks at the plan site ceiling', function () {
+    config(['subscription.standard.plans' => [
+        'free' => ['label' => 'Free', 'price_cents' => 0, 'max_servers' => 1, 'max_sites' => 1],
+        'business' => ['label' => 'Business', 'price_cents' => 3900, 'max_servers' => null, 'max_sites' => null],
+    ]]);
+
+    $org = Organization::factory()->create();
+
+    expect($org->canCreateSite())->toBeTrue();
+    expect($org->siteLimitReached())->toBeFalse();
+
+    $server = Server::factory()->create([
+        'organization_id' => $org->id,
+        'status' => Server::STATUS_READY,
+        'created_at' => now()->subDays(3),
+    ]);
+    Site::factory()->create([
+        'organization_id' => $org->id,
+        'server_id' => $server->id,
+    ]);
+
+    $org->refresh();
+
+    // Free plan = 1 site, now consumed.
+    expect($org->quotaCountedSiteCount())->toBe(1);
+    expect($org->siteLimitReached())->toBeTrue();
+    expect($org->canCreateSite())->toBeFalse();
+    expect($org->siteLimitMessage())->toContain('Free plan');
+});
+
+test('unlimited plans never block site creation', function () {
+    config(['subscription.standard.plans' => [
+        'business' => ['label' => 'Business', 'price_cents' => 3900, 'max_servers' => null, 'max_sites' => null],
+    ]]);
+
+    $org = Organization::factory()->create();
+
+    expect($org->planSiteLimit())->toBeNull();
+    expect($org->maxSites())->toBe(PHP_INT_MAX);
+    expect($org->maxSitesDisplay())->toBe('Unlimited');
+    expect($org->canCreateSite())->toBeTrue();
+    expect($org->siteLimitMessage())->toBe('');
+});
+
+test('org creation starts a 14 day trial', function () {
+    config(['subscription.standard.trial_days' => 14]);
+    $org = Organization::factory()->create();
+
+    expect($org->trial_ends_at)->not->toBeNull();
+    expect($org->trial_ends_at->isFuture())->toBeTrue();
+    expect(now()->diffInSeconds($org->trial_ends_at, false))->toEqualWithDelta(14 * 86400, 5);
+});
+
+test('org creation respects explicitly set trial', function () {
+    $explicit = now()->addDays(30);
+    $org = Organization::factory()->create(['trial_ends_at' => $explicit]);
+
+    expect($org->trial_ends_at->timestamp)->toEqualWithDelta($explicit->timestamp, 2);
+});
+
+test('on dply trial is true while trial is future', function () {
+    $org = Organization::factory()->create(['trial_ends_at' => now()->addDay()]);
+
+    expect($org->onDplyTrial())->toBeTrue();
+});
+
+test('on dply trial is false after trial expires', function () {
+    $org = Organization::factory()->create(['trial_ends_at' => now()->subDay()]);
+
+    expect($org->onDplyTrial())->toBeFalse();
+});

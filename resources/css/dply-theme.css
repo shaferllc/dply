@@ -1,0 +1,41 @@
+@theme {
+    /* App font (matches Bunny font loaded in Blade layouts) */
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+
+    /* Brand palette — sampled from dply logo */
+    --color-brand-ink: #171a0e;
+    --color-brand-forest: #32482c;
+    --color-brand-moss: #5d6259;
+    --color-brand-sage: #688479;
+    --color-brand-olive: #5d5622;
+    --color-brand-rust: #9a6215;
+    --color-brand-copper: #ac6e22;
+    --color-brand-gold: #cda942;
+    --color-brand-sand: #e1d8ac;
+    --color-brand-cream: #fdfcf9;
+    --color-brand-mist: #a7a69a;
+
+    --background-image-mesh-brand: radial-gradient(at 40% 20%, rgb(205 169 66 / 0.12) 0px, transparent 50%),
+        radial-gradient(at 80% 0%, rgb(104 132 121 / 0.14) 0px, transparent 45%),
+        radial-gradient(at 0% 50%, rgb(50 72 44 / 0.08) 0px, transparent 50%);
+}
+
+/* Dark palette: same semantic tokens, tuned for low-light UI */
+html.dark {
+    color-scheme: dark;
+    --color-brand-ink: #eef0e8;
+    --color-brand-forest: #9cbc92;
+    --color-brand-moss: #b9bcb4;
+    --color-brand-sage: #9fb5ae;
+    --color-brand-olive: #c9b86a;
+    --color-brand-rust: #d4a574;
+    --color-brand-copper: #d9b07a;
+    --color-brand-gold: #e6d18f;
+    --color-brand-sand: #2f352c;
+    --color-brand-cream: #141612;
+    --color-brand-mist: #7a7d76;
+    --background-image-mesh-brand: radial-gradient(at 40% 20%, rgb(205 169 66 / 0.06) 0px, transparent 50%),
+        radial-gradient(at 80% 0%, rgb(104 132 121 / 0.07) 0px, transparent 45%),
+        radial-gradient(at 0% 50%, rgb(50 72 44 / 0.05) 0px, transparent 50%);
+}

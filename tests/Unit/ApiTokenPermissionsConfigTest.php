@@ -1,46 +1,33 @@
 <?php
 
-namespace Tests\Unit;
+namespace Tests\Unit\ApiTokenPermissionsConfigTest;
 
 use App\Models\ApiToken;
-use Tests\TestCase;
 
-class ApiTokenPermissionsConfigTest extends TestCase
-{
-    public function test_presets_only_reference_defined_or_star_abilities(): void
-    {
-        $presets = config('api_token_permissions.presets', []);
+test('presets only reference defined or star abilities', function () {
+    $presets = config('api_token_permissions.presets', []);
 
-        foreach ($presets as $name => $abilities) {
-            $this->assertIsArray($abilities, 'Preset '.$name.' must be an array');
-            foreach ($abilities as $ab) {
-                $this->assertIsString($ab);
-                $this->assertTrue(
-                    ApiToken::abilityIsAllowedForStorage($ab),
-                    'Preset "'.$name.'" contains invalid ability: '.$ab
-                );
-            }
+    foreach ($presets as $name => $abilities) {
+        expect($abilities)->toBeArray();
+        foreach ($abilities as $ab) {
+            expect($ab)->toBeString();
+            expect(ApiToken::abilityIsAllowedForStorage($ab))->toBeTrue();
         }
     }
+});
 
-    public function test_deployer_allowlist_is_subset_of_catalog_or_star(): void
-    {
-        $catalog = array_flip(ApiToken::catalogAbilities());
+test('deployer allowlist is subset of catalog or star', function () {
+    $catalog = array_flip(ApiToken::catalogAbilities());
 
-        foreach (ApiToken::deployerApiAllowlist() as $ab) {
-            $this->assertArrayHasKey($ab, $catalog, 'Deployer allowlist must use catalog abilities: '.$ab);
-        }
+    foreach (ApiToken::deployerApiAllowlist() as $ab) {
+        expect($catalog)->toHaveKey($ab);
     }
+});
 
-    public function test_http_route_abilities_reference_catalog(): void
-    {
-        $routes = config('api_token_permissions.http_route_abilities', []);
+test('http route abilities reference catalog', function () {
+    $routes = config('api_token_permissions.http_route_abilities', []);
 
-        foreach ($routes as $key => $ability) {
-            $this->assertTrue(
-                ApiToken::abilityIsAllowedForStorage($ability),
-                'Route "'.$key.'" ability invalid: '.$ability
-            );
-        }
+    foreach ($routes as $key => $ability) {
+        expect(ApiToken::abilityIsAllowedForStorage($ability))->toBeTrue();
     }
-}
+});

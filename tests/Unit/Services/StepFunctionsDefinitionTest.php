@@ -2,43 +2,34 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Services;
+namespace Tests\Unit\Services\StepFunctionsDefinitionTest;
 
 use App\Services\Serverless\Aws\StepFunctionsDefinition;
 use InvalidArgumentException;
-use Tests\TestCase;
 
-class StepFunctionsDefinitionTest extends TestCase
-{
-    public function test_it_chains_functions_into_a_state_machine(): void
-    {
-        $definition = json_decode(
-            StepFunctionsDefinition::forSequence(['fetch', 'transform', 'store']),
-            true,
-        );
+test('it chains functions into a state machine', function () {
+    $definition = json_decode(
+        StepFunctionsDefinition::forSequence(['fetch', 'transform', 'store']),
+        true,
+    );
 
-        $this->assertSame('fetch', $definition['StartAt']);
-        $this->assertSame(['fetch', 'transform', 'store'], array_keys($definition['States']));
+    expect($definition['StartAt'])->toBe('fetch');
+    expect(array_keys($definition['States']))->toBe(['fetch', 'transform', 'store']);
 
-        // Each state invokes its Lambda and threads output into the next.
-        $this->assertSame('transform', $definition['States']['fetch']['Next']);
-        $this->assertSame('store', $definition['States']['transform']['Next']);
-        $this->assertTrue($definition['States']['store']['End']);
+    // Each state invokes its Lambda and threads output into the next.
+    expect($definition['States']['fetch']['Next'])->toBe('transform');
+    expect($definition['States']['transform']['Next'])->toBe('store');
+    expect($definition['States']['store']['End'])->toBeTrue();
 
-        $this->assertSame('fetch', $definition['States']['fetch']['Parameters']['FunctionName']);
-        $this->assertSame('arn:aws:states:::lambda:invoke', $definition['States']['fetch']['Resource']);
-        $this->assertSame('$.Payload', $definition['States']['fetch']['OutputPath']);
-    }
-
-    public function test_it_rejects_a_sequence_shorter_than_two_actions(): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-        StepFunctionsDefinition::forSequence(['solo']);
-    }
-
-    public function test_it_rejects_duplicate_function_names(): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-        StepFunctionsDefinition::forSequence(['process', 'process']);
-    }
-}
+    expect($definition['States']['fetch']['Parameters']['FunctionName'])->toBe('fetch');
+    expect($definition['States']['fetch']['Resource'])->toBe('arn:aws:states:::lambda:invoke');
+    expect($definition['States']['fetch']['OutputPath'])->toBe('$.Payload');
+});
+test('it rejects a sequence shorter than two actions', function () {
+    $this->expectException(InvalidArgumentException::class);
+    StepFunctionsDefinition::forSequence(['solo']);
+});
+test('it rejects duplicate function names', function () {
+    $this->expectException(InvalidArgumentException::class);
+    StepFunctionsDefinition::forSequence(['process', 'process']);
+});

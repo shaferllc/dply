@@ -1,13 +1,17 @@
 <section
-    class="rounded-2xl border border-brand-ink/10 bg-white p-6 shadow-sm"
+    class="dply-card overflow-hidden"
     @if ($laravelPailLive) wire:poll.2s="loadLaravelPail" @endif
 >
-    <header class="flex items-start justify-between gap-3">
-        <div>
-            <h3 class="text-base font-semibold text-brand-ink">{{ __('Pail (live tail)') }}</h3>
-            <p class="mt-0.5 text-sm text-brand-moss">{{ __('Streams `storage/logs/laravel.log`. Live mode polls every 2s and only ships bytes appended since the last poll, so a chatty log doesn\'t flood the panel.') }}</p>
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <x-icon-badge>
+            <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
+        </x-icon-badge>
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Logs') }}</p>
+            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Pail (live tail)') }}</h3>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Streams `storage/logs/laravel.log`. Live mode polls every 2s and only ships bytes appended since the last poll, so a chatty log doesn\'t flood the panel.') }}</p>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex shrink-0 items-center gap-2">
             <button
                 type="button"
                 wire:click="toggleLaravelPailLive"
@@ -47,8 +51,9 @@
                 </button>
             @endif
         </div>
-    </header>
+    </div>
 
+    <div class="px-6 py-6 sm:px-7">
     <x-input-error :messages="$errors->get('laravel_pail')" class="mt-3" />
 
     @if (! $laravelPailLoaded)
@@ -58,4 +63,5 @@
     @else
         <pre class="mt-5 max-h-[36rem] overflow-auto rounded-lg bg-brand-ink p-4 font-mono text-[11px] leading-relaxed text-brand-cream">{{ $laravelPailBuffer }}</pre>
     @endif
+    </div>
 </section>

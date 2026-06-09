@@ -68,7 +68,7 @@ class ProviderCredentialController extends Controller
             } elseif ($validated['provider'] === 'hetzner') {
                 $hetzner = new HetznerService($credential);
                 $hetzner->validateToken();
-            } elseif ($validated['provider'] === 'linode' || $validated['provider'] === 'akamai') {
+            } elseif ($validated['provider'] === 'linode') {
                 $linode = new LinodeService($credential);
                 $linode->validateToken();
             } elseif ($validated['provider'] === 'vultr') {

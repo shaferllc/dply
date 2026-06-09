@@ -1,14 +1,26 @@
 <section class="space-y-4">
-    <div class="dply-card p-4 sm:p-6">
-        <label class="flex items-center gap-3 text-sm">
-            <x-heroicon-o-magnifying-glass class="h-4 w-4 text-brand-moss" />
-            <input
-                type="text"
-                wire:model.live.debounce.300ms="branchSearch"
-                placeholder="{{ __('Filter branches by name…') }}"
-                class="w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-ink focus:ring-1 focus:ring-brand-ink"
-            />
-        </label>
+    <div class="dply-card overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <x-icon-badge>
+                <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
+            </x-icon-badge>
+            <div class="min-w-0 flex-1">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Refs') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Branches') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Pick the deploy branch or browse what other refs are currently visible on the remote.') }}</p>
+            </div>
+        </div>
+        <div class="px-6 py-6 sm:px-7">
+            <label class="flex items-center gap-3 text-sm">
+                <x-heroicon-o-magnifying-glass class="h-4 w-4 text-brand-moss" />
+                <input
+                    type="text"
+                    wire:model.live.debounce.300ms="branchSearch"
+                    placeholder="{{ __('Filter branches by name…') }}"
+                    class="w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-ink focus:ring-1 focus:ring-brand-ink"
+                />
+            </label>
+        </div>
     </div>
 
     @if (! ($branchesResult['ok'] ?? false))
@@ -24,7 +36,7 @@
             @endif
         </div>
     @else
-        <ul class="divide-y divide-brand-ink/10 rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
+        <ul class="dply-card divide-y divide-brand-ink/10 overflow-hidden">
             @foreach ($branchesFiltered as $branch)
                 <li class="flex flex-wrap items-center justify-between gap-3 px-4 py-3" wire:key="branch-{{ $branch['name'] }}">
                     <div class="min-w-0">
@@ -57,7 +69,7 @@
                             wire:target="switchBranch('{{ $branch['name'] }}')"
                             class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-wait disabled:opacity-60"
                         >
-                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                            <x-heroicon-o-arrow-path class="h-4 w-4" />
                             {{ __('Set as deploy branch') }}
                         </button>
                     @endif

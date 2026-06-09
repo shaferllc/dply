@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use Laravel\Pennant\Feature;
+
 /**
  * Whether a provider is exposed in UI and accepted for new credentials / server create.
  */
@@ -17,15 +19,17 @@ final class ServerProviderGate
      * @var array<string, string>
      */
     private const PENNANT_FLAGS = [
+        'digitalocean' => 'provider.digitalocean',
+        'hetzner' => 'provider.hetzner',
         'aws' => 'provider.aws',
+        'gcp' => 'provider.gcp',
         'aws_app_runner' => 'provider.aws_app_runner',
         'aws_kubernetes' => 'provider.aws_eks',
         'linode' => 'provider.linode',
         'vultr' => 'provider.vultr',
-        'fly_io' => 'provider.fly_io',
+        'azure' => 'provider.azure',
+        'oracle' => 'provider.oracle',
         'upcloud' => 'provider.upcloud',
-        'scaleway' => 'provider.scaleway',
-        'equinix_metal' => 'provider.equinix_metal',
     ];
 
     /**
@@ -35,16 +39,13 @@ final class ServerProviderGate
         'digitalocean',
         'digitalocean_functions',
         'digitalocean_kubernetes',
-        'digitalocean_app_platform',
         'hetzner',
         'vultr',
         'linode',
-        'akamai',
-        'scaleway',
         'upcloud',
-        'equinix_metal',
-        'fly_io',
         'aws',
+        'azure',
+        'oracle',
         'aws_app_runner',
         'aws_kubernetes',
         'aws_lambda',
@@ -54,12 +55,20 @@ final class ServerProviderGate
     /**
      * Providers that are surfaced as "coming soon" in the credentials UI — visible in the
      * sidebar but disabled (no form submission). Set as a constant rather than via env so
-     * the placeholder rollout is deterministic in tests. Empty now that the DNS & CDN
-     * providers (Gandi, Namecheap, Vercel) ship real credential forms.
+     * the placeholder rollout is deterministic in tests.
+     *
+     * AWS (EC2) is config-enabled but Pennant-gated on `provider.aws`; while that flag is
+     * off it is shown here as "coming soon" rather than hidden. Once the flag is enabled
+     * for an org it resolves to a fully enabled provider (see comingSoon() guard below).
      *
      * @var list<string>
      */
-    private const COMING_SOON = [];
+    private const COMING_SOON = [
+        'aws',
+        'gcp',
+        'azure',
+        'oracle',
+    ];
 
     public static function enabled(string $provider): bool
     {
@@ -77,7 +86,7 @@ final class ServerProviderGate
             return true;
         }
 
-        return \Laravel\Pennant\Feature::active($flag);
+        return Feature::active($flag);
     }
 
     /**
@@ -86,6 +95,13 @@ final class ServerProviderGate
      */
     public static function comingSoon(string $provider): bool
     {
+        // A fully enabled provider (config on + any Pennant flag active) is never
+        // "coming soon" — so a flag-gated provider like AWS flips from placeholder
+        // to a working credential form the moment its flag turns on.
+        if (self::enabled($provider)) {
+            return false;
+        }
+
         return in_array($provider, self::COMING_SOON, true);
     }
 

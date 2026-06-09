@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
+use App\Jobs\ScanServerLiveCertsJob;
 use App\Models\Server;
 use App\Services\SshConnection;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Cross-engine TLS certificates aggregator. Sweeps the canonical cert
@@ -57,28 +59,105 @@ class WebserverCertsAggregator
         '/etc/ssl/dply',
     ];
 
-    /**
-     * @return array{certs: list<array{path: string, subject: string, issuer: string, not_after: ?string, expires_at: ?\Carbon\CarbonImmutable, days_until_expiry: ?int, urgency: string, engine_hint: string, error: ?string}>, scanned_at: ?\Carbon\CarbonImmutable, unreadable: bool}
-     */
-    public function aggregate(Server $server, bool $forceFresh = false): array
+    public static function cacheKey(string $serverId): string
     {
-        $cacheKey = 'dply.webserver-certs:'.$server->id;
+        return 'dply.webserver-certs:'.$serverId;
+    }
 
-        if (! $forceFresh) {
-            $cached = \Illuminate\Support\Facades\Cache::get($cacheKey);
-            if (is_array($cached)) {
-                return $this->rehydrate($cached);
-            }
+    /** Marks that a scan job is queued/running for a server, so we don't pile up dispatches. */
+    public static function inflightKey(string $serverId): string
+    {
+        return 'dply.webserver-certs:inflight:'.$serverId;
+    }
+
+    /**
+     * The cached sweep for a server, or null when nothing is cached yet (no SSH).
+     * This is the read side the Livewire surfaces poll; the SSH work happens in
+     * {@see ScanServerLiveCertsJob} via {@see scanAndCache()}.
+     *
+     * @return array{certs: list<array<string, mixed>>, scanned_at: ?CarbonImmutable, unreadable: bool}|null
+     */
+    public function cached(Server $server): ?array
+    {
+        $cached = Cache::get(self::cacheKey((string) $server->id));
+
+        return is_array($cached) ? $this->rehydrate($cached) : null;
+    }
+
+    /**
+     * Queue an async SSH sweep when there's no fresh cache (or one is forced),
+     * deduped so concurrent viewers don't stack jobs. Callers then poll
+     * {@see cached()} for the result — SSH never runs in the request.
+     */
+    public function dispatchScan(Server $server, bool $forceFresh = false): void
+    {
+        $serverId = (string) $server->id;
+
+        if ($forceFresh) {
+            // Drop the cache so cached() reports "no result yet" and the UI shows
+            // the scanning state until the fresh job repopulates it.
+            Cache::forget(self::cacheKey($serverId));
         }
 
+        if (Cache::get(self::inflightKey($serverId))) {
+            return;
+        }
+
+        Cache::put(self::inflightKey($serverId), true, now()->addSeconds(180));
+        ScanServerLiveCertsJob::dispatch($serverId);
+    }
+
+    /**
+     * Run the SSH sweep and persist it to cache. Called from the queue job, never
+     * inline from a request. Clears the in-flight marker on completion.
+     *
+     * @return array{certs: list<array<string, mixed>>, scanned_at: ?CarbonImmutable, unreadable: bool}
+     */
+    public function scanAndCache(Server $server): array
+    {
         $payload = $this->runScan($server);
-        \Illuminate\Support\Facades\Cache::put($cacheKey, $payload, now()->addSeconds(self::CACHE_TTL_SECONDS));
+        Cache::put(self::cacheKey((string) $server->id), $payload, now()->addSeconds(self::CACHE_TTL_SECONDS));
+        Cache::forget(self::inflightKey((string) $server->id));
 
         return $payload;
     }
 
     /**
-     * @return array{certs: list<array<string, mixed>>, scanned_at: ?\Carbon\CarbonImmutable, unreadable: bool}
+     * Cache an "unreadable" result and clear the in-flight marker. Used when the
+     * scan job fails outright so a polling UI resolves to the SSH-error state
+     * instead of spinning on "scanning" forever.
+     */
+    public function cacheUnreadable(string $serverId): void
+    {
+        Cache::put(
+            self::cacheKey($serverId),
+            ['certs' => [], 'scanned_at' => null, 'unreadable' => true],
+            now()->addSeconds(self::CACHE_TTL_SECONDS),
+        );
+        Cache::forget(self::inflightKey($serverId));
+    }
+
+    /**
+     * Synchronous cache-or-scan. Retained for non-request callers (and tests);
+     * request/Livewire surfaces use {@see cached()} + {@see dispatchScan()} so
+     * the 20s SSH probe never runs in the page request.
+     *
+     * @return array{certs: list<array{path: string, subject: string, issuer: string, not_after: ?string, expires_at: ?CarbonImmutable, days_until_expiry: ?int, urgency: string, engine_hint: string, error: ?string}>, scanned_at: ?CarbonImmutable, unreadable: bool}
+     */
+    public function aggregate(Server $server, bool $forceFresh = false): array
+    {
+        if (! $forceFresh) {
+            $cached = $this->cached($server);
+            if ($cached !== null) {
+                return $cached;
+            }
+        }
+
+        return $this->scanAndCache($server);
+    }
+
+    /**
+     * @return array{certs: list<array<string, mixed>>, scanned_at: ?CarbonImmutable, unreadable: bool}
      */
     private function runScan(Server $server): array
     {
@@ -253,7 +332,7 @@ BASH;
      * objects from `not_after` on the way back out.
      *
      * @param  array<string, mixed>  $cached
-     * @return array{certs: list<array<string, mixed>>, scanned_at: ?\Carbon\CarbonImmutable, unreadable: bool}
+     * @return array{certs: list<array<string, mixed>>, scanned_at: ?CarbonImmutable, unreadable: bool}
      */
     private function rehydrate(array $cached): array
     {

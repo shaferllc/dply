@@ -129,4 +129,29 @@ final class SiteCloneAttributeMapper
 
         return $attributes;
     }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
+     */
+    public static function withPromoteMeta(
+        array $attributes,
+        Site $source,
+        string $previewHostname,
+        string $sourceProductionHostname,
+    ): array {
+        $meta = is_array($attributes['meta'] ?? null) ? $attributes['meta'] : [];
+        $meta['promote'] = [
+            'source_site_id' => (string) $source->id,
+            'source_server_id' => $source->server_id !== null ? (string) $source->server_id : null,
+            'source_production_hostname' => strtolower(trim($sourceProductionHostname)),
+            'preview_hostname' => strtolower(trim($previewHostname)),
+            'preview_first' => true,
+            'cutover_status' => 'pending_preview',
+            'at' => now()->toIso8601String(),
+        ];
+        $attributes['meta'] = $meta;
+
+        return $attributes;
+    }
 }

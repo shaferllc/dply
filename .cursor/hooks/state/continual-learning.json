@@ -1,18 +1,8 @@
 {
   "version": 1,
-<<<<<<< Updated upstream
-  "lastRunAtMs": 1778281457456,
-  "turnsSinceLastRun": 0,
-  "lastTranscriptMtimeMs": 1778281457341.976,
-  "lastProcessedGenerationId": "2037fdbd-d7e5-4097-9285-949fa2386779",
-=======
-  "lastRunAtMs": 1777425351973,
+  "lastRunAtMs": 1780264546383,
   "turnsSinceLastRun": 4,
-  "lastTranscriptMtimeMs": 1777425351797.8076,
-  "lastProcessedGenerationId": "ba007460-36df-47f0-8ae3-c53572b4dbf8",
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
+  "lastTranscriptMtimeMs": 1780264545444.7058,
+  "lastProcessedGenerationId": "31880324-fa79-4ece-961d-481c302f56b6",
   "trialStartedAtMs": null
 }

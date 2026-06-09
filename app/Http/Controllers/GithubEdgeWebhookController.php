@@ -5,29 +5,21 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\Edge\CreateEdgePreviewSite;
-use App\Jobs\RedeployEdgeSiteJob;
+use App\Actions\Edge\RedeployEdgeSite;
 use App\Jobs\TeardownEdgeSiteJob;
 use App\Models\Site;
+use App\Support\Edge\EdgePreviewPolicy;
+use App\Support\Edge\EdgeRepoRoot;
+use App\Support\ProductLine\ProductLineKillSwitches;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * Inbound GitHub App / repo webhook for source-mode edge sites.
- *
- * The operator pastes the webhook URL + the site's webhook_secret
- * into their GitHub repository's webhook settings (one-time setup).
- * GitHub then POSTs us push + pull_request events; we route them
- * to the right job:
+ * Inbound GitHub webhook for git-connected Edge sites.
  *
  *   pull_request opened|reopened|synchronize  → CreateEdgePreviewSite
  *   pull_request closed                       → TeardownEdgeSiteJob (preview)
- *   push (to source branch)                   → RedeployEdgeSiteJob (parent)
- *
- * Auth: HMAC SHA256 of the raw body, signed with the site's
- * webhook_secret, presented as `X-Hub-Signature-256: sha256=<hex>`.
- * Bad signature → 403. Wrong site type → 422. Anything else
- * (irrelevant event, push to non-source branch, missing payload)
- * → 200 with a "no-op" reason so GitHub doesn't keep retrying.
+ *   push (to source branch)                   → RedeployEdgeSite (parent)
  */
 class GithubEdgeWebhookController extends Controller
 {
@@ -38,10 +30,15 @@ class GithubEdgeWebhookController extends Controller
             return response()->json(['ok' => false, 'reason' => 'invalid_signature'], 403);
         }
 
-        if (! $site->usesContainerRuntime()) {
-            return response()->json(['ok' => false, 'reason' => 'not_a_container_site'], 422);
+        if (! $site->usesEdgeRuntime()) {
+            return response()->json(['ok' => false, 'reason' => 'not_an_edge_site'], 422);
         }
-        if (! is_array($site->meta['container']['source'] ?? null)) {
+
+        if (ProductLineKillSwitches::blocksEdgeDelivery()) {
+            return response()->json(['ok' => false, 'reason' => 'edge_delivery_paused'], 503);
+        }
+
+        if (! is_array($site->edgeMeta()['source'] ?? null)) {
             return response()->json(['ok' => false, 'reason' => 'site_is_not_source_mode'], 422);
         }
 
@@ -54,7 +51,7 @@ class GithubEdgeWebhookController extends Controller
         return match ($event) {
             'pull_request' => $this->handlePullRequest($site, $payload),
             'push' => $this->handlePush($site, $payload),
-            'ping' => response()->json(['ok' => true, 'event' => 'ping']),
+            'ping' => tap(response()->json(['ok' => true, 'event' => 'ping']), fn () => $this->touchWebhookLastEvent($site)),
             default => response()->json(['ok' => true, 'queued' => false, 'reason' => 'event_ignored', 'event' => $event]),
         };
     }
@@ -68,13 +65,28 @@ class GithubEdgeWebhookController extends Controller
         $pr = is_array($payload['pull_request'] ?? null) ? $payload['pull_request'] : [];
         $branch = is_string($pr['head']['ref'] ?? null) ? (string) $pr['head']['ref'] : '';
         $prNumber = is_int($pr['number'] ?? null) ? (int) $pr['number'] : null;
+        $headSha = is_string($pr['head']['sha'] ?? null) ? (string) $pr['head']['sha'] : null;
 
         if ($branch === '') {
             return response()->json(['ok' => false, 'reason' => 'no_branch'], 200);
         }
 
         if (in_array($action, ['opened', 'reopened', 'synchronize'], true)) {
-            $preview = (new CreateEdgePreviewSite)->handle($site, $branch, $prNumber);
+            // Gate against the repo's `previews:` policy in dply.yaml.
+            // Disabled globally or branch on the exclude list → skip.
+            if (! EdgePreviewPolicy::shouldCreatePreview($site, EdgePreviewPolicy::EVENT_PULL_REQUEST, $branch)) {
+                $this->touchWebhookLastEvent($site);
+
+                return response()->json([
+                    'ok' => true,
+                    'queued' => false,
+                    'reason' => 'preview_disabled_by_dply_yaml',
+                    'branch' => $branch,
+                ]);
+            }
+
+            $preview = (new CreateEdgePreviewSite)->handle($site, $branch, $prNumber, $headSha);
+            $this->touchWebhookLastEvent($site);
 
             return response()->json([
                 'ok' => true,
@@ -90,6 +102,7 @@ class GithubEdgeWebhookController extends Controller
                 return response()->json(['ok' => true, 'queued' => false, 'reason' => 'no_preview']);
             }
             TeardownEdgeSiteJob::dispatch($preview->id);
+            $this->touchWebhookLastEvent($site);
 
             return response()->json([
                 'ok' => true,
@@ -109,7 +122,7 @@ class GithubEdgeWebhookController extends Controller
     {
         $ref = is_string($payload['ref'] ?? null) ? (string) $payload['ref'] : '';
         $branch = preg_replace('#^refs/heads/#', '', $ref) ?? '';
-        $sourceBranch = (string) ($site->meta['container']['source']['branch'] ?? 'main');
+        $sourceBranch = (string) ($site->edgeMeta()['source']['branch'] ?? 'main');
 
         if ($branch === '' || $branch !== $sourceBranch) {
             return response()->json([
@@ -121,12 +134,26 @@ class GithubEdgeWebhookController extends Controller
             ]);
         }
 
-        RedeployEdgeSiteJob::dispatch($site->id);
+        $changedFiles = EdgeRepoRoot::changedFilesFromPushPayload($payload);
+        if (! EdgeRepoRoot::pushTouchesSite($site->edgeRepoRoot(), $changedFiles)) {
+            return response()->json([
+                'ok' => true,
+                'queued' => false,
+                'reason' => 'push_outside_repo_root',
+                'repo_root' => $site->edgeRepoRoot(),
+                'changed_files' => $changedFiles,
+            ]);
+        }
+
+        $commit = is_string($payload['after'] ?? null) ? (string) $payload['after'] : null;
+        $deployment = (new RedeployEdgeSite)->handle($site, $commit);
+        $this->touchWebhookLastEvent($site);
 
         return response()->json([
             'ok' => true,
             'queued' => 'redeploy',
             'site' => $site->id,
+            'deployment_id' => $deployment->id,
             'branch' => $branch,
         ]);
     }
@@ -144,5 +171,20 @@ class GithubEdgeWebhookController extends Controller
         $expected = hash_hmac('sha256', $request->getContent(), $site->webhook_secret);
 
         return hash_equals($expected, $provided);
+    }
+
+    private function touchWebhookLastEvent(Site $site): void
+    {
+        $webhook = is_array($site->edgeMeta()['webhook'] ?? null) ? $site->edgeMeta()['webhook'] : null;
+        if (! is_array($webhook)) {
+            return;
+        }
+
+        $site->mergeEdgeMeta([
+            'webhook' => array_merge($webhook, [
+                'last_event_at' => now()->toIso8601String(),
+            ]),
+        ]);
+        $site->save();
     }
 }

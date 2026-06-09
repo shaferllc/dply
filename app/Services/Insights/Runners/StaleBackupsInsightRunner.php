@@ -10,6 +10,7 @@ use App\Models\Site;
 use App\Models\SiteFileBackup;
 use App\Services\Insights\Contracts\InsightRunnerInterface;
 use App\Services\Insights\InsightCandidate;
+use Carbon\CarbonInterface;
 
 /**
  * Stale-backup detector. Pure DB check (no SSH). For each *active* backup
@@ -121,7 +122,7 @@ class StaleBackupsInsightRunner implements InsightRunnerInterface
      * Most-recent completed backup timestamp for a schedule's target, or null
      * if the target has never produced a successful backup.
      */
-    private function latestSuccessAt(ServerBackupSchedule $schedule): ?\Carbon\CarbonInterface
+    private function latestSuccessAt(ServerBackupSchedule $schedule): ?CarbonInterface
     {
         return match ($schedule->target_type) {
             ServerBackupSchedule::TARGET_DATABASE => ServerDatabaseBackup::query()

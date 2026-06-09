@@ -54,7 +54,7 @@ class SyncAllOrganizationBillingCommand extends Command
                 continue;
             }
 
-            SyncOrganizationBillingJob::dispatch($org->id);
+            SyncOrganizationBillingJob::dispatch($org->id, 'nightly_sweep');
             $dispatched++;
         }
 

@@ -1,72 +1,59 @@
 <?php
 
-namespace Tests\Unit\Services;
+namespace Tests\Unit\Services\ServerSystemdServiceSnapshotDiffTest;
 
 use App\Services\Servers\ServerSystemdServiceSnapshotDiff;
-use PHPUnit\Framework\Attributes\Test;
-use Tests\TestCase;
 
-class ServerSystemdServiceSnapshotDiffTest extends TestCase
-{
-    #[Test]
-    public function it_emits_no_events_without_prior_snapshot(): void
-    {
-        $diff = new ServerSystemdServiceSnapshotDiff;
+it('emits no events without prior snapshot', function () {
+    $diff = new ServerSystemdServiceSnapshotDiff;
 
-        $this->assertSame([], $diff->diff(null, [
-            ['unit' => 'nginx.service', 'label' => 'nginx', 'active' => 'active', 'sub' => 'running', 'ts' => 't1', 'version' => '1'],
-        ]));
-    }
+    expect($diff->diff(null, [
+        ['unit' => 'nginx.service', 'label' => 'nginx', 'active' => 'active', 'sub' => 'running', 'ts' => 't1', 'version' => '1'],
+    ]))->toBe([]);
+});
 
-    #[Test]
-    public function it_detects_stopped_when_unit_disappears_from_running_list(): void
-    {
-        $diff = new ServerSystemdServiceSnapshotDiff;
-        $old = [
-            ['unit' => 'nginx.service', 'label' => 'nginx', 'active' => 'active', 'sub' => 'running', 'ts' => 't1', 'version' => '1'],
-        ];
-        $new = [];
+it('detects stopped when unit disappears from running list', function () {
+    $diff = new ServerSystemdServiceSnapshotDiff;
+    $old = [
+        ['unit' => 'nginx.service', 'label' => 'nginx', 'active' => 'active', 'sub' => 'running', 'ts' => 't1', 'version' => '1'],
+    ];
+    $new = [];
 
-        $events = $diff->diff($old, $new);
+    $events = $diff->diff($old, $new);
 
-        $this->assertCount(1, $events);
-        $this->assertSame('stopped', $events[0]['kind']);
-        $this->assertSame('nginx.service', $events[0]['unit']);
-    }
+    expect($events)->toHaveCount(1);
+    expect($events[0]['kind'])->toBe('stopped');
+    expect($events[0]['unit'])->toBe('nginx.service');
+});
 
-    #[Test]
-    public function it_detects_started_for_new_running_unit(): void
-    {
-        $diff = new ServerSystemdServiceSnapshotDiff;
-        $old = [
-            ['unit' => 'nginx.service', 'label' => 'nginx', 'active' => 'active', 'sub' => 'running', 'ts' => 't1', 'version' => '1'],
-        ];
-        $new = [
-            ['unit' => 'nginx.service', 'label' => 'nginx', 'active' => 'active', 'sub' => 'running', 'ts' => 't1', 'version' => '1'],
-            ['unit' => 'redis-server.service', 'label' => 'redis-server', 'active' => 'active', 'sub' => 'running', 'ts' => 't2', 'version' => '1'],
-        ];
+it('detects started for new running unit', function () {
+    $diff = new ServerSystemdServiceSnapshotDiff;
+    $old = [
+        ['unit' => 'nginx.service', 'label' => 'nginx', 'active' => 'active', 'sub' => 'running', 'ts' => 't1', 'version' => '1'],
+    ];
+    $new = [
+        ['unit' => 'nginx.service', 'label' => 'nginx', 'active' => 'active', 'sub' => 'running', 'ts' => 't1', 'version' => '1'],
+        ['unit' => 'redis-server.service', 'label' => 'redis-server', 'active' => 'active', 'sub' => 'running', 'ts' => 't2', 'version' => '1'],
+    ];
 
-        $events = $diff->diff($old, $new);
+    $events = $diff->diff($old, $new);
 
-        $kinds = array_column($events, 'kind');
-        $this->assertContains('started', $kinds);
-        $this->assertTrue(collect($events)->contains(fn ($e) => $e['unit'] === 'redis-server.service'));
-    }
+    $kinds = array_column($events, 'kind');
+    expect($kinds)->toContain('started');
+    expect(collect($events)->contains(fn ($e) => $e['unit'] === 'redis-server.service'))->toBeTrue();
+});
 
-    #[Test]
-    public function it_detects_restarted_when_active_timestamp_changes(): void
-    {
-        $diff = new ServerSystemdServiceSnapshotDiff;
-        $old = [
-            ['unit' => 'nginx.service', 'label' => 'nginx', 'active' => 'active', 'sub' => 'running', 'ts' => 'Mon 2026-01-01', 'version' => '1'],
-        ];
-        $new = [
-            ['unit' => 'nginx.service', 'label' => 'nginx', 'active' => 'active', 'sub' => 'running', 'ts' => 'Mon 2026-01-02', 'version' => '1'],
-        ];
+it('detects restarted when active timestamp changes', function () {
+    $diff = new ServerSystemdServiceSnapshotDiff;
+    $old = [
+        ['unit' => 'nginx.service', 'label' => 'nginx', 'active' => 'active', 'sub' => 'running', 'ts' => 'Mon 2026-01-01', 'version' => '1'],
+    ];
+    $new = [
+        ['unit' => 'nginx.service', 'label' => 'nginx', 'active' => 'active', 'sub' => 'running', 'ts' => 'Mon 2026-01-02', 'version' => '1'],
+    ];
 
-        $events = $diff->diff($old, $new);
+    $events = $diff->diff($old, $new);
 
-        $this->assertCount(1, $events);
-        $this->assertSame('restarted', $events[0]['kind']);
-    }
-}
+    expect($events)->toHaveCount(1);
+    expect($events[0]['kind'])->toBe('restarted');
+});

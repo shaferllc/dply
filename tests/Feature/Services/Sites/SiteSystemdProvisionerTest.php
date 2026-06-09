@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature\Services\Sites;
+namespace Tests\Feature\Services\Sites\SiteSystemdProvisionerTest;
 
 use App\Contracts\RemoteShell;
 use App\Models\Server;
@@ -11,197 +11,179 @@ use App\Models\SiteProcess;
 use App\Services\Sites\SiteSystemdProvisioner;
 use App\Services\Sites\SiteSystemdUnitBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
 
-class SiteSystemdProvisionerTest extends TestCase
-{
-    use RefreshDatabase;
+uses(RefreshDatabase::class);
 
-    public function test_provision_uploads_web_unit_and_activates_via_systemctl(): void
-    {
-        $server = Server::factory()->ready()->create([
-            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n",
-        ]);
-        $site = Site::factory()->create([
-            'server_id' => $server->id,
-            'runtime' => 'node',
-            'start_command' => 'npm start',
-            'internal_port' => 30007,
-            'repository_path' => '/var/www/jobs',
-            'deploy_strategy' => 'simple',
-        ]);
-        $site->processes()->where('type', SiteProcess::TYPE_WEB)
-            ->update(['command' => 'npm start']);
+test('provision uploads web unit and activates via systemctl', function () {
+    $server = Server::factory()->ready()->create([
+        'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n",
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'runtime' => 'node',
+        'start_command' => 'npm start',
+        'internal_port' => 30007,
+        'repository_path' => '/var/www/jobs',
+        'deploy_strategy' => 'simple',
+    ]);
+    $site->processes()->where('type', SiteProcess::TYPE_WEB)
+        ->update(['command' => 'npm start']);
 
-        $shell = new RecordingShell;
+    $shell = new RecordingShell;
 
-        $written = (new SiteSystemdProvisioner(new SiteSystemdUnitBuilder))
-            ->provision($site, fn () => $shell);
+    $written = (new SiteSystemdProvisioner(new SiteSystemdUnitBuilder))
+        ->provision($site, fn () => $shell);
 
-        $this->assertContains("dply-site-{$site->id}.service", $written);
-        $putFiles = $shell->putFiles;
-        $this->assertCount(1, $putFiles);
-        $this->assertStringContainsString('Environment=PORT=30007', $putFiles[0]['contents']);
-        $this->assertStringContainsString('ExecStart=npm start', $putFiles[0]['contents']);
+    expect($written)->toContain("dply-site-{$site->id}.service");
+    $putFiles = $shell->putFiles;
+    expect($putFiles)->toHaveCount(1);
+    $this->assertStringContainsString('Environment=PORT=30007', $putFiles[0]['contents']);
+    $this->assertStringContainsString('ExecStart=npm start', $putFiles[0]['contents']);
 
-        // Verify the install + daemon-reload + enable sequence.
-        $execs = $shell->execCalls;
-        $this->assertTrue(collect($execs)->contains(
-            fn ($call) => str_contains($call['command'], '/etc/systemd/system/')
-                && str_contains($call['command'], $site->id)
-        ));
-        $this->assertTrue(collect($execs)->contains(
-            fn ($call) => $call['command'] === 'sudo systemctl daemon-reload',
-        ));
-        $this->assertTrue(collect($execs)->contains(
-            fn ($call) => str_contains($call['command'], 'systemctl enable --now')
-                && str_contains($call['command'], $site->id),
-        ));
-    }
+    // Verify the install + daemon-reload + enable sequence.
+    $execs = $shell->execCalls;
+    expect(collect($execs)->contains(
+        fn ($call) => str_contains($call['command'], '/etc/systemd/system/')
+            && str_contains($call['command'], $site->id)
+    ))->toBeTrue();
+    expect(collect($execs)->contains(
+        fn ($call) => $call['command'] === 'sudo systemctl daemon-reload',
+    ))->toBeTrue();
+    expect(collect($execs)->contains(
+        fn ($call) => str_contains($call['command'], 'systemctl enable --now')
+            && str_contains($call['command'], $site->id),
+    ))->toBeTrue();
+});
+test('provision uploads separate units for non web processes', function () {
+    $server = Server::factory()->ready()->create([
+        'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n",
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'runtime' => 'node',
+        'start_command' => 'npm start',
+        'internal_port' => 30001,
+        'repository_path' => '/var/www/queue-app',
+    ]);
+    $site->processes()->where('type', SiteProcess::TYPE_WEB)
+        ->update(['command' => 'npm start']);
+    $site->processes()->create([
+        'type' => SiteProcess::TYPE_WORKER,
+        'name' => 'worker',
+        'command' => 'npm run worker',
+    ]);
 
-    public function test_provision_uploads_separate_units_for_non_web_processes(): void
-    {
-        $server = Server::factory()->ready()->create([
-            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n",
-        ]);
-        $site = Site::factory()->create([
-            'server_id' => $server->id,
-            'runtime' => 'node',
-            'start_command' => 'npm start',
-            'internal_port' => 30001,
-            'repository_path' => '/var/www/queue-app',
-        ]);
-        $site->processes()->where('type', SiteProcess::TYPE_WEB)
-            ->update(['command' => 'npm start']);
-        $site->processes()->create([
-            'type' => SiteProcess::TYPE_WORKER,
-            'name' => 'worker',
-            'command' => 'npm run worker',
-        ]);
+    $shell = new RecordingShell;
 
-        $shell = new RecordingShell;
+    $written = (new SiteSystemdProvisioner(new SiteSystemdUnitBuilder))
+        ->provision($site, fn () => $shell);
 
-        $written = (new SiteSystemdProvisioner(new SiteSystemdUnitBuilder))
-            ->provision($site, fn () => $shell);
+    expect($written)->toHaveCount(2);
+    expect($written)->toContain("dply-site-{$site->id}.service");
+    expect($written)->toContain("dply-site-{$site->id}-worker.service");
 
-        $this->assertCount(2, $written);
-        $this->assertContains("dply-site-{$site->id}.service", $written);
-        $this->assertContains("dply-site-{$site->id}-worker.service", $written);
+    $contents = collect($shell->putFiles)->pluck('contents')->all();
+    expect(collect($contents)->contains(fn ($c) => str_contains($c, 'ExecStart=npm start')))->toBeTrue();
+    expect(collect($contents)->contains(fn ($c) => str_contains($c, 'ExecStart=npm run worker')))->toBeTrue();
+});
+test('provision skips php sites with no units to write', function () {
+    $server = Server::factory()->ready()->create([
+        'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n",
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'runtime' => 'php',
+        'start_command' => null,
+    ]);
 
-        $contents = collect($shell->putFiles)->pluck('contents')->all();
-        $this->assertTrue(collect($contents)->contains(fn ($c) => str_contains($c, 'ExecStart=npm start')));
-        $this->assertTrue(collect($contents)->contains(fn ($c) => str_contains($c, 'ExecStart=npm run worker')));
-    }
+    $shell = new RecordingShell;
 
-    public function test_provision_skips_php_sites_with_no_units_to_write(): void
-    {
-        $server = Server::factory()->ready()->create([
-            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n",
-        ]);
-        $site = Site::factory()->create([
-            'server_id' => $server->id,
-            'runtime' => 'php',
-            'start_command' => null,
-        ]);
+    $written = (new SiteSystemdProvisioner(new SiteSystemdUnitBuilder))
+        ->provision($site, fn () => $shell);
 
-        $shell = new RecordingShell;
+    expect($written)->toBe([]);
+    expect($shell->putFiles)->toBe([]);
+    expect($shell->execCalls)->toBe([]);
+});
+test('provision throws when server not ready', function () {
+    $server = Server::factory()->create([
+        'status' => Server::STATUS_PROVISIONING,
+        'ssh_private_key' => null,
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'runtime' => 'node',
+        'start_command' => 'npm start',
+    ]);
 
-        $written = (new SiteSystemdProvisioner(new SiteSystemdUnitBuilder))
-            ->provision($site, fn () => $shell);
+    $this->expectException(\RuntimeException::class);
+    $this->expectExceptionMessage('Server must be ready');
 
-        $this->assertSame([], $written);
-        $this->assertSame([], $shell->putFiles);
-        $this->assertSame([], $shell->execCalls);
-    }
+    (new SiteSystemdProvisioner(new SiteSystemdUnitBuilder))
+        ->provision($site, fn () => new RecordingShell);
+});
+test('teardown unit disables and removes a single unit', function () {
+    $server = Server::factory()->ready()->create([
+        'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n",
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'runtime' => 'node',
+    ]);
 
-    public function test_provision_throws_when_server_not_ready(): void
-    {
-        $server = Server::factory()->create([
-            'status' => Server::STATUS_PROVISIONING,
-            'ssh_private_key' => null,
-        ]);
-        $site = Site::factory()->create([
-            'server_id' => $server->id,
-            'runtime' => 'node',
-            'start_command' => 'npm start',
-        ]);
+    $shell = new RecordingShell;
+    (new SiteSystemdProvisioner(new SiteSystemdUnitBuilder))
+        ->teardownUnit($site, 'dply-site-'.$site->id.'-celery.service', fn () => $shell);
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Server must be ready');
+    $combined = implode("\n", array_column($shell->execCalls, 'command'));
+    $this->assertStringContainsString('systemctl disable --now', $combined);
+    $this->assertStringContainsString('rm -f /etc/systemd/system/', $combined);
+    $this->assertStringContainsString('celery.service', $combined);
+    $this->assertStringContainsString('daemon-reload', $combined);
+});
+test('teardown unit throws when server not ready', function () {
+    $server = Server::factory()->create([
+        'status' => Server::STATUS_PROVISIONING,
+        'ssh_private_key' => null,
+    ]);
+    $site = Site::factory()->create(['server_id' => $server->id]);
 
-        (new SiteSystemdProvisioner(new SiteSystemdUnitBuilder))
-            ->provision($site, fn () => new RecordingShell);
-    }
+    $this->expectException(\RuntimeException::class);
 
-    public function test_teardown_unit_disables_and_removes_a_single_unit(): void
-    {
-        $server = Server::factory()->ready()->create([
-            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n",
-        ]);
-        $site = Site::factory()->create([
-            'server_id' => $server->id,
-            'runtime' => 'node',
-        ]);
+    (new SiteSystemdProvisioner(new SiteSystemdUnitBuilder))
+        ->teardownUnit($site, 'dply-site-'.$site->id.'.service', fn () => new RecordingShell);
+});
+test('teardown disables and removes each unit', function () {
+    $server = Server::factory()->ready()->create([
+        'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n",
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'runtime' => 'node',
+        'start_command' => 'npm start',
+    ]);
+    $site->processes()->create([
+        'type' => SiteProcess::TYPE_WORKER,
+        'name' => 'worker',
+        'command' => 'npm run worker',
+    ]);
 
-        $shell = new RecordingShell;
-        (new SiteSystemdProvisioner(new SiteSystemdUnitBuilder))
-            ->teardownUnit($site, 'dply-site-'.$site->id.'-celery.service', fn () => $shell);
+    $shell = new RecordingShell;
+    $names = (new SiteSystemdProvisioner(new SiteSystemdUnitBuilder))
+        ->teardown($site, fn () => $shell);
 
-        $combined = implode("\n", array_column($shell->execCalls, 'command'));
-        $this->assertStringContainsString('systemctl disable --now', $combined);
-        $this->assertStringContainsString('rm -f /etc/systemd/system/', $combined);
-        $this->assertStringContainsString('celery.service', $combined);
-        $this->assertStringContainsString('daemon-reload', $combined);
-    }
+    expect($names)->toContain("dply-site-{$site->id}.service");
+    expect($names)->toContain("dply-site-{$site->id}-worker.service");
 
-    public function test_teardown_unit_throws_when_server_not_ready(): void
-    {
-        $server = Server::factory()->create([
-            'status' => Server::STATUS_PROVISIONING,
-            'ssh_private_key' => null,
-        ]);
-        $site = Site::factory()->create(['server_id' => $server->id]);
+    $disableCalls = collect($shell->execCalls)
+        ->filter(fn ($c) => str_contains($c['command'], 'systemctl disable'))
+        ->count();
+    expect($disableCalls)->toBe(2);
 
-        $this->expectException(\RuntimeException::class);
-
-        (new SiteSystemdProvisioner(new SiteSystemdUnitBuilder))
-            ->teardownUnit($site, 'dply-site-'.$site->id.'.service', fn () => new RecordingShell);
-    }
-
-    public function test_teardown_disables_and_removes_each_unit(): void
-    {
-        $server = Server::factory()->ready()->create([
-            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\nfake\n-----END OPENSSH PRIVATE KEY-----\n",
-        ]);
-        $site = Site::factory()->create([
-            'server_id' => $server->id,
-            'runtime' => 'node',
-            'start_command' => 'npm start',
-        ]);
-        $site->processes()->create([
-            'type' => SiteProcess::TYPE_WORKER,
-            'name' => 'worker',
-            'command' => 'npm run worker',
-        ]);
-
-        $shell = new RecordingShell;
-        $names = (new SiteSystemdProvisioner(new SiteSystemdUnitBuilder))
-            ->teardown($site, fn () => $shell);
-
-        $this->assertContains("dply-site-{$site->id}.service", $names);
-        $this->assertContains("dply-site-{$site->id}-worker.service", $names);
-
-        $disableCalls = collect($shell->execCalls)
-            ->filter(fn ($c) => str_contains($c['command'], 'systemctl disable'))
-            ->count();
-        $this->assertSame(2, $disableCalls);
-
-        $this->assertTrue(collect($shell->execCalls)->contains(
-            fn ($c) => $c['command'] === 'sudo systemctl daemon-reload'
-        ));
-    }
-}
-
+    expect(collect($shell->execCalls)->contains(
+        fn ($c) => $c['command'] === 'sudo systemctl daemon-reload'
+    ))->toBeTrue();
+});
 /**
  * In-memory RemoteShell that records putFile + exec calls so tests can
  * assert on the shell sequence without booting an SSH client.

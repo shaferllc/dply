@@ -64,6 +64,13 @@ class ContextBreadcrumb extends Component
     {
         $user = auth()->user();
         $organizations = $user->organizations()->orderBy('name')->get();
+
+        foreach ($organizations as $organization) {
+            if ($organization->relationLoaded('pivot') && $organization->pivot !== null) {
+                $organization->rememberMemberRoleFor($user, (string) $organization->pivot->role);
+            }
+        }
+
         $currentOrg = $user->currentOrganization();
         $teams = $currentOrg ? $user->accessibleTeamsForOrganization($currentOrg) : new Collection([]);
         $currentTeam = $user->currentTeam();

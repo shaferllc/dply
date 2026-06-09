@@ -77,8 +77,13 @@ class CacheServiceKeyExplorer
         $this->guard($row);
 
         $cli = CacheServiceStats::binaryFor($row->engine);
+        // AUTH flag must come AFTER the cli binary — `-a 'pw' valkey-cli …` makes
+        // bash run `-a` as the command (which fails with "-a: command not found"
+        // AND visibly leaks the password). `--no-auth-warning` suppresses the
+        // "using -a on the command line may not be safe" stderr line that would
+        // otherwise glue onto SCAN/GET output via 2>&1.
         $authFlag = filled($row->auth_password ?? null)
-            ? '-a '.escapeshellarg((string) $row->auth_password).' '
+            ? '-a '.escapeshellarg((string) $row->auth_password).' --no-auth-warning '
             : '';
 
         $keys = [];
@@ -92,10 +97,21 @@ class CacheServiceKeyExplorer
         // $OUT) — they need to stay literal for bash to evaluate. The previous `."..."` chain
         // mixed double-quoted PHP segments and made PHP try to expand $CURSOR/$OUT, which under
         // PHP 8 throws "Undefined variable" warnings that bubbled up as the SCAN error message.
+        // `--raw` strips the pretty redis-cli wrapper (`1) "key_name"`) so each
+        // line of OUT is exactly:
+        //   <cursor>
+        //   <key1>
+        //   <key2>
+        //   …
+        // With `--no-raw` (the previous default), every line came back quoted
+        // and prefixed with the array index — operators saw keys like
+        // `1) "dply_horizon:recent_jobs"` in the table and `TYPE` of that
+        // literal returned `none`, which is the exact symptom this fix
+        // addresses.
         $template = <<<'BASH'
 CURSOR=%s
 for i in $(seq 1 %d); do
-    OUT=$(%s%s -p %d --no-raw SCAN "$CURSOR" MATCH %s COUNT %d 2>&1) || { echo "__DPLY_SCAN_ERR__$OUT"; exit 1; }
+    OUT=$(%s %s-p %d --raw SCAN "$CURSOR" MATCH %s COUNT %d 2>&1) || { echo "__DPLY_SCAN_ERR__$OUT"; exit 1; }
     CURSOR=$(echo "$OUT" | head -n 1)
     echo "$OUT" | tail -n +2
     if [ "$CURSOR" = "0" ]; then break; fi
@@ -106,8 +122,8 @@ BASH;
             $template,
             escapeshellarg($current),
             self::MAX_SCAN_ITERATIONS,
-            $authFlag,
             escapeshellarg($cli),
+            $authFlag,
             (int) $row->port,
             escapeshellarg($pattern),
             max(1, $count),
@@ -139,21 +155,21 @@ BASH;
 
                 continue;
             }
-            // SCAN's --no-raw output for keys looks like `1) "foo"` / `2) "bar"`;
-            // we strip the `N) ` prefix and the surrounding quotes.
-            $captured = null;
+            // With --raw, each key is emitted as a bare line (no `N) "..."`
+            // wrapper). Use the line as the key. We still tolerate the old
+            // --no-raw shape in case any caller passes a script that doesn't
+            // include --raw.
+            $captured = $trim;
             if (preg_match('/^\d+\)\s*"(.*)"\s*$/', $trim, $m) === 1) {
                 $captured = $m[1];
             } elseif (preg_match('/^\d+\)\s*(.*)$/', $trim, $m) === 1) {
-                // Fallback when --no-raw emitted an unquoted token (e.g. an
-                // integer-shaped key); take it as-is.
                 $captured = $m[1];
             }
 
-            // redis-cli --no-raw emits human-friendly markers for empty results / nil values
-            // (`(empty array)`, `(empty list or set)`, `(nil)`); drop them so they don't show
-            // up as bogus keys in the browser.
-            if ($captured !== null && ! self::isEmptyMarker($captured)) {
+            // redis-cli emits human-friendly markers for empty results / nil
+            // values (`(empty array)`, `(empty list or set)`, `(nil)`); drop
+            // them so they don't show up as bogus keys in the browser.
+            if (! self::isEmptyMarker($captured)) {
                 $keys[] = $captured;
             }
         }
@@ -177,11 +193,20 @@ BASH;
         $this->guard($row);
 
         $cli = CacheServiceStats::binaryFor($row->engine);
+        // AUTH flag must come AFTER the cli binary — `-a 'pw' valkey-cli …` makes
+        // bash run `-a` as the command (which fails with "-a: command not found"
+        // AND visibly leaks the password). `--no-auth-warning` suppresses the
+        // "using -a on the command line may not be safe" stderr line that would
+        // otherwise glue onto SCAN/GET output via 2>&1.
         $authFlag = filled($row->auth_password ?? null)
-            ? '-a '.escapeshellarg((string) $row->auth_password).' '
+            ? '-a '.escapeshellarg((string) $row->auth_password).' --no-auth-warning '
             : '';
 
-        $cliCmd = sprintf('%s%s -p %d --no-raw', $authFlag, escapeshellarg($cli), (int) $row->port);
+        // `--raw` so TTL comes back as a plain number (`5`) instead of
+        // `(integer) 5` — the latter would `(int)`-cast to 0. List/hash/set
+        // outputs also come back one item per line, no `N) "…"` wrapper, so
+        // explode("\n") gives clean tokens for the value renderer.
+        $cliCmd = sprintf('%s %s-p %d --raw', escapeshellarg($cli), $authFlag, (int) $row->port);
 
         // First call: TYPE + TTL. We do both in one SSH round to keep latency
         // down. The output is two lines — type, ttl.

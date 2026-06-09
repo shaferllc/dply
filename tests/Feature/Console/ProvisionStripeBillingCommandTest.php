@@ -1,82 +1,92 @@
 <?php
 
-namespace Tests\Feature\Console;
+namespace Tests\Feature\Console\ProvisionStripeBillingCommandTest;
 
 use App\Services\Billing\StripeBillingProvisioner;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
-use Tests\TestCase;
 
-class ProvisionStripeBillingCommandTest extends TestCase
-{
-    use RefreshDatabase;
+uses(RefreshDatabase::class);
 
-    public function test_dry_run_lists_objects_without_calling_stripe(): void
-    {
-        Config::set('cashier.secret', 'sk_test_dummy');
-        Config::set('subscription.standard.base_cents', 1500);
-        Config::set('subscription.standard.annual_discount_pct', 20);
-        Config::set('subscription.standard.tiers', ['xs' => 200, 's' => 500, 'm' => 1000, 'l' => 2000, 'xl' => 4000]);
+test('dry run lists objects without calling stripe', function () {
+    Config::set('cashier.secret', 'sk_test_dummy');
+    Config::set('subscription.standard.annual_discount_pct', 20);
+    Config::set('subscription.standard.plans', [
+        'free' => ['label' => 'Free', 'price_cents' => 0, 'max_servers' => 1],
+        'starter' => ['label' => 'Starter', 'price_cents' => 900, 'max_servers' => 3],
+        'pro' => ['label' => 'Pro', 'price_cents' => 1900, 'max_servers' => 10],
+        'business' => ['label' => 'Business', 'price_cents' => 3900, 'max_servers' => null],
+    ]);
 
-        $this->artisan('dply:billing:provision-stripe', ['--dry-run' => true])
-            ->expectsOutputToContain('Dry-run')
-            ->expectsOutputToContain('Base monthly: $15.00')
-            ->expectsOutputToContain('Base yearly:  $144.00')
-            ->expectsOutputToContain('Tier XS')
-            ->expectsOutputToContain('Tier XL')
-            ->expectsOutputToContain('dply Enterprise')
-            ->assertOk();
-    }
+    // Each expectsOutputToContain is matched against a single write call, so
+    // assert at most one substring per emitted line.
+    $this->artisan('dply:billing:provision-stripe', ['--dry-run' => true])
+        ->expectsOutputToContain('Dry-run')
+        ->expectsOutputToContain('Plans (metered by BYO server count)')
+        ->expectsOutputToContain('free, no Stripe object')
+        ->expectsOutputToContain('$9.00/mo')
+        ->expectsOutputToContain('$39.00/mo')
+        ->expectsOutputToContain('dply serverless function')
+        ->expectsOutputToContain('dply Cloud app')
+        ->expectsOutputToContain('Per app $5.00/mo')
+        ->expectsOutputToContain('dply Edge site')
+        ->expectsOutputToContain('Per site $2.00/mo')
+        ->expectsOutputToContain('dply Enterprise')
+        ->assertOk();
+});
 
-    public function test_fails_loudly_when_stripe_secret_is_missing(): void
-    {
-        Config::set('cashier.secret', '');
+test('fails loudly when stripe secret is missing', function () {
+    Config::set('cashier.secret', '');
 
-        $this->artisan('dply:billing:provision-stripe')
-            ->expectsOutputToContain('STRIPE_SECRET')
-            ->assertFailed();
-    }
+    $this->artisan('dply:billing:provision-stripe')
+        ->expectsOutputToContain('STRIPE_SECRET')
+        ->assertFailed();
+});
 
-    public function test_format_env_emits_expected_lines(): void
-    {
-        $result = [
-            StripeBillingProvisioner::ROLE_BASE_PRODUCT => 'prod_std',
-            StripeBillingProvisioner::ROLE_BASE_MONTHLY => 'price_bm',
-            StripeBillingProvisioner::ROLE_BASE_YEARLY => 'price_by',
-            StripeBillingProvisioner::ROLE_TIER_PREFIX.'xs' => 'price_xs',
-            StripeBillingProvisioner::ROLE_TIER_PREFIX.'s' => 'price_s',
-            StripeBillingProvisioner::ROLE_TIER_PREFIX.'m' => 'price_m',
-            StripeBillingProvisioner::ROLE_TIER_PREFIX.'l' => 'price_l',
-            StripeBillingProvisioner::ROLE_TIER_PREFIX.'xl' => 'price_xl',
-            StripeBillingProvisioner::ROLE_TIER_PREFIX.'xs'.StripeBillingProvisioner::ROLE_TIER_YEARLY_SUFFIX => 'price_xs_y',
-            StripeBillingProvisioner::ROLE_TIER_PREFIX.'m'.StripeBillingProvisioner::ROLE_TIER_YEARLY_SUFFIX => 'price_m_y',
-            StripeBillingProvisioner::ROLE_TIER_PREFIX.'xl'.StripeBillingProvisioner::ROLE_TIER_YEARLY_SUFFIX => 'price_xl_y',
-            StripeBillingProvisioner::ROLE_ENTERPRISE_PRODUCT => 'prod_ent',
-        ];
+test('format env emits expected lines', function () {
+    $result = [
+        StripeBillingProvisioner::ROLE_PLAN_PRODUCT_PREFIX.'starter' => 'prod_starter',
+        StripeBillingProvisioner::ROLE_PLAN_PREFIX.'starter' => 'price_starter',
+        StripeBillingProvisioner::ROLE_PLAN_PREFIX.'starter'.StripeBillingProvisioner::ROLE_PLAN_YEARLY_SUFFIX => 'price_starter_y',
+        StripeBillingProvisioner::ROLE_PLAN_PRODUCT_PREFIX.'pro' => 'prod_pro',
+        StripeBillingProvisioner::ROLE_PLAN_PREFIX.'pro' => 'price_pro',
+        StripeBillingProvisioner::ROLE_PLAN_PREFIX.'pro'.StripeBillingProvisioner::ROLE_PLAN_YEARLY_SUFFIX => 'price_pro_y',
+        StripeBillingProvisioner::ROLE_PLAN_PREFIX.'business' => 'price_business',
+        StripeBillingProvisioner::ROLE_PLAN_PREFIX.'business'.StripeBillingProvisioner::ROLE_PLAN_YEARLY_SUFFIX => 'price_business_y',
+        StripeBillingProvisioner::ROLE_SERVERLESS_MONTHLY => 'price_sl',
+        StripeBillingProvisioner::ROLE_SERVERLESS_YEARLY => 'price_sl_y',
+        StripeBillingProvisioner::ROLE_CLOUD_MONTHLY => 'price_cloud',
+        StripeBillingProvisioner::ROLE_CLOUD_YEARLY => 'price_cloud_y',
+        StripeBillingProvisioner::ROLE_EDGE_MONTHLY => 'price_edge',
+        StripeBillingProvisioner::ROLE_EDGE_YEARLY => 'price_edge_y',
+        StripeBillingProvisioner::ROLE_ENTERPRISE_PRODUCT => 'prod_ent',
+    ];
 
-        $env = StripeBillingProvisioner::formatEnv($result);
+    $env = StripeBillingProvisioner::formatEnv($result);
 
-        $this->assertStringContainsString('STRIPE_PRICE_STANDARD_BASE_MONTHLY=price_bm', $env);
-        $this->assertStringContainsString('STRIPE_PRICE_STANDARD_BASE_YEARLY=price_by', $env);
-        $this->assertStringContainsString('STRIPE_PRICE_STANDARD_TIER_XS=price_xs', $env);
-        $this->assertStringContainsString('STRIPE_PRICE_STANDARD_TIER_M=price_m', $env);
-        $this->assertStringContainsString('STRIPE_PRICE_STANDARD_TIER_XL=price_xl', $env);
-        $this->assertStringContainsString('STRIPE_PRICE_STANDARD_TIER_XS_YEARLY=price_xs_y', $env);
-        $this->assertStringContainsString('STRIPE_PRICE_STANDARD_TIER_M_YEARLY=price_m_y', $env);
-        $this->assertStringContainsString('STRIPE_PRICE_STANDARD_TIER_XL_YEARLY=price_xl_y', $env);
-        // No coupon env var — credit retired.
-        $this->assertStringNotContainsString('STRIPE_COUPON_STANDARD_CREDIT', $env);
-        // Product IDs aren't env-bound (operators don't need them at runtime).
-        $this->assertStringNotContainsString('prod_std', $env);
-        $this->assertStringNotContainsString('prod_ent', $env);
-    }
+    $this->assertStringContainsString('STRIPE_PRICE_STANDARD_STARTER=price_starter', $env);
+    $this->assertStringContainsString('STRIPE_PRICE_STANDARD_STARTER_YEARLY=price_starter_y', $env);
+    $this->assertStringContainsString('STRIPE_PRICE_STANDARD_PRO=price_pro', $env);
+    $this->assertStringContainsString('STRIPE_PRICE_STANDARD_PRO_YEARLY=price_pro_y', $env);
+    $this->assertStringContainsString('STRIPE_PRICE_STANDARD_BUSINESS=price_business', $env);
+    $this->assertStringContainsString('STRIPE_PRICE_STANDARD_BUSINESS_YEARLY=price_business_y', $env);
+    $this->assertStringContainsString('STRIPE_PRICE_STANDARD_SERVERLESS=price_sl', $env);
+    $this->assertStringContainsString('STRIPE_PRICE_STANDARD_SERVERLESS_YEARLY=price_sl_y', $env);
+    $this->assertStringContainsString('STRIPE_PRICE_STANDARD_CLOUD=price_cloud', $env);
+    $this->assertStringContainsString('STRIPE_PRICE_STANDARD_CLOUD_YEARLY=price_cloud_y', $env);
+    $this->assertStringContainsString('STRIPE_PRICE_STANDARD_EDGE=price_edge', $env);
+    $this->assertStringContainsString('STRIPE_PRICE_STANDARD_EDGE_YEARLY=price_edge_y', $env);
 
-    public function test_format_env_skips_missing_roles(): void
-    {
-        $env = StripeBillingProvisioner::formatEnv([
-            StripeBillingProvisioner::ROLE_BASE_MONTHLY => 'price_bm',
-        ]);
+    // Product IDs aren't env-bound (operators don't need them at runtime).
+    $this->assertStringNotContainsString('prod_starter', $env);
+    $this->assertStringNotContainsString('prod_pro', $env);
+    $this->assertStringNotContainsString('prod_ent', $env);
+});
 
-        $this->assertSame('STRIPE_PRICE_STANDARD_BASE_MONTHLY=price_bm', $env);
-    }
-}
+test('format env skips product roles and emits only plan + managed prices', function () {
+    $env = StripeBillingProvisioner::formatEnv([
+        StripeBillingProvisioner::ROLE_PLAN_PREFIX.'starter' => 'price_starter',
+    ]);
+
+    expect($env)->toBe('STRIPE_PRICE_STANDARD_STARTER=price_starter');
+});

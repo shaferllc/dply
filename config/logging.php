@@ -1,6 +1,8 @@
 <?php
 
+use Monolog\Formatter\LineFormatter;
 use Monolog\Handler\NullHandler;
+use Monolog\Handler\SocketHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
 use Monolog\Processor\PsrLogMessageProcessor;
@@ -55,7 +57,10 @@ return [
         'stack' => [
             'driver' => 'stack',
             'channels' => explode(',', (string) env('LOG_STACK', 'single')),
-            'ignore_exceptions' => false,
+            // Opt-in (default false = unchanged): set true when a network sink
+            // like `dply_logs` is in the stack so a drain hiccup can't break
+            // application logging.
+            'ignore_exceptions' => filter_var(env('LOG_STACK_IGNORE_EXCEPTIONS', false), FILTER_VALIDATE_BOOL),
         ],
 
         'single' => [
@@ -90,6 +95,31 @@ return [
                 'host' => env('PAPERTRAIL_URL'),
                 'port' => env('PAPERTRAIL_PORT'),
                 'connectionString' => 'tls://'.env('PAPERTRAIL_URL').':'.env('PAPERTRAIL_PORT'),
+            ],
+            'processors' => [PsrLogMessageProcessor::class],
+        ],
+
+        // dply Logs — ships this app's own logs to the dply Logs drain over
+        // TLS/TCP (built-in Monolog handlers only). Opt in by adding `dply_logs`
+        // to LOG_STACK and setting DPLY_LOG_DRAIN_HOST/PORT/TOKEN. warning+ keeps
+        // volume sane; short timeouts + LOG_STACK_IGNORE_EXCEPTIONS keep a slow or
+        // unreachable drain from affecting the app. See docs/LOG_DRAIN_RECEIVER.md.
+        'dply_logs' => [
+            'driver' => 'monolog',
+            'level' => env('DPLY_LOG_DRAIN_LEVEL', 'warning'),
+            'handler' => SocketHandler::class,
+            'handler_with' => [
+                'connectionString' => (filter_var(env('DPLY_LOG_DRAIN_TLS', true), FILTER_VALIDATE_BOOL) ? 'tls://' : 'tcp://').env('DPLY_LOG_DRAIN_HOST').':'.env('DPLY_LOG_DRAIN_PORT'),
+                'persistent' => true,
+                'timeout' => 0.5,
+                'writingTimeout' => 0.5,
+                'connectionTimeout' => 0.5,
+            ],
+            'formatter' => LineFormatter::class,
+            'formatter_with' => [
+                'format' => env('DPLY_LOG_DRAIN_TOKEN').' %level_name% %message% %context%'."\n",
+                'allowInlineLineBreaks' => false,
+                'ignoreEmptyContextAndExtra' => true,
             ],
             'processors' => [PsrLogMessageProcessor::class],
         ],

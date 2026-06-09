@@ -7,6 +7,7 @@ namespace App\Services\Deploy;
 use App\Models\ServerCronJob;
 use App\Models\ServerDatabase;
 use App\Models\Site;
+use App\Models\SiteBinding;
 use App\Models\SupervisorProgram;
 use App\Support\Deployment\SiteResourceBinding;
 
@@ -39,6 +40,20 @@ final class SiteResourceBindingResolver
         $mode = $site->runtimeTargetMode();
         $serverId = $site->server_id;
 
+        // Role-aware suppression: queue-worker hosts already ARE the queue
+        // worker for some other app, and they don't host their own DB. So
+        // the "database binding pending" and "workers binding pending"
+        // preflight warnings are structurally wrong on these boxes — the
+        // DB lives on a separate server, and the supervisor programs are
+        // exactly what the worker host provides. Mark those bindings
+        // required=false here so DeploymentPreflightValidator drops them
+        // from the preflight summary while still leaving the binding rows
+        // visible for debugging.
+        $serverMeta = is_array($site->server?->meta) ? $site->server->meta : [];
+        $installProfile = (string) ($serverMeta['install_profile'] ?? '');
+        $serverRole = (string) ($serverMeta['server_role'] ?? '');
+        $isWorkerHost = $installProfile === 'queue_worker' || $serverRole === 'worker';
+
         $databaseCount = $serverId
             ? ServerDatabase::query()->where('server_id', $serverId)->count()
             : 0;
@@ -64,7 +79,9 @@ final class SiteResourceBindingResolver
         $bindings[] = new SiteResourceBinding(
             type: 'database',
             mode: $mode === 'vm' ? 'provision_new' : 'attach_existing',
-            required: in_array($mode, ['vm', 'docker', 'kubernetes'], true) && $site->type?->value !== 'static',
+            required: ! $isWorkerHost
+                && in_array($mode, ['vm', 'docker', 'kubernetes'], true)
+                && $site->type?->value !== 'static',
             status: $databaseCount > 0 ? 'configured' : 'pending',
             source: $databaseCount > 0 ? 'server_database' : 'inferred_requirement',
             name: $databaseCount > 0 ? 'server-database' : null,
@@ -84,7 +101,7 @@ final class SiteResourceBindingResolver
         $bindings[] = new SiteResourceBinding(
             type: 'workers',
             mode: $mode === 'vm' ? 'provision_new' : 'attach_existing',
-            required: $mode === 'vm',
+            required: $mode === 'vm' && ! $isWorkerHost,
             status: $workerCount > 0 ? 'configured' : 'pending',
             source: $workerCount > 0 ? 'supervisor_programs' : 'inferred_requirement',
             name: $workerCount > 0 ? 'supervisor' : null,
@@ -103,7 +120,50 @@ final class SiteResourceBindingResolver
 
         $bindings[] = $this->redisBinding($env);
         $bindings[] = $this->queueBinding($env);
+        $bindings[] = $this->cacheBinding($env);
         $bindings[] = $this->objectStorageBinding($env);
+        $bindings[] = $this->broadcastingBinding($env);
+
+        // A persisted SiteBinding (an explicit operator attach/provision) is
+        // authoritative: it replaces the derived inference for its type so the
+        // UI shows the managed state and the deploy reads the bound resource.
+        // The publication binding stays runtime-owned and is never manageable.
+        // Reuse the already-loaded relation (effectiveEnvironmentMapForSite()
+        // above calls loadMissing('bindings')) rather than bindings()->get(),
+        // which would re-query the same rows.
+        $persisted = $site->loadMissing('bindings')->bindings->keyBy('type');
+        $bindings = array_map(function (SiteResourceBinding $derived) use ($persisted): SiteResourceBinding {
+            $manageable = $derived->type !== 'publication';
+
+            $row = $persisted->get($derived->type);
+            if (! $row instanceof SiteBinding) {
+                return new SiteResourceBinding(
+                    type: $derived->type,
+                    mode: $derived->mode,
+                    required: $derived->required,
+                    status: $derived->status,
+                    source: $derived->source,
+                    name: $derived->name,
+                    config: $derived->config,
+                    bindingId: null,
+                    manageable: $manageable,
+                );
+            }
+
+            return new SiteResourceBinding(
+                type: $derived->type,
+                mode: (string) ($row->mode ?: $derived->mode),
+                required: $derived->required,
+                status: (string) ($row->status ?: $derived->status),
+                source: 'binding',
+                name: $row->name ?: $derived->name,
+                config: array_merge($derived->config, is_array($row->config) ? $row->config : [], [
+                    'last_error' => $row->last_error,
+                ]),
+                bindingId: (string) $row->id,
+                manageable: $manageable,
+            );
+        }, $bindings);
 
         if ($key !== '') {
             $this->cache[$key] = $bindings;
@@ -185,6 +245,39 @@ final class SiteResourceBindingResolver
     /**
      * @param  array<string, string>  $env
      */
+    private function cacheBinding(array $env): SiteResourceBinding
+    {
+        $driver = strtolower(trim((string) ($env['CACHE_STORE'] ?? $env['CACHE_DRIVER'] ?? '')));
+
+        // No store, or the per-request `array` store (which caches nothing
+        // across requests), reads as "not configured yet" — same treatment the
+        // queue binding gives sync/null.
+        if ($driver === '' || $driver === 'array') {
+            return new SiteResourceBinding(
+                type: 'cache',
+                mode: 'attach_existing',
+                required: false,
+                status: 'pending',
+                source: $driver === 'array' ? 'environment' : 'environment_defaults',
+                name: null,
+                config: ['driver' => $driver !== '' ? $driver : 'array'],
+            );
+        }
+
+        return new SiteResourceBinding(
+            type: 'cache',
+            mode: 'attach_existing',
+            required: false,
+            status: 'configured',
+            source: 'environment',
+            name: 'cache-'.$driver,
+            config: ['driver' => $driver],
+        );
+    }
+
+    /**
+     * @param  array<string, string>  $env
+     */
     private function objectStorageBinding(array $env): SiteResourceBinding
     {
         $disk = strtolower(trim((string) ($env['FILESYSTEM_DISK'] ?? '')));
@@ -233,6 +326,25 @@ final class SiteResourceBindingResolver
             source: 'environment',
             name: null,
             config: ['reason' => $reason],
+        );
+    }
+
+    /**
+     * @param  array<string, string>  $env
+     */
+    private function broadcastingBinding(array $env): SiteResourceBinding
+    {
+        $driver = strtolower(trim((string) ($env['BROADCAST_CONNECTION'] ?? '')));
+        $configured = in_array($driver, ['pusher', 'reverb', 'ably'], true);
+
+        return new SiteResourceBinding(
+            type: 'broadcasting',
+            mode: 'attach_existing',
+            required: false,
+            status: $configured ? 'configured' : 'pending',
+            source: $driver !== '' ? 'environment' : 'deferred',
+            name: $configured ? 'broadcasting-'.$driver : null,
+            config: $driver !== '' ? ['driver' => $driver] : [],
         );
     }
 

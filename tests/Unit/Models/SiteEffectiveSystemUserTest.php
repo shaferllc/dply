@@ -1,26 +1,20 @@
 <?php
 
-namespace Tests\Unit\Models;
+namespace Tests\Unit\Models\SiteEffectiveSystemUserTest;
 
 use App\Models\Server;
 use App\Models\Site;
-use PHPUnit\Framework\TestCase;
 
-class SiteEffectiveSystemUserTest extends TestCase
-{
-    public function test_effective_system_user_prefers_explicit_php_fpm_user(): void
-    {
-        $server = new Server(['ssh_user' => 'deploy']);
-        $site = new Site(['php_fpm_user' => 'custom']);
+test('effective system user prefers explicit php fpm user', function () {
+    $server = new Server(['ssh_user' => 'deploy']);
+    $site = new Site(['php_fpm_user' => 'custom']);
 
-        $this->assertSame('custom', $site->effectiveSystemUser($server));
-    }
+    expect($site->effectiveSystemUser($server))->toBe('custom');
+});
 
-    public function test_effective_system_user_falls_back_to_server_ssh_user(): void
-    {
-        $server = new Server(['ssh_user' => 'deploy']);
-        $site = new Site(['php_fpm_user' => null]);
+test('effective system user falls back to server ssh user', function () {
+    $server = new Server(['ssh_user' => 'deploy']);
+    $site = new Site(['php_fpm_user' => null]);
 
-        $this->assertSame('deploy', $site->effectiveSystemUser($server));
-    }
-}
+    expect($site->effectiveSystemUser($server))->toBe('deploy');
+});

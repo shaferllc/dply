@@ -26,6 +26,12 @@ class ServerDatabaseEngineAuditEvent extends Model
 
     public const EVENT_ENGINE_UNINSTALL_FAILED = 'engine_uninstall_failed';
 
+    public const EVENT_ENGINE_ACTIVATED = 'engine_activated';
+
+    public const EVENT_ENGINE_DEACTIVATED = 'engine_deactivated';
+
+    public const EVENT_ENGINE_ACTIVATION_FAILED = 'engine_activation_failed';
+
     protected $table = 'server_database_engine_audit_events';
 
     protected $fillable = [

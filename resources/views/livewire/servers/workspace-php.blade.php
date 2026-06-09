@@ -2,93 +2,108 @@
     $card = 'dply-card overflow-hidden';
     $btnPrimary = 'inline-flex w-auto shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-4 py-2.5 text-sm font-medium text-white transition hover:bg-brand-ink/90 disabled:cursor-not-allowed disabled:opacity-60';
     $btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/10 bg-white px-3 py-2 text-sm font-medium text-brand-ink transition hover:border-brand-ink/20 hover:bg-brand-sand/30 disabled:cursor-not-allowed disabled:opacity-60';
+    $tonePalette = [
+        'sage' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
+        'sky' => 'bg-sky-50 text-sky-700 ring-sky-200',
+        'amber' => 'bg-amber-50 text-amber-900 ring-amber-200',
+        'violet' => 'bg-violet-50 text-violet-700 ring-violet-200',
+        'sand' => 'bg-brand-sand/55 text-brand-forest ring-brand-ink/10',
+        'rose' => 'bg-rose-50 text-rose-700 ring-rose-200',
+    ];
 @endphp
 
+{{-- Single stable root: the layout below plus the trailing modal include are two
+     top-level siblings. A Livewire component must morph against ONE consistent
+     root element — without this wrapper the morph / wire:navigate cycle can
+     leave an orphaned, snapshot-less root ("Snapshot missing on Livewire
+     component"). `display:contents` keeps the wrapper layout-neutral. --}}
+<div class="contents">
 <x-server-workspace-layout
     :server="$server"
     active="php"
     :title="__('PHP')"
     :description="__('Review server-level PHP inventory, defaults, and runtime configuration from one workspace.')"
 >
-    @include('livewire.servers.partials.workspace-flashes', ['command_output' => $remote_output ?? null])
+    @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     @if (! $opsReady && ! $sshUnavailable)
         @include('livewire.servers.partials.workspace-ops-not-ready', ['server' => $server])
     @endif
 
-    <x-explainer class="mb-4">
+    <x-explainer>
         <p>{{ __('This workspace inventories the PHP versions installed on this server, lets you set the default CLI version, and review FPM + ini configuration. Inventory is read live from the box via SSH on each render; default-version changes happen through update-alternatives.') }}</p>
         <p>{{ __('Adding/removing PHP versions runs apt against the upstream Sury/Ondrej PPA. Existing sites pin to a specific version in their FPM pool, so changing the server default doesn\'t move sites — that\'s a per-site setting on the Sites workspace.') }}</p>
     </x-explainer>
 
-    {{-- Console banner — install/uninstall/patch/refresh-inventory + set-default actions
-         all stream into the shared ConsoleAction partial. Subject is the Server (no per-
-         version model); kind family `php_` keeps unrelated runs off this banner. --}}
-    @if ($phpRun)
-        <div class="mb-4">
-            @include('livewire.partials.console-action-banner-static', [
-                'run' => $phpRun,
-                'kindLabels' => [],
-            ])
-        </div>
-    @endif
+    {{-- Console banner — install/uninstall/patch/refresh-inventory, config load/save,
+         and set-default actions stream into the shared ConsoleAction partial. --}}
+    @include('livewire.partials.console-action-banner-static', [
+        'run' => $phpRun,
+        'kindLabels' => (array) config('console_actions.kinds', []),
+    ])
 
-    <div class="space-y-6">
-        {{-- Slim trigger card — icon + inline summary + compact actions, like SSH keys --}}
-        <div class="{{ $card }}">
-            <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
-                <div class="flex min-w-0 items-start gap-3">
-                    <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                        <x-heroicon-o-command-line class="h-5 w-5" />
-                    </span>
-                    <div class="min-w-0">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('PHP runtime') }}</h2>
+    {{-- PHP runtime: hero card with eyebrow + title + summary stat tiles. --}}
+    <section class="dply-card overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <x-icon-badge>
+                        <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Runtime') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('PHP runtime') }}</h3>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                             {{ __('Server-owned PHP inventory, CLI default, and new-site default.') }}
                         </p>
-                        <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
-                            <span class="inline-flex items-center gap-1">
-                                <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-                                {{ __('Installed versions') }}: {{ (int) $phpSummary['installed_count'] }}
-                            </span>
-                            <span class="text-brand-mist/60">·</span>
-                            <span class="inline-flex items-center gap-1">
-                                <x-heroicon-o-command-line class="h-3 w-3" />
-                                {{ __('CLI default') }}: {{ $phpSummary['cli_default'] ? 'PHP '.$phpSummary['cli_default'] : __('not set') }}
-                            </span>
-                            <span class="text-brand-mist/60">·</span>
-                            <span class="inline-flex items-center gap-1">
-                                <x-heroicon-o-sparkles class="h-3 w-3" />
-                                {{ __('Default for new sites') }}: {{ $phpSummary['new_site_default'] ? 'PHP '.$phpSummary['new_site_default'] : __('not set') }}
-                            </span>
-                        </div>
                     </div>
-                </div>
-                <div class="flex shrink-0 flex-wrap items-center gap-2">
-                    @can('update', $server)
-                        @if ($opsReady)
+                @can('update', $server)
+                    @if ($opsReady)
+                        <div class="flex shrink-0 flex-wrap items-center gap-2">
                             <button
                                 type="button"
                                 wire:click="refreshPhpInventory"
                                 wire:loading.attr="disabled"
                                 wire:target="refreshPhpInventory"
-                                class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
+                                class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
                             >
-                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="refreshPhpInventory" />
-                                <span wire:loading wire:target="refreshPhpInventory" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0" wire:loading.remove wire:target="refreshPhpInventory" aria-hidden="true" />
+                                <span wire:loading wire:target="refreshPhpInventory" class="inline-flex h-4 w-4 items-center justify-center">
                                     <x-spinner variant="forest" size="sm" />
                                 </span>
                                 <span wire:loading.remove wire:target="refreshPhpInventory">{{ __('Refresh inventory') }}</span>
                                 <span wire:loading wire:target="refreshPhpInventory">{{ __('Refreshing…') }}</span>
                             </button>
-                        @endif
-                    @endcan
-                </div>
+                        </div>
+                    @endif
+                @endcan
+        </div>
+        <dl class="grid grid-cols-1 gap-2 p-6 sm:grid-cols-3 sm:p-7">
+            <div @class([
+                'rounded-2xl border px-4 py-3 shadow-sm',
+                'border-brand-sage/30 bg-brand-sage/8' => (int) ($phpSummary['installed_count'] ?? 0) > 0,
+                'border-brand-ink/10 bg-white' => (int) ($phpSummary['installed_count'] ?? 0) === 0,
+            ])>
+                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Installed versions') }}</dt>
+                <dd class="mt-1 flex items-baseline gap-1.5">
+                    <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ (int) $phpSummary['installed_count'] }}</span>
+                    <span class="text-[11px] text-brand-moss">{{ trans_choice('version|versions', (int) $phpSummary['installed_count']) }}</span>
+                </dd>
+                <p class="mt-1 text-[11px] text-brand-mist">{{ __('Detected on host') }}</p>
             </div>
+            <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('CLI default') }}</dt>
+                <dd class="mt-1 truncate font-mono text-sm font-semibold text-brand-ink">{{ $phpSummary['cli_default'] ? 'PHP '.$phpSummary['cli_default'] : __('not set') }}</dd>
+                <p class="mt-1 text-[11px] text-brand-mist">{{ __('update-alternatives') }}</p>
+            </div>
+            <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('New-site default') }}</dt>
+                <dd class="mt-1 truncate font-mono text-sm font-semibold text-brand-ink">{{ $phpSummary['new_site_default'] ? 'PHP '.$phpSummary['new_site_default'] : __('not set') }}</dd>
+                <p class="mt-1 text-[11px] text-brand-mist">{{ __('Applied to new sites') }}</p>
+            </div>
+        </dl>
 
-            @if ($sshUnavailable || $phpInventoryRefreshRunning || $phpInventoryRefreshFailed || $phpInventoryStale || $phpEnvironmentUnsupported || $phpInventoryNeverRun || (! $opsReady && ! $sshUnavailable))
-                <div class="space-y-3 px-6 py-5 sm:px-8">
+        @if ($sshUnavailable || $phpInventoryRefreshRunning || $phpInventoryRefreshFailed || $phpInventoryStale || $phpEnvironmentUnsupported || $phpInventoryNeverRun || (! $opsReady && ! $sshUnavailable))
+            <div class="space-y-3 border-t border-brand-ink/10 bg-brand-cream/20 px-6 py-5 sm:px-7">
                     @if ($sshUnavailable)
                         <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900">
                             <p class="min-w-0 leading-6">
@@ -150,31 +165,36 @@
                             </p>
                         </div>
                     @endif
-                </div>
-            @endif
-        </div>
+            </div>
+        @endif
+    </section>
 
-        @if ($opsReady && ! $sshUnavailable && ! $phpInventoryNeverRun)
-            <div class="{{ $card }} overflow-hidden">
-                <div class="flex flex-wrap items-baseline justify-between gap-3 border-b border-brand-ink/10 px-6 py-5 sm:px-8">
-                    <div>
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Versions on this server') }}</h2>
-                        <p class="mt-1 text-sm text-brand-moss">{{ __('Install, patch, set defaults, or edit ini/FPM configuration — applied on the server when you click.') }}</p>
+    @if ($opsReady && ! $sshUnavailable && ! $phpInventoryNeverRun)
+        <section class="dply-card overflow-hidden">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <x-icon-badge>
+                        <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Versions on this server') }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Install, patch, set defaults, or edit ini/FPM configuration — applied on the server when you click.') }}</p>
                     </div>
-                    <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-sand/40 px-2.5 py-1 text-[11px] font-semibold text-brand-moss">
-                        <span class="h-1.5 w-1.5 rounded-full bg-brand-forest"></span>
-                        {{ trans_choice('{0} no versions|{1} :count version|[2,*] :count versions', count($phpVersionRows), ['count' => count($phpVersionRows)]) }}
-                    </span>
-                </div>
+                    <span class="shrink-0 rounded-full bg-brand-sand/60 px-2.5 py-0.5 text-[11px] font-semibold tabular-nums text-brand-moss ring-1 ring-brand-ink/10">{{ count($phpVersionRows) }}</span>
+            </div>
 
-                <ul class="divide-y divide-brand-ink/8">
+            <ul class="divide-y divide-brand-ink/10">
                     @foreach ($phpVersionRows as $row)
                         @php
                             $isInstalled = $row['is_installed'] ?? false;
                             $isCliDefault = ($phpSummary['cli_default'] ?? null) === $row['id'];
                             $isNewSiteDefault = ($phpSummary['new_site_default'] ?? null) === $row['id'];
                             $siteCount = (int) ($row['site_count'] ?? 0);
-                            $disableUninstall = ! $isInstalled || $siteCount > 0 || $isCliDefault || $isNewSiteDefault;
+                            $migrationTarget = $row['migration_target_version'] ?? null;
+                            $uninstallFallback = $row['uninstall_fallback_version'] ?? null;
+                            $disableUninstall = ! $isInstalled || ($siteCount > 0 && $migrationTarget === null);
+                            $canMigrateSites = $isInstalled && $siteCount > 0 && is_string($migrationTarget) && $migrationTarget !== '';
+                            $canMigrateAndUninstall = $canMigrateSites;
                             $actionTarget = fn (string $action) => "runPhpPackageAction('{$action}', '{$row['id']}')";
                             $configTarget = fn (string $target) => "openPhpConfigEditor('{$row['id']}', '{$target}')";
                             // Combined target list for row-level loading state. Lets the whole row
@@ -184,9 +204,11 @@
                             $rowTargets = implode(',', [
                                 $actionTarget('install'),
                                 $actionTarget('patch'),
+                                $actionTarget('migrate_sites'),
                                 $actionTarget('set_cli_default'),
                                 $actionTarget('set_new_site_default'),
                                 $actionTarget('uninstall'),
+                                'runPhpMigrateAndUninstall',
                                 $configTarget('cli_ini'),
                                 $configTarget('fpm_ini'),
                                 $configTarget('pool_config'),
@@ -196,22 +218,11 @@
                                 && ! empty($phpConfigEditorErrorLines);
                         @endphp
 
-                        <li
-                            class="relative px-6 py-4 transition sm:px-8"
+                        <x-workspace-table-row
                             wire:key="php-{{ $row['id'] }}"
-                            wire:loading.class.delay="opacity-60 pointer-events-none"
-                            wire:target="{{ $rowTargets }}"
+                            :wire-target="$rowTargets"
+                            class="px-6 py-4 sm:px-8"
                         >
-                            <div
-                                class="pointer-events-none absolute inset-0 hidden items-center justify-center bg-white/40 backdrop-blur-[1px]"
-                                wire:loading.flex.delay
-                                wire:target="{{ $rowTargets }}"
-                            >
-                                <span class="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm ring-1 ring-brand-ink/10">
-                                    <x-spinner variant="forest" size="sm" />
-                                    {{ __('Working…') }}
-                                </span>
-                            </div>
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start">
                                 <span class="mt-0.5 hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sand/30 text-brand-forest sm:inline-flex">
                                     <x-heroicon-o-command-line class="h-4 w-4" />
@@ -262,13 +273,16 @@
                                         @if ($disableUninstall && $isInstalled)
                                             <span class="text-brand-mist/60">·</span>
                                             <span class="italic">
-                                                @if ($siteCount > 0)
+                                                @if ($siteCount > 0 && $migrationTarget === null)
+                                                    {{ __('uninstall blocked: no other PHP version installed') }}
+                                                @elseif ($siteCount > 0)
                                                     {{ __('uninstall blocked: sites in use') }}
-                                                @elseif ($isCliDefault)
-                                                    {{ __('uninstall blocked: CLI default') }}
-                                                @elseif ($isNewSiteDefault)
-                                                    {{ __('uninstall blocked: new-site default') }}
                                                 @endif
+                                            </span>
+                                        @elseif ($isInstalled && is_string($uninstallFallback) && $uninstallFallback !== '' && ($isCliDefault || $isNewSiteDefault))
+                                            <span class="text-brand-mist/60">·</span>
+                                            <span class="italic">
+                                                {{ __('Uninstall moves defaults to PHP :version', ['version' => $uninstallFallback]) }}
                                             </span>
                                         @endif
                                     </p>
@@ -284,8 +298,8 @@
                                                 wire:target="{{ $actionTarget('install') }}"
                                                 class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                                             >
-                                                <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5" wire:loading.remove wire:target="{{ $actionTarget('install') }}" />
-                                                <span wire:loading wire:target="{{ $actionTarget('install') }}" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                                <x-heroicon-o-arrow-down-tray class="h-4 w-4" wire:loading.remove wire:target="{{ $actionTarget('install') }}" />
+                                                <span wire:loading wire:target="{{ $actionTarget('install') }}" class="inline-flex h-4 w-4 items-center justify-center">
                                                     <x-spinner variant="cream" size="sm" />
                                                 </span>
                                                 <span wire:loading.remove wire:target="{{ $actionTarget('install') }}">{{ __('Install') }}</span>
@@ -299,8 +313,8 @@
                                                 wire:target="{{ $actionTarget('patch') }}"
                                                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                                             >
-                                                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="{{ $actionTarget('patch') }}" />
-                                                <span wire:loading wire:target="{{ $actionTarget('patch') }}" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                                                <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="{{ $actionTarget('patch') }}" />
+                                                <span wire:loading wire:target="{{ $actionTarget('patch') }}" class="inline-flex h-4 w-4 items-center justify-center">
                                                     <x-spinner variant="forest" size="sm" />
                                                 </span>
                                                 <span wire:loading.remove wire:target="{{ $actionTarget('patch') }}">{{ __('Patch') }}</span>
@@ -344,19 +358,46 @@
                                                         <span wire:loading.remove wire:target="{{ $actionTarget('set_new_site_default') }}">{{ __('Set new-site default') }}</span>
                                                         <span wire:loading wire:target="{{ $actionTarget('set_new_site_default') }}">{{ __('Setting new-site default…') }}</span>
                                                     </button>
+                                                    @if ($canMigrateSites)
+                                                        <button
+                                                            type="button"
+                                                            wire:click="runPhpPackageAction('migrate_sites', '{{ $row['id'] }}')"
+                                                            wire:loading.attr="disabled"
+                                                            wire:target="{{ $actionTarget('migrate_sites') }}"
+                                                            class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50"
+                                                        >
+                                                            <x-heroicon-o-arrow-up-circle class="h-4 w-4 shrink-0 text-brand-moss" />
+                                                            <span wire:loading.remove wire:target="{{ $actionTarget('migrate_sites') }}">{{ trans_choice('Upgrade :count site to PHP :target|Upgrade :count sites to PHP :target', $siteCount, ['count' => $siteCount, 'target' => $migrationTarget]) }}</span>
+                                                            <span wire:loading wire:target="{{ $actionTarget('migrate_sites') }}">{{ __('Upgrading sites…') }}</span>
+                                                        </button>
+                                                    @endif
                                                     <div class="my-1 border-t border-brand-ink/10" role="presentation"></div>
-                                                    <button
-                                                        type="button"
-                                                        wire:click="runPhpPackageAction('uninstall', '{{ $row['id'] }}')"
-                                                        wire:loading.attr="disabled"
-                                                        wire:target="{{ $actionTarget('uninstall') }}"
-                                                        @disabled($disableUninstall)
-                                                        class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                                                    >
-                                                        <x-heroicon-o-trash class="h-4 w-4 shrink-0" />
-                                                        <span wire:loading.remove wire:target="{{ $actionTarget('uninstall') }}">{{ __('Uninstall') }}</span>
-                                                        <span wire:loading wire:target="{{ $actionTarget('uninstall') }}">{{ __('Uninstalling…') }}</span>
-                                                    </button>
+                                                    @if ($canMigrateAndUninstall)
+                                                        <button
+                                                            type="button"
+                                                            wire:click="openMigrateAndUninstallPhpModal('{{ $row['id'] }}', {{ $siteCount }}, '{{ $migrationTarget }}')"
+                                                            wire:loading.attr="disabled"
+                                                            wire:target="runPhpMigrateAndUninstall,openMigrateAndUninstallPhpModal"
+                                                            class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-700 hover:bg-red-50"
+                                                        >
+                                                            <x-heroicon-o-trash class="h-4 w-4 shrink-0" />
+                                                            <span wire:loading.remove wire:target="runPhpMigrateAndUninstall">{{ trans_choice('Migrate :count site and uninstall|Migrate :count sites and uninstall', $siteCount, ['count' => $siteCount]) }}</span>
+                                                            <span wire:loading wire:target="runPhpMigrateAndUninstall">{{ __('Migrating sites and uninstalling…') }}</span>
+                                                        </button>
+                                                    @else
+                                                        <button
+                                                            type="button"
+                                                            wire:click="runPhpPackageAction('uninstall', '{{ $row['id'] }}')"
+                                                            wire:loading.attr="disabled"
+                                                            wire:target="{{ $actionTarget('uninstall') }}"
+                                                            @disabled($disableUninstall)
+                                                            class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                                        >
+                                                            <x-heroicon-o-trash class="h-4 w-4 shrink-0" />
+                                                            <span wire:loading.remove wire:target="{{ $actionTarget('uninstall') }}">{{ __('Uninstall') }}</span>
+                                                            <span wire:loading wire:target="{{ $actionTarget('uninstall') }}">{{ __('Uninstalling…') }}</span>
+                                                        </button>
+                                                    @endif
                                                 </x-slot>
                                             </x-dropdown>
 
@@ -368,7 +409,7 @@
                                                         aria-label="{{ __('Edit config') }}"
                                                         aria-haspopup="true"
                                                     >
-                                                        <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" />
+                                                        <x-heroicon-o-cog-6-tooth class="h-4 w-4" />
                                                         {{ __('Config') }}
                                                         <x-heroicon-o-chevron-down class="h-3.5 w-3.5 text-brand-ink/70" />
                                                     </button>
@@ -413,13 +454,11 @@
                                     </div>
                                 @endcan
                             </div>
-                        </li>
+                        </x-workspace-table-row>
                     @endforeach
                 </ul>
-            </div>
-        @endif
-
-    </div>
+        </section>
+    @endif
 
     <x-slot name="modals">
         @if ($phpConfigEditorOpen)
@@ -433,28 +472,34 @@
                 aria-modal="true"
                 aria-labelledby="php-config-editor-title"
             >
-                <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" @if (! $editorHasErrors) wire:click="closePhpConfigEditor" @endif></div>
+                <div class="fixed inset-0 bg-brand-ink/30" @if (! $editorHasErrors) wire:click="closePhpConfigEditor" @endif></div>
                 <div class="relative z-10 flex min-h-full justify-center px-4 py-10 sm:px-6 sm:py-14">
                     <div
-                        class="my-auto w-full max-w-7xl dply-modal-panel"
+                        class="my-auto w-full max-w-7xl dply-modal-panel overflow-hidden shadow-xl"
                         @click.stop
                         x-data="{ sidebarCollapsed: (localStorage.getItem('php-config-sidebar-collapsed') === '1') }"
                     >
-                        <div class="border-b border-brand-ink/10 px-6 py-5 sm:px-8">
+                        <div class="border-b border-brand-ink/10 px-6 py-5 sm:px-7">
                             <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                <div>
-                                    <h2 id="php-config-editor-title" class="text-lg font-semibold text-brand-ink">
-                                        {{ __('Editing PHP :version :target', ['version' => $phpConfigEditorVersion, 'target' => $phpConfigEditorTargetLabel]) }}
-                                    </h2>
-                                    <p class="mt-1 text-sm text-brand-moss">
-                                        {{ __('Edit the config, then save to validate it before Dply replaces the live file.') }}
-                                    </p>
-                                    @if ($phpConfigEditorPath)
-                                        <p class="mt-2 font-mono text-xs text-brand-moss">{{ $phpConfigEditorPath }}</p>
-                                    @endif
+                                <div class="flex min-w-0 items-start gap-3">
+                                    <x-icon-badge>
+                                        <x-heroicon-o-cog-6-tooth class="h-5 w-5" aria-hidden="true" />
+                                    </x-icon-badge>
+                                    <div class="min-w-0">
+                                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('PHP') }} {{ $phpConfigEditorVersion }}</p>
+                                        <h2 id="php-config-editor-title" class="mt-1 text-lg font-semibold text-brand-ink">
+                                            {{ __('Editing :target', ['target' => $phpConfigEditorTargetLabel]) }}
+                                        </h2>
+                                        <p class="mt-1 text-sm leading-6 text-brand-moss">
+                                            {{ __('Edit the config, then save to validate it before Dply replaces the live file.') }}
+                                        </p>
+                                        @if ($phpConfigEditorPath)
+                                            <p class="mt-2 break-all font-mono text-xs text-brand-moss">{{ $phpConfigEditorPath }}</p>
+                                        @endif
+                                    </div>
                                 </div>
 
-                                <div class="flex items-center gap-2">
+                                <div class="flex shrink-0 items-center gap-2">
                                     <button
                                         type="button"
                                         @click="sidebarCollapsed = !sidebarCollapsed; localStorage.setItem('php-config-sidebar-collapsed', sidebarCollapsed ? '1' : '0')"
@@ -479,12 +524,12 @@
                             </div>
                         </div>
 
-                        <div class="flex">
+                        <div class="flex max-h-[78vh]">
                             {{-- Revision sidebar --}}
                             <aside
                                 x-show="!sidebarCollapsed"
                                 x-cloak
-                                class="w-80 shrink-0 border-r border-brand-ink/10 bg-brand-sand/10 max-h-[75vh] overflow-y-auto"
+                                class="w-80 shrink-0 border-r border-brand-ink/10 bg-brand-sand/10 overflow-y-auto"
                             >
                                 @if ($phpConfigEditorDriftDetected)
                                     <div class="border-b border-amber-200 bg-amber-50/70 px-4 py-3 text-xs text-amber-900">
@@ -595,7 +640,7 @@
                                 @endif
                             </aside>
 
-                            <div class="min-w-0 flex-1 space-y-4 p-6 sm:p-8">
+                            <div class="min-w-0 flex-1 space-y-4 overflow-y-auto p-6 sm:p-8">
                             @if ($diffOpen)
                                 <div class="flex items-center justify-between gap-3">
                                     <p class="text-sm font-medium text-brand-ink">{{ $phpConfigDiffHeader }}</p>
@@ -724,3 +769,6 @@
         @endif
     </x-slot>
 </x-server-workspace-layout>
+
+@include('livewire.partials.confirm-action-modal')
+</div>{{-- /single root --}}

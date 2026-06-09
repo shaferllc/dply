@@ -3,6 +3,7 @@
 namespace App\Services\Deploy;
 
 use App\Contracts\DeployEngine;
+use App\Jobs\ApplySiteWebserverConfigJob;
 
 final class DockerDeployEngine implements DeployEngine
 {
@@ -48,7 +49,12 @@ final class DockerDeployEngine implements DeployEngine
         ]);
 
         $site->forceFill(['meta' => $meta])->save();
-        $this->revisionTracker->markApplied($site->fresh(), $this->contractBuilder->build($site->fresh())->revision(), 'runtime');
+        $site = $site->fresh();
+        $this->revisionTracker->markApplied($site, $this->contractBuilder->build($site)->revision(), 'runtime');
+
+        if ($site->usesVmDockerRuntime()) {
+            ApplySiteWebserverConfigJob::dispatch($site->id);
+        }
 
         return [
             'output' => $result['output'],

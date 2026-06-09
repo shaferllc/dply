@@ -4,9 +4,13 @@ namespace App\Livewire\Servers;
 
 use App\Jobs\ExportServerDatabaseBackupJob;
 use App\Jobs\ExportSiteFileBackupJob;
-use App\Livewire\Concerns\AuthorsBackupDestinations;
+use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
+use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\ManagesBackupDestinationModal;
+use App\Livewire\Servers\Concerns\ManagesBackupNotifications;
 use App\Models\BackupConfiguration;
 use App\Models\Server;
 use App\Models\ServerBackupSchedule;
@@ -15,34 +19,65 @@ use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
 use App\Models\SiteFileBackup;
+use App\Notifications\BackupFailureNotification;
+use App\Services\Servers\DatabaseBackupDownloader;
+use App\Services\Servers\DatabaseBackupExporter;
 use App\Services\Servers\ServerRemovalAdvisor;
+use App\Support\Servers\DatabaseBackupSettings;
 use Cron\CronExpression;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * Server-scoped backups workspace: surfaces existing {@see ServerDatabaseBackup}
- * and {@see SiteFileBackup} runs for everything attached to the server, plus
- * recurring schedule CRUD via {@see ServerBackupSchedule}.
+ * Backups workspace at {@see servers.backups} (server-wide) and {@see sites.backups}
+ * (site-scoped). Surfaces {@see ServerDatabaseBackup} and {@see SiteFileBackup}
+ * runs plus recurring schedule CRUD via {@see ServerBackupSchedule}.
  *
  * Schedules materialize as {@see ServerCronJob} entries that invoke
  * `dply:run-backup-schedule {schedule}` so the cron line stays stable across
  * cadence edits.
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceBackups extends Component
 {
-    use AuthorsBackupDestinations;
+    use RendersWorkspacePlaceholder;
+    use ConfirmsActionWithModal;
+    use CreatesNotificationChannelInline;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use ManagesBackupDestinationModal;
+    use ManagesBackupNotifications;
+    use RequiresFeature;
+
+    protected string $requiredFeature = 'workspace.backups';
+
+    /** When true, render the coming-soon teaser instead of the full workspace. */
+    public bool $comingSoonPreview = false;
 
     /** Form state for "Run database backup now". */
     public string $run_database_id = '';
+
+    /** Optional one-off S3 destination override (empty = server default). */
+    public string $run_database_backup_configuration_id = '';
+
+    /** Server default: remote_server or destination. */
+    public string $db_backup_default_kind = DatabaseBackupSettings::KIND_REMOTE_SERVER;
+
+    public string $db_backup_configuration_id = '';
+
+    /** Display field (GB); persisted as bytes in server meta. */
+    public string $db_backup_remote_max_gb = '';
 
     /** Form state for "Run site files backup now". */
     public string $run_site_id = '';
@@ -56,27 +91,77 @@ class WorkspaceBackups extends Component
 
     public ?string $new_backup_configuration_id = null;
 
-    /**
-     * "Add backup destination" modal state. Mirrors the settings page form but
-     * scoped to the current server's organization, so a teammate adding an
-     * S3 bucket here for server A immediately makes it available on every
-     * other server in the org too.
-     */
-    public bool $showDestinationModal = false;
-
-    /** @var array<string, mixed> */
-    public array $destinationForm = [];
-
-    /** When set (?site=…), all queries on this page narrow to backups/sites for that site only. */
+    /** When set (site route or ?site=), all queries narrow to that site. */
     public ?string $context_site_id = null;
 
-    public function mount(Server $server): void
+    /** True when mounted from {@see sites.backups} (native site workspace, not a server filter). */
+    public bool $siteDedicatedContext = false;
+
+    /** overview | schedules | history */
+    public string $backups_workspace_tab = 'overview';
+
+    public function setBackupsWorkspaceTab(string $tab): void
     {
+        $this->backups_workspace_tab = in_array($tab, ['overview', 'schedules', 'history', 'notifications'], true) ? $tab : 'overview';
+    }
+
+    /**
+     * Fired by {@see CreatesNotificationChannelInline} after the inline modal
+     * creates a channel. Jump to the Notifications tab and pre-select the new
+     * channel so the operator can finish wiring it to events in one motion.
+     */
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId): void
+    {
+        $this->backups_workspace_tab = 'notifications';
+        $this->notif_channel_id = $channelId;
+    }
+
+    public function bootedRequiresFeature(): void
+    {
+        if ($this->comingSoonPreview) {
+            return;
+        }
+
+        $flag = $this->requiredFeature ?? '';
+        if ($flag !== '' && ! Feature::active($flag)) {
+            abort(404);
+        }
+    }
+
+    public function mount(Server $server, ?Site $site = null): void
+    {
+        if ($site !== null) {
+            abort_unless($site->server_id === $server->id, 404);
+            abort_unless($server->organization_id === auth()->user()->currentOrganization()?->id, 404);
+            Gate::authorize('view', $site);
+
+            $this->siteDedicatedContext = true;
+            $this->context_site_id = $site->id;
+            $this->new_target_type = ServerBackupSchedule::TARGET_SITE_FILES;
+            $this->new_target_id = $site->id;
+        }
+
+        if (! Feature::active('workspace.backups')) {
+            if (workspace_backups_preview_active()) {
+                $this->comingSoonPreview = true;
+                $this->bootWorkspace($server);
+
+                return;
+            }
+
+            abort(404);
+        }
+
         $this->bootWorkspace($server);
         $this->destinationForm = $this->emptyDestinationForm();
+        $this->hydrateDatabaseBackupSettings();
 
-        // Site sidebar's "Backups" entry navigates here with ?site={id}; honoring it pre-filters
-        // the page so operators don't see noise from other sites on the same server.
+        if ($this->context_site_id !== null) {
+            return;
+        }
+
+        // Server workspace can deep-link with ?site= to pre-filter without leaving server nav.
         $siteId = request()->query('site');
         if (is_string($siteId) && $siteId !== '') {
             $exists = Site::query()
@@ -89,66 +174,79 @@ class WorkspaceBackups extends Component
                 $this->new_target_id = $siteId;
             }
         }
+
+        // Deep-link from surfaces that need a destination but have none yet (e.g.
+        // the Snapshots → Cache empty state): ?add_destination=1 lands here with
+        // the "Add backup destination" modal already open.
+        if (request()->boolean('add_destination') && Gate::allows('create', BackupConfiguration::class)) {
+            $this->openDestinationModal();
+        }
     }
 
     /**
-     * Opens the inline "Add backup destination" modal. The created destination
-     * belongs to the server's organization and is immediately selected on the
-     * schedule form, so the operator stays on the same page from "no
-     * destinations" to "schedule queued".
+     * Auto-select the freshly-created destination so the operator's next action
+     * is to submit the schedule, not to scroll-find the entry they just made.
      */
-    public function openDestinationModal(): void
+    protected function onBackupDestinationCreated(BackupConfiguration $destination): void
     {
-        $this->authorize('create', BackupConfiguration::class);
-        $this->resetErrorBag();
-        $this->destinationForm = $this->emptyDestinationForm();
-        $this->showDestinationModal = true;
+        $this->new_backup_configuration_id = $destination->id;
+        $this->db_backup_configuration_id = $destination->id;
     }
 
-    public function closeDestinationModal(): void
+    public function saveDatabaseBackupSettings(): void
     {
-        $this->showDestinationModal = false;
-        $this->destinationForm = $this->emptyDestinationForm();
-        $this->resetErrorBag();
-    }
+        $this->authorize('update', $this->server);
 
-    public function saveDestination(): void
-    {
-        $this->authorize('create', BackupConfiguration::class);
+        $this->validate([
+            'db_backup_default_kind' => 'required|in:remote_server,destination',
+            'db_backup_configuration_id' => 'nullable|string',
+            'db_backup_remote_max_gb' => 'nullable|numeric|min:0.1|max:10000',
+        ]);
 
-        $org = $this->server->organization;
-        if ($org === null) {
-            $this->toastError(__('This server has no organization — refresh the page.'));
+        if ($this->db_backup_default_kind === DatabaseBackupSettings::KIND_DESTINATION && $this->db_backup_configuration_id === '') {
+            $this->addError('db_backup_configuration_id', __('Pick a backup destination when using S3 storage.'));
 
             return;
         }
 
-        $this->resetErrorBag();
-        $this->validate($this->destinationFormRules('destinationForm', $this->destinationForm['provider'] ?? ''));
-        $this->validateDestinationFormExtras('destinationForm', $this->destinationForm);
+        $maxBytes = null;
+        if ($this->db_backup_remote_max_gb !== '') {
+            $maxBytes = (int) round((float) $this->db_backup_remote_max_gb * 1024 * 1024 * 1024);
+        }
 
-        $row = $org->backupConfigurations()->create([
-            'name' => $this->destinationForm['name'],
-            'provider' => $this->destinationForm['provider'],
-            'config' => $this->extractDestinationConfig($this->destinationForm),
-            'created_by_user_id' => Auth::id(),
-        ]);
+        $settings = new DatabaseBackupSettings(
+            defaultKind: $this->db_backup_default_kind,
+            backupConfigurationId: $this->db_backup_configuration_id !== '' ? $this->db_backup_configuration_id : null,
+            remoteMaxBytes: $maxBytes,
+        );
 
-        // Auto-select the new destination so the operator's next action is to
-        // submit the schedule, not to scroll-find the entry they just created.
-        $this->new_backup_configuration_id = $row->id;
+        $meta = $this->server->meta ?? [];
+        $meta['database_backup'] = $settings->toMetaArray();
+        $this->server->update(['meta' => $meta]);
+        $this->server->refresh();
 
-        $this->showDestinationModal = false;
-        $this->destinationForm = $this->emptyDestinationForm();
-        $this->toastSuccess(__('Backup destination added — selected on this schedule.'));
+        $this->toastSuccess(__('Database backup storage settings saved.'));
+    }
+
+    protected function hydrateDatabaseBackupSettings(): void
+    {
+        $settings = DatabaseBackupSettings::fromServer($this->server);
+        $this->db_backup_default_kind = $settings->defaultKind;
+        $this->db_backup_configuration_id = $settings->backupConfigurationId ?? '';
+        $bytes = $settings->remoteMaxBytes ?? (int) config('server_database.remote_backup_max_bytes_per_server', 10 * 1024 * 1024 * 1024);
+        $this->db_backup_remote_max_gb = (string) round($bytes / 1024 / 1024 / 1024, 1);
     }
 
     public function runDatabaseBackup(): void
     {
         $this->authorize('update', $this->server);
 
+        // Site context only runs databases linked to the focused site.
+        $siteScope = $this->siteDedicatedContext ? $this->context_site_id : null;
+
         $database = ServerDatabase::query()
             ->where('server_id', $this->server->id)
+            ->when($siteScope !== null, fn ($q) => $q->where('site_id', $siteScope))
             ->whereKey($this->run_database_id)
             ->first();
 
@@ -164,6 +262,12 @@ class WorkspaceBackups extends Component
             'status' => ServerDatabaseBackup::STATUS_PENDING,
         ]);
 
+        app(DatabaseBackupExporter::class)->prepareBackupRow(
+            $backup,
+            $this->server,
+            $this->run_database_backup_configuration_id !== '' ? $this->run_database_backup_configuration_id : null,
+        );
+
         ExportServerDatabaseBackupJob::dispatch($backup->id);
 
         if ($this->server->organization) {
@@ -174,6 +278,12 @@ class WorkspaceBackups extends Component
             ]);
         }
 
+        $this->dispatchBackupNotification('run_started', [__('Database — :name', ['name' => $database->name])], [
+            'backup_type' => 'database',
+            'backup_id' => (string) $backup->id,
+            'database_id' => (string) $database->id,
+        ]);
+
         $this->run_database_id = '';
         $this->toastSuccess(__('Database backup queued for :name.', ['name' => $database->name]));
     }
@@ -182,8 +292,13 @@ class WorkspaceBackups extends Component
     {
         $this->authorize('update', $this->server);
 
+        // Site context can only run the focused site (the second whereKey pins
+        // it, so a crafted run_site_id for another site finds no match).
+        $siteScope = $this->siteDedicatedContext ? $this->context_site_id : null;
+
         $site = Site::query()
             ->where('server_id', $this->server->id)
+            ->when($siteScope !== null, fn ($q) => $q->whereKey($siteScope))
             ->whereKey($this->run_site_id)
             ->first();
 
@@ -209,6 +324,12 @@ class WorkspaceBackups extends Component
             ]);
         }
 
+        $this->dispatchBackupNotification('run_started', [__('Site files — :name', ['name' => $site->name])], [
+            'backup_type' => 'site_files',
+            'backup_id' => (string) $backup->id,
+            'site_id' => (string) $site->id,
+        ]);
+
         $this->run_site_id = '';
         $this->toastSuccess(__('Site files backup queued for :name.', ['name' => $site->name]));
     }
@@ -224,19 +345,28 @@ class WorkspaceBackups extends Component
             'new_backup_configuration_id' => 'nullable|string',
         ]);
 
+        // In site-dedicated context the target must belong to the focused site
+        // (the picker only offers this site + its linked databases) — enforce it
+        // server-side so a crafted request can't schedule another site's backup.
+        $siteScope = $this->siteDedicatedContext ? $this->context_site_id : null;
+
         $exists = match ($this->new_target_type) {
             ServerBackupSchedule::TARGET_DATABASE => ServerDatabase::query()
                 ->where('server_id', $this->server->id)
+                ->when($siteScope !== null, fn ($q) => $q->where('site_id', $siteScope))
                 ->whereKey($this->new_target_id)
                 ->exists(),
             ServerBackupSchedule::TARGET_SITE_FILES => Site::query()
                 ->where('server_id', $this->server->id)
+                ->when($siteScope !== null, fn ($q) => $q->whereKey($siteScope))
                 ->whereKey($this->new_target_id)
                 ->exists(),
             default => false,
         };
         if (! $exists) {
-            $this->toastError(__('Target not found on this server.'));
+            $this->toastError($siteScope !== null
+                ? __('Pick a target that belongs to this site.')
+                : __('Target not found on this server.'));
 
             return;
         }
@@ -273,12 +403,18 @@ class WorkspaceBackups extends Component
             ]);
         }
 
+        $this->dispatchBackupNotification('schedule_created', [$schedule->targetLabel()], [
+            'schedule_id' => (string) $schedule->id,
+            'target_type' => $schedule->target_type,
+            'cron_expression' => $schedule->cron_expression,
+        ]);
+
         $this->reset(['new_target_id', 'new_backup_configuration_id']);
         $this->new_cron_expression = '0 3 * * *';
         $this->toastSuccess(__('Backup schedule added.'));
     }
 
-    public function downloadDatabaseBackup(string $backupId): StreamedResponse|Response|null
+    public function downloadDatabaseBackup(string $backupId, DatabaseBackupDownloader $downloader): StreamedResponse|Response|null
     {
         $this->authorize('update', $this->server);
         $backup = ServerDatabaseBackup::query()
@@ -287,23 +423,16 @@ class WorkspaceBackups extends Component
             ->with('serverDatabase')
             ->firstOrFail();
 
-        if ($backup->status !== ServerDatabaseBackup::STATUS_COMPLETED || empty($backup->disk_path)) {
-            $this->toastError(__('Backup is not ready yet.'));
-
-            return null;
-        }
-
-        $disk = Storage::disk(config('server_database.backup_disk', 'local'));
-        if (! $disk->exists($backup->disk_path)) {
-            $this->toastError(__('Backup file is missing from storage.'));
-
-            return null;
-        }
-
         $extension = $backup->serverDatabase?->engine === 'sqlite' ? 'db' : 'sql';
         $filename = ($backup->serverDatabase?->name ?? 'database').'-'.$backup->id.'.'.$extension;
 
-        return $disk->download($backup->disk_path, $filename);
+        try {
+            return $downloader->response($backup, $filename);
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+
+            return null;
+        }
     }
 
     public function downloadFileBackup(string $backupId): StreamedResponse|Response|null
@@ -355,7 +484,13 @@ class WorkspaceBackups extends Component
             ], null);
         }
 
+        $scheduleLabel = $schedule->targetLabel();
+        $scheduleCron = $schedule->cron_expression;
         $schedule->delete();
+        $this->dispatchBackupNotification('schedule_deleted', [$scheduleLabel], [
+            'schedule_id' => $scheduleId,
+            'cron_expression' => $scheduleCron,
+        ]);
         $this->toastSuccess(__('Backup schedule removed.'));
     }
 
@@ -417,6 +552,13 @@ class WorkspaceBackups extends Component
             );
         }
 
+        $this->dispatchBackupNotification('schedule_updated', [$schedule->targetLabel()], [
+            'schedule_id' => (string) $schedule->id,
+            'change' => 'cadence',
+            'cron_expression' => $newCron,
+            'previous_cron_expression' => $oldCron,
+        ]);
+
         unset($this->editing_schedules[$scheduleId]);
         $this->toastSuccess(__('Schedule updated.'));
     }
@@ -427,7 +569,7 @@ class WorkspaceBackups extends Component
      * destination credentials.
      */
     /**
-     * Fire a one-shot {@see \App\Notifications\BackupFailureNotification} with the
+     * Fire a one-shot {@see BackupFailureNotification} with the
      * test marker so operators can validate their email/recipient setup without
      * inducing an actual backup failure.
      */
@@ -457,7 +599,7 @@ class WorkspaceBackups extends Component
             return;
         }
 
-        \Illuminate\Support\Facades\Notification::send($admins, new \App\Notifications\BackupFailureNotification(
+        Notification::send($admins, new BackupFailureNotification(
             schedule: $schedule,
             errorMessage: __('Test alert triggered by :user.', ['user' => auth()->user()?->email ?? 'operator']),
             serverName: (string) ($this->server->name ?? ''),
@@ -536,7 +678,20 @@ class WorkspaceBackups extends Component
             'user_id' => auth()->id(),
             'status' => ServerDatabaseBackup::STATUS_PENDING,
         ]);
+
+        app(DatabaseBackupExporter::class)->prepareBackupRow(
+            $backup,
+            $this->server,
+            $schedule->backup_configuration_id,
+        );
+
         ExportServerDatabaseBackupJob::dispatch($backup->id);
+        $this->dispatchBackupNotification('run_started', [__('Database — :name', ['name' => $database->name])], [
+            'backup_type' => 'database',
+            'backup_id' => (string) $backup->id,
+            'database_id' => (string) $database->id,
+            'scheduled' => true,
+        ]);
         $this->toastSuccess(__('Backup queued for :name.', ['name' => $database->name]));
     }
 
@@ -558,6 +713,12 @@ class WorkspaceBackups extends Component
             'status' => SiteFileBackup::STATUS_PENDING,
         ]);
         ExportSiteFileBackupJob::dispatch($backup->id);
+        $this->dispatchBackupNotification('run_started', [__('Site files — :name', ['name' => $site->name])], [
+            'backup_type' => 'site_files',
+            'backup_id' => (string) $backup->id,
+            'site_id' => (string) $site->id,
+            'scheduled' => true,
+        ]);
         $this->toastSuccess(__('Backup queued for :name.', ['name' => $site->name]));
     }
 
@@ -592,6 +753,11 @@ class WorkspaceBackups extends Component
             );
         }
 
+        $this->dispatchBackupNotification('schedule_updated', [$schedule->targetLabel()], [
+            'schedule_id' => (string) $schedule->id,
+            'change' => $newActive ? 'resumed' : 'paused',
+        ]);
+
         $this->toastSuccess($newActive ? __('Schedule resumed.') : __('Schedule paused.'));
     }
 
@@ -607,16 +773,11 @@ class WorkspaceBackups extends Component
             return;
         }
 
-        if (! empty($backup->disk_path)) {
-            $disk = Storage::disk(config('server_database.backup_disk', 'local'));
-            if ($disk->exists($backup->disk_path)) {
-                $disk->delete($backup->disk_path);
-            }
-        }
+        app(DatabaseBackupExporter::class)->deleteArtifact($backup);
         $snapshot = [
             'backup_id' => (string) $backup->id,
             'server_database_id' => (string) $backup->server_database_id,
-            'disk_path' => $backup->disk_path,
+            'storage_kind' => $backup->storage_kind,
             'status' => $backup->status,
         ];
         $backup->delete();
@@ -624,6 +785,12 @@ class WorkspaceBackups extends Component
         if ($this->server->organization) {
             audit_log($this->server->organization, auth()->user(), 'backup.database.deleted', $this->server, $snapshot, null);
         }
+
+        $this->dispatchBackupNotification('deleted', [__('Database backup')], [
+            'backup_type' => 'database',
+            'backup_id' => $snapshot['backup_id'],
+            'server_database_id' => $snapshot['server_database_id'],
+        ]);
 
         $this->toastSuccess(__('Backup deleted.'));
     }
@@ -655,33 +822,55 @@ class WorkspaceBackups extends Component
             audit_log($this->server->organization, auth()->user(), 'backup.site_files.deleted', $this->server, $snapshot, null);
         }
 
+        $this->dispatchBackupNotification('deleted', [__('Site files backup')], [
+            'backup_type' => 'site_files',
+            'backup_id' => $snapshot['backup_id'],
+            'site_id' => $snapshot['site_id'],
+        ]);
+
         $this->toastSuccess(__('Backup deleted.'));
     }
 
     public function render(): View
     {
-        $this->server->refresh();
+        if ($this->comingSoonPreview) {
+            $contextSite = $this->context_site_id !== null
+                ? Site::query()->where('server_id', $this->server->id)->whereKey($this->context_site_id)->first()
+                : null;
 
-        // Note: $databases/$sites are NOT narrowed by context_site_id — the new-schedule form
-        // still needs them all to pick from. The query collections below DO narrow so the
-        // operator only sees runs / schedules / stats for the focused site.
+            return view('livewire.servers.workspace-backups-preview', [
+                'contextSite' => $contextSite,
+                'siteDedicatedContext' => $this->siteDedicatedContext,
+            ]);
+        }
+
+        // No $this->server->refresh() here — route binding (and Livewire hydration)
+        // already load the row fresh, and saveDatabaseBackupSettings() refreshes after
+        // its own write. A blanket refresh on every render just duplicated the
+        // `select * from servers` query that route binding already ran.
+
+        // In site-dedicated context every picker (run-now + new-schedule target)
+        // is scoped to the focused site: $sites is just that site, and $databases
+        // only the databases linked to it (server_databases.site_id). The server
+        // workspace still lists the whole fleet. The runs / schedules / stats
+        // collections below narrow the same way.
         $databases = ServerDatabase::query()
             ->where('server_id', $this->server->id)
+            ->when($this->context_site_id !== null, fn ($q) => $q->where('site_id', $this->context_site_id))
             ->orderBy('name')
             ->get();
 
         $sites = Site::query()
             ->where('server_id', $this->server->id)
+            ->when($this->context_site_id !== null, fn ($q) => $q->whereKey($this->context_site_id))
             ->orderBy('name')
             ->get();
 
-        // When filtered to a single site, database backups go away entirely (databases are
-        // server-scoped, not site-scoped) — we narrow $databaseIds to an empty list so the
-        // DB run list reads as "none for this site" rather than the full server fleet.
-        $databaseIds = $this->context_site_id !== null ? [] : $databases->pluck('id')->all();
-        $siteIds = $this->context_site_id !== null
-            ? [$this->context_site_id]
-            : $sites->pluck('id')->all();
+        // $databases / $sites are already scoped to the focused site in site
+        // context, so the id lists follow directly: DB history shows the site's
+        // linked databases (if any), file history shows just this site.
+        $databaseIds = $databases->pluck('id')->all();
+        $siteIds = $sites->pluck('id')->all();
 
         $databaseBackups = ServerDatabaseBackup::query()
             ->whereIn('server_database_id', $databaseIds)
@@ -806,6 +995,7 @@ class WorkspaceBackups extends Component
         return view('livewire.servers.workspace-backups', [
             'opsReady' => $this->serverOpsReady(),
             'contextSite' => $contextSite,
+            'siteDedicatedContext' => $this->siteDedicatedContext,
             'databases' => $databases,
             'sites' => $sites,
             'databaseBackups' => $databaseBackups,
@@ -817,6 +1007,9 @@ class WorkspaceBackups extends Component
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
+            'notifChannels' => $this->backups_workspace_tab === 'notifications' ? $this->assignableBackupNotificationChannels() : collect(),
+            'notifSubscriptions' => $this->backups_workspace_tab === 'notifications' ? $this->backupNotificationSubscriptions() : collect(),
+            'notifEventLabels' => $this->backups_workspace_tab === 'notifications' ? $this->backupEventLabels() : [],
         ]);
     }
 }

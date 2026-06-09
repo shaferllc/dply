@@ -1,105 +1,110 @@
 <?php
 
-namespace Tests\Feature\Auth;
+namespace Tests\Feature\Auth\AuthenticationTest;
 
 use App\Livewire\Auth\Login;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-use Tests\TestCase;
 
-class AuthenticationTest extends TestCase
-{
-    use RefreshDatabase;
+uses(RefreshDatabase::class);
 
-    public function test_login_screen_can_be_rendered(): void
-    {
-        $response = $this->get('/login');
+test('login screen can be rendered', function () {
+    $response = $this->get('/login');
 
-        $response->assertStatus(200);
-    }
+    $response->assertStatus(200);
+});
 
-    public function test_users_can_authenticate_using_the_login_screen(): void
-    {
-        $user = User::factory()->create();
+test('local login screen shows quick login button', function () {
+    config()->set('app.env', 'local');
 
-        Livewire::test(Login::class)
-            ->set('email', $user->email)
-            ->set('password', 'password')
-            ->call('submit')
-            ->assertRedirect(route('dashboard', absolute: false));
+    $this->get('/login')
+        ->assertOk()
+        ->assertSee('Quick login as TJ', false);
+});
 
-        $this->assertAuthenticated();
-    }
+test('production login screen hides quick login button', function () {
+    config()->set('app.env', 'production');
 
-    public function test_users_can_not_authenticate_with_invalid_password(): void
-    {
-        $user = User::factory()->create();
+    $this->get('/login')
+        ->assertOk()
+        ->assertDontSee('Quick login as TJ', false);
+});
 
-        Livewire::test(Login::class)
-            ->set('email', $user->email)
-            ->set('password', 'wrong-password')
-            ->call('submit')
-            ->assertHasErrors('email');
+test('users can authenticate using the login screen', function () {
+    $user = User::factory()->create();
 
-        $this->assertGuest();
-    }
+    Livewire::test(Login::class)
+        ->set('email', $user->email)
+        ->set('password', 'password')
+        ->call('submit')
+        ->assertRedirect(route('dashboard', absolute: false));
 
-    public function test_local_tj_account_can_authenticate_without_password(): void
-    {
-        config()->set('app.env', 'local');
+    $this->assertAuthenticated();
+});
 
-        $user = User::factory()->create([
-            'email' => 'tj@tjshafer.com',
-        ]);
+test('users can not authenticate with invalid password', function () {
+    $user = User::factory()->create();
 
-        Livewire::test(Login::class)
-            ->set('email', $user->email)
-            ->set('password', '')
-            ->call('submit')
-            ->assertRedirect(route('dashboard', absolute: false));
+    Livewire::test(Login::class)
+        ->set('email', $user->email)
+        ->set('password', 'wrong-password')
+        ->call('submit')
+        ->assertHasErrors('email');
 
-        $this->assertAuthenticatedAs($user);
-    }
+    $this->assertGuest();
+});
 
-    public function test_local_tj_account_can_use_quick_login_button(): void
-    {
-        config()->set('app.env', 'local');
+test('local tj account can authenticate without password', function () {
+    config()->set('app.env', 'local');
 
-        $user = User::factory()->create([
-            'email' => 'tj@tjshafer.com',
-        ]);
+    $user = User::factory()->create([
+        'email' => 'tj@tjshafer.com',
+    ]);
 
-        Livewire::test(Login::class)
-            ->call('quickLogin')
-            ->assertRedirect(route('dashboard', absolute: false));
+    Livewire::test(Login::class)
+        ->set('email', $user->email)
+        ->set('password', '')
+        ->call('submit')
+        ->assertRedirect(route('dashboard', absolute: false));
 
-        $this->assertAuthenticatedAs($user);
-    }
+    $this->assertAuthenticatedAs($user);
+});
 
-    public function test_local_quick_login_creates_tj_user_when_missing(): void
-    {
-        config()->set('app.env', 'local');
+test('local tj account can use quick login button', function () {
+    config()->set('app.env', 'local');
 
-        $this->assertDatabaseMissing('users', ['email' => 'tj@tjshafer.com']);
+    $user = User::factory()->create([
+        'email' => 'tj@tjshafer.com',
+    ]);
 
-        Livewire::test(Login::class)
-            ->call('quickLogin')
-            ->assertRedirect(route('dashboard', absolute: false));
+    Livewire::test(Login::class)
+        ->call('quickLogin')
+        ->assertRedirect(route('dashboard', absolute: false));
 
-        $this->assertDatabaseHas('users', ['email' => 'tj@tjshafer.com']);
+    $this->assertAuthenticatedAs($user);
+});
 
-        $user = User::query()->where('email', 'tj@tjshafer.com')->firstOrFail();
-        $this->assertAuthenticatedAs($user);
-    }
+test('local quick login creates tj user when missing', function () {
+    config()->set('app.env', 'local');
 
-    public function test_users_can_logout(): void
-    {
-        $user = User::factory()->create();
+    $this->assertDatabaseMissing('users', ['email' => 'tj@tjshafer.com']);
 
-        $response = $this->actingAs($user)->post('/logout');
+    Livewire::test(Login::class)
+        ->call('quickLogin')
+        ->assertRedirect(route('dashboard', absolute: false));
 
-        $this->assertGuest();
-        $response->assertRedirect('/');
-    }
-}
+    $this->assertDatabaseHas('users', ['email' => 'tj@tjshafer.com']);
+
+    $user = User::query()->where('email', 'tj@tjshafer.com')->firstOrFail();
+    $this->assertAuthenticatedAs($user);
+});
+
+test('users can logout', function () {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)->post('/logout');
+
+    $this->assertGuest();
+    $response->assertRedirect('/');
+});

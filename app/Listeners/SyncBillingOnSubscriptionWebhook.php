@@ -44,6 +44,6 @@ class SyncBillingOnSubscriptionWebhook
             return;
         }
 
-        SyncOrganizationBillingJob::dispatch($organization->id);
+        SyncOrganizationBillingJob::dispatch($organization->id, 'stripe_webhook');
     }
 }

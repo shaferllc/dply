@@ -68,4 +68,51 @@ final class ServerDatabaseNotificationDispatcher
             actor: $actor,
         );
     }
+
+    /**
+     * Generic publisher for the snapshot events that aren't keyed to a single
+     * ServerDatabase row — engine install/remove and database-user create/remove.
+     * The title comes from the config label so it stays in sync with the registry.
+     *
+     * @param  list<string>  $detailLines
+     * @param  array<string, mixed>  $extraMetadata
+     */
+    public function notify(
+        Server $server,
+        string $kind,
+        array $detailLines = [],
+        ?User $actor = null,
+        array $extraMetadata = [],
+    ): void {
+        if (! in_array($kind, ServerDatabaseNotificationKeys::KINDS, true)) {
+            return;
+        }
+
+        $eventKey = ServerDatabaseNotificationKeys::eventKey($kind);
+        $events = (array) config('notification_events.categories.server_database.events', []);
+        $label = (string) ($events[$eventKey] ?? ucfirst(str_replace('_', ' ', $kind)));
+
+        $detailLines = array_values(array_filter(array_map(
+            static fn ($n) => trim((string) $n),
+            $detailLines,
+        ), static fn (string $n) => $n !== ''));
+
+        $lines = [__('Server: :name', ['name' => $server->name])];
+        foreach ($detailLines as $line) {
+            $lines[] = $line;
+        }
+        if ($actor !== null) {
+            $lines[] = __('Actor: :name', ['name' => $actor->name]);
+        }
+
+        $this->publisher->publish(
+            eventKey: $eventKey,
+            subject: $server,
+            title: '['.config('app.name').'] '.$server->name.' — '.$label,
+            body: implode("\n", $lines),
+            url: route('servers.databases', $server, absolute: true),
+            metadata: array_merge(['server_id' => $server->id, 'kind' => $kind], $extraMetadata),
+            actor: $actor,
+        );
+    }
 }

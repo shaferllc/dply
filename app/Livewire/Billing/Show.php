@@ -2,15 +2,20 @@
 
 namespace App\Livewire\Billing;
 
-use App\Enums\ServerTier;
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Services\Billing\DesiredBillingState;
 use App\Services\Billing\OrganizationBillingStateComputer;
 use App\Services\Billing\StandardSubscriptionCreator;
+use App\Services\Billing\SubscriptionPlanResolver;
+use App\Services\Billing\VatInsightService;
+use Carbon\CarbonInterface;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 use Laravel\Cashier\Invoice;
+use Laravel\Cashier\Subscription;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 use RuntimeException;
@@ -19,12 +24,81 @@ use Throwable;
 #[Layout('layouts.app')]
 class Show extends Component
 {
+    use DispatchesToastNotifications;
+
     public Organization $organization;
+
+    /**
+     * Billing-entity fields for the org's invoices. Migrated off
+     * `users` in 2026-05 because subscriptions are org-scoped.
+     */
+    public string $invoice_email = '';
+
+    public string $vat_number = '';
+
+    public string $billing_currency = '';
+
+    public string $billing_details = '';
 
     public function mount(Organization $organization): void
     {
         $this->authorize('update', $organization);
         $this->organization = $organization;
+        $this->invoice_email = (string) ($organization->invoice_email ?? '');
+        $this->vat_number = (string) ($organization->vat_number ?? '');
+        $this->billing_currency = (string) ($organization->billing_currency ?? '');
+        $this->billing_details = (string) ($organization->billing_details ?? '');
+    }
+
+    public function saveBillingDetails(VatInsightService $vatInsights): void
+    {
+        $this->authorize('update', $this->organization);
+
+        $rules = [
+            'invoice_email' => ['nullable', 'string', 'email', 'max:255'],
+            'vat_number' => [
+                'nullable',
+                'string',
+                'max:64',
+                function ($attribute, $value, $fail) use ($vatInsights): void {
+                    $msg = $vatInsights->blockingValidationMessage(is_string($value) ? $value : null);
+                    if ($msg !== null) {
+                        $fail($msg);
+                    }
+                },
+            ],
+            'billing_details' => ['nullable', 'string', 'max:5000'],
+        ];
+
+        // Currency must come from the supported list when populated.
+        $allowed = array_keys((array) config('profile_options.currencies', []));
+        $rules['billing_currency'] = $this->billing_currency === ''
+            ? ['nullable']
+            : ['nullable', 'string', Rule::in($allowed)];
+
+        $this->validate($rules);
+
+        $this->organization->update([
+            'invoice_email' => $this->invoice_email !== '' ? $this->invoice_email : null,
+            'vat_number' => $this->vat_number !== '' ? $this->vat_number : null,
+            'billing_currency' => $this->billing_currency === '' ? null : $this->billing_currency,
+            'billing_details' => $this->billing_details !== '' ? $this->billing_details : null,
+        ]);
+
+        $fresh = $this->organization->fresh();
+        if ($fresh) {
+            $this->organization = $fresh;
+            $this->invoice_email = (string) ($fresh->invoice_email ?? '');
+            $this->vat_number = (string) ($fresh->vat_number ?? '');
+            $this->billing_currency = (string) ($fresh->billing_currency ?? '');
+            $this->billing_details = (string) ($fresh->billing_details ?? '');
+        }
+
+        $this->toastSuccess(__('Billing details saved.'));
+
+        foreach ($vatInsights->collectSoftWarnings($this->vat_number) as $message) {
+            $this->toastInfo($message);
+        }
     }
 
     public function getSubscriptionProperty()
@@ -46,9 +120,7 @@ class Show extends Component
             return null;
         }
         if ($this->organization->onStandardSubscription()) {
-            $interval = $sub->hasPrice((string) (config('subscription.standard.stripe.base_yearly') ?? ''))
-                ? 'yearly'
-                : 'monthly';
+            $interval = $this->subscriptionIsYearly($sub) ? 'yearly' : 'monthly';
 
             return 'Standard ('.$interval.')';
         }
@@ -132,6 +204,14 @@ class Show extends Component
             $items = $creator->buildPriceList($computer->compute($this->organization), $interval);
         } catch (RuntimeException $e) {
             $this->addError('billing', __('Standard pricing is not configured yet. Contact support.'));
+
+            return null;
+        }
+
+        if ($items === []) {
+            // Free plan, no managed products — nothing for Stripe to bill, so
+            // there's no subscription to start. The org keeps using dply free.
+            $this->addError('billing', __('Your fleet is on the free plan — there\'s nothing to subscribe to yet. Add another server or a managed product to move onto a paid plan.'));
 
             return null;
         }
@@ -284,7 +364,7 @@ class Show extends Component
         return $this->subscription?->onGracePeriod() ?? false;
     }
 
-    public function getSubscriptionEndsAtProperty(): ?\Carbon\CarbonInterface
+    public function getSubscriptionEndsAtProperty(): ?CarbonInterface
     {
         return $this->subscription?->ends_at;
     }
@@ -306,8 +386,21 @@ class Show extends Component
 
     public function getStandardPricingAvailableProperty(): bool
     {
-        return (string) (config('subscription.standard.stripe.base_monthly') ?? '') !== ''
-            || (string) (config('subscription.standard.stripe.base_yearly') ?? '') !== '';
+        // Standard pricing is "available" as soon as any paid plan price (at
+        // either interval) is configured in Stripe. The Free plan never needs
+        // a price, so its absence doesn't gate the subscribe UI.
+        $configured = array_merge(
+            array_values((array) config('subscription.standard.stripe.plans', [])),
+            array_values((array) config('subscription.standard.stripe.plans_yearly', [])),
+        );
+
+        foreach ($configured as $priceId) {
+            if ((string) $priceId !== '') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -335,7 +428,9 @@ class Show extends Component
             ->where('status', Server::STATUS_READY)
             ->where('created_at', '<=', now()->subDays($minAge))
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->reject(fn (Server $server): bool => $server->isManagedProductHost())
+            ->values();
     }
 
     /**
@@ -356,9 +451,14 @@ class Show extends Component
             ->reject(fn (Server $s) => in_array($s->id, $billableIds, true))
             ->map(function (Server $server) use ($cutoff, $minAge): array {
                 $reason = match (true) {
+                    $server->isManagedProductHost() => match (true) {
+                        $server->isDplyCloudHost() => __('Billed as dply Cloud app'),
+                        $server->isDplyEdgeHost() => __('Billed as dply Edge site'),
+                        $server->isServerlessHost() => __('Billed as serverless function'),
+                        default => __('Billed as managed product'),
+                    },
                     $server->status !== Server::STATUS_READY => __('Status: :status', ['status' => $server->status]),
-                    $server->created_at !== null && $server->created_at->gt($cutoff)
-                        => __('Under the :days-day billable threshold', ['days' => $minAge]),
+                    $server->created_at !== null && $server->created_at->gt($cutoff) => __('Under the :days-day billable threshold', ['days' => $minAge]),
                     default => __('Excluded'),
                 };
 
@@ -368,8 +468,8 @@ class Show extends Component
     }
 
     /**
-     * Structured line items for the "Your bill" hero. One entry for the org
-     * base, one per non-empty tier with quantity and per-unit price. Cents
+     * Structured line items for the "Your bill" hero. One entry for the flat
+     * plan (chosen by server count) plus one per managed product in use. Cents
      * preserved so the view can choose monthly/yearly presentation.
      *
      * @return list<array{label: string, quantity: int, unit_cents: int, line_cents: int}>
@@ -377,33 +477,142 @@ class Show extends Component
     public function getTierLineItemsProperty(): array
     {
         $state = $this->billingState;
-        $tierPrices = (array) config('subscription.standard.tiers', []);
 
         $items = [
             [
-                'label' => __('dply base'),
+                'label' => __('dply plan — :plan', ['plan' => $state->planLabel]),
                 'quantity' => 1,
-                'unit_cents' => $state->baseCents,
-                'line_cents' => $state->baseCents,
+                'unit_cents' => $state->planPriceCents,
+                'line_cents' => $state->planPriceCents,
+                'detail' => $state->serverCount() > 0
+                    ? trans_choice(':count server|:count servers', $state->serverCount(), ['count' => $state->serverCount()])
+                    : null,
             ],
         ];
 
-        foreach (ServerTier::ordered() as $tier) {
-            $qty = $state->quantityFor($tier);
-            if ($qty <= 0) {
-                continue;
-            }
-
-            $unit = (int) ($tierPrices[$tier->value] ?? 0);
+        if ($state->serverlessCount > 0) {
+            $unit = (int) config('subscription.standard.serverless_cents', 200);
             $items[] = [
-                'label' => __('dply server — :tier', ['tier' => strtoupper($tier->value)]),
-                'quantity' => $qty,
+                'label' => __('dply serverless function'),
+                'quantity' => $state->serverlessCount,
                 'unit_cents' => $unit,
-                'line_cents' => $unit * $qty,
+                'line_cents' => $state->serverlessSubtotalCents,
+            ];
+        }
+
+        if ($state->serverlessUsageSubtotalCents > 0) {
+            $items[] = [
+                'label' => __('dply serverless usage'),
+                'quantity' => 1,
+                'unit_cents' => $state->serverlessUsageSubtotalCents,
+                'line_cents' => $state->serverlessUsageSubtotalCents,
+                'detail' => __('Metered invocations, managed databases & caches'),
+            ];
+        }
+
+        if ($state->managedServerSubtotalCents > 0) {
+            $items[] = [
+                'label' => __('dply managed server'),
+                'quantity' => $state->managedServerCount,
+                'unit_cents' => $state->managedServerCount > 0
+                    ? (int) round($state->managedServerSubtotalCents / $state->managedServerCount)
+                    : $state->managedServerSubtotalCents,
+                'line_cents' => $state->managedServerSubtotalCents,
+                'detail' => __('All-in cost-plus — dply-hosted VM (provider cost + margin)'),
+            ];
+        }
+
+        if ($state->cloudCount > 0) {
+            $unit = (int) config('subscription.standard.cloud_cents', 500);
+            $items[] = [
+                'label' => __('dply Cloud app'),
+                'quantity' => $state->cloudCount,
+                'unit_cents' => $unit,
+                'line_cents' => $state->cloudSubtotalCents,
+            ];
+        }
+
+        if ($state->cloudResourceSubtotalCents > 0) {
+            $items[] = [
+                'label' => __('dply Cloud resources'),
+                'quantity' => 1,
+                'unit_cents' => $state->cloudResourceSubtotalCents,
+                'line_cents' => $state->cloudResourceSubtotalCents,
+                'detail' => __('Metered compute, workers & databases'),
+            ];
+        }
+
+        if ($state->edgeCount > 0) {
+            $unit = (int) config('subscription.standard.edge_cents', 200);
+            $items[] = [
+                'label' => __('dply Edge site'),
+                'quantity' => $state->edgeCount,
+                'unit_cents' => $unit,
+                'line_cents' => $state->edgeSubtotalCents,
+            ];
+        }
+
+        if ($state->edgeUsageSubtotalCents > 0) {
+            $items[] = [
+                'label' => __('dply Edge delivery usage'),
+                'quantity' => 1,
+                'unit_cents' => $state->edgeUsageSubtotalCents,
+                'line_cents' => $state->edgeUsageSubtotalCents,
+                'detail' => $this->formatEdgeUsageDetail($state->edgeUsageEstimate),
             ];
         }
 
         return $items;
+    }
+
+    /**
+     * @param  array<string, mixed>  $estimate
+     */
+    private function formatEdgeUsageDetail(array $estimate): ?string
+    {
+        $requests = (int) ($estimate['requests'] ?? 0);
+        $egress = (int) ($estimate['bytes_egress'] ?? 0);
+
+        if ($requests === 0 && $egress === 0) {
+            return null;
+        }
+
+        $parts = [];
+        if ($requests > 0) {
+            $parts[] = number_format($requests).' '.__('requests');
+        }
+        if ($egress > 0) {
+            $parts[] = number_format($egress / (1024 ** 3), 2).' GB '.__('egress');
+        }
+
+        $periodStart = (string) ($estimate['period_start'] ?? '');
+        $periodEnd = (string) ($estimate['period_end'] ?? '');
+        if ($periodStart !== '' && $periodEnd !== '') {
+            $parts[] = $periodStart.' → '.$periodEnd;
+        }
+
+        return implode(' · ', $parts);
+    }
+
+    /**
+     * Plan catalog for the interactive "what would it cost?" calculator,
+     * ordered cheapest → most expensive. Prices in dollars; `max` is the
+     * inclusive server-count ceiling (null = unlimited) so the Alpine widget
+     * can resolve a plan from a hypothetical fleet size.
+     *
+     * @return list<array{key: string, label: string, price: float, max: ?int}>
+     */
+    public function getPlanCatalogProperty(): array
+    {
+        return array_map(
+            fn (array $plan): array => [
+                'key' => $plan['key'],
+                'label' => $plan['label'],
+                'price' => $plan['price_cents'] / 100,
+                'max' => $plan['max_servers'],
+            ],
+            app(SubscriptionPlanResolver::class)->all(),
+        );
     }
 
     public function getYearlyTotalCentsProperty(): int
@@ -420,15 +629,36 @@ class Show extends Component
             return null;
         }
 
-        $yearlyBase = (string) (config('subscription.standard.stripe.base_yearly') ?? '');
-        if ($yearlyBase !== '' && $sub->hasPrice($yearlyBase)) {
-            return 'year';
-        }
-
-        return 'month';
+        return $this->subscriptionIsYearly($sub) ? 'year' : 'month';
     }
 
-    public function getNextInvoiceAtProperty(): ?\Carbon\CarbonInterface
+    /**
+     * Detect a yearly subscription from any yearly plan or managed-product
+     * price on it. A Free-plan org can carry only a yearly managed line (no
+     * plan line), so we can't key off a single price.
+     */
+    private function subscriptionIsYearly(Subscription $sub): bool
+    {
+        $yearlyIds = array_merge(
+            array_values((array) config('subscription.standard.stripe.plans_yearly', [])),
+            [
+                (string) (config('subscription.standard.stripe.serverless_yearly') ?? ''),
+                (string) (config('subscription.standard.stripe.cloud_yearly') ?? ''),
+                (string) (config('subscription.standard.stripe.edge_yearly') ?? ''),
+            ],
+        );
+
+        foreach ($yearlyIds as $priceId) {
+            $priceId = (string) $priceId;
+            if ($priceId !== '' && $sub->hasPrice($priceId)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function getNextInvoiceAtProperty(): ?CarbonInterface
     {
         $sub = $this->subscription;
         if (! $sub) {

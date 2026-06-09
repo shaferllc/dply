@@ -7,6 +7,7 @@ use App\Models\Server;
 use App\Services\DigitalOceanService;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
 use App\Support\Servers\FakeCloudProvision;
+use App\Support\Servers\ServerImageCatalog;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -28,7 +29,9 @@ class ProvisionDigitalOceanDropletJob implements ShouldQueue
 
     public function __construct(
         public Server $server
-    ) {}
+    ) {
+        $this->onQueue(config('server_provision.queue', 'dply'));
+    }
 
     public function handle(): void
     {
@@ -59,7 +62,12 @@ class ProvisionDigitalOceanDropletJob implements ShouldQueue
                 return;
             }
 
-            $image = config('services.digitalocean.default_image', 'ubuntu-24-04-x64');
+            // Image precedence: an explicit user-chosen OS image wins; otherwise
+            // launch from a region-matched pre-baked snapshot (fast path — stack
+            // already installed, setup script skip-fasts); otherwise stock Ubuntu.
+            $image = ServerImageCatalog::resolveForServer($this->server, 'digitalocean')
+                ?? ServerImageCatalog::bakedSnapshotForRegion('digitalocean', $this->server->region)
+                ?? config('services.digitalocean.default_image', 'ubuntu-24-04-x64');
 
             $meta = $this->server->meta ?? [];
             $doOpts = is_array($meta['digitalocean'] ?? null) ? $meta['digitalocean'] : [];
@@ -78,7 +86,13 @@ class ProvisionDigitalOceanDropletJob implements ShouldQueue
                         ? $doOpts['vpc_uuid']
                         : null,
                     'tags' => isset($doOpts['tags']) && is_array($doOpts['tags']) ? $doOpts['tags'] : [],
-                    'user_data' => isset($doOpts['user_data']) && is_string($doOpts['user_data']) ? $doOpts['user_data'] : '',
+                    // Prefer a user-supplied user_data; otherwise inject the boot
+                    // head-start (apt warmup at boot) when enabled. No-op when off.
+                    'user_data' => (isset($doOpts['user_data']) && is_string($doOpts['user_data']) && $doOpts['user_data'] !== '')
+                        ? $doOpts['user_data']
+                        : (\App\Support\Servers\BootHeadStartScript::enabled()
+                            ? \App\Support\Servers\BootHeadStartScript::cloudInitUserData()
+                            : ''),
                 ],
             );
         } catch (Throwable $e) {
@@ -103,7 +117,10 @@ class ProvisionDigitalOceanDropletJob implements ShouldQueue
             $this->server->update(['meta' => $cleared]);
         }
 
-        PollDropletIpJob::dispatch($this->server)->delay(now()->addSeconds(15));
+        // DigitalOcean assigns a public IP within a few seconds of create;
+        // a short delay before the first poll avoids a guaranteed-empty call
+        // without adding meaningful wall-clock (the 5s backoff handles the rest).
+        PollDropletIpJob::dispatch($this->server)->delay(now()->addSeconds(5));
     }
 
     public function failed(Throwable $e): void

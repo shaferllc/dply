@@ -16,6 +16,7 @@ import {
     foldKeymap,
     indentOnInput,
 } from '@codemirror/language';
+import { autocompletion } from '@codemirror/autocomplete';
 import { json } from '@codemirror/lang-json';
 import { php } from '@codemirror/lang-php';
 import { xml } from '@codemirror/lang-xml';
@@ -52,9 +53,46 @@ function languageFor(mime, path) {
     return [];
 }
 
+function completionSource(items) {
+    if (!Array.isArray(items) || items.length === 0) {
+        return [];
+    }
+
+    const options = items
+        .filter((item) => item && typeof item.label === 'string' && typeof item.insert === 'string')
+        .map((item) => ({
+            label: item.label,
+            type: item.type || 'snippet',
+            detail: item.detail || undefined,
+            apply: item.insert,
+        }));
+
+    if (options.length === 0) {
+        return [];
+    }
+
+    return autocompletion({
+        override: [
+            (context) => {
+                const word = context.matchBefore(/\w*/);
+                if (!word || (word.from === word.to && !context.explicit)) {
+                    return null;
+                }
+
+                return {
+                    from: word.from,
+                    options,
+                };
+            },
+        ],
+    });
+}
+
 window.dplyFileBrowserMountEditor = function (mount, opts = {}) {
     const initial = opts.content ?? '';
     const langExt = languageFor(opts.mime, opts.path);
+    const readOnly = Boolean(opts.readOnly);
+    const completionExt = completionSource(opts.completions);
 
     while (mount.firstChild) mount.removeChild(mount.firstChild);
 
@@ -64,9 +102,44 @@ window.dplyFileBrowserMountEditor = function (mount, opts = {}) {
         }
     });
 
+    const lightEditorTheme = EditorView.theme({
+        '&': {
+            height: '100%',
+            backgroundColor: '#fafaf8',
+            color: '#1c2b1c',
+        },
+        '.cm-scroller': {
+            overflow: 'auto',
+        },
+        '.cm-content': {
+            caretColor: '#2d4a2d',
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+            fontSize: '12px',
+            lineHeight: '1.6',
+        },
+        '.cm-gutters': {
+            backgroundColor: '#f3f4ef',
+            color: '#7a847a',
+            borderRight: '1px solid rgba(28, 43, 28, 0.08)',
+        },
+        '.cm-activeLine': {
+            backgroundColor: 'rgba(63, 98, 63, 0.06)',
+        },
+        '.cm-activeLineGutter': {
+            backgroundColor: 'rgba(63, 98, 63, 0.08)',
+        },
+        '&.cm-focused .cm-cursor': {
+            borderLeftColor: '#2d4a2d',
+        },
+        '&.cm-focused .cm-selectionBackground, ::selection': {
+            backgroundColor: 'rgba(63, 98, 63, 0.18) !important',
+        },
+    });
+
     const state = EditorState.create({
         doc: initial,
         extensions: [
+            lightEditorTheme,
             lineNumbers(),
             foldGutter(),
             drawSelection(),
@@ -83,8 +156,11 @@ window.dplyFileBrowserMountEditor = function (mount, opts = {}) {
                 ...foldKeymap,
             ]),
             EditorView.lineWrapping,
+            EditorState.readOnly.of(readOnly),
+            EditorView.editable.of(!readOnly),
             updateListener,
             ...(Array.isArray(langExt) ? langExt : [langExt]),
+            ...(Array.isArray(completionExt) ? completionExt : [completionExt]),
         ],
     });
 

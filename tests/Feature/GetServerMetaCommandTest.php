@@ -2,129 +2,110 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature;
+namespace Tests\Feature\GetServerMetaCommandTest;
 
 use App\Models\Server;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-use Tests\TestCase;
 
-class GetServerMetaCommandTest extends TestCase
-{
-    use RefreshDatabase;
+uses(RefreshDatabase::class);
 
-    public function test_prints_string_value_plain(): void
-    {
-        $server = Server::factory()->create([
-            'meta' => ['webserver' => 'nginx'],
-        ]);
+test('prints string value plain', function () {
+    $server = Server::factory()->create([
+        'meta' => ['webserver' => 'nginx'],
+    ]);
 
-        $exit = Artisan::call('dply:server:meta-get', [
-            'server' => $server->id,
-            'key' => 'webserver',
-        ]);
-        $output = trim(Artisan::output());
+    $exit = Artisan::call('dply:server:meta-get', [
+        'server' => $server->id,
+        'key' => 'webserver',
+    ]);
+    $output = trim(Artisan::output());
 
-        $this->assertSame(0, $exit);
-        $this->assertSame('nginx', $output);
-    }
+    expect($exit)->toBe(0);
+    expect($output)->toBe('nginx');
+});
+test('prints nested value via dot notation', function () {
+    $server = Server::factory()->create([
+        'meta' => ['runtime_defaults' => ['node' => '22.1.0']],
+    ]);
 
-    public function test_prints_nested_value_via_dot_notation(): void
-    {
-        $server = Server::factory()->create([
-            'meta' => ['runtime_defaults' => ['node' => '22.1.0']],
-        ]);
+    Artisan::call('dply:server:meta-get', [
+        'server' => $server->id,
+        'key' => 'runtime_defaults.node',
+    ]);
+    $output = trim(Artisan::output());
 
-        Artisan::call('dply:server:meta-get', [
-            'server' => $server->id,
-            'key' => 'runtime_defaults.node',
-        ]);
-        $output = trim(Artisan::output());
+    expect($output)->toBe('22.1.0');
+});
+test('prints json for array values', function () {
+    $server = Server::factory()->create([
+        'meta' => ['runtime_defaults' => ['node' => '22', 'python' => '3.12']],
+    ]);
 
-        $this->assertSame('22.1.0', $output);
-    }
+    Artisan::call('dply:server:meta-get', [
+        'server' => $server->id,
+        'key' => 'runtime_defaults',
+    ]);
+    $output = trim(Artisan::output());
+    $decoded = json_decode($output, true);
 
-    public function test_prints_json_for_array_values(): void
-    {
-        $server = Server::factory()->create([
-            'meta' => ['runtime_defaults' => ['node' => '22', 'python' => '3.12']],
-        ]);
+    expect($decoded)->toBe(['node' => '22', 'python' => '3.12']);
+});
+test('dumps full meta when no key given', function () {
+    $server = Server::factory()->create([
+        'meta' => ['webserver' => 'nginx', 'php_version' => '8.4'],
+    ]);
 
-        Artisan::call('dply:server:meta-get', [
-            'server' => $server->id,
-            'key' => 'runtime_defaults',
-        ]);
-        $output = trim(Artisan::output());
-        $decoded = json_decode($output, true);
+    Artisan::call('dply:server:meta-get', ['server' => $server->id]);
+    $decoded = json_decode(trim(Artisan::output()), true);
 
-        $this->assertSame(['node' => '22', 'python' => '3.12'], $decoded);
-    }
+    expect($decoded['webserver'])->toBe('nginx');
+    expect($decoded['php_version'])->toBe('8.4');
+});
+test('json output wraps payload', function () {
+    $server = Server::factory()->create(['meta' => ['webserver' => 'nginx']]);
 
-    public function test_dumps_full_meta_when_no_key_given(): void
-    {
-        $server = Server::factory()->create([
-            'meta' => ['webserver' => 'nginx', 'php_version' => '8.4'],
-        ]);
+    Artisan::call('dply:server:meta-get', [
+        'server' => $server->id,
+        'key' => 'webserver',
+        '--json' => true,
+    ]);
+    $decoded = json_decode(Artisan::output(), true);
 
-        Artisan::call('dply:server:meta-get', ['server' => $server->id]);
-        $decoded = json_decode(trim(Artisan::output()), true);
+    expect($decoded['key'])->toBe('webserver');
+    expect($decoded['value'])->toBe('nginx');
+    expect($decoded['present'])->toBeTrue();
+});
+test('exits non zero when key missing', function () {
+    $server = Server::factory()->create(['meta' => ['webserver' => 'nginx']]);
 
-        $this->assertSame('nginx', $decoded['webserver']);
-        $this->assertSame('8.4', $decoded['php_version']);
-    }
+    $exit = Artisan::call('dply:server:meta-get', [
+        'server' => $server->id,
+        'key' => 'nonexistent',
+    ]);
 
-    public function test_json_output_wraps_payload(): void
-    {
-        $server = Server::factory()->create(['meta' => ['webserver' => 'nginx']]);
+    expect($exit)->toBe(1);
+});
+test('json with missing key includes present false', function () {
+    $server = Server::factory()->create(['meta' => ['webserver' => 'nginx']]);
 
-        Artisan::call('dply:server:meta-get', [
-            'server' => $server->id,
-            'key' => 'webserver',
-            '--json' => true,
-        ]);
-        $decoded = json_decode(Artisan::output(), true);
+    Artisan::call('dply:server:meta-get', [
+        'server' => $server->id,
+        'key' => 'nonexistent',
+        '--json' => true,
+    ]);
+    $decoded = json_decode(Artisan::output(), true);
 
-        $this->assertSame('webserver', $decoded['key']);
-        $this->assertSame('nginx', $decoded['value']);
-        $this->assertTrue($decoded['present']);
-    }
+    expect($decoded['present'])->toBeFalse();
+    expect($decoded['value'])->toBeNull();
+});
+test('command fails when server not found', function () {
+    $exit = Artisan::call('dply:server:meta-get', [
+        'server' => 'nope',
+        'key' => 'foo',
+    ]);
+    $output = Artisan::output();
 
-    public function test_exits_non_zero_when_key_missing(): void
-    {
-        $server = Server::factory()->create(['meta' => ['webserver' => 'nginx']]);
-
-        $exit = Artisan::call('dply:server:meta-get', [
-            'server' => $server->id,
-            'key' => 'nonexistent',
-        ]);
-
-        $this->assertSame(1, $exit);
-    }
-
-    public function test_json_with_missing_key_includes_present_false(): void
-    {
-        $server = Server::factory()->create(['meta' => ['webserver' => 'nginx']]);
-
-        Artisan::call('dply:server:meta-get', [
-            'server' => $server->id,
-            'key' => 'nonexistent',
-            '--json' => true,
-        ]);
-        $decoded = json_decode(Artisan::output(), true);
-
-        $this->assertFalse($decoded['present']);
-        $this->assertNull($decoded['value']);
-    }
-
-    public function test_command_fails_when_server_not_found(): void
-    {
-        $exit = Artisan::call('dply:server:meta-get', [
-            'server' => 'nope',
-            'key' => 'foo',
-        ]);
-        $output = Artisan::output();
-
-        $this->assertSame(1, $exit);
-        $this->assertStringContainsString('Server not found', $output);
-    }
-}
+    expect($exit)->toBe(1);
+    $this->assertStringContainsString('Server not found', $output);
+});

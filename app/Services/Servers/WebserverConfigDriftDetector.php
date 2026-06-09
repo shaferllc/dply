@@ -12,6 +12,7 @@ use App\Services\Sites\NginxSiteConfigBuilder;
 use App\Services\Sites\OpenLiteSpeedSiteConfigBuilder;
 use App\Services\SshConnection;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Compares each Site's on-disk webserver config against what dply's
@@ -55,7 +56,7 @@ class WebserverConfigDriftDetector
      *     results: list<array{site_id: string, site_name: string, path: string, drifted: bool, added: int, removed: int, diff: string, error: ?string}>,
      *     total_sites: int,
      *     drifted_count: int,
-     *     scanned_at: \Carbon\CarbonImmutable,
+     *     scanned_at: CarbonImmutable,
      *     truncated: bool,
      *     unsupported: bool,
      * }
@@ -64,7 +65,7 @@ class WebserverConfigDriftDetector
     {
         $cacheKey = 'dply.webserver-drift:'.$server->id;
         if (! $forceFresh) {
-            $cached = \Illuminate\Support\Facades\Cache::get($cacheKey);
+            $cached = Cache::get($cacheKey);
             if (is_array($cached)) {
                 return $this->rehydrate($cached);
             }
@@ -75,12 +76,7 @@ class WebserverConfigDriftDetector
             return $this->emptyResult($engine ?: null, true);
         }
 
-        $sites = Site::query()
-            ->where('server_id', $server->id)
-            ->where('status', '!=', 'deleted')
-            ->with(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers', 'webserverConfigProfile', 'certificates', 'server'])
-            ->orderBy('name')
-            ->get();
+        $sites = app(ServerWebserverSitesProvider::class)->for($server);
 
         $total = $sites->count();
         $candidates = $sites->take(self::MAX_SITES_PER_RUN);
@@ -96,7 +92,7 @@ class WebserverConfigDriftDetector
                 'truncated' => false,
                 'unsupported' => false,
             ];
-            \Illuminate\Support\Facades\Cache::put($cacheKey, $payload, now()->addSeconds(self::CACHE_TTL_SECONDS));
+            Cache::put($cacheKey, $payload, now()->addSeconds(self::CACHE_TTL_SECONDS));
 
             return $payload;
         }
@@ -175,6 +171,7 @@ class WebserverConfigDriftDetector
             if ($aSort !== $bSort) {
                 return $aSort <=> $bSort;
             }
+
             // Within the same bucket, sort by total change size descending.
             return ($b['added'] + $b['removed']) <=> ($a['added'] + $a['removed']);
         });
@@ -188,7 +185,7 @@ class WebserverConfigDriftDetector
             'truncated' => $truncated,
             'unsupported' => false,
         ];
-        \Illuminate\Support\Facades\Cache::put($cacheKey, $payload, now()->addSeconds(self::CACHE_TTL_SECONDS));
+        Cache::put($cacheKey, $payload, now()->addSeconds(self::CACHE_TTL_SECONDS));
 
         return $payload;
     }
@@ -210,7 +207,7 @@ class WebserverConfigDriftDetector
         return match ($engine) {
             'openlitespeed' => '/usr/local/lsws/conf/vhosts/'.$basename.'/vhconf.conf',
             'caddy' => '/etc/caddy/sites-enabled/'.$basename.'.caddy',
-            'nginx' => '/etc/nginx/sites-enabled/'.$basename,
+            'nginx' => rtrim((string) config('sites.nginx_sites_enabled'), '/').'/'.$basename.'.conf',
             'apache' => '/etc/apache2/sites-enabled/'.$basename.'.conf',
             default => null,
         };
@@ -235,7 +232,7 @@ class WebserverConfigDriftDetector
      * a marker scheme so we can split per-file from the combined output.
      *
      * @param  list<string>  $paths
-     * @return array<string, string>  path → contents
+     * @return array<string, string> path → contents
      */
     private function fetchOnDiskContents(Server $server, array $paths): array
     {

@@ -1,33 +1,24 @@
 <?php
 
-namespace Tests\Unit\Services;
+namespace Tests\Unit\Services\SshPublicKeyFingerprintTest;
 
 use App\Services\Servers\SshPublicKeyFingerprint;
 use phpseclib3\Crypt\PublicKeyLoader;
-use PHPUnit\Framework\Attributes\Test;
-use Tests\TestCase;
 
-class SshPublicKeyFingerprintTest extends TestCase
-{
-    #[Test]
-    public function it_returns_sha256_and_md5_for_derived_openssh_line(): void
-    {
-        $pem = file_get_contents(base_path('app/TaskRunner/Tests/fixtures/private_key.pem'));
-        $key = PublicKeyLoader::loadPrivateKey($pem);
-        $line = trim($key->getPublicKey()->toString('OpenSSH'));
+it('returns sha256 and md5 for derived openssh line', function () {
+    $pem = file_get_contents(base_path('app/TaskRunner/Tests/fixtures/private_key.pem'));
+    $key = PublicKeyLoader::loadPrivateKey($pem);
+    $line = trim($key->getPublicKey()->toString('OpenSSH'));
 
-        $fp = SshPublicKeyFingerprint::forLine($line);
+    $fp = SshPublicKeyFingerprint::forLine($line);
 
-        $this->assertNotNull($fp);
-        $this->assertArrayHasKey('sha256', $fp);
-        $this->assertArrayHasKey('md5', $fp);
-        $this->assertStringStartsWith('SHA256:', $fp['sha256']);
-        $this->assertStringStartsWith('MD5:', $fp['md5']);
-    }
+    expect($fp)->not->toBeNull();
+    expect($fp)->toHaveKey('sha256');
+    expect($fp)->toHaveKey('md5');
+    expect($fp['sha256'])->toStartWith('SHA256:');
+    expect($fp['md5'])->toStartWith('MD5:');
+});
 
-    #[Test]
-    public function it_returns_null_for_garbage(): void
-    {
-        $this->assertNull(SshPublicKeyFingerprint::forLine('not-a-key'));
-    }
-}
+it('returns null for garbage', function () {
+    expect(SshPublicKeyFingerprint::forLine('not-a-key'))->toBeNull();
+});

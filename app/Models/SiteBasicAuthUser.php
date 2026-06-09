@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -37,6 +38,15 @@ class SiteBasicAuthUser extends Model
     public function site(): BelongsTo
     {
         return $this->belongsTo(Site::class);
+    }
+
+    /**
+     * @param  Builder<SiteBasicAuthUser>  $query
+     * @return Builder<SiteBasicAuthUser>
+     */
+    public function scopeNotPendingRemoval(Builder $query): Builder
+    {
+        return $query->whereNull('pending_removal_at');
     }
 
     /**
@@ -93,5 +103,15 @@ class SiteBasicAuthUser extends Model
         return str_starts_with($hash, '$2y$')
             || str_starts_with($hash, '$2a$')
             || str_starts_with($hash, '$2b$');
+    }
+
+    /**
+     * Apache-style apr1 hash for htpasswd files consumed by nginx, Apache, Traefik, and OLS.
+     */
+    public static function apr1Hash(string $password): string
+    {
+        $salt = substr(str_replace(['+', '/'], ['.', '_'], base64_encode(random_bytes(9))), 0, 8);
+
+        return crypt($password, '$apr1$'.$salt);
     }
 }

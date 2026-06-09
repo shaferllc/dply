@@ -22,10 +22,10 @@ use Carbon\CarbonImmutable;
  * Output normalized into the four sub-tab unit arrays:
  *   frontends / backends / ssl / runtime.
  *
- * `socat` is the only non-standard dependency. The dply haproxy installer
- * doesn't currently install it, but most cloud images ship it as part of
- * the apt-update-recommends pool; if missing the probe lands an error
- * in engineSpecific['errors'].
+ * `socat` queries the admin socket; the dply HAProxy edge installer
+ * installs it alongside haproxy. When missing, the probe falls back to
+ * `nc -U` when available; otherwise it surfaces a clear error in
+ * engineSpecific['errors'].
  */
 class HaproxyLiveStateProbe extends AbstractEngineLiveStateProbe
 {
@@ -38,6 +38,10 @@ class HaproxyLiveStateProbe extends AbstractEngineLiveStateProbe
 
     protected function runFreshProbe(Server $server): EngineLiveState
     {
+        if ($standby = $this->inactiveEdgeProxyLiveState($server)) {
+            return $standby;
+        }
+
         $ssh = new SshConnection($server);
         $script = $this->buildProbeScript();
         $output = $ssh->exec($this->privilegedCommand($server, $script), 30);
@@ -45,7 +49,8 @@ class HaproxyLiveStateProbe extends AbstractEngineLiveStateProbe
 
         $errors = [];
         if ($exit !== null && $exit !== 0) {
-            $errors[] = sprintf('HAProxy stats socket SSH exited %d', $exit);
+            $errors[] = $this->extractProbeError((string) $output)
+                ?? sprintf('HAProxy stats socket SSH exited %d', $exit);
         }
 
         $sections = $this->splitSections((string) $output);
@@ -74,26 +79,50 @@ class HaproxyLiveStateProbe extends AbstractEngineLiveStateProbe
 set +e
 SOCK=/run/haproxy/admin.sock
 if [ ! -S "$SOCK" ]; then
-  echo "[dply] haproxy admin socket missing at $SOCK" >&2
+  echo "[dply] HAProxy admin socket missing at $SOCK" >&2
   exit 1
 fi
-if ! command -v socat >/dev/null 2>&1; then
-  echo "[dply] socat not installed; cannot query haproxy stats socket" >&2
+haproxy_sock() {
+  if command -v socat >/dev/null 2>&1; then
+    printf '%s\n' "$1" | socat - "UNIX-CONNECT:$SOCK"
+    return $?
+  fi
+  if command -v nc >/dev/null 2>&1; then
+    printf '%s\n' "$1" | nc -U "$SOCK" 2>/dev/null
+    return $?
+  fi
+  echo "[dply] socat not installed; run apt-get install -y socat on this server" >&2
+  return 2
+}
+if ! command -v socat >/dev/null 2>&1 && ! command -v nc >/dev/null 2>&1; then
+  echo "[dply] socat not installed; run apt-get install -y socat on this server" >&2
   exit 2
 fi
 echo '###dply-section:stat###'
-echo "show stat" | socat - "UNIX-CONNECT:$SOCK"
+haproxy_sock "show stat"
 echo '###dply-section:end###'
 echo '###dply-section:info###'
-echo "show info" | socat - "UNIX-CONNECT:$SOCK"
+haproxy_sock "show info"
 echo '###dply-section:end###'
 echo '###dply-section:ssl###'
-echo "show ssl cert" | socat - "UNIX-CONNECT:$SOCK"
+haproxy_sock "show ssl cert"
 echo '###dply-section:end###'
 echo '###dply-section:pools###'
-echo "show pools" | socat - "UNIX-CONNECT:$SOCK" 2>/dev/null
+haproxy_sock "show pools" 2>/dev/null
 echo '###dply-section:end###'
 BASH;
+    }
+
+    private function extractProbeError(string $output): ?string
+    {
+        foreach (preg_split('/\r\n|\n/', $output) ?: [] as $line) {
+            $line = trim($line);
+            if (str_starts_with($line, '[dply]')) {
+                return trim(substr($line, 6));
+            }
+        }
+
+        return null;
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\SshConnection;
@@ -38,7 +39,7 @@ class OpenLiteSpeedListenersConfig
      *
      * @var list<string>
      */
-    public const MANAGED_NAMES = ['Default'];
+    public const MANAGED_NAMES = ['Default', 'DefaultSsl'];
 
     /**
      * Identity directives — fixed when the listener is created. address +
@@ -165,6 +166,7 @@ class OpenLiteSpeedListenersConfig
 
     /**
      * @param  array<string, array<string, string>>  $updates  Listener-name → values
+     *
      * @throws \RuntimeException
      */
     public function save(Server $server, array $updates, ?ConsoleEmitter $emitter = null): void
@@ -205,6 +207,7 @@ class OpenLiteSpeedListenersConfig
     /**
      * @param  array{name: string, address: string, secure: string, keyFile?: string, certFile?: string}  $identity
      * @param  array<string, string>  $values
+     *
      * @throws \RuntimeException
      */
     public function addListener(Server $server, array $identity, array $values, ?ConsoleEmitter $emitter = null): void
@@ -320,7 +323,7 @@ class OpenLiteSpeedListenersConfig
         foreach (preg_split('/\R/', trim($stripped)) ?: [] as $line) {
             $line = trim($line);
             if ($line !== '') {
-                $emit($line, $exit !== 0 ? \App\Models\ConsoleAction::LEVEL_WARN : \App\Models\ConsoleAction::LEVEL_INFO);
+                $emit($line, $exit !== 0 ? ConsoleAction::LEVEL_WARN : ConsoleAction::LEVEL_INFO);
             }
         }
         if ($exit !== 0) {

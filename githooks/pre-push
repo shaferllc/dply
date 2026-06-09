@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# ---------------------------------------------------------------------------
+# pre-push — run pre-deploy generators before a push reaches the remote.
+#
+# Enable (per clone): git config core.hooksPath githooks
+#
+# Runs every executable in githooks/pre-push.d/ in order, passing the range of
+# commits being pushed (DPLY_PUSH_RANGE) and the target branch (DPLY_PUSH_BRANCH).
+# Hooks may WRITE files (e.g. the changelog); they must NOT commit or push.
+#
+# If a hook produced changelog changes, this script commits ONLY those files and
+# re-pushes HEAD so the changelog ships WITH the push (single `git push`, no
+# second run). A recursion guard (DPLY_GITHOOK_SKIP) stops the inner push from
+# re-entering the hook. The roadmap generator writes to the DB, so it needs no
+# commit.
+# ---------------------------------------------------------------------------
+set -euo pipefail
+
+# The re-push we trigger below re-invokes pre-push — skip it.
+[ -n "${DPLY_GITHOOK_SKIP:-}" ] && exit 0
+
+remote="$1"
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+Z="0000000000000000000000000000000000000000"
+
+# Files the changelog generator may touch (the only paths we'll auto-commit).
+CHANGELOG_PATHS=(CHANGELOG.md resources/views/changelog.blade.php)
+
+# Act on the first real branch update in the push.
+range=""; branch=""
+while read -r local_ref local_sha _remote_ref remote_sha; do
+  [ "$local_sha" = "$Z" ] && continue                 # branch deletion
+  case "$local_ref" in refs/heads/*) ;; *) continue ;; esac
+  branch="${local_ref#refs/heads/}"
+  if [ "$remote_sha" = "$Z" ]; then range="$local_sha"; else range="$remote_sha..$local_sha"; fi
+  break
+done
+[ -z "$range" ] && exit 0
+
+echo "[pre-push] pre-deploy generators for $range (branch: $branch)"
+for h in "$HOOK_DIR"/pre-push.d/*.sh; do
+  [ -f "$h" ] || continue
+  if ! DPLY_PUSH_RANGE="$range" DPLY_PUSH_BRANCH="$branch" bash "$h"; then
+    echo "[pre-push] $(basename "$h") failed — aborting push." >&2
+    exit 1
+  fi
+done
+
+# Fold any generated changelog changes into this push.
+if ! git diff --quiet -- "${CHANGELOG_PATHS[@]}" 2>/dev/null; then
+  echo "[pre-push] committing changelog + re-pushing $branch ..."
+  git commit -q -m "docs(changelog): entry for ${range}" -- "${CHANGELOG_PATHS[@]}"
+  DPLY_GITHOOK_SKIP=1 git push "$remote" "HEAD:$branch"
+  echo "[pre-push] changelog shipped; the original push will report up-to-date."
+fi
+
+exit 0

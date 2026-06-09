@@ -18,7 +18,7 @@
             'lead' => 'Create an account, add an organization, and connect your first cloud or SSH host.',
             'items' => [
                 ['icon' => 'org', 'title' => 'Organizations first', 'text' => 'Billing and resources group naturally for teams and side projects.'],
-                ['icon' => 'cloud', 'title' => 'Many clouds', 'text' => 'DigitalOcean, Hetzner, AWS, Fly.io, and more—or bring any server over SSH.'],
+                ['icon' => 'cloud', 'title' => 'Many clouds', 'text' => 'DigitalOcean, Hetzner, AWS, Linode, Vultr, and more—or bring any server over SSH.'],
                 ['icon' => 'key', 'title' => 'Vaulted secrets', 'text' => 'API tokens and deploy keys stay encrypted; teammates use the app, not raw secrets.'],
             ],
         ],

@@ -52,6 +52,7 @@ class ScaffoldLaravelPipeline
         private readonly ExecuteRemoteTaskOnServer $executor,
         private readonly SiteAuditWriter $audit,
         private readonly PlaceholderDnsManager $placeholderDns,
+        private readonly ScaffoldRepoSeeder $repoSeeder,
     ) {}
 
     /**
@@ -110,10 +111,24 @@ class ScaffoldLaravelPipeline
             }
         }
 
+        // Best-effort: seed a local Git repo so this code-first scaffold is
+        // versioned + redeployable. Never fails the scaffold — on error the site
+        // stays live and a repo can be connected later.
+        try {
+            $this->repoSeeder->seed($site->fresh() ?? $site);
+        } catch (Throwable $e) {
+            Log::warning('Scaffold repo seed failed (non-fatal)', [
+                'site_id' => $site->getKey(),
+                'framework' => self::FRAMEWORK,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         // Pipeline succeeded — flip status. nginx wiring + hardening
         // are intentionally deferred to a follow-up PR; the site row
         // is already viable and points at meta.scaffold.steps for
         // the journey to render.
+        $site = $site->fresh() ?? $site;
         $site->status = Site::STATUS_PENDING;
         $site->save();
 
@@ -250,17 +265,23 @@ class ScaffoldLaravelPipeline
 
         $dbName = 'dply_'.Str::slug($site->slug, '_');
         $username = 'dply_'.Str::slug($site->slug, '_');
-        $password = Str::password(24, symbols: false);
-
-        $db = new ServerDatabase([
+        // Idempotent on retry: a prior failed attempt may have already created
+        // this server_databases row. Reuse it (keeping its stored password so
+        // the server-side user and .env stay in sync) rather than inserting a
+        // duplicate, which trips the (server_id, name) unique constraint.
+        $db = ServerDatabase::firstOrNew([
             'server_id' => $site->server->id,
             'name' => $dbName,
-            'username' => $username,
-            'password' => $password,
-            'engine' => $engine,
-            'host' => 'localhost',
         ]);
-        $db->save();
+        if (! $db->exists) {
+            $db->fill([
+                'username' => $username,
+                'password' => Str::password(24, symbols: false),
+                'engine' => $engine,
+                'host' => 'localhost',
+            ])->save();
+        }
+        $password = $db->password;
         $this->databaseProvisioner->createOnServer($db);
 
         $this->setMeta($site, 'scaffold.database', [

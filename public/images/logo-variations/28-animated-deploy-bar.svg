@@ -1,0 +1,11 @@
+<svg width="148" height="96" viewBox="0 0 148 96" fill="none" xmlns="http://www.w3.org/2000/svg" font-family="'Instrument Sans','Helvetica Neue',Arial,sans-serif">
+  <!-- Animated: a "deploy" progress bar sweeping beneath the lockup -->
+  <rect x="4" y="14" width="64" height="64" rx="16" fill="#171a0e"/>
+  <text x="37" y="63" font-size="46" font-weight="700" fill="#cda942" text-anchor="middle">d</text>
+  <text x="76" y="62" font-size="50" font-weight="700" letter-spacing="-1.5" fill="#171a0e">ply</text>
+  <rect x="4" y="86" width="130" height="6" rx="3" fill="#171a0e" fill-opacity="0.12"/>
+  <rect x="4" y="86" width="0" height="6" rx="3" fill="#cda942">
+    <animate attributeName="width" values="0;130;130" keyTimes="0;0.78;1" dur="1.9s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="1;1;0;1" keyTimes="0;0.85;0.95;1" dur="1.9s" repeatCount="indefinite"/>
+  </rect>
+</svg>

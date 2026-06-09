@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\ProviderCredential;
 use Aws\Eks\EksClient;
+use Aws\Exception\AwsException;
 
 /**
  * Thin wrapper around the EKS API. Currently only used to list clusters for
@@ -114,7 +115,7 @@ class AwsEksService
     {
         try {
             $result = $this->client->describeCluster(['name' => $name]);
-        } catch (\Aws\Exception\AwsException $e) {
+        } catch (AwsException $e) {
             // EksException extends AwsException; catching the parent covers
             // both the production SDK's service-specific exception class and
             // anything our MockHandler test infra might inject.

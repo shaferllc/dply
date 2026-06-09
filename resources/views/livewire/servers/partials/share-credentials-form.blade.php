@@ -3,13 +3,45 @@
     $databases = $databases ?? collect();
     $orgAllowsCredentialShares = $orgAllowsCredentialShares ?? true;
 @endphp
-<div class="{{ $card ?? 'dply-card overflow-hidden' }} p-6 sm:p-8">
-    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Share credentials (read-only link)') }}</h2>
-    <p class="mt-2 text-sm text-brand-moss">{{ __('Hand a tracked database\'s credentials to a teammate via a single-use link with an expiry and view cap.') }}</p>
+<div class="{{ $card ?? 'dply-card overflow-hidden' }} overflow-hidden">
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <x-icon-badge>
+            <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
+        </x-icon-badge>
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Share') }}</p>
+            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Share credentials (read-only link)') }}</h2>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Hand a tracked database\'s credentials to a teammate via a single-use link with an expiry and view cap.') }}</p>
+        </div>
+    </div>
+    <div class="px-6 py-6 sm:px-7">
     @if (! $orgAllowsCredentialShares)
-        <p class="mt-2 text-sm text-brand-moss">{{ __('Public credential share links are disabled for this organization.') }}</p>
+        <x-empty-state
+            borderless
+            icon="heroicon-o-lock-closed"
+            tone="amber"
+            :title="__('Credential sharing disabled')"
+            :description="__('Public credential share links are turned off for this organization. Ask an admin to enable them in organization settings.')"
+        />
     @elseif ($databases->isEmpty())
-        <p class="mt-3 text-sm text-brand-moss">{{ __('Add a database to share its credentials.') }}</p>
+        <x-empty-state
+            borderless
+            icon="heroicon-o-share"
+            tone="sage"
+            :title="__('No database to share yet')"
+            :description="__('Create a tracked database on Basics, then generate a single-use read-only link with expiry and view limits.')"
+        >
+            <x-slot:actions>
+                <button
+                    type="button"
+                    wire:click="setWorkspaceTab('databases')"
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-forest/90"
+                >
+                    <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Go to Basics') }}
+                </button>
+            </x-slot:actions>
+        </x-empty-state>
     @else
         <form wire:submit="createCredentialShare" class="mt-6 grid max-w-xl grid-cols-1 gap-4 sm:grid-cols-2">
             <div class="sm:col-span-2">
@@ -38,4 +70,5 @@
             </div>
         </form>
     @endif
+    </div>
 </div>

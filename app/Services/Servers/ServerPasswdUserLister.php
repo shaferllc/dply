@@ -43,9 +43,12 @@ class ServerPasswdUserLister
             $maxLines,
         );
 
+        // /etc/passwd and `getent group` are world-readable, so this runs fine as the
+        // unprivileged deploy user — no need to take the recovery (root) credential.
         $out = app(ServerSshConnectionRunner::class)->run(
             $server,
             fn ($ssh): string => $ssh->exec($cmd, $timeoutSeconds),
+            useRoot: false,
         );
 
         return $this->parsePasswdAndGroups($out);

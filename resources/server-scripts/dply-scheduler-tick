@@ -27,7 +27,7 @@
 
 set -u
 
-WRAPPER_VERSION=1
+WRAPPER_VERSION=2
 HEARTBEAT_DIR=${DPLY_SCHEDULER_HEARTBEAT_DIR:-/var/lib/dply/scheduler-heartbeats}
 LOCK_DIR=${DPLY_SCHEDULER_LOCK_DIR:-/var/lib/dply/scheduler-locks}
 STATE_DIR=${DPLY_SCHEDULER_STATE_DIR:-/var/lib/dply/scheduler-state}
@@ -72,6 +72,13 @@ HEARTBEAT_TICK="$HEARTBEAT_DIR/${SITE_ID}.tick"
 HEARTBEAT_JSON="$HEARTBEAT_DIR/${SITE_ID}.json"
 LOCK_FILE="$LOCK_DIR/${SITE_ID}.lock"
 STATE_FILE="$STATE_DIR/${SITE_ID}.state"
+# Per-scheduler output-capture opt-in (PR2). dply touches/removes this file over
+# SSH when the operator flips the capture toggle. When present, successful-run
+# stdout is excerpted into the sidecar; otherwise only failure stderr is kept,
+# so we never hoard customer output for tasks the operator didn't opt in to.
+CAPTURE_FILE="$HEARTBEAT_DIR/${SITE_ID}.capture"
+CAPTURE_ENABLED=false
+[ -f "$CAPTURE_FILE" ] && CAPTURE_ENABLED=true
 
 # -------- circuit breaker --------
 # If this wrapper has crashed N consecutive times, fall through to running the
@@ -155,11 +162,19 @@ else
 fi
 
 # -------- stderr excerpt (last 50 lines, capped at 16KB) --------
-# Only captured on failure per Q16 (a2). Successful runs get an empty excerpt
-# so we don't hoard customer-data-bearing output for tasks that worked fine.
+# Failure stderr is always captured. When per-scheduler capture is enabled,
+# stderr is also captured on success so the operator sees full run output.
 STDERR_EXCERPT=
-if [ "$EXIT_CODE" -ne 0 ] && [ -s "$STDERR_TMP" ]; then
+if [ -s "$STDERR_TMP" ] && { [ "$EXIT_CODE" -ne 0 ] || [ "$CAPTURE_ENABLED" = true ]; }; then
     STDERR_EXCERPT=$(tail -n 50 "$STDERR_TMP" | head -c 16384)
+fi
+
+# -------- stdout excerpt (last 50 lines, capped at 16KB) --------
+# Only captured when the operator opted in via the .capture control file —
+# stdout commonly contains customer data, so it's off by default.
+STDOUT_EXCERPT=
+if [ "$CAPTURE_ENABLED" = true ] && [ -s "$STDOUT_TMP" ]; then
+    STDOUT_EXCERPT=$(tail -n 50 "$STDOUT_TMP" | head -c 16384)
 fi
 
 # -------- per-task parse (Laravel only) --------
@@ -188,6 +203,22 @@ if [ "$SCHEDULER_KIND" = "laravel" ] && [ -s "$STDOUT_TMP" ]; then
     [ -z "$TASKS_JSON" ] && TASKS_JSON='[]'
 fi
 
+# -------- JSON string escaper (shared by stderr + stdout excerpts) --------
+# Emits a JSON string literal (including surrounding quotes) for the given
+# value, or `null` for an empty value. python3 for correctness; ascii-safe
+# sed fallback otherwise.
+json_escape_or_null() {
+    if [ -z "$1" ]; then
+        printf 'null'
+        return
+    fi
+    if command -v python3 >/dev/null 2>&1; then
+        printf '%s' "$1" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))'
+    else
+        printf '%s' "$1" | tr -d '\000-\010\013\014\016-\037' | sed 's/\\/\\\\/g; s/"/\\"/g; s/$/\\n/' | tr -d '\n' | sed 's/^/"/; s/\\n$/"/'
+    fi
+}
+
 # -------- write heartbeat + sidecar atomically --------
 # Atomic write: render the JSON to a temp file in the same dir, then mv into
 # place. Avoids the agent reading a half-written sidecar between our two
@@ -209,21 +240,9 @@ JSON_TMP="${HEARTBEAT_JSON}.tmp.$$"
         printf '"memory_peak_kb":null,'
     fi
     printf '"circuit_open":false,'
-    if [ -n "$STDERR_EXCERPT" ]; then
-        # Escape for JSON: backslash, doublequote, control chars 0x00-0x1f.
-        # Use python3 if available for correctness; fall back to a defensive
-        # ascii-only filter otherwise.
-        if command -v python3 >/dev/null 2>&1; then
-            ENCODED=$(printf '%s' "$STDERR_EXCERPT" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
-        else
-            # Strip everything outside printable ASCII + escape backslash/quote.
-            # Lossy but safe. Operators wanting full fidelity get it via python3.
-            ENCODED=$(printf '%s' "$STDERR_EXCERPT" | tr -d '\000-\010\013\014\016-\037' | sed 's/\\/\\\\/g; s/"/\\"/g; s/$/\\n/' | tr -d '\n' | sed 's/^/"/; s/\\n$/"/')
-        fi
-        printf '"stderr_excerpt":%s,' "$ENCODED"
-    else
-        printf '"stderr_excerpt":null,'
-    fi
+    printf '"capture_enabled":%s,' "$CAPTURE_ENABLED"
+    printf '"stderr_excerpt":%s,' "$(json_escape_or_null "$STDERR_EXCERPT")"
+    printf '"stdout_excerpt":%s,' "$(json_escape_or_null "$STDOUT_EXCERPT")"
     printf '"tasks":%s' "$TASKS_JSON"
     printf '}\n'
 } >"$JSON_TMP" 2>/dev/null

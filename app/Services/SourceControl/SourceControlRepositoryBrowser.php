@@ -4,36 +4,50 @@ declare(strict_types=1);
 
 namespace App\Services\SourceControl;
 
-use App\Models\SocialAccount;
+use App\Contracts\SourceControl\GitIdentity;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 
 class SourceControlRepositoryBrowser
 {
+    public function __construct(
+        private ?GitIdentityResolver $resolver = null,
+    ) {
+        $this->resolver ??= app(GitIdentityResolver::class);
+    }
+
     /**
-     * @return list<array{id: string, provider: string, label: string}>
+     * @return list<array{id: string, provider: string, label: string, kind: string}>
      */
     public function accountsForUser(User $user): array
     {
-        return $user->socialAccounts()
-            ->whereIn('provider', ['github', 'gitlab', 'bitbucket'])
-            ->orderBy('provider')
-            ->orderBy('id')
-            ->get()
-            ->map(fn (SocialAccount $account): array => [
-                'id' => (string) $account->id,
-                'provider' => $account->provider,
-                'label' => $this->accountLabel($account),
-            ])
-            ->all();
+        $cacheKey = 'source-control.accounts.'.(string) $user->getKey();
+        $cached = request()->attributes->get($cacheKey);
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        $accounts = array_map(
+            fn (GitIdentity $identity): array => [
+                'id' => $identity->id(),
+                'provider' => $identity->provider(),
+                'label' => $identity->displayLabel(),
+                'kind' => $identity->kind(),
+            ],
+            $this->resolver->allForUser($user),
+        );
+
+        request()->attributes->set($cacheKey, $accounts);
+
+        return $accounts;
     }
 
     /**
      * @return list<array{label: string, url: string, branch: string}>
      */
-    public function repositoriesForAccount(SocialAccount $account): array
+    public function repositoriesForAccount(GitIdentity $account): array
     {
-        return match ($account->provider) {
+        return match ($account->provider()) {
             'github' => $this->githubRepositories($account),
             'gitlab' => $this->gitlabRepositories($account),
             'bitbucket' => $this->bitbucketRepositories($account),
@@ -41,9 +55,9 @@ class SourceControlRepositoryBrowser
         };
     }
 
-    public function authenticatedCloneUrl(SocialAccount $account, string $repositoryUrl): string
+    public function authenticatedCloneUrl(GitIdentity $account, string $repositoryUrl): string
     {
-        $token = trim((string) $account->access_token);
+        $token = $account->accessToken();
         if ($token === '') {
             return $repositoryUrl;
         }
@@ -53,7 +67,7 @@ class SourceControlRepositoryBrowser
             return $repositoryUrl;
         }
 
-        $user = match ($account->provider) {
+        $user = match ($account->provider()) {
             'github' => 'x-access-token',
             'gitlab' => 'oauth2',
             'bitbucket' => 'x-token-auth',
@@ -72,22 +86,14 @@ class SourceControlRepositoryBrowser
         return $parts['scheme'].'://'.$auth.$port.$path.$query;
     }
 
-    private function accountLabel(SocialAccount $account): string
-    {
-        $provider = ucfirst($account->provider);
-        $nickname = trim((string) ($account->label ?: $account->nickname ?: $account->provider_id));
-
-        return $provider.($nickname !== '' ? ' - '.$nickname : '');
-    }
-
     /**
      * @return list<array{label: string, url: string, branch: string}>
      */
-    private function githubRepositories(SocialAccount $account): array
+    private function githubRepositories(GitIdentity $account): array
     {
-        $response = Http::withToken((string) $account->access_token)
+        $response = Http::withToken($account->accessToken())
             ->acceptJson()
-            ->get('https://api.github.com/user/repos', [
+            ->get($account->apiBaseUrl().'/user/repos', [
                 'sort' => 'updated',
                 'per_page' => 100,
             ]);
@@ -111,11 +117,11 @@ class SourceControlRepositoryBrowser
     /**
      * @return list<array{label: string, url: string, branch: string}>
      */
-    private function gitlabRepositories(SocialAccount $account): array
+    private function gitlabRepositories(GitIdentity $account): array
     {
-        $response = Http::withToken((string) $account->access_token)
+        $response = Http::withToken($account->accessToken())
             ->acceptJson()
-            ->get('https://gitlab.com/api/v4/projects', [
+            ->get($account->apiBaseUrl().'/api/v4/projects', [
                 'membership' => true,
                 'simple' => true,
                 'per_page' => 100,
@@ -140,11 +146,11 @@ class SourceControlRepositoryBrowser
     /**
      * @return list<array{label: string, url: string, branch: string}>
      */
-    private function bitbucketRepositories(SocialAccount $account): array
+    private function bitbucketRepositories(GitIdentity $account): array
     {
-        $response = Http::withToken((string) $account->access_token)
+        $response = Http::withToken($account->accessToken())
             ->acceptJson()
-            ->get('https://api.bitbucket.org/2.0/repositories', [
+            ->get($account->apiBaseUrl().'/2.0/repositories', [
                 'role' => 'member',
                 'pagelen' => 100,
             ]);

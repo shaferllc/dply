@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Services\Serverless;
 
+use App\Console\Commands\ServerlessTickCommand;
 use App\Models\FunctionInvocation;
 use App\Models\Site;
 
 /**
  * Fire a single dply tick against a serverless function.
  *
- * Both the scheduled {@see \App\Console\Commands\ServerlessTickCommand}
+ * Both the scheduled {@see ServerlessTickCommand}
  * (every minute, all enabled sites) and the in-UI "Tick now" buttons on the
  * Schedule / Workers pages delegate here, so a tick is recorded identically
  * however it was triggered.

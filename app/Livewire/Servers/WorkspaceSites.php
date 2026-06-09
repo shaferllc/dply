@@ -4,29 +4,38 @@ namespace App\Livewire\Servers;
 
 use App\Enums\SiteType;
 use App\Jobs\ProvisionSiteJob;
+use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\EnforcesSiteQuota;
 use App\Livewire\Forms\SiteCreateForm;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\Server;
 use App\Models\Site;
-use App\Models\SiteDeployStep;
 use App\Models\SiteDomain;
-use App\Services\Deploy\RuntimeAwareDeployStepDefaults;
+use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Services\Servers\ServerBulkSiteActions;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\Sites\InternalPortAllocator;
 use App\Services\Sites\SiteProvisioner;
 use App\Support\HostnameValidator;
+use App\Support\Sites\SiteCreateAccess;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceSites extends Component
 {
+    use RendersWorkspacePlaceholder;
+    use DispatchesToastNotifications;
+    use EnforcesSiteQuota;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
 
@@ -34,19 +43,28 @@ class WorkspaceSites extends Component
 
     public bool $showAddSiteModal = false;
 
+    public bool $showRedeployAllModal = false;
+
+    /**
+     * @var list<string>
+     */
+    public array $selectedSiteIds = [];
+
     /**
      * @var list<array{id: string, label: string}>
      */
     public array $phpVersions = [];
 
     #[Computed]
+    public function siteCreateAccess(): array
+    {
+        return SiteCreateAccess::assess($this->server);
+    }
+
+    #[Computed]
     public function canAddSite(): bool
     {
-        if (! $this->server->isReady()) {
-            return false;
-        }
-
-        return Gate::forUser(auth()->user())->allows('create', Site::class);
+        return $this->siteCreateAccess['can_create'];
     }
 
     /**
@@ -57,45 +75,34 @@ class WorkspaceSites extends Component
     #[Computed]
     public function addSiteBlockedReason(): string
     {
-        if (! $this->server->isReady()) {
-            return __('This server is still provisioning — site creation unlocks once it reaches the ready state.');
-        }
-
-        $user = auth()->user();
-        $org = $user?->currentOrganization();
-
-        if ($org === null) {
-            return __('No active organization is selected for your account.');
-        }
-
-        if ($org->userIsDeployer($user)) {
-            return __('Your role on this organization (deployer) cannot create new sites. Ask an owner or admin.');
-        }
-
-        if (! $org->canCreateSite()) {
-            return __('You\'ve hit your plan\'s site limit (:used / :max). Delete an existing site or upgrade to add more.', [
-                'used' => $org->sites()->count(),
-                'max' => $org->maxSitesDisplay(),
-            ]);
-        }
-
-        return '';
+        return $this->siteCreateAccess['blocked_reason'];
     }
 
     #[Computed]
     public function supportsQuickAdd(): bool
     {
+        // When the choose-app flow is enabled, VM hosts skip the inline
+        // quick-add modal and go through the full create page (bare site →
+        // choose-app picker). See docs/CHOOSE_APP_FLOW.md.
+        if (config('dply.choose_app_enabled') && $this->server->isVmHost()) {
+            return false;
+        }
+
         return ! $this->server->hostCapabilities()->supportsFunctionDeploy()
             && ! $this->server->isDockerHost()
             && ! $this->server->isKubernetesCluster();
     }
 
-    public function mount(Server $server, ServerPhpManager $phpManager): void
+    public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
 
+        // Resolve via app() rather than mount() injection: #[Lazy] components
+        // capture all mount() params in a snapshot for the placeholder, and
+        // Livewire can't serialize a service-container object (it has no public
+        // properties, producing {} which matches no registered synth).
         if ($server->hostCapabilities()->supportsMachinePhpManagement()) {
-            $phpData = $phpManager->siteCreationPhpData($server);
+            $phpData = app(ServerPhpManager::class)->siteCreationPhpData($server);
             $this->phpVersions = $phpData['available_versions'];
             $this->form->php_version = $phpData['preselected_version'];
         }
@@ -106,6 +113,15 @@ class WorkspaceSites extends Component
     public function openAddSiteModal(): void
     {
         if (! $this->canAddSite) {
+            return;
+        }
+
+        // Headless hosts (webserver=none, e.g. workers) have no domain, so the
+        // hostname-based quick-add doesn't apply — send them to the full create
+        // flow, which renders its headless (no-domain) variant.
+        if (($this->server->meta['webserver'] ?? 'nginx') === 'none') {
+            $this->redirect(route('sites.create', $this->server), navigate: true);
+
             return;
         }
 
@@ -123,6 +139,84 @@ class WorkspaceSites extends Component
     {
         $this->dispatch('close-modal', 'add-site-modal');
         $this->showAddSiteModal = false;
+    }
+
+    public function selectAllSites(): void
+    {
+        $this->selectedSiteIds = $this->server->sites
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->values()
+            ->all();
+    }
+
+    public function clearSiteSelection(): void
+    {
+        $this->selectedSiteIds = [];
+    }
+
+    public function openRedeployAllModal(): void
+    {
+        abort_unless(Feature::active('workspace.bulk_site_actions'), 404);
+        $this->authorize('update', $this->server);
+
+        if ($this->selectedBulkPreview['redeploy_count'] === 0) {
+            $this->toastError(__('No deployable sites are ready in your selection.'));
+
+            return;
+        }
+
+        $this->showRedeployAllModal = true;
+        $this->dispatch('open-modal', 'redeploy-all-sites');
+    }
+
+    public function closeRedeployAllModal(): void
+    {
+        $this->showRedeployAllModal = false;
+        $this->dispatch('close-modal', 'redeploy-all-sites');
+    }
+
+    public function confirmRedeployAll(ServerBulkSiteActions $bulkActions): void
+    {
+        abort_unless(Feature::active('workspace.bulk_site_actions'), 404);
+        $this->authorize('update', $this->server);
+
+        $preview = $this->selectedBulkPreview;
+        if ($preview['redeploy_count'] === 0) {
+            $this->closeRedeployAllModal();
+            $this->toastError(__('No deployable sites are ready in your selection.'));
+
+            return;
+        }
+
+        $result = $bulkActions->redeploySelected($this->server, $this->selectedSiteIds, auth()->user());
+        $this->closeRedeployAllModal();
+        $this->selectedSiteIds = [];
+
+        $this->toastSuccess(trans_choice(
+            'Queued redeploy for :count site|Queued redeploy for :count sites',
+            $result['queued'],
+            ['count' => $result['queued']],
+        ));
+    }
+
+    /**
+     * Bulk-action preview scoped to the current row selection.
+     *
+     * @return array{redeploy_count: int, renewable_count: int, site_names: list<string>}
+     */
+    #[Computed]
+    public function selectedBulkPreview(): array
+    {
+        if (! Feature::active('workspace.bulk_site_actions') || ! $this->server->isVmHost()) {
+            return [
+                'redeploy_count' => 0,
+                'renewable_count' => 0,
+                'site_names' => [],
+            ];
+        }
+
+        return app(ServerBulkSiteActions::class)->previewSelected($this->server, $this->selectedSiteIds);
     }
 
     public function updatedFormPrimaryHostname(string $value): void
@@ -213,6 +307,10 @@ class WorkspaceSites extends Component
 
         $org = $this->server->organization;
 
+        if ($this->siteQuotaReached($org)) {
+            return null;
+        }
+
         // PHP version is intentionally not collected in the modal: the
         // server's preselected default is used at create time and the
         // runtime detector overrides it from the repo (composer.json
@@ -271,17 +369,7 @@ class WorkspaceSites extends Component
             ],
         ]);
 
-        $defaults = app(RuntimeAwareDeployStepDefaults::class)->defaultsFor($site->runtime, null);
-        foreach ($defaults as $step) {
-            SiteDeployStep::create([
-                'site_id' => $site->id,
-                'sort_order' => $step['sort_order'],
-                'step_type' => $step['step_type'],
-                'phase' => $step['phase'],
-                'custom_command' => $step['custom_command'] ?? null,
-                'timeout_seconds' => $step['timeout_seconds'],
-            ]);
-        }
+        app(SiteDeployPipelineManager::class)->seedRuntimeDefaults($site, $site->runtime, null);
 
         SiteDomain::query()->create([
             'site_id' => $site->id,
@@ -299,13 +387,20 @@ class WorkspaceSites extends Component
 
     public function render(): View
     {
-        $this->server->refresh();
+        // No $this->server->refresh() here — Livewire re-resolves the bound
+        // model from the database on every request (route binding on first
+        // load, the Eloquent synthesizer on later updates), so the row is
+        // already current at render time. Action handlers that mutate
+        // $this->server (server-removal flow, etc.) refresh it themselves,
+        // so refreshing again here only doubled the `select * from servers`
+        // per render — same rationale as WorkspaceManage::render().
         $this->server->load(['sites.domains']);
 
         return view('livewire.servers.workspace-sites', [
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
+            'bulkActionsEnabled' => Feature::active('workspace.bulk_site_actions'),
         ]);
     }
 }

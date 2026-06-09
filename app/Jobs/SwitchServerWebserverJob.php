@@ -6,12 +6,17 @@ namespace App\Jobs;
 
 use App\Jobs\Concerns\PrivilegedRemoteFileWrites;
 use App\Jobs\Concerns\WritesConsoleAction;
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerWebserverAuditEvent;
 use App\Models\Site;
+use App\Models\SiteCertificate;
+use App\Services\Certificates\CertificateRequestService;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\RemoteCli\RiskLevel;
 use App\Services\Servers\OpenLiteSpeedHttpdConfigBuilder;
+use App\Services\Servers\OpenLiteSpeedHttpdConfigPreserver;
+use App\Services\Servers\OpenLiteSpeedTlsConfigurator;
 use App\Services\Servers\WebserverStatsEndpointTemplates;
 use App\Services\Servers\WebserverSwitchPreflight;
 use App\Services\Sites\ApacheSiteConfigBuilder;
@@ -19,10 +24,12 @@ use App\Services\Sites\CaddySiteConfigBuilder;
 use App\Services\Sites\NginxSiteConfigBuilder;
 use App\Services\Sites\OpenLiteSpeedSiteConfigBuilder;
 use App\Services\SshConnection;
-use Illuminate\Support\Str;
+use App\Support\Servers\CaddyRuntimeOwnership;
 use Illuminate\Bus\Queueable;
+use Illuminate\Bus\UniqueLock;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -110,13 +117,14 @@ class SwitchServerWebserverJob implements ShouldBeUnique, ShouldQueue
         return $this->userId;
     }
 
-    public function handle(): void
+    public function handle(\App\Services\Notifications\ServerWebserverNotificationDispatcher $notifications): void
     {
         $server = Server::query()->find($this->serverId);
         if ($server === null) {
             return;
         }
 
+        $actor = $this->userId !== null ? \App\Models\User::query()->find($this->userId) : null;
         $emitter = $this->beginConsoleAction();
         $startedAt = microtime(true);
         $from = strtolower(trim((string) ($server->meta['webserver'] ?? 'nginx')));
@@ -132,6 +140,11 @@ class SwitchServerWebserverJob implements ShouldBeUnique, ShouldQueue
                 'reason' => 'preflight_blocker',
                 'blocker' => $preflight['blocker'],
             ], $startedAt);
+
+            $notifications->notify($server, 'engine_switch_failed', [
+                __('Switch: :from → :to', ['from' => $from, 'to' => $this->target]),
+                __('Reason: :reason', ['reason' => (string) ($preflight['blocker']['label'] ?? 'preflight blocker')]),
+            ], $actor, ['from' => $from, 'to' => $this->target, 'reason' => 'preflight_blocker']);
 
             return;
         }
@@ -163,7 +176,18 @@ class SwitchServerWebserverJob implements ShouldBeUnique, ShouldQueue
             // webserver workspace shows stale state from the OLD engine for
             // up to the next scheduled probe — see the engine-Overview filter
             // that hides Start when daemon is active, etc.
-            \App\Jobs\SyncServerSystemdServicesJob::dispatch($server->id);
+            SyncServerSystemdServicesJob::dispatch($server->id);
+
+            $this->reconcileSitesAfterSwitch($server, $this->target, $from);
+
+            if ($this->target === 'openlitespeed') {
+                try {
+                    app(OpenLiteSpeedTlsConfigurator::class)->syncServer($server->fresh());
+                    $emitter->info('[tls]       applied OpenLiteSpeed HTTPS listeners for existing certificates');
+                } catch (\Throwable $e) {
+                    $emitter->info('[tls]       HTTPS listener sync skipped — '.$e->getMessage());
+                }
+            }
 
             $emitter->info('Done.');
             $this->completeConsoleAction();
@@ -172,12 +196,22 @@ class SwitchServerWebserverJob implements ShouldBeUnique, ShouldQueue
                 'sites_affected' => $preflight['sites_affected'],
                 'site_ids' => Site::query()->where('server_id', $server->id)->pluck('id')->all(),
             ], $startedAt, ServerWebserverAuditEvent::RESULT_SUCCESS);
+
+            $notifications->notify($server, 'engine_switched', [
+                __('Switch: :from → :to', ['from' => $from, 'to' => $this->target]),
+                __('Sites reconfigured: :count', ['count' => (int) $preflight['sites_affected']]),
+            ], $actor, ['from' => $from, 'to' => $this->target, 'sites_affected' => $preflight['sites_affected']]);
         } catch (\Throwable $e) {
             $emitter->error('Switch failed: '.$e->getMessage());
             $this->failConsoleAction($e->getMessage());
             $this->recordAudit($server, $from, ServerWebserverAuditEvent::ACTION_SWITCH_FAILED, [
                 'reason' => $e->getMessage(),
             ], $startedAt);
+
+            $notifications->notify($server, 'engine_switch_failed', [
+                __('Switch: :from → :to', ['from' => $from, 'to' => $this->target]),
+                __('Reason: :reason', ['reason' => $e->getMessage()]),
+            ], $actor, ['from' => $from, 'to' => $this->target, 'error' => $e->getMessage()]);
         }
     }
 
@@ -197,18 +231,18 @@ class SwitchServerWebserverJob implements ShouldBeUnique, ShouldQueue
         // the lock would otherwise sit for the full uniqueFor() window
         // blocking every retry. failed() does run after a SIGKILL via
         // Horizon's lost-job detection, so this is the right hook.
-        app(\Illuminate\Bus\UniqueLock::class)->release($this);
+        app(UniqueLock::class)->release($this);
 
         $server = Server::query()->find($this->serverId);
         if ($server === null) {
             return;
         }
 
-        $action = \App\Models\ConsoleAction::query()
+        $action = ConsoleAction::query()
             ->where('subject_type', $server->getMorphClass())
             ->where('subject_id', $server->getKey())
             ->where('kind', 'webserver_switch')
-            ->whereIn('status', [\App\Models\ConsoleAction::STATUS_QUEUED, \App\Models\ConsoleAction::STATUS_RUNNING])
+            ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING])
             ->whereNull('dismissed_at')
             ->orderByDesc('created_at')
             ->first();
@@ -216,7 +250,7 @@ class SwitchServerWebserverJob implements ShouldBeUnique, ShouldQueue
         $message = sprintf('Job failed before completing: %s', $e->getMessage());
         if ($action !== null) {
             $action->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($message, 0, 2000),
             ]);
@@ -372,7 +406,9 @@ BASH;
             // for Host-header matching — it's not what Apache reads for the
             // global identity. We source from `hostname -f`, falling back
             // through `hostname` to `localhost` for systems without a FQDN.
-            'apache' => $this->aptInstallIdempotent('apache2').'; '.$this->apacheInstallPostPatches(),
+            'apache' => $this->aptInstallIdempotent('apache2')
+                .'; apt-get install -y --no-install-recommends certbot python3-certbot-apache'
+                .'; '.$this->apacheInstallPostPatches(),
             // Caddy ships in the official cloudsmith / cloudflare-managed apt repo.
             // `command -v` (not dpkg) drives the skip check: a half-installed
             // package can still show `ii` in dpkg while the binary is missing
@@ -423,7 +459,7 @@ BASH;
         $statusName = WebserverStatsEndpointTemplates::APACHE_CONF_NAME;
 
         return <<<BASH
-a2enmod proxy proxy_http proxy_fcgi rewrite headers status >/dev/null
+a2enmod proxy proxy_http proxy_fcgi rewrite headers status ssl >/dev/null
 DPLY_FQDN="\$(hostname -f 2>/dev/null || hostname 2>/dev/null || echo localhost)"
 printf 'ServerName %s\n' "\$DPLY_FQDN" > /etc/apache2/conf-available/dply-servername.conf
 a2enconf dply-servername >/dev/null
@@ -481,27 +517,8 @@ SOURCES
 fi
 command -v caddy >/dev/null 2>&1 || { echo "[dply] caddy binary not on PATH after install" >&2; exit 127; }
 
-# Ensure the caddy system user/group and working dirs exist, regardless of which
-# branch above we took. The cloudsmith .deb postinst normally creates these, but
-# the "already installed" skip-branch above never re-runs that postinst — so a
-# server that ended up with the binary but no `caddy` account (e.g. partial
-# prior install, user removed by hand) would surface as systemd exit 217/USER
-# ("Failed to determine user credentials") the moment caddy.service tries to
-# start. Creating them here keeps the installer self-healing across retries.
-getent group caddy >/dev/null 2>&1 || groupadd --system caddy
-id -u caddy >/dev/null 2>&1 || useradd --system --gid caddy --no-create-home \
-  --home-dir /var/lib/caddy --shell /usr/sbin/nologin caddy
-
-# /var/log/caddy and /var/lib/caddy must be writable by the caddy user — without
-# this Caddy fails at startup with "open /var/log/caddy/...-access.log:
-# permission denied". `chown -R` (not just `install -d -o`) so stale files left
-# inside the dirs by a prior root-run / earlier package version also get fixed;
-# `install -d -o` only touches the leaf directory's perms, not the contents.
-mkdir -p /var/lib/caddy /var/log/caddy
-chown -R caddy:caddy /var/lib/caddy /var/log/caddy
-chmod 0755 /var/log/caddy
-chmod 0750 /var/lib/caddy
-BASH;
+BASH
+            .CaddyRuntimeOwnership::shell();
     }
 
     /**
@@ -623,6 +640,7 @@ else
   systemctl stop lshttpd 2>/dev/null || true
 fi
 [ -x /usr/local/lsws/bin/lshttpd ] || { echo "[dply] lshttpd binary not found at /usr/local/lsws/bin/lshttpd after install" >&2; exit 127; }
+apt-get install -y --no-install-recommends certbot || true
 {$lsphpPackages}
 BASH;
     }
@@ -684,6 +702,11 @@ BASH;
             $path = $this->siteConfigPathFor($site, $this->target);
             $this->writeRemoteFile($server, $ssh, $path, $config);
 
+            if ($this->target === 'openlitespeed') {
+                $repo = rtrim($site->effectiveRepositoryPath(), '/');
+                $ssh->exec($this->privilegedCommand($server, 'mkdir -p '.escapeshellarg($repo.'/logs')), 15);
+            }
+
             // For nginx/apache, ensure sites-enabled is symlinked to sites-available.
             $this->ensureSiteEnabled($server, $ssh, $site, $this->target);
         }
@@ -693,6 +716,10 @@ BASH;
         // overwrites it with the :80-bound version.
         if ($this->target === 'openlitespeed') {
             $this->writeOlsHttpdConfig($server, $ssh, $sites, listenPort: 8080);
+        }
+
+        if ($this->target === 'caddy') {
+            $this->ensureCaddyRuntimeOwnership($server, $ssh);
         }
     }
 
@@ -704,7 +731,7 @@ BASH;
     {
         $cmd = match ($this->target) {
             'nginx' => 'nginx -t',
-            'caddy' => 'caddy validate --config /etc/caddy/Caddyfile',
+            'caddy' => CaddyRuntimeOwnership::validateCommand(),
             'apache' => 'apachectl configtest',
             // `lshttpd -t` parses the active httpd_config.conf and per-vhost
             // configs in dry-run mode (no port binding) — same model as
@@ -726,6 +753,10 @@ BASH;
                 $exit,
                 trim(substr($out, -500)),
             ));
+        }
+
+        if ($this->target === 'caddy') {
+            $this->ensureCaddyRuntimeOwnership($server, $ssh);
         }
     }
 
@@ -778,8 +809,16 @@ BASH;
             $this->waitForPortFree($server, $ssh, 80, $fromUnit);
         }
         if ($toUnit !== null) {
-            $cmd = sprintf('systemctl enable --now %1$s && systemctl reload %1$s', escapeshellarg($toUnit));
-            $out = $ssh->exec($this->privilegedCommand($server, $cmd.' 2>&1'), 60);
+            if ($this->target === 'caddy') {
+                $this->ensureCaddyRuntimeOwnership($server, $ssh);
+            }
+            // `restart` (not `enable --now` + `reload`): a failed first start leaves
+            // the unit inactive and `reload` errors with "cannot reload".
+            $cmd = sprintf(
+                'systemctl enable %1$s 2>/dev/null || true; systemctl restart %1$s 2>&1; systemctl is-active %1$s',
+                escapeshellarg($toUnit),
+            );
+            $out = $ssh->exec($this->privilegedCommand($server, $cmd), 60);
             $exit = $ssh->lastExecExitCode();
             if ($exit !== null && $exit !== 0) {
                 $diag = $this->captureUnitDiagnostics($server, $ssh, $toUnit);
@@ -883,8 +922,9 @@ BASH;
 
     /**
      * Render a per-site config string for the target webserver. Dispatches to
-     * the appropriate builder; listenPort=8080 produces a :8080-bound test
-     * variant for validation; listenPort=null produces the production config.
+     * the appropriate builder; listenPort=8080 binds each site hostname on
+     * that port for validation (not a catch-all `:8080` block); listenPort=null
+     * produces the production config.
      */
     private function buildSiteConfigFor(Site $site, string $target, ?int $listenPort): string
     {
@@ -927,7 +967,7 @@ BASH;
         $cmd = match ($this->target) {
             'nginx' => 'mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled',
             'apache' => 'mkdir -p /etc/apache2/sites-available /etc/apache2/sites-enabled',
-            'caddy' => 'mkdir -p /etc/caddy/sites-enabled /var/log/caddy && touch /etc/caddy/Caddyfile && (grep -Fq \'import /etc/caddy/sites-enabled/*.caddy\' /etc/caddy/Caddyfile || printf "\nimport /etc/caddy/sites-enabled/*.caddy\n" >> /etc/caddy/Caddyfile)',
+            'caddy' => 'mkdir -p /etc/caddy/sites-enabled /var/log/caddy && touch /etc/caddy/Caddyfile && (grep -Fq \'import /etc/caddy/sites-enabled/*.caddy\' /etc/caddy/Caddyfile || printf "\nimport /etc/caddy/sites-enabled/*.caddy\n" >> /etc/caddy/Caddyfile) && '.CaddyRuntimeOwnership::shell(),
             // OLS keeps per-vhost configs under conf/vhosts/<name>/vhconf.conf;
             // executeStageProvision writes the top-level httpd_config.conf
             // after the per-site loop via writeOlsHttpdConfig().
@@ -977,12 +1017,17 @@ BASH;
      * stock config with WebAdmin + Example vhosts that we don't want to keep,
      * but we preserve it for forensic recovery.
      *
-     * @param  \Illuminate\Database\Eloquent\Collection<int, Site>  $sites
+     * @param  Collection<int, Site>  $sites
      */
+    private function ensureCaddyRuntimeOwnership(Server $server, SshConnection $ssh): void
+    {
+        $ssh->exec($this->privilegedCommand($server, CaddyRuntimeOwnership::shell()), 30);
+    }
+
     private function writeOlsHttpdConfig(
         Server $server,
         SshConnection $ssh,
-        \Illuminate\Database\Eloquent\Collection $sites,
+        Collection $sites,
         int $listenPort
     ): void {
         $path = '/usr/local/lsws/conf/httpd_config.conf';
@@ -993,6 +1038,10 @@ BASH;
         $ssh->exec($this->privilegedCommand($server, $backupCmd), 15);
 
         $contents = app(OpenLiteSpeedHttpdConfigBuilder::class)->build($sites, $listenPort);
+        $existing = $ssh->exec('sudo -n cat '.escapeshellarg($path).' 2>/dev/null', 15);
+        if ($existing !== '' && $ssh->lastExecExitCode() === 0) {
+            $contents = app(OpenLiteSpeedHttpdConfigPreserver::class)->merge($contents, $existing);
+        }
         $this->writeRemoteFile($server, $ssh, $path, $contents);
     }
 
@@ -1031,6 +1080,74 @@ BASH;
             'traefik' => 'traefik',
             default => null,
         };
+    }
+
+    /**
+     * Align site rows with the new server webserver and re-queue HTTP-01 TLS
+     * installs when leaving Caddy auto-HTTPS or another certbot-backed engine.
+     */
+    protected function reconcileSitesAfterSwitch(Server $server, string $target, string $from): void
+    {
+        $target = strtolower(trim($target));
+        $from = strtolower(trim($from));
+        $activeStatus = Site::activeStatusForWebserver($target);
+
+        $sites = Site::query()
+            ->where('server_id', $server->id)
+            ->with('previewDomains')
+            ->get();
+
+        foreach ($sites as $site) {
+            $meta = is_array($site->meta) ? $site->meta : [];
+            if (isset($meta['provisioning']) && is_array($meta['provisioning'])) {
+                $meta['provisioning']['webserver'] = $target;
+            }
+
+            $site->update([
+                'status' => $activeStatus,
+                'meta' => $meta,
+            ]);
+        }
+
+        if ($target === 'caddy' && $this->tlsToCaddy) {
+            return;
+        }
+
+        if (! in_array($target, ['nginx', 'apache', 'openlitespeed'], true)) {
+            return;
+        }
+
+        if (! in_array($from, ['nginx', 'apache', 'caddy', 'openlitespeed'], true)) {
+            return;
+        }
+
+        $siteIds = $sites->pluck('id');
+
+        $certificates = SiteCertificate::query()
+            ->whereIn('site_id', $siteIds)
+            ->where('provider_type', SiteCertificate::PROVIDER_LETSENCRYPT)
+            ->where('challenge_type', SiteCertificate::CHALLENGE_HTTP)
+            ->whereIn('status', [
+                SiteCertificate::STATUS_FAILED,
+                SiteCertificate::STATUS_ACTIVE,
+                SiteCertificate::STATUS_PENDING,
+                SiteCertificate::STATUS_ISSUED,
+                SiteCertificate::STATUS_INSTALLING,
+            ])
+            ->get();
+
+        foreach ($certificates as $certificate) {
+            $certificate->update(['status' => SiteCertificate::STATUS_PENDING]);
+            ExecuteSiteCertificateJob::dispatch($certificate->id, $this->userId);
+        }
+
+        $certificateRequestService = app(CertificateRequestService::class);
+        foreach ($sites as $site) {
+            $certificate = $certificateRequestService->queuePrimaryPreviewAutoSsl($site);
+            if ($certificate !== null) {
+                ExecuteSiteCertificateJob::dispatch($certificate->id, $this->userId);
+            }
+        }
     }
 
     /**

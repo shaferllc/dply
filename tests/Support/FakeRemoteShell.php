@@ -2,9 +2,14 @@
 
 namespace Tests\Support;
 
-use App\Contracts\RemoteShell;
+use App\Services\SshConnection;
 
-class FakeRemoteShell implements RemoteShell
+/**
+ * Extends the concrete SshConnection (rather than just implementing
+ * RemoteShell) so it satisfies SshConnectionFactory::forServer(), which is
+ * typed against the concrete connection.
+ */
+class FakeRemoteShell extends SshConnection
 {
     /** @var list<array{0: string, 1: int}> */
     public array $execCalls = [];
@@ -18,6 +23,11 @@ class FakeRemoteShell implements RemoteShell
     public function __construct(
         protected $execHandler = null
     ) {}
+
+    public function connect(int $timeout = 10): bool
+    {
+        return true;
+    }
 
     public function exec(string $command, int $timeoutSeconds = 120): string
     {
@@ -46,6 +56,20 @@ class FakeRemoteShell implements RemoteShell
         }
 
         return '';
+    }
+
+    /**
+     * @param  callable(string):void  $chunkCallback
+     * @return array{0: string, 1: ?int}
+     */
+    public function execWithCallbackAndExit(string $command, callable $chunkCallback, int $timeoutSeconds = 120): array
+    {
+        $out = $this->exec($command, $timeoutSeconds);
+        if ($out !== '') {
+            $chunkCallback($out);
+        }
+
+        return [$out, 0];
     }
 
     public function putFile(string $remotePath, string $contents, int $timeoutSeconds = 60): void

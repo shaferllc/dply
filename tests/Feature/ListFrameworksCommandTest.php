@@ -2,57 +2,46 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature;
+namespace Tests\Feature\ListFrameworksCommandTest;
 
 use Illuminate\Support\Facades\Artisan;
-use Tests\TestCase;
 
-class ListFrameworksCommandTest extends TestCase
-{
-    public function test_lists_all_runtimes_and_frameworks(): void
-    {
-        Artisan::call('dply:list-frameworks', ['--json' => true]);
-        $decoded = json_decode(Artisan::output(), true);
+test('lists all runtimes and frameworks', function () {
+    Artisan::call('dply:list-frameworks', ['--json' => true]);
+    $decoded = json_decode(Artisan::output(), true);
 
-        $this->assertArrayHasKey('php', $decoded['frameworks_by_runtime']);
-        $this->assertArrayHasKey('laravel', $decoded['frameworks_by_runtime']['php']);
-        $this->assertArrayHasKey('node', $decoded['frameworks_by_runtime']);
-        $this->assertArrayHasKey('next', $decoded['frameworks_by_runtime']['node']);
-        $this->assertArrayHasKey('python', $decoded['frameworks_by_runtime']);
-        $this->assertArrayHasKey('django', $decoded['frameworks_by_runtime']['python']);
-    }
+    expect($decoded['frameworks_by_runtime'])->toHaveKey('php');
+    expect($decoded['frameworks_by_runtime']['php'])->toHaveKey('laravel');
+    expect($decoded['frameworks_by_runtime'])->toHaveKey('node');
+    expect($decoded['frameworks_by_runtime']['node'])->toHaveKey('next');
+    expect($decoded['frameworks_by_runtime'])->toHaveKey('python');
+    expect($decoded['frameworks_by_runtime']['python'])->toHaveKey('django');
+});
+test('runtime filter narrows output', function () {
+    Artisan::call('dply:list-frameworks', [
+        '--runtime' => 'ruby',
+        '--json' => true,
+    ]);
+    $decoded = json_decode(Artisan::output(), true);
 
-    public function test_runtime_filter_narrows_output(): void
-    {
-        Artisan::call('dply:list-frameworks', [
-            '--runtime' => 'ruby',
-            '--json' => true,
-        ]);
-        $decoded = json_decode(Artisan::output(), true);
+    expect(array_keys($decoded['frameworks_by_runtime']))->toBe(['ruby']);
+    expect($decoded['frameworks_by_runtime']['ruby'])->toHaveKey('rails');
+});
+test('unknown runtime returns failure', function () {
+    $exit = Artisan::call('dply:list-frameworks', ['--runtime' => 'cobol']);
+    $output = Artisan::output();
 
-        $this->assertSame(['ruby'], array_keys($decoded['frameworks_by_runtime']));
-        $this->assertArrayHasKey('rails', $decoded['frameworks_by_runtime']['ruby']);
-    }
+    expect($exit)->toBe(1);
+    $this->assertStringContainsString('Unknown runtime', $output);
+});
+test('human output renders all runtimes', function () {
+    $exit = Artisan::call('dply:list-frameworks');
+    $output = Artisan::output();
 
-    public function test_unknown_runtime_returns_failure(): void
-    {
-        $exit = Artisan::call('dply:list-frameworks', ['--runtime' => 'cobol']);
-        $output = Artisan::output();
-
-        $this->assertSame(1, $exit);
-        $this->assertStringContainsString('Unknown runtime', $output);
-    }
-
-    public function test_human_output_renders_all_runtimes(): void
-    {
-        $exit = Artisan::call('dply:list-frameworks');
-        $output = Artisan::output();
-
-        $this->assertSame(0, $exit);
-        $this->assertStringContainsString('Php', $output);
-        $this->assertStringContainsString('laravel', $output);
-        $this->assertStringContainsString('Node', $output);
-        $this->assertStringContainsString('next', $output);
-        $this->assertStringContainsString('Static', $output);
-    }
-}
+    expect($exit)->toBe(0);
+    $this->assertStringContainsString('Php', $output);
+    $this->assertStringContainsString('laravel', $output);
+    $this->assertStringContainsString('Node', $output);
+    $this->assertStringContainsString('next', $output);
+    $this->assertStringContainsString('Static', $output);
+});

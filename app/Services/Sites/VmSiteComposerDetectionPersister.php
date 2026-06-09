@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Sites;
 
+use App\Contracts\RemoteShell;
 use App\Models\Site;
 use App\Services\Deploy\LaravelComposerPackageDetector;
 
@@ -13,7 +14,7 @@ use App\Services\Deploy\LaravelComposerPackageDetector;
  */
 final class VmSiteComposerDetectionPersister
 {
-    public function persistFromReleasePath(Site $site, SshConnection $ssh, string $releaseRoot): void
+    public function persistFromReleasePath(Site $site, RemoteShell $ssh, string $releaseRoot): void
     {
         if (! $site->server?->isVmHost()) {
             return;

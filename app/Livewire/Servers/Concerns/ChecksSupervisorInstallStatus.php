@@ -7,7 +7,7 @@ use App\Services\Servers\SupervisorProvisioner;
 
 /**
  * Shared supervisor-install awareness for any Livewire page that needs to gate
- * its UI on whether the Supervisor package is present (Daemons, Queue workers,
+ * its UI on whether the Supervisor package is present (Daemons and
  * site-scoped variants). Tri-state mirrors the underlying enum:
  *
  *  - null  → not yet checked (host hasn't been probed since provision)

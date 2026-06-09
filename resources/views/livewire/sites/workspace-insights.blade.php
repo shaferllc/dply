@@ -1,36 +1,24 @@
-@php
-    $btnPrimary = 'inline-flex items-center justify-center gap-2 rounded-lg bg-brand-ink px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-cream shadow-sm hover:bg-brand-forest transition-colors disabled:cursor-not-allowed disabled:opacity-50';
-    $btnSecondary = 'inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm hover:bg-brand-sand/50 transition-colors';
-@endphp
-
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <nav class="text-sm text-brand-moss mb-6" aria-label="{{ __('Breadcrumb') }}">
-        <ol class="flex flex-wrap items-center gap-2">
-            <li><a href="{{ route('dashboard') }}" wire:navigate class="hover:text-brand-ink transition-colors">{{ __('Dashboard') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('servers.index') }}" wire:navigate class="hover:text-brand-ink transition-colors">{{ __('Servers') }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('servers.sites', $server) }}" wire:navigate class="hover:text-brand-ink transition-colors truncate max-w-[10rem]" title="{{ $server->name }}">{{ $server->name }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li><a href="{{ route('sites.show', [$server, $site]) }}" wire:navigate class="hover:text-brand-ink transition-colors truncate max-w-[10rem]" title="{{ $site->name }}">{{ $site->name }}</a></li>
-            <li class="text-brand-mist" aria-hidden="true">/</li>
-            <li class="text-brand-ink font-medium">{{ __('Insights') }}</li>
-        </ol>
-    </nav>
+    @include('livewire.sites.partials.workspace-breadcrumb-bar', [
+        'server' => $server,
+        'site' => $site,
+        'currentLabel' => __('Insights'),
+        'currentIcon' => 'light-bulb',
+    ])
 
     <div class="mb-8 border-b border-brand-ink/10 pb-6">
         <x-page-header
             :title="__('Insights')"
             :description="__('Monitoring and recommendations for this site.')"
-            doc-route="docs.index"
+            :show-documentation="false"
             flush
             compact
         >
             <x-slot name="actions">
-                <button type="button" wire:click="runChecksNow" wire:loading.attr="disabled" class="{{ $btnPrimary }}">
+                <x-primary-button size="sm" type="button" wire:click="runChecksNow" wire:loading.attr="disabled">
                     <span wire:loading.remove wire:target="runChecksNow">{{ __('Refresh') }}</span>
                     <span wire:loading wire:target="runChecksNow">{{ __('Queueing…') }}</span>
-                </button>
+                </x-primary-button>
             </x-slot>
         </x-page-header>
     </div>
@@ -131,8 +119,14 @@
 
     @if ($tab === 'overview')
         <div class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 px-5 py-4">
-                <h2 class="text-sm font-semibold text-brand-ink">{{ __('Findings for this site') }}</h2>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <x-icon-badge>
+                    <x-heroicon-o-clipboard-document-check class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Insights') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Findings for this site') }}</h2>
+                </div>
             </div>
             @if ($findings->isEmpty())
                 <p class="px-5 py-10 text-sm text-brand-moss text-center">{{ __('No findings yet.') }}</p>
@@ -160,9 +154,9 @@
                                 @include('livewire.partials.insight-correlation', ['finding' => $f])
                             </div>
                             @if ($canFix)
-                                <button type="button" wire:click="openConfirmActionModal('applyFix', [{{ $f->id }}], @js(__('Apply suggested fix')), @js(__('Apply the suggested fix on the server?')), @js(__('Apply fix')), true)" class="{{ $btnSecondary }} shrink-0">
+                                <x-secondary-button size="sm" type="button" wire:click="openConfirmActionModal('applyFix', [{{ $f->id }}], @js(__('Apply suggested fix')), @js(__('Apply the suggested fix on the server?')), @js(__('Apply fix')), true)" class="shrink-0">
                                     {{ __('Apply fix') }}
-                                </button>
+                                </x-secondary-button>
                             @endif
                         </li>
                     @endforeach
@@ -176,8 +170,8 @@
             <p>{{ __('Deploy completions, deployment start, and uptime transitions for this site are configured under Site workspace → Notifications. Connect outbound webhooks and channel subscriptions there.') }}</p>
             <p>{{ __('Insights findings still use the server’s “Insights alerts” subscription when enabled.') }}</p>
             <div class="flex flex-wrap gap-2 pt-1">
-                <a href="{{ route('sites.show', [$server, $site, 'section' => 'notifications']) }}" wire:navigate class="{{ $btnPrimary }}">{{ __('Open site Notifications') }}</a>
-                <a href="{{ route('profile.notification-channels') }}" wire:navigate class="{{ $btnSecondary }}">{{ __('Manage notification channels') }}</a>
+                <x-primary-button size="sm" href="{{ route('sites.show', [$server, $site, 'section' => 'notifications']) }}" wire:navigate>{{ __('Open site Notifications') }}</x-primary-button>
+                <x-secondary-button size="sm" href="{{ route('profile.notification-channels') }}" wire:navigate>{{ __('Manage notification channels') }}</x-secondary-button>
             </div>
         </div>
     @endif
@@ -186,10 +180,10 @@
         @include('livewire.partials.insights-settings-form', ['catalog' => $insightsCatalog, 'orgHasPro' => $orgHasPro])
         <div class="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-brand-ink/10">
             <div class="flex flex-wrap gap-2">
-                <button type="button" wire:click="enableAll" class="{{ $btnSecondary }}">{{ __('Enable all') }}</button>
-                <button type="button" wire:click="disableAll" class="{{ $btnSecondary }}">{{ __('Disable all') }}</button>
+                <x-secondary-button size="sm" type="button" wire:click="enableAll">{{ __('Enable all') }}</x-secondary-button>
+                <x-secondary-button size="sm" type="button" wire:click="disableAll">{{ __('Disable all') }}</x-secondary-button>
             </div>
-            <button type="button" wire:click="saveSettings" class="{{ $btnPrimary }}">{{ __('Save settings') }}</button>
+            <x-primary-button size="sm" type="button" wire:click="saveSettings">{{ __('Save settings') }}</x-primary-button>
         </div>
     @endif
 

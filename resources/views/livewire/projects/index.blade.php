@@ -40,7 +40,7 @@
         @else
             <div class="space-y-5">
                 <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Your projects') }}</h2>
+                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Your projects') }}</h2>
                     @if ($views->isNotEmpty())
                         <div class="flex flex-wrap items-center gap-2">
                             <span class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Saved views') }}</span>

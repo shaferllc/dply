@@ -3,6 +3,7 @@
 namespace App\Livewire\Servers;
 
 use App\Actions\Servers\DeleteServerAction;
+use App\Enums\ServerProvider;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\ManagesServerRemovalForm;
 use App\Models\ProviderCredential;
@@ -12,10 +13,12 @@ use App\Models\ServerMetricSnapshot;
 use App\Services\Insights\OrganizationInsightsMetricsService;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\ProvisioningDigest;
+use App\Support\Servers\ServerTags;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -32,6 +35,8 @@ class Index extends Component
 
     /** @var string all|pending|provisioning|ready|error|disconnected */
     public string $statusFilter = '';
+
+    public string $tagFilter = '';
 
     /** @var string list|grid */
     public string $viewMode = 'list';
@@ -53,6 +58,7 @@ class Index extends Component
         $this->search = '';
         $this->sort = 'created_at';
         $this->statusFilter = '';
+        $this->tagFilter = '';
         $this->viewMode = 'list';
     }
 
@@ -279,8 +285,6 @@ class Index extends Component
         }
 
         $query = Server::query()
-            ->with(['sites', 'organization', 'team', 'workspace'])
-            ->withCount('sites')
             ->where(function (Builder $q) use ($org) {
                 $q->where('organization_id', $org->id)
                     ->orWhere(fn (Builder $q2) => $q2->whereNull('organization_id')->where('user_id', auth()->id()));
@@ -310,6 +314,11 @@ class Index extends Component
             $query->where('status', $this->statusFilter);
         }
 
+        $tag = trim($this->tagFilter);
+        if ($tag !== '') {
+            $query->whereJsonContains('meta->tags', $tag);
+        }
+
         return match ($this->sort) {
             'name' => $query->orderBy('name'),
             'status' => $query->orderBy('status')->orderBy('name'),
@@ -321,14 +330,21 @@ class Index extends Component
     {
         $base = $this->baseQuery();
         $org = auth()->user()->currentOrganization();
-        $hasServersInScope = $base !== null && (clone $base)->exists();
+        $allInScope = $base !== null ? (clone $base)->get() : collect();
+        $tagOptions = ServerTags::collectFromServers($allInScope);
+        $hasServersInScope = $base !== null && $allInScope->isNotEmpty();
         $servers = $base
-            ? $this->applyFilters(clone $base)->get()
+            ? $this->applyFilters(clone $base)
+                ->with(['sites', 'organization', 'team', 'workspace'])
+                ->withCount('sites')
+                ->get()
             : collect();
 
         $groupedServers = $this->groupedServers($servers);
 
-        $insightRollup = $servers->isNotEmpty()
+        // Insights is gated (coming soon). Skip the per-server rollup query
+        // entirely when the flag is off — the fleet rows hide the badge too.
+        $insightRollup = $servers->isNotEmpty() && Feature::active('workspace.insights')
             ? $insightsMetrics->perServerRollup($servers->pluck('id'))
             : collect();
 
@@ -380,7 +396,7 @@ class Index extends Component
         if ($org) {
             $importSources = ProviderCredential::query()
                 ->where('organization_id', $org->id)
-                ->whereIn('provider', \App\Enums\ServerProvider::importProviderKeys())
+                ->whereIn('provider', ServerProvider::importProviderKeys())
                 ->pluck('provider')
                 ->unique()
                 ->values();
@@ -436,6 +452,7 @@ class Index extends Component
                 Server::STATUS_ERROR => __('Error'),
                 Server::STATUS_DISCONNECTED => __('Disconnected'),
             ],
+            'tagOptions' => $tagOptions,
         ]);
     }
 }

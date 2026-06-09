@@ -1,540 +1,479 @@
 <?php
 
-namespace Tests\Feature\Console;
+namespace Tests\Feature\Console\WorkspaceConsoleTest;
 
 use App\Livewire\Servers\WorkspaceConsole;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\User;
 use App\Services\Servers\DplyCliInstaller;
-use App\Services\SshConnection;
+use App\Services\SshConnectionFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Mockery;
 use Tests\Concerns\WithFeatures;
-use Tests\TestCase;
+use Tests\Support\FakeRemoteShell;
+use Tests\Support\FakeSshConnectionFactory;
 
-/**
- * Feature tests for the server workspace console page.
- *
- * @covers \App\Livewire\Servers\WorkspaceConsole
- */
-final class WorkspaceConsoleTest extends TestCase
+uses(RefreshDatabase::class);
+
+uses(WithFeatures::class);
+
+beforeEach(function () {
+    Feature::define('workspace.console', fn () => true);
+    Feature::flushCache();
+});
+
+function bindSshExecHandler(?callable $handler = null): FakeRemoteShell
 {
-    use RefreshDatabase;
-    use WithFeatures;
+    $shell = new FakeRemoteShell($handler);
+    app()->instance(SshConnectionFactory::class, new FakeSshConnectionFactory($shell));
 
-    protected array $features = ['workspace.console'];
+    return $shell;
+}
 
-    protected function userWithOrganization(?string $role = 'owner'): User
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => $role]);
-        session(['current_organization_id' => $org->id]);
+function userWithOrganization(?string $role = 'owner'): User
+{
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => $role]);
+    session(['current_organization_id' => $org->id]);
 
-        return $user;
-    }
+    return $user;
+}
 
-    protected function readyServer(User $user, array $overrides = []): Server
-    {
-        return Server::factory()->ready()->create(array_merge([
-            'user_id' => $user->id,
-            'organization_id' => $user->currentOrganization()?->id,
-            'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
-            'ssh_user' => 'deploy',
-            'name' => 'test-server',
-        ], $overrides));
-    }
+function readyServer(User $user, array $overrides = []): Server
+{
+    return Server::factory()->ready()->create(array_merge([
+        'user_id' => $user->id,
+        'organization_id' => $user->currentOrganization()?->id,
+        'ssh_private_key' => "-----BEGIN OPENSSH PRIVATE KEY-----\ntest\n-----END OPENSSH PRIVATE KEY-----",
+        'ssh_user' => 'deploy',
+        'name' => 'test-server',
+    ], $overrides));
+}
 
-    public function test_console_page_renders_for_ready_server(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = $this->readyServer($user);
+test('console page renders for ready server', function () {
+    $user = userWithOrganization();
+    $server = readyServer($user);
 
-        $this->actingAs($user)
-            ->get(route('servers.console', $server))
-            ->assertOk()
-            ->assertSee('Console')
-            ->assertSee('Quick read-only SSH console')
-            ->assertSee('Type a command, hit Enter')
-            ->assertSee('deploy@test-server');
-    }
+    $this->actingAs($user)
+        ->get(route('servers.console', $server))
+        ->assertOk()
+        ->assertSee('Console')
+        ->assertSee('Quick read-only SSH console')
+        ->assertSee('type a command, hit Enter')
+        ->assertSee('Type a command below or pick a quick action above')
+        ->assertSee('deploy@test-server');
+});
 
-    public function test_console_page_shows_provisioning_message_for_non_ready_server(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = $this->readyServer($user, [
-            'status' => Server::STATUS_PROVISIONING,
-            'setup_status' => Server::SETUP_STATUS_RUNNING,
-        ]);
+test('console page shows provisioning message for non ready server', function () {
+    $user = userWithOrganization();
+    $server = readyServer($user, [
+        'status' => Server::STATUS_PROVISIONING,
+        'setup_status' => Server::SETUP_STATUS_RUNNING,
+    ]);
 
-        $this->actingAs($user)
-            ->get(route('servers.console', $server))
-            ->assertOk()
-            ->assertSee('Provisioning and SSH must be ready');
-    }
+    $this->actingAs($user)
+        ->get(route('servers.console', $server))
+        ->assertOk()
+        ->assertSee('Provisioning and SSH must be ready');
+});
 
-    public function test_console_page_shows_provisioning_message_when_ssh_key_missing(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = $this->readyServer($user, [
-            'ssh_private_key' => null,
-        ]);
+test('console page shows provisioning message when ssh key missing', function () {
+    $user = userWithOrganization();
+    $server = readyServer($user, [
+        'ssh_private_key' => null,
+    ]);
 
-        $this->actingAs($user)
-            ->get(route('servers.console', $server))
-            ->assertOk()
-            ->assertSee('Provisioning and SSH must be ready');
-    }
+    $this->actingAs($user)
+        ->get(route('servers.console', $server))
+        ->assertOk()
+        ->assertSee('Provisioning and SSH must be ready');
+});
 
-    public function test_console_page_requires_authentication(): void
-    {
-        $server = Server::factory()->ready()->create();
+test('console page requires authentication', function () {
+    $server = Server::factory()->ready()->create();
 
-        $this->get(route('servers.console', $server))
-            ->assertRedirect(route('login'));
-    }
+    $this->get(route('servers.console', $server))
+        ->assertRedirect(route('login'));
+});
 
-    public function test_console_page_requires_view_permission(): void
-    {
-        $owner = $this->userWithOrganization('owner');
-        $server = $this->readyServer($owner);
+test('console page requires view permission', function () {
+    $owner = userWithOrganization('owner');
+    $server = readyServer($owner);
 
-        // Create a user in a different organization
-        $otherUser = User::factory()->create();
-        $otherOrg = Organization::factory()->create();
-        $otherOrg->users()->attach($otherUser->id, ['role' => 'owner']);
+    // Create a user in a different organization
+    $otherUser = User::factory()->create();
+    $otherOrg = Organization::factory()->create();
+    $otherOrg->users()->attach($otherUser->id, ['role' => 'owner']);
 
-        $this->actingAs($otherUser)
-            ->get(route('servers.console', $server))
-            ->assertForbidden();
-    }
+    $this->actingAs($otherUser)
+        ->get(route('servers.console', $server))
+        ->assertForbidden();
+});
 
-    public function test_deployer_cannot_run_commands(): void
-    {
-        $user = $this->userWithOrganization('deployer');
-        $server = $this->readyServer($user);
+test('deployer cannot run commands', function () {
+    $user = userWithOrganization('deployer');
+    $server = readyServer($user);
 
-        Livewire::actingAs($user)
-            ->test(WorkspaceConsole::class, ['server' => $server])
-            ->set('command', 'uptime')
-            ->call('run')
-            ->assertSet('error', 'Deployers cannot run shell commands on servers.');
-    }
+    Livewire::actingAs($user)
+        ->test(WorkspaceConsole::class, ['server' => $server])
+        ->set('command', 'uptime')
+        ->call('run')
+        ->assertSet('error', 'Deployers cannot run shell commands on servers.');
+});
 
-    public function test_deployer_cannot_see_install_cli_button(): void
-    {
-        $user = $this->userWithOrganization('deployer');
-        $server = $this->readyServer($user);
+test('deployer cannot see install cli button', function () {
+    $user = userWithOrganization('deployer');
+    $server = readyServer($user);
 
-        Livewire::actingAs($user)
-            ->test(WorkspaceConsole::class, ['server' => $server])
-            ->call('loadProbes')
-            ->assertSet('cliState', 'missing')
-            // Deployer sees the banner but cannot click install
-            ->assertSee('Install the dply CLI')
-            ->assertDontSee('wire:click="installCli"');
-    }
-
-    public function test_quick_actions_list_is_correct(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = $this->readyServer($user);
-
-        $component = Livewire::actingAs($user)
-            ->test(WorkspaceConsole::class, ['server' => $server]);
-
-        $actions = $component->instance()->quickActions();
-
-        $this->assertCount(8, $actions);
-        $this->assertEquals('uptime', $actions[0]['label']);
-        $this->assertEquals('uptime', $actions[0]['cmd']);
-        $this->assertEquals('disk', $actions[1]['label']);
-        $this->assertEquals('df -h', $actions[1]['cmd']);
-        $this->assertEquals('memory', $actions[2]['label']);
-        $this->assertEquals('free -h', $actions[2]['cmd']);
-        $this->assertEquals('who', $actions[3]['label']);
-        $this->assertEquals('who', $actions[3]['cmd']);
-        $this->assertEquals('top processes', $actions[4]['label']);
-        $this->assertEquals('nginx status', $actions[6]['label']);
-        $this->assertEquals('kernel', $actions[7]['label']);
-    }
-
-    public function test_run_quick_action_executes_command(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = $this->readyServer($user);
-
-        // Mock SSH connection
-        $mockSsh = Mockery::mock(SshConnection::class);
-        $mockSsh->shouldReceive('execWithCallbackAndExit')
-            ->once()
-            ->with('uptime 2>&1', Mockery::any(), 60)
-            ->andReturn(['14:00:00 up 5 days', 0]);
-
-        $this->app->instance(SshConnection::class, $mockSsh);
-
-        Livewire::actingAs($user)
-            ->test(WorkspaceConsole::class, ['server' => $server])
-            ->call('runQuickAction', 0) // uptime
-            ->assertSet('command', '')
-            ->assertCount('history', 1);
-
-        $history = Livewire::actingAs($user)
-            ->test(WorkspaceConsole::class, ['server' => $server])
-            ->get('history');
-
-        $this->assertEquals('uptime', $history[0]['cmd']);
-        $this->assertEquals(0, $history[0]['exit']);
-    }
-
-    public function test_command_execution_adds_to_history(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = $this->readyServer($user);
-
-        Livewire::actingAs($user)
-            ->test(WorkspaceConsole::class, ['server' => $server])
-            ->set('command', 'ls -la')
-            ->call('run')
-            ->assertSet('command', '')
-            ->assertCount('history', 1);
-    }
-
-    public function test_history_persists_across_requests(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = $this->readyServer($user);
-
-        // First request - run a command
-        $component = Livewire::actingAs($user)
-            ->test(WorkspaceConsole::class, ['server' => $server])
-            ->set('command', 'echo hello')
-            ->call('run')
-            ->assertCount('history', 1);
-
-        // Second request - history should still have the entry
-        // Note: In real Livewire, this would persist, but in tests we simulate
-    }
-
-    public function test_history_limits_to_30_entries(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = $this->readyServer($user);
-
-        $component = Livewire::actingAs($user)
-            ->test(WorkspaceConsole::class, ['server' => $server]);
-
-        // Manually populate history beyond limit
-        $largeHistory = [];
-        for ($i = 0; $i < 35; $i++) {
-            $largeHistory[] = [
-                'cmd' => "echo {$i}",
-                'out' => (string) $i,
-                'exit' => 0,
-                'ran_at' => now()->subSeconds($i)->toIso8601String(),
-                'error' => null,
-            ];
+    bindSshExecHandler(function (string $cmd): string {
+        if (str_contains($cmd, 'BIN:')) {
+            return "BIN:missing\nJQ:missing\nSTATE:missing";
         }
 
-        // Set the history directly via reflection
-        $reflection = new \ReflectionClass($component->instance());
-        $property = $reflection->getProperty('history');
-        $property->setAccessible(true);
-        $property->setValue($component->instance(), $largeHistory);
+        return '';
+    });
 
-        // Now run one more command
-        $component->set('command', 'echo newest')
-            ->call('run');
+    Livewire::actingAs($user)
+        ->test(WorkspaceConsole::class, ['server' => $server])
+        ->call('loadProbes')
+        ->assertSet('cliState', 'missing')
+        ->assertSee('Install the dply CLI on this server')
+        ->call('installCli')
+        ->assertSet('cliInstallError', 'Deployers cannot install the dply CLI.');
+});
 
-        // Should be trimmed to 30
-        $history = $property->getValue($component->instance());
-        $this->assertCount(30, $history);
-        // Most recent should be 'echo newest'
-        $this->assertEquals('echo newest', end($history)['cmd']);
+test('quick actions list is correct', function () {
+    $user = userWithOrganization();
+    $server = readyServer($user);
+
+    $component = Livewire::actingAs($user)
+        ->test(WorkspaceConsole::class, ['server' => $server]);
+
+    $actions = $component->instance()->quickActions();
+
+    expect($actions)->toHaveCount(8);
+    expect($actions[0]['label'])->toEqual('uptime');
+    expect($actions[0]['cmd'])->toEqual('uptime');
+    expect($actions[1]['label'])->toEqual('disk');
+    expect($actions[1]['cmd'])->toEqual('df -h');
+    expect($actions[2]['label'])->toEqual('memory');
+    expect($actions[2]['cmd'])->toEqual('free -h');
+    expect($actions[3]['label'])->toEqual('who');
+    expect($actions[3]['cmd'])->toEqual('who');
+    expect($actions[4]['label'])->toEqual('top processes');
+    expect($actions[6]['label'])->toEqual('nginx status');
+    expect($actions[7]['label'])->toEqual('kernel');
+});
+
+test('run quick action executes command', function () {
+    $user = userWithOrganization();
+    $server = readyServer($user);
+
+    bindSshExecHandler(function (string $cmd): string {
+        if (str_contains($cmd, 'uptime')) {
+            return '14:00:00 up 5 days';
+        }
+
+        return '';
+    });
+
+    $component = Livewire::actingAs($user)
+        ->test(WorkspaceConsole::class, ['server' => $server])
+        ->call('runQuickAction', 0) // uptime
+        ->assertSet('command', '')
+        ->assertCount('history', 1);
+
+    $history = $component->get('history');
+    expect($history[0]['cmd'])->toEqual('uptime');
+    expect($history[0]['exit'])->toEqual(0);
+});
+
+test('command execution adds to history', function () {
+    $user = userWithOrganization();
+    $server = readyServer($user);
+
+    Livewire::actingAs($user)
+        ->test(WorkspaceConsole::class, ['server' => $server])
+        ->set('command', 'ls -la')
+        ->call('run')
+        ->assertSet('command', '')
+        ->assertCount('history', 1);
+});
+
+test('history persists across requests', function () {
+    $user = userWithOrganization();
+    $server = readyServer($user);
+
+    // First request - run a command
+    $component = Livewire::actingAs($user)
+        ->test(WorkspaceConsole::class, ['server' => $server])
+        ->set('command', 'echo hello')
+        ->call('run')
+        ->assertCount('history', 1);
+
+    // Second request - history should still have the entry
+    // Note: In real Livewire, this would persist, but in tests we simulate
+});
+
+test('history limits to 30 entries', function () {
+    $user = userWithOrganization();
+    $server = readyServer($user);
+
+    bindSshExecHandler(fn (): string => 'ok');
+
+    $component = Livewire::actingAs($user)
+        ->test(WorkspaceConsole::class, ['server' => $server]);
+
+    for ($i = 0; $i < 31; $i++) {
+        $component->set('command', "echo {$i}")->call('run');
     }
 
-    public function test_output_is_capped_at_16kb(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = $this->readyServer($user);
+    $history = $component->get('history');
+    expect($history)->toHaveCount(30);
+    expect(end($history)['cmd'])->toEqual('echo 30');
+});
 
-        // This test verifies the behavior - actual truncation happens in RunsServerConsoleCommands
-        // which uses Str::limit($out, 16000, "\n… (output truncated)")
+test('output is capped at 16kb', function () {
+    $user = userWithOrganization();
+    $server = readyServer($user);
 
-        Livewire::actingAs($user)
-            ->test(WorkspaceConsole::class, ['server' => $server])
-            ->set('command', 'cat /dev/zero | head -c 20000 | tr "\0" "A"')
-            ->call('run');
+    // This test verifies the behavior - actual truncation happens in RunsServerConsoleCommands
+    // which uses Str::limit($out, 16000, "\n… (output truncated)")
+    Livewire::actingAs($user)
+        ->test(WorkspaceConsole::class, ['server' => $server])
+        ->set('command', 'cat /dev/zero | head -c 20000 | tr "\0" "A"')
+        ->call('run');
 
-        // The actual SSH execution would be mocked in practice
-        $this->assertTrue(true); // Placeholder for the concept
-    }
+    // The actual SSH execution would be mocked in practice
+    expect(true)->toBeTrue();
+    // Placeholder for the concept
+});
 
-    public function test_clear_history_empties_history(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = $this->readyServer($user);
+test('clear history empties history', function () {
+    $user = userWithOrganization();
+    $server = readyServer($user);
 
-        Livewire::actingAs($user)
-            ->test(WorkspaceConsole::class, ['server' => $server])
-            ->set('command', 'echo test')
-            ->call('run')
-            ->assertCount('history', 1)
-            ->call('clearHistory')
-            ->assertCount('history', 0)
-            ->assertSet('error', null);
-    }
+    Livewire::actingAs($user)
+        ->test(WorkspaceConsole::class, ['server' => $server])
+        ->set('command', 'echo test')
+        ->call('run')
+        ->assertCount('history', 1)
+        ->call('clearHistory')
+        ->assertCount('history', 0)
+        ->assertSet('error', null);
+});
 
-    public function test_help_sidebar_toggle_works(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = $this->readyServer($user);
+test('help sidebar toggle works', function () {
+    $user = userWithOrganization();
+    $server = readyServer($user);
 
-        Livewire::actingAs($user)
-            ->test(WorkspaceConsole::class, ['server' => $server])
-            ->assertSet('helpOpen', false)
-            ->call('toggleHelp')
-            ->assertSet('helpOpen', true)
-            ->call('toggleHelp')
-            ->assertSet('helpOpen', false);
-    }
+    Livewire::actingAs($user)
+        ->test(WorkspaceConsole::class, ['server' => $server])
+        ->assertSet('helpOpen', false)
+        ->call('toggleHelp')
+        ->assertSet('helpOpen', true)
+        ->call('toggleHelp')
+        ->assertSet('helpOpen', false);
+});
 
-    public function test_insert_command_populates_command_field(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = $this->readyServer($user);
+test('insert command populates command field', function () {
+    $user = userWithOrganization();
+    $server = readyServer($user);
 
-        Livewire::actingAs($user)
-            ->test(WorkspaceConsole::class, ['server' => $server])
-            ->call('insertCommand', 'systemctl status nginx')
-            ->assertSet('command', 'systemctl status nginx');
-    }
+    Livewire::actingAs($user)
+        ->test(WorkspaceConsole::class, ['server' => $server])
+        ->call('insertCommand', 'systemctl status nginx')
+        ->assertSet('command', 'systemctl status nginx');
+});
 
-    public function test_dply_cli_banner_shows_missing_state(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = $this->readyServer($user);
+test('dply cli banner shows missing state', function () {
+    $user = userWithOrganization();
+    $server = readyServer($user);
 
-        // Mock SSH to return "missing" for all probes
-        $mockSsh = Mockery::mock(SshConnection::class);
-        $mockSsh->shouldReceive('exec')
-            ->andReturnUsing(function ($cmd) {
-                if (str_contains($cmd, 'BIN:')) {
-                    return "BIN:missing\nJQ:missing\nSTATE:missing";
-                }
+    bindSshExecHandler(function (string $cmd): string {
+        if (str_contains($cmd, 'BIN:')) {
+            return "BIN:missing\nJQ:missing\nSTATE:missing";
+        }
 
-                return '';
-            });
+        return '';
+    });
 
-        $this->app->instance(SshConnection::class, $mockSsh);
+    Livewire::actingAs($user)
+        ->test(WorkspaceConsole::class, ['server' => $server])
+        ->call('loadProbes')
+        ->assertSet('cliState', 'missing')
+        ->assertSet('cliBinaryOk', false)
+        ->assertSet('cliJqOk', false)
+        ->assertSet('cliStateFileOk', false)
+        ->assertSee('Install the dply CLI on this server');
+});
 
-        Livewire::actingAs($user)
-            ->test(WorkspaceConsole::class, ['server' => $server])
-            ->call('loadProbes')
-            ->assertSet('cliState', 'missing')
-            ->assertSet('cliBinaryOk', false)
-            ->assertSet('cliJqOk', false)
-            ->assertSet('cliStateFileOk', false)
-            ->assertSee('Install the dply CLI on this server');
-    }
+test('dply cli banner shows partial state', function () {
+    $user = userWithOrganization();
+    $server = readyServer($user);
 
-    public function test_dply_cli_banner_shows_partial_state(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = $this->readyServer($user);
+    bindSshExecHandler(function (string $cmd): string {
+        if (str_contains($cmd, 'BIN:')) {
+            return "BIN:dply 0.1.0\nJQ:missing\nSTATE:missing";
+        }
 
-        // Mock SSH to return partial install (binary present, jq missing)
-        $mockSsh = Mockery::mock(SshConnection::class);
-        $mockSsh->shouldReceive('exec')
-            ->andReturnUsing(function ($cmd) {
-                if (str_contains($cmd, 'BIN:')) {
-                    return "BIN:dply 0.1.0\nJQ:missing\nSTATE:missing";
-                }
+        return '';
+    });
 
-                return '';
-            });
+    Livewire::actingAs($user)
+        ->test(WorkspaceConsole::class, ['server' => $server])
+        ->call('loadProbes')
+        ->assertSet('cliState', 'partial')
+        ->assertSet('cliBinaryOk', true)
+        ->assertSet('cliJqOk', false)
+        ->assertSet('cliStateFileOk', false)
+        ->assertSee('dply CLI install is incomplete')
+        ->assertSee('jq missing — apt install jq')
+        ->assertSee('Repair install');
+});
 
-        $this->app->instance(SshConnection::class, $mockSsh);
+test('dply cli banner shows ok state', function () {
+    $user = userWithOrganization();
+    $server = readyServer($user);
 
-        Livewire::actingAs($user)
-            ->test(WorkspaceConsole::class, ['server' => $server])
-            ->call('loadProbes')
-            ->assertSet('cliState', 'partial')
-            ->assertSet('cliBinaryOk', true)
-            ->assertSet('cliJqOk', false)
-            ->assertSet('cliStateFileOk', false)
-            ->assertSee('dply CLI install is incomplete')
-            ->assertSee('jq missing — apt install jq')
-            ->assertSee('Repair install');
-    }
+    bindSshExecHandler(function (string $cmd): string {
+        if (str_contains($cmd, 'BIN:')) {
+            return "BIN:dply 0.1.0\nJQ:present\nSTATE:1";
+        }
 
-    public function test_dply_cli_banner_shows_ok_state(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = $this->readyServer($user);
+        return '';
+    });
 
-        // Mock SSH to return full install
-        $mockSsh = Mockery::mock(SshConnection::class);
-        $mockSsh->shouldReceive('exec')
-            ->andReturnUsing(function ($cmd) {
-                if (str_contains($cmd, 'BIN:')) {
-                    return "BIN:dply 0.1.0\nJQ:present\nSTATE:1";
-                }
+    Livewire::actingAs($user)
+        ->test(WorkspaceConsole::class, ['server' => $server])
+        ->call('loadProbes')
+        ->assertSet('cliState', 'ok')
+        ->assertSet('cliBinaryOk', true)
+        ->assertSet('cliJqOk', true)
+        ->assertSet('cliStateFileOk', true)
+        ->assertSet('cliVersion', '0.1.0');
+});
 
-                return '';
-            });
+test('install cli triggers installer service', function () {
+    $user = userWithOrganization();
+    $server = readyServer($user);
 
-        $this->app->instance(SshConnection::class, $mockSsh);
+    $mockInstaller = Mockery::mock(DplyCliInstaller::class);
+    $mockInstaller->shouldReceive('install')
+        ->once()
+        ->with(Mockery::on(fn (Server $s): bool => $s->is($server)))
+        ->andReturn('0.1.0');
 
-        Livewire::actingAs($user)
-            ->test(WorkspaceConsole::class, ['server' => $server])
-            ->call('loadProbes')
-            ->assertSet('cliState', 'ok')
-            ->assertSet('cliBinaryOk', true)
-            ->assertSet('cliJqOk', true)
-            ->assertSet('cliStateFileOk', true)
-            ->assertSet('cliVersion', '0.1.0');
-    }
+    $this->app->instance(DplyCliInstaller::class, $mockInstaller);
 
-    public function test_install_cli_triggers_installer_service(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = $this->readyServer($user);
+    Livewire::actingAs($user)
+        ->test(WorkspaceConsole::class, ['server' => $server])
+        ->set('cliState', 'missing')
+        ->call('installCli')
+        ->assertSet('cliState', 'ok')
+        ->assertSet('cliBinaryOk', true)
+        ->assertSet('cliJqOk', true)
+        ->assertSet('cliStateFileOk', true)
+        ->assertSet('cliVersion', '0.1.0');
+});
 
-        $mockInstaller = Mockery::mock(DplyCliInstaller::class);
-        $mockInstaller->shouldReceive('install')
-            ->once()
-            ->with($server)
-            ->andReturn('0.1.0');
+test('install cli handles failure', function () {
+    $user = userWithOrganization();
+    $server = readyServer($user);
 
-        $this->app->instance(DplyCliInstaller::class, $mockInstaller);
+    $mockInstaller = Mockery::mock(DplyCliInstaller::class);
+    $mockInstaller->shouldReceive('install')
+        ->once()
+        ->andThrow(new \RuntimeException('SSH connection failed'));
 
-        Livewire::actingAs($user)
-            ->test(WorkspaceConsole::class, ['server' => $server])
-            ->set('cliState', 'missing')
-            ->call('installCli')
-            ->assertSet('cliState', 'ok')
-            ->assertSet('cliBinaryOk', true)
-            ->assertSet('cliJqOk', true)
-            ->assertSet('cliStateFileOk', true)
-            ->assertSet('cliVersion', '0.1.0');
-    }
+    $this->app->instance(DplyCliInstaller::class, $mockInstaller);
 
-    public function test_install_cli_handles_failure(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = $this->readyServer($user);
+    Livewire::actingAs($user)
+        ->test(WorkspaceConsole::class, ['server' => $server])
+        ->set('cliState', 'missing')
+        ->call('installCli')
+        ->assertSet('cliState', 'missing') // Should re-probe after failure
+        ->assertSet('cliInstallError', 'SSH connection failed');
+});
 
-        $mockInstaller = Mockery::mock(DplyCliInstaller::class);
-        $mockInstaller->shouldReceive('install')
-            ->once()
-            ->andThrow(new \RuntimeException('SSH connection failed'));
+test('load probes populates bin list', function () {
+    $user = userWithOrganization();
+    $server = readyServer($user);
 
-        $this->app->instance(DplyCliInstaller::class, $mockInstaller);
+    bindSshExecHandler(function (string $cmd): string {
+        if (str_contains($cmd, 'compgen')) {
+            return "ls\ncat\ngrep\nnginx\nphp\nmysql\nredis-cli\n===DPLY-PROBE-SEPARATOR===\n";
+        }
+        if (str_contains($cmd, 'BIN:')) {
+            return "BIN:missing\nJQ:missing\nSTATE:missing";
+        }
 
-        Livewire::actingAs($user)
-            ->test(WorkspaceConsole::class, ['server' => $server])
-            ->set('cliState', 'missing')
-            ->call('installCli')
-            ->assertSet('cliState', 'missing') // Should re-probe after failure
-            ->assertSet('cliInstallError', 'SSH connection failed');
-    }
+        return '';
+    });
 
-    public function test_load_probes_populates_bin_list(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = $this->readyServer($user);
+    Livewire::actingAs($user)
+        ->test(WorkspaceConsole::class, ['server' => $server])
+        ->call('loadProbes')
+        ->assertSet('probesLoaded', true)
+        ->assertSet('binList', ['ls', 'cat', 'grep', 'nginx', 'php', 'mysql', 'redis-cli']);
+});
 
-        $mockSsh = Mockery::mock(SshConnection::class);
-        $mockSsh->shouldReceive('exec')
-            ->andReturnUsing(function ($cmd) {
-                if (str_contains($cmd, 'compgen')) {
-                    return "ls\ncat\ngrep\nnginx\nphp\nmysql\nredis-cli\n===DPLY-PROBE-SEPARATOR===\n";
-                }
-                if (str_contains($cmd, 'BIN:')) {
-                    return "BIN:missing\nJQ:missing\nSTATE:missing";
-                }
+test('load probes populates history list', function () {
+    $user = userWithOrganization();
+    $server = readyServer($user);
 
-                return '';
-            });
+    bindSshExecHandler(function (string $cmd): string {
+        if (str_contains($cmd, 'compgen')) {
+            return "===DPLY-PROBE-SEPARATOR===\ncd /var/www\nls -la\nphp artisan migrate\ngit pull\n";
+        }
+        if (str_contains($cmd, 'BIN:')) {
+            return "BIN:missing\nJQ:missing\nSTATE:missing";
+        }
 
-        $this->app->instance(SshConnection::class, $mockSsh);
+        return '';
+    });
 
-        Livewire::actingAs($user)
-            ->test(WorkspaceConsole::class, ['server' => $server])
-            ->call('loadProbes')
-            ->assertSet('probesLoaded', true)
-            ->assertSet('binList', ['ls', 'cat', 'grep', 'nginx', 'php', 'mysql', 'redis-cli']);
-    }
+    Livewire::actingAs($user)
+        ->test(WorkspaceConsole::class, ['server' => $server])
+        ->call('loadProbes')
+        ->assertSet('historyList', ['git pull', 'php artisan migrate', 'ls -la', 'cd /var/www']);
+});
 
-    public function test_load_probes_populates_history_list(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = $this->readyServer($user);
+test('catalog commands are passed to view', function () {
+    $user = userWithOrganization();
+    $server = readyServer($user);
 
-        $mockSsh = Mockery::mock(SshConnection::class);
-        $mockSsh->shouldReceive('exec')
-            ->andReturnUsing(function ($cmd) {
-                if (str_contains($cmd, 'compgen')) {
-                    return "===DPLY-PROBE-SEPARATOR===\ncd /var/www\nls -la\nphp artisan migrate\ngit pull\n";
-                }
-                if (str_contains($cmd, 'BIN:')) {
-                    return "BIN:missing\nJQ:missing\nSTATE:missing";
-                }
+    Livewire::actingAs($user)
+        ->test(WorkspaceConsole::class, ['server' => $server])
+        ->assertViewHas('catalogSections');
+});
 
-                return '';
-            });
+test('empty command does not execute', function () {
+    $user = userWithOrganization();
+    $server = readyServer($user);
 
-        $this->app->instance(SshConnection::class, $mockSsh);
+    Livewire::actingAs($user)
+        ->test(WorkspaceConsole::class, ['server' => $server])
+        ->set('command', '   ') // whitespace only
+        ->call('run')
+        ->assertCount('history', 0);
+});
 
-        Livewire::actingAs($user)
-            ->test(WorkspaceConsole::class, ['server' => $server])
-            ->call('loadProbes')
-            ->assertSet('historyList', ['git pull', 'php artisan migrate', 'ls -la', 'cd /var/www']);
-    }
+test('command validation rejects too long commands', function () {
+    $user = userWithOrganization();
+    $server = readyServer($user);
 
-    public function test_catalog_commands_are_passed_to_view(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = $this->readyServer($user);
+    Livewire::actingAs($user)
+        ->test(WorkspaceConsole::class, ['server' => $server])
+        ->set('command', str_repeat('a', 2001))
+        ->call('run')
+        ->assertHasErrors(['command']);
+});
 
-        $response = $this->actingAs($user)
-            ->get(route('servers.console', $server));
-
-        $response->assertOk();
-        // Catalog sections should be available
-        $this->assertTrue($response->baseResponse->original->getData()['catalogSections'] !== null);
-    }
-
-    public function test_empty_command_does_not_execute(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = $this->readyServer($user);
-
-        Livewire::actingAs($user)
-            ->test(WorkspaceConsole::class, ['server' => $server])
-            ->set('command', '   ') // whitespace only
-            ->call('run')
-            ->assertCount('history', 0);
-    }
-
-    public function test_command_validation_rejects_too_long_commands(): void
-    {
-        $user = $this->userWithOrganization();
-        $server = $this->readyServer($user);
-
-        Livewire::actingAs($user)
-            ->test(WorkspaceConsole::class, ['server' => $server])
-            ->set('command', str_repeat('a', 2001))
-            ->call('run')
-            ->assertHasErrors(['command']);
-    }
-
-    protected function tearDown(): void
-    {
-        Mockery::close();
-        parent::tearDown();
-    }
-}
+afterEach(function () {
+    Mockery::close();
+});

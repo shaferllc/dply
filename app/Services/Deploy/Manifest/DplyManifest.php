@@ -31,11 +31,27 @@ final readonly class DplyManifest
     public const ALLOWED_RUNTIMES = ['php', 'node', 'python', 'ruby', 'go', 'static'];
 
     /**
-     * Top-level keys we recognize. Unknown top-level keys produce a
-     * forward-compat warning but do not fail parsing — older dply versions
-     * can read newer manifests with new keys, and vice versa.
+     * Every top-level key the unified manifest recognizes across all site
+     * kinds. This DTO only *stores* the code-shape subset (runtime, version,
+     * build, release, processes, healthcheck) — the remaining keys are owned by
+     * sibling loaders (routing/crons/hooks/env via ByoRepoConfigLoader, and the
+     * `edge:` block via EdgeRepoConfigLoader). They are listed here so the
+     * code-shape parser does NOT emit "unknown key" warnings when it reads a
+     * real unified file that also carries those sections.
+     *
+     * Genuinely unknown keys still produce a forward-compat warning (newer
+     * manifests may add fields older clients can safely skip).
      */
-    public const KNOWN_TOP_LEVEL_KEYS = ['runtime', 'version', 'build', 'release', 'processes'];
+    public const KNOWN_TOP_LEVEL_KEYS = [
+        // code-shape (stored on this DTO)
+        'runtime', 'version', 'build', 'release', 'processes', 'healthcheck',
+        // repeatable config (owned by ByoRepoConfigLoader / EdgeRepoConfig)
+        'crons', 'server_crons', 'redirects', 'rewrites', 'headers',
+        'deploy_hooks', 'env', 'env_declarations', 'domains',
+        // Cloudflare-only block (owned by EdgeRepoConfigLoader)
+        'edge', 'bindings', 'firewall', 'origin', 'previews', 'error_pages',
+        'maintenance', 'images', 'comment_widget', 'env_files',
+    ];
 
     /**
      * @param  list<string>  $build
@@ -50,6 +66,7 @@ final readonly class DplyManifest
         public array $release,
         public array $processes,
         public array $warnings,
+        public ?string $healthcheck = null,
     ) {}
 
     public static function empty(): self
@@ -61,6 +78,21 @@ final readonly class DplyManifest
             release: [],
             processes: [],
             warnings: [],
+            healthcheck: null,
         );
+    }
+
+    /**
+     * True when the manifest declares at least one code-shape field — i.e. it
+     * has an opinion the deploy pipeline should honor (authoritative).
+     */
+    public function hasCodeShape(): bool
+    {
+        return $this->runtime !== null
+            || $this->version !== null
+            || $this->build !== []
+            || $this->release !== []
+            || $this->processes !== []
+            || $this->healthcheck !== null;
     }
 }

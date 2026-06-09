@@ -2,56 +2,38 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit;
+namespace Tests\Unit\SiteRuntimeKeyTest;
 
 use App\Enums\SiteType;
 use App\Models\Site;
-use Tests\TestCase;
 
-class SiteRuntimeKeyTest extends TestCase
-{
-    public function test_returns_runtime_column_when_set(): void
-    {
-        $site = new Site(['runtime' => 'python']);
+test('returns runtime column when set', function () {
+    $site = new Site(['runtime' => 'python']);
 
-        $this->assertSame('python', $site->runtimeKey());
-    }
+    expect($site->runtimeKey())->toBe('python');
+});
+test('falls back to type enum when runtime is null', function () {
+    $site = new Site;
+    $site->type = SiteType::Php;
 
-    public function test_falls_back_to_type_enum_when_runtime_is_null(): void
-    {
-        $site = new Site;
-        $site->type = SiteType::Php;
+    expect($site->runtimeKey())->toBe('php');
+});
+test('returns null when neither is set', function () {
+    expect((new Site)->runtimeKey())->toBeNull();
+});
+test('runtime column wins over type when both present', function () {
+    $site = new Site(['runtime' => 'ruby']);
+    $site->type = SiteType::Php;
 
-        $this->assertSame('php', $site->runtimeKey());
-    }
+    expect($site->runtimeKey())->toBe('ruby');
+});
+test('internal port is fillable and round trips', function () {
+    $site = new Site(['internal_port' => 31234]);
 
-    public function test_returns_null_when_neither_is_set(): void
-    {
-        $this->assertNull((new Site)->runtimeKey());
-    }
+    expect($site->internal_port)->toBe(31234);
+});
+test('start command is fillable and round trips', function () {
+    $site = new Site(['start_command' => 'gunicorn app:app --bind 0.0.0.0:8000']);
 
-    public function test_runtime_column_wins_over_type_when_both_present(): void
-    {
-        $site = new Site(['runtime' => 'ruby']);
-        $site->type = SiteType::Php;
-
-        $this->assertSame('ruby', $site->runtimeKey());
-    }
-
-    public function test_internal_port_is_fillable_and_round_trips(): void
-    {
-        $site = new Site(['internal_port' => 31234]);
-
-        $this->assertSame(31234, $site->internal_port);
-    }
-
-    public function test_start_command_is_fillable_and_round_trips(): void
-    {
-        $site = new Site(['start_command' => 'gunicorn app:app --bind 0.0.0.0:8000']);
-
-        $this->assertSame(
-            'gunicorn app:app --bind 0.0.0.0:8000',
-            $site->start_command,
-        );
-    }
-}
+    expect($site->start_command)->toBe('gunicorn app:app --bind 0.0.0.0:8000');
+});

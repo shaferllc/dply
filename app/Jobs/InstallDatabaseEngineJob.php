@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\WritesConsoleAction;
+use App\Models\ConsoleAction;
 use App\Models\ServerDatabaseEngine;
 use App\Models\ServerDatabaseEngineAuditEvent;
 use App\Services\Servers\DatabaseEngineAuditLogger;
@@ -12,6 +14,7 @@ use App\Support\Servers\DatabaseEngineInstallScripts;
 use App\Support\Servers\ServerDatabaseHostCapabilities;
 use App\Support\Servers\ServerResourcePreflight;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Str;
 
@@ -20,15 +23,20 @@ use Illuminate\Support\Str;
  * cache install job: preflight resources, run the apt + systemctl bash, parse the version, mark
  * the row running. Failures land the row in `failed` with a clear error message so the operator
  * can retry from the workspace.
+ *
+ * Progress streams into a {@see ConsoleAction} on the engine row so the databases workspace
+ * banner shows live apt output (same pattern as webserver switch).
  */
 class InstallDatabaseEngineJob implements ShouldQueue
 {
     use Queueable;
+    use WritesConsoleAction;
 
     public int $timeout = 1800; // apt-get on a 1 GB box can run a few minutes for mysql
 
     public function __construct(
-        public string $serverDatabaseEngineId
+        public string $serverDatabaseEngineId,
+        public ?string $userId = null,
     ) {
         $q = config('server_database.install_queue');
         if (is_string($q) && $q !== '') {
@@ -36,11 +44,27 @@ class InstallDatabaseEngineJob implements ShouldQueue
         }
     }
 
+    protected function consoleSubject(): Model
+    {
+        return ServerDatabaseEngine::query()->findOrFail($this->serverDatabaseEngineId);
+    }
+
+    protected function consoleKind(): string
+    {
+        return 'db_engine_install';
+    }
+
+    protected function triggeringUserId(): ?string
+    {
+        return $this->userId;
+    }
+
     public function handle(
         ExecuteRemoteTaskOnServer $executor,
         ServerDatabaseHostCapabilities $capabilities,
         DatabaseEngineAuditLogger $audit,
         ServerResourcePreflight $preflight,
+        \App\Services\Notifications\ServerDatabaseNotificationDispatcher $notifications,
     ): void {
         /** @var ServerDatabaseEngine|null $row */
         $row = ServerDatabaseEngine::query()->with('server')->find($this->serverDatabaseEngineId);
@@ -48,10 +72,7 @@ class InstallDatabaseEngineJob implements ShouldQueue
             return;
         }
 
-        $row->update([
-            'status' => ServerDatabaseEngine::STATUS_INSTALLING,
-            'error_message' => null,
-        ]);
+        $emit = $this->beginConsoleAction();
 
         $preflightResult = $preflight->check(
             $row->server,
@@ -59,6 +80,7 @@ class InstallDatabaseEngineJob implements ShouldQueue
         );
         if (! $preflightResult['ok']) {
             $message = (string) ($preflightResult['reason'] ?? 'Insufficient resources.');
+            $emit->error('db', $message);
             $row->update([
                 'status' => ServerDatabaseEngine::STATUS_FAILED,
                 'error_message' => Str::limit($message, 800),
@@ -72,18 +94,34 @@ class InstallDatabaseEngineJob implements ShouldQueue
                 'required_ram_mb' => $preflightResult['required_ram_mb'],
                 'required_disk_mb' => $preflightResult['required_disk_mb'],
             ]);
+            $this->failConsoleAction($message);
 
             return;
         }
+
+        $row->update([
+            'status' => ServerDatabaseEngine::STATUS_INSTALLING,
+            'error_message' => null,
+        ]);
+
+        $emit->step('db', __('Running apt install for :engine …', ['engine' => $row->engine]));
 
         try {
             $script = DatabaseEngineInstallScripts::installScript($row->engine).
                 "\n".DatabaseEngineInstallScripts::versionProbeScript($row->engine);
 
-            $output = $executor->runInlineBash(
+            $output = $executor->runInlineBashWithOutputCallback(
                 $row->server,
                 'database-engine:install:'.$row->engine,
                 $script,
+                function (string $type, string $chunk) use ($emit): void {
+                    foreach (preg_split("/\r?\n/", $chunk) ?: [] as $line) {
+                        $line = trim($line);
+                        if ($line !== '') {
+                            $emit($line, ConsoleAction::LEVEL_INFO, 'apt');
+                        }
+                    }
+                },
                 timeoutSeconds: 1800,
                 asRoot: true,
             );
@@ -109,15 +147,29 @@ class InstallDatabaseEngineJob implements ShouldQueue
                 'version' => $version,
                 'port' => $row->port,
             ]);
+
+            $notifications->notify(
+                $row->server,
+                'engine_installed',
+                [__('Engine: :engine :version', ['engine' => $row->engine, 'version' => (string) $version])],
+                $this->userId !== null ? \App\Models\User::query()->find($this->userId) : null,
+                ['engine' => $row->engine, 'version' => $version, 'port' => $row->port],
+            );
+
+            $emit->success('db', __(':engine is running.', ['engine' => $row->engine]));
+            $this->completeConsoleAction();
         } catch (\Throwable $e) {
+            $message = Str::limit($e->getMessage(), 800);
             $row->update([
                 'status' => ServerDatabaseEngine::STATUS_FAILED,
-                'error_message' => Str::limit($e->getMessage(), 800),
+                'error_message' => $message,
             ]);
             $audit->record($row->server, ServerDatabaseEngineAuditEvent::EVENT_ENGINE_INSTALL_FAILED, [
                 'engine' => $row->engine,
-                'error' => Str::limit($e->getMessage(), 800),
+                'error' => $message,
             ]);
+            $emit->error('db', $message);
+            $this->failConsoleAction($message);
         }
     }
 

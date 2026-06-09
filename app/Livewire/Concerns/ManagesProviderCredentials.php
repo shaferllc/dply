@@ -2,19 +2,25 @@
 
 namespace App\Livewire\Concerns;
 
+use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Services\AwsEc2Service;
+use App\Services\AwsEc2ServiceFactory;
+use App\Services\AzureComputeService;
 use App\Services\Cloudflare\CloudflareDnsService;
+use App\Services\Cloudflare\CloudflareEdgeCredentialValidator;
 use App\Services\DigitalOceanService;
-use App\Services\EquinixMetalService;
-use App\Services\FlyIoService;
+use App\Services\GcpDnsService;
 use App\Services\HetznerService;
 use App\Services\Imports\Forge\ForgeImportDriver;
 use App\Services\Imports\Ploi\PloiImportDriver;
 use App\Services\LinodeService;
-use App\Services\ScalewayService;
+use App\Services\OracleComputeService;
+use App\Services\OvhService;
 use App\Services\UpCloudService;
 use App\Services\VultrService;
+use App\Support\Cloud\GcpAccessToken;
+use App\Support\Edge\EdgeOrgCredentialConfig;
 use App\Support\ServerProviderGate;
 
 trait ManagesProviderCredentials
@@ -45,61 +51,21 @@ trait ManagesProviderCredentials
 
     public string $vultr_api_token = '';
 
-    public string $akamai_name = '';
-
-    public string $akamai_api_token = '';
-
-    public string $equinix_metal_name = '';
-
-    public string $equinix_metal_api_token = '';
-
-    public string $equinix_metal_project_id = '';
-
     public string $upcloud_name = '';
 
     public string $upcloud_username = '';
 
     public string $upcloud_password = '';
 
-    public string $scaleway_name = '';
-
-    public string $scaleway_api_token = '';
-
-    public string $scaleway_project_id = '';
-
     public string $ovh_name = '';
 
-    public string $ovh_api_token = '';
+    public string $ovh_endpoint = 'ovh-eu';
 
-    public string $rackspace_name = '';
+    public string $ovh_application_key = '';
 
-    public string $rackspace_api_token = '';
+    public string $ovh_application_secret = '';
 
-    public string $fly_io_name = '';
-
-    public string $fly_io_api_token = '';
-
-    public string $fly_io_org_slug = 'personal';
-
-    public string $render_name = '';
-
-    public string $render_api_token = '';
-
-    public string $railway_name = '';
-
-    public string $railway_api_token = '';
-
-    public string $coolify_name = '';
-
-    public string $coolify_api_url = '';
-
-    public string $coolify_api_token = '';
-
-    public string $cap_rover_name = '';
-
-    public string $cap_rover_api_url = '';
-
-    public string $cap_rover_api_token = '';
+    public string $ovh_consumer_key = '';
 
     public string $aws_name = '';
 
@@ -113,15 +79,27 @@ trait ManagesProviderCredentials
 
     public string $azure_name = '';
 
-    public string $azure_api_token = '';
+    public string $azure_tenant_id = '';
+
+    public string $azure_client_id = '';
+
+    public string $azure_client_secret = '';
+
+    public string $azure_subscription_id = '';
 
     public string $oracle_name = '';
 
-    public string $oracle_api_token = '';
+    public string $oracle_tenancy_ocid = '';
 
-    public string $do_app_platform_name = '';
+    public string $oracle_user_ocid = '';
 
-    public string $do_app_platform_api_token = '';
+    public string $oracle_fingerprint = '';
+
+    public string $oracle_private_key = '';
+
+    public string $oracle_region = '';
+
+    public string $oracle_compartment_id = '';
 
     public string $aws_app_runner_name = '';
 
@@ -154,6 +132,48 @@ trait ManagesProviderCredentials
     public string $vercel_dns_api_token = '';
 
     public string $vercel_dns_team_id = '';
+
+    public string $ghcr_name = '';
+
+    public string $ghcr_username = '';
+
+    public string $ghcr_token = '';
+
+    public function storeGhcr(): void
+    {
+        if (! $this->ensureProviderEnabled('ghcr')) {
+            return;
+        }
+        $this->validate([
+            'ghcr_name' => 'nullable|string|max:255',
+            'ghcr_username' => 'required|string|max:255',
+            'ghcr_token' => 'required|string',
+        ], [], [
+            'ghcr_username' => 'GitHub username',
+            'ghcr_token' => 'Personal access token',
+        ]);
+        $this->authorize('create', ProviderCredential::class);
+        $org = auth()->user()->currentOrganization();
+        if (! $org) {
+            $this->toastError('Select or create an organization first.');
+
+            return;
+        }
+        auth()->user()->providerCredentials()->create([
+            'organization_id' => $org->id,
+            'provider' => 'ghcr',
+            'name' => trim($this->ghcr_name) ?: 'GitHub Container Registry',
+            // Stored encrypted by the model cast. DO wants the
+            // `username:token` form when we attach it to the image spec.
+            'credentials' => [
+                'username' => $this->ghcr_username,
+                'token' => $this->ghcr_token,
+            ],
+        ]);
+        $this->toastSuccess('Provider connected.');
+        $this->reset('ghcr_name', 'ghcr_username', 'ghcr_token');
+        $this->notifyProviderCredentialStored('ghcr');
+    }
 
     public function storeDigitalOcean(): void
     {
@@ -253,65 +273,6 @@ trait ManagesProviderCredentials
         }
     }
 
-    public function storeAkamai(): void
-    {
-        if (! $this->ensureProviderEnabled('akamai')) {
-            return;
-        }
-        $this->validate([
-            'akamai_name' => 'nullable|string|max:255',
-            'akamai_api_token' => 'required|string',
-        ], [], ['akamai_api_token' => 'API token']);
-        if ($this->storeProviderCredential('akamai', $this->akamai_name, $this->akamai_api_token, 'akamai_api_token')) {
-            $this->reset('akamai_name', 'akamai_api_token');
-        }
-    }
-
-    public function storeEquinixMetal(): void
-    {
-        if (! $this->ensureProviderEnabled('equinix_metal')) {
-            return;
-        }
-        $this->validate([
-            'equinix_metal_name' => 'nullable|string|max:255',
-            'equinix_metal_api_token' => 'required|string',
-            'equinix_metal_project_id' => 'required|string|max:255',
-        ], [], [
-            'equinix_metal_api_token' => 'API token',
-            'equinix_metal_project_id' => 'Project ID',
-        ]);
-        $this->authorize('create', ProviderCredential::class);
-        $org = auth()->user()->currentOrganization();
-        if (! $org) {
-            $this->toastError('Select or create an organization first.');
-
-            return;
-        }
-        $credential = auth()->user()->providerCredentials()->create([
-            'organization_id' => $org->id,
-            'provider' => 'equinix_metal',
-            'name' => trim($this->equinix_metal_name) ?: 'Equinix Metal',
-            'credentials' => [
-                'api_token' => $this->equinix_metal_api_token,
-                'project_id' => $this->equinix_metal_project_id,
-            ],
-        ]);
-        try {
-            $metal = new EquinixMetalService($credential);
-            $metal->validateToken();
-        } catch (\Throwable $e) {
-            $credential->delete();
-            $msg = 'Invalid token/project or API error: '.$e->getMessage();
-            $this->addError('equinix_metal_api_token', $msg);
-            $this->toastError($msg);
-
-            return;
-        }
-        $this->toastSuccess('Provider connected.');
-        $this->reset('equinix_metal_name', 'equinix_metal_api_token', 'equinix_metal_project_id');
-        $this->notifyProviderCredentialStored('equinix_metal');
-    }
-
     public function storeUpCloud(): void
     {
         if (! $this->ensureProviderEnabled('upcloud')) {
@@ -357,51 +318,6 @@ trait ManagesProviderCredentials
         $this->notifyProviderCredentialStored('upcloud');
     }
 
-    public function storeScaleway(): void
-    {
-        if (! $this->ensureProviderEnabled('scaleway')) {
-            return;
-        }
-        $this->validate([
-            'scaleway_name' => 'nullable|string|max:255',
-            'scaleway_api_token' => 'required|string',
-            'scaleway_project_id' => 'required|string|max:255',
-        ], [], [
-            'scaleway_api_token' => 'API token',
-            'scaleway_project_id' => 'Project ID',
-        ]);
-        $this->authorize('create', ProviderCredential::class);
-        $org = auth()->user()->currentOrganization();
-        if (! $org) {
-            $this->toastError('Select or create an organization first.');
-
-            return;
-        }
-        $credential = auth()->user()->providerCredentials()->create([
-            'organization_id' => $org->id,
-            'provider' => 'scaleway',
-            'name' => trim($this->scaleway_name) ?: 'Scaleway',
-            'credentials' => [
-                'api_token' => $this->scaleway_api_token,
-                'project_id' => $this->scaleway_project_id,
-            ],
-        ]);
-        try {
-            $scw = new ScalewayService($credential);
-            $scw->validateToken();
-        } catch (\Throwable $e) {
-            $credential->delete();
-            $msg = 'Invalid token/project or API error: '.$e->getMessage();
-            $this->addError('scaleway_api_token', $msg);
-            $this->toastError($msg);
-
-            return;
-        }
-        $this->toastSuccess('Provider connected.');
-        $this->reset('scaleway_name', 'scaleway_api_token', 'scaleway_project_id');
-        $this->notifyProviderCredentialStored('scaleway');
-    }
-
     public function storeOvh(): void
     {
         if (! $this->ensureProviderEnabled('ovh')) {
@@ -409,39 +325,15 @@ trait ManagesProviderCredentials
         }
         $this->validate([
             'ovh_name' => 'nullable|string|max:255',
-            'ovh_api_token' => 'required|string',
-        ], [], ['ovh_api_token' => 'API token']);
-        if ($this->storeProviderCredential('ovh', $this->ovh_name, $this->ovh_api_token, 'ovh_api_token')) {
-            $this->reset('ovh_name', 'ovh_api_token');
-        }
-    }
-
-    public function storeRackspace(): void
-    {
-        if (! $this->ensureProviderEnabled('rackspace')) {
-            return;
-        }
-        $this->validate([
-            'rackspace_name' => 'nullable|string|max:255',
-            'rackspace_api_token' => 'required|string',
-        ], [], ['rackspace_api_token' => 'API key']);
-        if ($this->storeProviderCredential('rackspace', $this->rackspace_name, $this->rackspace_api_token, 'rackspace_api_token')) {
-            $this->reset('rackspace_name', 'rackspace_api_token');
-        }
-    }
-
-    public function storeFlyIo(): void
-    {
-        if (! $this->ensureProviderEnabled('fly_io')) {
-            return;
-        }
-        $this->validate([
-            'fly_io_name' => 'nullable|string|max:255',
-            'fly_io_api_token' => 'required|string',
-            'fly_io_org_slug' => 'required|string|max:100',
+            'ovh_endpoint' => 'required|string|in:ovh-eu,ovh-us,ovh-ca',
+            'ovh_application_key' => 'required|string|max:255',
+            'ovh_application_secret' => 'required|string|max:255',
+            'ovh_consumer_key' => 'required|string|max:255',
         ], [], [
-            'fly_io_api_token' => 'API token',
-            'fly_io_org_slug' => 'Organization slug',
+            'ovh_endpoint' => 'API endpoint',
+            'ovh_application_key' => 'Application Key',
+            'ovh_application_secret' => 'Application Secret',
+            'ovh_consumer_key' => 'Consumer Key',
         ]);
         $this->authorize('create', ProviderCredential::class);
         $org = auth()->user()->currentOrganization();
@@ -452,46 +344,41 @@ trait ManagesProviderCredentials
         }
         $credential = auth()->user()->providerCredentials()->create([
             'organization_id' => $org->id,
-            'provider' => 'fly_io',
-            'name' => trim($this->fly_io_name) ?: 'Fly.io',
+            'provider' => 'ovh',
+            'name' => trim($this->ovh_name) ?: 'OVH',
             'credentials' => [
-                'api_token' => $this->fly_io_api_token,
-                'org_slug' => $this->fly_io_org_slug,
+                'endpoint' => $this->ovh_endpoint,
+                'application_key' => $this->ovh_application_key,
+                'application_secret' => $this->ovh_application_secret,
+                'consumer_key' => $this->ovh_consumer_key,
             ],
         ]);
+
         try {
-            $fly = new FlyIoService($credential);
-            $fly->validateToken($this->fly_io_org_slug);
+            $ovh = new OvhService($credential);
+            $ovh->validateToken();
+
+            // Bind the credential to a Cloud project so provisioning knows where
+            // instances live (OVH instances are project-scoped, not account-scoped).
+            $project = $ovh->projectId();
+            $credential->update(['credentials' => array_merge($credential->credentials, ['project' => $project])]);
         } catch (\Throwable $e) {
             $credential->delete();
-            $msg = 'Invalid token or API error: '.$e->getMessage();
-            $this->addError('fly_io_api_token', $msg);
+            $msg = 'Invalid OVH credentials or API error: '.$e->getMessage();
+            $this->addError('ovh_application_key', $msg);
             $this->toastError($msg);
 
             return;
         }
-        $this->toastSuccess('Provider connected.');
-        $this->reset('fly_io_name', 'fly_io_api_token', 'fly_io_org_slug');
-        $this->notifyProviderCredentialStored('fly_io');
-    }
 
-    public function storeDigitalOceanAppPlatform(): void
-    {
-        if (! $this->ensureProviderEnabled('digitalocean_app_platform')) {
-            return;
-        }
-        $this->validate([
-            'do_app_platform_name' => 'nullable|string|max:255',
-            'do_app_platform_api_token' => 'required|string',
-        ], [], ['do_app_platform_api_token' => 'API token']);
-        if ($this->storeProviderCredential(
-            'digitalocean_app_platform',
-            $this->do_app_platform_name,
-            $this->do_app_platform_api_token,
-            'do_app_platform_api_token',
-        )) {
-            $this->reset('do_app_platform_name', 'do_app_platform_api_token');
-        }
+        audit_log($org, auth()->user(), 'credential.created', $credential, null, [
+            'provider' => 'ovh',
+            'name' => $credential->name,
+        ]);
+
+        $this->toastSuccess('Provider connected.');
+        $this->reset('ovh_name', 'ovh_application_key', 'ovh_application_secret', 'ovh_consumer_key');
+        $this->notifyProviderCredentialStored('ovh');
     }
 
     public function storeAwsAppRunner(): void
@@ -535,84 +422,6 @@ trait ManagesProviderCredentials
         $this->notifyProviderCredentialStored('aws_app_runner');
     }
 
-    public function storeRender(): void
-    {
-        if (! $this->ensureProviderEnabled('render')) {
-            return;
-        }
-        $this->validate(['render_name' => 'nullable|string|max:255', 'render_api_token' => 'required|string'], [], ['render_api_token' => 'API token']);
-        if ($this->storeProviderCredential('render', $this->render_name, $this->render_api_token, 'render_api_token')) {
-            $this->reset('render_name', 'render_api_token');
-        }
-    }
-
-    public function storeRailway(): void
-    {
-        if (! $this->ensureProviderEnabled('railway')) {
-            return;
-        }
-        $this->validate(['railway_name' => 'nullable|string|max:255', 'railway_api_token' => 'required|string'], [], ['railway_api_token' => 'API token']);
-        if ($this->storeProviderCredential('railway', $this->railway_name, $this->railway_api_token, 'railway_api_token')) {
-            $this->reset('railway_name', 'railway_api_token');
-        }
-    }
-
-    public function storeCoolify(): void
-    {
-        if (! $this->ensureProviderEnabled('coolify')) {
-            return;
-        }
-        $this->validate([
-            'coolify_name' => 'nullable|string|max:255',
-            'coolify_api_url' => 'required|string|max:500',
-            'coolify_api_token' => 'required|string',
-        ], [], ['coolify_api_url' => 'Coolify server URL', 'coolify_api_token' => 'API token']);
-        $this->authorize('create', ProviderCredential::class);
-        $org = auth()->user()->currentOrganization();
-        if (! $org) {
-            $this->toastError('Select or create an organization first.');
-
-            return;
-        }
-        auth()->user()->providerCredentials()->create([
-            'organization_id' => $org->id,
-            'provider' => 'coolify',
-            'name' => trim($this->coolify_name) ?: 'Coolify',
-            'credentials' => ['api_url' => rtrim($this->coolify_api_url, '/'), 'api_token' => $this->coolify_api_token],
-        ]);
-        $this->toastSuccess('Credential saved. Server create/destroy not yet implemented.');
-        $this->reset('coolify_name', 'coolify_api_url', 'coolify_api_token');
-        $this->notifyProviderCredentialStored('coolify');
-    }
-
-    public function storeCapRover(): void
-    {
-        if (! $this->ensureProviderEnabled('cap_rover')) {
-            return;
-        }
-        $this->validate([
-            'cap_rover_name' => 'nullable|string|max:255',
-            'cap_rover_api_url' => 'required|string|max:500',
-            'cap_rover_api_token' => 'required|string',
-        ], [], ['cap_rover_api_url' => 'CapRover server URL', 'cap_rover_api_token' => 'API token']);
-        $this->authorize('create', ProviderCredential::class);
-        $org = auth()->user()->currentOrganization();
-        if (! $org) {
-            $this->toastError('Select or create an organization first.');
-
-            return;
-        }
-        auth()->user()->providerCredentials()->create([
-            'organization_id' => $org->id,
-            'provider' => 'cap_rover',
-            'name' => trim($this->cap_rover_name) ?: 'CapRover',
-            'credentials' => ['api_url' => rtrim($this->cap_rover_api_url, '/'), 'api_token' => $this->cap_rover_api_token],
-        ]);
-        $this->toastSuccess('Credential saved. Server create/destroy not yet implemented.');
-        $this->reset('cap_rover_name', 'cap_rover_api_url', 'cap_rover_api_token');
-        $this->notifyProviderCredentialStored('cap_rover');
-    }
-
     public function storeAws(): void
     {
         if (! $this->ensureProviderEnabled('aws')) {
@@ -637,7 +446,7 @@ trait ManagesProviderCredentials
             'credentials' => ['access_key_id' => $this->aws_access_key_id, 'secret_access_key' => $this->aws_secret_access_key],
         ]);
         try {
-            $aws = new AwsEc2Service($credential);
+            $aws = app(AwsEc2ServiceFactory::class)->make($credential);
             $aws->validateCredentials();
         } catch (\Throwable $e) {
             $credential->delete();
@@ -657,10 +466,63 @@ trait ManagesProviderCredentials
         if (! $this->ensureProviderEnabled('gcp')) {
             return;
         }
-        $this->validate(['gcp_name' => 'nullable|string|max:255', 'gcp_api_token' => 'required|string'], [], ['gcp_api_token' => 'API token']);
-        if ($this->storeProviderCredential('gcp', $this->gcp_name, $this->gcp_api_token, 'gcp_api_token')) {
-            $this->reset('gcp_name', 'gcp_api_token');
+        $this->validate([
+            'gcp_name' => 'nullable|string|max:255',
+            'gcp_api_token' => 'required|string',
+        ], [], [
+            'gcp_api_token' => 'Service account JSON',
+        ]);
+        $this->authorize('create', ProviderCredential::class);
+        $org = auth()->user()->currentOrganization();
+        if (! $org) {
+            $this->toastError('Select or create an organization first.');
+
+            return;
         }
+
+        try {
+            $serviceAccount = GcpAccessToken::normalizeServiceAccount($this->gcp_api_token);
+        } catch (\Throwable $e) {
+            $msg = 'Invalid service account JSON: '.$e->getMessage();
+            $this->addError('gcp_api_token', $msg);
+            $this->toastError($msg);
+
+            return;
+        }
+
+        $projectId = trim((string) ($serviceAccount['project_id'] ?? ''));
+        if ($projectId === '') {
+            $msg = 'The service account JSON must include project_id.';
+            $this->addError('gcp_api_token', $msg);
+            $this->toastError($msg);
+
+            return;
+        }
+
+        $credential = auth()->user()->providerCredentials()->create([
+            'organization_id' => $org->id,
+            'provider' => 'gcp',
+            'name' => trim($this->gcp_name) ?: 'Google Cloud',
+            'credentials' => [
+                'project_id' => $projectId,
+                'service_account' => $serviceAccount,
+            ],
+        ]);
+
+        try {
+            (new GcpDnsService($credential))->validateCredentials();
+        } catch (\Throwable $e) {
+            $credential->delete();
+            $msg = 'Invalid service account or API error: '.$e->getMessage();
+            $this->addError('gcp_api_token', $msg);
+            $this->toastError($msg);
+
+            return;
+        }
+
+        $this->toastSuccess('Provider connected.');
+        $this->reset('gcp_name', 'gcp_api_token');
+        $this->notifyProviderCredentialStored('gcp');
     }
 
     public function storeAzure(): void
@@ -668,10 +530,49 @@ trait ManagesProviderCredentials
         if (! $this->ensureProviderEnabled('azure')) {
             return;
         }
-        $this->validate(['azure_name' => 'nullable|string|max:255', 'azure_api_token' => 'required|string'], [], ['azure_api_token' => 'API token']);
-        if ($this->storeProviderCredential('azure', $this->azure_name, $this->azure_api_token, 'azure_api_token')) {
-            $this->reset('azure_name', 'azure_api_token');
+        $this->validate([
+            'azure_name' => 'nullable|string|max:255',
+            'azure_tenant_id' => 'required|string|max:255',
+            'azure_client_id' => 'required|string|max:255',
+            'azure_client_secret' => 'required|string',
+            'azure_subscription_id' => 'required|string|max:255',
+        ], [], [
+            'azure_tenant_id' => 'Tenant ID',
+            'azure_client_id' => 'Client ID',
+            'azure_client_secret' => 'Client secret',
+            'azure_subscription_id' => 'Subscription ID',
+        ]);
+        $this->authorize('create', ProviderCredential::class);
+        $org = auth()->user()->currentOrganization();
+        if (! $org) {
+            $this->toastError('Select or create an organization first.');
+
+            return;
         }
+        $credential = auth()->user()->providerCredentials()->create([
+            'organization_id' => $org->id,
+            'provider' => 'azure',
+            'name' => trim($this->azure_name) ?: 'Azure',
+            'credentials' => [
+                'tenant_id' => trim($this->azure_tenant_id),
+                'client_id' => trim($this->azure_client_id),
+                'client_secret' => $this->azure_client_secret,
+                'subscription_id' => trim($this->azure_subscription_id),
+            ],
+        ]);
+        try {
+            (new AzureComputeService($credential))->validateCredentials();
+        } catch (\Throwable $e) {
+            $credential->delete();
+            $msg = 'Invalid Azure credentials or API error: '.$e->getMessage();
+            $this->addError('azure_client_secret', $msg);
+            $this->toastError($msg);
+
+            return;
+        }
+        $this->toastSuccess('Provider connected.');
+        $this->reset('azure_name', 'azure_tenant_id', 'azure_client_id', 'azure_client_secret', 'azure_subscription_id');
+        $this->notifyProviderCredentialStored('azure');
     }
 
     public function storeOracle(): void
@@ -679,10 +580,66 @@ trait ManagesProviderCredentials
         if (! $this->ensureProviderEnabled('oracle')) {
             return;
         }
-        $this->validate(['oracle_name' => 'nullable|string|max:255', 'oracle_api_token' => 'required|string'], [], ['oracle_api_token' => 'API token']);
-        if ($this->storeProviderCredential('oracle', $this->oracle_name, $this->oracle_api_token, 'oracle_api_token')) {
-            $this->reset('oracle_name', 'oracle_api_token');
+        $this->validate([
+            'oracle_name' => 'nullable|string|max:255',
+            'oracle_tenancy_ocid' => 'required|string|max:255',
+            'oracle_user_ocid' => 'required|string|max:255',
+            'oracle_fingerprint' => 'required|string|max:255',
+            'oracle_private_key' => 'required|string',
+            'oracle_region' => 'required|string|max:100',
+            'oracle_compartment_id' => 'nullable|string|max:255',
+        ], [], [
+            'oracle_tenancy_ocid' => 'Tenancy OCID',
+            'oracle_user_ocid' => 'User OCID',
+            'oracle_fingerprint' => 'API key fingerprint',
+            'oracle_private_key' => 'Private key',
+            'oracle_region' => 'Region',
+            'oracle_compartment_id' => 'Compartment OCID',
+        ]);
+        $this->authorize('create', ProviderCredential::class);
+        $org = auth()->user()->currentOrganization();
+        if (! $org) {
+            $this->toastError('Select or create an organization first.');
+
+            return;
         }
+        $credential = auth()->user()->providerCredentials()->create([
+            'organization_id' => $org->id,
+            'provider' => 'oracle',
+            'name' => trim($this->oracle_name) ?: 'Oracle Cloud',
+            'credentials' => [
+                'tenancy_ocid' => trim($this->oracle_tenancy_ocid),
+                'user_ocid' => trim($this->oracle_user_ocid),
+                'fingerprint' => trim($this->oracle_fingerprint),
+                'private_key' => $this->oracle_private_key,
+                'region' => trim($this->oracle_region),
+                'compartment_id' => trim($this->oracle_compartment_id) !== ''
+                    ? trim($this->oracle_compartment_id)
+                    : trim($this->oracle_tenancy_ocid),
+            ],
+        ]);
+        try {
+            (new OracleComputeService($credential))->validateCredentials();
+        } catch (\Throwable $e) {
+            $credential->delete();
+            $msg = 'Invalid Oracle credentials or API error: '.$e->getMessage();
+            $this->addError('oracle_private_key', $msg);
+            $this->toastError($msg);
+
+            return;
+        }
+
+        $this->toastSuccess('Provider connected.');
+        $this->reset(
+            'oracle_name',
+            'oracle_tenancy_ocid',
+            'oracle_user_ocid',
+            'oracle_fingerprint',
+            'oracle_private_key',
+            'oracle_region',
+            'oracle_compartment_id',
+        );
+        $this->notifyProviderCredentialStored('oracle');
     }
 
     public function storeGandi(): void
@@ -789,7 +746,7 @@ trait ManagesProviderCredentials
 
         $defaultNames = [
             'digitalocean' => 'DigitalOcean', 'cloudflare' => 'Cloudflare', 'hetzner' => 'Hetzner', 'linode' => 'Linode', 'vultr' => 'Vultr',
-            'akamai' => 'Akamai', 'ovh' => 'OVH', 'rackspace' => 'Rackspace', 'render' => 'Render', 'railway' => 'Railway',
+            'ovh' => 'OVH',
             'gcp' => 'GCP', 'azure' => 'Azure', 'oracle' => 'Oracle Cloud', 'ploi' => 'Ploi', 'forge' => 'Laravel Forge',
             'gandi' => 'Gandi',
         ];
@@ -807,7 +764,7 @@ trait ManagesProviderCredentials
             } elseif ($provider === 'hetzner') {
                 $hetzner = new HetznerService($credential);
                 $hetzner->validateToken();
-            } elseif ($provider === 'linode' || $provider === 'akamai') {
+            } elseif ($provider === 'linode') {
                 $linode = new LinodeService($credential);
                 $linode->validateToken();
             } elseif ($provider === 'vultr') {
@@ -815,11 +772,15 @@ trait ManagesProviderCredentials
                 $vultr->validateToken();
             } elseif ($provider === 'cloudflare') {
                 (new CloudflareDnsService($credential))->verifyToken();
+                if (($this->capability ?? null) === 'cdn') {
+                    $accountId = (new CloudflareEdgeCredentialValidator)->validate($credential);
+                    EdgeOrgCredentialConfig::merge($credential, ['account_id' => $accountId]);
+                }
             } elseif ($provider === 'ploi') {
                 PloiImportDriver::for($credential)->validateConnection();
             } elseif ($provider === 'forge') {
                 ForgeImportDriver::for($credential)->validateConnection();
-            } elseif (in_array($provider, ['ovh', 'rackspace', 'render', 'railway', 'gcp', 'azure', 'oracle', 'digitalocean_app_platform', 'gandi'], true)) {
+            } elseif (in_array($provider, ['gandi', 'ghcr'], true)) {
                 // No validation service yet; credential saved for future use
             } else {
                 throw new \InvalidArgumentException("Unknown provider: {$provider}");
@@ -831,6 +792,13 @@ trait ManagesProviderCredentials
             $this->toastError($msg);
 
             return false;
+        }
+
+        if ($org) {
+            audit_log($org, auth()->user(), 'credential.created', $credential, null, [
+                'provider' => $provider,
+                'name' => $credential->name,
+            ]);
         }
 
         $this->toastSuccess('Provider connected.');
@@ -849,14 +817,18 @@ trait ManagesProviderCredentials
     public function canVerifyCredentialProvider(string $provider): bool
     {
         return in_array($provider, [
-            'digitalocean', 'cloudflare', 'hetzner', 'linode', 'akamai', 'vultr',
-            'equinix_metal', 'upcloud', 'scaleway', 'fly_io', 'aws', 'ploi', 'forge',
+            'digitalocean', 'cloudflare', 'hetzner', 'linode', 'vultr',
+            'upcloud', 'aws', 'gcp', 'azure', 'oracle', 'ploi', 'forge',
         ], true);
     }
 
     public function verifyCredential(string $id): void
     {
         $this->verifyingCredentialId = $id;
+
+        $credential = null;
+        $ok = false;
+        $error = null;
 
         try {
             $credential = ProviderCredential::findOrFail($id);
@@ -871,25 +843,41 @@ trait ManagesProviderCredentials
             match ($credential->provider) {
                 // Light GET /account — confirms the token works (same check as when connecting).
                 'digitalocean' => (new DigitalOceanService($credential))->validateToken(),
-                'cloudflare' => (new CloudflareDnsService($credential))->verifyToken(),
+                'cloudflare' => EdgeOrgCredentialConfig::isBootstrapped($credential)
+                    ? (new CloudflareEdgeCredentialValidator)->validate($credential)
+                    : (new CloudflareDnsService($credential))->verifyToken(),
                 'hetzner' => (new HetznerService($credential))->validateToken(),
-                'linode', 'akamai' => (new LinodeService($credential))->validateToken(),
+                'linode' => (new LinodeService($credential))->validateToken(),
                 'vultr' => (new VultrService($credential))->validateToken(),
-                'equinix_metal' => (new EquinixMetalService($credential))->validateToken(),
                 'upcloud' => (new UpCloudService($credential))->validateToken(),
-                'scaleway' => (new ScalewayService($credential))->validateToken(),
-                'fly_io' => (new FlyIoService($credential))->validateToken($credential->credentials['org_slug'] ?? 'personal'),
                 'aws' => (new AwsEc2Service($credential))->validateCredentials(),
+                'gcp' => (new GcpDnsService($credential))->validateCredentials(),
+                'azure' => (new AzureComputeService($credential))->validateCredentials(),
+                'oracle' => (new OracleComputeService($credential))->validateCredentials(),
                 'ploi' => PloiImportDriver::for($credential)->validateConnection(),
                 'forge' => ForgeImportDriver::for($credential)->validateConnection(),
                 default => throw new \RuntimeException(__('Unknown provider.')),
             };
 
+            $ok = true;
             $this->toastSuccess(__('Credentials verified with the provider API.'));
         } catch (\Throwable $e) {
-            $this->toastError($e->getMessage());
+            $error = $e->getMessage();
+            $this->toastError($error);
         } finally {
             $this->verifyingCredentialId = null;
+        }
+
+        if ($credential !== null) {
+            $org = $credential->organization_id
+                ? Organization::find($credential->organization_id)
+                : auth()->user()?->currentOrganization();
+            if ($org) {
+                audit_log($org, auth()->user(), $ok ? 'credential.verified' : 'credential.verify_failed', $credential, null, [
+                    'provider' => $credential->provider,
+                    'error' => $error,
+                ]);
+            }
         }
     }
 
@@ -897,7 +885,22 @@ trait ManagesProviderCredentials
     {
         $credential = ProviderCredential::findOrFail($id);
         $this->authorize('delete', $credential);
+
+        $snapshot = [
+            'provider' => $credential->provider,
+            'name' => $credential->name,
+        ];
+
+        $org = $credential->organization_id
+            ? Organization::find($credential->organization_id)
+            : auth()->user()?->currentOrganization();
+
         $credential->delete();
+
+        if ($org) {
+            audit_log($org, auth()->user(), 'credential.deleted', null, $snapshot, null);
+        }
+
         $this->toastSuccess('Credential removed.');
     }
 }

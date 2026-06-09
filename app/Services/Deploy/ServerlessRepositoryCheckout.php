@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Deploy;
 
-use App\Models\SocialAccount;
+use App\Models\User;
+use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Process\Process;
@@ -13,6 +14,7 @@ final class ServerlessRepositoryCheckout
 {
     public function __construct(
         private readonly SourceControlRepositoryBrowser $repositoryBrowser,
+        private readonly GitIdentityResolver $resolver = new GitIdentityResolver,
     ) {}
 
     /**
@@ -31,10 +33,13 @@ final class ServerlessRepositoryCheckout
         string $subdirectory = '',
         int|string|null $userId = null,
         ?string $sourceControlAccountId = null,
+        ?string $refKind = null,
     ): array {
         $repositoryUrl = trim($repositoryUrl);
         $branch = trim($branch) !== '' ? trim($branch) : 'main';
         $subdirectory = trim($subdirectory, '/');
+        $refKind = in_array($refKind, ['branch', 'tag', 'commit'], true) ? $refKind : 'branch';
+        $isCommit = $refKind === 'commit';
 
         if ($repositoryUrl === '') {
             throw new \RuntimeException('Choose a repository before continuing.');
@@ -50,23 +55,36 @@ final class ServerlessRepositoryCheckout
 
         if (is_dir($repositoryPath.'/.git')) {
             $log[] = $this->run(['git', '-C', $repositoryPath, 'remote', 'set-url', 'origin', $cloneUrl], $workspacePath);
-            $resolvedBranch = $this->fetchBranch($repositoryPath, $workspacePath, $cloneUrl, $branch, $log);
-            $log[] = $this->run(['git', '-C', $repositoryPath, 'checkout', '-B', $resolvedBranch, 'FETCH_HEAD'], $workspacePath);
-            $log[] = $this->run(['git', '-C', $repositoryPath, 'clean', '-fdx'], $workspacePath);
+            if ($isCommit) {
+                // Commit SHAs: fetch full history then detached checkout.
+                $log[] = $this->run(['git', '-C', $repositoryPath, 'fetch', '--all', '--prune'], $workspacePath);
+                $log[] = $this->run(['git', '-C', $repositoryPath, 'checkout', '--detach', $branch], $workspacePath);
+                $log[] = $this->run(['git', '-C', $repositoryPath, 'clean', '-fdx'], $workspacePath);
+            } else {
+                $resolvedBranch = $this->fetchBranch($repositoryPath, $workspacePath, $cloneUrl, $branch, $log);
+                $log[] = $this->run(['git', '-C', $repositoryPath, 'checkout', '-B', $resolvedBranch, 'FETCH_HEAD'], $workspacePath);
+                $log[] = $this->run(['git', '-C', $repositoryPath, 'clean', '-fdx'], $workspacePath);
+            }
         } else {
             File::deleteDirectory($repositoryPath);
-            try {
-                $log[] = $this->run(['git', 'clone', '--depth', '1', '--branch', $branch, $cloneUrl, $repositoryPath], $workspacePath);
-            } catch (\RuntimeException $e) {
-                $fallbackBranch = $this->defaultBranchForCloneUrl($cloneUrl, $workspacePath);
-                if ($fallbackBranch === null || $fallbackBranch === $branch) {
-                    throw $e;
-                }
+            if ($isCommit) {
+                // Full clone (no --depth, no --branch) so any commit is reachable.
+                $log[] = $this->run(['git', 'clone', $cloneUrl, $repositoryPath], $workspacePath);
+                $log[] = $this->run(['git', '-C', $repositoryPath, 'checkout', '--detach', $branch], $workspacePath);
+            } else {
+                try {
+                    $log[] = $this->run(['git', 'clone', '--depth', '1', '--branch', $branch, $cloneUrl, $repositoryPath], $workspacePath);
+                } catch (\RuntimeException $e) {
+                    $fallbackBranch = $this->defaultBranchForCloneUrl($cloneUrl, $workspacePath);
+                    if ($fallbackBranch === null || $fallbackBranch === $branch) {
+                        throw $e;
+                    }
 
-                $resolvedBranch = $fallbackBranch;
-                $log[] = sprintf('Requested branch "%s" was unavailable. Falling back to remote default branch "%s".', $branch, $fallbackBranch);
-                File::deleteDirectory($repositoryPath);
-                $log[] = $this->run(['git', 'clone', '--depth', '1', '--branch', $fallbackBranch, $cloneUrl, $repositoryPath], $workspacePath);
+                    $resolvedBranch = $fallbackBranch;
+                    $log[] = sprintf('Requested branch "%s" was unavailable. Falling back to remote default branch "%s".', $branch, $fallbackBranch);
+                    File::deleteDirectory($repositoryPath);
+                    $log[] = $this->run(['git', 'clone', '--depth', '1', '--branch', $fallbackBranch, $cloneUrl, $repositoryPath], $workspacePath);
+                }
             }
         }
 
@@ -105,15 +123,17 @@ final class ServerlessRepositoryCheckout
             return $this->normalizeRepositoryUrl($repositoryUrl);
         }
 
-        $account = SocialAccount::query()
-            ->where('user_id', $userId)
-            ->find($accountId);
-
-        if (! $account) {
+        $user = User::query()->find($userId);
+        if ($user === null) {
             throw new \RuntimeException('The selected source-control account could not be found.');
         }
 
-        return $this->repositoryBrowser->authenticatedCloneUrl($account, $repositoryUrl);
+        $identity = $this->resolver->forId($user, $accountId);
+        if ($identity === null) {
+            throw new \RuntimeException('The selected source-control account could not be found.');
+        }
+
+        return $this->repositoryBrowser->authenticatedCloneUrl($identity, $repositoryUrl);
     }
 
     /**

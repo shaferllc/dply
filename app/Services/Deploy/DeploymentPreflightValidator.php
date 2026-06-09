@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Deploy;
 
 use App\Models\Site;
+use App\Support\Deployment\DeploymentContract;
 
 final class DeploymentPreflightValidator
 {
@@ -20,9 +21,9 @@ final class DeploymentPreflightValidator
      *     checks: list<array{key: string, level: string, message: string}>
      * }
      */
-    public function validate(Site $site): array
+    public function validate(Site $site, ?DeploymentContract $contract = null): array
     {
-        $contract = $this->contractBuilder->build($site);
+        $contract ??= $this->contractBuilder->build($site);
         $errors = [];
         $warnings = [];
         $checks = [];
@@ -48,13 +49,20 @@ final class DeploymentPreflightValidator
             $checks[] = $this->check('app_key', 'error', 'APP_KEY is missing for a Laravel deployment.');
         }
 
-        if ($site->runtimeTargetMode() === 'vm' && ! filled($site->testingHostname()) && ! filled(optional($site->primaryDomain())->hostname)) {
+        // Headless sites (webserver=none, e.g. workers) have no HTTP front, so a
+        // missing publication hostname / domain is expected — not a warning.
+        if ($site->runtimeTargetMode() === 'vm' && ! $site->isHeadless() && ! filled($site->testingHostname()) && ! filled(optional($site->primaryDomain())->hostname)) {
             $warnings[] = 'No preview or primary domain is configured yet.';
             $checks[] = $this->check('publication', 'warning', 'No publication hostname is configured yet.');
         }
 
         foreach ($contract->resourceBindings as $binding) {
             if (! $binding->required || $binding->status === 'configured') {
+                continue;
+            }
+
+            // Headless sites serve no HTTP — publication/routing bindings don't apply.
+            if ($site->isHeadless() && $binding->type === 'publication') {
                 continue;
             }
 

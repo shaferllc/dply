@@ -23,12 +23,7 @@
     }
 
     // Catalog of all webservers dply knows about. Order = display order.
-    $webserverCatalog = [
-        'nginx' => ['label' => 'nginx', 'icon' => 'heroicon-o-bolt', 'systemd' => 'nginx'],
-        'caddy' => ['label' => 'Caddy', 'icon' => 'heroicon-o-shield-check', 'systemd' => 'caddy'],
-        'apache' => ['label' => 'Apache', 'icon' => 'heroicon-o-cube', 'systemd' => 'apache2'],
-        'openlitespeed' => ['label' => 'OpenLiteSpeed', 'icon' => 'heroicon-o-rocket-launch', 'systemd' => 'lshttpd'],
-    ];
+    $webserverCatalog = \App\Support\Servers\WebserverWorkspaceViewData::webserverCatalog();
 
     // Parse certbot output into a structured table (best-effort regex).
     $certs = [];
@@ -170,49 +165,23 @@
                 @continue($key === $activeWebserver)
                 @php
                     $isBlocked = $preflight->isBlocked($server, $key);
+                    $isComingSoon = ! empty($info['coming_soon']);
                 @endphp
                 <div class="rounded-xl border border-brand-ink/10 bg-white p-4">
-                    <div class="flex items-start gap-2">
-                        <x-dynamic-component :component="$info['icon']" class="mt-0.5 h-5 w-5 shrink-0 text-brand-forest" />
-                        <div class="min-w-0">
-                            <p class="font-semibold text-brand-ink">{{ $info['label'] }}</p>
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="flex min-w-0 items-start gap-2">
+                            <x-dynamic-component :component="$info['icon']" class="mt-0.5 h-5 w-5 shrink-0 text-brand-forest" />
+                            <p class="min-w-0 font-semibold text-brand-ink">{{ $info['label'] }}</p>
                         </div>
+                        @if ($isComingSoon)
+                            <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-brand-sand/70 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">
+                                <x-heroicon-o-clock class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                {{ __('Soon') }}
+                            </span>
+                        @endif
                     </div>
 
-                    @if ($inflightSwitch)
-                        <div class="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-brand-sand/40 px-3 py-1.5 text-xs font-semibold text-brand-mist">
-                            <x-spinner variant="forest" size="sm" />
-                            <span>{{ __('Switching in progress…') }}</span>
-                        </div>
-                    @else
-                        <button
-                            type="button"
-                            wire:click="openSwitchWebserver('{{ $key }}')"
-                            wire:loading.attr="disabled"
-                            wire:target="openSwitchWebserver"
-                            @disabled($isDeployer || ! $opsReady || $isBlocked)
-                            @class([
-                                'mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition disabled:opacity-60',
-                                'bg-brand-forest text-brand-cream shadow-sm shadow-brand-forest/20 hover:bg-brand-forest/90' => ! $isBlocked,
-                                'cursor-not-allowed bg-brand-sand/40 text-brand-mist' => $isBlocked,
-                            ])
-                            title="{{ $isBlocked ? __('Unavailable — see preflight blocker') : '' }}"
-                        >
-                            <span class="inline-flex items-center gap-1.5" wire:loading.remove wire:target="openSwitchWebserver">
-                                @if ($isBlocked)
-                                    <x-heroicon-o-no-symbol class="h-3.5 w-3.5" />
-                                    {{ __('Unavailable') }}
-                                @else
-                                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
-                                    {{ __('Switch to :name', ['name' => $info['label']]) }}
-                                @endif
-                            </span>
-                            <span class="inline-flex items-center gap-1.5" wire:loading wire:target="openSwitchWebserver">
-                                <x-spinner variant="cream" size="sm" />
-                                {{ __('Preparing…') }}
-                            </span>
-                        </button>
-                    @endif
+                    @include('livewire.servers.partials.webserver._switch-target-action')
                 </div>
             @endforeach
         </div>
@@ -283,129 +252,7 @@
         </div>
     @endif
 
-    {{-- Cascade confirmation modal — opened by openSwitchWebserver(). Renders the
-         preflight blocker (if any), always-applied + opt-in cascades, computed
-         downtime breakdown, and the manual list. Cancel + "Switch to <target>". --}}
-    @if ($switch_plan !== null)
-        <x-modal
-            name="webserver-switch-modal"
-            maxWidth="2xl"
-            overlayClass="bg-brand-ink/40"
-            panelClass="dply-modal-panel overflow-hidden shadow-xl flex max-h-[min(90vh,880px)] flex-col"
-        >
-            <div class="shrink-0 border-b border-brand-ink/10 px-6 py-5">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Confirm switch') }}</p>
-                <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Switch webserver?') }}</h2>
-                <div class="mt-3 inline-flex flex-wrap items-center gap-2 rounded-xl border border-brand-ink/10 bg-brand-sand/30 px-3 py-2 font-mono text-sm text-brand-ink">
-                    <span>{{ $switch_plan['from'] }}</span>
-                    <x-heroicon-o-arrow-right class="h-3.5 w-3.5 shrink-0 text-brand-mist" />
-                    <span>{{ $switch_plan['to'] }}</span>
-                </div>
-            </div>
-
-            <div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-6">
-                @if ($switch_plan['blocker'] !== null)
-                    <div class="rounded-xl border border-rose-200 bg-rose-50/70 px-4 py-3">
-                        <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-900">
-                            <x-heroicon-m-no-symbol class="h-3.5 w-3.5" />
-                            {{ __('Cannot switch') }}
-                        </p>
-                        <p class="mt-2 text-sm leading-relaxed text-rose-900">{{ $switch_plan['blocker']['label'] }}</p>
-                    </div>
-                @else
-                    {{-- Always applied --}}
-                    <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Always applied') }}</p>
-                        <ul class="mt-2 space-y-1.5">
-                            @foreach ($switch_plan['auto'] as $row)
-                                <li class="flex items-start gap-2 text-sm text-brand-ink">
-                                    <x-heroicon-m-check-circle class="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                                    <span>{{ $row['label'] }}</span>
-                                </li>
-                            @endforeach
-                        </ul>
-                    </div>
-
-                    {{-- Opt-in --}}
-                    @if (! empty($switch_plan['optIn']))
-                        <div>
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Opt in') }}</p>
-                            <ul class="mt-2 space-y-2">
-                                @foreach ($switch_plan['optIn'] as $row)
-                                    @php
-                                        $wireModel = match ($row['key']) {
-                                            'tls_to_caddy' => 'switch_tls_to_caddy',
-                                            default => null,
-                                        };
-                                    @endphp
-                                    @if ($wireModel)
-                                        <li class="flex items-start gap-2 rounded-xl border border-brand-ink/10 bg-white px-3 py-2.5">
-                                            <input id="switch-optin-{{ $row['key'] }}" type="checkbox" wire:model="{{ $wireModel }}" class="mt-0.5 h-4 w-4 rounded border-brand-ink/20 text-brand-forest focus:ring-brand-sage/30" />
-                                            <label for="switch-optin-{{ $row['key'] }}" class="text-sm leading-relaxed text-brand-ink">{{ $row['label'] }}</label>
-                                        </li>
-                                    @endif
-                                @endforeach
-                            </ul>
-                        </div>
-                    @endif
-
-                    {{-- Computed downtime --}}
-                    <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Estimated timing') }}</p>
-                        <ul class="mt-2 divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10 bg-white">
-                            @foreach ($switch_plan['downtime'] as $phase)
-                                @php
-                                    $secs = max(1, (int) round($phase['estimate_ms'] / 1000));
-                                    $secLabel = $phase['estimate_ms'] < 1000
-                                        ? trans_choice(':n ms|:n ms', $phase['estimate_ms'], ['n' => $phase['estimate_ms']])
-                                        : trans_choice(':n second|:n seconds', $secs, ['n' => $secs]);
-                                @endphp
-                                <li class="flex items-center justify-between gap-3 px-3 py-2 text-sm">
-                                    <span class="text-brand-ink">{{ $phase['label'] }}</span>
-                                    <span class="flex items-center gap-2">
-                                        <span class="font-mono text-[11px] text-brand-moss">~{{ $secLabel }}</span>
-                                        @if ($phase['blocking'])
-                                            <span class="inline-flex items-center rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-800 ring-1 ring-rose-200">{{ __('downtime') }}</span>
-                                        @else
-                                            <span class="inline-flex items-center rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-800 ring-1 ring-emerald-200">{{ __('live') }}</span>
-                                        @endif
-                                    </span>
-                                </li>
-                            @endforeach
-                        </ul>
-                    </div>
-
-                    {{-- Manual / unfixable --}}
-                    @if (! empty($switch_plan['manual']))
-                        <div class="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3">
-                            <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-900">
-                                <x-heroicon-m-information-circle class="h-3.5 w-3.5" />
-                                {{ __('Cannot be fixed from here') }}
-                            </p>
-                            <ul class="mt-2 space-y-1 text-sm text-amber-900">
-                                @foreach ($switch_plan['manual'] as $line)
-                                    <li class="flex items-start gap-2">
-                                        <span class="mt-1.5 inline-block h-1 w-1 shrink-0 rounded-full bg-amber-700"></span>
-                                        <span>{{ $line }}</span>
-                                    </li>
-                                @endforeach
-                            </ul>
-                        </div>
-                    @endif
-                @endif
-            </div>
-
-            <div class="shrink-0 flex flex-wrap items-center justify-end gap-2 border-t border-brand-ink/10 px-6 py-4">
-                <x-secondary-button type="button" wire:click="cancelSwitchWebserver">{{ __('Cancel') }}</x-secondary-button>
-                @if ($switch_plan['blocker'] === null)
-                    <x-primary-button type="button" wire:click="confirmSwitchWebserver" wire:loading.attr="disabled" wire:target="confirmSwitchWebserver">
-                        <span wire:loading.remove wire:target="confirmSwitchWebserver">{{ __('Switch to :to', ['to' => $switch_plan['to']]) }}</span>
-                        <span wire:loading wire:target="confirmSwitchWebserver">{{ __('Queueing…') }}</span>
-                    </x-primary-button>
-                @endif
-            </div>
-        </x-modal>
-    @endif
+    @include('livewire.servers.partials.webserver.switch-modal')
 
     {{-- PHP-FPM (unchanged from previous render) --}}
     @if (! empty($phpFpm['versions']))

@@ -16,13 +16,17 @@ declare(strict_types=1);
 
 require __DIR__.'/../vendor/autoload.php';
 
-/** @var \Illuminate\Foundation\Application $app */
+/** @var Application $app */
 $app = require __DIR__.'/../bootstrap/app.php';
-$app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$app->make(Kernel::class)->bootstrap();
 
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Database\QueryException;
+use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Each entry: [table, primary_key, columns_to_purge].
@@ -51,14 +55,16 @@ $totalPurged = 0;
 $totalChecked = 0;
 
 foreach ($targets as [$table, $columns]) {
-    if (! \Illuminate\Support\Facades\Schema::hasTable($table)) {
+    if (! Schema::hasTable($table)) {
         echo "skip {$table} (table missing)\n";
+
         continue;
     }
 
     foreach ($columns as $column) {
-        if (! \Illuminate\Support\Facades\Schema::hasColumn($table, $column)) {
+        if (! Schema::hasColumn($table, $column)) {
             echo "skip {$table}.{$column} (column missing)\n";
+
             continue;
         }
 
@@ -82,7 +88,7 @@ foreach ($targets as [$table, $columns]) {
                         try {
                             DB::table($table)->where('id', $row->id)->update([$column => null]);
                             $purgedHere++;
-                        } catch (\Illuminate\Database\QueryException $e) {
+                        } catch (QueryException $e) {
                             // Column is NOT NULL — can't null it, delete the row.
                             if (str_contains($e->getMessage(), 'not-null constraint')
                                 || str_contains($e->getMessage(), 'cannot be null')) {

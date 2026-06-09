@@ -4,19 +4,17 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Models\Server;
 use App\Models\Site;
+use App\Services\Edge\EdgeMiddlewareBundleUploader;
 use App\Services\Edge\EdgeRouter;
+use App\Services\Edge\EdgeSsrBundleUploader;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-/**
- * Tears down the backend resource for an edge site. Idempotent
- * — safe to retry if the backend rejects (e.g. resource already
- * deleted out-of-band).
- */
 class TeardownEdgeSiteJob implements ShouldQueue
 {
     use Dispatchable;
@@ -24,33 +22,56 @@ class TeardownEdgeSiteJob implements ShouldQueue
     use Queueable;
     use SerializesModels;
 
-    public int $tries = 5;
-
     public function __construct(public string $siteId) {}
 
     public function handle(): void
     {
         $site = Site::query()->find($this->siteId);
-        if ($site === null) {
+        if ($site === null || ! $site->usesEdgeRuntime()) {
             return;
         }
 
+        $server = $site->server;
+        $serverId = $site->server_id;
+
         $backend = EdgeRouter::backendFor($site);
-        $credential = EdgeRouter::credentialFor($site);
-        if ($backend !== null && $credential !== null) {
-            $backend->teardown($site, $credential);
+        $site->load('edgeDeployments');
+
+        // Drop every per-deployment SSR script in the dispatch
+        // namespace BEFORE wiping the deployment rows — once the rows
+        // are gone we lose the script names and the scripts would
+        // sit in the namespace forever, consuming quota.
+        try {
+            app(EdgeSsrBundleUploader::class)->deleteAllForSite($site);
+        } catch (\Throwable) {
+            // Best-effort — leaving an orphan script is preferable to
+            // failing the rest of the teardown.
         }
 
-        // Mark the site row inactive but don't delete it — keeps
-        // audit history of what was deployed where, and lets the
-        // operator see the failure path in the dashboard.
-        $meta = is_array($site->meta) ? $site->meta : [];
-        $meta['container'] = array_merge($meta['container'] ?? [], [
-            'torn_down_at' => now()->toIso8601String(),
-        ]);
-        $site->update([
-            'status' => Site::STATUS_ERROR, // 'inactive' marker; could add STATUS_CONTAINER_TORN_DOWN later
-            'meta' => $meta,
-        ]);
+        try {
+            app(EdgeMiddlewareBundleUploader::class)->deleteAllForSite($site);
+        } catch (\Throwable) {
+            // Same — orphan middleware scripts are non-blocking.
+        }
+
+        $backend?->unpublish($site);
+
+        $site->edgeDeployments()->delete();
+        $site->delete();
+
+        $this->deleteOrphanedEdgeServer($serverId, $server);
+    }
+
+    private function deleteOrphanedEdgeServer(?string $serverId, ?Server $server): void
+    {
+        if ($serverId === null || $server === null || ! $server->isDplyEdgeHost()) {
+            return;
+        }
+
+        if (Site::query()->where('server_id', $serverId)->exists()) {
+            return;
+        }
+
+        $server->delete();
     }
 }

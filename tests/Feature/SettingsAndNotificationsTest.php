@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Feature;
+namespace Tests\Feature\SettingsAndNotificationsTest;
 
 use App\Livewire\Organizations\Automation as OrganizationsAutomation;
 use App\Livewire\Settings\Hub as SettingsHub;
@@ -9,149 +9,133 @@ use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-use Tests\TestCase;
 
-class SettingsAndNotificationsTest extends TestCase
-{
-    use RefreshDatabase;
+uses(RefreshDatabase::class);
 
-    public function test_settings_hub_is_reachable_for_authenticated_user(): void
-    {
-        $user = User::factory()->create();
+test('settings hub is reachable for authenticated user', function () {
+    $user = User::factory()->create();
 
-        $this->actingAs($user)
-            ->get(route('settings.profile'))
-            ->assertOk()
-            ->assertSee('Profile stores personal preferences on this page', false);
-    }
+    $this->actingAs($user)
+        ->get(route('settings.profile'))
+        ->assertOk()
+        ->assertSee('Profile stores personal preferences on this page', false);
+});
 
-    public function test_settings_hub_livewire_renders(): void
-    {
-        $user = User::factory()->create();
+test('settings hub livewire renders', function () {
+    $user = User::factory()->create();
 
-        Livewire::actingAs($user)
-            ->test(SettingsHub::class)
-            ->assertOk();
-    }
+    Livewire::actingAs($user)
+        ->test(SettingsHub::class)
+        ->assertOk();
+});
 
-    public function test_docs_source_control_renders_markdown(): void
-    {
-        $user = User::factory()->create();
+test('docs source control renders markdown', function () {
+    $user = User::factory()->create();
 
-        $this->actingAs($user)
-            ->get(route('docs.markdown', ['slug' => 'source-control']))
-            ->assertOk()
-            ->assertSeeText('Source control & deploy flow');
-    }
+    $this->actingAs($user)
+        ->get(route('docs.markdown', ['slug' => 'source-control']))
+        ->assertOk()
+        ->assertSeeText('Source control & deploy flow');
+});
 
-    public function test_docs_org_roles_and_limits_renders_markdown(): void
-    {
-        $user = User::factory()->create();
+test('docs org roles and limits renders markdown', function () {
+    $user = User::factory()->create();
 
-        $this->actingAs($user)
-            ->get(route('docs.markdown', ['slug' => 'org-roles-and-limits']))
-            ->assertOk()
-            ->assertSeeText('Organization roles & plan limits');
-    }
+    $this->actingAs($user)
+        ->get(route('docs.markdown', ['slug' => 'org-roles-and-limits']))
+        ->assertOk()
+        ->assertSeeText('Organization roles & plan limits');
+});
 
-    public function test_docs_api_renders_http_api_markdown(): void
-    {
-        $user = User::factory()->create();
+test('docs api renders http api markdown', function () {
+    $user = User::factory()->create();
 
-        $this->actingAs($user)
-            ->get(route('docs.api'))
-            ->assertOk()
-            ->assertSeeText('HTTP API');
-    }
+    $this->actingAs($user)
+        ->get(route('docs.api'))
+        ->assertOk()
+        ->assertSeeText('HTTP API');
+});
 
-    public function test_docs_sites_and_deploy_renders_markdown(): void
-    {
-        $user = User::factory()->create();
+test('docs sites and deploy renders markdown', function () {
+    $user = User::factory()->create();
 
-        $this->actingAs($user)
-            ->get(route('docs.markdown', ['slug' => 'sites-and-deploy']))
-            ->assertOk()
-            ->assertSeeText('Sites, DNS & deploy');
-    }
+    $this->actingAs($user)
+        ->get(route('docs.markdown', ['slug' => 'sites-and-deploy']))
+        ->assertOk()
+        ->assertSeeText('Sites, DNS & deploy');
+});
 
-    public function test_docs_credentials_renders_markdown(): void
-    {
-        $user = User::factory()->create();
+test('docs credentials renders markdown', function () {
+    $user = User::factory()->create();
 
-        $this->actingAs($user)
-            ->get(route('docs.markdown', ['slug' => 'credentials']))
-            ->assertOk()
-            ->assertSeeText('Server providers vs Git');
-    }
+    $this->actingAs($user)
+        ->get(route('docs.markdown', ['slug' => 'credentials']))
+        ->assertOk()
+        ->assertSeeText('Server providers vs Git');
+});
 
-    public function test_docs_billing_and_plans_renders_markdown(): void
-    {
-        $user = User::factory()->create();
+test('docs billing and plans renders markdown', function () {
+    $user = User::factory()->create();
 
-        $this->actingAs($user)
-            ->get(route('docs.markdown', ['slug' => 'billing-and-plans']))
-            ->assertOk()
-            ->assertSeeText('Billing & plans');
-    }
+    $this->actingAs($user)
+        ->get(route('docs.markdown', ['slug' => 'billing-and-plans']))
+        ->assertOk()
+        ->assertSeeText('Billing & plans');
+});
 
-    public function test_docs_server_workspace_renders_markdown(): void
-    {
-        $user = User::factory()->create();
+test('docs server workspace renders markdown', function () {
+    $user = User::factory()->create();
 
-        $this->actingAs($user)
-            ->get(route('docs.markdown', ['slug' => 'server-workspace']))
-            ->assertOk()
-            ->assertSeeText('Server workspace overview');
-    }
+    $this->actingAs($user)
+        ->get(route('docs.markdown', ['slug' => 'server-workspace']))
+        ->assertOk()
+        ->assertSeeText('Server workspace overview');
+});
 
-    public function test_docs_local_development_renders_markdown(): void
-    {
-        $user = User::factory()->create();
+test('docs local development renders markdown', function () {
+    $user = User::factory()->create();
 
-        $this->actingAs($user)
-            ->get(route('docs.markdown', ['slug' => 'local-development']))
-            ->assertOk()
-            ->assertSeeText('Local development');
-    }
+    $this->actingAs($user)
+        ->get(route('docs.markdown', ['slug' => 'local-development']))
+        ->assertOk()
+        ->assertSeeText('Local development');
+});
 
-    public function test_org_admin_can_disable_deploy_email_notifications(): void
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'owner']);
+test('org admin can disable deploy email notifications', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
 
-        Livewire::actingAs($user)
-            ->test(OrganizationsAutomation::class, ['organization' => $org])
-            ->set('deploy_email_notifications_enabled', false);
+    Livewire::actingAs($user)
+        ->test(OrganizationsAutomation::class, ['organization' => $org])
+        ->set('deploy_email_notifications_enabled', false);
 
-        $this->assertDatabaseHas('organizations', [
-            'id' => $org->id,
-            'deploy_email_notifications_enabled' => false,
-        ]);
-    }
+    $this->assertDatabaseHas('organizations', [
+        'id' => $org->id,
+        'deploy_email_notifications_enabled' => false,
+    ]);
+});
 
-    public function test_org_admin_can_add_webhook_destination_from_org_overview(): void
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'owner']);
+test('org admin can add webhook destination from org overview', function () {
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
 
-        Livewire::actingAs($user)
-            ->test(OrganizationsAutomation::class, ['organization' => $org])
-            ->set('int_hook_name', 'Ops room')
-            ->set('int_hook_driver', NotificationWebhookDestination::DRIVER_SLACK)
-            ->set('int_hook_url', 'https://hooks.slack.com/services/T000/B000/XXXX')
-            ->set('int_evt_success', true)
-            ->set('int_evt_failed', true)
-            ->set('int_evt_skipped', false)
-            ->call('saveWebhookDestination')
-            ->assertHasNoErrors();
+    Livewire::actingAs($user)
+        ->test(OrganizationsAutomation::class, ['organization' => $org])
+        ->set('int_hook_name', 'Ops room')
+        ->set('int_hook_driver', NotificationWebhookDestination::DRIVER_SLACK)
+        ->set('int_hook_url', 'https://hooks.slack.com/services/T000/B000/XXXX')
+        ->set('int_evt_success', true)
+        ->set('int_evt_failed', true)
+        ->set('int_evt_skipped', false)
+        ->call('saveWebhookDestination')
+        ->assertHasNoErrors();
 
-        $this->assertDatabaseHas('notification_webhook_destinations', [
-            'organization_id' => $org->id,
-            'name' => 'Ops room',
-            'driver' => NotificationWebhookDestination::DRIVER_SLACK,
-            'enabled' => true,
-        ]);
-    }
-}
+    $this->assertDatabaseHas('notification_webhook_destinations', [
+        'organization_id' => $org->id,
+        'name' => 'Ops room',
+        'driver' => NotificationWebhookDestination::DRIVER_SLACK,
+        'enabled' => true,
+    ]);
+});

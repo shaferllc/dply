@@ -242,11 +242,27 @@ final class BuildServerCreatePreflight
         $sizeValue = $form->size;
         if ($sizeValue !== '' && isset($sizeRecommendations[$sizeValue])) {
             $recommendation = $sizeRecommendations[$sizeValue];
+            $role = collect(config('server_provision_options.server_roles', []))
+                ->firstWhere('id', $form->server_role);
+            $roleLabel = is_array($role) && filled($role['label'] ?? null)
+                ? (string) $role['label']
+                : str($form->server_role)->replace('_', ' ')->title()->toString();
+            // A too-small box for a memory-heavy role risks OOM during the
+            // install itself (cloud-init/apt getting killed on sub-1GB droplets),
+            // which can leave a half-built server. Surface that clearly for
+            // application/database roles — but as a WARNING, never a block: the
+            // operator decides.
+            $tooSmall = $recommendation['state'] === 'too_small';
+            $memoryHeavyRole = in_array($form->server_role, ['application', 'database'], true);
+            $oomRisk = $tooSmall && $memoryHeavyRole;
+
             $checks[] = $this->check(
                 'size_recommendation',
-                $recommendation['state'] === 'too_small' ? 'warning' : 'info',
-                __('Sizing guidance'),
-                $recommendation['detail'],
+                $tooSmall ? 'warning' : 'info',
+                __('Sizing for :role', ['role' => $roleLabel]),
+                $oomRisk
+                    ? $recommendation['detail'].' '.__('This plan is small enough that setup may run out of memory mid-install — 2 GB+ is recommended for this role.')
+                    : $recommendation['detail'],
                 false,
                 'size',
             );

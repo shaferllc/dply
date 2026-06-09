@@ -4,15 +4,20 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers\Create;
 
+use App\Actions\Servers\FilterServerProvisionOptionsForCreateForm;
 use App\Actions\Servers\GetProviderCredentialsForServerType;
+use App\Actions\Servers\ListExistingProviderServers;
 use App\Livewire\Concerns\ManagesProviderCredentials;
 use App\Livewire\Forms\ServerCreateForm;
 use App\Livewire\Servers\Concerns\InteractsWithServerCreateDraft;
 use App\Livewire\Servers\Concerns\ServerCreateActions;
+use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerCreateDraft;
+use App\Services\DigitalOceanService;
 use App\Support\ServerProviderGate;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
@@ -41,8 +46,6 @@ class StepWhere extends Component
         }
 
         $this->hydrateFormFromDraft($this->form, $this->currentDraft());
-
-        // Default the active provider tile to whatever the form already has,
         // or the first credentialled provider if blank.
         if ($this->form->mode === 'provider') {
             if ($this->form->provider_host_kind === 'kubernetes' && $this->form->type === '') {
@@ -79,14 +82,21 @@ class StepWhere extends Component
             return;
         }
 
+        $catalog = $this->resolveServerCreateCatalog($org);
+        $credentials = $catalog['credentials'] instanceof Collection
+            ? $catalog['credentials']
+            : collect();
+
         if ($this->form->provider_credential_id === '') {
-            $credentials = GetProviderCredentialsForServerType::run($org, $this->form->type);
             if ($credentials->count() === 1) {
                 $this->form->provider_credential_id = (string) $credentials->first()->id;
                 // Picking a credential changes the catalog source — refresh the memo.
                 $this->memoServerCreateCatalog = null;
                 $this->memoServerCreateCatalogKey = null;
-                $this->syncProvisionPreferenceFields();
+                $this->syncProvisionPreferenceFields($credentials);
+                $catalog = $this->resolveServerCreateCatalog($org);
+            } else {
+                return;
             }
         }
 
@@ -94,7 +104,6 @@ class StepWhere extends Component
             return;
         }
 
-        $catalog = $this->resolveServerCreateCatalog($org);
         $regions = $catalog['regions'] ?? [];
 
         // Region: if empty, prefer West Coast US (per project default) and fall through
@@ -103,10 +112,9 @@ class StepWhere extends Component
         if ($this->form->region === '' && $regions !== []) {
             $this->form->region = $this->preferredRegionValue($regions);
 
-            // Scaleway and DigitalOcean sizes depend on region — drop the
-            // catalog memo so the next read reloads filtered by the
-            // newly-defaulted region.
-            if (in_array($this->form->type, ['scaleway', 'digitalocean'], true)) {
+            // DigitalOcean sizes depend on region — drop the catalog memo so the
+            // next read reloads filtered by the newly-defaulted region.
+            if (in_array($this->form->type, ['digitalocean'], true)) {
                 $this->memoServerCreateCatalog = null;
                 $this->memoServerCreateCatalogKey = null;
                 $catalog = $this->resolveServerCreateCatalog($org);
@@ -200,6 +208,42 @@ class StepWhere extends Component
         }
     }
 
+    public function chooseServerRole(string $role): void
+    {
+        $org = auth()->user()?->currentOrganization();
+        if ($org === null) {
+            return;
+        }
+
+        $catalog = $this->resolveServerCreateCatalog($org);
+
+        $hasLinkedCredential = $this->form->provider_credential_id !== ''
+            && ($catalog['credentials'] instanceof Collection)
+            && $catalog['credentials']->contains('id', $this->form->provider_credential_id);
+
+        $allowed = collect(
+            FilterServerProvisionOptionsForCreateForm::run(
+                $this->form->type,
+                $hasLinkedCredential,
+                $role,
+            )['server_roles'] ?? []
+        )->pluck('id')->all();
+
+        if ($allowed !== [] && ! in_array($role, $allowed, true)) {
+            return;
+        }
+
+        $this->form->server_role = $role;
+        $this->syncInstallProfileForServerRole();
+        $this->notifySizeRoleGuidance();
+    }
+
+    public function updatedFormServerRole(): void
+    {
+        $this->syncInstallProfileForServerRole();
+        $this->notifySizeRoleGuidance();
+    }
+
     public function chooseProvider(string $provider): void
     {
         // For K8s the tile id is the bare provider name (digitalocean / aws)
@@ -232,10 +276,51 @@ class StepWhere extends Component
         $this->autoSelectSingleOptions();
     }
 
+    public function loadDoVpcs(): void
+    {
+        if ($this->form->type !== 'digitalocean' || $this->form->region === '' || $this->form->provider_credential_id === '') {
+            return;
+        }
+
+        $credential = ProviderCredential::query()->find($this->form->provider_credential_id);
+        if (! $credential) {
+            return;
+        }
+
+        $this->form->do_vpcs_loading = true;
+
+        try {
+            $do = new DigitalOceanService($credential);
+            $this->form->do_vpcs = $do->listVpcs($this->form->region);
+        } catch (\Throwable) {
+            $this->form->do_vpcs = [];
+        }
+
+        $this->form->do_vpcs_loading = false;
+    }
+
     #[On('personal-ssh-key-created')]
     public function refreshPersonalSshKeyState(): void
     {
         // Triggers re-render so the connection panel reflects newly-saved keys.
+    }
+
+    #[On('provider-credential-created')]
+    public function applyStoredProviderCredential(?string $provider = null, mixed $credentialId = null): void
+    {
+        if (! is_string($provider) || $provider === '' || $credentialId === null || $credentialId === '') {
+            return;
+        }
+
+        $formProvider = str_replace('_kubernetes', '', $this->form->type);
+        if ($formProvider !== $provider) {
+            return;
+        }
+
+        $this->form->provider_credential_id = (string) $credentialId;
+        $this->active_provider = $provider;
+        $this->applyCloudDefaults($provider);
+        $this->autoSelectSingleOptions();
     }
 
     public function previous(): mixed
@@ -328,16 +413,49 @@ class StepWhere extends Component
     {
         $org = auth()->user()?->currentOrganization();
         $context = $this->buildPreflightContext($org);
+        $catalog = $context['catalog'];
+        $regionLabels = collect(is_array($catalog['regions'] ?? null) ? $catalog['regions'] : [])
+            ->mapWithKeys(fn (array $region): array => [(string) ($region['value'] ?? '') => (string) ($region['label'] ?? '')])
+            ->filter(fn (string $label, string $value): bool => $value !== '')
+            ->all();
+
+        $existingProviderServers = ($org !== null && $this->form->type !== '' && $this->form->type !== 'custom')
+            ? ListExistingProviderServers::run($org, $this->form->type)
+            : [];
+
+        $existingServersByRegion = ($org !== null && $this->form->type !== '' && $this->form->type !== 'custom')
+            ? ListExistingProviderServers::make()->regionCounts($org, $this->form->type)
+            : [];
+
+        // Private networks we already track for this account — let the user pick
+        // one instead of hunting for the ID in the Hetzner console.
+        $privateNetworks = ($org !== null && $this->form->type === 'hetzner' && $this->form->provider_credential_id !== '')
+            ? \App\Models\PrivateNetwork::query()
+                ->where('organization_id', $org->id)
+                ->where('provider', \App\Models\PrivateNetwork::PROVIDER_HETZNER)
+                ->where('provider_credential_id', $this->form->provider_credential_id)
+                ->whereNotNull('provider_id')
+                ->orderBy('name')
+                ->get()
+            : collect();
 
         return view('livewire.servers.create.step-where', [
             'totalSteps' => ServerCreateDraft::TOTAL_STEPS,
             'reachedStep' => $this->currentDraft()?->step ?? 2,
-            'catalog' => $context['catalog'],
+            'catalog' => $catalog,
             'preflight' => $context['preflight'],
+            'provisionOptions' => $context['provisionOptions'],
             'hasAnyProviderCredentials' => $context['hasAnyProviderCredentials'],
             'hasLinkedCredential' => $context['hasLinkedCredential'],
             'providerCards' => $this->resolveProviderCards(),
             'credentialProviderNav' => $this->memoCredentialProviderNav(),
+            'selectedServerRole' => collect($context['provisionOptions']['server_roles'] ?? [])
+                ->firstWhere('id', $this->form->server_role),
+            'roleSizingTip' => $this->roleSizingTip($this->form->server_role),
+            'existingProviderServers' => $existingProviderServers,
+            'existingServersByRegion' => $existingServersByRegion,
+            'regionLabels' => $regionLabels,
+            'privateNetworks' => $privateNetworks,
         ]);
     }
 }

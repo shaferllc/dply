@@ -47,7 +47,15 @@ class Server extends Model
 
     public const HOST_KIND_AWS_APP_RUNNER = 'aws_app_runner';
 
-    public const HOST_KIND_DPLY_EDGE = 'dply_edge';
+    public const HOST_KIND_DPLY_CLOUD = 'dply_cloud';
+
+    public const HOST_KIND_DPLY_EDGE = 'dply_edge_delivery';
+
+    /** The customer's own provider account runs (and is billed for) this VM. */
+    public const HOSTING_BACKEND_BYO = 'byo';
+
+    /** dply runs this VM on its own provider account and bills it all-in cost-plus. */
+    public const HOSTING_BACKEND_DPLY = 'dply_managed';
 
     public const HEALTH_REACHABLE = 'reachable';
 
@@ -70,11 +78,17 @@ class Server extends Model
         'organization_id',
         'workspace_id',
         'team_id',
+        'worker_pool_id',
+        'pool_role',
         'provider_credential_id',
         'name',
         'provider',
+        'hosting_backend',
         'provider_id',
         'ip_address',
+        'private_ip_address',
+        'hetzner_network_id',
+        'private_network_id',
         'ssh_port',
         'ssh_user',
         'ssh_private_key',
@@ -102,6 +116,7 @@ class Server extends Model
             'meta' => 'array',
             'last_health_check_at' => 'datetime',
             'scheduled_deletion_at' => 'datetime',
+            'comped_until' => 'datetime',
         ];
     }
 
@@ -125,6 +140,54 @@ class Server extends Model
         return $this->belongsTo(Team::class);
     }
 
+    /**
+     * A dedicated cache host provisioned via the "redis_server" profile — as
+     * opposed to an app server that merely runs redis as a co-located cache.
+     * Gates the redis-specific provisioning emails.
+     */
+    public function isRedisServer(): bool
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+
+        return ($meta['server_role'] ?? null) === 'redis'
+            && ($meta['install_profile'] ?? null) === 'redis_server';
+    }
+
+    /**
+     * A worker host is provisioned for background/queue-style workloads and
+     * always runs Caddy (it attaches testing URLs but isn't a public web
+     * front). Caching + CDN/edge tabs don't apply to these sites.
+     */
+    public function isWorkerHost(): bool
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+
+        return ($meta['server_role'] ?? null) === 'worker';
+    }
+
+    /**
+     * The worker pool this server belongs to (clones + their source), if any.
+     * See {@see WorkerPool}.
+     */
+    public function workerPool(): BelongsTo
+    {
+        return $this->belongsTo(WorkerPool::class);
+    }
+
+    /** True when this server is the pool's single primary (scheduler owner). */
+    public function isPoolPrimary(): bool
+    {
+        return $this->pool_role === WorkerPool::ROLE_PRIMARY;
+    }
+
+    /** Per-member reconciler sub-state (servers.meta['pool']['state']). */
+    public function poolMemberState(): ?string
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+
+        return $meta['pool']['state'] ?? null;
+    }
+
     public function providerCredential(): BelongsTo
     {
         return $this->belongsTo(ProviderCredential::class);
@@ -133,6 +196,36 @@ class Server extends Model
     public function sites(): HasMany
     {
         return $this->hasMany(Site::class);
+    }
+
+    /** Memoized request-lifetime cache for {@see cachedSitesCount()}. */
+    private ?int $cachedSitesCount = null;
+
+    /**
+     * Request-level cache for sites().count() — both the sidebar nav helper
+     * and the shared-host report widget call this on the same Server
+     * instance during a page render, so eat the query once and reuse it.
+     * Cleared when caller knows the count changed via {@see flushCachedSitesCount()}.
+     */
+    public function cachedSitesCount(): int
+    {
+        if ($this->cachedSitesCount !== null) {
+            return $this->cachedSitesCount;
+        }
+
+        // Reuse a withCount-loaded value if a controller pre-warmed it
+        // (sites_count is the Laravel convention).
+        $preloaded = $this->getAttributeValue('sites_count');
+        if (is_int($preloaded) || (is_string($preloaded) && ctype_digit($preloaded))) {
+            return $this->cachedSitesCount = (int) $preloaded;
+        }
+
+        return $this->cachedSitesCount = $this->sites()->count();
+    }
+
+    public function flushCachedSitesCount(): void
+    {
+        $this->cachedSitesCount = null;
     }
 
     public function serverDatabases(): HasMany
@@ -176,7 +269,7 @@ class Server extends Model
     /**
      * The L7 edge proxy (if any) sitting in front of this server's webserver.
      * Returns null when the webserver handles :80 directly; otherwise one
-     * of {'traefik', 'haproxy'}.
+     * of {'traefik', 'haproxy', 'envoy', 'openresty'}.
      *
      * When this is non-null, dply runs Caddy as the per-site backend on
      * ephemeral high ports and the edge proxy on :80 — see
@@ -187,7 +280,7 @@ class Server extends Model
         $meta = is_array($this->meta) ? $this->meta : [];
         $proxy = $meta['edge_proxy'] ?? null;
 
-        return is_string($proxy) && in_array($proxy, ['traefik', 'haproxy'], true) ? $proxy : null;
+        return is_string($proxy) && in_array($proxy, ['traefik', 'haproxy', 'envoy', 'openresty'], true) ? $proxy : null;
     }
 
     public function hasEdgeProxy(): bool
@@ -221,6 +314,15 @@ class Server extends Model
     public function databaseAdminCredential(): HasOne
     {
         return $this->hasOne(ServerDatabaseAdminCredential::class);
+    }
+
+    /**
+     * The dply Logs add-on agent for this server (at most one — the add-on is a
+     * per-server resource). See {@see \App\Models\ServerLogAgent}.
+     */
+    public function logAgent(): HasOne
+    {
+        return $this->hasOne(ServerLogAgent::class);
     }
 
     public function databaseAuditEvents(): HasMany
@@ -264,6 +366,18 @@ class Server extends Model
     }
 
     /**
+     * Most-recent metric snapshot as a relation so Eloquent memoizes the
+     * single-row lookup on the instance. The overview render fans the same
+     * server out to the cost card, health cockpit, and billing tier — each
+     * of which used to run its own "latest snapshot" query. Routing them all
+     * through this relation collapses those into one query per request.
+     */
+    public function latestMetricSnapshot(): HasOne
+    {
+        return $this->hasOne(ServerMetricSnapshot::class)->latestOfMany('captured_at');
+    }
+
+    /**
      * Billing tier derived from the most recent metric snapshot's cpu_count
      * and mem_total_kb. Returns ServerTier::XS while specs are unknown so a
      * freshly-connected server isn't accidentally billed at XL during the
@@ -271,7 +385,7 @@ class Server extends Model
      */
     public function billingTier(): ServerTier
     {
-        $snapshot = $this->metricSnapshots()->first();
+        $snapshot = $this->latestMetricSnapshot;
         $payload = is_array($snapshot?->payload) ? $snapshot->payload : [];
 
         $cpuCount = isset($payload['cpu_count']) && is_numeric($payload['cpu_count'])
@@ -340,6 +454,17 @@ class Server extends Model
         return $this->status === self::STATUS_READY;
     }
 
+    public function privateNetwork(): BelongsTo
+    {
+        return $this->belongsTo(PrivateNetwork::class, 'private_network_id');
+    }
+
+    /** Whether this server has a known private/VPC IP it can be reached on by peers. */
+    public function hasPrivateNetwork(): bool
+    {
+        return filled($this->private_ip_address);
+    }
+
     public function hostKind(): string
     {
         $meta = is_array($this->meta) ? $this->meta : [];
@@ -353,6 +478,7 @@ class Server extends Model
             self::HOST_KIND_DIGITALOCEAN_APP_PLATFORM,
             self::HOST_KIND_AWS_LAMBDA,
             self::HOST_KIND_AWS_APP_RUNNER,
+            self::HOST_KIND_DPLY_CLOUD,
             self::HOST_KIND_DPLY_EDGE,
         ], true) ? $hostKind : self::HOST_KIND_VM;
     }
@@ -397,9 +523,68 @@ class Server extends Model
         return $this->hostKind() === self::HOST_KIND_AWS_APP_RUNNER;
     }
 
+    public function isDplyCloudHost(): bool
+    {
+        return $this->hostKind() === self::HOST_KIND_DPLY_CLOUD;
+    }
+
     public function isDplyEdgeHost(): bool
     {
         return $this->hostKind() === self::HOST_KIND_DPLY_EDGE;
+    }
+
+    /**
+     * Logical hosts for dply-managed products — never spec-tiered as BYO VMs.
+     */
+    public function isManagedProductHost(): bool
+    {
+        return $this->isServerlessHost() || $this->isDplyCloudHost() || $this->isDplyEdgeHost();
+    }
+
+    /**
+     * True when this is a real SSH-managed VM that dply runs on its OWN provider
+     * account (dply pays the provider) and bills all-in cost-plus, rather than
+     * the customer's connected credential. Distinct from isManagedProductHost()
+     * — a managed VM is still a full server with SSH, a workspace, sites, etc.
+     */
+    public function usesManagedHosting(): bool
+    {
+        return $this->hosting_backend === self::HOSTING_BACKEND_DPLY;
+    }
+
+    /**
+     * A real dply-managed VM (the free-CX22 grant counter), as opposed to a
+     * managed-product logical host (Cloud/Edge/serverless).
+     */
+    public function isManagedVm(): bool
+    {
+        return $this->usesManagedHosting() && $this->isVmHost();
+    }
+
+    /**
+     * True when this server is currently comped (free) and must be excluded from
+     * the managed-server bill. Two cases: an explicit future `comped_until`
+     * stamp (the localized comp primitive — reusable for support credits), or a
+     * managed box on a still-open beta org with no stamp yet (reads as
+     * comped-until-cutover; a backfill stamps the real date once it's known).
+     */
+    public function isComped(): bool
+    {
+        if ($this->comped_until !== null) {
+            return $this->comped_until->isFuture();
+        }
+
+        return $this->isManagedVm()
+            && $this->organization !== null
+            && $this->organization->isBeta();
+    }
+
+    public function hostingBackendLabel(): string
+    {
+        return match ($this->hosting_backend) {
+            self::HOSTING_BACKEND_DPLY => __('Dply-hosted (managed)'),
+            default => __('Your provider account'),
+        };
     }
 
     public function isContainerHost(): bool
@@ -407,13 +592,27 @@ class Server extends Model
         return in_array($this->hostKind(), [
             self::HOST_KIND_DIGITALOCEAN_APP_PLATFORM,
             self::HOST_KIND_AWS_APP_RUNNER,
-            self::HOST_KIND_DPLY_EDGE,
+            self::HOST_KIND_DPLY_CLOUD,
         ], true);
     }
 
     public function isDockerHost(): bool
     {
         return $this->hostKind() === self::HOST_KIND_DOCKER;
+    }
+
+    public function dockerEnginePresent(): bool
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $manageDocker = is_array($meta['manage_docker'] ?? null) ? $meta['manage_docker'] : [];
+        if (! empty($manageDocker['present'])) {
+            return true;
+        }
+
+        $manageTools = is_array($meta['manage_tools'] ?? null) ? $meta['manage_tools'] : [];
+        $dockerTool = is_array($manageTools['docker'] ?? null) ? $manageTools['docker'] : [];
+
+        return ! empty($dockerTool['present']);
     }
 
     public function isKubernetesCluster(): bool

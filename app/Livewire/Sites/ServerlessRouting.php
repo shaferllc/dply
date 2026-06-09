@@ -19,11 +19,12 @@ use Livewire\Component;
 /**
  * NETWORKING > Routing — manages the dply edge proxy for a serverless app.
  *
- * Five tabs:
- *   - hostname:    auto-provisioned `{slug}.{testing-domain}` + DNS state
- *                  (lifts the existing DnsPanel component).
- *   - domains:     operator-owned custom hostnames (api.acme.com) pointed
- *                  at this function via DNS the operator (or dply) writes.
+ * Four tabs:
+ *   - domains:     the dply-managed edge hostname (auto-provisioned
+ *                  `{slug}.{testing-domain}` + DNS state, via the DnsPanel
+ *                  component) shown as the primary endpoint, followed by the
+ *                  operator-owned custom hostnames (api.acme.com) that CNAME
+ *                  to it via DNS the operator (or dply) writes.
  *   - redirects:   path-based redirects served by the proxy controller
  *                  before forwarding upstream.
  *   - headers:     static response headers + CORS policy merged onto the
@@ -45,8 +46,8 @@ class ServerlessRouting extends Component
 
     public Site $site;
 
-    #[Url(as: 'tab', except: 'hostname')]
-    public string $tab = 'hostname';
+    #[Url(as: 'tab', except: 'domains')]
+    public string $tab = 'domains';
 
     public string $newDomainHostname = '';
 
@@ -84,6 +85,29 @@ class ServerlessRouting extends Component
 
         $this->server = $server;
         $this->site = $site;
+
+        // This page is the dply EDGE proxy surface (edge hostname, path
+        // redirects, response headers/CORS, invocation URLs) — it only applies
+        // to serverless / container workspaces that sit behind the edge. A VM
+        // site routes through its own nginx/caddy server block, managed on the
+        // Settings → Routing surface, so send VM sites there instead of showing
+        // them edge concepts that don't apply.
+        if ($site->runtimeTargetMode() === 'vm') {
+            $this->redirect(route('sites.show', [
+                'server' => $server,
+                'site' => $site,
+                'section' => 'routing',
+            ]), navigate: true);
+
+            return;
+        }
+
+        // The old standalone "hostname" tab was folded into "domains" (the edge
+        // hostname now shows as the primary endpoint above custom domains).
+        // Redirect any bookmarked ?tab=hostname links to the merged tab.
+        if (! in_array($this->tab, ['domains', 'redirects', 'headers', 'invocation'], true)) {
+            $this->tab = 'domains';
+        }
 
         $this->loadHeadersAndCorsFromMeta();
     }
@@ -263,6 +287,16 @@ class ServerlessRouting extends Component
         $this->toastSuccess(__('CORS settings saved.'));
     }
 
+    /* ──────────── Tab navigation ──────────── */
+
+    public function setTab(string $tab): void
+    {
+        if (! in_array($tab, ['domains', 'redirects', 'headers', 'invocation'], true)) {
+            return;
+        }
+        $this->tab = $tab;
+    }
+
     /* ──────────── Render ──────────── */
 
     public function render(): View
@@ -364,7 +398,7 @@ class ServerlessRouting extends Component
 
         $raw = (string) ($serverless['action_url'] ?? '');
         if ($raw !== '') {
-            $out[] = ['label' => __('Raw DigitalOcean Functions URL'), 'url' => $raw, 'scope' => 'upstream'];
+            $out[] = ['label' => __('Origin URL'), 'url' => $raw, 'scope' => 'upstream'];
         }
 
         $edge = (string) ($this->site->serverlessFunctionHost() ?? '');

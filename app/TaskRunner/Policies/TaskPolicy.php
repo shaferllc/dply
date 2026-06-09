@@ -6,32 +6,39 @@ namespace App\Modules\TaskRunner\Policies;
 
 use App\Models\User;
 use App\Modules\TaskRunner\Models\Task;
-use App\Policies\BasePolicy;
 
-class TaskPolicy extends BasePolicy
+/**
+ * Tasks are owned through the server they run against — access mirrors the
+ * server's own policy. (This module originally shipped extending a generic
+ * `App\Policies\BasePolicy` that does not exist in this app; it is rewritten
+ * here to follow the host app's server-scoped policy conventions.)
+ */
+class TaskPolicy
 {
-    protected function initializePolicy(): void
+    public function viewAny(User $user): bool
     {
-        $this->modelClass = Task::class;
-        $this->permissionPrefix = 'task';
-        $this->usageLimitType = 'tasks';
+        return $user->currentOrganization() !== null;
     }
 
-    /**
-     * Check if user owns the task through server ownership.
-     */
-    protected function checkModelOwnership(User $user, $model): bool
+    public function view(User $user, Task $task): bool
     {
-        // Super admins can access everything
-        if ($this->hasSuperAdminRole($user)) {
-            return true;
-        }
+        return $task->server !== null && $user->can('view', $task->server);
+    }
 
-        // Check if task belongs to a server that the user has access to
-        if ($model->server) {
-            return $user->belongsToTeam($model->server->team);
-        }
+    public function create(User $user): bool
+    {
+        $org = $user->currentOrganization();
 
-        return false;
+        return $org !== null && ! $org->userIsDeployer($user);
+    }
+
+    public function update(User $user, Task $task): bool
+    {
+        return $task->server !== null && $user->can('update', $task->server);
+    }
+
+    public function delete(User $user, Task $task): bool
+    {
+        return $task->server !== null && $user->can('update', $task->server);
     }
 }

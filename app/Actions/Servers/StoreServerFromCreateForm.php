@@ -9,12 +9,11 @@ use App\Enums\ServerProvider;
 use App\Jobs\PollDoksClusterStatusJob;
 use App\Jobs\PollEksClusterStatusJob;
 use App\Jobs\ProvisionAwsEc2ServerJob;
+use App\Jobs\ProvisionAzureServerJob;
 use App\Jobs\ProvisionDigitalOceanDropletJob;
-use App\Jobs\ProvisionEquinixMetalServerJob;
-use App\Jobs\ProvisionFlyIoServerJob;
 use App\Jobs\ProvisionHetznerServerJob;
 use App\Jobs\ProvisionLinodeServerJob;
-use App\Jobs\ProvisionScalewayServerJob;
+use App\Jobs\ProvisionOracleServerJob;
 use App\Jobs\ProvisionUpCloudServerJob;
 use App\Jobs\ProvisionVultrServerJob;
 use App\Jobs\RunSetupScriptJob;
@@ -24,8 +23,10 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\User;
+use App\Notifications\RedisServerProvisioningStartedNotification;
 use App\Services\AwsEksService;
 use App\Services\DigitalOceanService;
+use App\Services\HetznerService;
 use App\Support\ServerProviderGate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -86,7 +87,7 @@ final class StoreServerFromCreateForm
             )->validate();
         }
 
-        return match ($form->type) {
+        $server = match ($form->type) {
             'digitalocean' => $this->storeDigitalOcean($user, $org, $form, $scriptKeys),
             'digitalocean_functions' => $this->storeDigitalOceanFunctions($user, $org, $form),
             'digitalocean_kubernetes' => $this->storeDigitalOceanKubernetes($user, $org, $form),
@@ -95,15 +96,43 @@ final class StoreServerFromCreateForm
             'hetzner' => $this->storeHetzner($user, $org, $form, $scriptKeys),
             'linode' => $this->storeLinode($user, $org, $form, $scriptKeys),
             'vultr' => $this->storeVultr($user, $org, $form, $scriptKeys),
-            'akamai' => $this->storeAkamai($user, $org, $form, $scriptKeys),
-            'scaleway' => $this->storeScaleway($user, $org, $form, $scriptKeys),
             'upcloud' => $this->storeUpcloud($user, $org, $form, $scriptKeys),
-            'equinix_metal' => $this->storeEquinixMetal($user, $org, $form, $scriptKeys),
-            'fly_io' => $this->storeFlyIo($user, $org, $form, $scriptKeys),
             'aws' => $this->storeAws($user, $org, $form, $scriptKeys),
+            'azure' => $this->storeAzure($user, $org, $form, $scriptKeys),
+            'oracle' => $this->storeOracle($user, $org, $form, $scriptKeys),
             'custom' => $this->storeCustom($user, $org, $form),
             default => throw ValidationException::withMessages(['form.type' => __('Invalid server type.')]),
         };
+
+        $this->notifyRedisProvisioningStarted($server, $user);
+
+        return $server;
+    }
+
+    /**
+     * Heads-up email the moment a dedicated redis server begins provisioning.
+     * Single chokepoint for every provider; the "ready" email with the reveal
+     * link fires later from RunSetupScriptJob. Idempotent via a meta flag.
+     */
+    private function notifyRedisProvisioningStarted(Server $server, User $user): void
+    {
+        if (! $server->isRedisServer()) {
+            return;
+        }
+
+        if (! filled($user->email)) {
+            return;
+        }
+
+        if (filled(data_get($server->meta, 'redis_starting_email_sent_at'))) {
+            return;
+        }
+
+        $user->notify(new RedisServerProvisioningStartedNotification($server));
+
+        $meta = $server->meta ?? [];
+        $meta['redis_starting_email_sent_at'] = now()->toIso8601String();
+        $server->update(['meta' => $meta]);
     }
 
     /**
@@ -124,12 +153,27 @@ final class StoreServerFromCreateForm
                 'python' => $form->python_version,
                 'go' => $form->go_version,
             ],
+            cacheRemoteAccess: $form->cache_remote_access,
+            cacheAllowedFrom: $form->cache_allowed_from,
+            cacheRequirePassword: $form->cache_require_password,
+            cachePassword: $form->cache_password !== '' ? $form->cache_password : null,
+            databaseRemoteAccess: $form->database_remote_access,
+            databaseAllowedFrom: $form->database_allowed_from,
+            databaseInitialName: $form->database_initial_name,
+            databaseUsername: $form->database_username,
+            databasePassword: $form->database_password !== '' ? $form->database_password : null,
         );
 
         // Provider-mode Docker hosts: tag the meta so Server::hostKind() returns
         // HOST_KIND_DOCKER. Custom-mode does this inline in its own branch.
         if ($form->mode === 'provider' && $form->provider_host_kind === 'docker') {
             $meta['host_kind'] = Server::HOST_KIND_DOCKER;
+        }
+
+        // Chosen OS image (provider VM hosts only). Resolved to a provider-native
+        // slug at provision time; absent means "use the provider default".
+        if ($form->os_image !== '') {
+            $meta['os_image'] = $form->os_image;
         }
 
         return $meta;
@@ -531,7 +575,11 @@ final class StoreServerFromCreateForm
             ->where('provider', 'hetzner')
             ->findOrFail($form->provider_credential_id);
 
+        $this->validateHetznerRegionSizeCombo($credential, $form->region, $form->size);
+
         [$setupScriptKey, $setupStatus] = $this->setupScriptState($form->setup_script_key);
+
+        $networkId = $form->hetzner_network_id !== '' ? (int) $form->hetzner_network_id : null;
 
         $server = $user->servers()->create([
             'organization_id' => $org->id,
@@ -543,6 +591,7 @@ final class StoreServerFromCreateForm
             'setup_script_key' => $setupScriptKey,
             'setup_status' => $setupStatus,
             'meta' => $this->meta($form),
+            'hetzner_network_id' => $networkId !== null ? (string) $networkId : null,
             'status' => Server::STATUS_PENDING,
         ]);
 
@@ -649,100 +698,6 @@ final class StoreServerFromCreateForm
     /**
      * @param  list<string>  $scriptKeys
      */
-    private function storeAkamai(User $user, Organization $org, ServerCreateForm $form, array $scriptKeys): Server
-    {
-        Validator::make(
-            [
-                'name' => $form->name,
-                'provider_credential_id' => $form->provider_credential_id,
-                'region' => $form->region,
-                'size' => $form->size,
-                'setup_script_key' => $form->setup_script_key,
-            ],
-            [
-                'name' => 'required|string|max:255',
-                'provider_credential_id' => 'required|exists:provider_credentials,id',
-                'region' => 'required|string|max:50',
-                'size' => 'required|string|max:50',
-                'setup_script_key' => ['nullable', 'string', Rule::in(array_merge([''], $scriptKeys))],
-            ]
-        )->validate();
-
-        $credential = ProviderCredential::where('organization_id', $org->id)
-            ->where('provider', 'akamai')
-            ->findOrFail($form->provider_credential_id);
-
-        [$setupScriptKey, $setupStatus] = $this->setupScriptState($form->setup_script_key);
-
-        $server = $user->servers()->create([
-            'organization_id' => $org->id,
-            'name' => $form->name,
-            'provider' => ServerProvider::Akamai,
-            'provider_credential_id' => $credential->id,
-            'region' => $form->region,
-            'size' => $form->size,
-            'setup_script_key' => $setupScriptKey,
-            'setup_status' => $setupStatus,
-            'meta' => $this->meta($form),
-            'status' => Server::STATUS_PENDING,
-        ]);
-
-        ProvisionLinodeServerJob::dispatch($server);
-        audit_log($org, $user, 'server.created', $server);
-
-        return $server;
-    }
-
-    /**
-     * @param  list<string>  $scriptKeys
-     */
-    private function storeScaleway(User $user, Organization $org, ServerCreateForm $form, array $scriptKeys): Server
-    {
-        Validator::make(
-            [
-                'name' => $form->name,
-                'provider_credential_id' => $form->provider_credential_id,
-                'region' => $form->region,
-                'size' => $form->size,
-                'setup_script_key' => $form->setup_script_key,
-            ],
-            [
-                'name' => 'required|string|max:255',
-                'provider_credential_id' => 'required|exists:provider_credentials,id',
-                'region' => 'required|string|max:50',
-                'size' => 'required|string|max:100',
-                'setup_script_key' => ['nullable', 'string', Rule::in(array_merge([''], $scriptKeys))],
-            ]
-        )->validate();
-
-        $credential = ProviderCredential::where('organization_id', $org->id)
-            ->where('provider', 'scaleway')
-            ->findOrFail($form->provider_credential_id);
-
-        [$setupScriptKey, $setupStatus] = $this->setupScriptState($form->setup_script_key);
-
-        $server = $user->servers()->create([
-            'organization_id' => $org->id,
-            'name' => $form->name,
-            'provider' => ServerProvider::Scaleway,
-            'provider_credential_id' => $credential->id,
-            'region' => $form->region,
-            'size' => $form->size,
-            'setup_script_key' => $setupScriptKey,
-            'setup_status' => $setupStatus,
-            'meta' => $this->meta($form),
-            'status' => Server::STATUS_PENDING,
-        ]);
-
-        ProvisionScalewayServerJob::dispatch($server);
-        audit_log($org, $user, 'server.created', $server);
-
-        return $server;
-    }
-
-    /**
-     * @param  list<string>  $scriptKeys
-     */
     private function storeUpcloud(User $user, Organization $org, ServerCreateForm $form, array $scriptKeys): Server
     {
         Validator::make(
@@ -790,100 +745,6 @@ final class StoreServerFromCreateForm
     /**
      * @param  list<string>  $scriptKeys
      */
-    private function storeEquinixMetal(User $user, Organization $org, ServerCreateForm $form, array $scriptKeys): Server
-    {
-        Validator::make(
-            [
-                'name' => $form->name,
-                'provider_credential_id' => $form->provider_credential_id,
-                'region' => $form->region,
-                'size' => $form->size,
-                'setup_script_key' => $form->setup_script_key,
-            ],
-            [
-                'name' => 'required|string|max:255',
-                'provider_credential_id' => 'required|exists:provider_credentials,id',
-                'region' => 'required|string|max:50',
-                'size' => 'required|string|max:100',
-                'setup_script_key' => ['nullable', 'string', Rule::in(array_merge([''], $scriptKeys))],
-            ]
-        )->validate();
-
-        $credential = ProviderCredential::where('organization_id', $org->id)
-            ->where('provider', 'equinix_metal')
-            ->findOrFail($form->provider_credential_id);
-
-        [$setupScriptKey, $setupStatus] = $this->setupScriptState($form->setup_script_key);
-
-        $server = $user->servers()->create([
-            'organization_id' => $org->id,
-            'name' => $form->name,
-            'provider' => ServerProvider::EquinixMetal,
-            'provider_credential_id' => $credential->id,
-            'region' => $form->region,
-            'size' => $form->size,
-            'setup_script_key' => $setupScriptKey,
-            'setup_status' => $setupStatus,
-            'meta' => $this->meta($form),
-            'status' => Server::STATUS_PENDING,
-        ]);
-
-        ProvisionEquinixMetalServerJob::dispatch($server);
-        audit_log($org, $user, 'server.created', $server);
-
-        return $server;
-    }
-
-    /**
-     * @param  list<string>  $scriptKeys
-     */
-    private function storeFlyIo(User $user, Organization $org, ServerCreateForm $form, array $scriptKeys): Server
-    {
-        Validator::make(
-            [
-                'name' => $form->name,
-                'provider_credential_id' => $form->provider_credential_id,
-                'region' => $form->region,
-                'size' => $form->size,
-                'setup_script_key' => $form->setup_script_key,
-            ],
-            [
-                'name' => 'required|string|max:255',
-                'provider_credential_id' => 'required|exists:provider_credentials,id',
-                'region' => 'required|string|max:50',
-                'size' => 'required|string|max:100',
-                'setup_script_key' => ['nullable', 'string', Rule::in(array_merge([''], $scriptKeys))],
-            ]
-        )->validate();
-
-        $credential = ProviderCredential::where('organization_id', $org->id)
-            ->where('provider', 'fly_io')
-            ->findOrFail($form->provider_credential_id);
-
-        [$setupScriptKey, $setupStatus] = $this->setupScriptState($form->setup_script_key);
-
-        $server = $user->servers()->create([
-            'organization_id' => $org->id,
-            'name' => $form->name,
-            'provider' => ServerProvider::FlyIo,
-            'provider_credential_id' => $credential->id,
-            'region' => $form->region,
-            'size' => $form->size,
-            'setup_script_key' => $setupScriptKey,
-            'setup_status' => $setupStatus,
-            'meta' => $this->meta($form),
-            'status' => Server::STATUS_PENDING,
-        ]);
-
-        ProvisionFlyIoServerJob::dispatch($server);
-        audit_log($org, $user, 'server.created', $server);
-
-        return $server;
-    }
-
-    /**
-     * @param  list<string>  $scriptKeys
-     */
     private function storeAws(User $user, Organization $org, ServerCreateForm $form, array $scriptKeys): Server
     {
         Validator::make(
@@ -923,6 +784,100 @@ final class StoreServerFromCreateForm
         ]);
 
         ProvisionAwsEc2ServerJob::dispatch($server);
+        audit_log($org, $user, 'server.created', $server);
+
+        return $server;
+    }
+
+    /**
+     * @param  list<string>  $scriptKeys
+     */
+    private function storeAzure(User $user, Organization $org, ServerCreateForm $form, array $scriptKeys): Server
+    {
+        Validator::make(
+            [
+                'name' => $form->name,
+                'provider_credential_id' => $form->provider_credential_id,
+                'region' => $form->region,
+                'size' => $form->size,
+                'setup_script_key' => $form->setup_script_key,
+            ],
+            [
+                'name' => 'required|string|max:255',
+                'provider_credential_id' => 'required|exists:provider_credentials,id',
+                'region' => 'required|string|max:100',
+                'size' => 'required|string|max:100',
+                'setup_script_key' => ['nullable', 'string', Rule::in(array_merge([''], $scriptKeys))],
+            ]
+        )->validate();
+
+        $credential = ProviderCredential::where('organization_id', $org->id)
+            ->where('provider', 'azure')
+            ->findOrFail($form->provider_credential_id);
+
+        [$setupScriptKey, $setupStatus] = $this->setupScriptState($form->setup_script_key);
+
+        $server = $user->servers()->create([
+            'organization_id' => $org->id,
+            'name' => $form->name,
+            'provider' => ServerProvider::Azure,
+            'provider_credential_id' => $credential->id,
+            'region' => $form->region,
+            'size' => $form->size,
+            'setup_script_key' => $setupScriptKey,
+            'setup_status' => $setupStatus,
+            'meta' => $this->meta($form),
+            'status' => Server::STATUS_PENDING,
+        ]);
+
+        ProvisionAzureServerJob::dispatch($server);
+        audit_log($org, $user, 'server.created', $server);
+
+        return $server;
+    }
+
+    /**
+     * @param  list<string>  $scriptKeys
+     */
+    private function storeOracle(User $user, Organization $org, ServerCreateForm $form, array $scriptKeys): Server
+    {
+        Validator::make(
+            [
+                'name' => $form->name,
+                'provider_credential_id' => $form->provider_credential_id,
+                'region' => $form->region,
+                'size' => $form->size,
+                'setup_script_key' => $form->setup_script_key,
+            ],
+            [
+                'name' => 'required|string|max:255',
+                'provider_credential_id' => 'required|exists:provider_credentials,id',
+                'region' => 'required|string|max:100',
+                'size' => 'required|string|max:120',
+                'setup_script_key' => ['nullable', 'string', Rule::in(array_merge([''], $scriptKeys))],
+            ]
+        )->validate();
+
+        $credential = ProviderCredential::where('organization_id', $org->id)
+            ->where('provider', 'oracle')
+            ->findOrFail($form->provider_credential_id);
+
+        [$setupScriptKey, $setupStatus] = $this->setupScriptState($form->setup_script_key);
+
+        $server = $user->servers()->create([
+            'organization_id' => $org->id,
+            'name' => $form->name,
+            'provider' => ServerProvider::Oracle,
+            'provider_credential_id' => $credential->id,
+            'region' => $form->region,
+            'size' => $form->size,
+            'setup_script_key' => $setupScriptKey,
+            'setup_status' => $setupStatus,
+            'meta' => $this->meta($form),
+            'status' => Server::STATUS_PENDING,
+        ]);
+
+        ProvisionOracleServerJob::dispatch($server);
         audit_log($org, $user, 'server.created', $server);
 
         return $server;
@@ -1031,5 +986,57 @@ final class StoreServerFromCreateForm
         $status = $key ? Server::SETUP_STATUS_PENDING : null;
 
         return [$key, $status];
+    }
+
+    /**
+     * Reject incompatible Hetzner (location, server_type) combos before
+     * the row is persisted. The catalog filter on the wizard prevents
+     * this on the happy path, but a stale form, API hiccup, or direct
+     * URL submission can still land here — surfacing a validation error
+     * is much friendlier than letting the cloud-side provision job log a
+     * generic "unsupported location for server type" half a minute later.
+     */
+    private function validateHetznerRegionSizeCombo(ProviderCredential $credential, string $region, string $size): void
+    {
+        $region = trim($region);
+        $size = trim($size);
+        if ($region === '' || $size === '') {
+            return;
+        }
+
+        try {
+            $svc = new HetznerService($credential);
+            $serverTypes = $svc->getServerTypes();
+        } catch (Throwable) {
+            // Catalog probe failed — fall through and let the provision job
+            // surface the API error. We don't want to block submission on a
+            // transient Hetzner outage.
+            return;
+        }
+
+        foreach ($serverTypes as $st) {
+            if (! is_array($st) || (string) ($st['name'] ?? '') !== $size) {
+                continue;
+            }
+
+            $locations = [];
+            foreach ((array) ($st['prices'] ?? []) as $price) {
+                if (is_array($price) && (string) ($price['location'] ?? '') !== '') {
+                    $locations[] = (string) $price['location'];
+                }
+            }
+
+            if ($locations === [] || in_array($region, $locations, true)) {
+                return;
+            }
+
+            throw ValidationException::withMessages([
+                'size' => __('The server type :size is not available in :region. Available in: :locations.', [
+                    'size' => $size,
+                    'region' => $region,
+                    'locations' => implode(', ', $locations),
+                ]),
+            ]);
+        }
     }
 }

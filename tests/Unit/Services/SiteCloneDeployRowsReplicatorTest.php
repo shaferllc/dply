@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Unit\Services;
+namespace Tests\Unit\Services\SiteCloneDeployRowsReplicatorTest;
 
 use App\Enums\SiteRedirectKind;
 use App\Enums\SiteType;
@@ -9,80 +9,74 @@ use App\Models\SiteDomain;
 use App\Models\SiteRedirect;
 use App\Services\Sites\Clone\SiteCloneDeployRowsReplicator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
 
-class SiteCloneDeployRowsReplicatorTest extends TestCase
-{
-    use RefreshDatabase;
+uses(RefreshDatabase::class);
 
-    public function test_replicates_redirects_to_destination_site(): void
-    {
-        $source = Site::factory()->create(['type' => SiteType::Static]);
-        $dest = Site::factory()->create(['type' => SiteType::Static]);
+test('replicates redirects to destination site', function () {
+    $source = Site::factory()->create(['type' => SiteType::Static]);
+    $dest = Site::factory()->create(['type' => SiteType::Static]);
 
-        SiteDomain::query()->create([
-            'site_id' => $source->id,
-            'hostname' => 'a.example.com',
-            'is_primary' => true,
-        ]);
-        SiteDomain::query()->create([
-            'site_id' => $dest->id,
-            'hostname' => 'b.example.com',
-            'is_primary' => true,
-        ]);
+    SiteDomain::query()->create([
+        'site_id' => $source->id,
+        'hostname' => 'a.example.com',
+        'is_primary' => true,
+    ]);
+    SiteDomain::query()->create([
+        'site_id' => $dest->id,
+        'hostname' => 'b.example.com',
+        'is_primary' => true,
+    ]);
 
-        SiteRedirect::query()->create([
-            'site_id' => $source->id,
-            'kind' => SiteRedirectKind::InternalRewrite,
-            'from_path' => '/x',
-            'to_url' => '/y',
-            'status_code' => 301,
-            'response_headers' => null,
-            'sort_order' => 1,
-        ]);
+    SiteRedirect::query()->create([
+        'site_id' => $source->id,
+        'kind' => SiteRedirectKind::InternalRewrite,
+        'from_path' => '/x',
+        'to_url' => '/y',
+        'status_code' => 301,
+        'response_headers' => null,
+        'sort_order' => 1,
+    ]);
 
-        SiteCloneDeployRowsReplicator::replicate($source->fresh(['redirects']), $dest->fresh());
+    SiteCloneDeployRowsReplicator::replicate($source->fresh(['redirects']), $dest->fresh());
 
-        $this->assertDatabaseCount('site_redirects', 2);
-        $row = SiteRedirect::query()->where('site_id', $dest->id)->first();
-        $this->assertNotNull($row);
-        $this->assertSame(SiteRedirectKind::InternalRewrite, $row->kind);
-        $this->assertSame('/x', $row->from_path);
-        $this->assertSame('/y', $row->to_url);
-        $this->assertNull($row->response_headers);
-    }
+    $this->assertDatabaseCount('site_redirects', 2);
+    $row = SiteRedirect::query()->where('site_id', $dest->id)->first();
+    expect($row)->not->toBeNull();
+    expect($row->kind)->toBe(SiteRedirectKind::InternalRewrite);
+    expect($row->from_path)->toBe('/x');
+    expect($row->to_url)->toBe('/y');
+    expect($row->response_headers)->toBeNull();
+});
 
-    public function test_replicates_http_redirect_response_headers(): void
-    {
-        $source = Site::factory()->create(['type' => SiteType::Static]);
-        $dest = Site::factory()->create(['type' => SiteType::Static]);
+test('replicates http redirect response headers', function () {
+    $source = Site::factory()->create(['type' => SiteType::Static]);
+    $dest = Site::factory()->create(['type' => SiteType::Static]);
 
-        SiteDomain::query()->create([
-            'site_id' => $source->id,
-            'hostname' => 'src.example.com',
-            'is_primary' => true,
-        ]);
-        SiteDomain::query()->create([
-            'site_id' => $dest->id,
-            'hostname' => 'dst.example.com',
-            'is_primary' => true,
-        ]);
+    SiteDomain::query()->create([
+        'site_id' => $source->id,
+        'hostname' => 'src.example.com',
+        'is_primary' => true,
+    ]);
+    SiteDomain::query()->create([
+        'site_id' => $dest->id,
+        'hostname' => 'dst.example.com',
+        'is_primary' => true,
+    ]);
 
-        $headers = [['name' => 'X-Test', 'value' => 'ok']];
-        SiteRedirect::query()->create([
-            'site_id' => $source->id,
-            'kind' => SiteRedirectKind::Http,
-            'from_path' => '/a',
-            'to_url' => 'https://example.com/b',
-            'status_code' => 303,
-            'response_headers' => $headers,
-            'sort_order' => 1,
-        ]);
+    $headers = [['name' => 'X-Test', 'value' => 'ok']];
+    SiteRedirect::query()->create([
+        'site_id' => $source->id,
+        'kind' => SiteRedirectKind::Http,
+        'from_path' => '/a',
+        'to_url' => 'https://example.com/b',
+        'status_code' => 303,
+        'response_headers' => $headers,
+        'sort_order' => 1,
+    ]);
 
-        SiteCloneDeployRowsReplicator::replicate($source->fresh(['redirects']), $dest->fresh());
+    SiteCloneDeployRowsReplicator::replicate($source->fresh(['redirects']), $dest->fresh());
 
-        $row = SiteRedirect::query()->where('site_id', $dest->id)->first();
-        $this->assertNotNull($row);
-        $this->assertSame($headers, $row->response_headers);
-    }
-}
+    $row = SiteRedirect::query()->where('site_id', $dest->id)->first();
+    expect($row)->not->toBeNull();
+    expect($row->response_headers)->toBe($headers);
+});

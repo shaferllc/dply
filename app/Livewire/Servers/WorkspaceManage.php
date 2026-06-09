@@ -2,35 +2,53 @@
 
 namespace App\Livewire\Servers;
 
-use App\Actions\Servers\CloneServerOnDigitalOcean;
-use App\Enums\ServerProvider;
 use App\Jobs\AddEdgeProxyJob;
+use App\Jobs\ApplyEdgeBackendConfigsJob;
+use App\Jobs\RefreshServerInventoryJob;
 use App\Jobs\RemoveEdgeProxyJob;
 use App\Jobs\RevertServerWebserverSwitchJob;
 use App\Jobs\ServerManageRemoteSshJob;
 use App\Jobs\SwitchServerWebserverJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DismissesConsoleActionRun;
+use App\Livewire\Servers\Concerns\ClonesServer;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\RunsServerInventoryProbe;
+use App\Livewire\Sites\Show;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerManageAction;
 use App\Modules\TaskRunner\ProcessOutput;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\MiseInstallScriptBuilder;
+use App\Services\Servers\ServerAptLockBash;
+use App\Services\Servers\ServerDeployGitIdentity;
 use App\Services\Servers\ServerManageSshExecutor;
+use App\Services\Servers\ServerManageToolsReport;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\Servers\WebserverSwitchPreflight;
+use App\Services\SshConnection;
+use App\Support\Servers\EdgeProxyWorkspaceViewData;
+use App\Support\Servers\ServerConsoleActionLookup;
+use App\Support\Servers\WebserverWorkspaceViewData;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceManage extends Component
 {
+    use RendersWorkspacePlaceholder;
+    use ClonesServer;
     use ConfirmsActionWithModal;
     use DismissesConsoleActionRun;
     use HandlesServerRemovalFlow;
@@ -57,16 +75,6 @@ class WorkspaceManage extends Component
     public ?string $mise_loading_versions_for = null;
 
     /**
-     * Clone-server modal state. `clone_open` is the modal-show toggle (driven by
-     * Alpine via dispatch('open-modal', 'clone-server-modal')), and clone_name
-     * is the editable target name. Region + size stay locked to the source's
-     * values for v1; the operator can resize on DO after the clone lands.
-     */
-    public bool $clone_open = false;
-
-    public string $clone_name = '';
-
-    /**
      * Cascade preview for a pending webserver switch — set by openSwitchWebserver()
      * when the operator clicks "Switch to <target>" on the web tab. Consumed by
      * the confirmation modal in group-web.blade.php. Null when no switch is pending.
@@ -75,6 +83,12 @@ class WorkspaceManage extends Component
      * @var array<string, mixed>|null
      */
     public ?array $switch_plan = null;
+
+    /**
+     * Target engine key while the switch modal is open and the preflight plan
+     * is still loading. Null once {@see loadSwitchPlan()} finishes or cancel.
+     */
+    public ?string $switch_preflight_target = null;
 
     /** Opt-in: hand TLS to caddy auto-HTTPS at cutover. Greyed out for apache. */
     public bool $switch_tls_to_caddy = false;
@@ -87,6 +101,31 @@ class WorkspaceManage extends Component
      * When set, {@see syncManageRemoteTaskFromCache} polls cache until the queued SSH task finishes.
      */
     public ?string $manageRemoteTaskId = null;
+
+    /** Set by {@see WorkspaceWebserver::repairCaddyPhpFpmUpstream()} before {@see runAllowlistedAction()}. */
+    public ?string $allowlistedActionPhpVersion = null;
+
+    /** Server default PHP when it differs from the Caddy upstream socket version. */
+    public ?string $allowlistedActionPhpVersionFallback = null;
+
+    /** Stale PHP version from Caddy upstream when site configs need rewriting. */
+    public ?string $allowlistedActionUpstreamPhpVersion = null;
+
+    /** Full task name for the in-flight queued SSH job (used to trigger post-run reprobe). */
+    public ?string $manageRemoteTaskName = null;
+
+    /** Action key (e.g. install_docker) while a Tools install/repair is in flight. */
+    public ?string $pendingToolActionKey = null;
+
+    /** True while a synchronous inventory reprobe runs after a mise action completes. */
+    public bool $miseReprobePending = false;
+
+    public string $git_deploy_identity_name = '';
+
+    public string $git_deploy_identity_email = '';
+
+    /** Manage → Tools sub-panel: `tools` (catalog list) or `runtimes` (mise). */
+    public string $toolsPanel = 'tools';
 
     public function mount(Server $server, ?string $section = null): void
     {
@@ -119,6 +158,18 @@ class WorkspaceManage extends Component
             return;
         }
 
+        if ($section === 'updates' && Feature::active('workspace.patch_advisor')) {
+            $this->redirect(route('servers.patches', $server), navigate: true);
+
+            return;
+        }
+
+        if ($section === 'configuration') {
+            $this->redirect(route('servers.configuration', ['server' => $server]), navigate: true);
+
+            return;
+        }
+
         // Subclasses (currently WorkspaceWebserver) get a small section allowlist
         // extension so their inherited mount() can pass a logical section name
         // ('web') that's no longer in workspace_tabs config — the tab strip in the
@@ -137,6 +188,85 @@ class WorkspaceManage extends Component
         $this->bootWorkspace($server);
         $meta = $server->meta ?? [];
         $this->manage_auto_updates_interval = (string) ($meta['manage_auto_updates_interval'] ?? 'off');
+
+        if ($section === 'tools') {
+            $this->hydrateGitDeployIdentityForm();
+        }
+    }
+
+    public function setToolsPanel(string $panel): void
+    {
+        if (! in_array($panel, ['tools', 'runtimes'], true)) {
+            return;
+        }
+
+        $this->toolsPanel = $panel;
+    }
+
+    protected function hydrateGitDeployIdentityForm(): void
+    {
+        $identity = app(ServerDeployGitIdentity::class);
+        $defaults = $identity->defaults($this->server);
+        $meta = is_array($this->server->meta) ? $this->server->meta : [];
+        $git = is_array($meta['manage_tools']['git'] ?? null) ? $meta['manage_tools']['git'] : [];
+
+        $this->git_deploy_identity_name = is_string($git['user_name'] ?? null) && trim($git['user_name']) !== ''
+            ? trim($git['user_name'])
+            : $defaults['name'];
+        $this->git_deploy_identity_email = is_string($git['user_email'] ?? null) && trim($git['user_email']) !== ''
+            ? trim($git['user_email'])
+            : $defaults['email'];
+    }
+
+    public function saveDeployGitIdentity(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot change server manage settings.'));
+
+            return;
+        }
+
+        $this->validate([
+            'git_deploy_identity_name' => ['required', 'string', 'max:120'],
+            'git_deploy_identity_email' => ['required', 'email', 'max:190'],
+        ]);
+
+        if (! $this->serverOpsReady()) {
+            $this->toastError(__('Provisioning and SSH must be ready before running actions.'));
+
+            return;
+        }
+
+        $identity = app(ServerDeployGitIdentity::class);
+        $deployUser = $identity->deployUser($this->server);
+        if ($deployUser === null) {
+            $this->toastError(__('This server has no deploy user configured.'));
+
+            return;
+        }
+
+        $name = trim($this->git_deploy_identity_name);
+        $email = trim($this->git_deploy_identity_email);
+
+        $this->dispatchQueuedManageScript(
+            $this->server->fresh() ?? $this->server,
+            'manage-action:set_deploy_git_identity',
+            $identity->buildSetScript($deployUser, $name, $email),
+            60,
+            __('Deploy user Git identity saved.'),
+            __('TaskRunner (SSH)').' — '.__('Git identity'),
+            __('Git identity'),
+        );
+    }
+
+    public function applyDefaultDeployGitIdentity(): void
+    {
+        $defaults = app(ServerDeployGitIdentity::class)->defaults($this->server);
+        $this->git_deploy_identity_name = $defaults['name'];
+        $this->git_deploy_identity_email = $defaults['email'];
+        $this->saveDeployGitIdentity();
     }
 
     public function saveManageMetadata(): void
@@ -278,6 +408,11 @@ BASH;
 
         $service = config('server_manage.service_actions', []);
         $danger = config('server_manage.dangerous_actions', []);
+        if ($key === 'apply_edge_backend_configs') {
+            $this->applyEdgeBackendConfigs();
+
+            return;
+        }
         $def = $service[$key] ?? $danger[$key] ?? null;
         if (! is_array($def) || empty($def['script'])) {
             $this->remote_error = __('Unknown action.');
@@ -295,7 +430,19 @@ BASH;
 
         $script = (string) $def['script'];
         $meta = $this->server->meta ?? [];
-        if (in_array($key, ['restart_php_fpm', 'reload_php_fpm'], true)) {
+        if ($key === 'repair_caddy_php_fpm_upstream') {
+            $v = $this->allowlistedActionPhpVersion;
+            if (! is_string($v) || preg_match('/^\d+\.\d+$/', $v) !== 1) {
+                $this->remote_error = __('Could not determine PHP version for this repair.');
+
+                return;
+            }
+            $script = 'export DPLY_PHP_VERSION='.escapeshellarg($v)."\n".$script;
+            $upstream = $this->allowlistedActionUpstreamPhpVersion;
+            if (is_string($upstream) && preg_match('/^\d+\.\d+$/', $upstream) === 1 && $upstream !== $v) {
+                $script = 'export DPLY_UPSTREAM_PHP_VERSION='.escapeshellarg($upstream)."\n".$script;
+            }
+        } elseif (in_array($key, ['restart_php_fpm', 'reload_php_fpm'], true)) {
             $v = (string) ($meta['default_php_version'] ?? '8.3');
             if (! preg_match('/^\d+\.\d+$/', $v)) {
                 $v = '8.3';
@@ -305,17 +452,26 @@ BASH;
         if (str_starts_with($key, 'mysql_') && ! empty($meta['manage_internal_db_password']) && is_string($meta['manage_internal_db_password'])) {
             $script = 'export DPLY_DB_PASSWORD='.escapeshellarg($meta['manage_internal_db_password'])."\n".$script;
         }
+        if (str_contains($script, '__DPLY_DEPLOY_USER__')) {
+            $deployUser = trim((string) ($this->server->ssh_user ?? '')) !== ''
+                ? (string) $this->server->ssh_user
+                : (string) config('server_provision.deploy_ssh_user', 'dply');
+            $script = str_replace('__DPLY_DEPLOY_USER__', $deployUser, $script);
+        }
+
+        $this->pendingToolActionKey = $key;
 
         try {
             $server = $this->server->fresh();
             $timeout = isset($def['timeout']) ? (int) $def['timeout'] : null;
             $flash = ($def['label'] ?? $key).' '.__('finished.');
             $label = (string) ($def['label'] ?? $key);
+            $taskName = 'manage-action:'.$key;
 
             if ($this->shouldQueueManageRemoteTasks()) {
                 $this->dispatchQueuedManageScript(
                     $server,
-                    'manage-action:'.$key,
+                    $taskName,
                     $script,
                     $timeout,
                     $flash,
@@ -326,13 +482,18 @@ BASH;
                 return;
             }
 
+            $logId = $this->logManageActionStart($server, $taskName, $label);
+            ServerManageAction::query()
+                ->where('id', $logId)
+                ->update(['status' => ServerManageAction::STATUS_RUNNING]);
+
             // Sync path — seed the ConsoleAction row so the banner picks it up
             // in real time, then stream output lines into it as they arrive
             // alongside the existing remote_output buffer.
             $consoleId = $this->seedManageConsoleAction($server, $label);
-            $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+            $emitter = new ConsoleEmitter($consoleId);
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_RUNNING,
                 'started_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -345,7 +506,7 @@ BASH;
             try {
                 $out = $this->runManageInlineBash(
                     $server,
-                    'manage-action:'.$key,
+                    $taskName,
                     $script,
                     function (string $type, string $buffer) use ($emitter): void {
                         $this->remoteSshStreamAppendStdout($buffer);
@@ -366,16 +527,16 @@ BASH;
                 if (trim((string) $this->remote_output) === '') {
                     $emitter->success(__('Command finished with no terminal output.'), 'dply');
                 }
-                \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                    'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+                DB::table('console_actions')->where('id', $consoleId)->update([
+                    'status' => ConsoleAction::STATUS_COMPLETED,
                     'finished_at' => now(),
                     'error' => null,
                     'updated_at' => now(),
                 ]);
                 $this->toastSuccess($flash);
             } catch (\Throwable $inner) {
-                \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                    'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+                DB::table('console_actions')->where('id', $consoleId)->update([
+                    'status' => ConsoleAction::STATUS_FAILED,
                     'finished_at' => now(),
                     'error' => mb_substr($inner->getMessage(), 0, 2000),
                     'updated_at' => now(),
@@ -384,14 +545,18 @@ BASH;
             }
         } catch (\Throwable $e) {
             $this->remote_error = $e->getMessage();
+        } finally {
+            if (! $this->shouldQueueManageRemoteTasks()) {
+                $this->pendingToolActionKey = null;
+            }
         }
     }
 
     /**
-     * Install a runtime version under the deploy user's mise without changing
-     * the global default. The Tools tab's "Install version" button is wired
-     * here. Output streams via the hoisted manage-action banner; the seeded
-     * ConsoleAction row carries the per-line progress mise emits.
+     * Install a runtime version under the deploy user's mise and activate it as
+     * the global default (`mise use --global`). Without activation, mise warns
+     * that the version is "installed but not activated". The Tools tab's
+     * "Install & activate" button is wired here.
      */
     public function miseInstallRuntime(string $runtime, string $version): void
     {
@@ -400,7 +565,7 @@ BASH;
             version: $version,
             kind: 'install',
             taskName: 'mise-runtime:install',
-            labelTemplate: __('Installing :runtime :version'),
+            labelTemplate: __('Installing and activating :runtime :version'),
         );
     }
 
@@ -427,6 +592,38 @@ BASH;
             kind: 'uninstall',
             taskName: 'mise-runtime:uninstall',
             labelTemplate: __('Uninstalling :runtime :version'),
+        );
+    }
+
+    /**
+     * Open the confirmation modal before uninstalling a mise runtime version.
+     */
+    public function promptMiseUninstallRuntime(string $runtime, string $version): void
+    {
+        $runtime = strtolower(trim($runtime));
+        $version = trim($version);
+
+        if ($version === '') {
+            return;
+        }
+
+        $catalog = config('server_manage.mise_runtimes', []);
+        $label = is_array($catalog[$runtime] ?? null)
+            ? (string) ($catalog[$runtime]['label'] ?? $runtime)
+            : $runtime;
+
+        $confirm = __('Uninstall :runtime :version? The deploy user\'s mise data directory drops the install; sites already pinned to this version will fall back to the runtime default.', [
+            'runtime' => $label,
+            'version' => $version,
+        ]);
+
+        $this->openConfirmActionModal(
+            'miseUninstallRuntime',
+            [$runtime, $version],
+            __('Uninstall :v', ['v' => $version]),
+            $confirm,
+            __('Uninstall :runtime :v', ['runtime' => $label, 'v' => $version]),
+            true,
         );
     }
 
@@ -470,7 +667,7 @@ BASH;
         $runtime = strtolower(trim($runtime));
         $version = trim($version);
 
-        if (! in_array($runtime, MiseInstallScriptBuilder::SUPPORTED_RUNTIMES, true)) {
+        if (! in_array($runtime, MiseInstallScriptBuilder::supportedRuntimes(), true)) {
             $this->toastError(__('Unsupported runtime: :runtime.', ['runtime' => $runtime]));
 
             return;
@@ -502,12 +699,14 @@ BASH;
         }
 
         $builder = app(MiseInstallScriptBuilder::class);
-        $lines = match ($kind) {
-            'install' => $builder->installRuntimeVersionForUserLines($deployUser, $runtime, $version),
+        $runtimeLines = match ($kind) {
+            'install', 'default' => $builder->installRuntimeForUserLines($deployUser, $runtime, $version),
             'uninstall' => $builder->uninstallRuntimeVersionForUserLines($deployUser, $runtime, $version),
-            'default' => $builder->setRuntimeDefaultForUserLines($deployUser, $runtime, $version),
             default => [],
         };
+        $lines = $kind === 'uninstall'
+            ? $runtimeLines
+            : array_merge($builder->activateForUserLines($deployUser), $runtimeLines);
         if ($lines === []) {
             $this->toastError(__('Could not build the runtime script for :runtime :version.', [
                 'runtime' => $runtime,
@@ -549,7 +748,7 @@ BASH;
         $this->authorize('update', $this->server);
 
         $runtime = strtolower(trim($runtime));
-        if (! in_array($runtime, MiseInstallScriptBuilder::SUPPORTED_RUNTIMES, true)) {
+        if (! in_array($runtime, MiseInstallScriptBuilder::supportedRuntimes(), true)) {
             $this->toastError(__('Unsupported runtime: :runtime.', ['runtime' => $runtime]));
 
             return;
@@ -576,7 +775,7 @@ BASH;
             $userArg = escapeshellarg($deployUser);
             $toolArg = escapeshellarg($runtime);
             $script = "sudo -u {$userArg} -i mise ls-remote {$toolArg} 2>/dev/null || true";
-            $ssh = new \App\Services\SshConnection($this->server, 'root');
+            $ssh = new SshConnection($this->server, 'root');
             $output = $ssh->exec('/bin/sh -c '.escapeshellarg($script), 30);
             $ssh->disconnect();
 
@@ -620,6 +819,7 @@ BASH;
         }
         $versions = array_values(array_unique($versions));
         usort($versions, fn (string $a, string $b) => version_compare($b, $a));
+
         // Cap at a reasonable size — operators rarely need anything older.
         return array_slice($versions, 0, 60);
     }
@@ -642,97 +842,6 @@ BASH;
         $active = $entry['active'] ?? null;
 
         return is_string($active) && $active !== '' ? $active : null;
-    }
-
-    /**
-     * Eligibility gate for the Configuration tab's Clone server button.
-     * Mirrors the assertCloneable checks on the action so the UI hides /
-     * disables the affordance instead of relying on a post-click toast.
-     */
-    public function canCloneServer(): bool
-    {
-        if ($this->server->provider !== ServerProvider::DigitalOcean) {
-            return false;
-        }
-        $hostKind = (string) (($this->server->meta ?? [])['host_kind'] ?? Server::HOST_KIND_VM);
-        if ($hostKind !== Server::HOST_KIND_VM) {
-            return false;
-        }
-        if (! $this->server->providerCredential || $this->server->providerCredential->provider !== 'digitalocean') {
-            return false;
-        }
-        if ($this->server->provider_id === null || $this->server->provider_id === '') {
-            return false;
-        }
-
-        return $this->server->status === Server::STATUS_READY;
-    }
-
-    public function openCloneServerModal(): void
-    {
-        $this->authorize('update', $this->server);
-
-        if (! $this->canCloneServer()) {
-            $this->toastError(__('This server is not currently cloneable.'));
-
-            return;
-        }
-
-        $this->clone_name = $this->server->name.' (clone)';
-        $this->clone_open = true;
-        $this->dispatch('open-modal', 'clone-server-modal');
-    }
-
-    public function cancelCloneServer(): void
-    {
-        $this->clone_open = false;
-        $this->dispatch('close-modal', 'clone-server-modal');
-    }
-
-    public function confirmCloneServer(): void
-    {
-        $this->authorize('update', $this->server);
-
-        if (! $this->canCloneServer()) {
-            $this->toastError(__('This server is not currently cloneable.'));
-
-            return;
-        }
-
-        $this->validate([
-            'clone_name' => ['required', 'string', 'min:2', 'max:120'],
-        ]);
-
-        $user = auth()->user();
-        $org = $user?->currentOrganization();
-        if ($user === null || $org === null) {
-            $this->toastError(__('No active organization context.'));
-
-            return;
-        }
-
-        try {
-            $clone = app(CloneServerOnDigitalOcean::class)->handle(
-                actor: $user,
-                org: $org,
-                source: $this->server,
-                overrides: ['name' => $this->clone_name],
-            );
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            $messages = collect($e->errors())->flatten()->all();
-            $this->toastError($messages[0] ?? __('Clone failed.'));
-
-            return;
-        } catch (\Throwable $e) {
-            $this->toastError($e->getMessage());
-
-            return;
-        }
-
-        $this->clone_open = false;
-        $this->dispatch('close-modal', 'clone-server-modal');
-        $this->toastSuccess(__('Clone queued. Track progress on the new server\'s page.'));
-        $this->redirect(route('servers.manage', ['server' => $clone, 'section' => 'overview']), navigate: true);
     }
 
     /**
@@ -760,9 +869,43 @@ BASH;
             return;
         }
 
-        $this->switch_plan = app(WebserverSwitchPreflight::class)->plan($this->server, $target);
+        if (WebserverWorkspaceViewData::isComingSoonEngine($target)) {
+            $label = WebserverWorkspaceViewData::webserverCatalog()[$target]['label'] ?? $target;
+            $this->toastError(__(':engine switching is coming soon.', ['engine' => $label]));
+
+            return;
+        }
+
+        $this->switch_plan = null;
+        $this->switch_preflight_target = $target;
         $this->switch_tls_to_caddy = false;
         $this->dispatch('open-modal', 'webserver-switch-modal');
+    }
+
+    /**
+     * Compute the switch cascade preview after the modal opens. Kept separate
+     * from {@see openSwitchWebserver()} so the confirmation shell appears
+     * immediately while site/profile preflight runs.
+     */
+    public function loadSwitchPlan(): void
+    {
+        $target = $this->switch_preflight_target;
+        if ($target === null || $this->switch_plan !== null) {
+            return;
+        }
+
+        $this->authorize('update', $this->server);
+
+        $plan = app(WebserverSwitchPreflight::class)->plan($this->server, $target);
+
+        // Operator closed the modal while preflight was running.
+        if ($this->switch_preflight_target !== $target) {
+            return;
+        }
+
+        $this->switch_plan = $plan;
+        $this->switch_tls_to_caddy = false;
+        $this->switch_preflight_target = null;
     }
 
     /**
@@ -812,6 +955,7 @@ BASH;
         );
 
         $this->switch_plan = null;
+        $this->switch_preflight_target = null;
         $this->switch_tls_to_caddy = false;
         $this->dispatch('close-modal', 'webserver-switch-modal');
         $this->toastSuccess(__('Webserver switch queued. Progress shows in the banner above.'));
@@ -822,7 +966,7 @@ BASH;
      * so the banner-static partial picks it up on the next render — without
      * waiting for the worker to claim the job. Auto-dismisses prior terminal +
      * stale-running rows so the operator sees only the run they just started.
-     * Mirrors {@see \App\Livewire\Sites\Show::seedQueuedConsoleAction()} but
+     * Mirrors {@see Show::seedQueuedConsoleAction()} but
      * scoped to a Server subject instead of a Site.
      *
      * `from`/`to` are persisted in `output['meta']` so {@see stopAndRevertWebserverSwitch()}
@@ -862,7 +1006,7 @@ BASH;
             ], static fn ($v) => $v !== null);
         }
 
-        return ConsoleAction::query()->create([
+        $action = ConsoleAction::query()->create([
             'subject_type' => $subjectType,
             'subject_id' => $subjectId,
             'kind' => 'webserver_switch',
@@ -871,6 +1015,10 @@ BASH;
             'user_id' => request()->user()?->id,
             'output' => $output,
         ]);
+
+        app(ServerConsoleActionLookup::class)->forget($this->server);
+
+        return $action;
     }
 
     /**
@@ -879,6 +1027,7 @@ BASH;
     public function cancelSwitchWebserver(): void
     {
         $this->switch_plan = null;
+        $this->switch_preflight_target = null;
         $this->switch_tls_to_caddy = false;
         $this->dispatch('close-modal', 'webserver-switch-modal');
     }
@@ -913,6 +1062,54 @@ BASH;
             return;
         }
 
+        $row->forceFill([
+            'status' => ConsoleAction::STATUS_FAILED,
+            'finished_at' => now(),
+            'error' => 'Aborted by operator',
+            'dismissed_at' => now(),
+        ])->save();
+
+        $this->dispatchWebserverSwitchRevert($row, __('Stopping the switch and reverting :to → :from. Progress shows in the banner.'));
+    }
+
+    /**
+     * After a switch fails (e.g. cutover could not start Caddy), uninstall the
+     * partial target and bring the original webserver back on :80.
+     */
+    public function cleanupFailedWebserverSwitch(string $runId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $row = ConsoleAction::query()
+            ->where('id', $runId)
+            ->where('subject_type', $this->server->getMorphClass())
+            ->where('subject_id', $this->server->getKey())
+            ->where('kind', 'webserver_switch')
+            ->whereNull('dismissed_at')
+            ->first();
+
+        if ($row === null || $row->isInFlight()) {
+            $this->toastError(__('No failed webserver switch to clean up.'));
+
+            return;
+        }
+
+        if ($row->status !== ConsoleAction::STATUS_FAILED) {
+            $this->toastError(__('Cleanup is only available for a failed switch.'));
+
+            return;
+        }
+
+        $row->forceFill(['dismissed_at' => now()])->save();
+
+        $this->dispatchWebserverSwitchRevert($row, __('Cleaning up the failed switch and restoring :from on :80. Progress shows in the banner.'));
+    }
+
+    /**
+     * @return array{from: string, to: string}|null
+     */
+    private function webserverSwitchEndpointsFromRow(ConsoleAction $row): ?array
+    {
         $output = is_array($row->output) ? $row->output : [];
         $meta = is_array($output['meta'] ?? null) ? $output['meta'] : [];
         $serverWebserver = strtolower((string) ($this->server->meta['webserver'] ?? 'nginx'));
@@ -924,23 +1121,24 @@ BASH;
         }
 
         if ($to === '' || $to === $from) {
-            $this->toastError(__('Cannot determine the revert target from the failed switch.'));
+            return null;
+        }
+
+        return ['from' => $from, 'to' => $to];
+    }
+
+    private function dispatchWebserverSwitchRevert(ConsoleAction $row, string $toastTemplate): void
+    {
+        $endpoints = $this->webserverSwitchEndpointsFromRow($row);
+        if ($endpoints === null) {
+            $this->toastError(__('Cannot determine which webserver to restore from this switch run.'));
 
             return;
         }
 
-        // Mark the stuck row failed + dismissed so hasInflightWebserverSwitch()
-        // releases and the seed below isn't auto-dismissed by its own pre-clean.
-        $row->forceFill([
-            'status' => ConsoleAction::STATUS_FAILED,
-            'finished_at' => now(),
-            'error' => 'Aborted by operator',
-            'dismissed_at' => now(),
-        ])->save();
+        $from = $endpoints['from'];
+        $to = $endpoints['to'];
 
-        // Seed a fresh row so the banner immediately switches to the revert
-        // progress view rather than going blank between dispatch and worker
-        // pickup. Same kind so the banner partial transparently picks it up.
         $this->seedQueuedWebserverSwitchAction(
             label: __('Reverting webserver switch: :to → :from …', ['to' => $to, 'from' => $from]),
             from: $to,
@@ -954,10 +1152,7 @@ BASH;
             userId: auth()->id(),
         );
 
-        $this->toastSuccess(__('Stopping the switch and reverting :to → :from. Progress shows in the banner.', [
-            'to' => $to,
-            'from' => $from,
-        ]));
+        $this->toastSuccess(__($toastTemplate, ['to' => $to, 'from' => $from]));
     }
 
     /**
@@ -965,7 +1160,7 @@ BASH;
      * banner is scoped to. WorkspaceManage's banner shows server-level runs
      * (webserver_switch, etc.), so the subject is the server.
      */
-    protected function consoleActionSubject(): \Illuminate\Database\Eloquent\Model
+    protected function consoleActionSubject(): Model
     {
         return $this->server;
     }
@@ -976,13 +1171,7 @@ BASH;
      */
     public function hasInflightWebserverSwitch(): bool
     {
-        return ConsoleAction::query()
-            ->where('subject_type', $this->server->getMorphClass())
-            ->where('subject_id', $this->server->getKey())
-            ->where('kind', 'webserver_switch')
-            ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING])
-            ->whereNull('dismissed_at')
-            ->exists();
+        return app(ServerConsoleActionLookup::class)->hasInflightWebserverSwitch($this->server);
     }
 
     /**
@@ -992,13 +1181,7 @@ BASH;
      */
     public function hasInflightEdgeProxyAction(): bool
     {
-        return ConsoleAction::query()
-            ->where('subject_type', $this->server->getMorphClass())
-            ->where('subject_id', $this->server->getKey())
-            ->where('kind', 'edge_proxy')
-            ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING])
-            ->whereNull('dismissed_at')
-            ->exists();
+        return app(ServerConsoleActionLookup::class)->hasInflightEdgeProxy($this->server);
     }
 
     /**
@@ -1011,20 +1194,42 @@ BASH;
         $this->authorize('update', $this->server);
 
         $target = strtolower(trim($target));
-        if (! in_array($target, ['traefik', 'haproxy'], true)) {
+        $catalog = EdgeProxyWorkspaceViewData::edgeProxyCatalog();
+        if (! isset($catalog[$target])) {
             $this->toastError(__('Unknown edge proxy: :t.', ['t' => $target]));
 
             return;
         }
+
+        if (EdgeProxyWorkspaceViewData::isComingSoonEdgeProxy($target)) {
+            $label = $catalog[$target]['label'] ?? $target;
+            $this->toastError(__(':engine edge proxy is coming soon.', ['engine' => $label]));
+
+            return;
+        }
+
+        if (! in_array($target, EdgeProxyWorkspaceViewData::installableEdgeProxies(), true)) {
+            $label = $catalog[$target]['label'] ?? $target;
+            $this->toastError(__(':engine edge proxy is coming soon.', ['engine' => $label]));
+
+            return;
+        }
+
         if ($this->hasInflightEdgeProxyAction() || $this->hasInflightWebserverSwitch()) {
             $this->toastError(__('Another webserver action is in flight — wait for it to finish.'));
 
             return;
         }
 
+        $currentEdge = $this->server->edgeProxy();
+        $isSwitch = $currentEdge !== null && $currentEdge !== $target;
+        $targetLabel = $catalog[$target]['label'] ?? $target;
+
         $this->seedQueuedEdgeProxyAction(
-            label: __('Adding edge proxy: :target …', ['target' => $target]),
-            meta: ['op' => 'add', 'target' => $target],
+            label: $isSwitch
+                ? __('Switching edge proxy to :target …', ['target' => $targetLabel])
+                : __('Adding edge proxy: :target …', ['target' => $targetLabel]),
+            meta: ['op' => $isSwitch ? 'switch' : 'add', 'target' => $target, 'from' => $currentEdge],
         );
 
         AddEdgeProxyJob::dispatch(
@@ -1034,6 +1239,56 @@ BASH;
         );
 
         $this->toastSuccess(__('Edge proxy queued. Progress shows in the banner above.'));
+    }
+
+    /**
+     * Rebuild every site's Caddy backend + TLS configs and the active edge
+     * routing file (Envoy / HAProxy / Traefik). Repair when preview URLs or
+     * HTTPS fronts drift after cutover.
+     */
+    public function applyEdgeBackendConfigs(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot run service actions on servers.'));
+
+            return;
+        }
+
+        $edge = $this->server->edgeProxy();
+        if ($edge === null) {
+            $this->toastError(__('No edge proxy is active on this server.'));
+
+            return;
+        }
+
+        if ($this->hasInflightEdgeProxyAction() || $this->hasInflightWebserverSwitch()) {
+            $this->toastError(__('Another webserver action is in flight — wait for it to finish.'));
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->toastError(__('Provisioning and SSH must be ready before running actions.'));
+
+            return;
+        }
+
+        $catalog = EdgeProxyWorkspaceViewData::edgeProxyCatalog();
+        $edgeLabel = $catalog[$edge]['label'] ?? ucfirst($edge);
+
+        $this->seedQueuedEdgeProxyAction(
+            label: __('Applying webserver config (edge backends + :edge routing)…', ['edge' => $edgeLabel]),
+            meta: ['op' => 'apply_backends', 'target' => $edge],
+        );
+
+        ApplyEdgeBackendConfigsJob::dispatch(
+            serverId: $this->server->id,
+            userId: auth()->id(),
+        );
+
+        $this->toastSuccess(__('Edge backend sync queued. Progress shows in the banner above.'));
     }
 
     /**
@@ -1100,7 +1355,7 @@ BASH;
             'meta' => $meta,
         ];
 
-        return ConsoleAction::query()->create([
+        $action = ConsoleAction::query()->create([
             'subject_type' => $subjectType,
             'subject_id' => $subjectId,
             'kind' => 'edge_proxy',
@@ -1109,6 +1364,220 @@ BASH;
             'user_id' => request()->user()?->id,
             'output' => $output,
         ]);
+
+        app(ServerConsoleActionLookup::class)->forget($this->server);
+
+        return $action;
+    }
+
+    public function pollManageWorkspace(): void
+    {
+        $this->syncManageRemoteTaskFromCache();
+    }
+
+    /**
+     * wire:init target — queue a background inventory probe when Manage lands with
+     * SSH ready but no probe snapshot yet (common right after provision).
+     */
+    public function maybeRefreshInventoryProbeOnLoad(): void
+    {
+        if (! (bool) config('server_manage.inventory_probe_refresh_on_load', true)) {
+            return;
+        }
+
+        $this->attemptAutoInventoryProbeRefresh();
+    }
+
+    /**
+     * wire:poll target while provisioning is in flight or probe meta is still empty.
+     * Refreshes the server row from the database and re-attempts the auto-refresh
+     * dispatch once SSH becomes ready.
+     */
+    public function pollManageInventoryState(): void
+    {
+        $this->server->refresh();
+        $this->attemptAutoInventoryProbeRefresh();
+    }
+
+    protected function attemptAutoInventoryProbeRefresh(): void
+    {
+        if (! $this->shouldAutoRefreshInventoryProbe()) {
+            return;
+        }
+
+        $cacheKey = 'server-inventory-probe:auto:'.$this->server->id;
+        if (! Cache::add($cacheKey, 1, now()->addMinutes(2))) {
+            return;
+        }
+
+        RefreshServerInventoryJob::dispatch((string) $this->server->id);
+    }
+
+    protected function shouldAutoRefreshInventoryProbe(): bool
+    {
+        if ($this->currentUserIsDeployer()) {
+            return false;
+        }
+
+        if (! auth()->user()?->can('update', $this->server)) {
+            return false;
+        }
+
+        if (! $this->serverOpsReady()) {
+            return false;
+        }
+
+        $meta = is_array($this->server->meta) ? $this->server->meta : [];
+        $checkedAt = $meta['inventory_checked_at'] ?? null;
+
+        return ! is_string($checkedAt) || trim($checkedAt) === '';
+    }
+
+    /**
+     * @return array<string, array{kind: string, version: string, status: string, message: string}>
+     */
+    protected function activeMiseRuntimeOperations(): array
+    {
+        $rows = ServerManageAction::query()
+            ->where('server_id', $this->server->id)
+            ->where('task_name', 'like', 'mise-runtime:%')
+            ->whereIn('status', [
+                ServerManageAction::STATUS_QUEUED,
+                ServerManageAction::STATUS_RUNNING,
+            ])
+            ->orderByDesc('created_at')
+            ->get(['task_name', 'status']);
+
+        $ops = [];
+
+        foreach ($rows as $row) {
+            if (! preg_match('/^mise-runtime:(install|uninstall|default):([^@]+)@(.+)$/', (string) $row->task_name, $matches)) {
+                continue;
+            }
+
+            $runtime = strtolower($matches[2]);
+            if (isset($ops[$runtime])) {
+                continue;
+            }
+
+            $kind = $matches[1];
+            $version = $matches[3];
+
+            $ops[$runtime] = [
+                'kind' => $kind,
+                'version' => $version,
+                'status' => (string) $row->status,
+                'message' => match ($kind) {
+                    'install' => __('Installing :version…', ['version' => $version]),
+                    'uninstall' => __('Uninstalling :version…', ['version' => $version]),
+                    'default' => __('Setting :version as default…', ['version' => $version]),
+                    default => __('Working…'),
+                },
+            ];
+        }
+
+        return $ops;
+    }
+
+    /**
+     * @return array<string, array{status: string, message: string, label: string}>
+     */
+    public function activeManageActionOperations(): array
+    {
+        return $this->activeToolActionOperations();
+    }
+
+    /**
+     * @return array<string, array{status: string, message: string, label: string}>
+     */
+    protected function activeToolActionOperations(): array
+    {
+        $rows = ServerManageAction::query()
+            ->where('server_id', $this->server->id)
+            ->where('task_name', 'like', 'manage-action:%')
+            ->whereIn('status', [
+                ServerManageAction::STATUS_QUEUED,
+                ServerManageAction::STATUS_RUNNING,
+            ])
+            ->orderByDesc('created_at')
+            ->get(['task_name', 'status', 'label']);
+
+        $ops = [];
+
+        foreach ($rows as $row) {
+            if (! preg_match('/^manage-action:(.+)$/', (string) $row->task_name, $matches)) {
+                continue;
+            }
+
+            $key = $matches[1];
+            if (isset($ops[$key])) {
+                continue;
+            }
+
+            $status = (string) $row->status;
+            $ops[$key] = [
+                'status' => $status,
+                'label' => (string) $row->label,
+                'message' => $this->toolActionBusyMessage($key, $status, (string) $row->label),
+            ];
+        }
+
+        if ($this->manageRemoteTaskId !== null
+            && $this->manageRemoteTaskId !== ''
+            && is_string($this->manageRemoteTaskName)
+            && preg_match('/^manage-action:(.+)$/', $this->manageRemoteTaskName, $matches)) {
+            $key = $matches[1];
+            if (! isset($ops[$key])) {
+                $payload = Cache::get(ServerManageRemoteSshJob::cacheKey($this->manageRemoteTaskId));
+                $status = is_array($payload) ? (string) ($payload['status'] ?? 'queued') : 'queued';
+
+                if (in_array($status, ['queued', 'running'], true)) {
+                    $label = config('server_manage.service_actions.'.$key.'.label')
+                        ?? config('server_manage.dangerous_actions.'.$key.'.label')
+                        ?? $key;
+
+                    $ops[$key] = [
+                        'status' => $status,
+                        'label' => is_string($label) ? $label : $key,
+                        'message' => $this->toolActionBusyMessage($key, $status, is_string($label) ? $label : $key),
+                    ];
+                }
+            }
+        }
+
+        if ($this->pendingToolActionKey !== null
+            && $this->pendingToolActionKey !== ''
+            && ! isset($ops[$this->pendingToolActionKey])) {
+            $key = $this->pendingToolActionKey;
+            $label = config('server_manage.service_actions.'.$key.'.label')
+                ?? config('server_manage.dangerous_actions.'.$key.'.label')
+                ?? $key;
+
+            $ops[$key] = [
+                'status' => ServerManageAction::STATUS_RUNNING,
+                'label' => is_string($label) ? $label : $key,
+                'message' => $this->toolActionBusyMessage($key, ServerManageAction::STATUS_RUNNING, is_string($label) ? $label : $key),
+            ];
+        }
+
+        return $ops;
+    }
+
+    protected function toolActionBusyMessage(string $key, string $status, string $label): string
+    {
+        if ($status === ServerManageAction::STATUS_QUEUED) {
+            return __('Queuing :action…', ['action' => $label]);
+        }
+
+        if (str_starts_with($key, 'install_')) {
+            return __('Installing :action…', ['action' => $label]);
+        }
+
+        if (str_starts_with($key, 'repair_') || str_starts_with($key, 'update_')) {
+            return __('Updating :action…', ['action' => $label]);
+        }
+
+        return __('Running :action…', ['action' => $label]);
     }
 
     public function syncManageRemoteTaskFromCache(): void
@@ -1149,22 +1618,145 @@ BASH;
             return;
         }
 
+        $taskName = $this->manageRemoteTaskName;
+        $this->finalizeManageRemoteTaskLog($status, $taskName);
+
         if ($status === 'finished') {
             $flash = $payload['flash_success'] ?? null;
             if (is_string($flash) && $flash !== '') {
                 $this->toastSuccess($flash);
             }
-        } else {
+
+            if ($this->shouldRefreshInventoryAfterRemoteTask($taskName)) {
+                $this->runPostMiseInventoryRefresh();
+            }
+
+            if ($this->section === 'tools' && $taskName === 'manage-action:set_deploy_git_identity') {
+                $this->hydrateGitDeployIdentityForm();
+            }
         }
 
         Cache::forget(ServerManageRemoteSshJob::cacheKey($this->manageRemoteTaskId));
         $this->manageRemoteTaskId = null;
+        $this->manageRemoteTaskName = null;
+        $this->pendingToolActionKey = null;
     }
 
-    public function render(): View
+    protected function finalizeManageRemoteTaskLog(string $cacheStatus, ?string $taskName): void
     {
-        $this->server->refresh();
+        if (! is_string($taskName) || $taskName === '') {
+            return;
+        }
 
+        if (! in_array($cacheStatus, ['finished', 'failed'], true)) {
+            return;
+        }
+
+        $rowStatus = $cacheStatus === 'finished'
+            ? ServerManageAction::STATUS_FINISHED
+            : ServerManageAction::STATUS_FAILED;
+
+        ServerManageAction::query()
+            ->where('server_id', $this->server->id)
+            ->where('task_name', $taskName)
+            ->whereIn('status', [
+                ServerManageAction::STATUS_QUEUED,
+                ServerManageAction::STATUS_RUNNING,
+            ])
+            ->update([
+                'status' => $rowStatus,
+                'finished_at' => now(),
+            ]);
+    }
+
+    protected function shouldRefreshInventoryAfterRemoteTask(?string $taskName): bool
+    {
+        if (! is_string($taskName) || $taskName === '') {
+            return false;
+        }
+
+        if (str_starts_with($taskName, 'mise-runtime:')) {
+            return true;
+        }
+
+        if (! preg_match('/^manage-action:(.+)$/', $taskName, $matches)) {
+            return false;
+        }
+
+        $key = $matches[1];
+        if ($key === 'set_deploy_git_identity') {
+            return true;
+        }
+
+        $entry = config('server_manage.service_actions', [])[$key]
+            ?? config('server_manage.dangerous_actions', [])[$key]
+            ?? null;
+
+        return is_array($entry) && (bool) ($entry['rerun_probe_after_finish'] ?? false);
+    }
+
+    protected function shouldRefreshWebserverLiveStateAfterRemoteTask(?string $taskName): bool
+    {
+        if (! is_string($taskName) || $taskName === '') {
+            return false;
+        }
+
+        if (! preg_match('/^manage-action:(.+)$/', $taskName, $matches)) {
+            return false;
+        }
+
+        $key = $matches[1];
+        $entry = config('server_manage.service_actions', [])[$key]
+            ?? config('server_manage.dangerous_actions', [])[$key]
+            ?? null;
+
+        return is_array($entry) && (bool) ($entry['refresh_webserver_live_state_after_finish'] ?? false);
+    }
+
+    protected function runPostMiseInventoryRefresh(): void
+    {
+        if (! $this->canRunInventoryProbe()) {
+            return;
+        }
+
+        $this->miseReprobePending = true;
+
+        try {
+            $this->refreshServerInventoryDetails();
+        } finally {
+            $this->miseReprobePending = false;
+            $this->server->refresh();
+        }
+    }
+
+    /**
+     * Override the trait placeholder so the Manage sub-tab strip stays
+     * visible (with the destination section highlighted) while the body
+     * lazy-loads — only the content area below the sub-tabs skeletons.
+     */
+    public function placeholder(): View
+    {
+        return view('livewire.servers.partials.workspace-subtab-placeholder', [
+            'server' => $this->server,
+            'active' => 'manage',
+            'title' => __('Manage'),
+            'tabs' => $this->manageWorkspaceTabs(),
+            'section' => $this->section,
+            'routeName' => 'servers.manage',
+            'idPrefix' => 'manage-tab-',
+            'ariaLabel' => __('Manage categories'),
+        ]);
+    }
+
+    public function render(ServerManageToolsReport $toolsReport): View
+    {
+        // No $this->server->refresh() here: Livewire re-resolves the bound
+        // model from the database on every request (route binding on first
+        // load, the Eloquent synthesizer on later updates), so the row is
+        // already current at render time. The poll/action handlers that mutate
+        // the server (pollManageInventoryState, saveManageMetadata,
+        // runPostMiseInventoryRefresh) refresh it themselves, so refreshing
+        // again here only doubled the `select * from servers` per render.
         $recentActions = $this->section === 'overview'
             ? ServerManageAction::query()
                 ->where('server_id', $this->server->id)
@@ -1173,16 +1765,92 @@ BASH;
                 ->get()
             : collect();
 
+        $serviceActions = config('server_manage.service_actions', []);
+
+        // Quick-actions allowlist for the overview tile. Each key maps to one
+        // or more systemd unit prefixes; the button is hidden if none of the
+        // matching units exist on this server (e.g. a Valkey-only host
+        // shouldn't surface "Reload NGINX" or "Restart PHP-FPM"). Lookup is
+        // O(1) via the systemd-state table — populated by the inventory probe.
+        $serviceActionUnitMatchers = [
+            'reload_nginx' => ['nginx.service'],
+            'restart_nginx' => ['nginx.service'],
+            'restart_php_fpm' => ['php8.3-fpm.service', 'php8.2-fpm.service', 'php8.1-fpm.service', 'php8.4-fpm.service', 'php8.0-fpm.service', 'php7.4-fpm.service'],
+            'reload_php_fpm' => ['php8.3-fpm.service', 'php8.2-fpm.service', 'php8.1-fpm.service', 'php8.4-fpm.service', 'php8.0-fpm.service', 'php7.4-fpm.service'],
+            'restart_redis' => ['redis-server.service', 'redis.service'],
+            // 'apt_update' has no service prerequisite — always available on Debian/Ubuntu.
+        ];
+
+        $installedUnits = \App\Models\ServerSystemdServiceState::query()
+            ->where('server_id', $this->server->id)
+            ->where(function ($q) {
+                $q->whereNull('unit_file_state')
+                    ->orWhere('unit_file_state', '!=', 'not-found');
+            })
+            ->pluck('unit')
+            ->all();
+        $installedUnitsSet = array_flip($installedUnits);
+
+        $quickActionKeys = array_values(array_filter(
+            array_keys($serviceActions),
+            function (string $key) use ($serviceActionUnitMatchers, $installedUnitsSet): bool {
+                if (! isset($serviceActionUnitMatchers[$key])) {
+                    // No prerequisite declared (e.g. apt_update) — let it
+                    // through, falls under "universal" maintenance actions.
+                    return true;
+                }
+                foreach ($serviceActionUnitMatchers[$key] as $unit) {
+                    if (isset($installedUnitsSet[$unit])) {
+                        return true;
+                    }
+                }
+
+                return false;
+            },
+        ));
+
+        $activeMiseRuntimeOps = $this->section === 'tools'
+            ? $this->activeMiseRuntimeOperations()
+            : [];
+
+        $activeToolActionOps = $this->section === 'tools'
+            ? $this->activeToolActionOperations()
+            : [];
+
         return view('livewire.servers.workspace-manage', [
             'configPreviews' => config('server_manage.config_previews', []),
-            'serviceActions' => config('server_manage.service_actions', []),
+            'serviceActions' => $serviceActions,
+            'quickActionKeys' => $quickActionKeys,
             'dangerousActions' => config('server_manage.dangerous_actions', []),
             'autoUpdateIntervals' => config('server_manage.auto_update_intervals', []),
             'recentActions' => $recentActions,
+            'toolsReport' => $this->section === 'tools'
+                ? $toolsReport->build($this->server, $serviceActions)
+                : null,
+            'activeMiseRuntimeOps' => $activeMiseRuntimeOps,
+            'activeToolActionOps' => $activeToolActionOps,
+            'pendingToolActionKey' => $this->pendingToolActionKey,
+            'miseReprobePending' => $this->miseReprobePending,
+            'toolsPanel' => $this->toolsPanel,
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
+            'manageTabs' => $this->manageWorkspaceTabs(),
         ]);
+    }
+
+    /**
+     * @return array<string, array{label: string, icon: string}>
+     */
+    protected function manageWorkspaceTabs(): array
+    {
+        $tabs = config('server_manage.workspace_tabs', []);
+
+        if (Feature::active('workspace.patch_advisor')) {
+            unset($tabs['updates']);
+        }
+
+        return $tabs;
     }
 
     protected function assertAllowlistedConfigPath(string $path): void
@@ -1241,6 +1909,13 @@ BASH;
         ?string $consoleLabel = null,
     ): void {
         $this->manageRemoteTaskId = null;
+        $this->manageRemoteTaskName = $taskName;
+
+        if (preg_match('/^manage-action:(.+)$/', $taskName, $matches)) {
+            $this->pendingToolActionKey = $matches[1];
+        }
+
+        $inlineBash = ServerAptLockBash::wrapManageScript($inlineBash);
 
         $id = (string) Str::uuid();
         $ttl = (int) config('server_manage.remote_task_cache_ttl_seconds', 900);
@@ -1307,22 +1982,22 @@ BASH;
      */
     protected function seedManageConsoleAction(Server $server, string $label): string
     {
-        \App\Models\ConsoleAction::query()
+        ConsoleAction::query()
             ->where('subject_type', $server->getMorphClass())
             ->where('subject_id', $server->id)
             ->where('kind', 'manage_action')
             ->whereNull('dismissed_at')
             ->whereIn('status', [
-                \App\Models\ConsoleAction::STATUS_COMPLETED,
-                \App\Models\ConsoleAction::STATUS_FAILED,
+                ConsoleAction::STATUS_COMPLETED,
+                ConsoleAction::STATUS_FAILED,
             ])
             ->update(['dismissed_at' => now()]);
 
-        $row = \App\Models\ConsoleAction::query()->create([
+        $row = ConsoleAction::query()->create([
             'subject_type' => $server->getMorphClass(),
             'subject_id' => $server->id,
             'kind' => 'manage_action',
-            'status' => \App\Models\ConsoleAction::STATUS_QUEUED,
+            'status' => ConsoleAction::STATUS_QUEUED,
             'user_id' => auth()->id(),
             'label' => $label.' …',
             'output' => ['v' => (int) config('console_actions.current_version', 1), 'lines' => []],

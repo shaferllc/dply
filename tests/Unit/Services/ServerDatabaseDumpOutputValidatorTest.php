@@ -1,47 +1,32 @@
 <?php
 
-namespace Tests\Unit\Services;
+namespace Tests\Unit\Services\ServerDatabaseDumpOutputValidatorTest;
 
 use App\Services\Servers\ServerDatabaseDumpOutputValidator;
-use PHPUnit\Framework\Attributes\Test;
-use Tests\TestCase;
 
-class ServerDatabaseDumpOutputValidatorTest extends TestCase
-{
-    #[Test]
-    public function mysql_success_dump_is_not_failed(): void
-    {
-        $sql = "-- MySQL dump\nCREATE TABLE t (id int);\n";
-        $this->assertFalse(ServerDatabaseDumpOutputValidator::looksLikeFailedDump('mysql', $sql));
-    }
+test('mysql success dump is not failed', function () {
+    $sql = "-- MySQL dump\nCREATE TABLE t (id int);\n";
+    expect(ServerDatabaseDumpOutputValidator::looksLikeFailedDump('mysql', $sql))->toBeFalse();
+});
 
-    #[Test]
-    public function mysql_detects_mysqldump_prefix_line(): void
-    {
-        $out = "mysqldump: Got error: 1045: Access denied\n";
-        $this->assertTrue(ServerDatabaseDumpOutputValidator::looksLikeFailedDump('mysql', $out));
-    }
+test('mysql detects mysqldump prefix line', function () {
+    $out = "mysqldump: Got error: 1045: Access denied\n";
+    expect(ServerDatabaseDumpOutputValidator::looksLikeFailedDump('mysql', $out))->toBeTrue();
+});
 
-    #[Test]
-    public function mysql_detects_access_denied(): void
-    {
-        $this->assertTrue(ServerDatabaseDumpOutputValidator::looksLikeFailedDump(
-            'mysql',
-            'ERROR 1045 (28000): Access denied for user'
-        ));
-    }
+test('mysql detects access denied', function () {
+    expect(ServerDatabaseDumpOutputValidator::looksLikeFailedDump(
+        'mysql',
+        'ERROR 1045 (28000): Access denied for user'
+    ))->toBeTrue();
+});
 
-    #[Test]
-    public function postgres_detects_pg_dump_error_line(): void
-    {
-        $out = "pg_dump: error: connection to server failed\n";
-        $this->assertTrue(ServerDatabaseDumpOutputValidator::looksLikeFailedDump('postgres', $out));
-    }
+test('postgres detects pg dump error line', function () {
+    $out = "pg_dump: error: connection to server failed\n";
+    expect(ServerDatabaseDumpOutputValidator::looksLikeFailedDump('postgres', $out))->toBeTrue();
+});
 
-    #[Test]
-    public function postgres_success_dump_is_not_failed(): void
-    {
-        $sql = "--\n-- PostgreSQL database dump\n--\n\nSET statement_timeout = 0;\n";
-        $this->assertFalse(ServerDatabaseDumpOutputValidator::looksLikeFailedDump('postgres', $sql));
-    }
-}
+test('postgres success dump is not failed', function () {
+    $sql = "--\n-- PostgreSQL database dump\n--\n\nSET statement_timeout = 0;\n";
+    expect(ServerDatabaseDumpOutputValidator::looksLikeFailedDump('postgres', $sql))->toBeFalse();
+});

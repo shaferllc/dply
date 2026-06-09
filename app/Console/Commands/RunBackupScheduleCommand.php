@@ -7,8 +7,10 @@ namespace App\Console\Commands;
 use App\Jobs\ExportServerDatabaseBackupJob;
 use App\Jobs\ExportSiteFileBackupJob;
 use App\Models\ServerBackupSchedule;
+use App\Models\ServerCronJob;
 use App\Models\ServerDatabaseBackup;
 use App\Models\SiteFileBackup;
+use App\Services\Servers\DatabaseBackupExporter;
 use Illuminate\Console\Command;
 
 /**
@@ -44,7 +46,7 @@ class RunBackupScheduleCommand extends Command
         if ($this->shouldAutoPause($schedule)) {
             $schedule->update(['is_active' => false]);
             if ($schedule->server_cron_job_id) {
-                \App\Models\ServerCronJob::query()
+                ServerCronJob::query()
                     ->whereKey($schedule->server_cron_job_id)
                     ->update(['enabled' => false]);
             }
@@ -74,12 +76,12 @@ class RunBackupScheduleCommand extends Command
         $threshold = self::FAILURE_AUTO_PAUSE_THRESHOLD;
 
         $recent = match ($schedule->target_type) {
-            ServerBackupSchedule::TARGET_DATABASE => \App\Models\ServerDatabaseBackup::query()
+            ServerBackupSchedule::TARGET_DATABASE => ServerDatabaseBackup::query()
                 ->where('server_database_id', $schedule->target_id)
                 ->orderByDesc('created_at')
                 ->limit($threshold)
                 ->pluck('status'),
-            ServerBackupSchedule::TARGET_SITE_FILES => \App\Models\SiteFileBackup::query()
+            ServerBackupSchedule::TARGET_SITE_FILES => SiteFileBackup::query()
                 ->where('site_id', $schedule->target_id)
                 ->orderByDesc('created_at')
                 ->limit($threshold)
@@ -92,11 +94,19 @@ class RunBackupScheduleCommand extends Command
 
     private function dispatchDatabaseBackup(ServerBackupSchedule $schedule): void
     {
+        $schedule->loadMissing('server');
+
         $backup = ServerDatabaseBackup::create([
             'server_database_id' => $schedule->target_id,
             'user_id' => null,
             'status' => ServerDatabaseBackup::STATUS_PENDING,
         ]);
+
+        app(DatabaseBackupExporter::class)->prepareBackupRow(
+            $backup,
+            $schedule->server,
+            $schedule->backup_configuration_id,
+        );
 
         ExportServerDatabaseBackupJob::dispatch($backup->id);
         $this->info('Dispatched database backup '.$backup->id);

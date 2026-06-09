@@ -2,429 +2,363 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature;
+namespace Tests\Feature\EdgeCreatePageTest;
 
-use App\Jobs\ProvisionEdgeSiteJob;
-use App\Livewire\Edge\Create as EdgeCreate;
+use App\Enums\SiteType;
+use App\Livewire\Edge\Create;
 use App\Models\Organization;
-use App\Models\ProviderCredential;
 use App\Models\Site;
 use App\Models\SocialAccount;
 use App\Models\User;
-use App\Services\Deploy\RuntimeDetection\GitCloneException;
-use App\Services\Deploy\RuntimeDetection\GitCloner;
-use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePreview;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Laravel\Pennant\Feature;
 use Livewire\Livewire;
-use Tests\Concerns\WithFeatures;
-use Tests\TestCase;
+use ReflectionMethod;
 
-class EdgeCreatePageTest extends TestCase
-{
-    use RefreshDatabase;
-    use WithFeatures;
+uses(RefreshDatabase::class);
 
-    protected array $features = ['surface.edge'];
+usesFeatures('surface.edge', 'surface.cloud');
 
-    public function test_page_renders_with_no_backends_connected_warning(): void
-    {
-        config(['server_provision_fake.env_flag' => false]);
-        $user = $this->ownerWithOrg();
+test('guest is redirected from edge create', function () {
+    $this->get(route('edge.create'))
+        ->assertRedirect(route('login'));
+});
 
-        $response = $this->actingAs($user)->get(route('edge.create'));
+test('authenticated user can load edge create form', function () {
+    $user = ownerWithOrg();
 
-        $response->assertOk()
-            ->assertSee('Deploy a container app')
-            ->assertSee('No container backend connected')
-            ->assertSee('Connect DigitalOcean')
-            ->assertSee('Connect AWS App Runner');
-    }
+    $this->actingAs($user)
+        ->get(route('edge.create'))
+        ->assertOk()
+        ->assertSee('Deploy an edge app')
+        ->assertSee('Git repository')
+        ->assertSee('Build command override')
+        ->assertSee('SPA fallback')
+        ->assertSee('Deploy on push')
+        ->assertSee('Dply Edge (managed)')
+        ->assertSee('Your Cloudflare account');
+});
 
-    public function test_page_shows_fake_cloud_notice_instead_of_warning_when_no_creds_and_fake_on(): void
-    {
-        config(['server_provision_fake.env_flag' => true]);
-        $user = $this->ownerWithOrg();
+test('returns 404 when surface edge inactive', function () {
+    Feature::define('surface.edge', fn () => false);
+    Feature::flushCache();
 
-        $response = $this->actingAs($user)->get(route('edge.create'));
+    $user = ownerWithOrg();
 
-        $response->assertOk()
-            ->assertSee('Fake-cloud mode is on')
-            ->assertDontSee('No container backend connected');
-    }
+    $this->actingAs($user)
+        ->get(route('edge.create'))
+        ->assertStatus(400);
+});
 
-    public function test_page_hides_warning_when_backend_connected(): void
-    {
-        $user = $this->ownerWithOrg();
-        ProviderCredential::query()->create([
-            'user_id' => $user->id,
-            'organization_id' => $user->currentOrganization()->id,
-            'provider' => 'digitalocean_app_platform',
-            'name' => 'DO',
-            'credentials' => ['api_token' => 't'],
-        ]);
+test('ssr detection auto selects hybrid and name from repo when no cloud app', function () {
+    $user = ownerWithOrg();
 
-        $response = $this->actingAs($user)->get(route('edge.create'));
+    Livewire::actingAs($user)
+        ->test(Create::class)
+        ->set('repo', 'acme/next-app')
+        ->set('branch', 'main')
+        ->set('detectedPlan', [
+            'framework' => 'next',
+            'start_command' => 'next start',
+            'build_command' => 'npm run build',
+        ])
+        ->tap(function ($component): void {
+            $method = new ReflectionMethod($component->instance(), 'applyDetectedRuntimePrefills');
+            $method->setAccessible(true);
+            $method->invoke($component->instance());
+        })
+        ->assertSet('form.runtime_mode', 'hybrid')
+        ->assertSet('form.name', 'Next App')
+        ->assertSet('form.origin_url', '');
+});
 
-        $response->assertOk()
-            ->assertDontSee('No container backend connected');
-    }
+test('ssr detection auto fills origin from matching cloud app repo', function () {
+    $user = ownerWithOrg();
+    $org = $user->currentOrganization();
 
-    public function test_changing_backend_resets_region_to_first_available(): void
-    {
-        $user = $this->ownerWithOrg();
-
-        Livewire::actingAs($user)
-            ->test(EdgeCreate::class)
-            ->set('backend', 'aws_app_runner')
-            ->assertSet('region', 'us-east-1')
-            ->set('backend', 'digitalocean_app_platform')
-            ->assertSet('region', 'ams');
-    }
-
-    public function test_deploy_dispatches_provision_job_and_redirects(): void
-    {
-        Queue::fake();
-        $user = $this->ownerWithOrg();
-        ProviderCredential::query()->create([
-            'user_id' => $user->id,
-            'organization_id' => $user->currentOrganization()->id,
-            'provider' => 'digitalocean_app_platform',
-            'name' => 'DO',
-            'credentials' => ['api_token' => 't'],
-        ]);
-
-        Livewire::actingAs($user)
-            ->test(EdgeCreate::class)
-            ->set('name', 'Acme API')
-            ->set('image', 'ghcr.io/acme/api:v1')
-            ->set('port', 8080)
-            ->set('region', 'nyc')
-            ->set('backend', 'digitalocean_app_platform')
-            ->call('deploy')
-            ->assertHasNoErrors();
-
-        Queue::assertPushed(ProvisionEdgeSiteJob::class);
-    }
-
-    public function test_deploy_with_no_credential_shows_toast_error(): void
-    {
-        $user = $this->ownerWithOrg();
-
-        Livewire::actingAs($user)
-            ->test(EdgeCreate::class)
-            ->set('name', 'Lonely')
-            ->set('image', 'nginx:1')
-            ->set('region', 'nyc')
-            ->set('backend', 'auto')
-            ->call('deploy')
-            ->assertDispatched('notify');
-    }
-
-    public function test_deploy_validates_required_fields(): void
-    {
-        $user = $this->ownerWithOrg();
-
-        Livewire::actingAs($user)
-            ->test(EdgeCreate::class)
-            ->call('deploy')
-            ->assertHasErrors(['name', 'image']);
-    }
-
-    public function test_source_tab_renders_repo_inputs(): void
-    {
-        $user = $this->ownerWithOrg();
-
-        Livewire::actingAs($user)
-            ->test(EdgeCreate::class)
-            ->set('mode', 'source')
-            ->assertSee('GitHub repo')
-            ->assertSee('Branch')
-            ->assertSee('Auto-deploy on push to this branch')
-            ->assertSee('owner/name or full GitHub URL');
-    }
-
-    public function test_source_mode_validates_repo_and_branch(): void
-    {
-        $user = $this->ownerWithOrg();
-
-        Livewire::actingAs($user)
-            ->test(EdgeCreate::class)
-            ->set('mode', 'source')
-            ->set('name', 'svc')
-            ->call('deploy')
-            ->assertHasErrors(['repo']);
-    }
-
-    public function test_source_mode_warns_when_aws_lacks_github_connection(): void
-    {
-        $user = $this->ownerWithOrg();
-        ProviderCredential::query()->create([
-            'user_id' => $user->id,
-            'organization_id' => $user->currentOrganization()->id,
-            'provider' => 'aws_app_runner',
-            'name' => 'AWS',
-            'credentials' => ['access_key_id' => 'k', 'secret_access_key' => 's'],
-        ]);
-
-        Livewire::actingAs($user)
-            ->test(EdgeCreate::class)
-            ->set('mode', 'source')
-            ->set('backend', 'aws_app_runner')
-            ->assertSee('AWS App Runner needs a GitHub connection');
-    }
-
-    public function test_source_mode_skips_warning_when_aws_has_github_connection(): void
-    {
-        $user = $this->ownerWithOrg();
-        ProviderCredential::query()->create([
-            'user_id' => $user->id,
-            'organization_id' => $user->currentOrganization()->id,
-            'provider' => 'aws_app_runner',
-            'name' => 'AWS',
-            'credentials' => [
-                'access_key_id' => 'k',
-                'secret_access_key' => 's',
-                'github_connection_arn' => 'arn:aws:apprunner:us-east-1:1234:connection/dply/xyz',
+    Site::factory()->create([
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+        'name' => 'Next API',
+        'container_backend' => 'digitalocean_app_platform',
+        'meta' => [
+            'container' => [
+                'source' => ['repo' => 'acme/next-app', 'branch' => 'main'],
+                'live_url' => 'https://next-api.ondigitalocean.app',
             ],
-        ]);
+        ],
+    ]);
 
-        Livewire::actingAs($user)
-            ->test(EdgeCreate::class)
-            ->set('mode', 'source')
-            ->set('backend', 'aws_app_runner')
-            ->assertDontSee('AWS App Runner needs a GitHub connection');
-    }
+    Livewire::actingAs($user)
+        ->test(Create::class)
+        ->set('form.name', 'SSR App')
+        ->set('repo', 'acme/next-app')
+        ->set('branch', 'main')
+        ->set('form.runtime_mode', 'hybrid')
+        ->assertSet('form.origin_url', 'https://next-api.ondigitalocean.app');
+});
 
-    public function test_source_tab_shows_only_manual_entry_when_no_accounts_linked(): void
+test('rejects ssr-looking detection on deploy when hybrid origin missing', function () {
+    $user = ownerWithOrg();
+
+    Livewire::actingAs($user)
+        ->test(Create::class)
+        ->set('form.name', 'SSR App')
+        ->set('repo', 'acme/next-app')
+        ->set('branch', 'main')
+        ->set('form.runtime_mode', 'static')
+        ->set('runtimeModeTouched', true)
+        ->set('detectedPlan', [
+            'framework' => 'next',
+            'start_command' => 'next start',
+            'build_command' => 'npm run build',
+        ])
+        ->call('deploy')
+        ->assertNoRedirect();
+
+    expect(Site::query()->count())->toBe(0);
+});
+
+test('hybrid mode leaves origin empty when no cloud app matches', function () {
+    $user = ownerWithOrg();
+
+    Livewire::actingAs($user)
+        ->test(Create::class)
+        ->set('form.runtime_mode', 'hybrid')
+        ->set('form.name', 'My App')
+        ->assertSet('form.origin_url', '')
+        ->set('form.name', 'SSR App')
+        ->assertSet('form.origin_url', '');
+});
+
+test('hybrid mode uses live cloud app url when one is linked manually', function () {
+    $user = ownerWithOrg();
+    $org = $user->currentOrganization();
+
+    $cloudSite = Site::factory()->create([
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+        'name' => 'Next API',
+        'container_backend' => 'digitalocean_app_platform',
+        'meta' => [
+            'container' => [
+                'source' => ['repo' => 'acme/next-app', 'branch' => 'main'],
+                'live_url' => 'https://next-api.ondigitalocean.app',
+            ],
+        ],
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(Create::class)
+        ->set('form.name', 'SSR App')
+        ->set('form.runtime_mode', 'hybrid')
+        ->set('form.origin_cloud_site_id', (string) $cloudSite->id)
+        ->assertSet('form.origin_url', 'https://next-api.ondigitalocean.app');
+});
+
+test('shows manual entry when no git accounts linked', function () {
+    $user = ownerWithOrg();
+
+    Livewire::actingAs($user)
+        ->test(Create::class)
+        ->assertSet('linkedSourceControlAccounts', [])
+        ->assertSee('owner/repo or a full GitHub URL')
+        ->assertDontSee('Pick from connected account');
+});
+
+test('renders repo picker when git accounts linked', function () {
+    $user = ownerWithOrg();
+
+    $browser = new class extends SourceControlRepositoryBrowser
     {
-        $user = $this->ownerWithOrg();
+        public function __construct() {}
 
-        Livewire::actingAs($user)
-            ->test(EdgeCreate::class)
-            ->set('mode', 'source')
-            ->assertSet('linkedSourceControlAccounts', [])
-            ->assertSee('owner/name or full GitHub URL')
-            ->assertDontSee('Pick from connected account');
-    }
-
-    public function test_source_tab_renders_picker_when_accounts_linked(): void
-    {
-        $user = $this->ownerWithOrg();
-
-        $browser = new class extends SourceControlRepositoryBrowser
+        public function accountsForUser($user): array
         {
-            public function __construct() {}
+            return [['id' => 'acct-1', 'provider' => 'github', 'label' => 'Github - acme']];
+        }
 
-            public function accountsForUser($user): array
-            {
-                return [['id' => 'acct-1', 'label' => 'github:acme', 'name' => 'acme']];
-            }
-
-            public function repositoriesForAccount($account): array
-            {
-                return [
-                    ['url' => 'https://github.com/acme/api', 'name' => 'acme/api', 'branch' => 'main'],
-                    ['url' => 'https://github.com/acme/web', 'name' => 'acme/web', 'branch' => 'develop'],
-                ];
-            }
-        };
-        app()->instance(SourceControlRepositoryBrowser::class, $browser);
-
-        Livewire::actingAs($user)
-            ->test(EdgeCreate::class)
-            ->set('mode', 'source')
-            ->assertSee('Pick from connected account')
-            ->assertSee('Enter manually')
-            ->assertSee('github:acme');
-    }
-
-    public function test_picker_selection_populates_repo_and_branch(): void
-    {
-        $user = $this->ownerWithOrg();
-        // Seed a real SocialAccount because the component's
-        // loadRepositoriesForSelectedAccount() asks the User's relation
-        // for it. The browser fake is consulted only after that lookup.
-        $account = SocialAccount::query()->create([
-            'user_id' => $user->id,
-            'provider' => 'github',
-            'provider_id' => '12345',
-            'label' => 'github:acme',
-            'nickname' => 'acme',
-            'access_token' => encrypt('t'),
-        ]);
-
-        $browser = new class($account->id) extends SourceControlRepositoryBrowser
+        public function repositoriesForAccount($account): array
         {
-            public function __construct(public string $accountId) {}
+            return [
+                ['url' => 'https://github.com/acme/web', 'label' => 'acme/web', 'branch' => 'main'],
+            ];
+        }
+    };
+    app()->instance(SourceControlRepositoryBrowser::class, $browser);
 
-            public function accountsForUser($user): array
-            {
-                return [['id' => $this->accountId, 'label' => 'github:acme', 'name' => 'acme']];
-            }
+    Livewire::actingAs($user)
+        ->test(Create::class)
+        ->assertSee('Pick from connected account')
+        ->assertSee('Enter manually')
+        ->assertSee('Github - acme');
+});
 
-            public function repositoriesForAccount($account): array
-            {
-                return [
-                    ['url' => 'https://github.com/acme/api.git', 'name' => 'acme/api', 'branch' => 'develop'],
-                ];
-            }
-        };
-        app()->instance(SourceControlRepositoryBrowser::class, $browser);
+test('picker selection populates repo and branch', function () {
+    $user = ownerWithOrg();
 
-        Livewire::actingAs($user)
-            ->test(EdgeCreate::class)
-            ->set('mode', 'source')
-            ->set('repository_selection', 'https://github.com/acme/api.git')
-            ->assertSet('repo', 'acme/api')
-            ->assertSet('branch', 'develop');
-    }
+    $account = SocialAccount::query()->create([
+        'user_id' => $user->id,
+        'provider' => 'github',
+        'provider_id' => '12345',
+        'label' => 'github:acme',
+        'nickname' => 'acme',
+        'access_token' => encrypt('t'),
+    ]);
 
-    public function test_source_mode_dispatches_provision_with_source_meta(): void
+    $browser = new class($account->id) extends SourceControlRepositoryBrowser
     {
-        Queue::fake();
-        $user = $this->ownerWithOrg();
-        ProviderCredential::query()->create([
-            'user_id' => $user->id,
-            'organization_id' => $user->currentOrganization()->id,
-            'provider' => 'digitalocean_app_platform',
-            'name' => 'DO',
-            'credentials' => ['api_token' => 't'],
-        ]);
+        public function __construct(public string $accountId) {}
 
-        Livewire::actingAs($user)
-            ->test(EdgeCreate::class)
-            ->set('mode', 'source')
-            ->set('name', 'Acme API')
-            ->set('repo', 'acme/api')
-            ->set('branch', 'main')
-            ->set('port', 8080)
-            ->set('region', 'nyc')
-            ->set('backend', 'digitalocean_app_platform')
-            ->call('deploy')
-            ->assertHasNoErrors();
-
-        Queue::assertPushed(ProvisionEdgeSiteJob::class);
-        $site = Site::query()->where('name', 'Acme API')->firstOrFail();
-        $this->assertNull($site->container_image);
-        $this->assertSame('acme/api', $site->meta['container']['source']['repo']);
-    }
-
-    public function test_source_mode_detection_renders_runtime_panel(): void
-    {
-        $user = $this->ownerWithOrg();
-        $this->fakeClonerProducingNodeRepo('node server.js');
-
-        Livewire::actingAs($user)
-            ->test(EdgeCreate::class)
-            ->set('mode', 'source')
-            ->set('repo', 'acme/api')
-            ->set('branch', 'main')
-            ->call('detectFromRepository')
-            ->assertSee('node')
-            ->assertSee('confidence');
-    }
-
-    public function test_source_mode_detection_prefills_container_port(): void
-    {
-        $user = $this->ownerWithOrg();
-        $this->fakeClonerProducingNodeRepo('node server.js --port 4321');
-
-        Livewire::actingAs($user)
-            ->test(EdgeCreate::class)
-            ->set('mode', 'source')
-            ->set('repo', 'acme/api')
-            ->set('branch', 'main')
-            ->call('detectFromRepository')
-            ->assertSet('port', 4321);
-    }
-
-    public function test_source_mode_detection_does_not_overwrite_typed_port(): void
-    {
-        $user = $this->ownerWithOrg();
-        $this->fakeClonerProducingNodeRepo('node server.js --port 4321');
-
-        Livewire::actingAs($user)
-            ->test(EdgeCreate::class)
-            ->set('mode', 'source')
-            // Typing a port marks it touched — detection must not stomp it.
-            ->set('port', 9000)
-            ->set('repo', 'acme/api')
-            ->set('branch', 'main')
-            ->call('detectFromRepository')
-            ->assertSet('port', 9000);
-    }
-
-    public function test_source_mode_detection_failure_does_not_block_deploy(): void
-    {
-        Queue::fake();
-        $user = $this->ownerWithOrg();
-        ProviderCredential::query()->create([
-            'user_id' => $user->id,
-            'organization_id' => $user->currentOrganization()->id,
-            'provider' => 'digitalocean_app_platform',
-            'name' => 'DO',
-            'credentials' => ['api_token' => 't'],
-        ]);
-        $this->app->instance(GitCloner::class, new class implements GitCloner
+        public function accountsForUser($user): array
         {
-            public function shallowClone(string $url, string $branch, string $destination): void
-            {
-                throw new GitCloneException('Repository not found.');
-            }
-        });
-        unset($this->app[RepositoryRuntimePreview::class]);
+            return [['id' => $this->accountId, 'provider' => 'github', 'label' => 'Github - acme']];
+        }
 
-        $component = Livewire::actingAs($user)
-            ->test(EdgeCreate::class)
-            ->set('mode', 'source')
-            ->set('name', 'Acme API')
-            ->set('repo', 'acme/api')
-            ->set('branch', 'main')
-            ->set('port', 8080)
-            ->set('region', 'nyc')
-            ->set('backend', 'digitalocean_app_platform')
-            ->call('detectFromRepository');
-
-        $this->assertSame('Repository not found.', $component->get('detectedPlan')['error']);
-
-        $component->call('deploy')->assertHasNoErrors();
-        Queue::assertPushed(ProvisionEdgeSiteJob::class);
-    }
-
-    private function fakeClonerProducingNodeRepo(string $startScript): void
-    {
-        $this->app->instance(GitCloner::class, new class($startScript) implements GitCloner
+        public function repositoriesForAccount($account): array
         {
-            public function __construct(private string $startScript) {}
+            return [
+                ['url' => 'https://github.com/acme/marketing.git', 'label' => 'acme/marketing', 'branch' => 'develop'],
+            ];
+        }
+    };
+    app()->instance(SourceControlRepositoryBrowser::class, $browser);
 
-            public function shallowClone(string $url, string $branch, string $destination): void
-            {
-                mkdir($destination, 0o755, true);
-                file_put_contents(
-                    $destination.'/package.json',
-                    json_encode([
-                        'name' => 'acme-api',
-                        'dependencies' => ['express' => '^4.0'],
-                        'scripts' => ['start' => $this->startScript],
-                    ]),
-                );
-            }
-        });
+    Livewire::actingAs($user)
+        ->test(Create::class)
+        ->set('repository_selection', 'https://github.com/acme/marketing.git')
+        ->assertSet('repo', 'acme/marketing')
+        ->assertSet('branch', 'develop');
+});
 
-        // RepositoryRuntimePreview is constructed per-request; rebinding the
-        // GitCloner is enough — the concern resolves the preview fresh.
-        unset($this->app[RepositoryRuntimePreview::class]);
-    }
+test('auto detects when a complete manual repo is entered', function () {
+    $user = ownerWithOrg();
 
-    private function ownerWithOrg(): User
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'owner']);
-        session(['current_organization_id' => $org->id]);
+    Livewire::actingAs($user)
+        ->test(Create::class)
+        ->set('repo_source', 'manual')
+        ->set('repo', '11ty/eleventy-base-blog')
+        ->assertSet('detectedPlan.framework', 'eleventy')
+        ->assertSet('form.output_dir', '_site');
+});
 
-        return $user;
-    }
+test('does not auto detect for incomplete manual repo slug', function () {
+    $user = ownerWithOrg();
+
+    Livewire::actingAs($user)
+        ->test(Create::class)
+        ->set('repo_source', 'manual')
+        ->set('repo', '11ty')
+        ->set('branch', 'main')
+        ->assertSet('detectedPlan', []);
+});
+
+test('ssr without origin shows auto provision messaging when cloud available', function () {
+    config(['server_provision_fake.env_flag' => true]);
+    $user = ownerWithOrg();
+
+    Livewire::actingAs($user)
+        ->test(Create::class)
+        ->set('form.name', 'SSR App')
+        ->set('repo', 'acme/next-app')
+        ->set('branch', 'main')
+        ->set('form.runtime_mode', 'hybrid')
+        ->set('detectedPlan', [
+            'framework' => 'next',
+            'start_command' => 'next start',
+            'build_command' => 'npm run build',
+        ])
+        ->assertSee('Deploy hybrid stack')
+        ->assertSee('provisioned from this repository')
+        ->assertSee('SSR origin');
+});
+
+test('deploy auto provisions hybrid stack when ssr detected and cloud available', function () {
+    Queue::fake();
+    config(['server_provision_fake.env_flag' => true]);
+    $user = ownerWithOrg();
+
+    Livewire::actingAs($user)
+        ->test(Create::class)
+        ->set('form.name', 'SSR App')
+        ->set('repo', 'acme/next-app')
+        ->set('branch', 'main')
+        ->set('form.runtime_mode', 'hybrid')
+        ->set('detectedPlan', [
+            'framework' => 'next',
+            'start_command' => 'next start',
+            'build_command' => 'npm run build',
+        ])
+        ->call('deploy')
+        ->assertRedirect();
+
+    expect(Site::query()->where('type', SiteType::Container)->count())->toBe(1);
+});
+
+test('deploy hybrid stack redirects to cloud workspace', function () {
+    Queue::fake();
+    config(['server_provision_fake.env_flag' => true]);
+    $user = ownerWithOrg();
+
+    Livewire::actingAs($user)
+        ->test(Create::class)
+        ->set('form.name', 'SSR App')
+        ->set('repo', 'acme/next-app')
+        ->set('branch', 'main')
+        ->set('detectedPlan', [
+            'framework' => 'next',
+            'start_command' => 'next start',
+            'build_command' => 'npm run build',
+        ])
+        ->call('deployHybridStack')
+        ->assertRedirect();
+
+    $cloudSite = Site::query()->where('type', SiteType::Container)->first();
+    expect($cloudSite)->not->toBeNull();
+    expect($cloudSite->meta['container']['hybrid_edge_stack']['status'] ?? null)->toBe('awaiting_origin');
+});
+
+test('hybrid stack auto provision hidden when origin auto filled', function () {
+    config(['server_provision_fake.env_flag' => true]);
+    $user = ownerWithOrg();
+    $org = $user->currentOrganization();
+
+    Site::factory()->create([
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+        'name' => 'Next API',
+        'container_backend' => 'digitalocean_app_platform',
+        'meta' => [
+            'container' => [
+                'source' => ['repo' => 'acme/next-app', 'branch' => 'main'],
+                'live_url' => 'https://next-api.ondigitalocean.app',
+            ],
+        ],
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(Create::class)
+        ->set('form.name', 'SSR App')
+        ->set('repo', 'acme/next-app')
+        ->set('branch', 'main')
+        ->set('detectedPlan', [
+            'framework' => 'next',
+            'start_command' => 'next start',
+        ])
+        ->set('form.runtime_mode', 'hybrid')
+        ->assertSet('form.origin_url', 'https://next-api.ondigitalocean.app')
+        ->assertSee('SSR origin URL')
+        ->assertSee('Deploy edge app');
+});
+
+function ownerWithOrg(): User
+{
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+    session(['current_organization_id' => $org->id]);
+
+    return $user;
 }

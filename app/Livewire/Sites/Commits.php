@@ -116,7 +116,11 @@ class Commits extends Component
         $resourcePlural = $runtimeMode === 'vm' ? __('sites') : __('apps');
         $routingTab = 'domains';
         $laravel_tab = 'commands';
-        $section = 'commits';
+        // Commits is reached from the Deployments group ("Repository → Commits"
+        // sub-tab + the top-level Commits tab on the Deployments tablist), so
+        // it should highlight the "Deployments" sidebar item — not a "commits"
+        // id that the sidebar doesn't carry.
+        $section = 'deploy';
         $runtimeTarget = $this->site->runtimeTarget();
         $runtimePublication = is_array($runtimeTarget['publication'] ?? null) ? $runtimeTarget['publication'] : [];
 

@@ -1,0 +1,79 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use Cron\CronExpression;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
+
+/**
+ * A recurring, cron-scheduled deploy for a site. Evaluated on the control-plane
+ * Laravel scheduler (see {@see \App\Console\Commands\RunDueDeploymentSchedulesCommand}),
+ * which dispatches {@see \App\Jobs\RunSiteDeploymentJob} when a schedule is due —
+ * deploys are control-plane orchestrated (SSH out), so this is NOT a remote crontab.
+ */
+class SiteDeploymentSchedule extends Model
+{
+    use HasUlids;
+
+    protected $table = 'site_deployment_schedules';
+
+    /** Auto-pause after this many consecutive failed scheduled deploys. */
+    public const MAX_CONSECUTIVE_FAILURES = 5;
+
+    protected $fillable = [
+        'site_id',
+        'server_id',
+        'cron_expression',
+        'timezone',
+        'git_branch',
+        'is_active',
+        'notify_on_failure',
+        'consecutive_failures',
+        'last_run_at',
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
+        'notify_on_failure' => 'boolean',
+        'consecutive_failures' => 'integer',
+        'last_run_at' => 'datetime',
+    ];
+
+    public function site(): BelongsTo
+    {
+        return $this->belongsTo(Site::class);
+    }
+
+    /**
+     * Whether this schedule's next cron tick has elapsed since it last ran (or
+     * since `$now` minus one minute on first run). Called once a minute by the
+     * dispatcher, so a one-minute look-back means we never miss a tick.
+     */
+    public function isDue(Carbon $now): bool
+    {
+        if (! $this->is_active) {
+            return false;
+        }
+
+        $cron = new CronExpression($this->cron_expression);
+        $tz = $this->timezone ?: config('app.timezone', 'UTC');
+
+        // Anchor from the last run (or one tick ago on first run) and ask the
+        // parser for the next scheduled time after that anchor.
+        $anchor = $this->last_run_at ?? $now->copy()->subMinute();
+        $next = Carbon::instance($cron->getNextRunDate($anchor->copy()->setTimezone($tz)))
+            ->setTimezone($tz);
+
+        return $next->lessThanOrEqualTo($now->copy()->setTimezone($tz));
+    }
+
+    public function recordRun(Carbon $now): void
+    {
+        $this->forceFill(['last_run_at' => $now])->save();
+    }
+}

@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
 
@@ -14,7 +15,9 @@ class SitePolicy
 
     public function view(User $user, Site $site): bool
     {
-        return $user->can('view', $site->server);
+        $server = $this->resolveServer($site);
+
+        return $server !== null && $user->can('view', $server);
     }
 
     public function create(User $user): bool
@@ -42,7 +45,9 @@ class SitePolicy
             return $site->workspace->userCanUpdate($user);
         }
 
-        return $user->can('update', $site->server);
+        $server = $this->resolveServer($site);
+
+        return $server !== null && $user->can('update', $server);
     }
 
     public function clone(User $user, Site $site): bool
@@ -52,7 +57,8 @@ class SitePolicy
 
     public function delete(User $user, Site $site): bool
     {
-        if (! $user->can('view', $site->server)) {
+        $server = $this->resolveServer($site);
+        if ($server === null || ! $user->can('view', $server)) {
             return false;
         }
 
@@ -61,5 +67,39 @@ class SitePolicy
         }
 
         return $site->user_id === $user->id;
+    }
+
+    /**
+     * Manage per-site team members on an Edge site. Org admin only.
+     * The per-site members feature (edge_site_members) was deprecated
+     * along with the Members workspace tab — kept as a method for
+     * backwards-compat with any lingering Gate checks.
+     */
+    public function manageMembers(User $user, Site $site): bool
+    {
+        $server = $this->resolveServer($site);
+
+        return $server !== null
+            && $user->can('view', $server)
+            && $site->organization_id !== null
+            && $site->organization->hasAdminAccess($user);
+    }
+
+    private function resolveServer(Site $site): ?Server
+    {
+        if ($site->relationLoaded('server')) {
+            return $site->server;
+        }
+
+        $routeServer = request()->route('server');
+        if ($routeServer instanceof Server && (string) $routeServer->getKey() === (string) $site->server_id) {
+            $site->setRelation('server', $routeServer);
+
+            return $routeServer;
+        }
+
+        $site->loadMissing('server');
+
+        return $site->server;
     }
 }

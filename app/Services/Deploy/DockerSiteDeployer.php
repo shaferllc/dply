@@ -5,6 +5,7 @@ namespace App\Services\Deploy;
 use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Services\Sites\DeployHookRunner;
+use App\Services\Sites\PipelineAnchorScriptRunner;
 use App\Services\Sites\SiteDeployPipelineRunner;
 use App\Services\SshConnectionFactory;
 
@@ -13,6 +14,7 @@ final class DockerSiteDeployer
     public function __construct(
         private readonly DeployHookRunner $hookRunner,
         private readonly SiteDeployPipelineRunner $pipelineRunner,
+        private readonly PipelineAnchorScriptRunner $anchorRunner,
         private readonly SshConnectionFactory $sshFactory,
         private readonly DockerComposeArtifactBuilder $composeBuilder,
         private readonly DockerRuntimeDockerfileBuilder $dockerfileBuilder,
@@ -59,30 +61,9 @@ final class DockerSiteDeployer
         $log .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_BEFORE_CLONE, $path);
         $this->hookRunner->assertHooksSucceeded($log, 'before_clone');
 
-        $checkGit = trim($ssh->exec(sprintf('if [ -d %1$s/.git ]; then echo yes; else echo no; fi', $pathEsc), 30));
-        if ($checkGit !== 'yes') {
-            $log .= "\n--- git clone ---\n";
-            $log .= $ssh->exec(
-                $gitSsh.sprintf('git clone --branch %s %s %s 2>&1', $branchEsc, $repoEsc, $pathEsc),
-                600
-            );
-        } else {
-            $log .= "\n--- git fetch ---\n";
-            $log .= $ssh->exec(
-                sprintf('cd %s && %s git fetch origin 2>&1', $pathEsc, $gitSsh),
-                300
-            );
-            $log .= "\n--- git checkout ---\n";
-            $log .= $ssh->exec(
-                sprintf('cd %s && %s git checkout %s 2>&1', $pathEsc, $gitSsh, $branchEsc),
-                120
-            );
-            $log .= "\n--- git pull ---\n";
-            $log .= $ssh->exec(
-                sprintf('cd %s && %s git pull origin %s 2>&1', $pathEsc, $gitSsh, $branchEsc),
-                300
-            );
-        }
+        $checkGit = trim($ssh->exec(sprintf('if [ -d %1$s/.git ]; then echo yes; else echo no; fi', $pathEsc), 30)) === 'yes';
+        $log .= $this->anchorRunner->runClone($ssh, $site, $path, $gitSsh, $repo, $branch, false, $checkGit);
+        $this->hookRunner->assertHooksSucceeded($log, 'clone');
 
         $sha = trim($ssh->exec(sprintf('cd %s && git rev-parse HEAD 2>/dev/null', $pathEsc), 30));
         $log .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_CLONE, $path);
@@ -94,7 +75,14 @@ final class DockerSiteDeployer
         $log .= "\n--- docker runtime files ---\n";
         $log .= "Wrote docker-compose.dply.yml and Dockerfile.dply\n";
 
-        $log .= $this->pipelineRunner->run($ssh, $site, $path);
+        $build = $this->pipelineRunner->runBuild($ssh, $site, $path);
+        $log .= $build['log'];
+        if (! $build['ok']) {
+            throw new \RuntimeException('Deploy failed during the build phase. See the deployment log for details.');
+        }
+
+        $log .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::ANCHOR_BEFORE_ACTIVATE, $path);
+        $this->hookRunner->assertHooksSucceeded($log, 'before_activate');
 
         $post = trim((string) $site->post_deploy_command);
         if ($post !== '') {
@@ -102,11 +90,23 @@ final class DockerSiteDeployer
             $log .= $ssh->exec(sprintf('cd %s && %s', $pathEsc, $post), 900);
         }
 
-        $log .= "\n--- docker compose up ---\n";
-        $log .= $ssh->exec(
-            sprintf('cd %s && docker compose -f docker-compose.dply.yml up -d --build 2>&1', $pathEsc),
-            1800
-        );
+        $customActivate = trim((string) ($site->activeDeployPipeline?->activate_script ?? ''));
+        if ($customActivate !== '') {
+            $log .= $this->anchorRunner->runActivate($ssh, $site, $path, $gitSsh, $repo, $branch);
+            $this->hookRunner->assertHooksSucceeded($log, 'activate');
+        } else {
+            $log .= "\n--- docker compose up ---\n";
+            $log .= $ssh->exec(
+                sprintf('cd %s && docker compose -f docker-compose.dply.yml up -d --build 2>&1', $pathEsc),
+                1800
+            );
+        }
+
+        $release = $this->pipelineRunner->runRelease($ssh, $site, $path);
+        $log .= $release['log'];
+        if (! $release['ok']) {
+            throw new \RuntimeException('Deploy failed during the release phase. See the deployment log for details.');
+        }
 
         $log .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_ACTIVATE, $path);
         $this->hookRunner->assertHooksSucceeded($log, 'after_activate');

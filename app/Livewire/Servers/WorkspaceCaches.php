@@ -8,16 +8,23 @@ use App\Jobs\InstallCacheServiceJob;
 use App\Jobs\TailCacheServiceMonitorJob;
 use App\Jobs\UninstallCacheServiceJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\RequiresFeature;
+use App\Livewire\Concerns\SurfacesBindingConsumers;
 use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\RunsAllowlistedManageAction;
 use App\Livewire\Servers\Concerns\RunsServerConsoleActions;
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Models\ServerCacheServiceAuditEvent;
+use App\Models\ServerCacheServiceReplication;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\CacheServiceAuditLogger;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use App\Support\Servers\CacheEngineAvailability;
+use App\Support\Servers\CacheEngineInfo;
 use App\Support\Servers\CacheServiceAuth;
 use App\Support\Servers\CacheServiceCli;
 use App\Support\Servers\CacheServiceCommandPolicy;
@@ -27,35 +34,60 @@ use App\Support\Servers\CacheServiceKeyExplorer;
 use App\Support\Servers\CacheServiceKeyspaceSampler;
 use App\Support\Servers\CacheServiceMemoryConfig;
 use App\Support\Servers\CacheServiceNetworkExposure;
+use App\Support\Servers\CacheServicePersistence;
 use App\Support\Servers\CacheServicePort;
+use App\Support\Servers\CacheServiceReplicaSetup;
+use App\Support\Servers\CacheServiceReplication;
 use App\Support\Servers\CacheServiceStats;
+use App\Support\Servers\CacheWorkspaceViewData;
 use App\Support\Servers\ServerCacheServiceHostCapabilities;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
-use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceCaches extends Component
 {
+    use RendersWorkspacePlaceholder;
     use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.caches';
+
     use ConfirmsActionWithModal;
     use DismissesServerConsoleActionRun;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use RunsAllowlistedManageAction;
     use RunsServerConsoleActions;
+    use SurfacesBindingConsumers;
 
     /** Active workspace tab. URL-bound so deep links + back/forward work. */
     #[Url(as: 'tab', except: 'overview', history: true)]
     public string $workspace_tab = 'overview';
+
+    /**
+     * Engine reachability + distro-support gates, SSH-probed off the render path
+     * (wire:init → loadCacheCapabilities) so the workspace paints instantly.
+     * $capabilitiesLoaded gates the "checking…" UI.
+     *
+     * @var array<string, bool>
+     */
+    public array $capabilities_state = [];
+
+    /** @var array<string, string|null> */
+    public array $cache_unsupported_reasons = [];
+
+    public bool $capabilitiesLoaded = false;
 
     /**
      * Active sub-tab inside a per-engine tab. Per-engine layouts stack a lot of
@@ -111,6 +143,45 @@ class WorkspaceCaches extends Component
 
     public ?string $cacheClientsError = null;
 
+    /**
+     * True when {@see $cacheClients} was hydrated from the result cache on
+     * mount/tab-switch rather than from a fresh worker write this session.
+     * The view shows a "showing cached snapshot" banner while this is set;
+     * the next poll tick that lands a job result clears it.
+     */
+    public bool $cacheClientsFromCache = false;
+
+    /** ISO8601 timestamp of the cached payload's `at` field, surfaced in the banner. */
+    public ?string $cacheClientsCachedAt = null;
+
+    /**
+     * Slowlog entries for the Stats subtab card, populated by {@see loadSlowlog}.
+     * Null until first load; `[]` when the engine returns an empty ring buffer
+     * (the operationally happy case — no commands have crossed the slowlog
+     * threshold). Errors surface via $slowlogError.
+     *
+     * @var list<array{id: int, at: CarbonImmutable, duration_us: int, command: string, client_addr: string, client_name: string}>|null
+     */
+    public ?array $slowlogEntries = null;
+
+    public ?string $slowlogError = null;
+
+    /** See {@see $cacheClientsFromCache} — same pattern for the slowlog ring buffer. */
+    public bool $slowlogFromCache = false;
+
+    public ?string $slowlogCachedAt = null;
+
+    /**
+     * Page size + current page for the CLIENT LIST table. Pagination is
+     * client-side (we already have the full list in memory) so prev/next
+     * doesn't re-SSH — the snapshot is cheap to slice. Reset to page 1 on
+     * every fresh `loadCacheClients` so a refresh doesn't strand the operator
+     * on a page that no longer exists.
+     */
+    public const CACHE_CLIENTS_PAGE_SIZE = 10;
+
+    public int $cacheClientsPage = 1;
+
     /** True after `loadCacheMemorySettings` populates the form below. */
     public bool $cacheMemoryLoaded = false;
 
@@ -119,6 +190,71 @@ class WorkspaceCaches extends Component
     public string $cache_maxmemory_policy = 'noeviction';
 
     public ?string $cacheMemoryError = null;
+
+    /** See {@see $cacheClientsFromCache} — same pattern for the memory-settings card. */
+    public bool $cacheMemoryFromCache = false;
+
+    public ?string $cacheMemoryCachedAt = null;
+
+    /**
+     * Live persistence state for the Configure-subtab card (RDB save schedule,
+     * AOF status, last save time, BGSAVE in progress). Null until first load via
+     * {@see loadPersistenceState}. Errors surface via $persistenceError.
+     *
+     * @var array{
+     *     reachable: bool,
+     *     aof_enabled: ?bool,
+     *     aof_size_bytes: ?int,
+     *     aof_last_rewrite_at: ?CarbonImmutable,
+     *     rdb_last_save_at: ?CarbonImmutable,
+     *     rdb_bgsave_in_progress: ?bool,
+     *     save_schedule: list<array{seconds: int, changes: int}>,
+     *     raw_save: ?string,
+     * }|null
+     */
+    public ?array $persistenceState = null;
+
+    public ?string $persistenceError = null;
+
+    /**
+     * Live replication state for the Stats-subtab card: role (master/replica),
+     * connected replicas, master link status if this engine is a replica.
+     * Loaded lazily via wire:init on the Stats subtab; refreshed by wire:poll.
+     *
+     * @var array<string, mixed>|null
+     */
+    public ?array $replicationState = null;
+
+    public ?string $replicationError = null;
+
+    /** See {@see $cacheClientsFromCache} — same pattern for the replication snapshot. */
+    public bool $replicationFromCache = false;
+
+    public ?string $replicationCachedAt = null;
+
+    /** Modal: candidate replica server picker (server_id of target). */
+    public string $addReplicaTargetServerId = '';
+
+    /** Modal: operator-confirmed wipe of target if it has keys. */
+    public bool $addReplicaWipeAcknowledged = false;
+
+    /**
+     * Form input for the CACHE_PREFIX editor on the Connection Details card.
+     * Persisted on the row's cache_prefix column via {@see setCachePrefix}.
+     * Client-side concern only — Laravel's cache driver prepends this to every
+     * key before writing/reading; Redis itself doesn't enforce or know about it.
+     * Common values: app slug ("acme_") for single-app, env tag ("prod_cache_")
+     * for env separation.
+     */
+    public string $cache_prefix_input = '';
+
+    /**
+     * RDB save-schedule editor input. Space-separated `seconds changes` pairs —
+     * e.g. "3600 1 300 100" snapshots every 3600s after 1 change or every 300s
+     * after 100 changes. Empty disables RDB entirely. Populated from
+     * persistence state on subtab mount.
+     */
+    public string $rdb_save_schedule = '';
 
     /** Current REPL input value (cleared after each successful run). */
     public string $replInput = '';
@@ -149,6 +285,9 @@ class WorkspaceCaches extends Component
 
     public ?string $keyspaceError = null;
 
+    /** See {@see $cacheClientsFromCache} — set when samples come from cache, cleared on first fresh sample. */
+    public bool $keyspaceFromCache = false;
+
     public const KEYSPACE_SAMPLE_LIMIT = 60;
 
     /** SCAN MATCH pattern. Defaults to `*` so the first scan returns everything. */
@@ -171,6 +310,25 @@ class WorkspaceCaches extends Component
 
     /** True when the last SCAN page reported cursor=0 (no more keys to fetch). */
     public bool $keyBrowserComplete = false;
+
+    /**
+     * Client-side pagination of the in-memory key list. The SCAN buffer can
+     * accumulate hundreds of keys across "Load more" presses; rendering them
+     * all at once creates a scrolling wall — paginating in slices of 25 keeps
+     * the result table readable and prev/next is free (just an array slice).
+     */
+    public const KEYS_TABLE_PAGE_SIZE = 25;
+
+    public int $keysTablePage = 1;
+
+    /**
+     * Marker set when we hydrated keys from the user's session on mount —
+     * indicates the data is from a previous visit, not a fresh SCAN. The
+     * card shows a soft "from cache · Search to refresh" banner so the
+     * operator knows what they're looking at without leaving the page blank
+     * waiting for them to re-run Search.
+     */
+    public bool $keyBrowserFromCache = false;
 
     public ?string $keyBrowserSelected = null;
 
@@ -225,6 +383,190 @@ class WorkspaceCaches extends Component
     public function mount(Server $server): void
     {
         $this->bootWorkspace($server);
+        $this->hydrateKeyBrowserFromSession();
+        $this->hydrateKeyspaceSamplesFromCache();
+        $this->hydrateCacheStatsFromResultCache();
+    }
+
+    /**
+     * Read the last-known clients / slowlog / replication snapshots out of the
+     * refresh-job result cache so the Stats subtab lands populated instead of
+     * showing "No snapshot yet" until the first poll tick completes. The
+     * accompanying `*FromCache` flags drive a "showing cached — refreshing in
+     * the background" banner on each card; the next poll tick that lands a
+     * fresh worker write clears them.
+     */
+    protected function hydrateCacheStatsFromResultCache(): void
+    {
+        $engine = $this->workspace_tab;
+        if (! in_array($engine, ['redis', 'valkey', 'keydb', 'dragonfly'], true)) {
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if (! $row || ! $row->server) {
+            return;
+        }
+
+        $clients = Cache::get(\App\Jobs\RefreshCacheClientsJob::resultCacheKey($row->server->id, $row->engine));
+        if (is_array($clients) && ($clients['ok'] ?? false) === true) {
+            $this->cacheClients = array_values(array_filter((array) ($clients['clients'] ?? []), 'is_array'));
+            $this->cacheClientsFromCache = true;
+            $this->cacheClientsCachedAt = isset($clients['at']) ? (string) $clients['at'] : null;
+        }
+
+        $slowlog = Cache::get(\App\Jobs\RefreshSlowlogJob::resultCacheKey($row->server->id, $row->engine));
+        if (is_array($slowlog) && ($slowlog['ok'] ?? false) === true) {
+            $this->slowlogEntries = array_values(array_filter((array) ($slowlog['entries'] ?? []), 'is_array'));
+            $this->slowlogFromCache = true;
+            $this->slowlogCachedAt = isset($slowlog['at']) ? (string) $slowlog['at'] : null;
+        }
+
+        $replication = Cache::get(\App\Jobs\RefreshReplicationStateJob::resultCacheKey($row->server->id, $row->engine));
+        if (is_array($replication) && ($replication['ok'] ?? false) === true) {
+            $this->replicationState = is_array($replication['state'] ?? null) ? $replication['state'] : null;
+            $this->replicationFromCache = true;
+            $this->replicationCachedAt = isset($replication['at']) ? (string) $replication['at'] : null;
+        }
+
+        $memory = Cache::get(\App\Jobs\RefreshCacheMemorySettingsJob::resultCacheKey($row->server->id, $row->engine));
+        if (is_array($memory) && ($memory['ok'] ?? false) === true) {
+            $this->cache_maxmemory = (string) ($memory['maxmemory'] ?? '');
+            $this->cache_maxmemory_policy = (string) ($memory['maxmemory_policy'] ?? 'noeviction');
+            $this->cacheMemoryLoaded = true;
+            $this->cacheMemoryFromCache = true;
+            $this->cacheMemoryCachedAt = isset($memory['at']) ? (string) $memory['at'] : null;
+        }
+    }
+
+    /**
+     * Pull the recent keyspace samples for the active engine out of the cache so
+     * the dashboard lands with at least one prior sample on the buffer — that
+     * lets the very first ops/sec + hit-rate window compute on the next poll
+     * tick instead of showing "—" until two fresh samples accumulate.
+     *
+     * Cross-user (uses Cache, not session) so the data is "warm" regardless of
+     * which operator opens the page. Sampler delta math uses real timestamps,
+     * so a stale previous sample produces a correct (just-wider) window.
+     */
+    protected function hydrateKeyspaceSamplesFromCache(): void
+    {
+        $key = $this->keyspaceSamplesCacheKey();
+        if ($key === null) {
+            return;
+        }
+
+        $cached = Cache::get($key);
+        if (! is_array($cached) || $cached === []) {
+            return;
+        }
+
+        $this->keyspaceSamples = array_values(array_filter($cached, 'is_array'));
+        $this->keyspaceLoaded = $this->keyspaceSamples !== [];
+        $this->keyspaceFromCache = $this->keyspaceSamples !== [];
+    }
+
+    /**
+     * Persist the current keyspace sample buffer to cache so the next page load
+     * (any user / any session) can re-hydrate it. Scoped per (server, engine)
+     * so engine tabs don't bleed into each other.
+     */
+    protected function persistKeyspaceSamplesToCache(): void
+    {
+        $key = $this->keyspaceSamplesCacheKey();
+        if ($key === null) {
+            return;
+        }
+
+        if ($this->keyspaceSamples === []) {
+            Cache::forget($key);
+
+            return;
+        }
+
+        Cache::put($key, $this->keyspaceSamples, now()->addHour());
+    }
+
+    /**
+     * Cache key namespace for keyspace samples — per (server, engine) so
+     * switching engines doesn't carry the wrong buffer across.
+     */
+    protected function keyspaceSamplesCacheKey(): ?string
+    {
+        $engine = $this->workspace_tab;
+        if (! in_array($engine, ['redis', 'valkey', 'keydb', 'dragonfly'], true)) {
+            return null;
+        }
+
+        return sprintf('dply.cache_workspace.keyspace_samples.%s.%s', $this->server->id, $engine);
+    }
+
+    /**
+     * Pull the most-recent key browser snapshot out of the user's session if
+     * one exists for this server + engine. Keeps the table populated on page
+     * reload / back-button so the operator never lands on an empty card and
+     * has to re-run Search just to remind themselves what they were looking
+     * at. The `keyBrowserFromCache` flag drives a "click Search to refresh"
+     * banner in the view.
+     */
+    protected function hydrateKeyBrowserFromSession(): void
+    {
+        $key = $this->keyBrowserSessionKey();
+        if ($key === null) {
+            return;
+        }
+
+        $snapshot = session($key);
+        if (! is_array($snapshot) || empty($snapshot['keys'])) {
+            return;
+        }
+
+        $this->keyBrowserKeys = array_values(array_filter((array) $snapshot['keys'], 'is_string'));
+        $this->keyBrowserCursor = (string) ($snapshot['cursor'] ?? '0');
+        $this->keyBrowserComplete = (bool) ($snapshot['complete'] ?? false);
+        $this->keyBrowserPattern = (string) ($snapshot['pattern'] ?? ($this->keyBrowserPattern ?: '*'));
+        $this->keyBrowserLoaded = true;
+        $this->keyBrowserFromCache = true;
+        $this->keysTablePage = 1;
+    }
+
+    /**
+     * Persist the current key-browser state into the session so the next
+     * page load (mount) can re-hydrate. Scoped to the workspace_tab (engine)
+     * so switching engines doesn't carry the wrong list across.
+     */
+    protected function persistKeyBrowserToSession(): void
+    {
+        $key = $this->keyBrowserSessionKey();
+        if ($key === null) {
+            return;
+        }
+
+        session([$key => [
+            'keys' => array_values(array_filter($this->keyBrowserKeys, 'is_string')),
+            'cursor' => $this->keyBrowserCursor,
+            'complete' => $this->keyBrowserComplete,
+            'pattern' => $this->keyBrowserPattern ?: '*',
+            'saved_at' => now()->toIso8601String(),
+        ]]);
+    }
+
+    /**
+     * Session key namespace — per-server + per-engine so listings don't mix.
+     * The `v2` version tag forces the previous session payload to be ignored:
+     * v1 stored keys that came from `redis-cli --no-raw SCAN`, which wrapped
+     * names in `1) "…"` array-index quotes; any inspect attempt on that
+     * malformed key returned `none` because the literal `1) "name"` doesn't
+     * exist. Bumping the version invalidates those caches on first mount.
+     */
+    protected function keyBrowserSessionKey(): ?string
+    {
+        $engine = $this->workspace_tab;
+        if (! in_array($engine, ['redis', 'valkey', 'keydb', 'dragonfly'], true)) {
+            return null;
+        }
+
+        return sprintf('dply.cache_workspace.key_browser_v2.%s.%s', $this->server->id, $engine);
     }
 
     public function setWorkspaceTab(string $tab): void
@@ -240,6 +582,11 @@ class WorkspaceCaches extends Component
         }
 
         $this->workspace_tab = $next;
+
+        // Re-hydrate the keyspace sample buffer from cache for the new engine
+        // tab so the dashboard's ops/sec + hit-rate tiles aren't stuck on "—"
+        // until two fresh samples accumulate post-switch.
+        $this->hydrateKeyspaceSamplesFromCache();
     }
 
     public function setEngineSubtab(string $subtab): void
@@ -259,6 +606,15 @@ class WorkspaceCaches extends Component
             $this->cacheConfigDraft = '';
             $this->cacheClients = null;
             $this->cacheClientsError = null;
+            $this->slowlogEntries = null;
+            $this->slowlogError = null;
+            $this->persistenceState = null;
+            $this->persistenceError = null;
+            $this->rdb_save_schedule = '';
+            $this->replicationState = null;
+            $this->replicationError = null;
+            $this->addReplicaTargetServerId = '';
+            $this->addReplicaWipeAcknowledged = false;
             $this->cacheMemoryLoaded = false;
             $this->cache_maxmemory = '';
             $this->cache_maxmemory_policy = 'noeviction';
@@ -324,7 +680,37 @@ class WorkspaceCaches extends Component
             $stats->forget($this->server, $engine);
         }
 
+        // Re-probe off the render path: clearing the flag makes the wire:init hook
+        // re-fire loadCacheCapabilities on the next render rather than blocking here.
+        $this->capabilitiesLoaded = false;
+        $this->capabilities_state = [];
+        $this->cache_unsupported_reasons = [];
+
         $this->toastSuccess(__('Refreshed cache workspace data from the server.'));
+    }
+
+    /**
+     * Resolve engine capabilities + distro-support gates off the render path.
+     * Fired by wire:init so the workspace paints instantly; the per-engine badge
+     * and Install gate appear once the (24h-cached) probe returns.
+     */
+    public function loadCacheCapabilities(ServerCacheServiceHostCapabilities $capabilities): void
+    {
+        $this->authorize('view', $this->server);
+
+        try {
+            $this->capabilities_state = $capabilities->forServer($this->server);
+        } catch (\Throwable) {
+            $this->capabilities_state = ['redis' => false, 'valkey' => false, 'memcached' => false, 'keydb' => false, 'dragonfly' => false];
+        }
+
+        try {
+            $this->cache_unsupported_reasons = $capabilities->unsupportedReasonsByEngine($this->server);
+        } catch (\Throwable) {
+            $this->cache_unsupported_reasons = ['redis' => null, 'valkey' => null, 'memcached' => null, 'keydb' => null, 'dragonfly' => null];
+        }
+
+        $this->capabilitiesLoaded = true;
     }
 
     /**
@@ -334,13 +720,13 @@ class WorkspaceCaches extends Component
      * groups cache-engine output together. Throws on non-zero exit so the
      * {@see runConsoleAction()} wrapper marks the row failed and re-throws.
      */
-    protected function emitExecutorBuffer(\App\Services\ConsoleActions\ConsoleEmitter $emit, string $buffer, int $exitCode, string $verb): void
+    protected function emitExecutorBuffer(ConsoleEmitter $emit, string $buffer, int $exitCode, string $verb): void
     {
         foreach (preg_split("/\r?\n/", $buffer) ?: [] as $line) {
             if ($line === '') {
                 continue;
             }
-            $emit($line, \App\Models\ConsoleAction::LEVEL_INFO, 'cache');
+            $emit($line, ConsoleAction::LEVEL_INFO, 'cache');
         }
 
         if ($exitCode !== 0) {
@@ -356,10 +742,8 @@ class WorkspaceCaches extends Component
      * doesn't have to chase the badge to verify. Cheaper than installing /
      * uninstalling something to bust the cache.
      */
-    public function recheckCacheServiceInstance(
-        string $engine,
-        ServerCacheServiceHostCapabilities $capabilities,
-    ): void {
+    public function recheckCacheServiceInstance(string $engine): void
+    {
         $this->authorize('update', $this->server);
         if (! $this->validateEngine($engine)) {
             return;
@@ -372,18 +756,22 @@ class WorkspaceCaches extends Component
             return;
         }
 
-        $reachable = $capabilities->probeInstance($this->server, $engine, (int) $row->port);
-        $capabilities->forget($this->server);
+        // Two-step pattern so the banner appears IMMEDIATELY in QUEUED state
+        // and the operator sees progress as the job runs — instead of clicking
+        // and staring at a still page for 2-3s while a synchronous SSH probe
+        // blocks the response. seedConsoleActionRun() creates the row up
+        // front; the queued job flips it through RUNNING → COMPLETED while
+        // emitting probe output. wire:poll on the banner picks up each state
+        // transition.
+        $consoleActionId = $this->seedConsoleActionRun(
+            $row,
+            'cache_recheck',
+            __('Recheck :engine instance :name on :host', [
+                'engine' => $engine, 'name' => $row->name, 'host' => $this->server->name,
+            ])
+        );
 
-        if ($reachable) {
-            $this->toastSuccess(__(':engine instance :name on port :port is reachable.', [
-                'engine' => $engine, 'name' => $row->name, 'port' => $row->port,
-            ]));
-        } else {
-            $this->toastError(__(':engine instance :name on port :port is NOT reachable. Click Debug to see why.', [
-                'engine' => $engine, 'name' => $row->name, 'port' => $row->port,
-            ]));
-        }
+        \App\Jobs\RecheckCacheServiceJob::dispatch($consoleActionId, $row->id);
     }
 
     /**
@@ -455,7 +843,7 @@ BASH,
                 __('Debug :engine instance :name on :host', [
                     'engine' => $engine, 'name' => $row->name, 'host' => $this->server->name,
                 ]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($executor, $engine, $row, $script): void {
+                function (ConsoleEmitter $emit) use ($executor, $engine, $row, $script): void {
                     $output = $executor->runInlineBash(
                         $this->server,
                         'cache-service:debug:'.$engine.':'.$row->name,
@@ -469,30 +857,65 @@ BASH,
                     $this->emitExecutorBuffer($emit, $output->buffer, 0, 'debug');
                 },
             );
-            $this->toastSuccess(__('Diagnostics captured. See the console banner below.'));
+            $this->toastSuccess(__('Diagnostics captured. See the console banner at the top of the page.'));
         } catch (\Throwable $e) {
-            $this->toastError(__('Diagnostic run failed — see the console banner below for details.'));
+            $this->toastError(__('Diagnostic run failed — see the console banner at the top for details.'));
         }
     }
 
     /**
-     * Open the per-instance Status/Logs modal on its `systemctl status` view.
-     * The modal scope is the engine + currently-active instance: `cacheServiceFor()`
-     * already filters by `$active_instance`, so operators switch instances via
-     * the chip row and then click Status/Logs on the toolbar.
+     * Trigger a systemctl-status probe for the active instance. Now routes
+     * through the queued StatusCacheServiceJob so the result lands in the
+     * top-of-page console banner — same pattern as Recheck / Debug. Replaces
+     * the previous modal flow; the operator sees the result inline with every
+     * other action and can hit "Open" on the banner to expand the full output.
      */
-    public function showCacheInstanceStatus(string $engine, ExecuteRemoteTaskOnServer $executor): void
+    public function showCacheInstanceStatus(string $engine): void
     {
-        $this->openCacheStatusModal($engine, 'status', $executor);
+        $this->dispatchCacheStatusJob($engine, 'status');
     }
 
     /**
-     * Open the per-instance Status/Logs modal on its `journalctl -u` view.
-     * Same scope as `showCacheInstanceStatus` — operates on the active instance.
+     * Trigger a journalctl -u probe for the active instance — same banner-based
+     * flow as `showCacheInstanceStatus`.
      */
-    public function showCacheInstanceLogs(string $engine, ExecuteRemoteTaskOnServer $executor): void
+    public function showCacheInstanceLogs(string $engine): void
     {
-        $this->openCacheStatusModal($engine, 'logs', $executor);
+        $this->dispatchCacheStatusJob($engine, 'logs');
+    }
+
+    /**
+     * Shared seed+dispatch path for Status and Logs. Seeds a ConsoleAction row
+     * up front (banner appears in QUEUED) and dispatches the queued job which
+     * flips through RUNNING → COMPLETED while emitting output lines.
+     */
+    protected function dispatchCacheStatusJob(string $engine, string $view): void
+    {
+        $this->authorize('update', $this->server);
+        if (! $this->validateEngine($engine)) {
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if ($row === null) {
+            $this->toastError(__('No :engine instance to inspect.', ['engine' => $engine]));
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->toastError(__('SSH must be ready before viewing status or logs.'));
+
+            return;
+        }
+
+        $kind = $view === 'logs' ? 'cache_logs' : 'cache_status';
+        $label = $view === 'logs'
+            ? __('Logs for :engine instance :name on :host', ['engine' => $engine, 'name' => $row->name, 'host' => $this->server->name])
+            : __('Status of :engine instance :name on :host', ['engine' => $engine, 'name' => $row->name, 'host' => $this->server->name]);
+
+        $consoleActionId = $this->seedConsoleActionRun($row, $kind, $label);
+        \App\Jobs\StatusCacheServiceJob::dispatch($consoleActionId, $row->id, $view);
     }
 
     /**
@@ -622,6 +1045,17 @@ BASH,
         $this->authorize('update', $this->server);
 
         if (! $this->validateEngine($engine)) {
+            return;
+        }
+
+        // Coming-soon gate — Valkey / Memcached / KeyDB / Dragonfly are gated
+        // behind cache.{engine} flags until their install path is GA. Refuse
+        // before queueing so a stale payload can't slip past the disabled UI.
+        if (CacheEngineAvailability::isComingSoon($engine)) {
+            $this->toastError(__(':engine isn\'t available yet — it\'s coming soon.', [
+                'engine' => CacheEngineInfo::for($engine)['label'] ?? ucfirst($engine),
+            ]));
+
             return;
         }
 
@@ -869,12 +1303,12 @@ BASH,
             ->where('server_id', $this->server->id)
             ->where('engine', $engine)
             ->orderByRaw(
-                "CASE status "
+                'CASE status '
                 ."WHEN 'installing' THEN 0 "
                 ."WHEN 'uninstalling' THEN 1 "
                 ."WHEN 'pending' THEN 2 "
                 ."WHEN 'failed' THEN 3 "
-                ."ELSE 9 END"
+                .'ELSE 9 END'
             )
             ->first();
         if ($row === null) {
@@ -1179,7 +1613,7 @@ BASH,
                 $row,
                 'cache_save_config',
                 __('Save :engine config on :host', ['engine' => $row->engine, 'host' => $this->server->name]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($writer, $row, $draft, $audit): void {
+                function (ConsoleEmitter $emit) use ($writer, $row, $draft, $audit): void {
                     $emit->step('cache', sprintf('Writing %d bytes to %s config', strlen($draft), $row->engine));
                     $writer->write($row->server, $row, $draft);
                     $emit->success('cache', 'Config written and engine restarted.');
@@ -1202,7 +1636,14 @@ BASH,
         }
     }
 
-    public function loadCacheClients(CacheServiceStats $stats): void
+    /**
+     * Trigger a CLIENT LIST refresh. SSH happens in {@see \App\Jobs\RefreshCacheClientsJob}
+     * so the Livewire commit returns immediately — no risk of PHP's 30s
+     * max_execution_time biting a slow SSH link. The result lands in cache and
+     * {@see pollCacheClients()} (the wire:poll tick) hydrates the component
+     * from there.
+     */
+    public function loadCacheClients(): void
     {
         $this->authorize('update', $this->server);
 
@@ -1227,16 +1668,687 @@ BASH,
         }
 
         $this->cacheClientsError = null;
-        $this->cacheClients = $stats->clients($row->server, $row);
+        \App\Jobs\RefreshCacheClientsJob::dispatch($row->id);
+        $this->pollCacheClients();
     }
 
     public function hideCacheClients(): void
     {
         $this->cacheClients = null;
         $this->cacheClientsError = null;
+        $this->cacheClientsPage = 1;
     }
 
-    public function loadCacheMemorySettings(CacheServiceMemoryConfig $memory): void
+    /**
+     * Read the latest CLIENT LIST result that {@see \App\Jobs\RefreshCacheClientsJob}
+     * wrote to cache and apply it to the component. Called both inline by
+     * loadCacheClients (so the first paint shows last-known-good immediately
+     * after a dispatch) and by wire:poll every 10s for live refresh.
+     *
+     * No SSH here — read-only against the cache.
+     */
+    public function pollCacheClients(): void
+    {
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if (! $row) {
+            return;
+        }
+
+        // Re-dispatch a refresh on each poll tick so the cached result stays
+        // current. Dispatching is non-blocking; the SSH work runs on a queue
+        // worker. The next poll picks up the new value (or the same value if
+        // the job hasn't finished yet — the UI stays on last-known-good).
+        \App\Jobs\RefreshCacheClientsJob::dispatch($row->id);
+
+        $payload = Cache::get(\App\Jobs\RefreshCacheClientsJob::resultCacheKey($row->server->id, $row->engine));
+        if (! is_array($payload)) {
+            return;
+        }
+
+        if (($payload['ok'] ?? false) === true) {
+            $this->cacheClients = array_values(array_filter((array) ($payload['clients'] ?? []), 'is_array'));
+            $this->cacheClientsError = null;
+
+            $pageCount = max(1, (int) ceil(count($this->cacheClients) / self::CACHE_CLIENTS_PAGE_SIZE));
+            $this->cacheClientsPage = max(1, min($this->cacheClientsPage, $pageCount));
+
+            // Clear the "cached snapshot" banner once a write newer than the
+            // hydrated `at` lands — that means the worker completed this
+            // session and the data is fresh, not last-known-good.
+            $newAt = isset($payload['at']) ? (string) $payload['at'] : '';
+            if ($newAt !== '' && $newAt !== $this->cacheClientsCachedAt) {
+                $this->cacheClientsFromCache = false;
+                $this->cacheClientsCachedAt = $newAt;
+            }
+        } else {
+            $this->cacheClientsError = (string) ($payload['error'] ?? __('Could not load clients.'));
+        }
+    }
+
+    /**
+     * Pull the engine's top-32 slowlog entries (SLOWLOG GET 32). Cached server-side
+     * for {@see CacheServiceSlowlog} TTL so a wire:poll cycle doesn't hammer SSH.
+     * Empty result + null error = engine is healthy; no commands have crossed the
+     * `slowlog-log-slower-than` threshold (10ms default) in the ring buffer.
+     */
+    /**
+     * Trigger a SLOWLOG refresh. SSH happens in {@see \App\Jobs\RefreshSlowlogJob}
+     * — Livewire never blocks on it, so the 30s PHP timeout is impossible by
+     * construction. Each tick re-dispatches; the next poll reads whatever the
+     * worker has finished.
+     */
+    public function loadSlowlog(): void
+    {
+        $this->authorize('update', $this->server);
+
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            $this->slowlogError = __('Switch to an engine tab to view its slowlog.');
+
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if (! $row) {
+            $this->slowlogError = __('No :engine installed.', ['engine' => $engine]);
+
+            return;
+        }
+
+        if (! ServerCacheService::engineSupportsAuth($row->engine)) {
+            $this->slowlogError = __(':engine has no slowlog equivalent.', ['engine' => $row->engine]);
+
+            return;
+        }
+
+        $this->slowlogError = null;
+        \App\Jobs\RefreshSlowlogJob::dispatch($row->id);
+
+        $payload = Cache::get(\App\Jobs\RefreshSlowlogJob::resultCacheKey($row->server->id, $row->engine));
+        if (is_array($payload)) {
+            if (($payload['ok'] ?? false) === true) {
+                $this->slowlogEntries = array_values(array_filter((array) ($payload['entries'] ?? []), 'is_array'));
+
+                $newAt = isset($payload['at']) ? (string) $payload['at'] : '';
+                if ($newAt !== '' && $newAt !== $this->slowlogCachedAt) {
+                    $this->slowlogFromCache = false;
+                    $this->slowlogCachedAt = $newAt;
+                }
+            } else {
+                $this->slowlogError = (string) ($payload['error'] ?? __('Could not load slowlog.'));
+            }
+        }
+    }
+
+    /**
+     * Clear the engine's slowlog ring buffer. Audited via EVENT_SLOWLOG_RESET so an
+     * operator's "clean state, start observing fresh" intent is recoverable from
+     * the audit log if a perf investigation follows.
+     */
+    public function resetSlowlog(\App\Support\Servers\CacheServiceSlowlog $slowlog, CacheServiceAuditLogger $audits): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            $this->toastError(__('Switch to an engine tab to reset its slowlog.'));
+
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if (! $row) {
+            $this->toastError(__('No :engine installed.', ['engine' => $engine]));
+
+            return;
+        }
+
+        if (! ServerCacheService::engineSupportsAuth($row->engine)) {
+            $this->toastError(__(':engine has no slowlog equivalent.', ['engine' => $row->engine]));
+
+            return;
+        }
+
+        if (! $slowlog->reset($row->server, $row)) {
+            $this->toastError(__('Slowlog reset failed. Engine may be unreachable.'));
+
+            return;
+        }
+
+        $audits->record(
+            $row->server,
+            ServerCacheServiceAuditEvent::EVENT_SLOWLOG_RESET,
+            ['engine' => $row->engine, 'name' => $row->name],
+            auth()->user(),
+        );
+
+        $this->slowlogEntries = [];
+        $this->slowlogError = null;
+        $this->toastSuccess(__('Slowlog cleared on :engine.', ['engine' => $row->engine]));
+    }
+
+    /**
+     * Lazy-load the persistence card data (RDB schedule, AOF on/off, last save).
+     * Called via wire:init from the persistence card template.
+     */
+    public function loadPersistenceState(CacheServicePersistence $persistence): void
+    {
+        $this->authorize('update', $this->server);
+
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            $this->persistenceError = __('Switch to an engine tab to view its persistence state.');
+
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if (! $row) {
+            $this->persistenceError = __('No :engine installed.', ['engine' => $engine]);
+
+            return;
+        }
+
+        if (! ServerCacheService::engineSupportsAuth($row->engine)) {
+            $this->persistenceError = __(':engine has no persistence model.', ['engine' => $row->engine]);
+
+            return;
+        }
+
+        $state = $persistence->state($row->server, $row);
+        $this->persistenceState = $state;
+        $this->persistenceError = null;
+        if ($state['raw_save'] !== null && $this->rdb_save_schedule === '') {
+            $this->rdb_save_schedule = $state['raw_save'];
+        }
+    }
+
+    public function triggerBgsave(CacheServicePersistence $persistence, CacheServiceAuditLogger $audits): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        $engine = $this->currentEngineTab();
+        $row = $engine ? $this->cacheServiceFor($engine) : null;
+        if (! $row || ! ServerCacheService::engineSupportsAuth($row->engine)) {
+            $this->toastError(__('Switch to a redis-family engine tab to trigger BGSAVE.'));
+
+            return;
+        }
+
+        if (! $persistence->bgsave($row->server, $row)) {
+            $this->toastError(__('BGSAVE failed. Engine may be unreachable.'));
+
+            return;
+        }
+
+        $audits->record(
+            $row->server,
+            ServerCacheServiceAuditEvent::EVENT_BGSAVE,
+            ['engine' => $row->engine, 'name' => $row->name],
+            auth()->user(),
+        );
+
+        $this->persistenceState = null;
+        $this->toastSuccess(__('BGSAVE queued on :engine.', ['engine' => $row->engine]));
+    }
+
+    public function triggerBgrewriteaof(CacheServicePersistence $persistence, CacheServiceAuditLogger $audits): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        $engine = $this->currentEngineTab();
+        $row = $engine ? $this->cacheServiceFor($engine) : null;
+        if (! $row || ! ServerCacheService::engineSupportsAuth($row->engine)) {
+            $this->toastError(__('Switch to a redis-family engine tab to trigger BGREWRITEAOF.'));
+
+            return;
+        }
+
+        if (! $persistence->bgrewriteaof($row->server, $row)) {
+            $this->toastError(__('BGREWRITEAOF failed. Engine may be unreachable.'));
+
+            return;
+        }
+
+        $audits->record(
+            $row->server,
+            ServerCacheServiceAuditEvent::EVENT_BGREWRITEAOF,
+            ['engine' => $row->engine, 'name' => $row->name],
+            auth()->user(),
+        );
+
+        $this->persistenceState = null;
+        $this->toastSuccess(__('BGREWRITEAOF queued on :engine.', ['engine' => $row->engine]));
+    }
+
+    public function toggleAofPersistence(CacheServicePersistence $persistence, CacheServiceAuditLogger $audits): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        $engine = $this->currentEngineTab();
+        $row = $engine ? $this->cacheServiceFor($engine) : null;
+        if (! $row || ! ServerCacheService::engineSupportsAuth($row->engine)) {
+            $this->toastError(__('Switch to a redis-family engine tab to toggle AOF.'));
+
+            return;
+        }
+
+        $current = (bool) ($this->persistenceState['aof_enabled'] ?? false);
+        $next = ! $current;
+
+        if (! $persistence->setAofEnabled($row->server, $row, $next)) {
+            $this->toastError(__('AOF toggle failed. Check the engine logs.'));
+
+            return;
+        }
+
+        $audits->record(
+            $row->server,
+            ServerCacheServiceAuditEvent::EVENT_AOF_TOGGLED,
+            ['engine' => $row->engine, 'name' => $row->name, 'enabled' => $next],
+            auth()->user(),
+        );
+
+        $this->persistenceState = null;
+        $this->toastSuccess($next
+            ? __('AOF enabled on :engine.', ['engine' => $row->engine])
+            : __('AOF disabled on :engine.', ['engine' => $row->engine])
+        );
+    }
+
+    public function saveRdbSchedule(CacheServicePersistence $persistence, CacheServiceAuditLogger $audits): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        $engine = $this->currentEngineTab();
+        $row = $engine ? $this->cacheServiceFor($engine) : null;
+        if (! $row || ! ServerCacheService::engineSupportsAuth($row->engine)) {
+            $this->toastError(__('Switch to a redis-family engine tab to edit the RDB schedule.'));
+
+            return;
+        }
+
+        // Parse space-separated `secs changes` pairs from the textarea. Validate
+        // each pair before sending — easier than apologising to a Redis that
+        // refused the new config and restarted with the old one.
+        $raw = trim($this->rdb_save_schedule);
+        $tokens = $raw === '' ? [] : (preg_split('/\s+/', $raw) ?: []);
+        if (count($tokens) % 2 !== 0) {
+            $this->addError('rdb_save_schedule', __('Schedule must be space-separated <seconds> <changes> pairs.'));
+
+            return;
+        }
+        $schedule = [];
+        for ($i = 0, $n = count($tokens); $i < $n; $i += 2) {
+            $secs = (int) $tokens[$i];
+            $changes = (int) $tokens[$i + 1];
+            if ($secs <= 0 || $changes <= 0) {
+                $this->addError('rdb_save_schedule', __('Each <seconds> and <changes> must be positive integers.'));
+
+                return;
+            }
+            $schedule[] = ['seconds' => $secs, 'changes' => $changes];
+        }
+
+        if (! $persistence->setSaveSchedule($row->server, $row, $schedule)) {
+            $this->toastError(__('RDB schedule save failed. Check the engine logs.'));
+
+            return;
+        }
+
+        $audits->record(
+            $row->server,
+            ServerCacheServiceAuditEvent::EVENT_RDB_SCHEDULE_SAVED,
+            ['engine' => $row->engine, 'name' => $row->name, 'schedule' => $schedule],
+            auth()->user(),
+        );
+
+        $this->persistenceState = null;
+        $this->toastSuccess(__('RDB schedule saved on :engine.', ['engine' => $row->engine]));
+    }
+
+    /**
+     * Read-only INFO replication parse. Renders the Stats-subtab Replication card —
+     * role (master/replica), connected replicas (master side), master link status
+     * (replica side). Mutating actions (REPLICAOF, add-replica wizard) come in 4b.
+     */
+    /**
+     * Trigger an INFO-replication refresh. SSH happens in
+     * {@see \App\Jobs\RefreshReplicationStateJob} — Livewire reads the result
+     * from cache so the request never blocks on SSH.
+     */
+    public function loadReplicationState(): void
+    {
+        $this->authorize('update', $this->server);
+
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            $this->replicationError = __('Switch to an engine tab to view its replication state.');
+
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if (! $row) {
+            $this->replicationError = __('No :engine installed.', ['engine' => $engine]);
+
+            return;
+        }
+
+        if (! ServerCacheService::engineSupportsAuth($row->engine)) {
+            $this->replicationError = __(':engine has no replication.', ['engine' => $row->engine]);
+
+            return;
+        }
+
+        $this->replicationError = null;
+        \App\Jobs\RefreshReplicationStateJob::dispatch($row->id);
+
+        $payload = Cache::get(\App\Jobs\RefreshReplicationStateJob::resultCacheKey($row->server->id, $row->engine));
+        if (is_array($payload)) {
+            if (($payload['ok'] ?? false) === true) {
+                $this->replicationState = is_array($payload['state'] ?? null) ? $payload['state'] : null;
+
+                $newAt = isset($payload['at']) ? (string) $payload['at'] : '';
+                if ($newAt !== '' && $newAt !== $this->replicationCachedAt) {
+                    $this->replicationFromCache = false;
+                    $this->replicationCachedAt = $newAt;
+                }
+            } else {
+                $this->replicationError = (string) ($payload['error'] ?? __('Could not load replication state.'));
+            }
+        }
+    }
+
+    /**
+     * Submit the Add-Replica modal: validate the target, then attach via the
+     * orchestrator (network exposure → REPLICAOF → poll for master_link_status=up).
+     * On any step failure the orchestrator rolls back the replica config.
+     */
+    public function submitAddReplica(
+        CacheServiceReplicaSetup $setup,
+        CacheServiceAuditLogger $audits,
+    ): void {
+        $this->authorize('update', $this->server);
+
+        if ($this->rejectIfCacheBusy()) {
+            return;
+        }
+
+        $engine = $this->currentEngineTab();
+        $masterRow = $engine ? $this->cacheServiceFor($engine) : null;
+        if (! $masterRow || ! ServerCacheService::engineSupportsAuth($masterRow->engine)) {
+            $this->toastError(__('Switch to a redis-family engine tab on the master to add a replica.'));
+
+            return;
+        }
+
+        if ($this->addReplicaTargetServerId === '') {
+            $this->addError('addReplicaTargetServerId', __('Pick a target server.'));
+
+            return;
+        }
+
+        // Resolve the target server within the org. The picker scopes to
+        // redis/valkey role hosts so a stray app server can't be selected.
+        $targetServer = Server::query()
+            ->where('organization_id', $this->server->organization_id)
+            ->whereKey($this->addReplicaTargetServerId)
+            ->first();
+        if (! $targetServer) {
+            $this->addError('addReplicaTargetServerId', __('Target server not found in your organization.'));
+
+            return;
+        }
+        if ($targetServer->id === $this->server->id) {
+            $this->addError('addReplicaTargetServerId', __('Cannot use the master as its own replica.'));
+
+            return;
+        }
+
+        // Find the matching engine row on the target.
+        $replicaRow = ServerCacheService::query()
+            ->where('server_id', $targetServer->id)
+            ->where('engine', $masterRow->engine)
+            ->first();
+        if (! $replicaRow) {
+            $this->addError('addReplicaTargetServerId', __('Target server has no :engine instance installed.', ['engine' => $masterRow->engine]));
+
+            return;
+        }
+
+        if (ServerCacheServiceReplication::query()->where('replica_cache_service_id', $replicaRow->id)->exists()) {
+            $this->addError('addReplicaTargetServerId', __('Target is already replicating from another master.'));
+
+            return;
+        }
+
+        // DBSIZE pre-check: refuse to wipe a non-empty target unless the
+        // operator ticked the acknowledgement checkbox. REPLICAOF flushes
+        // the target — operators have lost data this way before.
+        $dbsize = $this->checkReplicaDbSize($targetServer, $replicaRow);
+        if ($dbsize > 0 && ! $this->addReplicaWipeAcknowledged) {
+            $this->addError('addReplicaWipeAcknowledged', __('Target has :n keys. Replication WILL wipe them on attach. Tick the box to acknowledge.', ['n' => number_format($dbsize)]));
+
+            return;
+        }
+
+        try {
+            $row = $setup->attach($this->server, $masterRow, $targetServer, $replicaRow, (string) auth()->id());
+
+            $audits->record(
+                $this->server,
+                ServerCacheServiceAuditEvent::EVENT_REPLICA_ATTACHED,
+                [
+                    'master_cache_service_id' => $masterRow->id,
+                    'replica_cache_service_id' => $replicaRow->id,
+                    'replica_server_id' => $targetServer->id,
+                ],
+                auth()->user(),
+            );
+
+            $this->addReplicaTargetServerId = '';
+            $this->addReplicaWipeAcknowledged = false;
+            $this->replicationState = null;
+            $this->dispatch('close-modal', 'add-replica-modal');
+            $this->toastSuccess(__('Replica attached on :host.', ['host' => $targetServer->name]));
+        } catch (\Throwable $e) {
+            $audits->record(
+                $this->server,
+                ServerCacheServiceAuditEvent::EVENT_REPLICA_ATTACH_FAILED,
+                [
+                    'master_cache_service_id' => $masterRow->id,
+                    'replica_cache_service_id' => $replicaRow->id,
+                    'error' => $e->getMessage(),
+                ],
+                auth()->user(),
+            );
+            $this->toastError($e->getMessage());
+        }
+    }
+
+    /**
+     * Detach a replica from this master. Caller invokes via the Replication
+     * card row's "Detach" button with the replication row id.
+     */
+    public function removeReplica(
+        string $replicationRowId,
+        CacheServiceReplicaSetup $setup,
+        CacheServiceAuditLogger $audits,
+    ): void {
+        $this->authorize('update', $this->server);
+
+        $engine = $this->currentEngineTab();
+        $masterRow = $engine ? $this->cacheServiceFor($engine) : null;
+        if (! $masterRow) {
+            return;
+        }
+
+        $row = ServerCacheServiceReplication::query()
+            ->where('master_cache_service_id', $masterRow->id)
+            ->whereKey($replicationRowId)
+            ->first();
+        if (! $row) {
+            return;
+        }
+
+        $replica = $row->replicaCacheService;
+        $replicaServer = $replica?->server;
+        if (! $replica || ! $replicaServer) {
+            $row->delete();
+
+            return;
+        }
+
+        try {
+            $setup->detach($replicaServer, $replica, $row);
+            $audits->record(
+                $this->server,
+                ServerCacheServiceAuditEvent::EVENT_REPLICA_DETACHED,
+                [
+                    'master_cache_service_id' => $masterRow->id,
+                    'replica_cache_service_id' => $replica->id,
+                ],
+                auth()->user(),
+            );
+
+            $this->replicationState = null;
+            $this->toastSuccess(__('Replica detached.'));
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+        }
+    }
+
+    /**
+     * Seed {@see $cache_prefix_input} with the row's current cache_prefix so the
+     * form shows the saved value on first render. Called via wire:init from the
+     * Connection Details card; no-op when the row is missing or the input has
+     * already been touched.
+     */
+    public function primeCachePrefix(): void
+    {
+        if ($this->cache_prefix_input !== '') {
+            return;
+        }
+        $engine = $this->currentEngineTab();
+        $row = $engine ? $this->cacheServiceFor($engine) : null;
+        if ($row && filled($row->cache_prefix)) {
+            $this->cache_prefix_input = (string) $row->cache_prefix;
+        }
+    }
+
+    /**
+     * Persist a Laravel-style cache key prefix on the current engine row. Surfaced
+     * via the Connection Details card on the Overview subtab; reflected in the
+     * Laravel `.env` and Docker Compose connection snippets as `CACHE_PREFIX=...`.
+     * No remote action — this is a label dply stores so the snippet operators
+     * paste matches the prefix they intend to use.
+     */
+    public function setCachePrefix(CacheServiceAuditLogger $audits): void
+    {
+        $this->authorize('update', $this->server);
+
+        $engine = $this->currentEngineTab();
+        $row = $engine ? $this->cacheServiceFor($engine) : null;
+        if (! $row) {
+            $this->toastError(__('Switch to an engine tab to set its cache prefix.'));
+
+            return;
+        }
+
+        $this->validate([
+            'cache_prefix_input' => ['nullable', 'string', 'max:64', 'regex:/^[A-Za-z0-9_\-:]*$/'],
+        ], [], [
+            'cache_prefix_input' => __('cache prefix'),
+        ]);
+
+        $normalised = trim($this->cache_prefix_input);
+        $row->update(['cache_prefix' => $normalised === '' ? null : $normalised]);
+
+        $audits->record(
+            $row->server,
+            \App\Models\ServerCacheServiceAuditEvent::EVENT_CACHE_PREFIX_UPDATED,
+            ['engine' => $row->engine, 'name' => $row->name, 'value' => $normalised],
+            auth()->user(),
+        );
+
+        $this->toastSuccess($normalised === ''
+            ? __('Cache prefix cleared.')
+            : __('Cache prefix set to :v', ['v' => $normalised])
+        );
+    }
+
+    private function checkReplicaDbSize(Server $server, ServerCacheService $row): int
+    {
+        $cli = CacheServiceStats::binaryFor($row->engine);
+        $authFlag = filled($row->auth_password ?? null)
+            ? '-a '.escapeshellarg((string) $row->auth_password).' '
+            : '';
+
+        try {
+            $output = app(ExecuteRemoteTaskOnServer::class)->runInlineBash(
+                $server,
+                'cache-service:replica-dbsize:'.$row->engine,
+                $authFlag.escapeshellarg($cli).' -p '.(int) $row->port.' DBSIZE 2>/dev/null',
+                timeoutSeconds: 30,
+                asRoot: false,
+            );
+        } catch (\Throwable) {
+            return 0;
+        }
+
+        return $output->exitCode === 0 ? (int) trim($output->buffer) : 0;
+    }
+
+    /**
+     * Set the CLIENT LIST table page. Bounded to [1, pageCount] so a malformed
+     * payload from a stale URL or back-button race can't strand the operator
+     * on an empty slice.
+     */
+    public function setCacheClientsPage(int $page): void
+    {
+        if (! is_array($this->cacheClients) || $this->cacheClients === []) {
+            $this->cacheClientsPage = 1;
+
+            return;
+        }
+
+        $pageCount = (int) ceil(count($this->cacheClients) / self::CACHE_CLIENTS_PAGE_SIZE);
+        $this->cacheClientsPage = max(1, min($page, max(1, $pageCount)));
+    }
+
+    /**
+     * Trigger a refresh of the maxmemory + maxmemory-policy values from the
+     * engine. SSH happens in {@see \App\Jobs\RefreshCacheMemorySettingsJob} —
+     * the Livewire commit returns immediately and reads whatever the worker
+     * has written to cache. PHP's 30s ceiling is never in play.
+     */
+    public function loadCacheMemorySettings(): void
     {
         $this->authorize('update', $this->server);
 
@@ -1260,18 +2372,23 @@ BASH,
             return;
         }
 
-        try {
-            $current = $memory->read($row->server, $row);
-        } catch (\Throwable $e) {
-            $this->cacheMemoryError = $e->getMessage();
+        \App\Jobs\RefreshCacheMemorySettingsJob::dispatch($row->id);
 
-            return;
+        $payload = Cache::get(\App\Jobs\RefreshCacheMemorySettingsJob::resultCacheKey($row->server->id, $row->engine));
+        if (is_array($payload) && ($payload['ok'] ?? false) === true) {
+            $this->cache_maxmemory = (string) ($payload['maxmemory'] ?? '');
+            $this->cache_maxmemory_policy = (string) ($payload['maxmemory_policy'] ?? 'noeviction');
+            $this->cacheMemoryLoaded = true;
+            $this->cacheMemoryError = null;
+
+            $newAt = isset($payload['at']) ? (string) $payload['at'] : '';
+            if ($newAt !== '' && $newAt !== $this->cacheMemoryCachedAt) {
+                $this->cacheMemoryFromCache = false;
+                $this->cacheMemoryCachedAt = $newAt;
+            }
+        } elseif (is_array($payload) && ($payload['ok'] ?? true) === false) {
+            $this->cacheMemoryError = (string) ($payload['error'] ?? __('Could not load memory settings.'));
         }
-
-        $this->cache_maxmemory = (string) ($current['maxmemory'] ?? '');
-        $this->cache_maxmemory_policy = (string) ($current['maxmemory_policy'] ?? 'noeviction');
-        $this->cacheMemoryLoaded = true;
-        $this->cacheMemoryError = null;
     }
 
     public function hideCacheMemorySettings(): void
@@ -1280,6 +2397,63 @@ BASH,
         $this->cache_maxmemory = '';
         $this->cache_maxmemory_policy = 'noeviction';
         $this->cacheMemoryError = null;
+    }
+
+    /**
+     * Read-only poll for the cached memory-settings result. Called by
+     * wire:poll on the idle state so the UI can pick up the worker write
+     * shortly after {@see loadCacheMemorySettings} dispatched the job —
+     * without this the operator clicks Load, nothing visible changes, and
+     * they have to click again to see the result. No SSH, no dispatch here.
+     *
+     * Steady-state no-op once values are loaded — pollers fire every 1.5s
+     * but we only touch component state when the cached payload's `at`
+     * differs from what we last applied, so re-renders stop after hydration.
+     */
+    public function pollCacheMemorySettings(): void
+    {
+        $engine = $this->currentEngineTab();
+        if ($engine === null) {
+            return;
+        }
+
+        $row = $this->cacheServiceFor($engine);
+        if (! $row || ! $row->server) {
+            return;
+        }
+
+        // Self-healing: if the memory has never loaded this session, dispatch
+        // a refresh on every poll tick. The job writes to cache and the next
+        // tick picks it up. This ensures the card eventually loads even if
+        // the click handler never fired the dispatch for any reason.
+        if (! $this->cacheMemoryLoaded && $this->cacheMemoryError === null
+            && ServerCacheService::engineSupportsAuth($row->engine)
+        ) {
+            \App\Jobs\RefreshCacheMemorySettingsJob::dispatch($row->id);
+        }
+
+        $payload = Cache::get(\App\Jobs\RefreshCacheMemorySettingsJob::resultCacheKey($row->server->id, $row->engine));
+        if (! is_array($payload)) {
+            return;
+        }
+
+        $newAt = isset($payload['at']) ? (string) $payload['at'] : '';
+        if ($newAt !== '' && $newAt === $this->cacheMemoryCachedAt) {
+            // Same payload we already applied — nothing to do.
+            return;
+        }
+
+        if (($payload['ok'] ?? false) === true) {
+            $this->cache_maxmemory = (string) ($payload['maxmemory'] ?? '');
+            $this->cache_maxmemory_policy = (string) ($payload['maxmemory_policy'] ?? 'noeviction');
+            $this->cacheMemoryLoaded = true;
+            $this->cacheMemoryError = null;
+            $this->cacheMemoryFromCache = false;
+            $this->cacheMemoryCachedAt = $newAt;
+        } elseif (($payload['ok'] ?? true) === false) {
+            $this->cacheMemoryError = (string) ($payload['error'] ?? __('Could not load memory settings.'));
+            $this->cacheMemoryCachedAt = $newAt;
+        }
     }
 
     public function saveCacheMemorySettings(
@@ -1329,7 +2503,7 @@ BASH,
                 $row,
                 'cache_save_memory',
                 __('Apply memory settings to :engine on :host', ['engine' => $row->engine, 'host' => $this->server->name]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($memory, $row, $maxNorm, $policyNorm, $audit, $maxmemory, $policy): void {
+                function (ConsoleEmitter $emit) use ($memory, $row, $maxNorm, $policyNorm, $audit, $maxmemory, $policy): void {
                     $emit->step('cache', sprintf('maxmemory=%s policy=%s', $maxNorm ?? 'unset', $policyNorm ?? 'unset'));
                     $memory->write($row->server, $row, $maxNorm, $policyNorm);
                     $emit->success('cache', 'Memory directives applied.');
@@ -1398,7 +2572,7 @@ BASH,
                 $row,
                 'cache_set_auth',
                 __('Set AUTH password on :engine on :host', ['engine' => $row->engine, 'host' => $this->server->name]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($auth, $row, $newAuth, $audits): void {
+                function (ConsoleEmitter $emit) use ($auth, $row, $newAuth, $audits): void {
                     $emit->step('cache', sprintf('Setting requirepass on %s', $row->engine));
                     $auth->setRequirePass($row->server, $row, $newAuth);
                     $emit->success('cache', 'AUTH password active.');
@@ -1453,7 +2627,7 @@ BASH,
                 $row,
                 'cache_clear_auth',
                 __('Clear AUTH password on :engine on :host', ['engine' => $row->engine, 'host' => $this->server->name]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($auth, $row, $audits): void {
+                function (ConsoleEmitter $emit) use ($auth, $row, $audits): void {
                     $emit->step('cache', sprintf('Clearing requirepass on %s', $row->engine));
                     $auth->clearRequirePass($row->server, $row);
                     $emit->success('cache', 'AUTH password cleared.');
@@ -1541,7 +2715,7 @@ BASH,
                 __('Change :engine port :old → :new on :host', [
                     'engine' => $row->engine, 'old' => $oldPort, 'new' => $newPort, 'host' => $this->server->name,
                 ]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($portChanger, $row, $newPort, $oldPort, $audits): void {
+                function (ConsoleEmitter $emit) use ($portChanger, $row, $newPort, $oldPort, $audits): void {
                     $emit->step('cache', sprintf('Rewriting %s config to listen on :%d', $row->engine, $newPort));
                     $portChanger->changePort($row->server, $row, $newPort);
                     $emit->success('cache', sprintf('%s now listening on :%d', $row->engine, $newPort));
@@ -1618,7 +2792,7 @@ BASH,
                 __('Expose :engine on :host to :cidr', [
                     'engine' => $row->engine, 'host' => $this->server->name, 'cidr' => $cidr,
                 ]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($exposure, $row, $cidr, $audits): void {
+                function (ConsoleEmitter $emit) use ($exposure, $row, $cidr, $audits): void {
                     $emit->step('cache', sprintf('Rewriting bind to 0.0.0.0; firewall rule for %s', $cidr));
                     $exposure->expose($row->server, $row, $cidr, auth()->id());
                     $emit->success('cache', 'Exposed; firewall apply queued.');
@@ -1670,7 +2844,7 @@ BASH,
                 $row,
                 'cache_lockdown',
                 __('Lock :engine on :host to loopback', ['engine' => $row->engine, 'host' => $this->server->name]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($exposure, $row, $audits): void {
+                function (ConsoleEmitter $emit) use ($exposure, $row, $audits): void {
                     $emit->step('cache', 'Rewriting bind to 127.0.0.1; removing firewall rule');
                     $exposure->lockdown($row->server, $row, auth()->id());
                     $emit->success('cache', 'Locked down; firewall apply queued.');
@@ -1854,7 +3028,17 @@ BASH,
      * sampler computes deltas relative to the previous sample for ops/sec and hit-rate
      * windows; absolute values for memory and clients come straight from the latest INFO.
      */
-    public function loadKeyspaceDashboard(CacheServiceStats $stats, CacheServiceKeyspaceSampler $sampler): void
+    /**
+     * Trigger a fresh INFO sample. SSH + sampler delta math happen in
+     * {@see \App\Jobs\RefreshKeyspaceSampleJob}; this method only dispatches
+     * and reads the cached result. PHP's 30s timeout never applies because we
+     * don't wait on SSH inside the Livewire commit.
+     *
+     * The previous sample (used by the sampler to compute ops/sec + hit-rate
+     * window deltas) is passed into the job so the worker has everything it
+     * needs without re-querying component state.
+     */
+    public function loadKeyspaceDashboard(): void
     {
         $this->authorize('update', $this->server);
 
@@ -1878,15 +3062,54 @@ BASH,
             return;
         }
 
-        $raw = $stats->rawInfo($row->server, $row);
-        if ($raw === null) {
-            $this->keyspaceError = __('Could not read INFO from :engine. Is it running?', ['engine' => $row->engine, 'name' => $row->name]);
+        $previous = end($this->keyspaceSamples) ?: null;
+        \App\Jobs\RefreshKeyspaceSampleJob::dispatch($row->id, $previous ?: null);
+
+        $this->ingestKeyspaceSampleFromCache($row->server->id, $row->engine);
+    }
+
+    public function pollKeyspaceDashboard(): void
+    {
+        // Polling tick: silently re-dispatch + ingest. wire:poll fires this
+        // every 10s while the dashboard is open; transient failures stay quiet
+        // so the operator keeps seeing the last-known-good buffer.
+        try {
+            $this->loadKeyspaceDashboard();
+        } catch (\Throwable) {
+            // swallow
+        }
+    }
+
+    /**
+     * Hydrate {@see $keyspaceSamples} from the cached result that
+     * {@see \App\Jobs\RefreshKeyspaceSampleJob} writes. Appends the sample
+     * (capped at KEYSPACE_SAMPLE_LIMIT) only when the job's `at` timestamp is
+     * newer than the latest buffered sample — so back-to-back polls before a
+     * worker has finished don't double-append the same sample.
+     */
+    protected function ingestKeyspaceSampleFromCache(string $serverId, string $engine): void
+    {
+        $payload = Cache::get(\App\Jobs\RefreshKeyspaceSampleJob::resultCacheKey($serverId, $engine));
+        if (! is_array($payload)) {
+            return;
+        }
+
+        if (($payload['ok'] ?? false) !== true) {
+            $this->keyspaceError = (string) ($payload['error'] ?? __('Could not read INFO.'));
 
             return;
         }
 
-        $previous = end($this->keyspaceSamples) ?: null;
-        $sample = $sampler->sample($raw, $previous ?: null);
+        $sample = is_array($payload['sample'] ?? null) ? $payload['sample'] : null;
+        if (! $sample) {
+            return;
+        }
+
+        $latest = end($this->keyspaceSamples) ?: null;
+        if (is_array($latest) && isset($latest['ts'], $sample['ts']) && (int) $sample['ts'] <= (int) $latest['ts']) {
+            // Same or older sample — worker hasn't produced a new one yet.
+            return;
+        }
 
         $this->keyspaceSamples[] = $sample;
         if (count($this->keyspaceSamples) > self::KEYSPACE_SAMPLE_LIMIT) {
@@ -1898,16 +3121,10 @@ BASH,
 
         $this->keyspaceLoaded = true;
         $this->keyspaceError = null;
-    }
+        // Fresh sample landed this session — drop the "cached snapshot" banner.
+        $this->keyspaceFromCache = false;
 
-    public function pollKeyspaceDashboard(CacheServiceStats $stats, CacheServiceKeyspaceSampler $sampler): void
-    {
-        // Same call as load, but silent on failure — a poll tick shouldn't toast.
-        try {
-            $this->loadKeyspaceDashboard($stats, $sampler);
-        } catch (\Throwable) {
-            // swallow
-        }
+        $this->persistKeyspaceSamplesToCache();
     }
 
     public function hideKeyspaceDashboard(): void
@@ -1938,8 +3155,28 @@ BASH,
         $this->keyBrowserValue = null;
         $this->keyBrowserValueError = null;
         $this->keyBrowserError = null;
+        $this->keyBrowserFromCache = false;
+        $this->keysTablePage = 1;
 
         $this->loadKeyBrowserPage($explorer);
+    }
+
+    /**
+     * Set the current page of the in-memory keys table. Bounded to
+     * [1, pageCount] so a stale URL or back-button can't strand the
+     * operator on an empty slice.
+     */
+    public function setKeysTablePage(int $page): void
+    {
+        $count = count($this->keyBrowserKeys);
+        if ($count === 0) {
+            $this->keysTablePage = 1;
+
+            return;
+        }
+
+        $pageCount = max(1, (int) ceil($count / self::KEYS_TABLE_PAGE_SIZE));
+        $this->keysTablePage = max(1, min($page, $pageCount));
     }
 
     /**
@@ -1974,6 +3211,9 @@ BASH,
         $this->keyBrowserComplete = $page['complete'];
         $this->keyBrowserLoaded = true;
         $this->keyBrowserError = null;
+        // Fresh data — clear the "from cache" badge and persist for next visit.
+        $this->keyBrowserFromCache = false;
+        $this->persistKeyBrowserToSession();
     }
 
     /**
@@ -2280,7 +3520,7 @@ BASH,
                 $row,
                 'cache_flush',
                 __('Flush all keys on :engine on :host', ['engine' => $row->engine, 'host' => $this->server->name]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($executor, $row, $cmd, $audit): void {
+                function (ConsoleEmitter $emit) use ($executor, $row, $cmd, $audit): void {
                     $output = $executor->runInlineBash(
                         $row->server,
                         'cache-service:flush:'.$row->engine,
@@ -2365,7 +3605,7 @@ BASH;
                 __(':label :engine on :host', [
                     'label' => $label, 'engine' => $row->engine, 'host' => $this->server->name,
                 ]),
-                function (\App\Services\ConsoleActions\ConsoleEmitter $emit) use ($executor, $row, $verb, $script, $audit, $event, $newStatus): void {
+                function (ConsoleEmitter $emit) use ($executor, $row, $verb, $script, $audit, $event, $newStatus): void {
                     $output = $executor->runInlineBash(
                         $row->server,
                         'cache-service:'.$verb.':'.$row->engine.':'.$row->name,
@@ -2396,35 +3636,29 @@ BASH;
     }
 
     public function render(
-        ServerCacheServiceHostCapabilities $capabilitiesService,
         CacheServiceStats $statsService,
     ): View {
-        $capabilities = ['redis' => false, 'valkey' => false, 'memcached' => false, 'keydb' => false, 'dragonfly' => false];
-        try {
-            $capabilities = $capabilitiesService->forServer($this->server);
-        } catch (\Throwable) {
-            // Probe failures (SSH timeout, key issues) leave the per-engine "running" badges off.
-        }
+        // Engine capabilities + distro-support gates are SSH-probed off the render path via
+        // wire:init (loadCacheCapabilities) so the workspace paints instantly; the per-engine
+        // "running" badge and Install gate resolve once that returns. $capabilitiesLoaded gates
+        // the "checking…" UI. Cached 24h, so this is usually a no-op after the first load.
+        $capabilities = $this->capabilitiesLoaded
+            ? ($this->capabilities_state ?: ['redis' => false, 'valkey' => false, 'memcached' => false, 'keydb' => false, 'dragonfly' => false])
+            : ['redis' => false, 'valkey' => false, 'memcached' => false, 'keydb' => false, 'dragonfly' => false];
 
-        // Per-engine distro-support gate. Null means "supported / unknown — let the operator
-        // proceed"; a string means "Install is disabled, here's why". Driven by
-        // CacheServiceInstallScripts::supportedDistroCodenames() so the UI and the install
-        // script agree on which combinations work. Swallowing exceptions matches the
-        // capabilities probe shape above — flaky SSH shouldn't grey out the whole page.
-        $engineUnsupportedReasons = ['redis' => null, 'valkey' => null, 'memcached' => null, 'keydb' => null, 'dragonfly' => null];
-        try {
-            foreach (CacheServiceInstallScripts::supportedEngines() as $engine) {
-                $engineUnsupportedReasons[$engine] = $capabilitiesService->engineUnsupportedReason($this->server, $engine);
-            }
-        } catch (\Throwable) {
-            // Same posture as the capabilities probe — fall back to "no gating" on probe error.
-        }
+        $engineUnsupportedReasons = $this->capabilitiesLoaded
+            ? ($this->cache_unsupported_reasons ?: ['redis' => null, 'valkey' => null, 'memcached' => null, 'keydb' => null, 'dragonfly' => null])
+            : ['redis' => null, 'valkey' => null, 'memcached' => null, 'keydb' => null, 'dragonfly' => null];
 
         $allowed = array_merge(['overview', 'advanced'], CacheServiceInstallScripts::supportedEngines());
         if (! in_array($this->workspace_tab, $allowed, true)) {
             $this->workspace_tab = 'overview';
         }
 
+        // Drop any memo a pre-render busy-check populated so this render reads
+        // rows live (incl. ones a mutating action just created), then share that
+        // single fetch with every downstream consumer in this lifecycle.
+        $this->cacheServicesMemo = null;
         $services = $this->cacheServices();
 
         // Pull live stats per-engine when looking at Overview and the engine is RUNNING. The
@@ -2464,7 +3698,7 @@ BASH;
 
         // Latest non-dismissed manage_action run for this server — drives the
         // Show Redis INFO output banner on the redis Stats subtab.
-        $manageActionRun = \App\Models\ConsoleAction::query()
+        $manageActionRun = ConsoleAction::query()
             ->where('subject_type', $this->server->getMorphClass())
             ->where('subject_id', $this->server->id)
             ->where('kind', 'manage_action')
@@ -2472,43 +3706,88 @@ BASH;
             ->orderByDesc('created_at')
             ->first();
 
-        return view('livewire.servers.workspace-caches', [
-            'capabilities' => $capabilities,
-            'engineUnsupportedReasons' => $engineUnsupportedReasons,
-            'cacheServices' => $services,
-            'cacheServicesByEngine' => $primaryByEngine,
-            'cacheRunsByEngine' => $cacheRunsByEngine,
-            'cacheStatsByInstance' => $statsByInstance,
-            'cacheAuditEvents' => $auditEvents,
-            // Allowlisted manage actions exposed on Caches (currently just `redis_info`).
-            // Banner-only flow — see RunsAllowlistedManageAction.
-            'serviceActions' => config('server_manage.service_actions', []),
-            'manageActionRun' => $manageActionRun,
-            'engineLabels' => [
-                'redis' => 'Redis',
-                'valkey' => 'Valkey',
-                'memcached' => 'Memcached',
-                'keydb' => 'KeyDB',
-                'dragonfly' => 'Dragonfly',
+        // Candidate replica servers for the Add-Replica modal: org-owned,
+        // redis/valkey role, READY, and not yet replicating from another master.
+        $availableReplicaServers = collect();
+        $activeReplications = collect();
+        if ($this->engine_subtab === 'stats') {
+            $availableReplicaServers = Server::query()
+                ->where('organization_id', $this->server->organization_id)
+                ->where('id', '!=', $this->server->id)
+                ->where('status', Server::STATUS_READY)
+                ->where(function ($q): void {
+                    $q->whereJsonContains('meta->server_role', 'redis')
+                        ->orWhereJsonContains('meta->server_role', 'valkey');
+                })
+                ->orderBy('name')
+                ->get();
+
+            $masterEngine = $this->currentEngineTab();
+            $masterRow = $masterEngine ? $this->cacheServiceFor($masterEngine) : null;
+            if ($masterRow) {
+                $activeReplications = ServerCacheServiceReplication::query()
+                    ->where('master_cache_service_id', $masterRow->id)
+                    ->with(['replicaCacheService.server'])
+                    ->get();
+            }
+        }
+
+        return view('livewire.servers.workspace-caches', array_merge(
+            CacheWorkspaceViewData::for($this->server, $this, $services),
+            [
+                'capabilities' => $capabilities,
+                'capabilitiesLoaded' => $this->capabilitiesLoaded,
+                'engineUnsupportedReasons' => $engineUnsupportedReasons,
+                'cacheServices' => $services,
+                'cacheServicesByEngine' => $primaryByEngine,
+                'cacheRunsByEngine' => $cacheRunsByEngine,
+                'cacheStatsByInstance' => $statsByInstance,
+                'cacheAuditEvents' => $auditEvents,
+                // Allowlisted manage actions exposed on Caches (currently just `redis_info`).
+                // Banner-only flow — see RunsAllowlistedManageAction.
+                'serviceActions' => config('server_manage.service_actions', []),
+                'manageActionRun' => $manageActionRun,
+                'deletionSummary' => null,
+                'availableReplicaServers' => $availableReplicaServers,
+                'activeReplications' => $activeReplications,
             ],
-            'engineDescriptions' => [
-                'redis' => __('In-memory data structure store; the most widely-deployed cache for PHP/Laravel apps.'),
-                'valkey' => __('Open-source fork of Redis maintained by the Linux Foundation; wire-compatible with Redis clients.'),
-                'memcached' => __('Lightweight key-value cache. Smaller feature set than Redis but very low overhead.'),
-                'keydb' => __('Multi-threaded Redis fork. Higher throughput on multi-core boxes; same wire protocol as Redis.'),
-                'dragonfly' => __('Modern in-memory store with Redis wire compatibility and lower memory overhead.'),
-            ],
-            'deletionSummary' => null,
-        ]);
+        ));
     }
 
     /** All cache service rows for this server, keyed by ULID and ordered by engine name. */
+    /**
+     * Request-scoped memo for {@see cacheServices()}. A single render fans the
+     * row set out to several consumers (the render() body, the
+     * {@see cacheConsumers()} computed, {@see CacheWorkspaceViewData}), each of
+     * which used to re-run the identical `server_cache_services` select.
+     * render() nulls this before its first read, so the rendered view always
+     * reflects rows a mutating action just created — the memo only collapses
+     * reads within one lifecycle, it never carries a stale set into a render.
+     */
+    private ?Collection $cacheServicesMemo = null;
+
     protected function cacheServices(): Collection
     {
-        return ServerCacheService::query()
+        return $this->cacheServicesMemo ??= ServerCacheService::query()
             ->where('server_id', $this->server->id)
             ->orderBy('engine')
             ->get();
+    }
+
+    /**
+     * Sites consuming this server's cache services, grouped by cache-service id —
+     * the "Used by" list on each engine's Overview. One query for the whole tab.
+     *
+     * @return array<string, array<int, array<string, mixed>>>
+     */
+    #[Computed]
+    public function cacheConsumers(): array
+    {
+        return $this->buildBindingConsumers(
+            'server_cache_service',
+            $this->cacheServices()->pluck('id')->all(),
+            $this->server->id,
+        );
     }
 
     /**
@@ -2560,6 +3839,11 @@ BASH;
         $this->cache_maxmemory_policy = 'noeviction';
         $this->cacheMemoryError = null;
         $this->new_auth_password = '';
+        // Reset the cache_prefix editor so the next engine tab re-seeds from
+        // its own row via primeCachePrefix(). Without this, jumping from a
+        // Redis instance with prefix "app_a_" to a Valkey instance with no
+        // prefix would carry "app_a_" into the Valkey form by mistake.
+        $this->cache_prefix_input = '';
 
         // REPL + dashboard + key browser are scoped to the current engine, so
         // their buffers go away on tab change. The unlock toggle deliberately

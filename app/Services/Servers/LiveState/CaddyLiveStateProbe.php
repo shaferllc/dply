@@ -7,25 +7,27 @@ namespace App\Services\Servers\LiveState;
 use App\Jobs\Concerns\PrivilegedRemoteFileWrites;
 use App\Models\Server;
 use App\Services\SshConnection;
+use App\Support\Servers\CaddyAdminUrl;
+use App\Support\Servers\CaddyPhpFpmUpstreamAddress;
 use Carbon\CarbonImmutable;
 
 /**
- * Probes Caddy's live state via its localhost admin API (default
- * 127.0.0.1:2019). Caddy enables the admin endpoint automatically unless
- * the operator set `admin off` in the global Caddyfile block — when
- * unreachable we surface an error in engineSpecific and the UI falls
- * back to an empty state.
+ * Probes Caddy's live state via its admin API (default localhost:2019).
+ * When `admin off` is set in the global Caddyfile block the probe is skipped.
  *
- * We hit:
+ * Admin endpoints:
  *   - GET /config/                       — full active config (JSON)
- *   - GET /reverse_proxy/upstreams       — backends + health counters
- *   - GET /pki/ca/local                  — internal CA info (Caddy auto-issued)
+ *   - GET /reverse_proxy/upstreams       — reverse_proxy backends + health
+ *   - GET /pki/ca/local                  — internal CA info
+ *   - GET /pki/ca/                       — CA inventory
+ *   - GET /metrics                       — Prometheus exposition
+ *   - GET /id/                           — instance identifier
  *
  * Parsed into four sub-tabs:
- *   - routes    — every route across http.servers.* with host matcher + handler chain
- *   - upstreams — reverse_proxy backends with healthy/fail/num_requests counters
- *   - certs     — TLS automation policies + issued certs (when the local CA is up)
- *   - admin     — versions, listening sockets, raw config size
+ *   - routes    — every route across http.servers.*
+ *   - upstreams — reverse_proxy + php_fastcgi unix sockets w/ live health
+ *   - certs     — TLS automation policies, local CA, on-disk issued certs
+ *   - admin     — version, admin listen, metrics, instance id
  */
 class CaddyLiveStateProbe extends AbstractEngineLiveStateProbe
 {
@@ -39,7 +41,7 @@ class CaddyLiveStateProbe extends AbstractEngineLiveStateProbe
     protected function runFreshProbe(Server $server): EngineLiveState
     {
         $ssh = new SshConnection($server);
-        $output = $ssh->exec($this->privilegedCommand($server, $this->buildProbeScript()), 30);
+        $output = $ssh->exec($this->privilegedCommand($server, $this->buildProbeScript()), 45);
         $exit = $ssh->lastExecExitCode();
 
         $errors = [];
@@ -48,14 +50,33 @@ class CaddyLiveStateProbe extends AbstractEngineLiveStateProbe
         }
 
         $sections = $this->splitSections((string) $output);
+        $adminListen = trim($sections['admin_listen'] ?? '');
+        $adminOff = trim($sections['admin_off'] ?? '') === '1';
+        $caddyVersion = trim($sections['version'] ?? '');
         $config = $this->decodeJson($sections['config'] ?? '');
         $upstreams = $this->decodeJson($sections['upstreams'] ?? '');
         $caInfo = $this->decodeJson($sections['ca'] ?? '');
-        $caddyVersion = trim($sections['version'] ?? '');
+        $caList = $this->decodeJson($sections['ca_list'] ?? '');
+        $instanceId = trim($sections['id'] ?? '');
+        $metricsBlob = trim($sections['metrics'] ?? '');
+        $phpSocketsRaw = trim($sections['php_sockets'] ?? '');
+        $issuedCertsRaw = trim($sections['issued_certs'] ?? '');
 
-        if ($config === [] && empty($errors)) {
-            $errors[] = 'Caddy admin API unreachable on 127.0.0.1:2019. Set `admin off` deliberately? Then probe is disabled.';
+        $adminUrl = $adminOff
+            ? null
+            : CaddyAdminUrl::fromListenDirective($adminListen !== '' ? $adminListen : null)
+                ?? CaddyAdminUrl::fromLoadedConfig($config);
+
+        if ($adminOff) {
+            $errors[] = 'Caddy admin API is disabled (`admin off`). Live-state probe skipped.';
+        } elseif ($config === [] && empty($errors)) {
+            $errors[] = 'Caddy admin API unreachable'
+                .($adminUrl !== null ? ' at '.$adminUrl : ' on 127.0.0.1:2019')
+                .'. Set `admin off` deliberately? Then probe is disabled.';
         }
+
+        $upstreamUnits = $this->buildUpstreamUnits($upstreams);
+        $upstreamUnits = $this->mergePhpSocketUnits($upstreamUnits, $phpSocketsRaw, $config);
 
         return new EngineLiveState(
             engine: $this->engineKey(),
@@ -63,14 +84,22 @@ class CaddyLiveStateProbe extends AbstractEngineLiveStateProbe
             isFresh: true,
             units: [
                 'routes' => $this->buildRouteUnits($config),
-                'upstreams' => $this->buildUpstreamUnits($upstreams),
-                'certs' => $this->buildCertUnits($config, $caInfo),
-                'admin' => $this->buildAdminUnits($config, $caddyVersion, $output),
+                'upstreams' => $upstreamUnits,
+                'certs' => $this->buildCertUnits($config, $caInfo, $caList, $issuedCertsRaw),
+                'admin' => $this->buildAdminUnits(
+                    $config,
+                    $caddyVersion,
+                    $adminUrl,
+                    $instanceId,
+                    $metricsBlob,
+                    $sections,
+                ),
             ],
             engineSpecific: array_filter([
-                'config_bytes' => is_string($output) ? strlen($sections['config'] ?? '') : null,
+                'admin_url' => $adminUrl,
+                'config_bytes' => strlen(trim($sections['config'] ?? '')),
                 'errors' => $errors !== [] ? $errors : null,
-            ], static fn ($v) => $v !== null),
+            ], static fn ($v) => $v !== null && $v !== ''),
         );
     }
 
@@ -78,21 +107,69 @@ class CaddyLiveStateProbe extends AbstractEngineLiveStateProbe
     {
         return <<<'BASH'
 set +e
-URL="http://127.0.0.1:2019"
+CADDYFILE="/etc/caddy/Caddyfile"
+ADMIN_LISTEN=""
+ADMIN_OFF=0
+if [ -r "$CADDYFILE" ]; then
+  admin_line=$(grep -E '^\s*admin\s+' "$CADDYFILE" 2>/dev/null | head -1 || true)
+  if echo "$admin_line" | grep -qiE '\soff\s*$'; then ADMIN_OFF=1; fi
+  ADMIN_LISTEN=$(echo "$admin_line" | awk '{print $2}')
+fi
+[ -z "$ADMIN_LISTEN" ] && ADMIN_LISTEN="localhost:2019"
+echo '###dply-section:admin_off###'
+echo "$ADMIN_OFF"
+echo '###dply-section:end###'
+echo '###dply-section:admin_listen###'
+echo "$ADMIN_LISTEN"
+echo '###dply-section:end###'
+if [ "$ADMIN_OFF" = "1" ]; then exit 0; fi
+host="${ADMIN_LISTEN%%:*}"
+port="${ADMIN_LISTEN##*:}"
+[ "$host" = "localhost" ] && host="127.0.0.1"
+[ "$host" = "::1" ] && host="127.0.0.1"
+[ "$port" = "$ADMIN_LISTEN" ] && port="2019"
+URL="http://${host}:${port}"
 echo '###dply-section:version###'
 caddy version 2>/dev/null | head -n 1
 echo '###dply-section:end###'
 echo '###dply-section:config###'
-curl -fsS --max-time 5 "$URL/config/" 2>/dev/null
+curl -fsS --max-time 8 "$URL/config/" 2>/dev/null
 echo
 echo '###dply-section:end###'
 echo '###dply-section:upstreams###'
-curl -fsS --max-time 5 "$URL/reverse_proxy/upstreams" 2>/dev/null
+curl -fsS --max-time 8 "$URL/reverse_proxy/upstreams" 2>/dev/null
 echo
 echo '###dply-section:end###'
 echo '###dply-section:ca###'
-curl -fsS --max-time 5 "$URL/pki/ca/local" 2>/dev/null
+curl -fsS --max-time 8 "$URL/pki/ca/local" 2>/dev/null
 echo
+echo '###dply-section:end###'
+echo '###dply-section:ca_list###'
+curl -fsS --max-time 8 "$URL/pki/ca/" 2>/dev/null
+echo
+echo '###dply-section:end###'
+echo '###dply-section:id###'
+curl -fsS --max-time 5 "$URL/id/" 2>/dev/null
+echo
+echo '###dply-section:end###'
+echo '###dply-section:metrics###'
+curl -fsS --max-time 8 "$URL/metrics" 2>/dev/null | head -n 400
+echo
+echo '###dply-section:end###'
+echo '###dply-section:php_sockets###'
+for sock_path in $(grep -rohE '/run/php/php[0-9.]+-fpm\.sock' /etc/caddy 2>/dev/null | sort -u); do
+  healthy=0
+  [ -S "$sock_path" ] && healthy=1
+  ver=$(echo "$sock_path" | sed -n 's#.*/php\([0-9.]*\)-fpm\.sock#\1#p')
+  active=unknown
+  if [ -n "$ver" ] && command -v systemctl >/dev/null 2>&1; then
+    active=$(systemctl is-active "php${ver}-fpm" 2>/dev/null || echo unknown)
+  fi
+  echo "${sock_path}|${healthy}|${active}"
+done
+echo '###dply-section:end###'
+echo '###dply-section:issued_certs###'
+find /var/lib/caddy/.local/share/caddy/certificates -name '*.crt' -type f 2>/dev/null | head -n 40
 echo '###dply-section:end###'
 BASH;
     }
@@ -102,7 +179,10 @@ BASH;
      */
     private function splitSections(string $output): array
     {
-        $heads = ['version', 'config', 'upstreams', 'ca'];
+        $heads = [
+            'admin_off', 'admin_listen', 'version', 'config', 'upstreams', 'ca',
+            'ca_list', 'id', 'metrics', 'php_sockets', 'issued_certs',
+        ];
         $end = '###dply-section:end###';
         $out = [];
         foreach ($heads as $name) {
@@ -134,10 +214,6 @@ BASH;
     }
 
     /**
-     * Flatten every route across every HTTP server into one list. Each route
-     * surfaces its first host matcher (for display), the listen addresses of
-     * the parent server, and a short summary of the handler chain.
-     *
      * @param  array<string, mixed>  $config
      * @return list<array<string, mixed>>
      */
@@ -174,10 +250,6 @@ BASH;
     }
 
     /**
-     * The first @host matcher set found in the route. Caddy stores matchers
-     * as `match: [{ host: [...], path: [...] }, ...]`; the host list is what
-     * the operator recognises.
-     *
      * @param  array<string, mixed>  $route
      * @return list<string>
      */
@@ -197,11 +269,6 @@ BASH;
     }
 
     /**
-     * Compact list of handler `handler` keys (reverse_proxy, file_server,
-     * subroute, headers, …). Subroutes are recursed one level so a typical
-     * "reverse_proxy under subroute" route surfaces "reverse_proxy" rather
-     * than just "subroute" — which is what an operator wants to see.
-     *
      * @param  array<string, mixed>  $route
      * @return list<string>
      */
@@ -234,9 +301,6 @@ BASH;
     }
 
     /**
-     * /reverse_proxy/upstreams returns a list of:
-     *   { address, healthy, num_requests, fails }
-     *
      * @param  array<int, array<string, mixed>>  $upstreams
      * @return list<array<string, mixed>>
      */
@@ -255,6 +319,7 @@ BASH;
                 'healthy' => (bool) ($u['healthy'] ?? false),
                 'num_requests' => (int) ($u['num_requests'] ?? 0),
                 'fails' => (int) ($u['fails'] ?? 0),
+                'kind' => 'reverse_proxy',
             ];
         }
 
@@ -262,18 +327,157 @@ BASH;
     }
 
     /**
-     * TLS automation policies (Caddy's auto-HTTPS config) merged with local
-     * CA info. Caddy's full cert inventory lives on disk under
-     * /var/lib/caddy/.local/share/caddy/certificates/ — surfacing every
-     * issued cert would require parsing that tree; for v1 we surface the
-     * policies + the internal CA root cert subject so the operator can see
-     * what Caddy is set up to issue.
-     *
+     * @param  list<array<string, mixed>>  $existing
      * @param  array<string, mixed>  $config
-     * @param  array<string, mixed>  $caInfo
      * @return list<array<string, mixed>>
      */
-    private function buildCertUnits(array $config, array $caInfo): array
+    private function mergePhpSocketUnits(array $existing, string $phpSocketsRaw, array $config): array
+    {
+        $byAddress = [];
+        foreach ($existing as $row) {
+            $canonical = CaddyPhpFpmUpstreamAddress::normalizeUpstreamAddress((string) ($row['address'] ?? ''));
+            if ($canonical === '') {
+                continue;
+            }
+            $row['address'] = $canonical;
+            $byAddress[$canonical] = $this->mergeUpstreamRow($byAddress[$canonical] ?? null, $row);
+        }
+
+        foreach ($this->parsePhpSocketProbeLines($phpSocketsRaw) as $row) {
+            $canonical = CaddyPhpFpmUpstreamAddress::normalizeUpstreamAddress((string) ($row['address'] ?? ''));
+            if ($canonical === '') {
+                continue;
+            }
+            $row['address'] = $canonical;
+            $byAddress[$canonical] = $this->mergeUpstreamRow($byAddress[$canonical] ?? null, $row);
+        }
+
+        foreach ($this->extractPhpFastcgiFromConfig($config) as $addr) {
+            $canonical = CaddyPhpFpmUpstreamAddress::normalizeUpstreamAddress($addr);
+            if ($canonical === '') {
+                continue;
+            }
+            if (! isset($byAddress[$canonical])) {
+                $byAddress[$canonical] = [
+                    'address' => $canonical,
+                    'healthy' => false,
+                    'num_requests' => 0,
+                    'fails' => 0,
+                    'kind' => 'php_fastcgi',
+                ];
+            }
+        }
+
+        return array_values($byAddress);
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $existing
+     * @param  array<string, mixed>  $incoming
+     * @return array<string, mixed>
+     */
+    private function mergeUpstreamRow(?array $existing, array $incoming): array
+    {
+        if ($existing === null) {
+            return $incoming;
+        }
+
+        if (empty($existing['healthy']) && ! empty($incoming['healthy'])) {
+            $existing['healthy'] = true;
+        }
+
+        $existing['num_requests'] = max((int) ($existing['num_requests'] ?? 0), (int) ($incoming['num_requests'] ?? 0));
+        $existing['fails'] = max((int) ($existing['fails'] ?? 0), (int) ($incoming['fails'] ?? 0));
+
+        if (($incoming['kind'] ?? '') === 'php_fastcgi') {
+            $existing['kind'] = 'php_fastcgi';
+        }
+
+        if (isset($incoming['fpm_active'])) {
+            $existing['fpm_active'] = $incoming['fpm_active'];
+        }
+
+        return $existing;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function parsePhpSocketProbeLines(string $raw): array
+    {
+        $rows = [];
+        foreach (preg_split('/\R/', trim($raw)) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '' || ! str_contains($line, '|')) {
+                continue;
+            }
+            [$path, $healthy, $active] = array_pad(explode('|', $line, 3), 3, '');
+            $path = trim($path);
+            if ($path === '') {
+                continue;
+            }
+            $version = CaddyPhpFpmUpstreamAddress::phpVersionFromUpstream($path);
+            $display = $version !== null
+                ? CaddyPhpFpmUpstreamAddress::normalizeUpstreamAddress($path)
+                : $path;
+            $rows[] = [
+                'address' => $display,
+                'healthy' => trim($healthy) === '1',
+                'num_requests' => 0,
+                'fails' => trim($healthy) === '1' ? 0 : 1,
+                'kind' => 'php_fastcgi',
+                'fpm_active' => trim($active),
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     * @return list<string>
+     */
+    private function extractPhpFastcgiFromConfig(array $config): array
+    {
+        $found = [];
+        $this->walkConfigForPhpUpstreams($config, $found);
+
+        return array_values(array_unique($found));
+    }
+
+    /**
+     * @param  array<string, mixed>|list<mixed>  $node
+     * @param  list<string>  $found
+     */
+    private function walkConfigForPhpUpstreams(array $node, array &$found): void
+    {
+        foreach ($node as $key => $value) {
+            if ($key === 'dial' && is_string($value) && str_contains($value, 'php') && str_contains($value, 'fpm')) {
+                $found[] = $value;
+            }
+            if ($key === 'upstreams' && is_array($value)) {
+                foreach ($value as $upstream) {
+                    if (is_array($upstream) && isset($upstream['dial']) && is_string($upstream['dial'])) {
+                        $dial = $upstream['dial'];
+                        if (str_contains($dial, 'php') && str_contains($dial, 'fpm')) {
+                            $found[] = $dial;
+                        }
+                    }
+                }
+            }
+            if (is_array($value)) {
+                $this->walkConfigForPhpUpstreams($value, $found);
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed>  $caInfo
+     * @param  array<string, mixed>  $caList
+     * @return list<array<string, mixed>>
+     */
+    private function buildCertUnits(array $config, array $caInfo, array $caList, string $issuedCertsRaw): array
     {
         $rows = [];
         $policies = $config['apps']['tls']['automation']['policies'] ?? [];
@@ -299,10 +503,41 @@ BASH;
             $rows[] = [
                 'kind' => 'local_ca',
                 'name' => (string) ($caInfo['name'] ?? 'local'),
-                'subjects' => [(string) ($caInfo['root_common_name'] ?? '')],
+                'subjects' => array_filter([(string) ($caInfo['root_common_name'] ?? '')]),
                 'issuer' => (string) ($caInfo['intermediate_common_name'] ?? ''),
                 'on_demand' => false,
                 'status' => 'active',
+            ];
+        }
+
+        if ($caList !== []) {
+            foreach ($caList as $id => $entry) {
+                if (! is_array($entry)) {
+                    continue;
+                }
+                $rows[] = [
+                    'kind' => 'ca',
+                    'name' => is_string($id) ? $id : (string) ($entry['id'] ?? 'ca'),
+                    'subjects' => [],
+                    'issuer' => (string) ($entry['name'] ?? ''),
+                    'on_demand' => false,
+                    'status' => 'registered',
+                ];
+            }
+        }
+
+        foreach (preg_split('/\R/', trim($issuedCertsRaw)) ?: [] as $path) {
+            $path = trim($path);
+            if ($path === '' || ! str_ends_with($path, '.crt')) {
+                continue;
+            }
+            $rows[] = [
+                'kind' => 'issued',
+                'name' => basename($path, '.crt'),
+                'subjects' => [basename(dirname($path))],
+                'issuer' => '',
+                'on_demand' => false,
+                'status' => 'on_disk',
             ];
         }
 
@@ -328,20 +563,24 @@ BASH;
     }
 
     /**
-     * Misc "admin / runtime" facts shown on the Admin sub-tab:
-     *   - Caddy version (from `caddy version`)
-     *   - Active config size
-     *   - Listening sockets parsed out of every http.servers.*.listen
-     *   - Admin endpoint state (always 127.0.0.1:2019 when probe succeeds)
-     *
      * @param  array<string, mixed>  $config
+     * @param  array<string, string>  $sections
      * @return list<array<string, string>>
      */
-    private function buildAdminUnits(array $config, string $caddyVersion, string $rawOutput): array
-    {
+    private function buildAdminUnits(
+        array $config,
+        string $caddyVersion,
+        ?string $adminUrl,
+        string $instanceId,
+        string $metricsBlob,
+        array $sections,
+    ): array {
         $rows = [];
         $rows[] = ['key' => 'version', 'value' => $caddyVersion !== '' ? $caddyVersion : '?'];
-        $rows[] = ['key' => 'admin', 'value' => $config !== [] ? '127.0.0.1:2019' : 'unreachable'];
+        $rows[] = ['key' => 'admin', 'value' => $adminUrl ?? 'unreachable'];
+        if ($instanceId !== '') {
+            $rows[] = ['key' => 'instance_id', 'value' => $instanceId];
+        }
 
         $listens = [];
         $servers = $config['apps']['http']['servers'] ?? [];
@@ -356,9 +595,57 @@ BASH;
         }
         $rows[] = ['key' => 'listeners', 'value' => $listens !== [] ? implode(', ', array_unique($listens)) : '—'];
 
-        $configSize = strlen($rawOutput);
-        $rows[] = ['key' => 'probe_bytes', 'value' => number_format($configSize).' B'];
+        $autoHttps = $config['apps']['http']['http_port'] ?? null;
+        if ($autoHttps !== null) {
+            $rows[] = ['key' => 'http_port', 'value' => (string) $autoHttps];
+        }
+        if (isset($config['apps']['http']['https_port'])) {
+            $rows[] = ['key' => 'https_port', 'value' => (string) $config['apps']['http']['https_port']];
+        }
+
+        $configBytes = strlen(trim($sections['config'] ?? ''));
+        $rows[] = ['key' => 'config_json', 'value' => number_format($configBytes).' B'];
+
+        foreach ($this->parsePrometheusMetrics($metricsBlob) as $key => $value) {
+            $rows[] = ['key' => 'metric:'.$key, 'value' => $value];
+        }
 
         return $rows;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function parsePrometheusMetrics(string $blob): array
+    {
+        if ($blob === '') {
+            return [];
+        }
+
+        $want = [
+            'caddy_admin_http_requests_total' => 'admin_requests',
+            'caddy_http_requests_total' => 'http_requests',
+            'caddy_http_request_errors_total' => 'http_errors',
+            'caddy_http_requests_in_flight' => 'in_flight',
+        ];
+        $out = [];
+
+        foreach (preg_split('/\R/', $blob) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '' || str_starts_with($line, '#')) {
+                continue;
+            }
+            foreach ($want as $metric => $label) {
+                if (! str_starts_with($line, $metric)) {
+                    continue;
+                }
+                if (preg_match('/\s(\S+)\s*$/', $line, $m) === 1) {
+                    $out[$label] = $m[1];
+                }
+                break;
+            }
+        }
+
+        return $out;
     }
 }

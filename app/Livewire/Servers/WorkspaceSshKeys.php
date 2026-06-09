@@ -5,9 +5,12 @@ namespace App\Livewire\Servers;
 use App\Jobs\PreviewDriftJob;
 use App\Jobs\SyncAuthorizedKeysJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\EmitsPanelEvent;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\ManagesSshKeyNotifications;
+use App\Services\Notifications\ServerSshKeyNotificationDispatcher;
 use App\Models\OrganizationSshKey;
 use App\Models\Server;
 use App\Models\ServerAuthorizedKey;
@@ -16,14 +19,14 @@ use App\Models\TeamSshKey;
 use App\Models\UserSshKey;
 use App\Services\Servers\OrganizationTeamSshKeyServerDeployer;
 use App\Services\Servers\ServerAuthorizedKeysAuditLogger;
-use App\Services\Servers\ServerAuthorizedKeysDiffPreview;
-use App\Services\Servers\ServerAuthorizedKeysSynchronizer;
 use App\Services\Servers\ServerPasswdUserLister;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\Servers\SshKeyLabelTemplate;
 use App\Services\Servers\SshPublicKeyFingerprint;
 use App\Support\OpenSshEd25519KeyPairGenerator;
+use App\Support\Servers\SshKeysWorkspaceViewData;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Request;
@@ -32,16 +35,22 @@ use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceSshKeys extends Component
 {
+    use RendersWorkspacePlaceholder;
     use ConfirmsActionWithModal;
+    use CreatesNotificationChannelInline;
     use EmitsPanelEvent;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use ManagesSshKeyNotifications;
 
-    /** @var 'keys'|'preview'|'advanced'|'activity' */
+    /** @var 'keys'|'preview'|'advanced'|'activity'|'notifications' */
     public string $ssh_workspace_tab = 'keys';
 
     public string $new_auth_name = '';
@@ -92,6 +101,24 @@ class WorkspaceSshKeys extends Component
         $this->deploy_target_linux_user = $this->new_target_linux_user;
         $this->hydrateAdvancedFromServer();
         $this->loadReviewDateInputs();
+    }
+
+    public function setSshWorkspaceTab(string $tab): void
+    {
+        $allowed = ['keys', 'preview', 'advanced', 'activity', 'notifications'];
+        $this->ssh_workspace_tab = in_array($tab, $allowed, true) ? $tab : 'keys';
+    }
+
+    /**
+     * Fired by {@see CreatesNotificationChannelInline} after the inline modal
+     * creates a channel. Jump to the Notifications tab and pre-select the new
+     * channel so the operator can finish wiring it to events in one motion.
+     */
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId): void
+    {
+        $this->ssh_workspace_tab = 'notifications';
+        $this->notif_channel_id = $channelId;
     }
 
     protected function loadReviewDateInputs(): void
@@ -241,7 +268,7 @@ class WorkspaceSshKeys extends Component
         $this->saveAdvancedSettings();
     }
 
-    public function saveAdvancedSettings(): void
+    public function saveAdvancedSettings(ServerAuthorizedKeysAuditLogger $audit): void
     {
         $this->authorize('update', $this->server);
         $this->validate([
@@ -260,6 +287,18 @@ class WorkspaceSshKeys extends Component
         $this->server->fresh()->update(['meta' => $meta]);
         $this->server->refresh();
         $this->hydrateAdvancedFromServer();
+
+        $audit->record(
+            $this->server,
+            ServerSshKeyAuditEvent::EVENT_SETTINGS_UPDATED,
+            [
+                'disable_sync' => (bool) $this->advanced_disable_sync,
+                'health_check' => (bool) $this->advanced_health_check,
+                'label_template' => trim($this->advanced_label_template) !== '' ? $this->advanced_label_template : null,
+            ],
+            Auth::user(),
+        );
+
         $this->toastSuccess(__('SSH key settings saved.'));
     }
 
@@ -286,7 +325,7 @@ class WorkspaceSshKeys extends Component
             return;
         }
 
-        $runId = (string) \Illuminate\Support\Str::ulid();
+        $runId = (string) Str::ulid();
         $meta = $this->server->fresh()->meta ?? [];
         $meta[config('server_ssh_keys.meta_drift_run_id_key')] = $runId;
         $meta[$statusKey] = 'queued';
@@ -300,12 +339,12 @@ class WorkspaceSshKeys extends Component
         // transcript before the queued state takes over.
         $this->diff_output = [];
         $this->diff_result = null;
-        $this->ssh_workspace_tab = 'preview';
+        $this->setSshWorkspaceTab('preview');
 
         PreviewDriftJob::dispatch($this->server->id, $runId);
     }
 
-    public function addAuthorizedKey(ServerAuthorizedKeysAuditLogger $audit): void
+    public function addAuthorizedKey(ServerAuthorizedKeysAuditLogger $audit, ServerSshKeyNotificationDispatcher $notifications): void
     {
         $this->authorize('update', $this->server);
         $this->validate([
@@ -396,9 +435,13 @@ class WorkspaceSshKeys extends Component
             ],
         );
 
+        $notifications->notify($this->server->fresh(), 'created', [$row->name], Auth::user(), [
+            'authorized_key_id' => $row->id,
+            'target_linux_user' => $selected !== '' ? $selected : (string) $this->server->ssh_user,
+        ]);
+
         $this->toastSuccess(__('Key saved. Click “Sync authorized_keys” to apply on the server.'));
     }
-
 
     public function updateKeyReviewFromInput(string $id, ServerAuthorizedKeysAuditLogger $audit): void
     {
@@ -430,7 +473,7 @@ class WorkspaceSshKeys extends Component
         $this->toastSuccess(__('Review date updated.'));
     }
 
-    public function deleteAuthorizedKey(string $id, ServerAuthorizedKeysAuditLogger $audit): void
+    public function deleteAuthorizedKey(string $id, ServerAuthorizedKeysAuditLogger $audit, ServerSshKeyNotificationDispatcher $notifications): void
     {
         $this->authorize('update', $this->server);
         $key = ServerAuthorizedKey::query()
@@ -463,9 +506,13 @@ class WorkspaceSshKeys extends Component
             Request::ip()
         );
 
+        $removedName = (string) $key->name;
         $key->delete();
         $this->server->unsetRelation('authorizedKeys');
         $this->loadReviewDateInputs();
+
+        $notifications->notify($this->server->fresh(), 'removed', [$removedName], Auth::user());
+
         $this->toastSuccess(__('Key removed. Sync again to update the server.'));
     }
 
@@ -543,7 +590,7 @@ class WorkspaceSshKeys extends Component
             return true;
         }
         try {
-            return ! \Illuminate\Support\Carbon::parse($startedAt)
+            return ! Carbon::parse($startedAt)
                 ->lt(now()->subSeconds(self::SYNC_STALE_THRESHOLD_SECONDS));
         } catch (\Throwable) {
             // Unparseable started_at → fail open and let the operator retry.
@@ -856,45 +903,83 @@ class WorkspaceSshKeys extends Component
 
     public function render(): View
     {
-        $this->server->loadMissing('authorizedKeys');
-        $user = Auth::user();
-
-        $profileKeys = UserSshKey::query()
-            ->where('user_id', $user?->id)
-            ->orderBy('name')
-            ->get();
-
-        $orgKeys = $this->server->organization_id
-            ? OrganizationSshKey::query()
-                ->where('organization_id', $this->server->organization_id)
-                ->orderBy('name')
-                ->get()
-            : collect();
-
-        $teamKeys = $this->server->team_id
-            ? TeamSshKey::query()
-                ->where('team_id', $this->server->team_id)
-                ->orderBy('name')
-                ->get()
-            : collect();
-
-        $auditEvents = $this->server->sshKeyAuditEvents()->with('user')->limit(100)->get();
-
-        $fingerprints = [];
-        foreach ($this->server->authorizedKeys as $ak) {
-            $fingerprints[$ak->id] = SshPublicKeyFingerprint::forLine((string) $ak->public_key);
+        $allowedTabs = ['keys', 'preview', 'advanced', 'activity', 'notifications'];
+        if (! in_array($this->ssh_workspace_tab, $allowedTabs, true)) {
+            $this->ssh_workspace_tab = 'keys';
         }
 
-        return view('livewire.servers.workspace-ssh-keys', [
+        $tab = $this->ssh_workspace_tab;
+        $needsKeys = $tab === 'keys';
+        $needsPreview = $tab === 'preview';
+        $needsActivity = $tab === 'activity';
+        $needsNotifications = $tab === 'notifications';
+
+        if ($needsKeys || $needsPreview) {
+            $this->server->loadMissing('authorizedKeys');
+        }
+
+        $user = Auth::user();
+
+        $profileKeys = collect();
+        $orgKeys = collect();
+        $teamKeys = collect();
+        $auditEvents = collect();
+        $fingerprints = [];
+        $serverHasPersonalProfileKey = false;
+
+        if ($needsKeys) {
+            $profileKeys = UserSshKey::query()
+                ->where('user_id', $user?->id)
+                ->orderBy('name')
+                ->get();
+
+            $orgKeys = $this->server->organization_id
+                ? OrganizationSshKey::query()
+                    ->where('organization_id', $this->server->organization_id)
+                    ->orderBy('name')
+                    ->get()
+                : collect();
+
+            $teamKeys = $this->server->team_id
+                ? TeamSshKey::query()
+                    ->where('team_id', $this->server->team_id)
+                    ->orderBy('name')
+                    ->get()
+                : collect();
+
+            $serverHasPersonalProfileKey = $this->server->hasPersonalUserSshKey($user);
+
+            foreach ($this->server->authorizedKeys as $ak) {
+                $fingerprints[$ak->id] = SshPublicKeyFingerprint::forLine((string) $ak->public_key);
+            }
+        }
+
+        if ($needsActivity) {
+            $auditEvents = $this->server->sshKeyAuditEvents()->with('user')->limit(100)->get();
+        }
+
+        $viewData = SshKeysWorkspaceViewData::for(
+            $this->server,
+            $this,
+            includeKeysContext: $needsKeys,
+            includePreviewContext: $needsPreview,
+            includeActivityContext: $needsActivity,
+            auditEvents: $needsActivity ? $auditEvents : null,
+        );
+
+        return view('livewire.servers.workspace-ssh-keys', array_merge($viewData, [
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
             'profileKeys' => $profileKeys,
-            'serverHasPersonalProfileKey' => $this->server->hasPersonalUserSshKey($user),
+            'serverHasPersonalProfileKey' => $serverHasPersonalProfileKey,
             'orgKeys' => $orgKeys,
             'teamKeys' => $teamKeys,
             'auditEvents' => $auditEvents,
             'fingerprints' => $fingerprints,
-        ]);
+            'notifChannels' => $needsNotifications ? $this->assignableSshKeyNotificationChannels() : collect(),
+            'notifSubscriptions' => $needsNotifications ? $this->sshKeyNotificationSubscriptions() : collect(),
+            'notifEventLabels' => $needsNotifications ? $this->sshKeyEventLabels() : [],
+        ]));
     }
 }

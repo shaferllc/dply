@@ -58,10 +58,19 @@
 
     {{-- Apt actions --}}
     @if ($opsReady && ! $isDeployer)
-        <div class="{{ $card }} p-6 sm:p-8">
-            <h3 class="text-base font-semibold text-brand-ink">{{ __('Apt actions') }}</h3>
-            <p class="mt-1 text-sm text-brand-moss">{{ __('Each runs over SSH; output streams in the panel above. Long-running upgrades trigger a state refresh on completion.') }}</p>
-            <div class="mt-4 flex flex-wrap gap-2">
+        <div class="{{ $card }}">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <x-icon-badge>
+                    <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Apt') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Apt actions') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Each runs over SSH; output streams in the panel above. Long-running upgrades trigger a state refresh on completion.') }}</p>
+                </div>
+            </div>
+            <div class="px-6 py-6 sm:px-7">
+            <div class="flex flex-wrap gap-2">
                 @foreach (['apt_update', 'apt_upgrade', 'apt_dist_upgrade', 'apt_autoremove', 'apt_clean'] as $key)
                     @if (! empty($serviceActions[$key]))
                         @php
@@ -83,26 +92,33 @@
                     @endif
                 @endforeach
             </div>
+            </div>
         </div>
     @endif
 
     {{-- Outdated packages --}}
     @if (! empty($rows))
         <div
-            class="{{ $card }} p-6 sm:p-8"
+            class="{{ $card }} overflow-hidden"
             x-data="{ filter: 'all', q: '' }"
         >
-            <div class="flex flex-wrap items-end justify-between gap-3">
-                <div>
-                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Outdated packages') }}</h3>
-                    <p class="mt-1 text-xs text-brand-moss">
-                        {{ trans_choice(':count package can be upgraded.|:count packages can be upgraded.', count($rows), ['count' => count($rows)]) }}
-                        @if ($securityCount > 0)
-                            · <span class="font-medium text-red-700">{{ trans_choice(':n flagged as security|:n flagged as security', $securityCount, ['n' => $securityCount]) }}</span>
-                        @endif
-                    </p>
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <div class="flex items-start gap-3">
+                    <x-icon-badge>
+                        <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Packages') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Outdated packages') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            {{ trans_choice(':count package can be upgraded.|:count packages can be upgraded.', count($rows), ['count' => count($rows)]) }}
+                            @if ($securityCount > 0)
+                                · <span class="font-medium text-red-700">{{ trans_choice(':n flagged as security|:n flagged as security', $securityCount, ['n' => $securityCount]) }}</span>
+                            @endif
+                        </p>
+                    </div>
                 </div>
-                <div class="flex flex-wrap items-center gap-2">
+                <div class="flex shrink-0 flex-wrap items-center gap-2">
                     <div class="inline-flex rounded-lg border border-brand-ink/15 bg-white p-0.5 text-xs">
                         <button type="button" x-on:click="filter = 'all'" :class="filter === 'all' ? 'bg-brand-sage/15 text-brand-ink' : 'text-brand-moss hover:text-brand-ink'" class="rounded-md px-2.5 py-1 font-medium">{{ __('All') }}</button>
                         <button type="button" x-on:click="filter = 'security'" :class="filter === 'security' ? 'bg-red-100 text-red-800' : 'text-brand-moss hover:text-brand-ink'" class="rounded-md px-2.5 py-1 font-medium">{{ __('Security') }}</button>
@@ -116,7 +132,8 @@
                 </div>
             </div>
 
-            <div class="mt-3 max-h-80 overflow-auto rounded-lg border border-brand-ink/10">
+            <div class="px-6 py-6 sm:px-7">
+            <div class="max-h-80 overflow-auto rounded-lg border border-brand-ink/10">
                 <table class="min-w-full divide-y divide-brand-ink/10 text-xs">
                     <thead class="sticky top-0 bg-brand-sand/30 text-left text-[11px] uppercase tracking-wide text-brand-mist">
                         <tr>
@@ -146,30 +163,36 @@
                     </tbody>
                 </table>
             </div>
+            </div>
         </div>
     @endif
 
     {{-- Unattended upgrades --}}
-    <div id="manage-os-updates" class="{{ $card }} scroll-mt-24 p-6 sm:p-8">
-        <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="max-w-2xl">
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Unattended-upgrades') }}</h3>
-                <p class="mt-1 text-sm text-brand-moss">{{ __('Server-side automatic update flag (Debian/Ubuntu). The cadence preference below is recorded for future Dply scheduling.') }}</p>
+    @php
+        $statusPill = match (true) {
+            ! ($unattended['present'] ?? false) => ['label' => __('Not installed'), 'classes' => 'bg-brand-ink/10 text-brand-moss', 'dot' => 'bg-brand-mist'],
+            ($unattended['enabled'] ?? null) === true => ['label' => __('Enabled'), 'classes' => 'bg-brand-sage/15 text-brand-forest', 'dot' => 'bg-brand-forest'],
+            ($unattended['enabled'] ?? null) === false => ['label' => __('Disabled'), 'classes' => 'bg-amber-100 text-amber-900', 'dot' => 'bg-amber-500'],
+            default => ['label' => __('Unknown'), 'classes' => 'bg-brand-ink/10 text-brand-moss', 'dot' => 'bg-brand-mist'],
+        };
+    @endphp
+    <div id="manage-os-updates" class="{{ $card }} scroll-mt-24">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <x-icon-badge>
+                <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
+            </x-icon-badge>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Auto-updates') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Unattended-upgrades') }}</h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Server-side automatic update flag (Debian/Ubuntu). The cadence preference below is recorded for future Dply scheduling.') }}</p>
             </div>
-            @php
-                $statusPill = match (true) {
-                    ! ($unattended['present'] ?? false) => ['label' => __('Not installed'), 'classes' => 'bg-brand-ink/10 text-brand-moss', 'dot' => 'bg-brand-mist'],
-                    ($unattended['enabled'] ?? null) === true => ['label' => __('Enabled'), 'classes' => 'bg-brand-sage/15 text-brand-forest', 'dot' => 'bg-brand-forest'],
-                    ($unattended['enabled'] ?? null) === false => ['label' => __('Disabled'), 'classes' => 'bg-amber-100 text-amber-900', 'dot' => 'bg-amber-500'],
-                    default => ['label' => __('Unknown'), 'classes' => 'bg-brand-ink/10 text-brand-moss', 'dot' => 'bg-brand-mist'],
-                };
-            @endphp
             <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium {{ $statusPill['classes'] }}">
                 <span aria-hidden="true" class="inline-block h-1.5 w-1.5 rounded-full {{ $statusPill['dot'] }}"></span>
                 {{ $statusPill['label'] }}
             </span>
         </div>
 
+        <div class="px-6 py-6 sm:px-7">
         @if (! empty($unattended['snippet']))
             <pre class="mt-4 max-h-32 overflow-auto rounded-lg border border-brand-ink/10 bg-brand-sand/15 p-3 font-mono text-[11px] leading-relaxed text-brand-ink">{{ $unattended['snippet'] }}</pre>
         @endif
@@ -211,28 +234,37 @@
                 <x-primary-button type="submit" class="!py-2.5" :disabled="$isDeployer">{{ __('Save cadence') }}</x-primary-button>
             </div>
         </form>
+        </div>
     </div>
 
     {{-- Reboot pending card (only when relevant) --}}
     @if ($reboot === true)
-        <div class="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <p class="font-semibold">{{ __('Reboot is pending on this server') }}</p>
-                    <p class="mt-1 text-xs">{{ __('Likely required after kernel or libc updates. Plan a maintenance window before rebooting.') }}</p>
+        <section class="dply-card overflow-hidden border-amber-200">
+            <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div class="flex items-start gap-3">
+                        <x-icon-badge tone="amber">
+                            <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
+                        </x-icon-badge>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Warning') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Reboot is pending on this server') }}</h3>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Likely required after kernel or libc updates. Plan a maintenance window before rebooting.') }}</p>
+                        </div>
+                    </div>
+                    @if ($opsReady && ! $isDeployer && ! empty($dangerousActions['reboot']))
+                        @php $r = $dangerousActions['reboot']; @endphp
+                        <button
+                            type="button"
+                            wire:click="openConfirmActionModal('runAllowlistedAction', ['reboot'], @js($r['label']), @js($r['confirm']), @js($r['label']), true)"
+                            class="inline-flex shrink-0 items-center gap-2 rounded-lg border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-900 hover:bg-red-100"
+                        >
+                            <x-heroicon-o-exclamation-triangle class="h-4 w-4" aria-hidden="true" />
+                            {{ $r['label'] }}
+                        </button>
+                    @endif
                 </div>
-                @if ($opsReady && ! $isDeployer && ! empty($dangerousActions['reboot']))
-                    @php $r = $dangerousActions['reboot']; @endphp
-                    <button
-                        type="button"
-                        wire:click="openConfirmActionModal('runAllowlistedAction', ['reboot'], @js($r['label']), @js($r['confirm']), @js($r['label']), true)"
-                        class="inline-flex shrink-0 items-center gap-2 rounded-lg border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-900 hover:bg-red-100"
-                    >
-                        <x-heroicon-o-exclamation-triangle class="h-4 w-4" aria-hidden="true" />
-                        {{ $r['label'] }}
-                    </button>
-                @endif
             </div>
-        </div>
+        </section>
     @endif
 </section>

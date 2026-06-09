@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace App\Livewire\Fleet;
 
-use App\Models\ProviderCredential;
+use App\Livewire\Concerns\RequiresFeature;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
-use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 /**
@@ -31,6 +30,7 @@ class Health extends Component
     use RequiresFeature;
 
     protected string $requiredFeature = 'surface.fleet';
+
     public function render(): View
     {
         $org = auth()->user()?->currentOrganization();
@@ -50,8 +50,8 @@ class Health extends Component
         $deploys = $this->computeDeployHealth($sites);
         $successRate = $this->computeSuccessRate($sites->pluck('id'));
         $mostActive = $this->computeMostActive($sites);
-        $flyUpsell = $this->computeFlyUpsell($org->id, $sites);
-        $edgeFleet = $this->computeEdgeFleet($org->id);
+        $cloudUpsell = $this->computeCloudUpsell($sites);
+        $cloudFleet = $this->computeCloudFleet($org->id);
 
         return view('livewire.fleet.health', [
             'org' => $org,
@@ -61,14 +61,14 @@ class Health extends Component
             'drift' => $drift,
             'deploys' => $deploys,
             'mostActive' => $mostActive,
-            'flyUpsell' => $flyUpsell,
-            'edgeFleet' => $edgeFleet,
+            'cloudUpsell' => $cloudUpsell,
+            'cloudFleet' => $cloudFleet,
         ])->layout('layouts.app');
     }
 
     /**
-     * Aggregate stats for edge container sites in the org. Returns
-     * null when the org has no edge sites — the view falls through
+     * Aggregate stats for cloud container sites in the org. Returns
+     * null when the org has no cloud sites — the view falls through
      * to the generic Fly upsell in that case.
      *
      * @return array{
@@ -80,7 +80,7 @@ class Health extends Component
      *     failed_sites: list<array{name: string, server_id: ?string, container_image: ?string}>
      * }|null
      */
-    private function computeEdgeFleet(string $organizationId): ?array
+    private function computeCloudFleet(string $organizationId): ?array
     {
         $sites = Site::query()
             ->where('organization_id', $organizationId)
@@ -120,14 +120,14 @@ class Health extends Component
     }
 
     /**
-     * Decide whether to surface the "Try Fly.io edge" upsell.
-     * Shows when the org has Node/static sites that could benefit
-     * from edge deployment, and no Fly credential is connected yet.
+     * Decide whether to surface the "Deploy a container app on dply cloud"
+     * upsell. Shows when the org has Node/static sites that could benefit from
+     * managed container/edge deployment.
      *
      * @param  \Illuminate\Database\Eloquent\Collection<int, Site>  $sites
-     * @return array{eligible_count: int, has_fly_credential: bool}|null
+     * @return array{eligible_count: int}|null
      */
-    private function computeFlyUpsell(string $organizationId, $sites): ?array
+    private function computeCloudUpsell($sites): ?array
     {
         $eligibleCount = $sites
             ->filter(fn (Site $s) => in_array($s->runtime, ['node', 'static'], true))
@@ -136,18 +136,8 @@ class Health extends Component
             return null;
         }
 
-        $hasFly = ProviderCredential::query()
-            ->where('organization_id', $organizationId)
-            ->where('provider', 'fly_io')
-            ->exists();
-        if ($hasFly) {
-            // Operator's already connected — no need to nudge.
-            return null;
-        }
-
         return [
             'eligible_count' => $eligibleCount,
-            'has_fly_credential' => false,
         ];
     }
 

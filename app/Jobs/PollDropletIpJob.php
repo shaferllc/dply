@@ -15,13 +15,15 @@ class PollDropletIpJob implements ShouldQueue
     use HandlesFakeCloudPoll;
     use Queueable;
 
-    public int $tries = 60;
+    public int $tries = 180;
 
-    public int $backoff = 15;
+    public int $backoff = 5;
 
     public function __construct(
         public Server $server
-    ) {}
+    ) {
+        $this->onQueue(config('server_provision.queue', 'dply'));
+    }
 
     public function handle(): void
     {
@@ -41,10 +43,19 @@ class PollDropletIpJob implements ShouldQueue
         $ip = DigitalOceanService::getDropletPublicIp($droplet);
 
         if ($ip) {
-            $this->server->update([
+            $updates = [
                 'ip_address' => $ip,
                 'status' => Server::STATUS_READY,
-            ]);
+            ];
+
+            // Capture the VPC/private IP at provision time. Don't clobber a
+            // value already on the row (e.g. a manually-set internal IP).
+            $privateIp = DigitalOceanService::getDropletPrivateIp($droplet);
+            if ($privateIp !== null && blank($this->server->private_ip_address)) {
+                $updates['private_ip_address'] = $privateIp;
+            }
+
+            $this->server->update($updates);
 
             $this->dispatchServerProvisionIfNeeded($this->server);
 

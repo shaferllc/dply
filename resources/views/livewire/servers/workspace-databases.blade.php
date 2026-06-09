@@ -1,14 +1,3 @@
-@php
-    $card = 'dply-card overflow-hidden';
-    $opsReady = $server->isReady() && $server->ssh_private_key;
-    $isDeployer = auth()->user()?->currentOrganization()?->userIsDeployer(auth()->user()) ?? false;
-    $localMysql = $server->serverDatabases->where('engine', 'mysql')->pluck('name')->all();
-    $localPg = $server->serverDatabases->where('engine', 'postgres')->pluck('name')->all();
-    $mysqlOnlyOnServer = array_values(array_diff($remote_mysql_databases, $localMysql));
-    $pgOnlyOnServer = array_values(array_diff($remote_postgres_databases, $localPg));
-    $engineLabels = ['mysql' => 'MySQL', 'postgres' => 'PostgreSQL', 'sqlite' => 'SQLite'];
-@endphp
-
 <x-server-workspace-layout
     :server="$server"
     active="databases"
@@ -26,27 +15,29 @@
         <div wire:poll.2s="syncManageRemoteTaskFromCache" class="hidden" aria-hidden="true"></div>
     @endif
 
-    <x-explainer class="mb-4">
-        <p>{{ __('This workspace manages relational databases on this server — MySQL, MariaDB, and PostgreSQL — and the per-app credentials that grant access to them. Engines are installed via apt + systemd; databases live inside whatever engines are running.') }}</p>
+    <x-explainer>
+        <p>{{ __('This workspace manages databases on this server — MySQL, MariaDB, PostgreSQL, MongoDB, ClickHouse, and SQLite — plus per-app credentials. Engines install via apt + systemd (or file-based SQLite). For Redis/Valkey caching, use the Caches workspace.') }}</p>
         <p>{{ __('Engine state is read live via SSH; database + credential rows live in the dply database. The "Discovered on server" panel reconciles both directions: databases the engine knows about that dply hasn\'t recorded yet.') }}</p>
     </x-explainer>
 
     @if ($opsReady)
-        @php
-            $engineWorking = collect($engineRows ?? [])->contains(fn ($row) => in_array($row->status, [
-                \App\Models\ServerDatabaseEngine::STATUS_PENDING,
-                \App\Models\ServerDatabaseEngine::STATUS_INSTALLING,
-                \App\Models\ServerDatabaseEngine::STATUS_UNINSTALLING,
-            ], true));
-        @endphp
-        @if ($engineWorking)
-            {{-- Conditional poll: only fires while a queued engine job is in flight. The element
-                 disappears the moment all rows settle, so polling stops on its own. --}}
-            <div wire:poll.4s class="hidden" aria-hidden="true"></div>
+        @if (! $capabilitiesLoaded)
+            {{-- Probe installed engines off the render path so the workspace paints
+                 instantly; badges + create buttons appear once loadCapabilities() returns. --}}
+            <div wire:init="loadCapabilities" class="hidden" aria-hidden="true"></div>
         @endif
 
-        <div class="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
-            <x-server-workspace-tablist :aria-label="__('Database workspace sections')" class="sm:min-w-0 sm:flex-1">
+        @if ($databaseConsoleBannerRun)
+            <div class="mb-4">
+                @include('livewire.partials.console-action-banner-static', [
+                    'run' => $databaseConsoleBannerRun,
+                    'kindLabels' => (array) config('console_actions.kinds', []),
+                ])
+            </div>
+        @endif
+
+        <div class="min-w-0">
+            <x-server-workspace-tablist :aria-label="__('Database workspace sections')" scroll class="w-full">
                 <x-server-workspace-tab
                     id="db-tab-basics"
                     icon="heroicon-o-circle-stack"
@@ -55,7 +46,7 @@
                 >
                     {{ __('Basics') }}
                 </x-server-workspace-tab>
-                @foreach (['mysql', 'postgres', 'sqlite'] as $engine)
+                @foreach ($engines as $engine)
                     @php
                         $engineRow = $engineRows[$engine] ?? null;
                         $engineInstalledOrInflight = ($capabilities[$engine] ?? false)
@@ -67,20 +58,12 @@
                                 \App\Models\ServerDatabaseEngine::STATUS_UNINSTALLING,
                             ], true));
                     @endphp
-                    {{-- Engine tabs are always reachable now: even when an engine isn't installed
-                         the operator clicks through to find the Install button. The badge tells
-                         them at a glance whether anything's running on it. --}}
                     <x-server-workspace-tab
                         :id="'db-tab-'.$engine"
                         :active="$workspace_tab === $engine"
                         wire:click="setWorkspaceTab('{{ $engine }}')"
                     >
                         <span class="inline-flex items-center gap-2">
-                            {{-- Per-engine icon switches on engine type, so we can't use the tab
-                                 component's `icon=` prop (which is what auto-swaps to a spinner
-                                 during wire:loading). Replicate that swap manually: render the
-                                 icon while idle, substitute a spinner while setWorkspaceTab is
-                                 in flight against THIS engine. Mirrors the caches pattern. --}}
                             <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center" wire:loading.remove wire:target="setWorkspaceTab('{{ $engine }}')">
                                 @if ($engine === 'sqlite')
                                     <x-heroicon-o-archive-box class="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -92,7 +75,9 @@
                                 <x-spinner class="h-4 w-4" />
                             </span>
                             {{ $engineLabels[$engine] ?? ucfirst($engine) }}
-                            @if ($engineRow && in_array($engineRow->status, [
+                            @if (($comingSoonEngines[$engine] ?? false) && ! ($capabilities[$engine] ?? false) && ! $engineRow)
+                                <span class="inline-flex items-center rounded-full bg-brand-sand/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/10">{{ __('Soon') }}</span>
+                            @elseif ($engineRow && in_array($engineRow->status, [
                                 \App\Models\ServerDatabaseEngine::STATUS_PENDING,
                                 \App\Models\ServerDatabaseEngine::STATUS_INSTALLING,
                                 \App\Models\ServerDatabaseEngine::STATUS_UNINSTALLING,
@@ -126,790 +111,291 @@
                     {{ __('Notifications') }}
                 </x-server-workspace-tab>
             </x-server-workspace-tablist>
-
-            <div class="flex shrink-0 flex-wrap items-center justify-end gap-2 sm:pb-0.5">
-                <x-dropdown align="right" width="w-56" contentClasses="py-1.5">
-                    <x-slot name="trigger">
-                        <button
-                            type="button"
-                            aria-label="{{ __('Workspace actions') }}"
-                            aria-haspopup="true"
-                            class="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                        >
-                            <span wire:loading.remove wire:target="refreshDatabaseCapabilities,synchronizeDatabases">{{ __('Actions') }}</span>
-                            <span wire:loading wire:target="refreshDatabaseCapabilities,synchronizeDatabases" class="inline-flex items-center gap-2">
-                                <x-spinner variant="forest" />
-                                {{ __('Working…') }}
-                            </span>
-                            <x-heroicon-o-chevron-down class="h-4 w-4 shrink-0 text-brand-ink/70" />
-                        </button>
-                    </x-slot>
-                    <x-slot name="content">
-                        <button
-                            type="button"
-                            wire:click="refreshDatabaseCapabilities"
-                            wire:loading.attr="disabled"
-                            wire:target="refreshDatabaseCapabilities"
-                            title="{{ __('Re-run engine detection (cached for a few minutes)') }}"
-                            class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            <span wire:loading.remove wire:target="refreshDatabaseCapabilities">{{ __('Recheck engines') }}</span>
-                            <span wire:loading wire:target="refreshDatabaseCapabilities">{{ __('Rechecking…') }}</span>
-                        </button>
-                        <button
-                            type="button"
-                            wire:click="synchronizeDatabases"
-                            wire:loading.attr="disabled"
-                            wire:target="synchronizeDatabases"
-                            class="block w-full px-4 py-2 text-left text-sm text-brand-ink hover:bg-brand-sand/50 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            <span wire:loading.remove wire:target="synchronizeDatabases">{{ __('Synchronize databases') }}</span>
-                            <span wire:loading wire:target="synchronizeDatabases">{{ __('Scanning…') }}</span>
-                        </button>
-                    </x-slot>
-                </x-dropdown>
-            </div>
         </div>
 
-        <div class="relative" wire:loading.class="opacity-60 pointer-events-none transition-opacity duration-150" wire:target="setWorkspaceTab">
-            <div
-                class="pointer-events-none absolute inset-x-0 top-0 z-10 hidden items-center justify-center pt-12"
-                wire:loading.delay.shortest.flex
-                wire:target="setWorkspaceTab"
-                aria-live="polite"
-            >
-                <div class="dply-card flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-brand-ink shadow-lg">
-                    <x-spinner variant="forest" />
-                    <span>{{ __('Loading…') }}</span>
-                </div>
-            </div>
-
-        <x-server-workspace-tab-panel
-            id="db-panel-basics"
-            labelled-by="db-tab-basics"
-            :hidden="$workspace_tab !== 'databases'"
-            panel-class="space-y-8"
-        >
-            @if ($generated_database_credentials)
-                <div class="{{ $card }} p-6 sm:p-8">
-                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                            <h2 class="text-lg font-semibold text-brand-ink">{{ __('New database credentials') }}</h2>
-                            <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                                {{ __('Save these now. Dply generated credentials for :name and shows them here right after creation.', ['name' => $generated_database_credentials['name']]) }}
-                            </p>
-                        </div>
-                        <button type="button" wire:click="dismissGeneratedDatabaseCredentials" class="rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">
-                            {{ __('Dismiss') }}
-                        </button>
-                    </div>
-                    <dl class="mt-6 grid gap-4 sm:grid-cols-2">
-                        <div>
-                            <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Database') }}</dt>
-                            <dd class="mt-1 font-mono text-sm text-brand-ink">{{ $generated_database_credentials['name'] }}</dd>
-                        </div>
-                        <div>
-                            <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Engine') }}</dt>
-                            <dd class="mt-1 text-sm text-brand-ink">{{ $engineLabels[$generated_database_credentials['engine']] ?? ucfirst((string) $generated_database_credentials['engine']) }}</dd>
-                        </div>
-                        @if (filled($generated_database_credentials['username']))
-                            <div>
-                                <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Username') }}</dt>
-                                <dd class="mt-1 font-mono text-sm text-brand-ink">{{ $generated_database_credentials['username'] }}</dd>
-                                @if ($generated_database_credentials['username_generated'])
-                                    <p class="mt-1 text-xs text-brand-moss">{{ __('Generated for you.') }}</p>
-                                @endif
-                            </div>
-                        @endif
-                        @if (filled($generated_database_credentials['password']))
-                            <div>
-                                <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Password') }}</dt>
-                                <dd class="mt-1 break-all font-mono text-sm text-brand-ink">{{ $generated_database_credentials['password'] }}</dd>
-                                @if ($generated_database_credentials['password_generated'])
-                                    <p class="mt-1 text-xs text-brand-moss">{{ __('Generated for you.') }}</p>
-                                @endif
-                            </div>
-                        @endif
-                        @if ($generated_database_credentials['engine'] === 'sqlite' && filled($generated_database_credentials['host'] ?? null))
-                            <div class="sm:col-span-2">
-                                <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('File path') }}</dt>
-                                <dd class="mt-1 break-all font-mono text-sm text-brand-ink">{{ $generated_database_credentials['host'] }}</dd>
-                            </div>
-                        @endif
-                    </dl>
-                </div>
+        <x-workspace-tab-panel-loading>
+            @if ($workspace_tab === 'databases')
+                <x-server-workspace-tab-panel
+                    id="db-panel-basics"
+                    labelled-by="db-tab-basics"
+                    panel-class="space-y-8"
+                >
+                    @include('livewire.servers.partials.databases.overview-tab')
+                </x-server-workspace-tab-panel>
             @endif
 
-            @php
-                $anyEngine = ($capabilities['mysql'] ?? false) || ($capabilities['postgres'] ?? false) || ($capabilities['sqlite'] ?? false);
-            @endphp
-            <div class="{{ $card }} p-6 sm:p-8">
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('New database') }}</h2>
-                @if (! $anyEngine)
-                    <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                        {{ __('No database engine detected on this server. Install MySQL, PostgreSQL, or SQLite, then use Recheck engines on the Advanced tab.') }}
-                    </p>
-                @else
-                <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ __('Creates the database and a user on the server. Leave user and password empty to generate values automatically.') }}</p>
-                <x-explainer class="mt-3">
-                    <p>{{ __('Picks an engine, runs CREATE DATABASE, then creates a per-database user (defaulting to the same name) and grants it full access on that database only. The credentials are stored encrypted in the dply database — reveal + copy them from the Credentials column on each row.') }}</p>
-                    <p>{{ __('Auto-generation: an empty user defaults to the database name. An empty password generates a 32-character symbol-free string. Both are good defaults for app-only use.') }}</p>
-                </x-explainer>
-                <form wire:submit="createDatabase" class="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2">
-                    <div class="sm:col-span-2">
-                        <x-input-label for="new_db_name" value="{{ __('Name') }}" />
-                        <x-text-input id="new_db_name" wire:model.live.debounce.250ms="new_db_name" class="mt-1 block w-full font-mono text-sm" wire:loading.attr="disabled" wire:target="createDatabase" required />
-                        <p class="mt-1 text-xs text-brand-moss">
-                            {{ __('Lowercase letters, digits, and underscores only. Spaces, dashes, and dots auto-convert to underscores; everything else is dropped. Max 64 characters.') }}
-                        </p>
-                        <x-input-error :messages="$errors->get('new_db_name')" class="mt-1" />
-                    </div>
-                    <div>
-                        <x-input-label for="new_db_engine" value="{{ __('Engine') }}" />
-                        <select id="new_db_engine" wire:model.live="new_db_engine" wire:loading.attr="disabled" wire:target="createDatabase" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30 disabled:cursor-not-allowed disabled:bg-brand-sand/40">
-                            @if ($capabilities['mysql'] ?? false)
-                                <option value="mysql">{{ __('MySQL / MariaDB') }}</option>
-                            @endif
-                            @if ($capabilities['postgres'] ?? false)
-                                <option value="postgres">{{ __('PostgreSQL') }}</option>
-                            @endif
-                            @if ($capabilities['sqlite'] ?? false)
-                                <option value="sqlite">{{ __('SQLite (file-based)') }}</option>
-                            @endif
-                        </select>
-                        <x-input-error :messages="$errors->get('new_db_engine')" class="mt-1" />
-                    </div>
-                    @if ($new_db_engine !== 'sqlite')
-                    <div>
-                        <x-input-label for="new_db_user_mode" value="{{ __('Database user') }}" />
-                        <select id="new_db_user_mode" wire:model.live="new_db_user_mode" @disabled($new_db_engine !== 'mysql') wire:loading.attr="disabled" wire:target="createDatabase" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30 disabled:cursor-not-allowed disabled:bg-brand-sand/40">
-                            <option value="new">{{ __('Create a new user') }}</option>
-                            <option value="existing">{{ __('Use an existing MySQL user') }}</option>
-                        </select>
-                        @if ($new_db_engine !== 'mysql')
-                            <p class="mt-1 text-xs text-brand-moss">{{ __('Existing-user reuse is currently available for MySQL only.') }}</p>
-                        @endif
-                        <x-input-error :messages="$errors->get('new_db_user_mode')" class="mt-1" />
-                    </div>
-                    @if (! ($new_db_engine === 'mysql' && $new_db_user_mode === 'existing'))
-                        <div>
-                            <x-input-label for="new_db_username" value="{{ __('User (optional)') }}" />
-                            <x-text-input id="new_db_username" wire:model="new_db_username" autocomplete="off" class="mt-1 block w-full font-mono text-sm" wire:loading.attr="disabled" wire:target="createDatabase" placeholder="{{ __('Auto-generated if empty') }}" />
-                            <x-input-error :messages="$errors->get('new_db_username')" class="mt-1" />
-                        </div>
-                    @endif
-                    @if ($new_db_engine === 'mysql' && $new_db_user_mode === 'existing')
-                        <div class="sm:col-span-2">
-                            <x-input-label for="new_db_existing_user_reference" value="{{ __('Existing MySQL user') }}" />
-                            <select id="new_db_existing_user_reference" wire:model="new_db_existing_user_reference" wire:loading.attr="disabled" wire:target="createDatabase" class="mt-1 block w-full rounded-lg border-brand-ink/15 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30">
-                                <option value="">{{ __('Select an existing user…') }}</option>
-                                @foreach ($existingMysqlUserOptions as $option)
-                                    <option value="{{ $option['id'] }}">{{ $option['label'] }}</option>
-                                @endforeach
-                            </select>
-                            <p class="mt-1 text-xs text-brand-moss">{{ __('Dply will create the database and grant this existing user access instead of creating another user.') }}</p>
-                            <x-input-error :messages="$errors->get('new_db_existing_user_reference')" class="mt-1" />
-                        </div>
-                    @endif
-                    @if (! ($new_db_engine === 'mysql' && $new_db_user_mode === 'existing'))
-                        <div>
-                            <div class="flex items-end justify-between gap-2">
-                                <x-input-label for="new_db_password" value="{{ __('Password (optional)') }}" class="mb-0" />
-                                <button type="button" wire:click="generateNewDbPassword" wire:loading.attr="disabled" wire:target="createDatabase,generateNewDbPassword" class="mb-1 text-xs font-medium text-brand-forest hover:underline disabled:opacity-50">{{ __('Generate') }}</button>
-                            </div>
-                            <x-text-input id="new_db_password" type="password" wire:model="new_db_password" autocomplete="new-password" class="mt-1 block w-full text-sm" wire:loading.attr="disabled" wire:target="createDatabase" placeholder="••••••••" />
-                            <x-input-error :messages="$errors->get('new_db_password')" class="mt-1" />
-                        </div>
-                    @endif
-                    @else
-                        @php
-                            $sqliteRoot = rtrim((string) config('server_database.sqlite_root', '/var/lib/dply/sqlite'), '/');
-                            $sqlitePreview = $sqliteRoot.'/'.$server->id.'/'.($new_db_name ?: 'database').'.db';
-                        @endphp
-                        <div class="sm:col-span-2 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 text-sm text-brand-moss">
-                            <p class="font-medium text-brand-ink">{{ __('SQLite is file-based — no user or password needed.') }}</p>
-                            <p class="mt-1">{{ __('Dply creates the file at a fixed location under :root and chowns it to the deploy user.', ['root' => $sqliteRoot]) }}</p>
-                            <p class="mt-2 break-all font-mono text-xs text-brand-ink/80">{{ $sqlitePreview }}</p>
-                        </div>
-                    @endif
-                    <div class="sm:col-span-2">
-                        <x-input-label for="new_db_description" value="{{ __('Description (optional)') }}" />
-                        <textarea
-                            id="new_db_description"
-                            wire:model="new_db_description"
-                            rows="3"
-                            class="mt-1 block w-full rounded-lg border border-brand-ink/15 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage/30 disabled:bg-brand-sand/40"
-                            wire:loading.attr="disabled"
-                            wire:target="createDatabase"
-                        ></textarea>
-                        <x-input-error :messages="$errors->get('new_db_description')" class="mt-1" />
-                    </div>
-                    @if ($new_db_engine === 'mysql')
-                        <div class="sm:col-span-2">
-                            <details class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 open:shadow-sm">
-                                <summary class="cursor-pointer select-none px-4 py-3 text-sm font-medium text-brand-ink">{{ __('Advanced MySQL options') }}</summary>
-                                <div class="grid gap-5 border-t border-brand-ink/10 px-4 py-4 sm:grid-cols-2">
-                                    <div>
-                                        <x-input-label for="new_mysql_charset" value="{{ __('MySQL charset (optional)') }}" />
-                                        <x-text-input id="new_mysql_charset" wire:model="new_mysql_charset" class="mt-1 block w-full font-mono text-sm" placeholder="utf8mb4" wire:loading.attr="disabled" wire:target="createDatabase" />
-                                        <x-input-error :messages="$errors->get('new_mysql_charset')" class="mt-1" />
-                                    </div>
-                                    <div>
-                                        <x-input-label for="new_mysql_collation" value="{{ __('MySQL collation (optional)') }}" />
-                                        <x-text-input id="new_mysql_collation" wire:model="new_mysql_collation" class="mt-1 block w-full font-mono text-sm" placeholder="utf8mb4_unicode_ci" wire:loading.attr="disabled" wire:target="createDatabase" />
-                                        <x-input-error :messages="$errors->get('new_mysql_collation')" class="mt-1" />
-                                    </div>
-                                </div>
-                            </details>
-                        </div>
-                    @endif
-                    <div class="sm:col-span-2 flex justify-end">
-                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="createDatabase">
-                            <span wire:loading.remove wire:target="createDatabase">{{ __('Add database') }}</span>
-                            <span wire:loading wire:target="createDatabase">{{ __('Adding database…') }}</span>
-                        </x-primary-button>
-                    </div>
-                </form>
+            @foreach ($engines as $engine)
+                @if ($workspace_tab === $engine)
+                    <x-server-workspace-tab-panel
+                        :id="'db-panel-'.$engine"
+                        :labelled-by="'db-tab-'.$engine"
+                        panel-class="space-y-8"
+                    >
+                        @include('livewire.servers.partials.databases.engine-panel', compact('engine'))
+                    </x-server-workspace-tab-panel>
                 @endif
-            </div>
+            @endforeach
 
-        </x-server-workspace-tab-panel>
-
-        @foreach (['mysql', 'postgres', 'sqlite'] as $engine)
-            <x-server-workspace-tab-panel
-                :id="'db-panel-'.$engine"
-                :labelled-by="'db-tab-'.$engine"
-                :hidden="$workspace_tab !== $engine"
-                panel-class="space-y-8"
-            >
-                @php
-                    $engineRow = $engineRows[$engine] ?? null;
-                    $engineRunning = $capabilities[$engine] ?? false;
-                    $isManageable = in_array($engine, ['mysql', 'postgres'], true);
-                    $dbEngineInfoForTab = \App\Support\Servers\DatabaseEngineInfo::for($engine);
-                    $hasDbInfo = ! empty($dbEngineInfoForTab['description']);
-                @endphp
-
-                {{-- Per-engine sub-tab strip — Overview (engine status, databases, users)
-                     and Info (license, maintainer, wire protocol, links). Mirrors the
-                     pattern in WorkspaceCaches + WorkspaceWebserver. Info hidden when
-                     the engine has no catalog entry (sqlite). --}}
-                @if ($hasDbInfo)
-                    <x-server-workspace-tablist :aria-label="__(':engine workspace sections', ['engine' => $engineLabels[$engine] ?? $engine])">
-                        <x-server-workspace-tab
-                            :id="'db-subtab-'.$engine.'-overview'"
-                            icon="heroicon-o-presentation-chart-line"
-                            :active="$engine_subtab === 'overview'"
-                            wire:click="setEngineSubtab('overview')"
-                        >
-                            {{ __('Overview') }}
-                        </x-server-workspace-tab>
-                        <x-server-workspace-tab
-                            :id="'db-subtab-'.$engine.'-info'"
-                            icon="heroicon-o-information-circle"
-                            :active="$engine_subtab === 'info'"
-                            wire:click="setEngineSubtab('info')"
-                        >
-                            {{ __('Info') }}
-                        </x-server-workspace-tab>
-                    </x-server-workspace-tablist>
-                @endif
-
-                {{-- Per-engine console-action banner. Surfaces create/drop SSH output via the
-                     shared ConsoleAction partial — tone-coded lines, copy-output, open-in-modal,
-                     stale detection, grace-window polling. Subject is the ServerDatabaseEngine
-                     row (or Server for sqlite); kind filter is `db_*`. --}}
-                @php $dbRun = $dbRunsByEngine[$engine] ?? null; @endphp
-                @if ($dbRun)
-                    <div class="mb-4">
-                        @include('livewire.partials.console-action-banner-static', [
-                            'run' => $dbRun,
-                            'kindLabels' => [],
-                        ])
-                    </div>
-                @endif
-
-                @if ($engine_subtab === 'info' && $hasDbInfo)
-                    {{-- Info subtab: engine description, license, links, best-for. --}}
-                    @include('livewire.servers.partials.cache-engine-info-card', [
-                        'info' => $dbEngineInfoForTab,
-                        'row' => $engineRow,
-                        'card' => $card,
-                    ])
-
-                    {{-- MySQL operational hints + processlist action. Migrated from
-                         /servers/{id}/manage/data when that tab was retired. The hint form
-                         persists into $server->meta and is read by RunsAllowlistedManageAction
-                         (mysql_* scripts export $DPLY_DB_PASSWORD); SHOW PROCESSLIST output
-                         flows through the same console-action banner partial as other
-                         workspace runs. --}}
-                    @if ($engine === 'mysql')
-                        @php
-                            $manageDbHasCreds = ! empty($server->meta['manage_internal_db_password']);
-                            $processlistAction = $serviceActions['mysql_processlist'] ?? null;
-                        @endphp
-
-                        @if ($manageActionRun)
-                            @include('livewire.partials.console-action-banner-static', [
-                                'run' => $manageActionRun,
-                                'kindLabels' => (array) config('console_actions.kinds', []),
-                            ])
-                        @endif
-
-                        <div class="{{ $card }} p-6 sm:p-8">
-                            <div class="flex flex-wrap items-start justify-between gap-3">
-                                <div class="max-w-2xl">
-                                    <h3 class="text-lg font-semibold text-brand-ink">{{ __('Live processlist') }}</h3>
-                                    <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ __('Runs SHOW PROCESSLIST against the engine over SSH. Output streams into the banner above.') }}</p>
-                                    @if (! $manageDbHasCreds)
-                                        <p class="mt-3 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-3 py-2 text-xs text-brand-moss">
-                                            {{ __('Add a manage password below to unlock the processlist when root requires auth.') }}
-                                        </p>
-                                    @endif
-                                </div>
-                                @if ($processlistAction && $opsReady && ! $isDeployer)
-                                    <button
-                                        type="button"
-                                        wire:click="openConfirmActionModal('runAllowlistedManageAction', ['mysql_processlist'], @js($processlistAction['label']), @js($processlistAction['confirm']), @js($processlistAction['label']), false)"
-                                        class="inline-flex shrink-0 items-center gap-2 self-start rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40"
-                                    >
-                                        <x-heroicon-o-bolt class="h-4 w-4 opacity-80" aria-hidden="true" />
-                                        {{ $processlistAction['label'] }}
-                                    </button>
-                                @endif
-                            </div>
-                        </div>
-
-                        <div id="db-manage-hints-{{ $engine }}" class="{{ $card }} scroll-mt-24 p-6 sm:p-8">
-                            <h3 class="text-lg font-semibold text-brand-ink">{{ __('Database connection hints') }}</h3>
-                            <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                                {{ __('Optional values for Dply features such as backups, and to authenticate the processlist action above.') }}
-                            </p>
-                            <form wire:submit="saveManageDbHints" class="mt-6 max-w-xl space-y-4">
-                                <div>
-                                    <label for="manage_db_bind_host" class="block text-sm font-medium text-brand-ink">{{ __('Database bind address') }}</label>
-                                    <input
-                                        id="manage_db_bind_host"
-                                        type="text"
-                                        wire:model="manage_db_bind_host"
-                                        placeholder="127.0.0.1"
-                                        autocomplete="off"
-                                        @disabled($isDeployer)
-                                        class="mt-2 block w-full rounded-lg border border-brand-ink/15 px-3 py-2 font-mono text-sm shadow-sm focus:border-brand-sage focus:ring-2 focus:ring-brand-sage/30 disabled:opacity-50"
-                                    />
-                                    @error('manage_db_bind_host')
-                                        <p class="mt-1 text-sm text-red-700">{{ $message }}</p>
-                                    @enderror
-                                </div>
-                                <div>
-                                    <label for="manage_db_port" class="block text-sm font-medium text-brand-ink">{{ __('Database port') }}</label>
-                                    <input
-                                        id="manage_db_port"
-                                        type="number"
-                                        wire:model="manage_db_port"
-                                        placeholder="3306"
-                                        min="1"
-                                        max="65535"
-                                        autocomplete="off"
-                                        @disabled($isDeployer)
-                                        class="mt-2 block w-full rounded-lg border border-brand-ink/15 px-3 py-2 font-mono text-sm shadow-sm focus:border-brand-sage focus:ring-2 focus:ring-brand-sage/30 disabled:opacity-50"
-                                    />
-                                    @error('manage_db_port')
-                                        <p class="mt-1 text-sm text-red-700">{{ $message }}</p>
-                                    @enderror
-                                </div>
-                                <div>
-                                    <label for="manage_db_password" class="block text-sm font-medium text-brand-ink">{{ __('Internal database password') }}</label>
-                                    <input
-                                        id="manage_db_password"
-                                        type="password"
-                                        wire:model="manage_db_password"
-                                        placeholder="{{ __('Leave blank to keep current') }}"
-                                        autocomplete="new-password"
-                                        @disabled($isDeployer)
-                                        class="mt-2 block w-full rounded-lg border border-brand-ink/15 px-3 py-2 font-mono text-sm shadow-sm focus:border-brand-sage focus:ring-2 focus:ring-brand-sage/30 disabled:opacity-50"
-                                    />
-                                    <p class="mt-1 text-xs text-brand-mist">{{ __('Used to authenticate the processlist action. Stored in server metadata; treat as sensitive.') }}</p>
-                                </div>
-                                <div>
-                                    <x-primary-button type="submit" class="!py-2.5" :disabled="$isDeployer">{{ __('Save connection hints') }}</x-primary-button>
-                                </div>
-                            </form>
-                        </div>
-                    @endif
-                @else
-
-                @if ($isManageable)
-                    {{-- Engine status / install card. Always present for mysql/postgres so the
-                         operator can install / inspect / uninstall the engine itself. SQLite
-                         skips this — it's a binary that ships with the others, no engine row. --}}
-                    <div class="{{ $card }} p-6 sm:p-8">
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div class="min-w-0">
-                                <h2 class="text-lg font-semibold text-brand-ink">
-                                    {{ __(':engine engine', ['engine' => $engineLabels[$engine]]) }}
-                                </h2>
-                                @if ($engineRow)
-                                    <dl class="mt-4 grid gap-4 sm:grid-cols-3">
-                                        <div>
-                                            <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
-                                            <dd class="mt-1 text-sm text-brand-ink">
-                                                @switch($engineRow->status)
-                                                    @case(\App\Models\ServerDatabaseEngine::STATUS_RUNNING)
-                                                        <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">{{ __('Running') }}</span>
-                                                        @break
-                                                    @case(\App\Models\ServerDatabaseEngine::STATUS_STOPPED)
-                                                        <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">{{ __('Stopped') }}</span>
-                                                        @break
-                                                    @case(\App\Models\ServerDatabaseEngine::STATUS_PENDING)
-                                                    @case(\App\Models\ServerDatabaseEngine::STATUS_INSTALLING)
-                                                        <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">
-                                                            <x-spinner variant="forest" />
-                                                            {{ __('Installing…') }}
-                                                        </span>
-                                                        @break
-                                                    @case(\App\Models\ServerDatabaseEngine::STATUS_UNINSTALLING)
-                                                        <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">
-                                                            <x-spinner variant="forest" />
-                                                            {{ __('Uninstalling…') }}
-                                                        </span>
-                                                        @break
-                                                    @case(\App\Models\ServerDatabaseEngine::STATUS_FAILED)
-                                                        <span class="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700" title="{{ $engineRow->error_message }}">{{ __('Failed') }}</span>
-                                                        @break
-                                                    @default
-                                                        <span class="inline-flex items-center rounded-full bg-brand-sand/60 px-2 py-0.5 text-xs font-medium text-brand-ink">{{ ucfirst($engineRow->status) }}</span>
-                                                @endswitch
-                                            </dd>
-                                        </div>
-                                        <div>
-                                            <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Version') }}</dt>
-                                            <dd class="mt-1 font-mono text-sm text-brand-ink">{{ $engineRow->version ?: '—' }}</dd>
-                                        </div>
-                                        <div>
-                                            <dt class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Port') }}</dt>
-                                            <dd class="mt-1 font-mono text-sm text-brand-ink">{{ $engineRow->port }}</dd>
-                                        </div>
-                                    </dl>
-                                    @if ($engineRow->status === \App\Models\ServerDatabaseEngine::STATUS_FAILED && filled($engineRow->error_message))
-                                        <p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-800">
-                                            {{ $engineRow->error_message }}
-                                        </p>
-                                    @endif
-                                @else
-                                    <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                                        {{ __(':engine is not installed on this server. Click Install to apt-install it. Dply will check available memory + disk first so a too-small box doesn\'t OOM mid-install.', ['engine' => $engineLabels[$engine]]) }}
-                                    </p>
-                                @endif
-                            </div>
-                            <div class="flex shrink-0 flex-wrap gap-2 self-start">
-                                @if (! $engineRow || $engineRow->status === \App\Models\ServerDatabaseEngine::STATUS_FAILED)
-                                    <button
-                                        type="button"
-                                        wire:click="installDatabaseEngine('{{ $engine }}')"
-                                        wire:loading.attr="disabled"
-                                        wire:target="installDatabaseEngine"
-                                        class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg bg-brand-forest px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-forest/90 disabled:opacity-50"
-                                    >
-                                        <x-heroicon-o-cloud-arrow-down class="h-4 w-4" />
-                                        <span wire:loading.remove wire:target="installDatabaseEngine">
-                                            {{ $engineRow ? __('Retry install') : __('Install :engine', ['engine' => $engineLabels[$engine]]) }}
-                                        </span>
-                                        <span wire:loading wire:target="installDatabaseEngine">{{ __('Queueing…') }}</span>
-                                    </button>
-                                @elseif ($engineRow && in_array($engineRow->status, [
-                                    \App\Models\ServerDatabaseEngine::STATUS_PENDING,
-                                    \App\Models\ServerDatabaseEngine::STATUS_INSTALLING,
-                                ], true))
-                                    {{-- Operator escape hatch when the install has stalled.
-                                         Mirrors the webserver-switch "Stop & revert" affordance:
-                                         marks the row FAILED and dispatches the uninstall job
-                                         to apt-purge any partial state. --}}
-                                    <button
-                                        type="button"
-                                        wire:click="openConfirmActionModal('stopAndRevertDatabaseEngineInstall', ['{{ $engine }}'], @js(__('Stop and revert :engine install?', ['engine' => $engineLabels[$engine]])), @js(__('Marks the install as failed and runs apt purge on the server to clean up any partial state. Use this when the install has stalled.')), @js(__('Stop & revert')), true)"
-                                        class="inline-flex items-center gap-1.5 rounded-md border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-800 shadow-sm hover:bg-rose-50"
-                                    >
-                                        <x-heroicon-o-arrow-uturn-left class="h-3.5 w-3.5" />
-                                        {{ __('Stop & revert') }}
-                                    </button>
-                                @elseif ($engineRow && in_array($engineRow->status, [
-                                    \App\Models\ServerDatabaseEngine::STATUS_RUNNING,
-                                    \App\Models\ServerDatabaseEngine::STATUS_STOPPED,
-                                ], true))
-                                    <button
-                                        type="button"
-                                        wire:click="openConfirmActionModal('uninstallDatabaseEngine', ['{{ $engine }}'], @js(__('Uninstall :engine', ['engine' => $engineLabels[$engine]])), @js(__('apt purge will remove the engine and its data dirs from the server. Existing tracked databases stay in Dply but won\'t have a live engine to talk to.')), @js(__('Uninstall')), true)"
-                                        class="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100"
-                                    >
-                                        {{ __('Uninstall') }}
-                                    </button>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-                @endif
-
-                @if ($engine === 'sqlite' || $engineRunning)
-                    @if ($engine !== 'sqlite')
-                        <div class="{{ $card }} p-6 sm:p-8">
-                            <h2 class="text-lg font-semibold text-brand-ink">
-                                {{ __(':engine admin credentials', ['engine' => $engineLabels[$engine]]) }}
-                            </h2>
-                            <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                                {{ __('Optional admin password used over SSH when passwordless sudo or socket access is not available. Stored encrypted.') }}
-                            </p>
-                            <form wire:submit="saveAdminCredentials" class="mt-8 space-y-6">
-                                @if ($engine === 'mysql')
-                                    <div class="grid gap-6 sm:grid-cols-2">
-                                        <div>
-                                            <x-input-label for="admin_mysql_root_username" value="{{ __('MySQL root username') }}" />
-                                            <x-text-input id="admin_mysql_root_username" wire:model="admin_mysql_root_username" class="mt-1 block w-full font-mono text-sm" />
-                                        </div>
-                                        <div>
-                                            <x-input-label for="admin_mysql_root_password" value="{{ __('MySQL root password (optional)') }}" />
-                                            <x-text-input id="admin_mysql_root_password" type="password" wire:model="admin_mysql_root_password" class="mt-1 block w-full text-sm" placeholder="{{ __('Leave blank to keep existing') }}" autocomplete="new-password" />
-                                        </div>
-                                    </div>
-                                    <div class="flex flex-wrap gap-3">
-                                        <x-primary-button type="submit">{{ __('Save admin credentials') }}</x-primary-button>
-                                        <button type="button" wire:click="clearStoredMysqlRootPassword" class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Clear MySQL password') }}</button>
-                                    </div>
-                                @else
-                                    <div class="grid gap-6 sm:grid-cols-2">
-                                        <div>
-                                            <x-input-label for="admin_postgres_superuser" value="{{ __('PostgreSQL superuser') }}" />
-                                            <x-text-input id="admin_postgres_superuser" wire:model="admin_postgres_superuser" class="mt-1 block w-full font-mono text-sm" />
-                                        </div>
-                                        <div>
-                                            <x-input-label for="admin_postgres_password" value="{{ __('PostgreSQL password (optional)') }}" />
-                                            <x-text-input id="admin_postgres_password" type="password" wire:model="admin_postgres_password" class="mt-1 block w-full text-sm" placeholder="{{ __('Leave blank to keep existing') }}" autocomplete="new-password" />
-                                        </div>
-                                    </div>
-                                    <label class="flex items-start gap-2 text-sm text-brand-ink">
-                                        <input type="checkbox" wire:model="admin_postgres_use_sudo" class="mt-1 rounded border-brand-ink/20 text-brand-forest focus:ring-brand-sage" />
-                                        <span>{{ __('Use sudo -u postgres for PostgreSQL (disable to use TCP auth with password above)') }}</span>
-                                    </label>
-                                    <div class="flex flex-wrap gap-3">
-                                        <x-primary-button type="submit">{{ __('Save admin credentials') }}</x-primary-button>
-                                        <button type="button" wire:click="clearStoredPostgresPassword" class="rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Clear PostgreSQL password') }}</button>
-                                    </div>
-                                @endif
-                            </form>
-                        </div>
-                    @endif
-
-                    @php
-                        $engineDatabases = $server->serverDatabases->where('engine', $engine);
-                        $engineSampleDatabase = $engineDatabases->sortBy('name')->first();
-                    @endphp
-                    <div>
-                        <h2 class="text-lg font-semibold text-brand-ink">
-                            {{ __(':engine databases', ['engine' => $engineLabels[$engine]]) }}
-                        </h2>
-                        @if ($engineDatabases->isEmpty())
-                            <p class="mt-3 text-sm text-brand-moss">
-                                {{ __('No :engine databases yet. Switch to Basics to create one.', ['engine' => $engineLabels[$engine]]) }}
-                            </p>
-                        @else
-                            <div class="mt-4">
-                                @include('livewire.servers.partials.databases-list', [
-                                    'databases' => $engineDatabases,
-                                ])
-                            </div>
-                        @endif
-                    </div>
-
-                    @include('livewire.servers.partials.connection-snippet', [
-                        'database' => $engineSampleDatabase,
-                        'card' => $card,
-                    ])
-
-                    @if ($engine !== 'sqlite')
-                        @include('livewire.servers.partials.extra-users-card', [
-                            'databases' => $engineDatabases,
-                            'engine' => $engine,
-                            'engineLabels' => $engineLabels,
-                            'card' => $card,
-                        ])
-
-                        @include('livewire.servers.partials.drift-card', [
-                            'engine' => $engine,
-                            'engineLabels' => $engineLabels,
-                            'drift_snapshot' => $drift_snapshot,
-                            'card' => $card,
-                        ])
-
-                        @include('livewire.servers.partials.share-credentials-form', [
-                            'databases' => $engineDatabases,
-                            'orgAllowsCredentialShares' => $orgAllowsCredentialShares,
-                            'card' => $card,
-                        ])
-                    @endif
-
-                    @include('livewire.servers.partials.destructive-actions', [
-                        'databases' => $engineDatabases,
-                        'engineLabels' => $engineLabels,
-                        'card' => $card,
-                    ])
-
-                    @include('livewire.servers.partials.recent-backups-list', [
-                        'backups' => ($recentBackupsByEngine[$engine] ?? collect()),
-                        'card' => $card,
-                    ])
-                @endif
-                @endif {{-- close $engine_subtab === 'info' / @else --}}
-            </x-server-workspace-tab-panel>
-        @endforeach
-
-        <x-server-workspace-tab-panel
-            id="db-panel-advanced"
-            labelled-by="db-tab-advanced"
-            :hidden="$workspace_tab !== 'advanced'"
-            panel-class="space-y-8"
-        >
-            @if (! empty($remote_mysql_databases) || ! empty($remote_postgres_databases))
-                <div class="{{ $card }} p-6 sm:p-8">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Discovered on server') }}</h2>
-                    <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                        {{ __('Names returned from the database engine. Import lets you attach credentials in Dply for databases that already exist on the host.') }}
-                    </p>
-                    <x-explainer class="mt-3">
-                        <p>{{ __('Reads SHOW DATABASES (MySQL/MariaDB) and the equivalent for Postgres. The list is filtered against the dply records so only databases dply isn\'t already tracking show up here. Use this to adopt databases that were created outside the workspace (manually, by a backup restore, by another tool).') }}</p>
-                        <p>{{ __('Importing creates a dply row with the database name and lets you set credentials; it doesn\'t change anything on the engine itself. Removing a row from dply doesn\'t drop the database — use Drop on the row to actually remove it from the engine.') }}</p>
-                    </x-explainer>
-                    @if (count($mysqlOnlyOnServer) > 0)
-                        <p class="mt-4 text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('MySQL / MariaDB') }}</p>
-                        <ul class="mt-2 space-y-2">
-                            @foreach ($mysqlOnlyOnServer as $n)
-                                <li class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand-ink/10 px-3 py-2 text-sm">
-                                    <span class="font-mono text-brand-ink">{{ $n }}</span>
-                                    <button
-                                        type="button"
-                                        wire:click="prefillDatabaseFromDiscovery(@js($n), 'mysql')"
-                                        class="text-xs font-medium text-brand-forest hover:underline"
-                                    >
-                                        {{ __('Track in Dply') }}
-                                    </button>
-                                </li>
-                            @endforeach
-                        </ul>
-                    @endif
-                    @if (count($pgOnlyOnServer) > 0)
-                        <p class="mt-4 text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('PostgreSQL') }}</p>
-                        <ul class="mt-2 space-y-2">
-                            @foreach ($pgOnlyOnServer as $n)
-                                <li class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand-ink/10 px-3 py-2 text-sm">
-                                    <span class="font-mono text-brand-ink">{{ $n }}</span>
-                                    <button
-                                        type="button"
-                                        wire:click="prefillDatabaseFromDiscovery(@js($n), 'postgres')"
-                                        class="text-xs font-medium text-brand-forest hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                        {{ __('Track in Dply') }}
-                                    </button>
-                                </li>
-                            @endforeach
-                        </ul>
-                    @endif
-                    @if (count($mysqlOnlyOnServer) === 0 && count($pgOnlyOnServer) === 0)
-                        <p class="mt-4 text-sm text-brand-moss">{{ __('No extra database names on the server beyond what Dply already tracks.') }}</p>
-                    @endif
-                </div>
+            @if ($workspace_tab === 'advanced')
+                <x-server-workspace-tab-panel
+                    id="db-panel-advanced"
+                    labelled-by="db-tab-advanced"
+                    panel-class="space-y-8"
+                >
+                    @include('livewire.servers.partials.databases.advanced-tab')
+                </x-server-workspace-tab-panel>
             @endif
 
-            <div class="{{ $card }} p-6 sm:p-8">
-                <h2 class="text-lg font-semibold text-brand-ink">{{ __('Audit log') }}</h2>
-                <p class="mt-2 text-sm text-brand-moss">{{ __('Recent database workspace actions for this server.') }}</p>
-                <x-explainer class="mt-3">
-                    <p>{{ __('Every workspace action — engine install/uninstall, database create/drop, credential set/clear, SQL run, share-link created/revoked — writes a row here. Events are also forwarded to the organization-wide audit log when a signed-in user is the actor.') }}</p>
-                    <p>{{ __('Event names are stable identifiers (e.g. database_dropped) so they\'re grep-able from the org log. SQL statements typed in the runner are NOT recorded in full — only the verb (SELECT, INSERT, …) so credentials and key contents stay out of the audit log.') }}</p>
-                </x-explainer>
-                <ul class="mt-6 divide-y divide-brand-ink/10 text-sm">
-                    @forelse ($server->databaseAuditEvents as $ev)
-                        <li class="py-3">
-                            <span class="font-medium text-brand-ink">{{ $ev->event }}</span>
-                            <span class="text-brand-mist"> · </span>
-                            <span class="text-brand-moss">{{ $ev->created_at->timezone(config('app.timezone'))->format('Y-m-d H:i') }}</span>
-                            @if ($ev->user)
-                                <span class="text-brand-mist"> · </span>
-                                <span class="text-brand-moss">{{ $ev->user->name }}</span>
-                            @endif
-                        </li>
-                    @empty
-                        <li class="py-4 text-brand-moss">{{ __('No events yet.') }}</li>
-                    @endforelse
-                </ul>
-            </div>
-
-        </x-server-workspace-tab-panel>
-
-        <x-server-workspace-tab-panel
-            id="db-panel-notifications"
-            labelled-by="db-tab-notifications"
-            :hidden="$workspace_tab !== 'notifications'"
-            panel-class="space-y-8"
-        >
-            @livewire(\App\Livewire\Notifications\ResourceSummary::class, [
-                'resource' => $server,
-                'heading' => __('Database and server notifications'),
-                'manageUrl' => route('profile.notification-channels.bulk-assign', ['server' => $server->id]),
-            ], key('resource-summary-databases-'.$server->id))
-        </x-server-workspace-tab-panel>
-        </div>
+            @if ($workspace_tab === 'notifications')
+                <x-server-workspace-tab-panel
+                    id="db-panel-notifications"
+                    labelled-by="db-tab-notifications"
+                    panel-class="space-y-8"
+                >
+                    @include('livewire.servers.partials.databases.notifications-tab')
+                </x-server-workspace-tab-panel>
+            @endif
+        </x-workspace-tab-panel-loading>
     @else
-        <div class="rounded-2xl border border-brand-gold/40 bg-brand-sand/40 px-5 py-4 text-sm text-brand-olive">
-            {{ __('Provisioning and SSH must be ready before you can use this section.') }}
-        </div>
+        @include('livewire.servers.partials.workspace-ops-not-ready')
     @endif
 
     <x-slot name="modals">
         @include('livewire.partials.confirm-action-modal')
+        {{-- Reusable inline channel-create modal (CreatesNotificationChannelInline trait),
+             shared with the Notifications tab so an operator can add a channel without
+             leaving the page; the new channel is auto-selected on success. --}}
+        @include('livewire.partials.create-notification-channel-modal')
         @if ($credentialsModalDatabase)
+            @php
+                $cDb = $credentialsModalDatabase;
+                $cPort = $cDb->defaultPort();
+                $cUser = rawurlencode((string) $cDb->username);
+                $cPass = rawurlencode((string) $cDb->password);
+                $cName = $cDb->name;
+                $cEngine = $cDb->engine;
+
+                $buildUrl = function (string $host) use ($cUser, $cPass, $cPort, $cName, $cEngine): string {
+                    return match ($cEngine) {
+                        'postgres' => "postgresql://{$cUser}:{$cPass}@{$host}:{$cPort}/{$cName}",
+                        'mongodb'  => "mongodb://{$cUser}:{$cPass}@{$host}:{$cPort}/{$cName}?authSource={$cName}",
+                        'clickhouse' => "clickhouse://{$cUser}:{$cPass}@{$host}:{$cPort}/{$cName}",
+                        default    => "mysql://{$cUser}:{$cPass}@{$host}:{$cPort}/{$cName}",
+                    };
+                };
+
+                $localUrl   = $buildUrl('127.0.0.1');
+                $privateIp  = $server->private_ip_address;
+                $publicIp   = $server->ip_address;
+                $remoteHost = $privateIp ?? $publicIp;
+                $remoteEnabled = (bool) $cDb->remote_access;
+                $remoteUrl  = $remoteHost ? $buildUrl($remoteHost) : null;
+            @endphp
             <div
                 class="fixed inset-0 z-50 overflow-y-auto overscroll-y-contain"
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="db-credentials-title"
-                wire:key="db-cred-{{ $credentialsModalDatabase->id }}"
+                wire:key="db-cred-{{ $cDb->id }}"
+                x-data="{
+                    copiedKey: null,
+                    async copy(text, key) {
+                        try { await navigator.clipboard.writeText(text); this.copiedKey = key; setTimeout(() => this.copiedKey = null, 1800); } catch(e) {}
+                    }
+                }"
             >
-                <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closeCredentialsModal"></div>
+                <div class="fixed inset-0 bg-brand-ink/30" wire:click="closeCredentialsModal"></div>
                 <div class="relative z-10 flex min-h-full justify-center px-4 py-10 sm:px-6 sm:py-14">
-                    <div class="my-auto w-full max-w-lg dply-modal-panel" @click.stop>
-                        <div class="border-b border-brand-ink/10 px-6 py-5 sm:px-8">
-                            <h2 id="db-credentials-title" class="text-lg font-semibold text-brand-ink">{{ __('Database credentials') }}</h2>
-                            <p class="mt-1 font-mono text-sm text-brand-moss">{{ $credentialsModalDatabase->name }}</p>
+                    <div class="my-auto flex w-full max-w-2xl flex-col dply-modal-panel overflow-hidden shadow-xl" @click.stop>
+
+                        {{-- Header --}}
+                        <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+                            <x-icon-badge>
+                                <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
+                            </x-icon-badge>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Credentials') }}</p>
+                                <h2 id="db-credentials-title" class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Database credentials') }}</h2>
+                                <p class="mt-0.5 font-mono text-sm text-brand-moss">{{ $cDb->name }}</p>
+                            </div>
                         </div>
-                        <div class="space-y-4 px-6 py-6 sm:px-8">
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Username') }}</p>
-                                <p class="mt-1 font-mono text-sm text-brand-ink">{{ $credentialsModalDatabase->username }}</p>
+
+                        <div class="max-h-[65vh] divide-y divide-brand-ink/5 overflow-y-auto">
+
+                            {{-- Core credentials --}}
+                            <div class="grid gap-3 px-6 py-5 sm:grid-cols-2">
+                                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 px-4 py-3">
+                                    <div class="flex items-center justify-between">
+                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Username') }}</p>
+                                        <button class="text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($cDb->username), 'user')">
+                                            <span x-show="copiedKey !== 'user'">{{ __('Copy') }}</span>
+                                            <span x-show="copiedKey === 'user'" x-cloak>{{ __('Copied!') }}</span>
+                                        </button>
+                                    </div>
+                                    <p class="mt-0.5 font-mono text-sm text-brand-ink">{{ $cDb->username }}</p>
+                                </div>
+                                <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 px-4 py-3" x-data="{ showPw: false }">
+                                    <div class="flex items-center justify-between">
+                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Password') }}</p>
+                                        <div class="flex items-center gap-3">
+                                            <button class="text-[11px] font-medium text-brand-sage hover:underline" x-show="showPw" x-cloak @click="showPw = false">{{ __('Hide') }}</button>
+                                            <button class="text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($cDb->password), 'pw')">
+                                                <span x-show="copiedKey !== 'pw'">{{ __('Copy') }}</span>
+                                                <span x-show="copiedKey === 'pw'" x-cloak>{{ __('Copied!') }}</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <p
+                                        class="mt-0.5 break-all font-mono text-sm text-brand-ink transition-all duration-200"
+                                        :class="showPw ? '' : 'blur-sm cursor-pointer select-none'"
+                                        @click="if (!showPw) showPw = true"
+                                        :title="showPw ? '' : 'Click to reveal'"
+                                    >{{ $cDb->password }}</p>
+                                </div>
                             </div>
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Password') }}</p>
-                                <p class="mt-1 break-all font-mono text-sm text-brand-ink">{{ $credentialsModalDatabase->password }}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host & port') }}</p>
-                                <p class="mt-1 font-mono text-sm text-brand-ink">{{ $credentialsModalDatabase->host ?: '127.0.0.1' }}:{{ $credentialsModalDatabase->defaultPort() }}</p>
-                            </div>
-                            <div>
-                                <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Connection URL') }}</p>
-                                <p class="mt-1 break-all font-mono text-xs leading-relaxed text-brand-moss">{{ $credentialsModalDatabase->connectionUrl() }}</p>
-                            </div>
-                            <div class="flex flex-wrap gap-2 pt-2">
+
+                            {{-- Local connection --}}
+                            @if ($cEngine !== 'sqlite')
+                                <div class="px-6 py-4">
+                                    <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">
+                                        {{ __('Local') }} <span class="font-normal normal-case">— {{ __('for apps on this server') }}</span>
+                                    </p>
+                                    <div class="space-y-2">
+                                        <div class="flex items-center justify-between gap-2 rounded-lg border border-brand-ink/10 bg-brand-cream/30 px-3 py-2.5">
+                                            <div>
+                                                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host & port') }}</p>
+                                                <code class="font-mono text-sm text-brand-ink">127.0.0.1:{{ $cPort }}</code>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-cream/30 px-3 py-2.5" x-data="{ showUrl: false }">
+                                            <div class="min-w-0 flex-1">
+                                                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Connection URL') }}</p>
+                                                <code
+                                                    class="break-all font-mono text-xs text-brand-ink transition-all duration-200"
+                                                    :class="showUrl ? '' : 'blur-sm cursor-pointer select-none'"
+                                                    @click="if (!showUrl) showUrl = true"
+                                                    :title="showUrl ? '' : 'Click to reveal'"
+                                                >{{ $localUrl }}</code>
+                                            </div>
+                                            <button class="shrink-0 text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($localUrl), 'local_url')">
+                                                <span x-show="copiedKey !== 'local_url'">{{ __('Copy') }}</span>
+                                                <span x-show="copiedKey === 'local_url'" x-cloak>{{ __('Copied!') }}</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+
+                            {{-- Private network connection --}}
+                            @if ($privateIp)
+                                @php $privateUrl = $buildUrl($privateIp); @endphp
+                                <div class="px-6 py-4">
+                                    <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">
+                                        {{ __('Private network') }}
+                                        <span class="ml-1 font-normal normal-case text-emerald-600">— {{ $privateIp }}</span>
+                                        @if (! $remoteEnabled)
+                                            <span class="ml-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-amber-200">{{ __('remote access off') }}</span>
+                                        @endif
+                                    </p>
+                                    @if (! $remoteEnabled)
+                                        <p class="mb-3 text-xs text-amber-700">{{ __('Enable remote access for this database on the Networking tab first.') }}</p>
+                                    @endif
+                                    <div class="space-y-2">
+                                        <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-cream/30 px-3 py-2.5" x-data="{ showUrl: false }">
+                                            <div class="min-w-0 flex-1">
+                                                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Connection URL') }}</p>
+                                                <code
+                                                    class="break-all font-mono text-xs text-brand-ink transition-all duration-200"
+                                                    :class="showUrl ? '' : 'blur-sm cursor-pointer select-none'"
+                                                    @click="if (!showUrl) showUrl = true"
+                                                    :title="showUrl ? '' : 'Click to reveal'"
+                                                >{{ $privateUrl }}</code>
+                                            </div>
+                                            <button class="shrink-0 text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($privateUrl), 'priv_url')">
+                                                <span x-show="copiedKey !== 'priv_url'">{{ __('Copy') }}</span>
+                                                <span x-show="copiedKey === 'priv_url'" x-cloak>{{ __('Copied!') }}</span>
+                                            </button>
+                                        </div>
+                                        @if ($remoteEnabled)
+                                            <button type="button" onclick="window.location.href={{ json_encode($privateUrl) }}" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">
+                                                <x-heroicon-o-table-cells class="h-4 w-4" />
+                                                {{ __('Open in TablePlus') }}
+                                            </button>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endif
+
+                            {{-- Remote / public connection --}}
+                            @if ($remoteEnabled && $publicIp)
+                                @php $publicUrl = $buildUrl($publicIp); @endphp
+                                <div class="px-6 py-4">
+                                    <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">
+                                        {{ __('Remote (public)') }}
+                                        <span class="ml-1 font-normal normal-case text-amber-700">— {{ $publicIp }} · {{ $cDb->allowed_from ?: __('no source set') }}</span>
+                                    </p>
+                                    <div class="space-y-2">
+                                        <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-cream/30 px-3 py-2.5" x-data="{ showUrl: false }">
+                                            <div class="min-w-0 flex-1">
+                                                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Connection URL') }}</p>
+                                                <code
+                                                    class="break-all font-mono text-xs text-brand-ink transition-all duration-200"
+                                                    :class="showUrl ? '' : 'blur-sm cursor-pointer select-none'"
+                                                    @click="if (!showUrl) showUrl = true"
+                                                    :title="showUrl ? '' : 'Click to reveal'"
+                                                >{{ $publicUrl }}</code>
+                                            </div>
+                                            <button class="shrink-0 text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($publicUrl), 'pub_url')">
+                                                <span x-show="copiedKey !== 'pub_url'">{{ __('Copy') }}</span>
+                                                <span x-show="copiedKey === 'pub_url'" x-cloak>{{ __('Copied!') }}</span>
+                                            </button>
+                                        </div>
+                                        <button type="button" onclick="window.location.href={{ json_encode($publicUrl) }}" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">
+                                            <x-heroicon-o-table-cells class="h-4 w-4" />
+                                            {{ __('Open in TablePlus') }}
+                                        </button>
+                                    </div>
+                                </div>
+                            @elseif (! $remoteEnabled && ! $privateIp && $publicIp && $cEngine !== 'sqlite')
+                                <div class="px-6 py-4">
+                                    <p class="text-xs text-brand-mist">
+                                        {{ __('Remote access is disabled for this database. Enable it from the Networking tab to connect from outside this server.') }}
+                                    </p>
+                                    <a href="{{ route('servers.networking', $server) }}" wire:navigate class="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-brand-sage hover:underline">
+                                        <x-heroicon-o-share class="h-4 w-4" />
+                                        {{ __('Go to Networking') }}
+                                    </a>
+                                </div>
+                            @endif
+
+                            {{-- SQLite path --}}
+                            @if ($cEngine === 'sqlite' && filled($cDb->host))
+                                <div class="px-6 py-4">
+                                    <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 px-4 py-3">
+                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('File path') }}</p>
+                                        <code class="mt-0.5 break-all font-mono text-sm text-brand-ink">{{ $cDb->host }}</code>
+                                    </div>
+                                </div>
+                            @endif
+
+                        </div>
+
+                        {{-- Footer --}}
+                        <div class="flex shrink-0 flex-wrap justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+                            @if ($cEngine !== 'sqlite')
                                 <button
                                     type="button"
-                                    x-data="{ ok: false }"
-                                    @click="navigator.clipboard.writeText(@js($credentialsModalDatabase->connectionUrl())); ok = true; setTimeout(() => ok = false, 2000)"
-                                    class="inline-flex rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/50"
+                                    @click="copy(@js($localUrl), 'footer_local')"
+                                    class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                                 >
-                                    <span x-show="!ok">{{ __('Copy connection URL') }}</span>
-                                    <span x-show="ok" x-cloak class="text-brand-forest">{{ __('Copied') }}</span>
+                                    <x-heroicon-m-clipboard-document class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                    <span x-show="copiedKey !== 'footer_local'">{{ __('Copy local URL') }}</span>
+                                    <span x-show="copiedKey === 'footer_local'" x-cloak class="text-brand-forest">{{ __('Copied') }}</span>
                                 </button>
-                                <x-secondary-button type="button" wire:click="closeCredentialsModal">{{ __('Close') }}</x-secondary-button>
-                            </div>
+                            @endif
+                            <x-secondary-button type="button" wire:click="closeCredentialsModal">{{ __('Close') }}</x-secondary-button>
                         </div>
+
                     </div>
                 </div>
             </div>
@@ -923,34 +409,42 @@
                 aria-labelledby="db-share-link-title"
                 wire:key="db-share-link"
             >
-                <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closeShareLinkModal"></div>
+                <div class="fixed inset-0 bg-brand-ink/30" wire:click="closeShareLinkModal"></div>
                 <div class="relative z-10 flex min-h-full justify-center px-4 py-10 sm:px-6 sm:py-14">
-                    <div class="my-auto w-full max-w-lg dply-modal-panel" @click.stop>
-                        <div class="border-b border-brand-ink/10 px-6 py-5 sm:px-8">
-                            <h2 id="db-share-link-title" class="text-lg font-semibold text-brand-ink">{{ __('Share link created') }}</h2>
-                            @if ($share_link_modal_db_name)
-                                <p class="mt-1 font-mono text-sm text-brand-moss">{{ $share_link_modal_db_name }}</p>
-                            @endif
+                    <div class="my-auto flex w-full max-w-2xl flex-col dply-modal-panel overflow-hidden shadow-xl" @click.stop>
+                        <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+                            <x-icon-badge>
+                                <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
+                            </x-icon-badge>
+                            <div class="min-w-0">
+                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Share') }}</p>
+                                <h2 id="db-share-link-title" class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Share link created') }}</h2>
+                                @if ($share_link_modal_db_name)
+                                    <p class="mt-1 font-mono text-sm text-brand-moss">{{ $share_link_modal_db_name }}</p>
+                                @endif
+                                <p class="mt-1 text-sm leading-6 text-brand-moss">
+                                    {{ __('Send this link to whoever needs the credentials. It honours the expiry and view limits you set.') }}
+                                </p>
+                            </div>
                         </div>
-                        <div class="space-y-4 px-6 py-6 sm:px-8">
-                            <p class="text-sm text-brand-moss leading-relaxed">
-                                {{ __('Send this link to whoever needs the credentials. It honours the expiry and view limits you set.') }}
-                            </p>
-                            <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4">
-                                <p class="break-all font-mono text-xs leading-relaxed text-brand-ink">{{ $share_link_modal_url }}</p>
+                        <div class="px-6 py-6">
+                            <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 px-4 py-3">
+                                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Link') }}</p>
+                                <p class="mt-1 break-all font-mono text-xs leading-relaxed text-brand-ink">{{ $share_link_modal_url }}</p>
                             </div>
-                            <div class="flex flex-wrap gap-2 pt-2">
-                                <button
-                                    type="button"
-                                    x-data="{ ok: false }"
-                                    @click="navigator.clipboard.writeText(@js($share_link_modal_url)); ok = true; setTimeout(() => ok = false, 2000)"
-                                    class="inline-flex rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/50"
-                                >
-                                    <span x-show="!ok">{{ __('Copy link') }}</span>
-                                    <span x-show="ok" x-cloak class="text-brand-forest">{{ __('Copied') }}</span>
-                                </button>
-                                <x-secondary-button type="button" wire:click="closeShareLinkModal">{{ __('Close') }}</x-secondary-button>
-                            </div>
+                        </div>
+                        <div class="flex shrink-0 flex-wrap justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+                            <button
+                                type="button"
+                                x-data="{ ok: false }"
+                                @click="navigator.clipboard.writeText(@js($share_link_modal_url)); ok = true; setTimeout(() => ok = false, 2000)"
+                                class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                            >
+                                <x-heroicon-m-clipboard-document class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                <span x-show="!ok">{{ __('Copy link') }}</span>
+                                <span x-show="ok" x-cloak class="text-brand-forest">{{ __('Copied') }}</span>
+                            </button>
+                            <x-secondary-button type="button" wire:click="closeShareLinkModal">{{ __('Close') }}</x-secondary-button>
                         </div>
                     </div>
                 </div>
@@ -965,60 +459,119 @@
                 aria-labelledby="db-connection-url-title"
                 wire:key="db-conn-url-{{ $connectionUrlModalDatabase->id }}"
             >
-                <div class="fixed inset-0 bg-brand-ink/50 backdrop-blur-sm" wire:click="closeConnectionUrlModal"></div>
+                <div class="fixed inset-0 bg-brand-ink/30" wire:click="closeConnectionUrlModal"></div>
                 <div class="relative z-10 flex min-h-full justify-center px-4 py-10 sm:px-6 sm:py-14">
-                    <div class="my-auto w-full max-w-lg dply-modal-panel" @click.stop>
-                        <div class="border-b border-brand-ink/10 px-6 py-5 sm:px-8">
-                            <h2 id="db-connection-url-title" class="text-lg font-semibold text-brand-ink">{{ __('Connection URL') }}</h2>
-                            <p class="mt-1 font-mono text-sm text-brand-moss">{{ $connectionUrlModalDatabase->name }}</p>
-                        </div>
-                        <div class="space-y-4 px-6 py-6 sm:px-8">
-                            <p class="break-all font-mono text-sm leading-relaxed text-brand-ink">{{ $connectionUrlModalDatabase->connectionUrl() }}</p>
-                            <div class="flex flex-wrap gap-2 pt-2">
-                                <button
-                                    type="button"
-                                    x-data="{ ok: false }"
-                                    @click="navigator.clipboard.writeText(@js($connectionUrlModalDatabase->connectionUrl())); ok = true; setTimeout(() => ok = false, 2000)"
-                                    class="inline-flex rounded-lg border border-brand-ink/15 bg-brand-sand/30 px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-sand/50"
-                                >
-                                    <span x-show="!ok">{{ __('Copy') }}</span>
-                                    <span x-show="ok" x-cloak class="text-brand-forest">{{ __('Copied') }}</span>
-                                </button>
-                                <x-secondary-button type="button" wire:click="closeConnectionUrlModal">{{ __('Close') }}</x-secondary-button>
+                    <div class="my-auto flex w-full max-w-2xl flex-col dply-modal-panel overflow-hidden shadow-xl" @click.stop>
+                        <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+                            <x-icon-badge>
+                                <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
+                            </x-icon-badge>
+                            <div class="min-w-0">
+                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Connection') }}</p>
+                                <h2 id="db-connection-url-title" class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Connection URL') }}</h2>
+                                <p class="mt-1 font-mono text-sm text-brand-moss">{{ $connectionUrlModalDatabase->name }}</p>
                             </div>
+                        </div>
+                        <div class="px-6 py-6">
+                            <div class="rounded-xl border border-brand-ink/10 bg-brand-cream/30 px-4 py-3">
+                                <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('URL') }}</p>
+                                <p class="mt-1 break-all font-mono text-sm leading-relaxed text-brand-ink">{{ $connectionUrlModalDatabase->connectionUrl() }}</p>
+                            </div>
+                        </div>
+                        <div class="flex shrink-0 flex-wrap justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+                            <button
+                                type="button"
+                                x-data="{ ok: false }"
+                                @click="navigator.clipboard.writeText(@js($connectionUrlModalDatabase->connectionUrl())); ok = true; setTimeout(() => ok = false, 2000)"
+                                class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                            >
+                                <x-heroicon-m-clipboard-document class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                <span x-show="!ok">{{ __('Copy') }}</span>
+                                <span x-show="ok" x-cloak class="text-brand-forest">{{ __('Copied') }}</span>
+                            </button>
+                            <x-secondary-button type="button" wire:click="closeConnectionUrlModal">{{ __('Close') }}</x-secondary-button>
                         </div>
                     </div>
                 </div>
             </div>
         @endif
 
+        @if ($engine_create_form_open)
+            <x-modal
+                name="create-database-modal"
+                :show="false"
+                maxWidth="2xl"
+                overlayClass="bg-brand-ink/30"
+                panelClass="dply-modal-panel overflow-hidden shadow-xl flex max-h-[min(90vh,880px)] flex-col"
+                focusable
+            >
+                <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+                    <x-icon-badge>
+                        <x-heroicon-o-circle-stack class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Create database') }}</p>
+                        <h2 class="mt-1 text-lg font-semibold text-brand-ink">
+                            @if ($create_lock_engine)
+                                {{ __('New :engine database', ['engine' => $engineLabels[$new_db_engine] ?? ucfirst($new_db_engine)]) }}
+                            @else
+                                {{ __('New database') }}
+                            @endif
+                        </h2>
+                        <p class="mt-1 text-sm leading-6 text-brand-moss">
+                            {{ __('Runs CREATE DATABASE, then creates a per-database user (defaulting to the database name) and grants it access to that database only. Credentials are stored encrypted in Dply.') }}
+                        </p>
+                    </div>
+                </div>
+                <div class="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+                    @include('livewire.servers.partials.databases._create-database-form', [
+                        'lockEngine' => $create_lock_engine ? $new_db_engine : null,
+                        'showExplainer' => false,
+                    ])
+                </div>
+            </x-modal>
+        @endif
+
+        @if ($backup_modal_db_id)
+            @include('livewire.servers.partials.databases._backup-database-modal', [
+                'backupModalDatabase' => $backupModalDatabase,
+                'backupS3Destinations' => $backupS3Destinations,
+            ])
+        @endif
+
         @if ($editing_db_id)
             <x-modal
                 name="edit-database-modal"
                 :show="false"
-                maxWidth="lg"
-                overlayClass="bg-brand-ink/40"
+                maxWidth="2xl"
+                overlayClass="bg-brand-ink/30"
+                panelClass="dply-modal-panel overflow-hidden shadow-xl flex max-h-[min(90vh,880px)] flex-col"
                 focusable
             >
-                <form wire:submit="saveDatabaseEdit">
-                    <div class="border-b border-brand-ink/10 px-6 py-5">
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Edit database') }}</p>
-                        <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ $editing_db_name }}</h2>
-                        <p class="mt-1 text-sm text-brand-moss">
-                            @switch($editing_db_engine)
-                                @case('sqlite')
-                                    {{ __('SQLite — file-based. Changing the path moves the file on the server.') }}
-                                    @break
-                                @case('postgres')
-                                    {{ __('PostgreSQL — the on-host database keeps its existing settings; this updates Dply\'s description metadata.') }}
-                                    @break
-                                @default
-                                    {{ __('MySQL/MariaDB — charset/collation here apply to the next create. The existing on-host database is unchanged.') }}
-                            @endswitch
-                        </p>
+                <form wire:submit="saveDatabaseEdit" class="flex min-h-0 flex-1 flex-col">
+                    <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+                        <x-icon-badge>
+                            <x-heroicon-o-pencil-square class="h-5 w-5" aria-hidden="true" />
+                        </x-icon-badge>
+                        <div class="min-w-0">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Edit') }}</p>
+                            <h2 class="mt-1 text-lg font-semibold text-brand-ink">{{ $editing_db_name }}</h2>
+                            <p class="mt-1 text-sm leading-6 text-brand-moss">
+                                @switch($editing_db_engine)
+                                    @case('sqlite')
+                                        {{ __('SQLite — file-based. Changing the path moves the file on the server.') }}
+                                        @break
+                                    @case('postgres')
+                                        {{ __('PostgreSQL — the on-host database keeps its existing settings; this updates Dply\'s description metadata.') }}
+                                        @break
+                                    @default
+                                        {{ __('MySQL/MariaDB — charset/collation here apply to the next create. The existing on-host database is unchanged.') }}
+                                @endswitch
+                            </p>
+                        </div>
                     </div>
 
-                    <div class="space-y-5 px-6 py-6">
+                    <div class="min-h-0 flex-1 space-y-5 overflow-y-auto px-6 py-6">
                         <div>
                             <x-input-label for="edit-description" :value="__('Description')" />
                             <textarea
@@ -1031,7 +584,7 @@
                             <x-input-error :messages="$errors->get('edit_description')" class="mt-1" />
                         </div>
 
-                        @if ($editing_db_engine === 'mysql')
+                        @if (\App\Support\Servers\DatabaseWorkspaceEngines::isMysqlFamily($editing_db_engine))
                             <div class="grid gap-5 sm:grid-cols-2">
                                 <div>
                                     <x-input-label for="edit-mysql-charset" :value="__('MySQL charset')" />
@@ -1061,15 +614,23 @@
                         @endif
                     </div>
 
-                    <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 px-6 py-4">
+                    <div class="flex shrink-0 flex-wrap justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
                         <x-secondary-button type="button" wire:click="closeEditDatabaseModal">{{ __('Cancel') }}</x-secondary-button>
-                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveDatabaseEdit">
-                            <span wire:loading.remove wire:target="saveDatabaseEdit">{{ __('Save changes') }}</span>
-                            <span wire:loading wire:target="saveDatabaseEdit" class="inline-flex items-center gap-2">
-                                <x-spinner variant="cream" />
+                        <button
+                            type="submit"
+                            wire:loading.attr="disabled"
+                            wire:target="saveDatabaseEdit"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            <span wire:loading.remove wire:target="saveDatabaseEdit" class="inline-flex items-center gap-2">
+                                <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Save changes') }}
+                            </span>
+                            <span wire:loading wire:target="saveDatabaseEdit" class="inline-flex items-center gap-2 whitespace-nowrap">
+                                <x-spinner variant="cream" size="sm" />
                                 {{ __('Saving…') }}
                             </span>
-                        </x-primary-button>
+                        </button>
                     </div>
                 </form>
             </x-modal>
@@ -1079,22 +640,28 @@
             <x-modal
                 name="sqlite-sql-console-modal"
                 :show="false"
-                maxWidth="2xl"
-                overlayClass="bg-brand-ink/40"
+                maxWidth="3xl"
+                overlayClass="bg-brand-ink/30"
+                panelClass="dply-modal-panel overflow-hidden shadow-xl flex max-h-[min(90vh,880px)] flex-col"
                 focusable
             >
-                <form wire:submit="runSqliteSql">
-                    <div class="border-b border-brand-ink/10 px-6 py-5">
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('SQLite SQL console') }}</p>
-                        <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ __('Run SQL against this database') }}</h2>
-                        <p class="mt-1 text-sm text-brand-moss">{{ __('Paste a SQL statement (or batch). Output streams back from sqlite3 on the server.') }}</p>
-                        <x-explainer class="mt-3" tone="warn">
-                            <p>{{ __('SQL runs as the engine\'s own DB user via SSH — this is full read + write + DDL access. There\'s no row-level safety net; SELECT and DROP are equally easy to type.') }}</p>
-                            <p>{{ __('The audit log records the verb (SELECT/INSERT/UPDATE/DELETE/DROP/etc.) but not the body of the query, so passwords and key contents never get logged. Output streams back as the engine emits it; there\'s no truncation client-side.') }}</p>
-                        </x-explainer>
+                <form wire:submit="runSqliteSql" class="flex min-h-0 flex-1 flex-col">
+                    <div class="flex shrink-0 items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+                        <x-icon-badge>
+                            <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
+                        </x-icon-badge>
+                        <div class="min-w-0">
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('SQL console') }}</p>
+                            <h2 class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Run SQL against this database') }}</h2>
+                            <p class="mt-1 text-sm leading-6 text-brand-moss">{{ __('Paste a SQL statement (or batch). Output streams back from sqlite3 on the server.') }}</p>
+                            <x-explainer class="mt-3" tone="warn">
+                                <p>{{ __('SQL runs as the engine\'s own DB user via SSH — this is full read + write + DDL access. There\'s no row-level safety net; SELECT and DROP are equally easy to type.') }}</p>
+                                <p>{{ __('The audit log records the verb (SELECT/INSERT/UPDATE/DELETE/DROP/etc.) but not the body of the query, so passwords and key contents never get logged. Output streams back as the engine emits it; there\'s no truncation client-side.') }}</p>
+                            </x-explainer>
+                        </div>
                     </div>
 
-                    <div class="space-y-4 px-6 py-6">
+                    <div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-6">
                         <div>
                             <x-input-label for="sqlite-console-sql" :value="__('SQL')" />
                             <textarea
@@ -1127,19 +694,250 @@
                         @endif
                     </div>
 
-                    <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 px-6 py-4">
+                    <div class="flex shrink-0 flex-wrap justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
                         <x-secondary-button type="button" wire:click="closeSqliteConsoleModal">{{ __('Close') }}</x-secondary-button>
-                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="runSqliteSql">
-                            <span wire:loading.remove wire:target="runSqliteSql">{{ __('Run query') }}</span>
-                            <span wire:loading wire:target="runSqliteSql" class="inline-flex items-center gap-2">
-                                <x-spinner variant="cream" />
+                        <button
+                            type="submit"
+                            wire:loading.attr="disabled"
+                            wire:target="runSqliteSql"
+                            class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            <span wire:loading.remove wire:target="runSqliteSql" class="inline-flex items-center gap-2">
+                                <x-heroicon-o-play class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                {{ __('Run query') }}
+                            </span>
+                            <span wire:loading wire:target="runSqliteSql" class="inline-flex items-center gap-2 whitespace-nowrap">
+                                <x-spinner variant="cream" size="sm" />
                                 {{ __('Running…') }}
                             </span>
-                        </x-primary-button>
+                        </button>
                     </div>
                 </form>
             </x-modal>
         @endif
+
+        {{-- Credentials modal — opens automatically when a database is created --}}
+        <x-modal name="database-credentials-modal" max-width="xl" focusable>
+            @if ($generated_database_credentials)
+                @php
+                    $creds = $generated_database_credentials;
+                    $credPlainPw = $creds['password'] ?? null;
+                    $credPwHidden = (bool) ($creds['password_hidden'] ?? false);
+                    $credEmailed = (bool) ($creds['credentials_emailed'] ?? false);
+                    $credShowPw = filled($credPlainPw) && ! $credPwHidden;
+                    $credPort = (int) ($creds['port'] ?? 5432);
+                    $credUser = $creds['username'] ?? '';
+                    $credDb = $creds['name'] ?? '';
+                    $credEngine = $creds['engine'] ?? 'postgres';
+                    $credPrivateIp = $creds['server_private_ip'] ?? null;
+                    $credPublicIp = $creds['server_public_ip'] ?? null;
+                    $credRemoteAccess = (bool) ($creds['remote_access'] ?? false);
+
+                    // Build connection URLs for local and remote.
+                    $userEnc = rawurlencode($credUser);
+                    $passEnc = $credShowPw ? rawurlencode((string) $credPlainPw) : '●●●●●●●●';
+                    $localConnStr = match ($credEngine) {
+                        'postgres' => "postgresql://{$userEnc}:{$passEnc}@127.0.0.1:{$credPort}/{$credDb}",
+                        'mongodb' => "mongodb://{$userEnc}:{$passEnc}@127.0.0.1:{$credPort}/{$credDb}?authSource={$credDb}",
+                        'clickhouse' => "clickhouse://{$userEnc}:{$passEnc}@127.0.0.1:{$credPort}/{$credDb}",
+                        default => "mysql://{$userEnc}:{$passEnc}@127.0.0.1:{$credPort}/{$credDb}",
+                    };
+                    $remoteHost = $credPrivateIp ?? $credPublicIp;
+                    $remoteConnStr = $remoteHost ? match ($credEngine) {
+                        'postgres' => "postgresql://{$userEnc}:{$passEnc}@{$remoteHost}:{$credPort}/{$credDb}",
+                        'mongodb' => "mongodb://{$userEnc}:{$passEnc}@{$remoteHost}:{$credPort}/{$credDb}?authSource={$credDb}",
+                        'clickhouse' => "clickhouse://{$userEnc}:{$passEnc}@{$remoteHost}:{$credPort}/{$credDb}",
+                        default => "mysql://{$userEnc}:{$passEnc}@{$remoteHost}:{$credPort}/{$credDb}",
+                    } : null;
+
+                    // Use standard connection URLs — TablePlus registers as the OS
+                    // handler for postgresql://, mysql://, etc. on macOS.
+                    $tpRemoteUrl = $remoteConnStr;
+                @endphp
+                <div
+                    class="bg-white"
+                    x-data="{
+                        copiedKey: null,
+                        async copy(text, key) {
+                            try {
+                                await navigator.clipboard.writeText(text);
+                                this.copiedKey = key;
+                                setTimeout(() => this.copiedKey = null, 1800);
+                            } catch (e) {}
+                        },
+                    }"
+                >
+                    {{-- Header --}}
+                    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5">
+                        <x-icon-badge>
+                            <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
+                        </x-icon-badge>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Database created') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':name credentials', ['name' => $credDb]) }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                                @if ($credEmailed)
+                                    {{ __('Emailed to you. Copy the password now — it hides when you close this.') }}
+                                @else
+                                    {{ __('Copy the password now — it hides when you close this.') }}
+                                @endif
+                            </p>
+                        </div>
+                        <button type="button" x-on:click="$dispatch('close-modal', 'database-credentials-modal')" class="shrink-0 rounded-lg p-1 text-brand-mist hover:bg-brand-sand/40 hover:text-brand-ink">
+                            <x-heroicon-o-x-mark class="h-5 w-5" />
+                        </button>
+                    </div>
+
+                    <div class="divide-y divide-brand-ink/5 overflow-y-auto" style="max-height: 70vh">
+                        {{-- Core credentials --}}
+                        <div class="grid gap-3 p-6 sm:grid-cols-2">
+                            @if (filled($credUser))
+                                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
+                                    <div class="flex items-center justify-between">
+                                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Username') }}</dt>
+                                        <button type="button" class="text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($credUser), 'user')">
+                                            <span x-show="copiedKey !== 'user'">{{ __('Copy') }}</span>
+                                            <span x-show="copiedKey === 'user'" x-cloak>{{ __('Copied!') }}</span>
+                                        </button>
+                                    </div>
+                                    <dd class="mt-0.5 break-all font-mono text-sm font-semibold text-brand-ink">{{ $credUser }}</dd>
+                                </div>
+                            @endif
+                            @if (filled($credPlainPw) || $credPwHidden)
+                                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
+                                    <div class="flex items-center justify-between">
+                                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Password') }}</dt>
+                                        @if ($credShowPw)
+                                            <button type="button" class="text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($credPlainPw), 'pw')">
+                                                <span x-show="copiedKey !== 'pw'">{{ __('Copy') }}</span>
+                                                <span x-show="copiedKey === 'pw'" x-cloak>{{ __('Copied!') }}</span>
+                                            </button>
+                                        @endif
+                                    </div>
+                                    @if ($credShowPw)
+                                        <dd class="mt-0.5 break-all font-mono text-sm font-semibold text-brand-ink">{{ $credPlainPw }}</dd>
+                                    @else
+                                        <dd class="mt-0.5 font-mono text-sm tracking-widest text-brand-mist">••••••••••••••••</dd>
+                                        <p class="mt-0.5 text-[11px] text-brand-mist">{{ __('Retrieve from Credentials on the database row.') }}</p>
+                                    @endif
+                                </div>
+                            @endif
+                        </div>
+
+                        {{-- Local connection --}}
+                        @if ($credEngine !== 'sqlite')
+                            <div class="px-6 py-5">
+                                <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Local connection') }} <span class="ml-1 font-normal normal-case text-brand-mist">{{ __('— for apps running on this server') }}</span></p>
+                                <div class="space-y-2">
+                                    <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/10 px-3 py-2.5">
+                                        <div class="min-w-0 flex-1">
+                                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host & Port') }}</p>
+                                            <code class="font-mono text-sm font-semibold text-brand-ink">127.0.0.1:{{ $credPort }}</code>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/10 px-3 py-2.5">
+                                        <div class="min-w-0 flex-1">
+                                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Connection URL') }}</p>
+                                            <code class="break-all font-mono text-xs text-brand-ink">{{ $localConnStr }}</code>
+                                        </div>
+                                        <button type="button" class="shrink-0 text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($localConnStr), 'local_url')">
+                                            <span x-show="copiedKey !== 'local_url'">{{ __('Copy') }}</span>
+                                            <span x-show="copiedKey === 'local_url'" x-cloak>{{ __('Copied!') }}</span>
+                                        </button>
+                                    </div>
+                                    <button type="button" onclick="window.location.href={{ json_encode($localConnStr) }}" class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                        <x-heroicon-o-table-cells class="h-4 w-4" aria-hidden="true" />
+                                        {{ __('Open in TablePlus') }}
+                                    </button>
+                                </div>
+                            </div>
+                        @endif
+
+                        {{-- Remote connection --}}
+                        @if ($remoteConnStr)
+                            <div class="px-6 py-5">
+                                <p class="mb-3 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">
+                                    {{ __('Remote connection') }}
+                                    @if ($credPrivateIp)
+                                        <span class="ml-1 font-normal normal-case text-emerald-600">{{ __('— via private network') }}</span>
+                                    @else
+                                        <span class="ml-1 font-normal normal-case text-amber-700">{{ __('— via public IP') }}</span>
+                                    @endif
+                                </p>
+                                @if (! $credRemoteAccess)
+                                    <p class="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                        {{ __('Remote access is not yet enabled for this database. Go to Networking → enable remote access first.') }}
+                                    </p>
+                                @endif
+                                <div class="space-y-2">
+                                    <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/10 px-3 py-2.5">
+                                        <div class="min-w-0 flex-1">
+                                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Host & Port') }}</p>
+                                            <code class="font-mono text-sm font-semibold text-brand-ink">{{ $remoteHost }}:{{ $credPort }}</code>
+                                        </div>
+                                        <button type="button" class="shrink-0 text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($remoteHost.':'.$credPort), 'remote_host')">
+                                            <span x-show="copiedKey !== 'remote_host'">{{ __('Copy') }}</span>
+                                            <span x-show="copiedKey === 'remote_host'" x-cloak>{{ __('Copied!') }}</span>
+                                        </button>
+                                    </div>
+                                    <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/10 px-3 py-2.5">
+                                        <div class="min-w-0 flex-1">
+                                            <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Connection URL') }}</p>
+                                            <code class="break-all font-mono text-xs text-brand-ink">{{ $remoteConnStr }}</code>
+                                        </div>
+                                        <button type="button" class="shrink-0 text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($remoteConnStr), 'remote_url')">
+                                            <span x-show="copiedKey !== 'remote_url'">{{ __('Copy') }}</span>
+                                            <span x-show="copiedKey === 'remote_url'" x-cloak>{{ __('Copied!') }}</span>
+                                        </button>
+                                    </div>
+                                    @if ($tpRemoteUrl)
+                                        <button type="button" onclick="window.location.href={{ json_encode($remoteConnStr) }}" class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                            <x-heroicon-o-table-cells class="h-4 w-4" aria-hidden="true" />
+                                            {{ __('Open in TablePlus (remote)') }}
+                                        </button>
+                                    @endif
+                                </div>
+                            </div>
+                        @elseif ($credEngine !== 'sqlite')
+                            <div class="px-6 py-4">
+                                <p class="text-xs text-brand-mist">
+                                    {{ __('No remote connection available — attach this server to a private network (Networking workspace) to get a private IP for external access.') }}
+                                </p>
+                            </div>
+                        @endif
+
+                        {{-- SQLite path --}}
+                        @if ($credEngine === 'sqlite' && filled($creds['host'] ?? null))
+                            <div class="px-6 py-5">
+                                <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/10 px-3 py-2.5">
+                                    <div class="min-w-0 flex-1">
+                                        <p class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('File path') }}</p>
+                                        <code class="break-all font-mono text-sm font-semibold text-brand-ink">{{ $creds['host'] }}</code>
+                                    </div>
+                                    <button type="button" class="shrink-0 text-[11px] font-medium text-brand-sage hover:underline" @click="copy(@js($creds['host']), 'sqlite_path')">
+                                        <span x-show="copiedKey !== 'sqlite_path'">{{ __('Copy') }}</span>
+                                        <span x-show="copiedKey === 'sqlite_path'" x-cloak>{{ __('Copied!') }}</span>
+                                    </button>
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+
+                    {{-- Footer --}}
+                    <div class="flex items-center justify-between border-t border-brand-ink/10 bg-brand-sand/10 px-6 py-4">
+                        <p class="text-[11px] text-brand-mist">{{ __('Password hides when you close this dialog.') }}</p>
+                        <button
+                            type="button"
+                            x-on:click="$dispatch('close-modal', 'database-credentials-modal')"
+                            wire:click="hideGeneratedDatabasePassword"
+                            class="inline-flex items-center gap-2 rounded-lg bg-brand-forest px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-forest/90"
+                        >
+                            {{ __('Done') }}
+                        </button>
+                    </div>
+                </div>
+            @endif
+        </x-modal>
 
         @include('livewire.servers.partials.remove-server-modal', [
             'open' => $showRemoveServerModal,

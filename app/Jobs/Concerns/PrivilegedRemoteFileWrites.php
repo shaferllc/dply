@@ -25,6 +25,10 @@ trait PrivilegedRemoteFileWrites
      */
     protected function privilegedCommand(Server $server, string $command): string
     {
+        if (str_contains($command, "\0")) {
+            $command = str_replace("\0", '', $command);
+        }
+
         return 'sudo -n bash -lc '.escapeshellarg($command);
     }
 

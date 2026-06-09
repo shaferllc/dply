@@ -1,31 +1,26 @@
 <?php
 
-namespace Tests\Feature;
+namespace Tests\Feature\BackfillOrganizationMembershipsTest;
 
 use App\Models\Organization;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-use Tests\TestCase;
 
-class BackfillOrganizationMembershipsTest extends TestCase
-{
-    use RefreshDatabase;
+uses(RefreshDatabase::class);
 
-    public function test_command_creates_a_workspace_for_users_without_an_organization(): void
-    {
-        $user = User::factory()->create([
-            'name' => 'Orphaned User',
-            'email' => 'orphaned@example.com',
-        ]);
+test('command creates a workspace for users without an organization', function () {
+    $user = User::factory()->create([
+        'name' => 'Orphaned User',
+        'email' => 'orphaned@example.com',
+    ]);
 
-        $this->assertFalse($user->organizations()->exists());
+    expect($user->organizations()->exists())->toBeFalse();
 
-        Artisan::call('dply:backfill-organizations');
+    Artisan::call('dply:backfill-organizations');
 
-        $org = Organization::query()->where('name', "Orphaned User's Workspace")->first();
+    $org = Organization::query()->where('name', "Orphaned User's Workspace")->first();
 
-        $this->assertNotNull($org);
-        $this->assertTrue($org->hasMember($user->fresh()));
-    }
-}
+    expect($org)->not->toBeNull();
+    expect($org->hasMember($user->fresh()))->toBeTrue();
+});

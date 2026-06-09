@@ -3,6 +3,7 @@
 namespace App\Services\Servers;
 
 use App\Events\Servers\ServerAuthorizedKeysSynced;
+use App\Jobs\SyncAuthorizedKeysJob;
 use App\Models\Server;
 use App\Models\ServerAuthorizedKey;
 use App\Models\ServerSshKeyAuditEvent;
@@ -17,11 +18,11 @@ class ServerAuthorizedKeysSynchronizer
 
     /**
      * Optional output callback set by callers that want to stream the SSH process output as it's
-     * produced (e.g. {@see \App\Jobs\SyncAuthorizedKeysJob} writing chunks into the application
+     * produced (e.g. {@see SyncAuthorizedKeysJob} writing chunks into the application
      * cache so the workspace banner can render a live tail). When null, the synchronizer falls
      * back to the buffered `runScript` path it always used.
      *
-     * @var (callable(string $type, string $chunk): void)|null
+     * @var (callable(string, string): void)|null
      */
     protected $outputCallback = null;
 

@@ -2,11 +2,11 @@
 
 namespace App\Livewire\Scripts;
 
+use App\Livewire\Concerns\RequiresFeature;
 use App\Models\Script;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
-use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
@@ -15,6 +15,7 @@ class Create extends Component
     use RequiresFeature;
 
     protected string $requiredFeature = 'surface.scripts';
+
     public string $name = '';
 
     public string $content = "#!/bin/bash\nset -euo pipefail\n\necho \"OK\"\n";
@@ -53,6 +54,11 @@ class Create extends Component
             'run_as_user' => $this->run_as_user !== '' ? $this->run_as_user : null,
             'source' => Script::SOURCE_USER_CREATED,
             'marketplace_key' => null,
+        ]);
+
+        audit_log($org, Auth::user(), 'script.created', $script, null, [
+            'name' => $script->name,
+            'run_as_user' => $script->run_as_user,
         ]);
 
         return $this->redirect(route('scripts.edit', $script), navigate: true);

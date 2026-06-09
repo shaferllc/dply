@@ -7,7 +7,7 @@ use App\Models\Server;
 use App\Models\User;
 use App\Services\ConfigRevisions\ConfigRevisionContext;
 use App\Services\ConfigRevisions\ConfigRevisionRecorder;
-use Illuminate\Support\Facades\Cache;
+use App\Support\Servers\ServerPhpMutationLock;
 
 class ServerPhpConfigEditor
 {
@@ -49,7 +49,6 @@ class ServerPhpConfigEditor
     {
         return $this->recorder->checksumFor(['path' => $path, 'content' => $content]);
     }
-
 
     /**
      * @return array{
@@ -138,6 +137,7 @@ class ServerPhpConfigEditor
         string $content,
         ?User $user = null,
         ?string $summary = null,
+        ?callable $afterLockAcquired = null,
     ): array {
         $version = $this->normalizeVersionId($version);
         $target = trim($target);
@@ -146,13 +146,16 @@ class ServerPhpConfigEditor
             throw new \RuntimeException('A PHP version and config target are required.');
         }
 
-        $lock = Cache::lock($this->serverMutationLockKey($server), 150);
+        $lock = ServerPhpMutationLock::acquire($server, 150);
+        $acquired = $lock->get();
 
-        if (! $lock->get()) {
-            throw new \RuntimeException('Another PHP server mutation is already running for this server.');
+        if (! $acquired) {
+            throw new \RuntimeException('Another PHP package action is already running for this server.');
         }
 
         try {
+            $afterLockAcquired?->__invoke();
+
             $server = $server->fresh() ?? $server;
             $resolved = $this->resolveEditableTarget($server, $version, $target);
             $verification = $this->verifyProposedContent($server, $resolved, $content);
@@ -211,7 +214,7 @@ class ServerPhpConfigEditor
                 'revision_id' => $revision?->id,
             ];
         } finally {
-            $lock->release();
+            ServerPhpMutationLock::releaseIfOwned($lock, $acquired);
         }
     }
 
@@ -334,7 +337,7 @@ class ServerPhpConfigEditor
 
     protected function serverMutationLockKey(Server $server): string
     {
-        return 'server-php-package-action:'.$server->id;
+        return ServerPhpMutationLock::key($server);
     }
 
     /**

@@ -2,58 +2,47 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature\Services\Serverless;
+namespace Tests\Feature\Services\Serverless\ServerlessCostEstimatorTest;
 
 use App\Models\Site;
 use App\Services\Serverless\ServerlessCostEstimator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
 
-class ServerlessCostEstimatorTest extends TestCase
-{
-    use RefreshDatabase;
+uses(RefreshDatabase::class);
 
-    public function test_function_fee_comes_from_subscription_config(): void
-    {
-        config(['subscription.standard.serverless_cents' => 200]);
+test('function fee comes from subscription config', function () {
+    config(['subscription.standard.serverless_cents' => 200]);
 
-        $this->assertSame(2.0, (new ServerlessCostEstimator)->functionFee());
-    }
+    expect((new ServerlessCostEstimator)->functionFee())->toBe(2.0);
+});
+test('cluster costs come from the pricing config', function () {
+    $estimator = new ServerlessCostEstimator;
 
-    public function test_cluster_costs_come_from_the_pricing_config(): void
-    {
-        $estimator = new ServerlessCostEstimator;
+    expect($estimator->databaseMonthly('db-s-1vcpu-1gb'))->toBe(15.0);
+    expect($estimator->cacheMonthly('db-s-2vcpu-4gb'))->toBe(60.0);
+    expect($estimator->databaseMonthly('unknown-size'))->toBe(0.0);
+});
+test('for site sums function fee plus provisioned resources', function () {
+    config(['subscription.standard.serverless_cents' => 200]);
 
-        $this->assertSame(15.0, $estimator->databaseMonthly('db-s-1vcpu-1gb'));
-        $this->assertSame(60.0, $estimator->cacheMonthly('db-s-2vcpu-4gb'));
-        $this->assertSame(0.0, $estimator->databaseMonthly('unknown-size'));
-    }
+    $site = Site::factory()->create(['meta' => ['serverless' => [
+        'database' => ['size' => 'db-s-1vcpu-1gb', 'status' => 'online'],
+        'cache' => ['size' => 'db-s-1vcpu-2gb', 'status' => 'online'],
+    ]]]);
 
-    public function test_for_site_sums_function_fee_plus_provisioned_resources(): void
-    {
-        config(['subscription.standard.serverless_cents' => 200]);
+    $estimate = (new ServerlessCostEstimator)->forSite($site);
 
-        $site = Site::factory()->create(['meta' => ['serverless' => [
-            'database' => ['size' => 'db-s-1vcpu-1gb', 'status' => 'online'],
-            'cache' => ['size' => 'db-s-1vcpu-2gb', 'status' => 'online'],
-        ]]]);
+    // $2 function + $15 database + $30 Redis.
+    expect($estimate['total'])->toBe(47.0);
+    expect($estimate['lines'])->toHaveCount(3);
+});
+test('for site with no resources is just the function fee', function () {
+    config(['subscription.standard.serverless_cents' => 200]);
 
-        $estimate = (new ServerlessCostEstimator)->forSite($site);
+    $site = Site::factory()->create(['meta' => ['serverless' => []]]);
 
-        // $2 function + $15 database + $30 Redis.
-        $this->assertSame(47.0, $estimate['total']);
-        $this->assertCount(3, $estimate['lines']);
-    }
+    $estimate = (new ServerlessCostEstimator)->forSite($site);
 
-    public function test_for_site_with_no_resources_is_just_the_function_fee(): void
-    {
-        config(['subscription.standard.serverless_cents' => 200]);
-
-        $site = Site::factory()->create(['meta' => ['serverless' => []]]);
-
-        $estimate = (new ServerlessCostEstimator)->forSite($site);
-
-        $this->assertSame(2.0, $estimate['total']);
-        $this->assertCount(1, $estimate['lines']);
-    }
-}
+    expect($estimate['total'])->toBe(2.0);
+    expect($estimate['lines'])->toHaveCount(1);
+});

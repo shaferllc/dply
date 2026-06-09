@@ -2,12 +2,20 @@
 
 namespace App\Services\Certificates;
 
+use App\Jobs\ApplySiteWebserverConfigJob;
+use App\Jobs\Concerns\PrivilegedRemoteFileWrites;
 use App\Models\Site;
 use App\Models\SiteCertificate;
+use App\Services\Servers\OpenLiteSpeedTlsConfigurator;
+use App\Services\Sites\SiteWebserverConfigApplier;
 use App\Services\SshConnection;
+use App\Support\Sites\CertbotOutputParser;
+use App\Support\Sites\LetsEncryptCertbotCommandBuilder;
 
 class LetsEncryptHttpCertificateEngine implements CertificateEngine
 {
+    use PrivilegedRemoteFileWrites;
+
     public function supports(SiteCertificate $certificate): bool
     {
         return $certificate->provider_type === SiteCertificate::PROVIDER_LETSENCRYPT
@@ -44,28 +52,17 @@ class LetsEncryptHttpCertificateEngine implements CertificateEngine
             ]),
         ])->save();
 
-        $flags = collect($domains)->map(fn (string $domain): string => '-d '.escapeshellarg($domain))->implode(' ');
-        $cmd = match ($site->webserver()) {
-            'apache' => sprintf(
-                'certbot --apache %s --non-interactive --agree-tos -m %s --redirect 2>&1',
-                $flags,
-                escapeshellarg($email)
-            ),
-            'openlitespeed', 'traefik', 'caddy' => sprintf(
-                'certbot certonly --webroot -w %s %s --non-interactive --agree-tos -m %s 2>&1',
-                escapeshellarg($site->effectiveDocumentRoot()),
-                $flags,
-                escapeshellarg($email)
-            ),
-            default => sprintf(
-                'certbot --nginx %s --non-interactive --agree-tos -m %s --redirect 2>&1',
-                $flags,
-                escapeshellarg($email)
-            ),
-        };
+        if (LetsEncryptCertbotCommandBuilder::usesWebrootChallenge($site)) {
+            app(SiteWebserverConfigApplier::class)->apply($site);
+        }
+
+        $cmd = LetsEncryptCertbotCommandBuilder::build($site, $domains, $email);
 
         $ssh = new SshConnection($server);
-        $output = $ssh->exec($cmd.'; printf "\nDPLY_EXIT:%s" "$?"', 600);
+        $output = $ssh->exec(
+            $this->privilegedCommand($server, $cmd.'; printf "\nDPLY_EXIT:%s" "$?"'),
+            600,
+        );
         $exitCode = preg_match('/DPLY_EXIT:(\d+)/', $output, $matches) ? (int) $matches[1] : 1;
         $ok = $exitCode === 0;
 
@@ -98,7 +95,20 @@ class LetsEncryptHttpCertificateEngine implements CertificateEngine
         }
 
         if (! $ok) {
-            throw new \RuntimeException('Certbot exited with code '.$exitCode.'. Check certificate output for details.');
+            $summary = CertbotOutputParser::failureSummary($output);
+            throw new \RuntimeException(
+                $summary !== ''
+                    ? 'Certbot exited with code '.$exitCode.': '.$summary
+                    : 'Certbot exited with code '.$exitCode.'. Check certificate output for details.',
+            );
+        }
+
+        if ($site->webserver() === 'openlitespeed') {
+            app(OpenLiteSpeedTlsConfigurator::class)->syncServer($server->fresh());
+        }
+
+        if (LetsEncryptCertbotCommandBuilder::usesWebrootChallenge($site)) {
+            ApplySiteWebserverConfigJob::dispatch((string) $site->id);
         }
 
         return $certificate->fresh();

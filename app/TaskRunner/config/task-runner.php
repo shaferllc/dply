@@ -5,6 +5,22 @@ declare(strict_types=1);
 return [
     /*
     |--------------------------------------------------------------------------
+    | Stalled-task sweeper
+    |--------------------------------------------------------------------------
+    |
+    | Thresholds for SweepStalledTasksCommand, the backstop that fails tasks
+    | stuck in `running` (lost callback / dead box). A task is swept when it has
+    | gone `heartbeat_seconds` with no output, or run past its own timeout plus
+    | `grace_seconds`.
+    |
+    */
+    'stall' => [
+        'heartbeat_seconds' => (int) env('DPLY_TASK_STALL_HEARTBEAT_SECONDS', 600),
+        'grace_seconds' => (int) env('DPLY_TASK_STALL_GRACE_SECONDS', 120),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Temporary Directory
     |--------------------------------------------------------------------------
     |
@@ -12,7 +28,7 @@ return [
     | If not set, the system's default temporary directory will be used.
     |
     */
-    'temporary_directory' => env('TASK_RUNNER_TEMPORARY_DIRECTORY', ''),
+    'temporary_directory' => env('TASK_RUNNER_TEMPORARY_DIRECTORY', storage_path('app/task-runner/temp')),
 
     /*
     |--------------------------------------------------------------------------
@@ -189,4 +205,27 @@ return [
             'check_dangerous_patterns' => env('TASK_RUNNER_VIEW_VALIDATION_PATTERNS', true),
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | SSH Connection Multiplexing
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, RemoteProcessRunner reuses a persistent OpenSSH control
+    | master per server so repeated ssh/scp calls skip the TCP + auth handshake
+    | (the dominant cost of a small remote op like reading a config file).
+    |
+    | OFF by default: the master is established out-of-band and command ssh/scp
+    | attach with ControlMaster=no (so a command can never become a persistent
+    | master — that would leak its pipes into the daemon and hang Symfony
+    | Process at max_execution_time). The failure mode is graceful (commands
+    | fall back to direct connections), but the master path touches every
+    | remote call, so opt in deliberately and verify on your host first.
+    |
+    | 'ssh_control_persist' is passed to OpenSSH's ControlPersist — how long an
+    | idle master lingers after the last connection closes.
+    |
+    */
+    'ssh_multiplexing' => (bool) env('TASK_RUNNER_SSH_MULTIPLEXING', false),
+    'ssh_control_persist' => env('TASK_RUNNER_SSH_CONTROL_PERSIST', '60s'),
 ];

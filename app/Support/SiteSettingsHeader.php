@@ -22,6 +22,10 @@ final class SiteSettingsHeader
      */
     public static function for(Site $site, Server $server, string $section): array
     {
+        if ($site->usesEdgeRuntime()) {
+            return self::forEdge($section);
+        }
+
         $resourceNoun = $site->runtimeTargetMode() === 'vm' ? __('site') : __('app');
 
         return match ($section) {
@@ -32,13 +36,8 @@ final class SiteSettingsHeader
             ],
             'routing' => [
                 'title' => __('Routing'),
-                'description' => __('Domains, aliases, redirects, preview hosts, and tenant routing for this :resource.', ['resource' => $resourceNoun]),
+                'description' => __('Domains, DNS automation, aliases, redirects, preview hosts, and tenant routing for this :resource.', ['resource' => $resourceNoun]),
                 'icon' => 'heroicon-o-share',
-            ],
-            'dns' => [
-                'title' => __('DNS'),
-                'description' => __('DNS providers and the records Dply manages for this :resource.', ['resource' => $resourceNoun]),
-                'icon' => 'heroicon-o-signal',
             ],
             'certificates' => [
                 'title' => __('Certificates'),
@@ -46,9 +45,14 @@ final class SiteSettingsHeader
                 'icon' => 'heroicon-o-shield-check',
             ],
             'deploy' => [
-                'title' => __('Deploy'),
-                'description' => __('Repository source, no-downtime rollout strategy, deploy scripts, hooks, and release/log access for this :resource.', ['resource' => $resourceNoun]),
+                'title' => __('Deployments'),
+                'description' => __('Deploy history, triggers, and release rollback for this :resource.', ['resource' => $resourceNoun]),
                 'icon' => 'heroicon-o-code-bracket-square',
+            ],
+            'pipeline' => [
+                'title' => __('Pipeline'),
+                'description' => __('Build steps, deploy hooks, zero-downtime rollout, and post-activate checks for this :resource.', ['resource' => $resourceNoun]),
+                'icon' => 'heroicon-o-adjustments-horizontal',
             ],
             'repository' => [
                 'title' => __('Repository'),
@@ -59,23 +63,8 @@ final class SiteSettingsHeader
                 'title' => __('Runtime'),
                 'description' => $site->usesFunctionsRuntime()
                     ? __('How this function executes — runtime, entrypoint, and the memory, timeout, and concurrency limits applied to the action.')
-                    : __('What this :resource runs and how — language, processes, detection, and container lifecycle.', ['resource' => $resourceNoun]),
+                    : __('What this :resource runs and how — language, processes, detection, and per-language tuning (PHP, Ruby, or Static) on the tabs below.', ['resource' => $resourceNoun]),
                 'icon' => 'heroicon-o-cube-transparent',
-            ],
-            'runtime-php' => [
-                'title' => __('PHP runtime'),
-                'description' => __('PHP version, memory and execution limits, FPM pool user, scheduler, and Octane settings for this :resource.', ['resource' => $resourceNoun]),
-                'icon' => 'heroicon-o-cog',
-            ],
-            'runtime-ruby' => [
-                'title' => __('Ruby runtime'),
-                'description' => __('Ruby/Rails-specific runtime settings for this :resource.', ['resource' => $resourceNoun]),
-                'icon' => 'heroicon-o-cog',
-            ],
-            'runtime-static' => [
-                'title' => __('Static runtime'),
-                'description' => __('Published path and static-site specific runtime settings for this :resource.', ['resource' => $resourceNoun]),
-                'icon' => 'heroicon-o-cog',
             ],
             'system-user' => [
                 'title' => __('System user'),
@@ -97,6 +86,11 @@ final class SiteSettingsHeader
                 'description' => __('Environment variables and secrets injected when this :resource builds and runs.', ['resource' => $resourceNoun]),
                 'icon' => 'heroicon-o-command-line',
             ],
+            'resources' => [
+                'title' => __('Resources'),
+                'description' => __('A visual map of this :resource and the resources wired to it — attach a database, cache, queue, storage, mail and more.', ['resource' => $resourceNoun]),
+                'icon' => 'heroicon-o-puzzle-piece',
+            ],
             'logs' => [
                 'title' => __('Logs'),
                 'description' => __('Deploy logs, runtime logs, and per-:resource log shortcuts.', ['resource' => $resourceNoun]),
@@ -112,6 +106,11 @@ final class SiteSettingsHeader
                 'description' => __('Username and password gate that the webserver checks before letting a request reach this :resource.', ['resource' => $resourceNoun]),
                 'icon' => 'heroicon-o-lock-closed',
             ],
+            'cli' => [
+                'title' => __('CLI'),
+                'description' => __('Install the dply CLI and manage this :resource from your terminal.', ['resource' => $resourceNoun]),
+                'icon' => 'heroicon-o-command-line',
+            ],
             'danger' => [
                 'title' => __('Danger zone'),
                 'description' => __('Suspend, archive, transfer, or delete this :resource. Actions here are scoped tightly and most are irreversible.', ['resource' => $resourceNoun]),
@@ -121,6 +120,90 @@ final class SiteSettingsHeader
                 'title' => $site->name,
                 'description' => __('Manage this :resource.', ['resource' => $resourceNoun]),
                 'icon' => 'heroicon-o-rectangle-stack',
+            ],
+        };
+    }
+
+    /**
+     * @return array{title: string, description: string, icon: string}
+     */
+    private static function forEdge(string $section): array
+    {
+        return match ($section) {
+            'general' => [
+                'title' => __('Overview'),
+                'description' => __('Live URL, source repository, deploy status, and quick actions for this Edge site.'),
+                'icon' => 'heroicon-o-home',
+            ],
+            'edge-deploys' => [
+                'title' => __('Deploys'),
+                'description' => __('Build and publish history — redeploy production or roll back to a previous release.'),
+                'icon' => 'heroicon-o-code-bracket-square',
+            ],
+            'edge-domains' => [
+                'title' => __('Domains'),
+                'description' => __('Attach custom hostnames to this Edge site. TLS is provisioned automatically on the edge network.'),
+                'icon' => 'heroicon-o-globe-alt',
+            ],
+            'edge-build' => [
+                'title' => __('Build'),
+                'description' => __('Build command, output directory, repo config snapshot, and deploy retention.'),
+                'icon' => 'heroicon-o-wrench-screwdriver',
+            ],
+            'edge-routing' => [
+                'title' => __('Routing'),
+                'description' => __('Redirects, rewrites, and headers from dply.yaml (read-only).'),
+                'icon' => 'heroicon-o-arrows-right-left',
+            ],
+            'edge-environment' => [
+                'title' => __('Environment'),
+                'description' => __('Production secrets injected at build and runtime.'),
+                'icon' => 'heroicon-o-command-line',
+            ],
+            'edge-deploy-triggers' => [
+                'title' => __('Deploy triggers'),
+                'description' => __('Deploy hooks, GitHub auto-deploy webhooks, and deploy notification routing.'),
+                'icon' => 'heroicon-o-bolt',
+            ],
+            'edge-members' => [
+                'title' => __('Members'),
+                'description' => __('Per-site viewer, deployer, and admin grants on top of org membership.'),
+                'icon' => 'heroicon-o-user-group',
+            ],
+            'edge-delivery' => [
+                'title' => __('Delivery'),
+                'description' => __('Edge CDN backend, hybrid SSR origin, image optimization, and cache purge.'),
+                'icon' => 'heroicon-o-cloud',
+            ],
+            'edge-previews' => [
+                'title' => __('Previews'),
+                'description' => __('Branch preview deployments, preview protection, and the review comment widget.'),
+                'icon' => 'heroicon-o-sparkles',
+            ],
+            'edge-billing' => [
+                'title' => __('Billing & usage'),
+                'description' => __('Platform fee, delivery usage, and request/egress stats for this Edge site.'),
+                'icon' => 'heroicon-o-chart-bar',
+            ],
+            'edge-traffic' => [
+                'title' => __('Traffic & analytics'),
+                'description' => __('CDN request and bandwidth stats from daily Cloudflare zone analytics — not real-time HTTP access logs.'),
+                'icon' => 'heroicon-o-signal',
+            ],
+            'edge-logs' => [
+                'title' => __('Build & deploy logs'),
+                'description' => __('Recent build output and deployment activity — not HTTP visitor access logs.'),
+                'icon' => 'heroicon-o-clipboard-document-list',
+            ],
+            'danger' => [
+                'title' => __('Danger zone'),
+                'description' => __('Permanently delete this Edge site and remove all deployments from the CDN.'),
+                'icon' => 'heroicon-o-exclamation-triangle',
+            ],
+            default => [
+                'title' => __('Edge site'),
+                'description' => __('Manage this Edge site.'),
+                'icon' => 'heroicon-o-globe-alt',
             ],
         };
     }

@@ -36,7 +36,7 @@ class NotificationChannels extends Component
             'intro' => __('Define destinations for alerts and product notifications tied to your account. Org and team channels are managed from their respective settings.'),
             'breadcrumbs' => [
                 ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-                ['label' => __('Profile'), 'href' => route('profile.edit'), 'icon' => 'user-circle'],
+                ['label' => __('Profile'), 'href' => route('settings.profile'), 'icon' => 'user-circle'],
                 ['label' => __('Notification channels'), 'icon' => 'bell-alert'],
             ],
             'showBulkAssign' => true,

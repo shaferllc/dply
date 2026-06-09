@@ -8,6 +8,8 @@ use App\Models\Server;
 use App\Models\ServerRecipe;
 use App\Models\User;
 use App\Models\WebserverTemplate;
+use App\Models\Workspace;
+use App\Models\WorkspaceRunbook;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Gate;
 
@@ -103,6 +105,50 @@ class MarketplaceImportService
             'user_id' => $user->id,
             'name' => (string) ($payload['name'] ?? $item->name),
             'script' => $script,
+        ]);
+    }
+
+    public function importWorkspaceRunbook(User $user, MarketplaceItem $item, Workspace $workspace): WorkspaceRunbook
+    {
+        if ($item->recipe_type !== MarketplaceItem::RECIPE_WORKSPACE_RUNBOOK) {
+            throw new \InvalidArgumentException('Invalid recipe type.');
+        }
+
+        Gate::authorize('update', $workspace);
+
+        $organization = $user->currentOrganization();
+        if (! $organization instanceof Organization || $workspace->organization_id !== $organization->id) {
+            throw new AuthorizationException(__('This project does not belong to your current organization.'));
+        }
+
+        $payload = $item->payload;
+        $title = trim((string) ($payload['title'] ?? $item->name));
+        if ($title === '') {
+            throw new \InvalidArgumentException('Runbook has no title.');
+        }
+
+        $url = trim((string) ($payload['url'] ?? ''));
+        $body = trim((string) ($payload['body'] ?? ''));
+
+        $existing = WorkspaceRunbook::query()
+            ->where('workspace_id', $workspace->id)
+            ->where('title', $title)
+            ->first();
+
+        if ($existing) {
+            $existing->update([
+                'url' => $url !== '' ? $url : null,
+                'body' => $body !== '' ? $body : null,
+            ]);
+
+            return $existing;
+        }
+
+        return $workspace->runbooks()->create([
+            'title' => $title,
+            'url' => $url !== '' ? $url : null,
+            'body' => $body !== '' ? $body : null,
+            'sort_order' => ((int) $workspace->runbooks()->max('sort_order')) + 1,
         ]);
     }
 }

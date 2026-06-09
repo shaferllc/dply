@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature;
+namespace Tests\Feature\SeedProvisionedEnginesTest;
 
 use App\Actions\Servers\SeedProvisionedEnginesForServer;
 use App\Models\Server;
@@ -11,210 +11,249 @@ use App\Models\ServerDatabaseEngine;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
-use Tests\TestCase;
+use Illuminate\Support\Facades\Crypt;
 
-class SeedProvisionedEnginesTest extends TestCase
+uses(RefreshDatabase::class);
+
+test('seeds initial database row and firewall rule from database_server meta', function () {
+    $password = 'SeedDb-Password12';
+    $server = makeServer([
+        'meta' => [
+            'server_role' => 'database',
+            'database' => 'postgres17',
+            'database_server' => [
+                'remote_access' => true,
+                'allowed_from' => '10.20.0.0/16',
+                'database_name' => 'analytics',
+                'username' => 'dply_app',
+                'password_encrypted' => Crypt::encryptString($password),
+            ],
+        ],
+    ]);
+
+    $result = app(SeedProvisionedEnginesForServer::class)->execute($server);
+
+    expect($result['database_row_created'])->toBeTrue();
+
+    $this->assertDatabaseHas('server_databases', [
+        'server_id' => $server->id,
+        'name' => 'analytics',
+        'engine' => 'postgres',
+        'username' => 'dply_app',
+    ]);
+
+    $this->assertDatabaseHas('server_firewall_rules', [
+        'server_id' => $server->id,
+        'port' => 5432,
+        'source' => '10.20.0.0/16',
+        'action' => 'allow',
+    ]);
+});
+test('seeds cache auth password and firewall rule from meta', function () {
+    $password = 'SeedCache-Password12';
+    $server = makeServer([
+        'meta' => [
+            'cache_service' => 'redis',
+            'cache_server' => [
+                'remote_access' => true,
+                'allowed_from' => '10.10.0.0/16',
+                'require_password' => true,
+                'password_encrypted' => Crypt::encryptString($password),
+            ],
+        ],
+    ]);
+
+    app(SeedProvisionedEnginesForServer::class)->execute($server);
+
+    $row = ServerCacheService::query()->where('server_id', $server->id)->first();
+    expect($row)->not->toBeNull();
+    expect($row->auth_password)->toBe($password);
+
+    $this->assertDatabaseHas('server_firewall_rules', [
+        'server_id' => $server->id,
+        'port' => 6379,
+        'source' => '10.10.0.0/16',
+        'action' => 'allow',
+    ]);
+});
+test('seeds cache and database rows from meta', function () {
+    $server = makeServer([
+        'meta' => [
+            'cache_service' => 'redis',
+            'database' => 'postgres18',
+        ],
+    ]);
+
+    $result = app(SeedProvisionedEnginesForServer::class)->execute($server);
+
+    expect($result['cache_created'])->toBeTrue();
+    expect($result['database_created'])->toBeTrue();
+
+    $this->assertDatabaseHas('server_cache_services', [
+        'server_id' => $server->id,
+        'engine' => 'redis',
+        'name' => 'default',
+        'status' => ServerCacheService::STATUS_RUNNING,
+        'port' => 6379,
+    ]);
+    $this->assertDatabaseHas('server_database_engines', [
+        'server_id' => $server->id,
+        'engine' => 'postgres',
+        'is_default' => true,
+        'status' => ServerDatabaseEngine::STATUS_RUNNING,
+        'port' => 5432,
+    ]);
+});
+test('skips when meta says none', function () {
+    $server = makeServer([
+        'meta' => [
+            'cache_service' => 'none',
+            'database' => 'none',
+        ],
+    ]);
+
+    $result = app(SeedProvisionedEnginesForServer::class)->execute($server);
+
+    expect($result['cache_created'])->toBeFalse();
+    expect($result['database_created'])->toBeFalse();
+    $this->assertDatabaseMissing('server_cache_services', ['server_id' => $server->id]);
+    $this->assertDatabaseMissing('server_database_engines', ['server_id' => $server->id]);
+});
+test('skips when meta keys are absent', function () {
+    $server = makeServer(['meta' => []]);
+
+    $result = app(SeedProvisionedEnginesForServer::class)->execute($server);
+
+    expect($result['cache_created'])->toBeFalse();
+    expect($result['database_created'])->toBeFalse();
+    $this->assertDatabaseMissing('server_cache_services', ['server_id' => $server->id]);
+    $this->assertDatabaseMissing('server_database_engines', ['server_id' => $server->id]);
+});
+test('rejects unknown cache engine', function () {
+    $server = makeServer([
+        'meta' => ['cache_service' => 'memcached-but-typo'],
+    ]);
+
+    $result = app(SeedProvisionedEnginesForServer::class)->execute($server);
+
+    expect($result['cache_created'])->toBeFalse();
+    $this->assertDatabaseMissing('server_cache_services', ['server_id' => $server->id]);
+});
+test('double run is idempotent', function () {
+    $server = makeServer([
+        'meta' => [
+            'cache_service' => 'valkey',
+            'database' => 'mysql84',
+        ],
+    ]);
+
+    $first = app(SeedProvisionedEnginesForServer::class)->execute($server);
+    $second = app(SeedProvisionedEnginesForServer::class)->execute($server);
+
+    expect($first['cache_created'])->toBeTrue();
+    expect($first['database_created'])->toBeTrue();
+    expect($second['cache_created'])->toBeFalse();
+    expect($second['database_created'])->toBeFalse();
+
+    expect(ServerCacheService::query()->where('server_id', $server->id)->count())->toBe(1);
+    expect(ServerDatabaseEngine::query()->where('server_id', $server->id)->count())->toBe(1);
+});
+test('preserves existing row inserted by ui', function () {
+    $server = makeServer([
+        'meta' => ['cache_service' => 'redis'],
+    ]);
+
+    // Simulate the UI install path: row already exists with a different status (e.g. a manual
+    // install in progress). The seeder must not overwrite it.
+    ServerCacheService::query()->create([
+        'server_id' => $server->id,
+        'engine' => 'redis',
+        'name' => 'default',
+        'status' => ServerCacheService::STATUS_INSTALLING,
+        'port' => 6379,
+    ]);
+
+    $result = app(SeedProvisionedEnginesForServer::class)->execute($server);
+
+    expect($result['cache_created'])->toBeFalse();
+    $this->assertDatabaseHas('server_cache_services', [
+        'server_id' => $server->id,
+        'engine' => 'redis',
+        'status' => ServerCacheService::STATUS_INSTALLING,
+    ]);
+});
+test('uses correct default port per database engine', function () {
+    $sqliteServer = makeServer(['meta' => ['database' => 'sqlite3']]);
+    $mariadbServer = makeServer(['meta' => ['database' => 'mariadb1011']]);
+
+    app(SeedProvisionedEnginesForServer::class)->execute($sqliteServer);
+    app(SeedProvisionedEnginesForServer::class)->execute($mariadbServer);
+
+    $this->assertDatabaseHas('server_database_engines', [
+        'server_id' => $sqliteServer->id,
+        'engine' => 'sqlite',
+        'port' => 0,
+    ]);
+    $this->assertDatabaseHas('server_database_engines', [
+        'server_id' => $mariadbServer->id,
+        'engine' => 'mariadb',
+        'port' => 3306,
+    ]);
+});
+test('backfill command dry run writes nothing', function () {
+    $server = makeServer([
+        'meta' => ['cache_service' => 'redis', 'database' => 'postgres18'],
+    ]);
+
+    $exit = Artisan::call('dply:servers:backfill-engine-rows', ['--dry-run' => true]);
+
+    expect($exit)->toBe(0);
+    $this->assertDatabaseMissing('server_cache_services', ['server_id' => $server->id]);
+    $this->assertDatabaseMissing('server_database_engines', ['server_id' => $server->id]);
+});
+test('backfill command seeds matching server only', function () {
+    $target = makeServer([
+        'meta' => ['cache_service' => 'redis', 'database' => 'postgres18'],
+    ]);
+    $other = makeServer([
+        'meta' => ['cache_service' => 'memcached', 'database' => 'mysql84'],
+    ]);
+
+    $exit = Artisan::call('dply:servers:backfill-engine-rows', ['--server' => $target->id]);
+
+    expect($exit)->toBe(0);
+    $this->assertDatabaseHas('server_cache_services', ['server_id' => $target->id, 'engine' => 'redis']);
+    $this->assertDatabaseHas('server_database_engines', ['server_id' => $target->id, 'engine' => 'postgres']);
+    $this->assertDatabaseMissing('server_cache_services', ['server_id' => $other->id]);
+    $this->assertDatabaseMissing('server_database_engines', ['server_id' => $other->id]);
+});
+test('backfill command seeds all ready servers', function () {
+    $first = makeServer(['meta' => ['cache_service' => 'redis']]);
+    $second = makeServer(['meta' => ['database' => 'postgres18']]);
+    $pending = makeServer([
+        'meta' => ['cache_service' => 'redis'],
+        'setup_status' => Server::SETUP_STATUS_RUNNING,
+    ]);
+
+    $exit = Artisan::call('dply:servers:backfill-engine-rows');
+
+    expect($exit)->toBe(0);
+    $this->assertDatabaseHas('server_cache_services', ['server_id' => $first->id, 'engine' => 'redis']);
+    $this->assertDatabaseHas('server_database_engines', ['server_id' => $second->id, 'engine' => 'postgres']);
+
+    // Only servers in setup_status=done get seeded — pending/running servers are mid-provision
+    // and will be handled by the post-provision hook when they finish.
+    $this->assertDatabaseMissing('server_cache_services', ['server_id' => $pending->id]);
+});
+/**
+ * @param  array<string, mixed>  $overrides
+ */
+function makeServer(array $overrides = []): Server
 {
-    use RefreshDatabase;
+    $user = User::factory()->create();
 
-    public function test_seeds_cache_and_database_rows_from_meta(): void
-    {
-        $server = $this->makeServer([
-            'meta' => [
-                'cache_service' => 'redis',
-                'database' => 'postgres18',
-            ],
-        ]);
-
-        $result = app(SeedProvisionedEnginesForServer::class)->execute($server);
-
-        $this->assertTrue($result['cache_created']);
-        $this->assertTrue($result['database_created']);
-
-        $this->assertDatabaseHas('server_cache_services', [
-            'server_id' => $server->id,
-            'engine' => 'redis',
-            'name' => 'default',
-            'status' => ServerCacheService::STATUS_RUNNING,
-            'port' => 6379,
-        ]);
-        $this->assertDatabaseHas('server_database_engines', [
-            'server_id' => $server->id,
-            'engine' => 'postgres18',
-            'is_default' => true,
-            'status' => ServerDatabaseEngine::STATUS_RUNNING,
-            'port' => 5432,
-        ]);
-    }
-
-    public function test_skips_when_meta_says_none(): void
-    {
-        $server = $this->makeServer([
-            'meta' => [
-                'cache_service' => 'none',
-                'database' => 'none',
-            ],
-        ]);
-
-        $result = app(SeedProvisionedEnginesForServer::class)->execute($server);
-
-        $this->assertFalse($result['cache_created']);
-        $this->assertFalse($result['database_created']);
-        $this->assertDatabaseMissing('server_cache_services', ['server_id' => $server->id]);
-        $this->assertDatabaseMissing('server_database_engines', ['server_id' => $server->id]);
-    }
-
-    public function test_skips_when_meta_keys_are_absent(): void
-    {
-        $server = $this->makeServer(['meta' => []]);
-
-        $result = app(SeedProvisionedEnginesForServer::class)->execute($server);
-
-        $this->assertFalse($result['cache_created']);
-        $this->assertFalse($result['database_created']);
-        $this->assertDatabaseMissing('server_cache_services', ['server_id' => $server->id]);
-        $this->assertDatabaseMissing('server_database_engines', ['server_id' => $server->id]);
-    }
-
-    public function test_rejects_unknown_cache_engine(): void
-    {
-        $server = $this->makeServer([
-            'meta' => ['cache_service' => 'memcached-but-typo'],
-        ]);
-
-        $result = app(SeedProvisionedEnginesForServer::class)->execute($server);
-
-        $this->assertFalse($result['cache_created']);
-        $this->assertDatabaseMissing('server_cache_services', ['server_id' => $server->id]);
-    }
-
-    public function test_double_run_is_idempotent(): void
-    {
-        $server = $this->makeServer([
-            'meta' => [
-                'cache_service' => 'valkey',
-                'database' => 'mysql84',
-            ],
-        ]);
-
-        $first = app(SeedProvisionedEnginesForServer::class)->execute($server);
-        $second = app(SeedProvisionedEnginesForServer::class)->execute($server);
-
-        $this->assertTrue($first['cache_created']);
-        $this->assertTrue($first['database_created']);
-        $this->assertFalse($second['cache_created']);
-        $this->assertFalse($second['database_created']);
-
-        $this->assertSame(1, ServerCacheService::query()->where('server_id', $server->id)->count());
-        $this->assertSame(1, ServerDatabaseEngine::query()->where('server_id', $server->id)->count());
-    }
-
-    public function test_preserves_existing_row_inserted_by_ui(): void
-    {
-        $server = $this->makeServer([
-            'meta' => ['cache_service' => 'redis'],
-        ]);
-
-        // Simulate the UI install path: row already exists with a different status (e.g. a manual
-        // install in progress). The seeder must not overwrite it.
-        ServerCacheService::query()->create([
-            'server_id' => $server->id,
-            'engine' => 'redis',
-            'name' => 'default',
-            'status' => ServerCacheService::STATUS_INSTALLING,
-            'port' => 6379,
-        ]);
-
-        $result = app(SeedProvisionedEnginesForServer::class)->execute($server);
-
-        $this->assertFalse($result['cache_created']);
-        $this->assertDatabaseHas('server_cache_services', [
-            'server_id' => $server->id,
-            'engine' => 'redis',
-            'status' => ServerCacheService::STATUS_INSTALLING,
-        ]);
-    }
-
-    public function test_uses_correct_default_port_per_database_engine(): void
-    {
-        $sqliteServer = $this->makeServer(['meta' => ['database' => 'sqlite3']]);
-        $mariadbServer = $this->makeServer(['meta' => ['database' => 'mariadb1011']]);
-
-        app(SeedProvisionedEnginesForServer::class)->execute($sqliteServer);
-        app(SeedProvisionedEnginesForServer::class)->execute($mariadbServer);
-
-        $this->assertDatabaseHas('server_database_engines', [
-            'server_id' => $sqliteServer->id,
-            'engine' => 'sqlite3',
-            'port' => 0,
-        ]);
-        $this->assertDatabaseHas('server_database_engines', [
-            'server_id' => $mariadbServer->id,
-            'engine' => 'mariadb1011',
-            'port' => 3306,
-        ]);
-    }
-
-    public function test_backfill_command_dry_run_writes_nothing(): void
-    {
-        $server = $this->makeServer([
-            'meta' => ['cache_service' => 'redis', 'database' => 'postgres18'],
-        ]);
-
-        $exit = Artisan::call('dply:servers:backfill-engine-rows', ['--dry-run' => true]);
-
-        $this->assertSame(0, $exit);
-        $this->assertDatabaseMissing('server_cache_services', ['server_id' => $server->id]);
-        $this->assertDatabaseMissing('server_database_engines', ['server_id' => $server->id]);
-    }
-
-    public function test_backfill_command_seeds_matching_server_only(): void
-    {
-        $target = $this->makeServer([
-            'meta' => ['cache_service' => 'redis', 'database' => 'postgres18'],
-        ]);
-        $other = $this->makeServer([
-            'meta' => ['cache_service' => 'memcached', 'database' => 'mysql84'],
-        ]);
-
-        $exit = Artisan::call('dply:servers:backfill-engine-rows', ['--server' => $target->id]);
-
-        $this->assertSame(0, $exit);
-        $this->assertDatabaseHas('server_cache_services', ['server_id' => $target->id, 'engine' => 'redis']);
-        $this->assertDatabaseHas('server_database_engines', ['server_id' => $target->id, 'engine' => 'postgres18']);
-        $this->assertDatabaseMissing('server_cache_services', ['server_id' => $other->id]);
-        $this->assertDatabaseMissing('server_database_engines', ['server_id' => $other->id]);
-    }
-
-    public function test_backfill_command_seeds_all_ready_servers(): void
-    {
-        $first = $this->makeServer(['meta' => ['cache_service' => 'redis']]);
-        $second = $this->makeServer(['meta' => ['database' => 'postgres18']]);
-        $pending = $this->makeServer([
-            'meta' => ['cache_service' => 'redis'],
-            'setup_status' => Server::SETUP_STATUS_RUNNING,
-        ]);
-
-        $exit = Artisan::call('dply:servers:backfill-engine-rows');
-
-        $this->assertSame(0, $exit);
-        $this->assertDatabaseHas('server_cache_services', ['server_id' => $first->id, 'engine' => 'redis']);
-        $this->assertDatabaseHas('server_database_engines', ['server_id' => $second->id, 'engine' => 'postgres18']);
-        // Only servers in setup_status=done get seeded — pending/running servers are mid-provision
-        // and will be handled by the post-provision hook when they finish.
-        $this->assertDatabaseMissing('server_cache_services', ['server_id' => $pending->id]);
-    }
-
-    /**
-     * @param  array<string, mixed>  $overrides
-     */
-    private function makeServer(array $overrides = []): Server
-    {
-        $user = User::factory()->create();
-
-        return Server::factory()->ready()->create(array_merge([
-            'user_id' => $user->id,
-            'setup_status' => Server::SETUP_STATUS_DONE,
-        ], $overrides));
-    }
+    return Server::factory()->ready()->create(array_merge([
+        'user_id' => $user->id,
+        'setup_status' => Server::SETUP_STATUS_DONE,
+    ], $overrides));
 }

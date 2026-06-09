@@ -13,7 +13,7 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-explainer class="mb-4" tone="warn">
+    <x-explainer tone="warn">
         <p>{{ __('A lightweight shell prompt for poking at the server: type a command, hit Enter, output appears below. History is kept per session so you can scroll back through recent runs.') }}</p>
         <p>{{ __('Each command runs as the dply SSH user with full shell access — same blast radius as the Run page. Output is captured up to 16KB; for streaming/long-running jobs use Run.') }}</p>
     </x-explainer>
@@ -173,7 +173,7 @@
                             :class="{ 'bg-brand-sage/15 border-brand-sage/40': open }"
                             title="{{ __('Toggle help sidebar') }}"
                         >
-                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <circle cx="10" cy="10" r="7.5"/>
                                 <path d="M8 7.5a2 2 0 1 1 3 1.7c-.7.4-1 .8-1 1.5V11"/>
                                 <circle cx="10" cy="13.5" r="0.5" fill="currentColor"/>
@@ -184,136 +184,167 @@
                 </div>
 
                 {{-- Terminal-style scrollback --}}
-                <div
-                    class="bg-[#0b1020] font-mono text-[12.5px] leading-relaxed text-slate-100"
-                    style="max-height: 520px; overflow-y: auto;"
-                    x-data="{}"
-                    x-init="$el.scrollTop = $el.scrollHeight"
-                    x-on:scroll-console-bottom.window="$nextTick(() => { $el.scrollTop = $el.scrollHeight })"
+                <x-console-terminal-shell
+                    :prompt-user="$promptUser"
+                    :prompt-host="$promptHost"
+                    class="rounded-none border-0 shadow-none ring-0"
+                    max-height="520px"
                 >
-                    <div class="px-4 py-3 space-y-3">
-                        @if (empty($history))
-                            <p class="text-slate-400 italic">{{ __('Type a command below or pick a quick action above. History will appear here.') }}</p>
-                        @endif
-
-                        @foreach ($history as $entry)
-                            <div>
-                                <div class="flex items-baseline gap-2">
-                                    <span class="text-emerald-400">{{ $promptUser.'@'.$promptHost }}</span><span class="text-slate-400">:~$</span>
-                                    <span class="text-slate-100 break-all">{{ $entry['cmd'] }}</span>
-                                </div>
-                                @if ($entry['error'])
-                                    <pre class="mt-1 whitespace-pre-wrap break-words text-rose-300">{{ $entry['error'] }}</pre>
-                                @else
-                                    @if ($entry['out'] !== '')
-                                        <pre class="mt-1 whitespace-pre-wrap break-words text-slate-200">{{ $entry['out'] }}</pre>
-                                    @endif
-                                    @if (! is_null($entry['exit']) && $entry['exit'] !== 0)
-                                        <p class="mt-1 text-xs text-amber-300">{{ __('exit :code', ['code' => $entry['exit']]) }}</p>
-                                    @endif
-                                @endif
-                            </div>
-                        @endforeach
-
-                        <div wire:loading wire:target="run,runQuickAction" class="text-slate-400">
-                            <span class="text-emerald-400">{{ $promptUser.'@'.$promptHost }}</span><span class="text-slate-400">:~$</span>
-                            <span class="ml-1 animate-pulse">{{ __('running…') }}</span>
+                    <x-slot:toolbar>
+                        <div class="flex items-center gap-1.5">
+                            <span class="inline-flex h-2 w-2 rounded-full bg-red-400/80" aria-hidden="true"></span>
+                            <span class="inline-flex h-2 w-2 rounded-full bg-amber-300/80" aria-hidden="true"></span>
+                            <span class="inline-flex h-2 w-2 rounded-full bg-brand-sage/80" aria-hidden="true"></span>
                         </div>
-                    </div>
-                </div>
+                        <span class="font-mono text-[11px] font-medium text-brand-forest">{{ $promptUser.'@'.$promptHost }}</span>
+                        <span class="inline-flex items-center gap-1 rounded-full border border-brand-sage/30 bg-brand-sage/10 px-2 py-0.5 text-[10px] font-semibold text-brand-forest">
+                            <span class="h-1.5 w-1.5 rounded-full bg-brand-forest" aria-hidden="true"></span>
+                            {{ __('Live') }}
+                        </span>
+                    </x-slot:toolbar>
 
-                {{-- Prompt with Tab-triggered autocomplete dropdown.
-
-                     The Alpine component owns the dropdown UI; the three
-                     sources (catalog/installed/history) and the argspec map
-                     are passed in as JSON from PHP. Selection state lives in
-                     JS only — Livewire just owns the final command string. --}}
-                <form
-                    wire:submit.prevent="run"
-                    x-data="dplyConsoleAutocomplete({
-                        catalog: @js($catalogCommands),
-                        argspecs: @js((object) $argspecs),
-                    })"
-                    x-on:autocomplete-pick.stop="pick($event.detail)"
-                    @keydown.tab.prevent="openOrCycle()"
-                    @keydown.escape="close()"
-                    @keydown.arrow-down.prevent="acOpen && next()"
-                    @keydown.arrow-up.prevent="acOpen && prev()"
-                    class="relative rounded-b-2xl border-t border-brand-ink/10 bg-[#0b1020] px-4 py-3"
-                >
-                    @if ($error)
-                        <p class="mb-2 text-xs text-rose-300">{{ $error }}</p>
-                    @endif
-                    @if ($probeError)
-                        <p class="mb-2 text-[11px] text-amber-300">{{ __('Autocomplete probes failed: :err', ['err' => $probeError]) }}</p>
-                    @endif
-
-                    {{-- Dropdown — positioned above the input. --}}
-                    <div
-                        x-show="acOpen"
-                        x-cloak
-                        x-on:click.outside="close()"
-                        class="absolute left-4 right-4 bottom-full mb-1 z-20 rounded-lg border border-slate-700 bg-[#0b1020] shadow-xl overflow-hidden text-[12.5px] font-mono"
-                    >
-                        <template x-for="(group, gi) in groups" :key="gi">
-                            <div class="border-b border-slate-800 last:border-b-0">
-                                <div class="flex items-center justify-between px-3 py-1 text-[10px] uppercase tracking-wide text-slate-500">
-                                    <span x-text="group.label"></span>
-                                    <span x-show="group.label === 'Installed' && !probesLoaded" class="italic text-slate-500">{{ __('indexing…') }}</span>
-                                </div>
-                                <template x-if="group.items.length === 0">
-                                    <div class="px-3 py-1.5 text-slate-500 italic">{{ __('no matches') }}</div>
-                                </template>
-                                <template x-for="(item, ii) in group.items" :key="gi + '-' + ii">
-                                    <button
-                                        type="button"
-                                        x-on:mousedown.prevent="pickAt(gi, ii)"
-                                        x-on:mouseenter="selected = flatIndex(gi, ii)"
-                                        :class="selected === flatIndex(gi, ii) ? 'bg-emerald-500/15 text-slate-50' : 'text-slate-200 hover:bg-slate-800/60'"
-                                        class="block w-full text-left px-3 py-1.5"
-                                    >
-                                        <span x-text="item"></span>
-                                    </button>
-                                </template>
-                            </div>
-                        </template>
-                        <div class="px-3 py-1 text-[10px] text-slate-500 bg-slate-900/60">
-                            <kbd class="px-1 rounded bg-slate-800">Tab</kbd> next
-                            · <kbd class="px-1 rounded bg-slate-800">↑↓</kbd> select
-                            · <kbd class="px-1 rounded bg-slate-800">Enter</kbd> insert
-                            · <kbd class="px-1 rounded bg-slate-800">Esc</kbd> dismiss
-                        </div>
-                    </div>
-
-                    <div class="flex items-center gap-2 font-mono text-[12.5px]">
-                        <span class="shrink-0 text-emerald-400">{{ $promptUser.'@'.$promptHost }}</span><span class="text-slate-400">:~$</span>
-                        <input
-                            type="text"
-                            wire:model="command"
-                            x-ref="prompt"
-                            x-on:input="acOpen && refreshGroups()"
-                            x-on:keydown.enter.prevent="onEnter($event)"
-                            autocomplete="off"
-                            autocorrect="off"
-                            spellcheck="false"
-                            placeholder="{{ __('type a command, Tab for suggestions, Enter to run') }}"
-                            class="flex-1 bg-transparent text-slate-100 placeholder-slate-500 caret-emerald-400 focus:outline-none"
-                            wire:loading.attr="disabled"
-                            wire:target="run,runQuickAction"
-                        />
-                        <button
-                            type="submit"
-                            wire:loading.attr="disabled"
-                            wire:target="run,runQuickAction"
-                            class="shrink-0 rounded-md bg-emerald-500/80 px-3 py-1 text-xs font-semibold text-slate-900 hover:bg-emerald-400 disabled:opacity-50"
+                    <x-slot:body>
+                        <div
+                            x-data="{}"
+                            x-init="$el.scrollTop = $el.scrollHeight"
+                            x-on:scroll-console-bottom.window="$nextTick(() => { $el.scrollTop = $el.scrollHeight })"
+                            class="space-y-3"
                         >
-                            {{ __('Run') }}
-                        </button>
-                    </div>
-                    @error('command')
-                        <p class="mt-1 text-xs text-rose-300">{{ $message }}</p>
-                    @enderror
-                </form>
+                            @if (empty($history))
+                                <p class="text-slate-400 italic">{{ __('Type a command below or pick a quick action above. History will appear here.') }}</p>
+                            @endif
+
+                            @foreach ($history as $entry)
+                                <div>
+                                    <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                                        <span class="text-brand-sage">{{ $promptUser.'@'.$promptHost }}</span><span class="text-slate-500">:~$</span>
+                                        <span class="break-all text-slate-100">{{ $entry['cmd'] }}</span>
+                                    </div>
+                                    @if ($entry['error'])
+                                        <pre class="mt-1 whitespace-pre-wrap break-words text-rose-300">{{ $entry['error'] }}</pre>
+                                    @else
+                                        @if ($entry['out'] !== '')
+                                            <pre class="mt-1 whitespace-pre-wrap break-words text-slate-200">{{ $entry['out'] }}</pre>
+                                        @endif
+                                        @if (! is_null($entry['exit']) && $entry['exit'] !== 0)
+                                            <p class="mt-1 text-[11px] text-amber-300">{{ __('exit :code', ['code' => $entry['exit']]) }}</p>
+                                        @endif
+                                    @endif
+                                </div>
+                            @endforeach
+
+                            <div wire:loading wire:target="run,runQuickAction" class="text-slate-400">
+                                <span class="text-brand-sage">{{ $promptUser.'@'.$promptHost }}</span><span class="text-slate-500">:~$</span>
+                                <span class="ml-1 inline-flex items-center gap-1.5 animate-pulse">
+                                    <x-spinner variant="slate" size="sm" />
+                                    {{ __('running…') }}
+                                </span>
+                            </div>
+                        </div>
+                    </x-slot:body>
+
+                    <x-slot:footer>
+                        {{-- Prompt with Tab-triggered autocomplete dropdown.
+
+                             The Alpine component owns the dropdown UI; the three
+                             sources (catalog/installed/history) and the argspec map
+                             are passed in as JSON from PHP. Selection state lives in
+                             JS only — Livewire just owns the final command string. --}}
+                        <form
+                            wire:submit.prevent="run"
+                            x-data="dplyConsoleAutocomplete({
+                                catalog: @js($catalogCommands),
+                                argspecs: @js((object) $argspecs),
+                            })"
+                            x-on:autocomplete-pick.stop="pick($event.detail)"
+                            @keydown.tab.prevent="openOrCycle()"
+                            @keydown.escape="close()"
+                            @keydown.arrow-down.prevent="acOpen && next()"
+                            @keydown.arrow-up.prevent="acOpen && prev()"
+                            class="relative"
+                        >
+                            @if ($error)
+                                <div class="mb-2.5 rounded-lg border border-rose-200/20 bg-rose-500/10 px-3 py-2">
+                                    <p class="text-[11px] leading-relaxed text-rose-200">{{ $error }}</p>
+                                </div>
+                            @endif
+                            @if ($probeError)
+                                <p class="mb-2 text-[11px] text-amber-300">{{ __('Autocomplete probes failed: :err', ['err' => $probeError]) }}</p>
+                            @endif
+
+                            {{-- Dropdown — positioned above the input. --}}
+                            <div
+                                x-show="acOpen"
+                                x-cloak
+                                x-on:click.outside="close()"
+                                class="absolute inset-x-0 bottom-full z-20 mb-1 overflow-hidden rounded-lg border border-white/10 bg-[#121826] font-mono text-[12px] shadow-xl shadow-black/40 sm:text-[12.5px]"
+                            >
+                                <template x-for="(group, gi) in groups" :key="gi">
+                                    <div class="border-b border-white/5 last:border-b-0">
+                                        <div class="flex items-center justify-between px-3 py-1 text-[10px] uppercase tracking-wide text-slate-500">
+                                            <span x-text="group.label"></span>
+                                            <span x-show="group.label === 'Installed' && !probesLoaded" class="italic text-slate-500">{{ __('indexing…') }}</span>
+                                        </div>
+                                        <template x-if="group.items.length === 0">
+                                            <div class="px-3 py-1.5 italic text-slate-500">{{ __('no matches') }}</div>
+                                        </template>
+                                        <template x-for="(item, ii) in group.items" :key="gi + '-' + ii">
+                                            <button
+                                                type="button"
+                                                x-on:mousedown.prevent="pickAt(gi, ii)"
+                                                x-on:mouseenter="selected = flatIndex(gi, ii)"
+                                                :class="selected === flatIndex(gi, ii) ? 'bg-brand-sage/20 text-slate-50' : 'text-slate-200 hover:bg-white/5'"
+                                                class="block w-full px-3 py-1.5 text-left"
+                                            >
+                                                <span x-text="item"></span>
+                                            </button>
+                                        </template>
+                                    </div>
+                                </template>
+                                <div class="bg-white/5 px-3 py-1 text-[10px] text-slate-500">
+                                    <kbd class="rounded bg-white/10 px-1">Tab</kbd> next
+                                    · <kbd class="rounded bg-white/10 px-1">↑↓</kbd> select
+                                    · <kbd class="rounded bg-white/10 px-1">Enter</kbd> insert
+                                    · <kbd class="rounded bg-white/10 px-1">Esc</kbd> dismiss
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-2 font-mono text-[12px] sm:text-[12.5px]">
+                                <span class="hidden shrink-0 text-brand-sage sm:inline">{{ $promptUser.'@'.$promptHost }}</span>
+                                <span class="shrink-0 text-slate-500">:~$</span>
+                                <input
+                                    type="text"
+                                    wire:model="command"
+                                    x-ref="prompt"
+                                    x-on:input="acOpen && refreshGroups()"
+                                    x-on:keydown.enter.prevent="onEnter($event)"
+                                    autocomplete="off"
+                                    autocorrect="off"
+                                    spellcheck="false"
+                                    placeholder="{{ __('type a command, Tab for suggestions, Enter to run') }}"
+                                    class="min-w-0 flex-1 rounded-md border border-white/10 bg-white/5 px-2.5 py-1.5 text-slate-100 placeholder-slate-500 caret-brand-sage focus:border-brand-sage/40 focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-brand-sage/20 disabled:cursor-not-allowed disabled:opacity-50"
+                                    wire:loading.attr="disabled"
+                                    wire:target="run,runQuickAction"
+                                />
+                                <button
+                                    type="submit"
+                                    wire:loading.attr="disabled"
+                                    wire:target="run,runQuickAction"
+                                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-brand-cream shadow-sm transition hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-40"
+                                >
+                                    <span wire:loading.remove wire:target="run,runQuickAction">{{ __('Run') }}</span>
+                                    <span wire:loading wire:target="run,runQuickAction" class="inline-flex items-center gap-1.5">
+                                        <x-spinner variant="cream" size="sm" />
+                                        {{ __('Running') }}
+                                    </span>
+                                </button>
+                            </div>
+                            @error('command')
+                                <p class="mt-1.5 text-[11px] text-rose-300">{{ $message }}</p>
+                            @enderror
+                        </form>
+                    </x-slot:footer>
+                </x-console-terminal-shell>
             </div>
 
             {{-- Help sidebar --}}
@@ -324,14 +355,14 @@
             >
                 <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-4 py-3">
                     <div class="flex items-center justify-between gap-2">
-                        <h3 class="text-sm font-semibold text-brand-ink">{{ __('Commands') }}</h3>
+                        <h3 class="text-base font-semibold text-brand-ink">{{ __('Commands') }}</h3>
                         <button
                             type="button"
                             x-on:click="toggle()"
                             class="rounded p-1 text-brand-moss hover:bg-white/60 hover:text-brand-ink"
                             title="{{ __('Hide help') }}"
                         >
-                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <path d="M5 5l10 10"/><path d="M15 5L5 15"/>
                             </svg>
                         </button>
@@ -383,9 +414,18 @@
             <a href="{{ route('servers.run', $server) }}" wire:navigate class="font-medium text-brand-ink underline-offset-2 hover:underline">{{ __('Run page') }}</a>.
         </p>
     @else
-        <div class="rounded-2xl border border-brand-gold/40 bg-brand-sand/40 px-5 py-4 text-sm text-brand-olive">
-            {{ __('Provisioning and SSH must be ready before you can use the console.') }}
-        </div>
+        <section class="dply-card overflow-hidden border-amber-200">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                    <x-icon-badge tone="amber">
+                        <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Waiting on provisioning') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Provisioning and SSH must be ready before you can use the console.') }}</p>
+                    </div>
+            </div>
+        </section>
     @endif
 
     <x-slot name="modals">

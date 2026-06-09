@@ -9,6 +9,8 @@ use App\Models\SiteBasicAuthUser;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Sites\Contracts\SiteWebserverProvisioner;
 use App\Services\SshConnection;
+use App\Services\SshConnectionFactory;
+use App\Support\Sites\SiteManagedErrorPageSupport;
 use Illuminate\Support\Str;
 
 abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisioner
@@ -30,15 +32,16 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
     protected function systemSsh(Site $site): SshConnection
     {
         $server = $site->server;
+        $factory = app(SshConnectionFactory::class);
 
         if ($server->recoverySshPrivateKey()) {
-            $root = new SshConnection($server, 'root', SshConnection::ROLE_RECOVERY);
+            $root = $factory->recoveryForServer($server);
             if ($root->connect()) {
                 return $root;
             }
         }
 
-        return new SshConnection($server);
+        return $factory->forServer($server);
     }
 
     protected function writeSystemFile(SshConnection $ssh, string $remotePath, string $contents): void
@@ -104,6 +107,14 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
             return;
         }
 
+        // Worker sites never serve their doc root — Caddy serves the dedicated
+        // worker page ({@see ensureWorkerPage()}) for every request. Writing the
+        // "awaiting first deploy" placeholder here would be misleading (it would
+        // never be replaced) and pointless (it would never be served).
+        if ($site->isWorkerSite()) {
+            return;
+        }
+
         $root = rtrim($site->effectiveDocumentRoot(), '/');
         if ($root === '') {
             return;
@@ -150,6 +161,22 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
         $builder = $this->placeholderPageBuilder ??= new SitePlaceholderPageBuilder;
         $this->writeSystemFile($ssh, $root.'/index.html', $builder->render($site));
         $emit?->step($this->emitterSource(), 'installing placeholder page');
+
+        // The mkdir + placeholder write above ran privileged (root), leaving the
+        // site tree root-owned. Hand the deploy base back to the deploy user
+        // (group = the web group, setgid) or the first `git clone` fails with
+        // "Permission denied" on /home/dply/<site>/.git. Best-effort.
+        $base = rtrim((string) $site->effectiveRepositoryPath(), '/');
+        if ($base !== '' && $site->server !== null) {
+            $deployUser = $site->effectiveSystemUser($site->server);
+            $webGroup = (string) config('site_settings.vm_site_file_web_group', 'www-data');
+            $ssh->exec($this->privilegedCommand($site->server, sprintf(
+                'chown -R %1$s:%2$s %3$s 2>/dev/null || true; chmod 2750 %3$s 2>/dev/null || true',
+                escapeshellarg($deployUser),
+                escapeshellarg($webGroup),
+                escapeshellarg($base),
+            )), 60);
+        }
     }
 
     /**
@@ -170,6 +197,164 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
         $emit?->step($this->emitterSource(), 'ensuring suspended page');
         $builder = new SiteSuspendedPageBuilder;
         $this->writeSystemFile($ssh, $dir.'/index.html', $builder->render($site));
+    }
+
+    /**
+     * Writes {@see SiteWorkerPageBuilder} HTML under {@see Site::workerStaticRoot()}.
+     * No-op unless the site is a worker site; emits a `step` only when work happens.
+     */
+    protected function ensureWorkerPage(Site $site, SshConnection $ssh, ?ConsoleEmitter $emit = null): void
+    {
+        if (! $site->isWorkerSite()) {
+            return;
+        }
+
+        $dir = rtrim($site->workerStaticRoot(), '/');
+        if ($dir === '') {
+            return;
+        }
+
+        $emit?->step($this->emitterSource(), 'ensuring worker page');
+        $builder = new SiteWorkerPageBuilder;
+        $this->writeSystemFile($ssh, $dir.'/index.html', $builder->render($site));
+    }
+
+    /**
+     * Writes the managed 500-series HTML page under {@see Site::managedErrorPagesRoot()}.
+     */
+    protected function ensureManagedErrorPages(Site $site, SshConnection $ssh, ?ConsoleEmitter $emit = null): void
+    {
+        if ($site->type === SiteType::Custom) {
+            return;
+        }
+
+        $dir = rtrim($site->managedErrorPagesRoot(), '/');
+        if ($dir === '') {
+            return;
+        }
+
+        $emit?->step($this->emitterSource(), 'ensuring managed error pages');
+        $builder = new SiteServerErrorPageBuilder;
+        $this->writeSystemFile($ssh, $dir.'/'.SiteManagedErrorPageSupport::ERROR_FILENAME, $builder->render($site));
+    }
+
+    /**
+     * Ensure this site's dedicated PHP-FPM pool exists on the box, is valid, and
+     * is the only pool for the site (cleaning up stale copies left in another
+     * PHP version's pool.d after a version switch). MUST run BEFORE the vhost is
+     * (re)written, because the vhost points at the pool's socket — creating the
+     * socket first means there's no window where nginx/Caddy proxies to a socket
+     * that doesn't exist yet.
+     *
+     * Idempotent: the on-box script compares content and only reloads php-fpm
+     * when something actually changed, so steady-state applies (deploys, SSL
+     * renewals) are no-ops here. Throws on a failed `php-fpm -t` so the caller
+     * aborts before pointing the vhost at a pool that won't load.
+     */
+    protected function ensurePhpFpmPool(Site $site, SshConnection $ssh, ?ConsoleEmitter $emit = null): void
+    {
+        if (! $site->usesDedicatedPhpFpmPool()) {
+            return;
+        }
+
+        $server = $site->server;
+        if ($server === null || ! $server->hostCapabilities()->supportsMachinePhpManagement()) {
+            return;
+        }
+
+        $version = $site->resolvedPhpFpmVersion();
+        $name = $site->phpFpmPoolName();
+        $content = app(SitePhpFpmPoolConfigBuilder::class)->build($site, $server);
+
+        $script = $this->phpFpmPoolScript($name, $version, base64_encode($content));
+
+        $out = $ssh->exec(sprintf(
+            '(%s) 2>&1; printf "\nDPLY_FPM_POOL_EXIT:%%s" "$?"',
+            $this->privilegedCommand($server, $script),
+        ), 120);
+
+        if (! preg_match('/DPLY_FPM_POOL_EXIT:0\s*$/', $out)) {
+            throw new \RuntimeException('PHP-FPM pool validation/reload failed for '.$name.'. Output: '.Str::limit($out, 2000));
+        }
+
+        if (str_contains($out, 'DPLY_FPM_POOL_CHANGED:1')) {
+            $emit?->step($this->emitterSource(), 'updating PHP-FPM pool ('.$name.' → php'.$version.'-fpm)');
+        }
+    }
+
+    /**
+     * The on-box bash that writes + validates + reloads a single pool conf and
+     * sweeps stale-version copies. Kept as a string builder (not a heredoc in
+     * the caller) so the escaping stays in one place and is unit-testable.
+     */
+    protected function phpFpmPoolScript(string $name, string $version, string $base64Content): string
+    {
+        $name = escapeshellarg($name);
+        $version = escapeshellarg($version);
+        $b64 = escapeshellarg($base64Content);
+
+        return <<<BASH
+set +e
+NAME={$name}
+VER={$version}
+TARGET="/etc/php/\${VER}/fpm/pool.d/\${NAME}.conf"
+
+# Boxes that never installed this fpm can't host the pool — skip rather than
+# block the whole webserver apply (the vhost still points at the socket, but a
+# later apply once the version is installed will create it).
+if ! command -v "php-fpm\${VER}" >/dev/null 2>&1; then
+  echo "DPLY_FPM_POOL_SKIP:1"
+  echo "DPLY_FPM_POOL_EXIT:0"
+  exit 0
+fi
+
+NEW="\$(mktemp)"
+echo {$b64} | base64 -d > "\$NEW"
+
+RELOAD=""
+
+# Remove this site's pool from any OTHER version's pool.d (left behind by a PHP
+# version switch) and mark those masters for reload.
+for d in /etc/php/*/fpm/pool.d; do
+  [ -d "\$d" ] || continue
+  v="\$(basename "\$(dirname "\$(dirname "\$d")")")"
+  f="\${d}/\${NAME}.conf"
+  if [ -f "\$f" ] && [ "\$v" != "\$VER" ]; then
+    rm -f "\$f"
+    RELOAD="\${RELOAD} \${v}"
+  fi
+done
+
+CHANGED=0
+if [ ! -f "\$TARGET" ] || ! cmp -s "\$NEW" "\$TARGET"; then
+  cp -f "\$TARGET" "\${TARGET}.dply-bak" 2>/dev/null
+  install -m 0644 -o root -g root "\$NEW" "\$TARGET"
+  CHANGED=1
+fi
+
+if [ "\$CHANGED" = "1" ]; then
+  if ! "php-fpm\${VER}" -t >/tmp/dply-fpm-test.\$\$ 2>&1; then
+    cat /tmp/dply-fpm-test.\$\$
+    rm -f /tmp/dply-fpm-test.\$\$
+    # Roll the pool back so an unrelated reload later doesn't trip on it.
+    if [ -f "\${TARGET}.dply-bak" ]; then mv -f "\${TARGET}.dply-bak" "\$TARGET"; else rm -f "\$TARGET"; fi
+    rm -f "\$NEW"
+    echo "DPLY_FPM_POOL_EXIT:1"
+    exit 1
+  fi
+  rm -f /tmp/dply-fpm-test.\$\$
+  RELOAD="\${RELOAD} \${VER}"
+  echo "DPLY_FPM_POOL_CHANGED:1"
+fi
+
+for v in \$(echo "\$RELOAD" | tr ' ' '\\n' | sort -u); do
+  [ -z "\$v" ] && continue
+  systemctl reload "php\${v}-fpm" 2>/dev/null || systemctl restart "php\${v}-fpm" 2>/dev/null || true
+done
+
+rm -f "\$NEW" "\${TARGET}.dply-bak" 2>/dev/null
+echo "DPLY_FPM_POOL_EXIT:0"
+BASH;
     }
 
     /**
@@ -418,5 +603,91 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
 
             $this->writeSystemFile($ssh, $filePath, $newContents);
         }
+    }
+
+    /**
+     * Deploy or remove the on-host form-password gate bundle under
+     * {@see Site::accessGateStorageDirectoryOnHost()}.
+     */
+    protected function syncAccessGateFiles(Site $site, SshConnection $ssh, ?ConsoleEmitter $emit = null): void
+    {
+        $payload = app(SiteAccessGateService::class)->configPayload($site);
+        $base = $site->accessGateStorageDirectoryOnHost();
+        $scriptPath = $site->accessGateScriptPathOnHost();
+        $configPath = $site->accessGateConfigPathOnHost();
+        $server = $site->server;
+
+        if ($payload === null) {
+            if ($server !== null) {
+                $out = $ssh->exec(sprintf(
+                    'test -d %1$s && rm -rf %1$s && echo dropped 2>/dev/null || true',
+                    escapeshellarg($base),
+                ), 30);
+                if (str_contains((string) $out, 'dropped')) {
+                    $emit?->step($this->emitterSource(), 'removed form-password gate directory');
+                }
+            } else {
+                $ssh->exec(sprintf('test -d %1$s && rm -rf %1$s || true', escapeshellarg($base)), 30);
+            }
+
+            return;
+        }
+
+        $scriptSource = (string) file_get_contents(resource_path('site-scripts/vm-access-gate.php'));
+        $configJson = json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
+
+        $logPath = $site->accessGateLoginLogPathOnHost();
+
+        if ($server !== null) {
+            $ssh->exec($this->privilegedCommand($server, 'mkdir -p '.escapeshellarg($base)), 30);
+            if ($this->writeSystemFileIfChanged($server, $ssh, $scriptPath, $scriptSource)) {
+                $emit?->step($this->emitterSource(), 'updating form-password gate script');
+            }
+            if ($this->writeSystemFileIfChanged($server, $ssh, $configPath, $configJson."\n")) {
+                $emit?->step($this->emitterSource(), 'updating form-password gate config');
+            }
+            $this->ensureAccessGateLoginLogWritable($site, $server, $ssh, $base, $logPath, $emit);
+        } else {
+            $ssh->exec('mkdir -p '.escapeshellarg($base), 30);
+            $this->writeSystemFile($ssh, $scriptPath, $scriptSource);
+            $this->writeSystemFile($ssh, $configPath, $configJson."\n");
+            @touch($logPath);
+            @chmod($base, 0775);
+            @chmod($logPath, 0664);
+        }
+    }
+
+    /**
+     * PHP-FPM executes the gate script; it must be able to append logins.jsonl even
+     * though Dply writes index.php/config.json as root-owned system files.
+     */
+    protected function ensureAccessGateLoginLogWritable(
+        Site $site,
+        Server $server,
+        SshConnection $ssh,
+        string $base,
+        string $logPath,
+        ?ConsoleEmitter $emit = null,
+    ): void {
+        $runtimeUser = $site->accessGatePhpRuntimeUser($server);
+        $cmd = sprintf(
+            'touch %1$s && chown %3$s:%3$s %2$s %1$s && chmod 775 %2$s && chmod 664 %1$s',
+            escapeshellarg($logPath),
+            escapeshellarg($base),
+            escapeshellarg($runtimeUser),
+        );
+
+        $out = $ssh->exec(sprintf(
+            '(%s) 2>&1; printf "\nDPLY_ACCESS_GATE_LOG_PERM_EXIT:%%s" "$?"',
+            $this->privilegedCommand($server, $cmd)
+        ), 30);
+
+        if (! preg_match('/DPLY_ACCESS_GATE_LOG_PERM_EXIT:0\s*$/', $out)) {
+            throw new \RuntimeException(
+                'Unable to prepare form-password gate login log permissions on '.$logPath.'. Output: '.Str::limit($out, 1000)
+            );
+        }
+
+        $emit?->step($this->emitterSource(), 'ensuring form-password gate login log is writable');
     }
 }

@@ -3,6 +3,25 @@
 return [
     'provisioner' => env('SERVERLESS_PROVISIONER', 'local'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | dply-managed serverless (platform account)
+    |--------------------------------------------------------------------------
+    |
+    | When a function is created in "managed" mode dply runs it on its OWN
+    | DigitalOcean Functions namespace (dply pays DO), rather than the
+    | customer's connected credential. These are the platform OpenWhisk
+    | credentials for that shared namespace; mirrors the Edge platform
+    | delivery context. The managed create option is only offered when these
+    | are configured (see ServerlessPlatformContext::configured()).
+    */
+    'managed' => [
+        'api_host' => env('DPLY_SERVERLESS_DO_API_HOST'),
+        'namespace' => env('DPLY_SERVERLESS_DO_NAMESPACE'),
+        'access_key' => env('DPLY_SERVERLESS_DO_ACCESS_KEY'),
+        'region' => env('DPLY_SERVERLESS_DO_REGION', 'nyc1'),
+    ],
+
     'aws' => [
         'use_real_sdk' => filter_var(env('SERVERLESS_AWS_USE_REAL_SDK', false), FILTER_VALIDATE_BOOL),
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),

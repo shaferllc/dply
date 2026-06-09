@@ -14,7 +14,6 @@ use App\Services\Cloudflare\CloudflareDnsService;
 use App\Services\DigitalOceanService;
 use App\Services\Imports\MigrationPlanner;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -337,7 +336,7 @@ class MigrationProgress extends Component
 
     /**
      * @param  array<string, mixed>  $resultData  result_data of the cutover_dns_swap step
-     * @return string|null  null on success, error reason string on failure
+     * @return string|null null on success, error reason string on failure
      */
     protected function tryDeleteDnsRecord(array $resultData): ?string
     {

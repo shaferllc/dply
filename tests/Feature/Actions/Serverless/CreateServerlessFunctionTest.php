@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Feature\Actions\Serverless;
+namespace Tests\Feature\Actions\Serverless\CreateServerlessFunctionTest;
 
 use App\Actions\Serverless\CreateServerlessFunction;
 use App\Jobs\ProvisionServerlessHostJob;
@@ -11,103 +11,168 @@ use App\Models\Site;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Config;
 use InvalidArgumentException;
-use Tests\TestCase;
 
-class CreateServerlessFunctionTest extends TestCase
+uses(RefreshDatabase::class);
+
+function configureManagedServerless(): void
 {
-    use RefreshDatabase;
-
-    private function handle(array $overrides = []): Site
-    {
-        $user = User::factory()->create();
-        $org = Organization::factory()->create();
-        $org->users()->attach($user->id, ['role' => 'owner']);
-
-        $credential = ProviderCredential::query()->create([
-            'organization_id' => $org->id,
-            'user_id' => $user->id,
-            'provider' => 'digitalocean',
-            'name' => 'DO main',
-            'credentials' => ['token' => 'dop_v1_test'],
-        ]);
-
-        return app(CreateServerlessFunction::class)->handle($user, $org, array_merge([
-            'name' => 'My API',
-            'repo' => 'acme/api',
-            'branch' => 'main',
-            'runtime' => 'nodejs:20',
-            'region' => 'nyc1',
-            'provider_credential_id' => $credential->id,
-        ], $overrides));
-    }
-
-    public function test_creates_a_serverless_host_and_function_site(): void
-    {
-        Bus::fake();
-
-        $site = $this->handle();
-
-        $server = Server::find($site->server_id);
-        $this->assertTrue($server->isServerlessHost());
-        $this->assertSame(Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS, $server->hostKind());
-        // Host starts PENDING — the provision job creates the namespace then
-        // marks it READY.
-        $this->assertSame(Server::STATUS_PENDING, $server->status);
-
-        $this->assertSame(Site::STATUS_FUNCTIONS_CONFIGURED, $site->status);
-        $this->assertSame('acme/api', $site->git_repository_url);
-        $this->assertSame('main', $site->git_branch);
-        $this->assertSame('nodejs:20', $site->meta['serverless']['runtime']);
-        $this->assertSame('digitalocean_functions_web', $site->meta['runtime_profile']);
-    }
-
-    public function test_dispatches_the_namespace_provision_job(): void
-    {
-        Bus::fake();
-
-        $site = $this->handle();
-
-        Bus::assertDispatched(
-            ProvisionServerlessHostJob::class,
-            fn (ProvisionServerlessHostJob $job) => $job->serverId === $site->server_id,
-        );
-    }
-
-    public function test_normalizes_a_full_github_url_to_owner_repo(): void
-    {
-        Bus::fake();
-
-        $site = $this->handle(['repo' => 'https://github.com/acme/widgets.git']);
-
-        $this->assertSame('acme/widgets', $site->git_repository_url);
-    }
-
-    public function test_rejects_an_empty_repository(): void
-    {
-        Bus::fake();
-
-        $this->expectException(InvalidArgumentException::class);
-        $this->handle(['repo' => '']);
-    }
-
-    public function test_function_site_is_not_billed_until_active(): void
-    {
-        Bus::fake();
-        // Fresh function is `functions_configured`, not `functions_active` —
-        // the billing computer only counts active functions.
-        $site = $this->handle();
-
-        $this->assertNotSame(Site::STATUS_FUNCTIONS_ACTIVE, $site->status);
-    }
-
-    public function test_auto_runtime_is_stored_unset_for_deploy_time_detection(): void
-    {
-        Bus::fake();
-        // `auto` leaves the runtime empty so ServerlessRuntimeDetector picks
-        // it from the repo at deploy time; an explicit value is kept verbatim.
-        $site = $this->handle(['runtime' => 'auto']);
-
-        $this->assertSame('', $site->meta['serverless']['runtime']);
-    }
+    Config::set('serverless.managed.api_host', 'https://faas-nyc1.doserverless.co');
+    Config::set('serverless.managed.namespace', 'fn-dply-shared');
+    Config::set('serverless.managed.access_key', 'uuid:secretkey');
+    Config::set('serverless.managed.region', 'nyc1');
 }
+
+function createFunction(array $overrides = []): Site
+{
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+
+    $credential = ProviderCredential::query()->create([
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+        'provider' => 'digitalocean',
+        'name' => 'DO main',
+        'credentials' => ['token' => 'dop_v1_test'],
+    ]);
+
+    return app(CreateServerlessFunction::class)->handle($user, $org, array_merge([
+        'name' => 'My API',
+        'repo' => 'acme/api',
+        'branch' => 'main',
+        'runtime' => 'nodejs:20',
+        'region' => 'nyc1',
+        'provider_credential_id' => $credential->id,
+    ], $overrides));
+}
+
+test('creates a serverless host and function site', function () {
+    Bus::fake();
+
+    $site = createFunction();
+
+    $server = Server::find($site->server_id);
+    expect($server->isServerlessHost())->toBeTrue();
+    expect($server->hostKind())->toBe(Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS);
+
+    // Host starts PENDING — the provision job creates the namespace then
+    // marks it READY.
+    expect($server->status)->toBe(Server::STATUS_PENDING);
+
+    expect($site->status)->toBe(Site::STATUS_FUNCTIONS_CONFIGURED);
+    expect($site->git_repository_url)->toBe('acme/api');
+    expect($site->git_branch)->toBe('main');
+    expect($site->meta['serverless']['runtime'])->toBe('nodejs:20');
+    expect($site->meta['runtime_profile'])->toBe('digitalocean_functions_web');
+});
+
+test('dispatches the namespace provision job', function () {
+    Bus::fake();
+
+    $site = createFunction();
+
+    Bus::assertDispatched(
+        ProvisionServerlessHostJob::class,
+        fn (ProvisionServerlessHostJob $job) => $job->serverId === $site->server_id,
+    );
+});
+
+test('normalizes a full github url to owner repo', function () {
+    Bus::fake();
+
+    $site = createFunction(['repo' => 'https://github.com/acme/widgets.git']);
+
+    expect($site->git_repository_url)->toBe('acme/widgets');
+});
+
+test('rejects an empty repository', function () {
+    Bus::fake();
+
+    $this->expectException(InvalidArgumentException::class);
+    createFunction(['repo' => '']);
+});
+
+test('function site is not billed until active', function () {
+    Bus::fake();
+
+    // Fresh function is `functions_configured`, not `functions_active` —
+    // the billing computer only counts active functions.
+    $site = createFunction();
+
+    $this->assertNotSame(Site::STATUS_FUNCTIONS_ACTIVE, $site->status);
+});
+
+test('auto runtime is stored unset for deploy time detection', function () {
+    Bus::fake();
+
+    // `auto` leaves the runtime empty so ServerlessRuntimeDetector picks
+    // it from the repo at deploy time; an explicit value is kept verbatim.
+    $site = createFunction(['runtime' => 'auto']);
+
+    expect($site->meta['serverless']['runtime'])->toBe('');
+});
+
+test('byo functions record the customer backend and credential', function () {
+    Bus::fake();
+
+    $site = createFunction();
+
+    expect($site->serverless_backend)->toBe(Site::SERVERLESS_BACKEND_BYO);
+    expect($site->serverless_provider_credential_id)->not->toBeNull();
+    expect($site->usesManagedServerless())->toBeFalse();
+
+    $server = Server::find($site->server_id);
+    expect($server->provider_credential_id)->not->toBeNull();
+    expect($server->meta['serverless_managed'] ?? false)->toBeFalse();
+});
+
+test('managed mode runs on dplys account without a customer credential', function () {
+    Bus::fake();
+    configureManagedServerless();
+
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+
+    // No provider_credential_id supplied — managed functions don't need one.
+    $site = app(CreateServerlessFunction::class)->handle($user, $org, [
+        'name' => 'Managed API',
+        'repo' => 'acme/api',
+        'branch' => 'main',
+        'runtime' => 'nodejs:20',
+        'region' => 'nyc1',
+        'delivery_mode' => 'managed',
+    ]);
+
+    expect($site->serverless_backend)->toBe(Site::SERVERLESS_BACKEND_DPLY);
+    expect($site->serverless_provider_credential_id)->toBeNull();
+    expect($site->usesManagedServerless())->toBeTrue();
+
+    $server = Server::find($site->server_id);
+    expect($server->provider_credential_id)->toBeNull();
+    expect($server->meta['serverless_managed'])->toBeTrue();
+});
+
+test('managed mode is rejected when the platform namespace is not configured', function () {
+    Bus::fake();
+    Config::set('serverless.managed.api_host', '');
+    Config::set('serverless.managed.namespace', '');
+    Config::set('serverless.managed.access_key', '');
+
+    $user = User::factory()->create();
+    $org = Organization::factory()->create();
+    $org->users()->attach($user->id, ['role' => 'owner']);
+
+    $this->expectException(InvalidArgumentException::class);
+
+    app(CreateServerlessFunction::class)->handle($user, $org, [
+        'name' => 'Managed API',
+        'repo' => 'acme/api',
+        'branch' => 'main',
+        'runtime' => 'nodejs:20',
+        'region' => 'nyc1',
+        'delivery_mode' => 'managed',
+    ]);
+});

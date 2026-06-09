@@ -1,47 +1,40 @@
 <?php
 
-namespace Tests\Unit\Services;
+namespace Tests\Unit\Services\SiteSuspendedPageBuilderTest;
 
 use App\Models\Site;
 use App\Services\Sites\SiteSuspendedPageBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
 
-class SiteSuspendedPageBuilderTest extends TestCase
-{
-    use RefreshDatabase;
+uses(RefreshDatabase::class);
 
-    public function test_render_escapes_site_name_and_includes_optional_message_from_meta(): void
-    {
-        $site = Site::factory()->create([
-            'name' => 'Test & Co',
-            'meta' => ['suspended_message' => 'Contact <support@example.com>'],
-        ]);
+test('render escapes site name and includes optional message from meta', function () {
+    $site = Site::factory()->create([
+        'name' => 'Test & Co',
+        'meta' => ['suspended_message' => 'Contact <support@example.com>'],
+    ]);
 
-        $html = (new SiteSuspendedPageBuilder)->render($site);
+    $html = (new SiteSuspendedPageBuilder)->render($site);
 
-        $this->assertStringContainsString('Test &amp; Co', $html);
-        $this->assertStringContainsString('Contact &lt;support@example.com&gt;', $html);
-        $this->assertStringContainsString('noindex', $html);
-    }
+    $this->assertStringContainsString('Test &amp; Co', $html);
+    $this->assertStringContainsString('Contact &lt;support@example.com&gt;', $html);
+    $this->assertStringContainsString('noindex', $html);
+});
 
-    public function test_suspended_public_message_prefers_meta_over_legacy_column(): void
-    {
-        $site = Site::factory()->create([
-            'suspended_reason' => 'Legacy column',
-            'meta' => ['suspended_message' => 'From meta'],
-        ]);
+test('suspended public message prefers meta over legacy column', function () {
+    $site = Site::factory()->create([
+        'suspended_reason' => 'Legacy column',
+        'meta' => ['suspended_message' => 'From meta'],
+    ]);
 
-        $this->assertSame('From meta', $site->suspendedPublicMessage());
-    }
+    expect($site->suspendedPublicMessage())->toBe('From meta');
+});
 
-    public function test_suspended_public_message_falls_back_to_legacy_column(): void
-    {
-        $site = Site::factory()->create([
-            'suspended_reason' => 'Legacy only',
-            'meta' => [],
-        ]);
+test('suspended public message falls back to legacy column', function () {
+    $site = Site::factory()->create([
+        'suspended_reason' => 'Legacy only',
+        'meta' => [],
+    ]);
 
-        $this->assertSame('Legacy only', $site->suspendedPublicMessage());
-    }
-}
+    expect($site->suspendedPublicMessage())->toBe('Legacy only');
+});

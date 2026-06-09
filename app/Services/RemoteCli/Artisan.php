@@ -131,7 +131,13 @@ class Artisan extends RemoteCli
      */
     protected function buildShellCommand(Site $site, string $command, array $args): string
     {
-        $path = $site->document_root ?: $site->repository_path ?: '/home/dply/'.$site->slug;
+        // artisan lives in the application root, not the web-served
+        // document_root (which for a Laravel site is `<root>/public`).
+        // Prefer the repository path; otherwise strip a trailing
+        // `/public` off the document_root before falling back.
+        $path = $site->repository_path
+            ?: preg_replace('#/public/?$#', '', (string) $site->document_root)
+            ?: '/home/dply/'.$site->slug;
         $escaped = array_map(escapeshellarg(...), $args);
 
         return sprintf(

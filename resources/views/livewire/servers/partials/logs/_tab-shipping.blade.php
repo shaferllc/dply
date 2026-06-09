@@ -1,0 +1,246 @@
+@php
+    $status = $agent?->status;
+    $busy = $agent !== null && in_array($status, ['installing', 'uninstalling'], true);
+    $statusMeta = match ($status) {
+        'running' => ['tone' => 'emerald', 'label' => __('Running')],
+        'installing' => ['tone' => 'sky', 'label' => __('Installing…')],
+        'uninstalling' => ['tone' => 'sky', 'label' => __('Removing…')],
+        'failed' => ['tone' => 'rose', 'label' => __('Failed')],
+        default => ['tone' => 'mist', 'label' => __('Idle')],
+    };
+    $statusTone = $tonePalette[$statusMeta['tone']] ?? $tonePalette['mist'];
+@endphp
+
+<div class="space-y-6">
+    {{-- Poll while a job is in flight so install output + status stream in --}}
+    @if ($busy)
+        <div wire:poll.2s="pollLogShipping" class="hidden" aria-hidden="true"></div>
+    @endif
+
+    <section class="dply-card overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <x-icon-badge>
+                <x-heroicon-o-paper-airplane class="h-5 w-5" aria-hidden="true" />
+            </x-icon-badge>
+            <div class="min-w-0 flex-1">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Add-on') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('dply Logs — ship & search') }}</h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                    {{ __('Run a lightweight agent (Vector) on this server to ship system + service logs to dply for persistent, searchable storage — beyond the live SSH tail. Hard-capped so it never competes with your app.') }}
+                </p>
+            </div>
+            @if ($agent !== null)
+                <span class="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset {{ $statusTone }}">
+                    {{ $statusMeta['label'] }}
+                    @if ($agent->version)
+                        <span class="font-normal opacity-70">· v{{ $agent->version }}</span>
+                    @endif
+                </span>
+            @endif
+        </div>
+
+        <div class="space-y-5 px-6 py-5 sm:px-7">
+            @unless ($this->logShippingEnabled)
+                <div class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-inset ring-amber-200">
+                    {{ __('The Logs add-on is not enabled in this environment yet. Set SERVER_LOGS_ENABLED=true to turn it on.') }}
+                </div>
+            @endunless
+
+            @if ($agent?->error_message)
+                <div class="rounded-lg bg-rose-50 px-4 py-3 text-sm text-rose-700 ring-1 ring-inset ring-rose-200">
+                    <p class="font-semibold">{{ __('Last error') }}</p>
+                    <p class="mt-0.5 break-words">{{ $agent->error_message }}</p>
+                </div>
+            @endif
+
+            {{-- Source toggles --}}
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.14em] text-brand-sage">{{ __('Sources') }}</p>
+                <p class="mt-1 text-xs text-brand-moss">{{ __('Toggle which logs this server collects. Fewer sources = less volume.') }}</p>
+                <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                    @foreach ($this->logShippingSourceCatalog as $key => $label)
+                        @php $on = (bool) ($this->logShippingSources[$key] ?? false); @endphp
+                        <button
+                            type="button"
+                            wire:click="toggleLogShippingSource('{{ $key }}')"
+                            @disabled($busy)
+                            class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-left text-sm transition disabled:opacity-50
+                                {{ $on ? 'border-brand-sage/40 bg-brand-sage/10' : 'border-brand-ink/10 bg-white hover:bg-brand-sand/20' }}"
+                        >
+                            <span class="min-w-0 truncate text-brand-ink">{{ $label }}</span>
+                            <span class="inline-flex h-5 w-9 shrink-0 items-center rounded-full px-0.5 transition {{ $on ? 'bg-brand-sage justify-end' : 'bg-brand-ink/15 justify-start' }}">
+                                <span class="h-4 w-4 rounded-full bg-white shadow"></span>
+                            </span>
+                        </button>
+                    @endforeach
+                </div>
+            </div>
+
+            {{-- Actions --}}
+            <div class="flex flex-wrap items-center gap-3 border-t border-brand-ink/10 pt-4">
+                @if ($agent === null || $status === 'failed')
+                    <button
+                        type="button"
+                        wire:click="enableLogShipping"
+                        wire:loading.attr="disabled"
+                        @disabled(! $this->logShippingEnabled || $busy)
+                        class="inline-flex items-center gap-2 rounded-lg bg-brand-forest px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-forest/90 disabled:opacity-50"
+                    >
+                        <x-heroicon-o-bolt class="h-4 w-4" aria-hidden="true" />
+                        {{ $status === 'failed' ? __('Retry install') : __('Enable log shipping') }}
+                    </button>
+                @else
+                    <button
+                        type="button"
+                        wire:click="resyncLogShipping"
+                        wire:loading.attr="disabled"
+                        @disabled($busy)
+                        class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink transition hover:bg-brand-sand/20 disabled:opacity-50"
+                    >
+                        <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
+                        {{ __('Re-sync agent') }}
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="disableLogShipping"
+                        wire:confirm="{{ __('Remove the log agent from this server? Shipping will stop.') }}"
+                        @disabled($busy)
+                        class="inline-flex items-center gap-2 rounded-lg border border-rose-200 bg-white px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-50"
+                    >
+                        <x-heroicon-o-trash class="h-4 w-4" aria-hidden="true" />
+                        {{ __('Disable') }}
+                    </button>
+                @endif
+
+                @if ($busy)
+                    <span class="inline-flex items-center gap-2 text-xs text-brand-moss">
+                        <x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" aria-hidden="true" />
+                        {{ __('Working on the server…') }}
+                    </span>
+                @endif
+            </div>
+
+            {{-- Streaming install output --}}
+            @if ($agent && trim((string) $agent->install_output) !== '')
+                <div x-data="{ open: {{ $busy ? 'true' : 'false' }} }" class="rounded-lg border border-brand-ink/10 bg-brand-ink/[0.02]">
+                    <button type="button" x-on:click="open = !open" class="flex w-full items-center justify-between px-4 py-2.5 text-xs font-semibold text-brand-moss">
+                        {{ __('Install output') }}
+                        <x-heroicon-o-chevron-down class="h-4 w-4 transition" x-bind:class="open ? 'rotate-180' : ''" aria-hidden="true" />
+                    </button>
+                    <div x-show="open" x-collapse>
+                        <pre class="max-h-72 overflow-auto border-t border-brand-ink/10 px-4 py-3 text-[11px] leading-relaxed text-brand-ink/80">{{ $agent->install_output }}</pre>
+                    </div>
+                </div>
+            @endif
+        </div>
+    </section>
+
+    {{-- Shipped logs explorer (reads ClickHouse, org + server scoped) --}}
+    @if ($logExplorer !== null)
+        <section class="dply-card overflow-hidden">
+            <div class="flex flex-wrap items-center gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 sm:px-7">
+                <x-icon-badge>
+                    <x-heroicon-o-magnifying-glass class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0 flex-1">
+                    <h3 class="text-base font-semibold text-brand-ink">{{ __('Shipped logs') }}</h3>
+                    <p class="text-xs text-brand-moss">{{ __('Searchable, persisted logs from this server (newest first).') }}</p>
+                </div>
+                <button type="button" wire:click="$refresh" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:bg-brand-sand/20">
+                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" wire:loading.class="animate-spin" wire:target="$refresh" />
+                    {{ __('Refresh') }}
+                </button>
+            </div>
+
+            @if (! ($logExplorer['available'] ?? false))
+                <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7">
+                    <x-heroicon-o-signal-slash class="mx-auto h-6 w-6 text-brand-ink/30" aria-hidden="true" />
+                    <p class="mt-2 font-medium text-brand-ink">{{ __('Log store unavailable') }}</p>
+                    <p class="mt-0.5">{{ __('Could not reach the dply Logs store.') }}</p>
+                </div>
+            @else
+                {{-- Filters --}}
+                <div class="flex flex-wrap items-center gap-2 border-b border-brand-ink/10 px-6 py-3 sm:px-7">
+                    <div class="relative min-w-0 flex-1">
+                        <x-heroicon-o-magnifying-glass class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-ink/30" aria-hidden="true" />
+                        <input
+                            type="search"
+                            wire:model.live.debounce.500ms="logExplorerSearch"
+                            placeholder="{{ __('Search message…') }}"
+                            class="w-full rounded-lg border border-brand-ink/15 bg-white py-1.5 pl-8 pr-3 text-sm placeholder:text-brand-ink/30 focus:border-brand-sage focus:ring-brand-sage"
+                        />
+                    </div>
+                    <select wire:model.live="logExplorerLevel" class="rounded-lg border border-brand-ink/15 bg-white py-1.5 pl-3 pr-8 text-sm focus:border-brand-sage focus:ring-brand-sage">
+                        <option value="">{{ __('All levels') }}</option>
+                        @foreach (['error', 'warn', 'warning', 'info', 'notice', 'debug', 'critical'] as $lvl)
+                            <option value="{{ $lvl }}">{{ ucfirst($lvl) }}</option>
+                        @endforeach
+                    </select>
+                    <select wire:model.live="logExplorerSource" class="rounded-lg border border-brand-ink/15 bg-white py-1.5 pl-3 pr-8 text-sm focus:border-brand-sage focus:ring-brand-sage">
+                        <option value="">{{ __('All sources') }}</option>
+                        @foreach ($this->logShippingSourceCatalog as $key => $label)
+                            <option value="{{ $key }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                    <select wire:model.live="logExplorerRange" class="rounded-lg border border-brand-ink/15 bg-white py-1.5 pl-3 pr-8 text-sm focus:border-brand-sage focus:ring-brand-sage">
+                        <option value="15">{{ __('Last 15m') }}</option>
+                        <option value="60">{{ __('Last 1h') }}</option>
+                        <option value="360">{{ __('Last 6h') }}</option>
+                        <option value="1440">{{ __('Last 24h') }}</option>
+                    </select>
+                    @if ($logExplorerSearch !== '' || $logExplorerLevel !== '' || $logExplorerSource !== '')
+                        <button type="button" wire:click="clearLogExplorerFilters" class="text-xs font-semibold text-brand-moss hover:text-brand-ink">{{ __('Clear') }}</button>
+                    @endif
+                </div>
+
+                {{-- Results --}}
+                @php $rows = $logExplorer['rows'] ?? []; @endphp
+                @if (count($rows) === 0)
+                    <div class="px-6 py-10 text-center text-sm text-brand-moss sm:px-7">
+                        <x-heroicon-o-inbox class="mx-auto h-6 w-6 text-brand-ink/30" aria-hidden="true" />
+                        <p class="mt-2">{{ __('No log lines match in this window.') }}</p>
+                        <p class="mt-0.5 text-xs">{{ __('If you just enabled shipping, allow a minute for logs to arrive.') }}</p>
+                    </div>
+                @else
+                    <div class="max-h-[28rem] overflow-auto">
+                        <table class="min-w-full text-left text-xs">
+                            <thead class="sticky top-0 bg-brand-sand/40 text-[10px] uppercase tracking-wider text-brand-moss">
+                                <tr>
+                                    <th class="whitespace-nowrap px-4 py-2 font-semibold">{{ __('Time') }}</th>
+                                    <th class="px-3 py-2 font-semibold">{{ __('Level') }}</th>
+                                    <th class="px-3 py-2 font-semibold">{{ __('Source') }}</th>
+                                    <th class="px-4 py-2 font-semibold">{{ __('Message') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-brand-ink/5">
+                                @foreach ($rows as $row)
+                                    @php
+                                        $lvl = strtolower((string) ($row['level'] ?? ''));
+                                        $lvlTone = match (true) {
+                                            str_contains($lvl, 'err'), str_contains($lvl, 'crit'), str_contains($lvl, 'fatal') => 'bg-rose-50 text-rose-700 ring-rose-200',
+                                            str_contains($lvl, 'warn') => 'bg-amber-50 text-amber-800 ring-amber-200',
+                                            default => 'bg-brand-sand/60 text-brand-moss ring-brand-ink/10',
+                                        };
+                                    @endphp
+                                    <tr class="align-top hover:bg-brand-sand/10">
+                                        <td class="whitespace-nowrap px-4 py-1.5 font-mono text-[11px] tabular-nums text-brand-moss">{{ $row['timestamp'] ?? '' }}</td>
+                                        <td class="px-3 py-1.5">
+                                            @if ($lvl !== '')
+                                                <span class="inline-flex rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ring-1 ring-inset {{ $lvlTone }}">{{ $lvl }}</span>
+                                            @endif
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-1.5 text-brand-moss">{{ $row['source'] ?? '' }}</td>
+                                        <td class="px-4 py-1.5 font-mono text-[11px] leading-relaxed text-brand-ink/80">{{ $row['message'] ?? '' }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="border-t border-brand-ink/10 px-6 py-2 text-[11px] text-brand-moss sm:px-7">
+                        {{ __(':n lines', ['n' => count($rows)]) }}@if (count($rows) >= $logExplorerLimit) · {{ __('showing newest :n', ['n' => $logExplorerLimit]) }}@endif
+                    </div>
+                @endif
+            @endif
+        </section>
+    @endif
+</div>

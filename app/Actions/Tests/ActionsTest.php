@@ -100,19 +100,3 @@ it('unauthorized response returns unprocessable entity status', function () {
         expect($e->getResponse()->getStatusCode())->toBe(422);
     }
 });
-
-/**
- * Concrete implementation of Actions for testing purposes
- */
-class ConcreteAction extends Actions
-{
-    public function getControllerMiddleware(): array
-    {
-        return ['auth:sanctum', 'api', 'verified'];
-    }
-
-    public function handle(): void
-    {
-        // Empty implementation for testing
-    }
-}

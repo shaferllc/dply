@@ -19,25 +19,40 @@ class LocalRuntimeWorkspace
         $workingDirectory = $repositoryPath;
         $subdirectory = $site->runtimeRepositorySubdirectory();
         $branch = trim((string) ($site->git_branch ?: 'main'));
+        $refKind = $site->gitRefKind();
+        $isCommit = $refKind === 'commit';
 
         File::ensureDirectoryExists($workspacePath);
 
         if (! File::isDirectory($repositoryPath.'/.git')) {
             File::deleteDirectory($repositoryPath);
 
-            $this->run([
-                'git',
-                'clone',
-                '--branch',
-                $branch,
-                '--single-branch',
-                (string) $site->git_repository_url,
-                $repositoryPath,
-            ], $workspacePath);
+            if ($isCommit) {
+                // Full clone (no --branch/--single-branch) so the SHA is in
+                // history, then check it out into a detached HEAD.
+                $this->run([
+                    'git', 'clone',
+                    (string) $site->git_repository_url,
+                    $repositoryPath,
+                ], $workspacePath);
+                $this->run(['git', 'checkout', $branch], $repositoryPath);
+            } else {
+                $this->run([
+                    'git', 'clone',
+                    '--branch', $branch,
+                    '--single-branch',
+                    (string) $site->git_repository_url,
+                    $repositoryPath,
+                ], $workspacePath);
+            }
         } else {
             $this->run(['git', 'fetch', '--all', '--prune'], $repositoryPath);
             $this->run(['git', 'checkout', $branch], $repositoryPath);
-            $this->run(['git', 'pull', '--ff-only', 'origin', $branch], $repositoryPath);
+            // Tags and commits are immutable refs — `git pull` on a detached
+            // HEAD fails. Only fast-forward when we're tracking a branch.
+            if ($refKind === 'branch') {
+                $this->run(['git', 'pull', '--ff-only', 'origin', $branch], $repositoryPath);
+            }
         }
 
         $revision = trim($this->run(['git', 'rev-parse', 'HEAD'], $repositoryPath));

@@ -1,6 +1,6 @@
 <?php
 
-namespace Tests\Feature\Livewire\Serverless;
+namespace Tests\Feature\Livewire\Serverless\CreateTest;
 
 use App\Livewire\Serverless\Create as ServerlessCreate;
 use App\Models\Organization;
@@ -12,249 +12,227 @@ use App\Services\Deploy\ServerlessRepositoryCheckout;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Livewire\Livewire;
-use Tests\TestCase;
 
-class CreateTest extends TestCase
+uses(RefreshDatabase::class);
+
+beforeEach(function () {
+    $this->user = User::factory()->create();
+    $this->org = Organization::factory()->create();
+    $this->org->users()->attach($this->user->id, ['role' => 'owner']);
+});
+
+function withCredential(User $user, Organization $org): void
 {
-    use RefreshDatabase;
+    ProviderCredential::query()->create([
+        'organization_id' => $org->id,
+        'user_id' => $user->id,
+        'provider' => 'digitalocean',
+        'name' => 'DO main',
+        'credentials' => ['token' => 'dop_v1_test'],
+    ]);
+}
 
-    private User $user;
+test('shows a warning when no digitalocean credential exists', function () {
+    Livewire::actingAs($this->user)
+        ->test(ServerlessCreate::class)
+        ->assertSee('Connect a DigitalOcean credential');
+});
 
-    private Organization $org;
+test('load php demo prefills the form', function () {
+    withCredential($this->user, $this->org);
 
-    protected function setUp(): void
+    Livewire::actingAs($this->user)
+        ->test(ServerlessCreate::class)
+        ->call('loadPhpDemo')
+        ->assertSet('repo', 'shaferllc/dply-demo-php-function')
+        ->assertSet('branch', 'master')
+        ->assertSet('runtime', 'php:8.3')
+        ->assertSet('name', 'PHP demo');
+});
+
+test('load laravel demo prefills the form', function () {
+    withCredential($this->user, $this->org);
+
+    Livewire::actingAs($this->user)
+        ->test(ServerlessCreate::class)
+        ->call('loadLaravelDemo')
+        ->assertSet('repo', 'shaferllc/dply-demo-laravel-function')
+        ->assertSet('branch', 'master')
+        ->assertSet('runtime', 'php:8.4')
+        ->assertSet('name', 'Laravel demo');
+});
+
+test('php is an offered runtime', function () {
+    withCredential($this->user, $this->org);
+
+    Livewire::actingAs($this->user)
+        ->test(ServerlessCreate::class)
+        ->assertSee('PHP 8.3');
+});
+
+test('validation rejects empty name and repo', function () {
+    withCredential($this->user, $this->org);
+
+    Livewire::actingAs($this->user)
+        ->test(ServerlessCreate::class)
+        ->set('name', '')
+        ->set('repo', '')
+        ->call('create')
+        ->assertHasErrors(['name', 'repo']);
+});
+
+test('happy path creates function and redirects', function () {
+    Bus::fake();
+    withCredential($this->user, $this->org);
+
+    Livewire::actingAs($this->user)
+        ->test(ServerlessCreate::class)
+        ->set('name', 'Orders API')
+        ->set('repo', 'acme/orders')
+        ->set('branch', 'main')
+        ->set('runtime', 'nodejs:20')
+        ->set('region', 'nyc1')
+        ->call('create')
+        ->assertHasNoErrors()
+        ->assertRedirect();
+
+    $site = Site::query()->where('organization_id', $this->org->id)->firstOrFail();
+    expect($site->git_repository_url)->toBe('acme/orders');
+
+    $server = Server::find($site->server_id);
+    expect($server->isServerlessHost())->toBeTrue();
+});
+
+test('runtime defaults to auto detect', function () {
+    withCredential($this->user, $this->org);
+
+    Livewire::actingAs($this->user)
+        ->test(ServerlessCreate::class)
+        ->assertSet('runtime', 'auto')
+        ->assertSee('Auto-detect');
+});
+
+test('auto detect creates a function with an unset runtime', function () {
+    Bus::fake();
+    withCredential($this->user, $this->org);
+
+    Livewire::actingAs($this->user)
+        ->test(ServerlessCreate::class)
+        ->set('name', 'Detected Fn')
+        ->set('repo', 'acme/detected')
+        ->set('branch', 'main')
+        ->set('runtime', 'auto')
+        ->set('region', 'nyc1')
+        ->call('create')
+        ->assertHasNoErrors()
+        ->assertRedirect();
+
+    $site = Site::query()->where('organization_id', $this->org->id)->firstOrFail();
+    expect($site->meta['serverless']['runtime'])->toBe('');
+});
+
+test('validation rejects an unknown runtime', function () {
+    withCredential($this->user, $this->org);
+
+    Livewire::actingAs($this->user)
+        ->test(ServerlessCreate::class)
+        ->set('name', 'Bad Runtime')
+        ->set('repo', 'acme/api')
+        ->set('runtime', 'cobol:74')
+        ->call('create')
+        ->assertHasErrors(['runtime']);
+});
+
+test('detect from repository renders panel', function () {
+    withCredential($this->user, $this->org);
+    fakeServerlessCheckout(function (string $dir): void {
+        file_put_contents($dir.'/main.php', "<?php\nfunction main(array \$args): array { return []; }\n");
+    });
+
+    Livewire::actingAs($this->user)
+        ->test(ServerlessCreate::class)
+        ->set('repo', 'acme/api')
+        ->set('branch', 'main')
+        ->call('detectFromRepository')
+        ->assertSee('php:8.3')
+        ->assertSee('raw');
+});
+
+test('detect from repository prefills runtime dropdown', function () {
+    withCredential($this->user, $this->org);
+    fakeServerlessCheckout(function (string $dir): void {
+        file_put_contents($dir.'/main.php', "<?php\nfunction main(array \$args): array { return []; }\n");
+    });
+
+    Livewire::actingAs($this->user)
+        ->test(ServerlessCreate::class)
+        ->set('repo', 'acme/api')
+        ->set('branch', 'main')
+        ->call('detectFromRepository')
+        ->assertSet('runtime', 'php:8.3');
+});
+
+test('detect from repository does not overwrite picked runtime', function () {
+    withCredential($this->user, $this->org);
+    fakeServerlessCheckout(function (string $dir): void {
+        file_put_contents($dir.'/main.php', "<?php\nfunction main(array \$args): array { return []; }\n");
+    });
+
+    Livewire::actingAs($this->user)
+        ->test(ServerlessCreate::class)
+        // Picking a runtime first marks it touched — detect must not stomp it.
+        ->set('runtime', 'go:1.22')
+        ->set('repo', 'acme/api')
+        ->set('branch', 'main')
+        ->call('detectFromRepository')
+        ->assertSet('runtime', 'go:1.22');
+});
+
+test('detect from repository leaves dropdown on auto when nothing detected', function () {
+    withCredential($this->user, $this->org);
+
+    // An empty checkout — no framework markers, no raw main() entry file.
+    fakeServerlessCheckout(fn (string $dir) => null);
+
+    Livewire::actingAs($this->user)
+        ->test(ServerlessCreate::class)
+        ->set('repo', 'acme/empty')
+        ->set('branch', 'main')
+        ->call('detectFromRepository')
+        ->assertSet('runtime', 'auto')
+        ->assertSee('No runtime detected');
+});
+
+/**
+ * Bind a fake {@see ServerlessRepositoryCheckout} that resolves to a local
+ * fixture directory instead of cloning over the network.
+ */
+function fakeServerlessCheckout(callable $populate): string
+{
+    $dir = sys_get_temp_dir().'/dply-sls-detect-'.bin2hex(random_bytes(6));
+    mkdir($dir, 0o755, true);
+    $populate($dir);
+
+    app()->instance(ServerlessRepositoryCheckout::class, new class($dir)
     {
-        parent::setUp();
-        $this->user = User::factory()->create();
-        $this->org = Organization::factory()->create();
-        $this->org->users()->attach($this->user->id, ['role' => 'owner']);
-    }
+        public function __construct(private string $dir) {}
 
-    private function withCredential(): void
-    {
-        ProviderCredential::query()->create([
-            'organization_id' => $this->org->id,
-            'user_id' => $this->user->id,
-            'provider' => 'digitalocean',
-            'name' => 'DO main',
-            'credentials' => ['token' => 'dop_v1_test'],
-        ]);
-    }
-
-    public function test_shows_a_warning_when_no_digitalocean_credential_exists(): void
-    {
-        Livewire::actingAs($this->user)
-            ->test(ServerlessCreate::class)
-            ->assertSee('Connect a DigitalOcean credential');
-    }
-
-    public function test_load_php_demo_prefills_the_form(): void
-    {
-        $this->withCredential();
-
-        Livewire::actingAs($this->user)
-            ->test(ServerlessCreate::class)
-            ->call('loadPhpDemo')
-            ->assertSet('repo', 'shaferllc/dply-demo-php-function')
-            ->assertSet('branch', 'master')
-            ->assertSet('runtime', 'php:8.3')
-            ->assertSet('name', 'PHP demo');
-    }
-
-    public function test_load_laravel_demo_prefills_the_form(): void
-    {
-        $this->withCredential();
-
-        Livewire::actingAs($this->user)
-            ->test(ServerlessCreate::class)
-            ->call('loadLaravelDemo')
-            ->assertSet('repo', 'shaferllc/dply-demo-laravel-function')
-            ->assertSet('branch', 'master')
-            ->assertSet('runtime', 'php:8.4')
-            ->assertSet('name', 'Laravel demo');
-    }
-
-    public function test_php_is_an_offered_runtime(): void
-    {
-        $this->withCredential();
-
-        Livewire::actingAs($this->user)
-            ->test(ServerlessCreate::class)
-            ->assertSee('PHP 8.3');
-    }
-
-    public function test_validation_rejects_empty_name_and_repo(): void
-    {
-        $this->withCredential();
-
-        Livewire::actingAs($this->user)
-            ->test(ServerlessCreate::class)
-            ->set('name', '')
-            ->set('repo', '')
-            ->call('create')
-            ->assertHasErrors(['name', 'repo']);
-    }
-
-    public function test_happy_path_creates_function_and_redirects(): void
-    {
-        Bus::fake();
-        $this->withCredential();
-
-        Livewire::actingAs($this->user)
-            ->test(ServerlessCreate::class)
-            ->set('name', 'Orders API')
-            ->set('repo', 'acme/orders')
-            ->set('branch', 'main')
-            ->set('runtime', 'nodejs:20')
-            ->set('region', 'nyc1')
-            ->call('create')
-            ->assertHasNoErrors()
-            ->assertRedirect();
-
-        $site = Site::query()->where('organization_id', $this->org->id)->firstOrFail();
-        $this->assertSame('acme/orders', $site->git_repository_url);
-
-        $server = Server::find($site->server_id);
-        $this->assertTrue($server->isServerlessHost());
-    }
-
-    public function test_runtime_defaults_to_auto_detect(): void
-    {
-        $this->withCredential();
-
-        Livewire::actingAs($this->user)
-            ->test(ServerlessCreate::class)
-            ->assertSet('runtime', 'auto')
-            ->assertSee('Auto-detect');
-    }
-
-    public function test_auto_detect_creates_a_function_with_an_unset_runtime(): void
-    {
-        Bus::fake();
-        $this->withCredential();
-
-        Livewire::actingAs($this->user)
-            ->test(ServerlessCreate::class)
-            ->set('name', 'Detected Fn')
-            ->set('repo', 'acme/detected')
-            ->set('branch', 'main')
-            ->set('runtime', 'auto')
-            ->set('region', 'nyc1')
-            ->call('create')
-            ->assertHasNoErrors()
-            ->assertRedirect();
-
-        $site = Site::query()->where('organization_id', $this->org->id)->firstOrFail();
-        $this->assertSame('', $site->meta['serverless']['runtime']);
-    }
-
-    public function test_validation_rejects_an_unknown_runtime(): void
-    {
-        $this->withCredential();
-
-        Livewire::actingAs($this->user)
-            ->test(ServerlessCreate::class)
-            ->set('name', 'Bad Runtime')
-            ->set('repo', 'acme/api')
-            ->set('runtime', 'cobol:74')
-            ->call('create')
-            ->assertHasErrors(['runtime']);
-    }
-
-    public function test_detect_from_repository_renders_panel(): void
-    {
-        $this->withCredential();
-        $this->fakeServerlessCheckout(function (string $dir): void {
-            file_put_contents($dir.'/main.php', "<?php\nfunction main(array \$args): array { return []; }\n");
-        });
-
-        Livewire::actingAs($this->user)
-            ->test(ServerlessCreate::class)
-            ->set('repo', 'acme/api')
-            ->set('branch', 'main')
-            ->call('detectFromRepository')
-            ->assertSee('php:8.3')
-            ->assertSee('raw');
-    }
-
-    public function test_detect_from_repository_prefills_runtime_dropdown(): void
-    {
-        $this->withCredential();
-        $this->fakeServerlessCheckout(function (string $dir): void {
-            file_put_contents($dir.'/main.php', "<?php\nfunction main(array \$args): array { return []; }\n");
-        });
-
-        Livewire::actingAs($this->user)
-            ->test(ServerlessCreate::class)
-            ->set('repo', 'acme/api')
-            ->set('branch', 'main')
-            ->call('detectFromRepository')
-            ->assertSet('runtime', 'php:8.3');
-    }
-
-    public function test_detect_from_repository_does_not_overwrite_picked_runtime(): void
-    {
-        $this->withCredential();
-        $this->fakeServerlessCheckout(function (string $dir): void {
-            file_put_contents($dir.'/main.php', "<?php\nfunction main(array \$args): array { return []; }\n");
-        });
-
-        Livewire::actingAs($this->user)
-            ->test(ServerlessCreate::class)
-            // Picking a runtime first marks it touched — detect must not stomp it.
-            ->set('runtime', 'go:1.22')
-            ->set('repo', 'acme/api')
-            ->set('branch', 'main')
-            ->call('detectFromRepository')
-            ->assertSet('runtime', 'go:1.22');
-    }
-
-    public function test_detect_from_repository_leaves_dropdown_on_auto_when_nothing_detected(): void
-    {
-        $this->withCredential();
-        // An empty checkout — no framework markers, no raw main() entry file.
-        $this->fakeServerlessCheckout(fn (string $dir) => null);
-
-        Livewire::actingAs($this->user)
-            ->test(ServerlessCreate::class)
-            ->set('repo', 'acme/empty')
-            ->set('branch', 'main')
-            ->call('detectFromRepository')
-            ->assertSet('runtime', 'auto')
-            ->assertSee('No runtime detected');
-    }
-
-    /**
-     * Bind a fake {@see ServerlessRepositoryCheckout} that resolves to a local
-     * fixture directory instead of cloning over the network.
-     */
-    private function fakeServerlessCheckout(callable $populate): string
-    {
-        $dir = sys_get_temp_dir().'/dply-sls-detect-'.bin2hex(random_bytes(6));
-        mkdir($dir, 0o755, true);
-        $populate($dir);
-
-        $this->app->instance(ServerlessRepositoryCheckout::class, new class($dir)
+        /**
+         * @return array<string, string>
+         */
+        public function checkout(): array
         {
-            public function __construct(private string $dir) {}
+            return [
+                'workspace_path' => $this->dir,
+                'repository_path' => $this->dir,
+                'working_directory' => $this->dir,
+                'output' => '',
+                'branch' => 'main',
+            ];
+        }
 
-            /**
-             * @return array<string, string>
-             */
-            public function checkout(): array
-            {
-                return [
-                    'workspace_path' => $this->dir,
-                    'repository_path' => $this->dir,
-                    'working_directory' => $this->dir,
-                    'output' => '',
-                    'branch' => 'main',
-                ];
-            }
+        public function cleanup(string $workspacePath): void {}
+    });
 
-            public function cleanup(string $workspacePath): void {}
-        });
-
-        return $dir;
-    }
+    return $dir;
 }

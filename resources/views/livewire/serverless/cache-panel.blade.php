@@ -1,13 +1,16 @@
-<div @if ($state === 'provisioning') wire:poll.10s @endif class="dply-card p-6 sm:p-8 space-y-4">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-        <div>
-            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Cache') }}</p>
-            <h2 class="mt-1 text-lg font-bold text-brand-ink">{{ __('Managed Redis') }}</h2>
-            <p class="mt-1 text-sm text-brand-moss">{{ __('A DigitalOcean Managed Redis cluster, wired in as this function\'s cache store.') }}</p>
+<div @if ($state === 'provisioning') wire:poll.10s @endif class="dply-card overflow-hidden">
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <x-icon-badge>
+            <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
+        </x-icon-badge>
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cache') }}</p>
+            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Managed Redis') }}</h2>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('A DigitalOcean Managed Redis cluster, wired in as this function\'s cache store.') }}</p>
         </div>
         @if ($state !== '')
             <span @class([
-                'inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold',
+                'ml-auto shrink-0 inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold',
                 'bg-brand-forest/15 text-brand-forest' => $state === 'online',
                 'bg-brand-gold/20 text-brand-ink' => $state === 'provisioning',
                 'bg-rose-100 text-rose-700' => $state === 'error',
@@ -17,6 +20,7 @@
         @endif
     </div>
 
+    <div class="px-6 py-6 sm:px-7 space-y-4">
     @if ($state === '')
         <div class="sm:max-w-xs">
             <label class="block text-sm font-semibold text-brand-ink">{{ __('Size') }}</label>
@@ -67,4 +71,5 @@
             {{ __('Try again') }}
         </button>
     @endif
+    </div>
 </div>

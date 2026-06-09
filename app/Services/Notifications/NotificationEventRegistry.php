@@ -2,7 +2,6 @@
 
 namespace App\Services\Notifications;
 
-use App\Support\ServerDatabaseNotificationKeys;
 use App\Support\ServerSystemdServiceNotificationKeys;
 
 class NotificationEventRegistry
@@ -28,23 +27,11 @@ class NotificationEventRegistry
                 'supports_in_app' => true,
                 // Import migration events surface action-required moments;
                 // default them to email-on per the Q17 cadence (in-app +
-                // email at action-required moments only).
-                'supports_email' => str_starts_with($eventKey, 'import.migration.'),
-                'supports_webhook' => true,
-            ];
-        }
-
-        if (in_array($eventKey, [
-            ServerDatabaseNotificationKeys::eventKey('created'),
-            ServerDatabaseNotificationKeys::eventKey('removed'),
-        ], true)) {
-            return [
-                'key' => $eventKey,
-                'label' => $eventKey === ServerDatabaseNotificationKeys::eventKey('created') ? 'Database created' : 'Database removed',
-                'category' => 'server',
-                'severity' => 'info',
-                'supports_in_app' => true,
-                'supports_email' => false,
+                // email at action-required moments only). Uptime down/recovered,
+                // degraded, and SSL-expiry are likewise action-required.
+                'supports_email' => str_starts_with($eventKey, 'import.migration.')
+                    || str_starts_with($eventKey, 'site.uptime.')
+                    || $eventKey === 'site.ssl.expiring',
                 'supports_webhook' => true,
             ];
         }
@@ -79,6 +66,8 @@ class NotificationEventRegistry
     protected function severityFor(string $eventKey): string
     {
         if (str_contains($eventKey, 'monitor')
+            || str_contains($eventKey, 'uptime')
+            || str_contains($eventKey, '.ssl.')
             || str_contains($eventKey, 'alerts')
             || str_ends_with($eventKey, 'step_failed')
             || str_ends_with($eventKey, 'cutover_ready')
@@ -86,6 +75,15 @@ class NotificationEventRegistry
             || str_ends_with($eventKey, 'paused_nudge')
             || str_ends_with($eventKey, 'container_launch.failed')
             || str_ends_with($eventKey, 'provision_failed')
+            || str_ends_with($eventKey, 'scale_failed')
+            || str_ends_with($eventKey, 'security_digest.critical_finding')
+            || str_ends_with($eventKey, 'security_digest.warning_finding')
+            || str_ends_with($eventKey, 'release_hygiene.critical_finding')
+            || str_ends_with($eventKey, 'release_hygiene.warning_finding')
+            || str_ends_with($eventKey, 'health.critical_finding')
+            || str_ends_with($eventKey, 'health.warning_finding')
+            || str_ends_with($eventKey, 'errors.deploy_failed')
+            || str_ends_with($eventKey, 'errors.operation_failed')
         ) {
             return 'warning';
         }

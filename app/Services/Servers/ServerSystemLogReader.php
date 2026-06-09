@@ -125,6 +125,35 @@ class ServerSystemLogReader
         return ['output' => '', 'error' => __('Unknown log source.')];
     }
 
+    /**
+     * Tail an allowlisted log file over SSH (newest lines first).
+     *
+     * @return array{output: string, error: ?string}
+     */
+    public function tailAllowlistedFile(Server $server, string $path, ?int $tailLineCount = null): array
+    {
+        $normalized = str_starts_with($path, '/') ? $path : '/'.$path;
+        if (str_contains($normalized, '..')) {
+            return ['output' => '', 'error' => __('Invalid log path.')];
+        }
+
+        if (! $this->pathMatchesAllowlist($normalized)) {
+            return ['output' => '', 'error' => __('This log path is not allowlisted.')];
+        }
+
+        if (! $server->ip_address || ! $server->ssh_private_key) {
+            return ['output' => '', 'error' => __('Server is not reachable over SSH yet.')];
+        }
+
+        return $this->tailFileOverSsh(
+            $server,
+            $normalized,
+            $this->resolveTailLineCount($tailLineCount),
+            null,
+            null,
+        );
+    }
+
     public function dplyActivityLog(Server $server, int $maxLines = 300, ?int $sinceMinutes = null): string
     {
         if ($server->organization_id === null) {
@@ -133,7 +162,8 @@ class ServerSystemLogReader
 
         $limit = max(1, min(5000, $maxLines));
 
-        $siteIds = Site::query()->where('server_id', $server->id)->pluck('id');
+        $server->loadMissing('sites');
+        $siteIds = $server->sites->pluck('id');
 
         $logs = AuditLog::query()
             ->where('organization_id', $server->organization_id)
@@ -155,7 +185,7 @@ class ServerSystemLogReader
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->limit($limit)
-            ->with('user')
+            ->with(['user', 'subject'])
             ->get();
 
         if ($logs->isEmpty()) {
@@ -202,7 +232,7 @@ class ServerSystemLogReader
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->limit($limit)
-            ->with('user')
+            ->with(['user', 'subject'])
             ->get();
 
         foreach ($audits as $log) {
@@ -293,14 +323,22 @@ class ServerSystemLogReader
         ?int $sinceMinutes = null,
     ): array {
         $qPath = escapeshellarg($path);
+        // Read directly when the SSH user can; otherwise fall back to passwordless
+        // sudo (the dply model: deploy user + sudo, root login disabled). Many
+        // system logs (e.g. /var/log/nginx/error.log) are root/adm-owned and only
+        // reachable via sudo.
         $script = "if [ -r {$qPath} ]; then tail -n {$lines} {$qPath} 2>&1; ".
-            "elif [ -f {$qPath} ]; then echo '[dply] File exists but is not readable as this SSH user.'; ".
+            "elif sudo -n test -r {$qPath} 2>/dev/null; then sudo -n tail -n {$lines} {$qPath} 2>&1; ".
+            "elif [ -f {$qPath} ]; then echo '[dply] File exists but is not readable as this SSH user, and passwordless sudo is unavailable.'; ".
             "else echo '[dply] File not found or path is not a regular file.'; fi";
         $cmd = '/bin/sh -c '.escapeshellarg($script);
         $budget = (int) config('server_system_logs.request_time_budget_seconds', 90);
         $sshTimeout = $budget > 0 ? max(15, min(60, $budget - 5)) : 60;
 
-        $candidates = $this->sshLoginCandidatesForLogPath($path, $server);
+        // The tail script sudo-escalates for root-owned logs, so the deploy user
+        // can read them on its own — log in as deploy first (root SSH is disabled
+        // on dply hosts), keeping root only as a last-resort fallback.
+        $candidates = $this->fileTailLoginCandidates($server);
         $lastError = null;
         $fallback = (bool) config('server_system_logs.fallback_to_deploy_user_for_logs', true);
 
@@ -322,7 +360,7 @@ class ServerSystemLogReader
                 }
                 $ssh->disconnect();
 
-                $unreadable = str_contains($output, '[dply] File exists but is not readable as this SSH user.');
+                $unreadable = str_contains($output, '[dply] File exists but is not readable');
                 if ($unreadable && $fallback && $i < count($candidates) - 1) {
                     continue;
                 }
@@ -508,6 +546,25 @@ class ServerSystemLogReader
     }
 
     /**
+     * Login candidates for tailing a file. The tail command escalates with
+     * `sudo -n` for root-owned logs, so the deploy user can read them directly —
+     * try it first (dply hosts disable root SSH login), with root as fallback.
+     *
+     * @return list<string>
+     */
+    private function fileTailLoginCandidates(Server $server): array
+    {
+        $deploy = trim((string) $server->ssh_user) ?: 'root';
+        if ($deploy === 'root') {
+            return ['root'];
+        }
+
+        return (bool) config('server_system_logs.fallback_to_deploy_user_for_logs', true)
+            ? [$deploy, 'root']
+            : [$deploy];
+    }
+
+    /**
      * @return list<string>
      */
     private function sshLoginCandidatesForLogPath(string $path, Server $server): array
@@ -554,12 +611,23 @@ class ServerSystemLogReader
         // php_version-drop the canonical column is runtime_version
         // (when runtime='php'). Site::phpVersion() encapsulates the
         // null-when-not-php semantics.
-        $site = Site::query()
-            ->where('server_id', $server->id)
-            ->where('runtime', 'php')
-            ->whereNotNull('runtime_version')
-            ->orderByDesc('updated_at')
-            ->first();
+        $site = null;
+        if ($server->relationLoaded('sites')) {
+            $site = $server->sites
+                ->where('runtime', 'php')
+                ->whereNotNull('runtime_version')
+                ->sortByDesc(fn (Site $row): mixed => $row->updated_at)
+                ->first();
+        }
+
+        if ($site === null) {
+            $site = Site::query()
+                ->where('server_id', $server->id)
+                ->where('runtime', 'php')
+                ->whereNotNull('runtime_version')
+                ->orderByDesc('updated_at')
+                ->first();
+        }
 
         $version = $site?->phpVersion();
         if (is_string($version) && preg_match('/^\d+(\.\d+)?$/', $version)) {

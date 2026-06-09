@@ -51,8 +51,13 @@ class CacheServiceCli
         }
 
         $cli = CacheServiceStats::binaryFor($row->engine);
+        // AUTH flag must come AFTER the cli binary, not before — `-a 'pw' valkey-cli …`
+        // makes bash run `-a` as the program name (fails with "-a: command not found"
+        // and visibly leaks the password into the visible REPL error trail).
+        // `--no-auth-warning` suppresses the stderr "using -a on the command line may
+        // not be safe" line that would otherwise pollute REPL output.
         $authFlag = filled($row->auth_password ?? null)
-            ? '-a '.escapeshellarg((string) $row->auth_password).' '
+            ? ' -a '.escapeshellarg((string) $row->auth_password).' --no-auth-warning'
             : '';
 
         // --no-raw keeps responses in the human-readable form (`(integer) 42`,
@@ -69,9 +74,9 @@ class CacheServiceCli
         // outer SSH timeout already bounds the round-trip.
         $line = <<<BASH
 if command -v {$cliBin} >/dev/null 2>&1; then
-    {$authFlag}{$cliBin} -p {$port} --no-raw {$argString}
+    {$cliBin}{$authFlag} -p {$port} --no-raw {$argString}
 elif command -v redis-cli >/dev/null 2>&1; then
-    {$authFlag}redis-cli -p {$port} --no-raw {$argString}
+    redis-cli{$authFlag} -p {$port} --no-raw {$argString}
 else
     echo "ERROR: No RESP client found on this server (tried {$cli}, redis-cli)." >&2
     exit 127

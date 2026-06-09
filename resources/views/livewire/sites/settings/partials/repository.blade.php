@@ -14,14 +14,15 @@
 <div class="space-y-6">
     {{-- Repository configuration: branch, provider, source-control account, URL. --}}
     <section class="{{ $card }}">
-        <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+        <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                    <x-heroicon-o-code-bracket-square class="h-5 w-5" />
-                </span>
+                <x-icon-badge>
+                    <x-heroicon-o-code-bracket-square class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
                 <div class="min-w-0">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Repository') }}</h2>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Repository') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Repository') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Branch, remote URL, and Git provider context. Changing the URL updates what Dply clones.') }}
                     </p>
                     <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
@@ -110,13 +111,20 @@
                 <button
                     type="button"
                     wire:click="generateDeployKey"
-                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                    wire:loading.attr="disabled"
+                    wire:target="generateDeployKey"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                    <x-heroicon-o-key class="h-3.5 w-3.5" />
-                    {{ __('Generate deploy key') }}
+                    <x-heroicon-o-key class="h-4 w-4" wire:loading.remove wire:target="generateDeployKey" />
+                    <x-spinner wire:loading wire:target="generateDeployKey" size="sm" />
+                    <span wire:loading.remove wire:target="generateDeployKey">{{ __('Generate deploy key') }}</span>
+                    <span wire:loading wire:target="generateDeployKey">{{ __('Generating…') }}</span>
                 </button>
             @endif
-            <x-primary-button type="submit" form="save-repository-form">{{ __('Save repository') }}</x-primary-button>
+            <x-primary-button type="submit" form="save-repository-form" wire:loading.attr="disabled" wire:target="saveRepositoryWorkspace">
+                <span wire:loading.remove wire:target="saveRepositoryWorkspace">{{ __('Save repository') }}</span>
+                <span wire:loading wire:target="saveRepositoryWorkspace">{{ __('Saving…') }}</span>
+            </x-primary-button>
         </div>
 
         @if ($hasDeployKey)
@@ -130,16 +138,23 @@
         @endif
     </section>
 
+    @feature('global.byo_repo_config')
+        @if ($server->isVmHost())
+            <livewire:sites.byo-repo-config-panel :site="$site" :key="'byo-repo-config-'.$site->id" />
+        @endif
+    @endfeature
+
     {{-- Quick deploy webhook toggle. --}}
     <section class="{{ $card }}">
-        <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+        <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                    <x-heroicon-o-bolt class="h-5 w-5" />
-                </span>
+                <x-icon-badge>
+                    <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
                 <div class="min-w-0">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Quick deploy') }}</h2>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Quick deploy') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Quick deploy') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Register a push webhook with your Git provider. Only the sync group leader registers an external webhook; peers deploy via coordination.') }}
                     </p>
                     <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
@@ -162,19 +177,23 @@
                     <button
                         type="button"
                         wire:click="disableQuickDeploy"
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                        wire:loading.attr="disabled"
+                        wire:target="disableQuickDeploy"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                        <x-heroicon-o-power class="h-3.5 w-3.5" />
-                        {{ __('Disable Quick deploy') }}
+                        <span wire:loading.remove wire:target="disableQuickDeploy">{{ __('Disable Quick deploy') }}</span>
+                        <span wire:loading wire:target="disableQuickDeploy">{{ __('Disabling…') }}</span>
                     </button>
                 @else
                     <button
                         type="button"
                         wire:click="enableQuickDeploy"
-                        class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90"
+                        wire:loading.attr="disabled"
+                        wire:target="enableQuickDeploy"
+                        class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                        <x-heroicon-o-bolt class="h-3.5 w-3.5" />
-                        {{ __('Enable Quick deploy') }}
+                        <span wire:loading.remove wire:target="enableQuickDeploy">{{ __('Enable Quick deploy') }}</span>
+                        <span wire:loading wire:target="enableQuickDeploy">{{ __('Enabling…') }}</span>
                     </button>
                 @endif
             </div>
@@ -183,14 +202,15 @@
 
     {{-- Synchronized deploy group. --}}
     <section class="{{ $card }}">
-        <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+        <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                    <x-heroicon-o-rectangle-stack class="h-5 w-5" />
-                </span>
+                <x-icon-badge>
+                    <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
                 <div class="min-w-0">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Synchronized deployments') }}</h2>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Sync group') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Synchronized deployments') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Group sites that share a repository so one push or coordinated manual deploy can update multiple destinations.') }}
                     </p>
                 </div>
@@ -239,7 +259,10 @@
                             @endforeach
                         </select>
                         <x-input-error :messages="$errors->get('sync_group_add_site_id')" class="mt-1" />
-                        <x-primary-button type="submit" class="!py-2">{{ __('Add to group') }}</x-primary-button>
+                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="addSiteToDeploySyncGroup" class="!py-2">
+                            <span wire:loading.remove wire:target="addSiteToDeploySyncGroup">{{ __('Add to group') }}</span>
+                            <span wire:loading wire:target="addSiteToDeploySyncGroup">{{ __('Adding…') }}</span>
+                        </x-primary-button>
                     </form>
 
                     <form wire:submit="setDeploySyncGroupLeader" class="space-y-3 rounded-xl border border-brand-ink/10 p-4">
@@ -249,7 +272,10 @@
                                 <option value="{{ $gs->id }}">{{ $gs->name }}</option>
                             @endforeach
                         </select>
-                        <x-primary-button type="submit" class="!py-2">{{ __('Save leader') }}</x-primary-button>
+                        <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="setDeploySyncGroupLeader" class="!py-2">
+                            <span wire:loading.remove wire:target="setDeploySyncGroupLeader">{{ __('Save leader') }}</span>
+                            <span wire:loading wire:target="setDeploySyncGroupLeader">{{ __('Saving…') }}</span>
+                        </x-primary-button>
                     </form>
                 </div>
 
@@ -257,10 +283,14 @@
                     <button
                         type="button"
                         wire:click="leaveDeploySyncGroup"
-                        class="inline-flex items-center gap-1.5 rounded-lg border border-transparent px-3 py-1.5 text-xs font-semibold text-rose-700 hover:border-rose-200 hover:bg-rose-50"
+                        wire:loading.attr="disabled"
+                        wire:target="leaveDeploySyncGroup"
+                        class="inline-flex items-center gap-1.5 rounded-lg border border-transparent px-3 py-1.5 text-xs font-semibold text-rose-700 hover:border-rose-200 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                        <x-heroicon-o-arrow-right-start-on-rectangle class="h-3.5 w-3.5" />
-                        {{ __('Leave group') }}
+                        <x-heroicon-o-arrow-right-start-on-rectangle class="h-4 w-4" wire:loading.remove wire:target="leaveDeploySyncGroup" />
+                        <x-spinner wire:loading wire:target="leaveDeploySyncGroup" variant="zinc" size="sm" />
+                        <span wire:loading.remove wire:target="leaveDeploySyncGroup">{{ __('Leave group') }}</span>
+                        <span wire:loading wire:target="leaveDeploySyncGroup">{{ __('Leaving…') }}</span>
                     </button>
                 </div>
             @else
@@ -270,7 +300,10 @@
                         <x-text-input id="sync_group_name_input" wire:model="sync_group_name_input" class="mt-1 block w-full" placeholder="production-fleet" />
                         <x-input-error :messages="$errors->get('sync_group_name_input')" class="mt-1" />
                     </div>
-                    <x-primary-button type="submit">{{ __('Create group') }}</x-primary-button>
+                    <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="createDeploySyncGroup">
+                        <span wire:loading.remove wire:target="createDeploySyncGroup">{{ __('Create group') }}</span>
+                        <span wire:loading wire:target="createDeploySyncGroup">{{ __('Creating…') }}</span>
+                    </x-primary-button>
                 </form>
             @endif
         </div>
@@ -278,24 +311,25 @@
 
     {{-- After-deploy health pointer. --}}
     <section class="{{ $card }}">
-        <div class="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+        <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                    <x-heroicon-o-shield-check class="h-5 w-5" />
-                </span>
+                <x-icon-badge>
+                    <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
                 <div class="min-w-0">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('After deploy health') }}</h2>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Health') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('After deploy health') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                         {{ __('Atomic deploys can verify HTTP health before traffic switches. Failed deployments also trigger notification subscriptions when configured.') }}
                     </p>
                 </div>
             </div>
             <a
-                href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'deploy']) }}"
+                href="{{ route('sites.pipeline', [$server, $site]) }}"
                 wire:navigate
                 class="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
             >
-                <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5" />
+                <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" />
                 {{ __('Configure in Deploy') }}
             </a>
         </div>
@@ -303,15 +337,16 @@
 
     {{-- Inbound deploy webhook URL + secret rotation. --}}
     <section class="{{ $card }}">
-        <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+        <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                    <x-heroicon-o-arrow-down-on-square class="h-5 w-5" />
-                </span>
+                <x-icon-badge>
+                    <x-heroicon-o-arrow-down-on-square class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
                 <div class="min-w-0">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Inbound deploy webhook') }}</h2>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">
-                        {{ __('Providers send signed POST payloads (GitHub/GitLab) or use custom X-Dply-Signature. Optional IP allow list is under Notifications.') }}
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Webhook') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Inbound deploy webhook') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                        {{ __('Providers send signed POST payloads (GitHub/GitLab) or use custom X-Dply-Signature. Restrict which IPs may call it with the allow list below.') }}
                     </p>
                 </div>
             </div>
@@ -328,7 +363,7 @@
                         x-on:click="navigator.clipboard.writeText(@js($deployHookUrl)); copied = true; setTimeout(() => copied = false, 2000)"
                         class="inline-flex shrink-0 items-center gap-1 border-l border-brand-ink/10 bg-brand-sand/15 px-3 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40"
                     >
-                        <x-heroicon-m-clipboard-document class="h-3.5 w-3.5" />
+                        <x-heroicon-m-clipboard-document class="h-4 w-4" />
                         <span x-show="!copied">{{ __('Copy') }}</span>
                         <span x-show="copied" x-cloak>{{ __('Copied') }}</span>
                     </button>
@@ -348,32 +383,51 @@
                 <button
                     type="button"
                     wire:click="regenerateWebhookSecret"
-                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                    wire:loading.attr="disabled"
+                    wire:target="regenerateWebhookSecret"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
-                    {{ __('Rotate webhook secret') }}
+                    <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.remove wire:target="regenerateWebhookSecret" />
+                    <x-spinner wire:loading wire:target="regenerateWebhookSecret" size="sm" />
+                    <span wire:loading.remove wire:target="regenerateWebhookSecret">{{ __('Rotate webhook secret') }}</span>
+                    <span wire:loading wire:target="regenerateWebhookSecret">{{ __('Rotating…') }}</span>
                 </button>
                 <a
                     href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'notifications']) }}"
                     wire:navigate
                     class="text-xs font-medium text-brand-sage underline decoration-brand-sage/30 hover:decoration-brand-sage"
                 >
-                    {{ __('IP allow list and notification subscriptions') }}
+                    {{ __('Notification subscriptions') }}
                 </a>
+            </div>
+
+            <div class="border-t border-brand-ink/10 pt-4">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-mist">{{ __('IP allow list') }}</p>
+                <form wire:submit="saveWebhookSecurity" class="mt-2 space-y-3">
+                    <x-input-label for="webhook_allowed_ips_text" value="{{ __('Optional IP allow list (one IPv4/IPv6 or IPv4 CIDR per line)') }}" />
+                    <textarea id="webhook_allowed_ips_text" wire:model="webhook_allowed_ips_text" rows="4" class="w-full rounded-md border-brand-ink/15 shadow-sm font-mono text-xs" placeholder="203.0.113.10&#10;192.0.2.0/24"></textarea>
+                    <p class="text-xs text-brand-mist">{{ __('Leave empty to accept the webhook from any IP (signature still required).') }}</p>
+                    <x-input-error :messages="$errors->get('webhook_allowed_ips_text')" class="mt-1" />
+                    <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveWebhookSecurity">
+                        <span wire:loading.remove wire:target="saveWebhookSecurity">{{ __('Save allow list') }}</span>
+                        <span wire:loading wire:target="saveWebhookSecurity">{{ __('Saving…') }}</span>
+                    </x-primary-button>
+                </form>
             </div>
         </div>
     </section>
 
     {{-- Danger zone. --}}
-    <section class="dply-card overflow-hidden border-rose-200/70 bg-rose-50/40">
-        <div class="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+    <section class="dply-card overflow-hidden border-rose-200">
+        <div class="flex flex-col gap-4 border-b border-rose-200 bg-rose-50/60 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-rose-100 text-rose-700 ring-1 ring-rose-200 sm:inline-flex">
-                    <x-heroicon-o-exclamation-triangle class="h-5 w-5" />
-                </span>
+                <x-icon-badge tone="danger">
+                    <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
                 <div class="min-w-0">
-                    <h2 class="text-lg font-semibold text-rose-900">{{ __('Danger zone') }}</h2>
-                    <p class="mt-1 text-sm leading-relaxed text-rose-900/80">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">{{ __('Destructive') }}</p>
+                    <h2 class="mt-0.5 text-lg font-semibold text-rose-900">{{ __('Danger zone') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-rose-900/80">
                         {{ __('Remove the deployed repository tree on the server without deleting this site in Dply.') }}
                     </p>
                 </div>
@@ -383,15 +437,15 @@
                 wire:click="openConfirmActionModal('queueRemoveRemoteRepository', [], @js(__('Remove repository files?')), @js(__('This queues a job to delete the repository directory on the server. It does not delete the site record.')), @js(__('Remove repository')), true)"
                 class="inline-flex shrink-0 items-center gap-1.5 self-start rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-800 shadow-sm hover:bg-rose-100"
             >
-                <x-heroicon-o-trash class="h-3.5 w-3.5" />
+                <x-heroicon-o-trash class="h-4 w-4" />
                 {{ __('Remove repository from server') }}
             </button>
         </div>
     </section>
 
     <x-cli-snippet :commands="[
-        ['label' => __('Update remote / branch'), 'command' => 'dply:site:set-repo '.$site->slug.' --url=git@github.com:org/repo.git --branch=main'],
-        ['label' => __('Switch monorepo path'), 'command' => 'dply:site:set-repo '.$site->slug.' --path=apps/web'],
-        ['label' => __('Trigger redeploy after change'), 'command' => 'dply:site:deploy '.$site->slug],
+        ['label' => __('Update remote / branch'), 'command' => 'dply sites:repo:set '.$site->slug.' --url=git@github.com:org/repo.git --branch=main'],
+        ['label' => __('Switch monorepo path'), 'command' => 'dply sites:repo:set '.$site->slug.' --path=apps/web'],
+        ['label' => __('Trigger redeploy after change'), 'command' => 'dply sites:deploy '.$site->slug],
     ]" />
 </div>

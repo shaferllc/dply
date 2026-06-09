@@ -42,7 +42,7 @@ class ListRuntimesCommand extends Command
 
     public function handle(): int
     {
-        $supported = MiseInstallScriptBuilder::SUPPORTED_RUNTIMES;
+        $supported = MiseInstallScriptBuilder::supportedRuntimes();
         $withUsage = (bool) $this->option('with-usage');
         $usage = $withUsage ? $this->collectUsage() : [];
 

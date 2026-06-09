@@ -2,117 +2,100 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature\Sites;
+namespace Tests\Feature\Sites\SiteCachingMetaTest;
 
 use App\Enums\SiteType;
 use App\Models\Server;
 use App\Models\Site;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
 
-class SiteCachingMetaTest extends TestCase
+uses(RefreshDatabase::class);
+
+test('pre migration site with legacy boolean reports nginx http enabled', function () {
+    $site = siteWithoutCachingMeta(['engine_http_cache_enabled' => true]);
+
+    $cfg = $site->cachingConfig();
+    expect($cfg['enabled'])->toBeTrue();
+    expect($cfg['methods'])->toContain('nginx_http');
+    expect($site->wantsEngineHttpCache())->toBeTrue();
+    expect($site->hasCachingMethod('nginx_http'))->toBeTrue();
+});
+test('pre migration site with legacy boolean off disables caching', function () {
+    $site = siteWithoutCachingMeta(['engine_http_cache_enabled' => false]);
+
+    expect($site->wantsEngineHttpCache())->toBeFalse();
+    expect($site->hasCachingMethod('nginx_http'))->toBeFalse();
+});
+test('observer syncs legacy boolean from meta caching', function () {
+    $site = siteWithoutCachingMeta(['engine_http_cache_enabled' => false]);
+
+    $meta = $site->meta ?? [];
+    $meta['caching'] = [
+        'enabled' => true,
+        'methods' => ['nginx_http', 'opcache'],
+    ];
+    $site->meta = $meta;
+    $site->save();
+
+    $site->refresh();
+    expect($site->engine_http_cache_enabled)->toBeTrue();
+});
+test('observer clears legacy boolean when nginx http dropped', function () {
+    $site = siteWithoutCachingMeta(['engine_http_cache_enabled' => true]);
+
+    $meta = $site->meta ?? [];
+    $meta['caching'] = [
+        'enabled' => true,
+        'methods' => ['opcache'], // varnish/opcache only — no nginx_http
+    ];
+    $site->meta = $meta;
+    $site->save();
+
+    $site->refresh();
+    expect($site->engine_http_cache_enabled)->toBeFalse();
+});
+test('suspended site never wants engine cache', function () {
+    $site = siteWithoutCachingMeta(['engine_http_cache_enabled' => true]);
+    $site->suspended_at = now();
+    $site->save();
+
+    expect($site->wantsEngineHttpCache())->toBeFalse();
+});
+test('available methods for php nginx site', function () {
+    $site = siteWithoutCachingMeta();
+
+    // Server defaults to nginx via SiteFactory; assert PHP+nginx surface.
+    expect($site->availableCachingMethods())->toContain('nginx_http');
+    expect($site->availableCachingMethods())->toContain('opcache');
+    expect($site->availableCachingMethods())->toContain('varnish');
+});
+test('available methods empty for container runtime', function () {
+    $site = siteWithoutCachingMeta();
+    $meta = $site->meta ?? [];
+    $meta['docker_runtime'] = ['enabled' => true];
+    $site->meta = $meta;
+
+    // usesDockerRuntime should be true now; available methods should drop.
+    if ($site->usesDockerRuntime()) {
+        expect($site->availableCachingMethods())->toBe([]);
+    } else {
+        $this->markTestSkipped('Site::usesDockerRuntime() did not flip — meta key shape may differ; skip rather than false-positive.');
+    }
+});
+/**
+ * @param  array<string, mixed>  $overrides
+ */
+function siteWithoutCachingMeta(array $overrides = []): Site
 {
-    use RefreshDatabase;
+    $server = Server::factory()->ready()->create([
+        'meta' => ['webserver' => 'nginx'],
+    ]);
 
-    public function test_pre_migration_site_with_legacy_boolean_reports_nginx_http_enabled(): void
-    {
-        $site = $this->siteWithoutCachingMeta(['engine_http_cache_enabled' => true]);
-
-        $cfg = $site->cachingConfig();
-        $this->assertTrue($cfg['enabled']);
-        $this->assertContains('nginx_http', $cfg['methods']);
-        $this->assertTrue($site->wantsEngineHttpCache());
-        $this->assertTrue($site->hasCachingMethod('nginx_http'));
-    }
-
-    public function test_pre_migration_site_with_legacy_boolean_off_disables_caching(): void
-    {
-        $site = $this->siteWithoutCachingMeta(['engine_http_cache_enabled' => false]);
-
-        $this->assertFalse($site->wantsEngineHttpCache());
-        $this->assertFalse($site->hasCachingMethod('nginx_http'));
-    }
-
-    public function test_observer_syncs_legacy_boolean_from_meta_caching(): void
-    {
-        $site = $this->siteWithoutCachingMeta(['engine_http_cache_enabled' => false]);
-
-        $meta = $site->meta ?? [];
-        $meta['caching'] = [
-            'enabled' => true,
-            'methods' => ['nginx_http', 'opcache'],
-        ];
-        $site->meta = $meta;
-        $site->save();
-
-        $site->refresh();
-        $this->assertTrue($site->engine_http_cache_enabled);
-    }
-
-    public function test_observer_clears_legacy_boolean_when_nginx_http_dropped(): void
-    {
-        $site = $this->siteWithoutCachingMeta(['engine_http_cache_enabled' => true]);
-
-        $meta = $site->meta ?? [];
-        $meta['caching'] = [
-            'enabled' => true,
-            'methods' => ['opcache'], // varnish/opcache only — no nginx_http
-        ];
-        $site->meta = $meta;
-        $site->save();
-
-        $site->refresh();
-        $this->assertFalse($site->engine_http_cache_enabled);
-    }
-
-    public function test_suspended_site_never_wants_engine_cache(): void
-    {
-        $site = $this->siteWithoutCachingMeta(['engine_http_cache_enabled' => true]);
-        $site->suspended_at = now();
-        $site->save();
-
-        $this->assertFalse($site->wantsEngineHttpCache());
-    }
-
-    public function test_available_methods_for_php_nginx_site(): void
-    {
-        $site = $this->siteWithoutCachingMeta();
-        // Server defaults to nginx via SiteFactory; assert PHP+nginx surface.
-        $this->assertContains('nginx_http', $site->availableCachingMethods());
-        $this->assertContains('opcache', $site->availableCachingMethods());
-        $this->assertContains('varnish', $site->availableCachingMethods());
-    }
-
-    public function test_available_methods_empty_for_container_runtime(): void
-    {
-        $site = $this->siteWithoutCachingMeta();
-        $meta = $site->meta ?? [];
-        $meta['docker_runtime'] = ['enabled' => true];
-        $site->meta = $meta;
-
-        // usesDockerRuntime should be true now; available methods should drop.
-        if ($site->usesDockerRuntime()) {
-            $this->assertSame([], $site->availableCachingMethods());
-        } else {
-            $this->markTestSkipped('Site::usesDockerRuntime() did not flip — meta key shape may differ; skip rather than false-positive.');
-        }
-    }
-
-    /**
-     * @param  array<string, mixed>  $overrides
-     */
-    private function siteWithoutCachingMeta(array $overrides = []): Site
-    {
-        $server = Server::factory()->ready()->create([
-            'meta' => ['webserver' => 'nginx'],
-        ]);
-
-        return Site::factory()->create(array_merge([
-            'server_id' => $server->id,
-            'organization_id' => $server->organization_id,
-            'type' => SiteType::Php,
-            'runtime' => 'php',
-            'meta' => [], // explicitly no caching block — simulates pre-migration row
-        ], $overrides));
-    }
+    return Site::factory()->create(array_merge([
+        'server_id' => $server->id,
+        'organization_id' => $server->organization_id,
+        'type' => SiteType::Php,
+        'runtime' => 'php',
+        'meta' => [], // explicitly no caching block — simulates pre-migration row
+    ], $overrides));
 }

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" role="img" aria-labelledby="remixTitle">
+  <title id="remixTitle">Remix Indie Stack template hero</title>
+  <defs>
+    <linearGradient id="remixBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#688479"/>
+      <stop offset="100%" stop-color="#32482c"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="400" fill="url(#remixBg)"/>
+  <g transform="translate(440,180)" fill="none" stroke="#fdfcf9" stroke-width="10" stroke-linecap="round">
+    <path d="M-70,0 A70,70 0 1,1 70,0" opacity="0.95"/>
+    <path d="M-50,0 A50,50 0 1,0 50,0" opacity="0.7"/>
+    <path d="M-30,0 A30,30 0 1,1 30,0" opacity="0.5"/>
+  </g>
+  <g transform="translate(440,180)" fill="#cda942">
+    <circle r="6"/>
+  </g>
+  <text x="48" y="270" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="52" font-weight="700" fill="#fdfcf9" letter-spacing="-1.5">Remix</text>
+  <text x="48" y="306" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="20" font-weight="500" fill="#e1d8ac" opacity="0.9">Indie Stack with Prisma + auth</text>
+  <g transform="translate(48,332)">
+    <rect width="68" height="22" rx="11" fill="#171a0e" fill-opacity="0.85"/>
+    <text x="34" y="15" text-anchor="middle" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="11" font-weight="600" fill="#fdfcf9" letter-spacing="1.2">HYBRID</text>
+  </g>
+</svg>

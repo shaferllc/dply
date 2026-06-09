@@ -8,6 +8,7 @@ use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Support\ServerProviderGate;
 use Illuminate\Contracts\View\View;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class Index extends Component
@@ -109,7 +110,7 @@ class Index extends Component
                     ['id' => 'hetzner', 'label' => 'Hetzner'],
                     ['id' => 'linode', 'label' => 'Linode'],
                     ['id' => 'vultr', 'label' => 'Vultr'],
-                    ['id' => 'akamai', 'label' => __('Akamai (Linode API)')],
+                    ['id' => 'upcloud', 'label' => 'UpCloud'],
                 ],
             ],
             [
@@ -122,25 +123,16 @@ class Index extends Component
                 ],
             ],
             [
-                'label' => __('Infrastructure'),
+                'label' => __('Other providers'),
                 'items' => [
-                    ['id' => 'equinix_metal', 'label' => 'Equinix Metal'],
-                    ['id' => 'upcloud', 'label' => 'UpCloud'],
-                    ['id' => 'scaleway', 'label' => 'Scaleway'],
                     ['id' => 'ovh', 'label' => __('OVH Public Cloud')],
-                    ['id' => 'rackspace', 'label' => __('Rackspace (OpenStack)')],
                 ],
             ],
             [
                 'label' => __('Platforms'),
                 'items' => [
-                    ['id' => 'fly_io', 'label' => 'Fly.io'],
-                    ['id' => 'digitalocean_app_platform', 'label' => 'DigitalOcean App Platform'],
                     ['id' => 'aws_app_runner', 'label' => 'AWS App Runner'],
-                    ['id' => 'render', 'label' => 'Render'],
-                    ['id' => 'railway', 'label' => 'Railway'],
-                    ['id' => 'coolify', 'label' => 'Coolify'],
-                    ['id' => 'cap_rover', 'label' => 'CapRover'],
+                    ['id' => 'ghcr', 'label' => __('GitHub Container Registry')],
                 ],
             ],
             [
@@ -218,15 +210,20 @@ class Index extends Component
 
     public function resolveActiveProviderLabel(): string
     {
+        return self::providerLabel($this->active_provider);
+    }
+
+    public static function providerLabel(string $providerId): string
+    {
         foreach (self::credentialProviderNav() as $group) {
             foreach ($group['items'] as $item) {
-                if ($item['id'] === $this->active_provider) {
+                if ($item['id'] === $providerId) {
                     return $item['label'];
                 }
             }
         }
 
-        return $this->active_provider;
+        return $providerId;
     }
 
     public function credentialCountFor(string $provider): int
@@ -237,6 +234,17 @@ class Index extends Component
             : auth()->user()->providerCredentials()->whereNull('organization_id');
 
         return (int) $query->where('provider', $provider)->count();
+    }
+
+    #[On('provider-credential-created')]
+    public function refreshAfterProviderCredentialStored(?string $provider = null, mixed $credentialId = null): void
+    {
+        if (is_string($provider) && $provider !== '') {
+            $ids = self::credentialProviderIds($this->capabilityForTab());
+            if (in_array($provider, $ids, true)) {
+                $this->active_provider = $provider;
+            }
+        }
     }
 
     public function render(): View

@@ -1,122 +1,99 @@
 <?php
 
-namespace Tests\Unit;
+namespace Tests\Unit\SiteOctaneTest;
 
 use App\Models\Site;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
 
-class SiteOctaneTest extends TestCase
-{
-    use RefreshDatabase;
+uses(RefreshDatabase::class);
 
-    public function test_octane_server_defaults_to_swoole(): void
-    {
-        $site = Site::factory()->create(['meta' => null]);
+test('octane server defaults to swoole', function () {
+    $site = Site::factory()->create(['meta' => null]);
 
-        $this->assertSame('swoole', $site->fresh()->octaneServer());
-    }
+    expect($site->fresh()->octaneServer())->toBe('swoole');
+});
 
-    public function test_octane_server_reads_meta_and_invalid_falls_back(): void
-    {
-        $site = Site::factory()->create([
-            'meta' => ['laravel_octane' => ['server' => 'roadrunner']],
-        ]);
+test('octane server reads meta and invalid falls back', function () {
+    $site = Site::factory()->create([
+        'meta' => ['laravel_octane' => ['server' => 'roadrunner']],
+    ]);
 
-        $this->assertSame('roadrunner', $site->fresh()->octaneServer());
+    expect($site->fresh()->octaneServer())->toBe('roadrunner');
 
-        $site->update(['meta' => ['laravel_octane' => ['server' => 'bogus']]]);
-        $this->assertSame('swoole', $site->fresh()->octaneServer());
-    }
+    $site->update(['meta' => ['laravel_octane' => ['server' => 'bogus']]]);
+    expect($site->fresh()->octaneServer())->toBe('swoole');
+});
 
-    public function test_octane_supervisor_command_uses_port_and_server(): void
-    {
-        $site = Site::factory()->create([
-            'octane_port' => 9001,
-            'meta' => ['laravel_octane' => ['server' => 'frankenphp']],
-        ]);
+test('octane supervisor command uses port and server', function () {
+    $site = Site::factory()->create([
+        'octane_port' => 9001,
+        'meta' => ['laravel_octane' => ['server' => 'frankenphp']],
+    ]);
 
-        $this->assertSame(
-            'php artisan octane:start --server=frankenphp --host=127.0.0.1 --port=9001',
-            $site->fresh()->octaneSupervisorCommand()
-        );
-    }
+    expect($site->fresh()->octaneSupervisorCommand())->toBe('php artisan octane:start --server=frankenphp --host=127.0.0.1 --port=9001');
+});
 
-    public function test_octane_supervisor_command_defaults_port_when_missing(): void
-    {
-        $site = Site::factory()->create([
-            'octane_port' => null,
-            'meta' => ['laravel_octane' => ['server' => 'swoole']],
-        ]);
+test('octane supervisor command defaults port when missing', function () {
+    $site = Site::factory()->create([
+        'octane_port' => null,
+        'meta' => ['laravel_octane' => ['server' => 'swoole']],
+    ]);
 
-        $this->assertSame(
-            'php artisan octane:start --server=swoole --host=127.0.0.1 --port=8000',
-            $site->fresh()->octaneSupervisorCommand()
-        );
-    }
+    expect($site->fresh()->octaneSupervisorCommand())->toBe('php artisan octane:start --server=swoole --host=127.0.0.1 --port=8000');
+});
 
-    public function test_should_show_octane_runtime_ui_requires_laravel_detection_and_composer_flag(): void
-    {
-        $noDetection = Site::factory()->create(['meta' => null]);
-        $this->assertFalse($noDetection->shouldShowOctaneRuntimeUi());
+test('should show octane runtime ui requires laravel detection and composer flag', function () {
+    $noDetection = Site::factory()->create(['meta' => null]);
+    expect($noDetection->shouldShowOctaneRuntimeUi())->toBeFalse();
 
-        $laravelOnly = Site::factory()->create([
-            'meta' => [
-                'docker_runtime' => [
-                    'detected' => [
-                        'framework' => 'laravel',
-                        'language' => 'php',
-                    ],
+    $laravelOnly = Site::factory()->create([
+        'meta' => [
+            'docker_runtime' => [
+                'detected' => [
+                    'framework' => 'laravel',
+                    'language' => 'php',
                 ],
             ],
-        ]);
-        $this->assertFalse($laravelOnly->fresh()->shouldShowOctaneRuntimeUi());
+        ],
+    ]);
+    expect($laravelOnly->fresh()->shouldShowOctaneRuntimeUi())->toBeFalse();
 
-        $withOctane = Site::factory()->create([
-            'meta' => [
-                'docker_runtime' => [
-                    'detected' => [
-                        'framework' => 'laravel',
-                        'language' => 'php',
-                        'laravel_octane' => true,
-                    ],
+    $withOctane = Site::factory()->create([
+        'meta' => [
+            'docker_runtime' => [
+                'detected' => [
+                    'framework' => 'laravel',
+                    'language' => 'php',
+                    'laravel_octane' => true,
                 ],
             ],
-        ]);
-        $this->assertTrue($withOctane->fresh()->shouldShowOctaneRuntimeUi());
-    }
+        ],
+    ]);
+    expect($withOctane->fresh()->shouldShowOctaneRuntimeUi())->toBeTrue();
+});
 
-    public function test_detected_laravel_package_keys_lists_composer_packages(): void
-    {
-        $site = Site::factory()->create([
-            'meta' => [
-                'docker_runtime' => [
-                    'detected' => [
-                        'framework' => 'laravel',
-                        'language' => 'php',
-                        'laravel_horizon' => true,
-                        'laravel_reverb' => true,
-                    ],
+test('detected laravel package keys lists composer packages', function () {
+    $site = Site::factory()->create([
+        'meta' => [
+            'docker_runtime' => [
+                'detected' => [
+                    'framework' => 'laravel',
+                    'language' => 'php',
+                    'laravel_horizon' => true,
+                    'laravel_reverb' => true,
                 ],
             ],
-        ]);
+        ],
+    ]);
 
-        $this->assertSame(['horizon', 'reverb'], $site->fresh()->detectedLaravelPackageKeys());
-    }
+    expect($site->fresh()->detectedLaravelPackageKeys())->toBe(['horizon', 'reverb']);
+});
 
-    public function test_reverb_supervisor_command_line_uses_meta_or_override(): void
-    {
-        $site = Site::factory()->create([
-            'meta' => ['laravel_reverb' => ['port' => 9090]],
-        ]);
+test('reverb supervisor command line uses meta or override', function () {
+    $site = Site::factory()->create([
+        'meta' => ['laravel_reverb' => ['port' => 9090]],
+    ]);
 
-        $this->assertSame(
-            'php artisan reverb:start --host=0.0.0.0 --port=9090',
-            $site->fresh()->reverbSupervisorCommandLine()
-        );
-        $this->assertSame(
-            'php artisan reverb:start --host=0.0.0.0 --port=7777',
-            $site->fresh()->reverbSupervisorCommandLine(7777)
-        );
-    }
-}
+    expect($site->fresh()->reverbSupervisorCommandLine())->toBe('php artisan reverb:start --host=0.0.0.0 --port=9090');
+    expect($site->fresh()->reverbSupervisorCommandLine(7777))->toBe('php artisan reverb:start --host=0.0.0.0 --port=7777');
+});

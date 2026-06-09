@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Services\Servers\LiveState;
 
 use App\Models\Server;
+use App\Support\Servers\EdgeProxyWorkspaceViewData;
+use App\Support\Servers\SystemdServiceStandbyReasonResolver;
 use Carbon\CarbonImmutable;
 
 /**
@@ -33,6 +35,42 @@ abstract class AbstractEngineLiveStateProbe implements EngineLiveStateProbe
      * catch a runaway exception as a last-resort safety net.
      */
     abstract protected function runFreshProbe(Server $server): EngineLiveState;
+
+    /**
+     * Edge-proxy engines are mutually exclusive — when this engine is not
+     * active, skip the admin API / stats socket and return standby copy
+     * instead of a probe error.
+     */
+    protected function inactiveEdgeProxyLiveState(Server $server): ?EngineLiveState
+    {
+        if (! in_array($this->engineKey(), ['traefik', 'haproxy', 'envoy', 'openresty'], true)) {
+            return null;
+        }
+
+        if ($server->edgeProxy() === $this->engineKey()) {
+            return null;
+        }
+
+        $hint = app(SystemdServiceStandbyReasonResolver::class)
+            ->inactiveEngineHint($server, $this->engineKey(), true);
+
+        if ($hint === null) {
+            $catalog = EdgeProxyWorkspaceViewData::edgeProxyCatalog();
+            $label = $catalog[$this->engineKey()]['label'] ?? ucfirst($this->engineKey());
+            $hint = __(':engine is not the active edge proxy on this server.', ['engine' => $label]);
+        }
+
+        return new EngineLiveState(
+            engine: $this->engineKey(),
+            capturedAt: CarbonImmutable::now(),
+            isFresh: true,
+            units: [],
+            engineSpecific: [
+                'standby' => true,
+                'standby_reason' => $hint,
+            ],
+        );
+    }
 
     public function probe(Server $server, bool $forceFresh = false): EngineLiveState
     {
@@ -73,16 +111,29 @@ abstract class AbstractEngineLiveStateProbe implements EngineLiveStateProbe
             return null;
         }
 
+        $ttl = max(1, (int) config('server_manage.webserver_live_state_cache_seconds', 60));
+        if ($state->capturedAt->lt(CarbonImmutable::now()->subSeconds($ttl))) {
+            return null;
+        }
+
         // Force isFresh=false on cache reads regardless of how the payload
         // was originally written — the UI uses this to render the "X
         // minutes ago" stamp differently from a freshly-pulled snapshot.
-        return new EngineLiveState(
+        $cached = new EngineLiveState(
             engine: $state->engine,
             capturedAt: $state->capturedAt,
             isFresh: false,
             units: $state->units,
             engineSpecific: $state->engineSpecific,
         );
+
+        // Persist is_fresh=false so blade reads (which load meta directly,
+        // not through readCache) can show the Cached badge on revisit.
+        if ($state->isFresh) {
+            $this->writeCache($server, $cached);
+        }
+
+        return $cached;
     }
 
     protected function writeCache(Server $server, EngineLiveState $state): void

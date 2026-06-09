@@ -18,11 +18,11 @@ class InsightRunCoordinator
     /**
      * @param  string|null  $onlyKey  When set, run only this single insight (used by post-fix recheck).
      * @param  (callable(string $event, string $insightKey, array<string, mixed> $context): void)|null  $onProgress
-     *     Optional progress hook for live workspace banner output. Events emitted:
-     *       'check.start'     — about to invoke the runner for $insightKey
-     *       'check.complete'  — runner finished; context: ['candidates' => int]
-     *       'check.error'     — runner threw; context: ['message' => string]
-     *     Runners themselves are unaware of the hook — the coordinator brackets each call.
+     *                                                                                                               Optional progress hook for live workspace banner output. Events emitted:
+     *                                                                                                               'check.start'     — about to invoke the runner for $insightKey
+     *                                                                                                               'check.complete'  — runner finished; context: ['candidates' => int]
+     *                                                                                                               'check.error'     — runner threw; context: ['message' => string]
+     *                                                                                                               Runners themselves are unaware of the hook — the coordinator brackets each call.
      */
     public function runForServer(Server $server, ?string $onlyKey = null, ?callable $onProgress = null): void
     {
@@ -89,7 +89,7 @@ class InsightRunCoordinator
     /**
      * @param  string|null  $onlyKey  When set, run only this single insight (used by post-fix recheck).
      * @param  (callable(string $event, string $insightKey, array<string, mixed> $context): void)|null  $onProgress
-     *     See {@see runForServer} for event semantics.
+     *                                                                                                               See {@see runForServer} for event semantics.
      */
     public function runForSite(Site $site, ?string $onlyKey = null, ?callable $onProgress = null): void
     {

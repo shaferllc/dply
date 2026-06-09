@@ -2,8 +2,9 @@
 
 namespace App\Services\Sites;
 
+use App\Contracts\SourceControl\GitIdentity;
 use App\Models\Site;
-use App\Models\SocialAccount;
+use App\Services\SourceControl\GitIdentityResolver;
 use App\Support\GitRemoteRepositoryRef;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -13,7 +14,10 @@ class RepositoryWebhookProvisioner
 {
     public function __construct(
         private SiteDeploySyncCoordinator $syncCoordinator,
-    ) {}
+        private ?GitIdentityResolver $resolver = null,
+    ) {
+        $this->resolver ??= app(GitIdentityResolver::class);
+    }
 
     public function canRegisterProviderHook(Site $site): bool
     {
@@ -31,7 +35,7 @@ class RepositoryWebhookProvisioner
     /**
      * @return array{ok: bool, message: string}
      */
-    public function enable(Site $site, SocialAccount $account): array
+    public function enable(Site $site, GitIdentity $account): array
     {
         if (! $this->canRegisterProviderHook($site)) {
             return ['ok' => false, 'message' => __('Only the sync group leader can register a provider webhook. Deploys for other members run when the leader receives a push.')];
@@ -79,7 +83,7 @@ class RepositoryWebhookProvisioner
             'provider_hook' => [
                 'id' => $result['hook_id'],
                 'provider' => $kind,
-                'account_id' => (string) $account->id,
+                'account_id' => $account->id(),
             ],
         ]);
         $site->save();
@@ -90,20 +94,20 @@ class RepositoryWebhookProvisioner
     /**
      * @return array{ok: bool, message: string, hook_id?: string|int}
      */
-    private function createGitHubHook(Site $site, SocialAccount $account, GitRemoteRepositoryRef $ref, string $hookUrl, string $secret): array
+    private function createGitHubHook(Site $site, GitIdentity $account, GitRemoteRepositoryRef $ref, string $hookUrl, string $secret): array
     {
         if ($ref->owner === null || $ref->repo === null) {
             return ['ok' => false, 'message' => __('Invalid GitHub repository path.')];
         }
 
-        $token = trim((string) $account->access_token);
-        if ($token === '' || $account->provider !== 'github') {
-            return ['ok' => false, 'message' => __('Connect a GitHub account under Profile → Source control.')];
+        $token = $account->accessToken();
+        if ($token === '' || $account->provider() !== 'github') {
+            return ['ok' => false, 'message' => __('Connect a GitHub account or add a personal access token under Profile → Source control.')];
         }
 
         $response = Http::withToken($token)
             ->acceptJson()
-            ->post('https://api.github.com/repos/'.$ref->owner.'/'.$ref->repo.'/hooks', [
+            ->post($account->apiBaseUrl().'/repos/'.$ref->owner.'/'.$ref->repo.'/hooks', [
                 'name' => 'web',
                 'active' => true,
                 'events' => ['push'],
@@ -118,7 +122,11 @@ class RepositoryWebhookProvisioner
         if (! $response->successful()) {
             Log::warning('GitHub webhook create failed', ['site_id' => $site->id, 'status' => $response->status(), 'body' => $response->body()]);
 
-            return ['ok' => false, 'message' => __('GitHub rejected the webhook (:status). Re-link GitHub with repo and hook permissions, or check repository access.', ['status' => $response->status()])];
+            $hint = $account->kind() === 'pat'
+                ? __('GitHub rejected the webhook (:status). The personal access token needs admin:repo_hook scope (classic) or Read/Write Webhooks repo permission (fine-grained).', ['status' => $response->status()])
+                : __('GitHub rejected the webhook (:status). Re-link GitHub with repo and hook permissions, or check repository access.', ['status' => $response->status()]);
+
+            return ['ok' => false, 'message' => $hint];
         }
 
         $id = $response->json('id');
@@ -129,22 +137,22 @@ class RepositoryWebhookProvisioner
     /**
      * @return array{ok: bool, message: string, hook_id?: string|int}
      */
-    private function createGitLabHook(Site $site, SocialAccount $account, GitRemoteRepositoryRef $ref, string $hookUrl, string $secret): array
+    private function createGitLabHook(Site $site, GitIdentity $account, GitRemoteRepositoryRef $ref, string $hookUrl, string $secret): array
     {
         if ($ref->gitlabProjectPath === null) {
-            return ['ok' => false, 'message' => __('Invalid GitLab.com repository path.')];
+            return ['ok' => false, 'message' => __('Invalid GitLab repository path.')];
         }
 
-        $token = trim((string) $account->access_token);
-        if ($token === '' || $account->provider !== 'gitlab') {
-            return ['ok' => false, 'message' => __('Connect a GitLab account under Profile → Source control.')];
+        $token = $account->accessToken();
+        if ($token === '' || $account->provider() !== 'gitlab') {
+            return ['ok' => false, 'message' => __('Connect a GitLab account or add a personal access token under Profile → Source control.')];
         }
 
         $encoded = rawurlencode($ref->gitlabProjectPath);
 
         $response = Http::withToken($token)
             ->acceptJson()
-            ->post('https://gitlab.com/api/v4/projects/'.$encoded.'/hooks', [
+            ->post($account->apiBaseUrl().'/api/v4/projects/'.$encoded.'/hooks', [
                 'url' => $hookUrl,
                 'push_events' => true,
                 'token' => $secret,
@@ -154,7 +162,11 @@ class RepositoryWebhookProvisioner
         if (! $response->successful()) {
             Log::warning('GitLab webhook create failed', ['site_id' => $site->id, 'status' => $response->status(), 'body' => $response->body()]);
 
-            return ['ok' => false, 'message' => __('GitLab rejected the webhook (:status). Re-link GitLab with API access.', ['status' => $response->status()])];
+            $hint = $account->kind() === 'pat'
+                ? __('GitLab rejected the webhook (:status). The personal access token needs the api scope.', ['status' => $response->status()])
+                : __('GitLab rejected the webhook (:status). Re-link GitLab with API access.', ['status' => $response->status()]);
+
+            return ['ok' => false, 'message' => $hint];
         }
 
         return ['ok' => true, 'message' => 'ok', 'hook_id' => $response->json('id')];
@@ -163,20 +175,20 @@ class RepositoryWebhookProvisioner
     /**
      * @return array{ok: bool, message: string, hook_id?: string|int}
      */
-    private function createBitbucketHook(Site $site, SocialAccount $account, GitRemoteRepositoryRef $ref, string $hookUrl, string $secret): array
+    private function createBitbucketHook(Site $site, GitIdentity $account, GitRemoteRepositoryRef $ref, string $hookUrl, string $secret): array
     {
         if ($ref->owner === null || $ref->repo === null) {
             return ['ok' => false, 'message' => __('Invalid Bitbucket repository path.')];
         }
 
-        $token = trim((string) $account->access_token);
-        if ($token === '' || $account->provider !== 'bitbucket') {
-            return ['ok' => false, 'message' => __('Connect a Bitbucket account under Profile → Source control.')];
+        $token = $account->accessToken();
+        if ($token === '' || $account->provider() !== 'bitbucket') {
+            return ['ok' => false, 'message' => __('Connect a Bitbucket account or add a personal access token under Profile → Source control.')];
         }
 
         $response = Http::withToken($token)
             ->acceptJson()
-            ->post('https://api.bitbucket.org/2.0/repositories/'.$ref->owner.'/'.$ref->repo.'/hooks', [
+            ->post($account->apiBaseUrl().'/2.0/repositories/'.$ref->owner.'/'.$ref->repo.'/hooks', [
                 'description' => 'Dply deploy',
                 'url' => $hookUrl,
                 'active' => true,
@@ -188,7 +200,11 @@ class RepositoryWebhookProvisioner
         if (! $response->successful()) {
             Log::warning('Bitbucket webhook create failed', ['site_id' => $site->id, 'status' => $response->status(), 'body' => $response->body()]);
 
-            return ['ok' => false, 'message' => __('Bitbucket rejected the webhook (:status).', ['status' => $response->status()])];
+            $hint = $account->kind() === 'pat'
+                ? __('Bitbucket rejected the webhook (:status). The personal access token needs repository:admin and webhook permissions.', ['status' => $response->status()])
+                : __('Bitbucket rejected the webhook (:status).', ['status' => $response->status()]);
+
+            return ['ok' => false, 'message' => $hint];
         }
 
         $uuid = $response->json('uuid');
@@ -197,7 +213,7 @@ class RepositoryWebhookProvisioner
         return ['ok' => true, 'message' => 'ok', 'hook_id' => $hookId !== '' ? $hookId : 'bitbucket'];
     }
 
-    public function disable(Site $site, ?SocialAccount $account = null): void
+    public function disable(Site $site, ?GitIdentity $account = null): void
     {
         $repo = $site->repositoryMeta();
         $hook = is_array($repo['provider_hook'] ?? null) ? $repo['provider_hook'] : null;
@@ -212,8 +228,11 @@ class RepositoryWebhookProvisioner
         $hookId = $hook['id'] ?? null;
         $accountId = (string) ($hook['account_id'] ?? '');
 
-        if ($account === null && $accountId !== '') {
-            $account = SocialAccount::query()->find($accountId);
+        if ($account === null && $accountId !== '' && $site->user_id !== null) {
+            $owner = $site->user;
+            if ($owner !== null) {
+                $account = $this->resolver->forId($owner, $accountId);
+            }
         }
 
         $url = trim((string) ($site->git_repository_url ?? ''));
@@ -239,46 +258,46 @@ class RepositoryWebhookProvisioner
         $site->save();
     }
 
-    private function deleteGitHubHook(SocialAccount $account, GitRemoteRepositoryRef $ref, mixed $hookId): void
+    private function deleteGitHubHook(GitIdentity $account, GitRemoteRepositoryRef $ref, mixed $hookId): void
     {
         if ($ref->owner === null || $ref->repo === null) {
             return;
         }
-        $token = trim((string) $account->access_token);
+        $token = $account->accessToken();
         if ($token === '') {
             return;
         }
         Http::withToken($token)
-            ->delete('https://api.github.com/repos/'.$ref->owner.'/'.$ref->repo.'/hooks/'.$hookId);
+            ->delete($account->apiBaseUrl().'/repos/'.$ref->owner.'/'.$ref->repo.'/hooks/'.$hookId);
     }
 
-    private function deleteGitLabHook(SocialAccount $account, GitRemoteRepositoryRef $ref, mixed $hookId): void
+    private function deleteGitLabHook(GitIdentity $account, GitRemoteRepositoryRef $ref, mixed $hookId): void
     {
         if ($ref->gitlabProjectPath === null) {
             return;
         }
-        $token = trim((string) $account->access_token);
+        $token = $account->accessToken();
         if ($token === '') {
             return;
         }
         $encoded = rawurlencode($ref->gitlabProjectPath);
         Http::withToken($token)
-            ->delete('https://gitlab.com/api/v4/projects/'.$encoded.'/hooks/'.$hookId);
+            ->delete($account->apiBaseUrl().'/api/v4/projects/'.$encoded.'/hooks/'.$hookId);
     }
 
-    private function deleteBitbucketHook(SocialAccount $account, GitRemoteRepositoryRef $ref, mixed $hookId): void
+    private function deleteBitbucketHook(GitIdentity $account, GitRemoteRepositoryRef $ref, mixed $hookId): void
     {
         if ($ref->owner === null || $ref->repo === null) {
             return;
         }
-        $token = trim((string) $account->access_token);
+        $token = $account->accessToken();
         if ($token === '') {
             return;
         }
         $uuid = is_string($hookId) ? $hookId : (string) $hookId;
         $encoded = rawurlencode($uuid);
         Http::withToken($token)
-            ->delete('https://api.bitbucket.org/2.0/repositories/'.$ref->owner.'/'.$ref->repo.'/hooks/'.$encoded);
+            ->delete($account->apiBaseUrl().'/2.0/repositories/'.$ref->owner.'/'.$ref->repo.'/hooks/'.$encoded);
     }
 
     /**
@@ -295,7 +314,8 @@ class RepositoryWebhookProvisioner
             return;
         }
         $accountId = (string) ($hook['account_id'] ?? '');
-        $account = $accountId !== '' ? SocialAccount::query()->find($accountId) : null;
+        $owner = $site->user;
+        $account = ($accountId !== '' && $owner !== null) ? $this->resolver->forId($owner, $accountId) : null;
         if ($account === null) {
             return;
         }
@@ -309,13 +329,14 @@ class RepositoryWebhookProvisioner
             return;
         }
 
+        $token = $account->accessToken();
+        if ($token === '') {
+            return;
+        }
+
         if ($provider === 'github' && $ref?->owner && $ref?->repo && $hookId !== null) {
-            $token = trim((string) $account->access_token);
-            if ($token === '') {
-                return;
-            }
             Http::withToken($token)
-                ->patch('https://api.github.com/repos/'.$ref->owner.'/'.$ref->repo.'/hooks/'.$hookId, [
+                ->patch($account->apiBaseUrl().'/repos/'.$ref->owner.'/'.$ref->repo.'/hooks/'.$hookId, [
                     'config' => [
                         'url' => $site->deployHookUrl(),
                         'content_type' => 'json',
@@ -326,13 +347,9 @@ class RepositoryWebhookProvisioner
         }
 
         if ($provider === 'gitlab' && $ref?->gitlabProjectPath !== null && $hookId !== null) {
-            $token = trim((string) $account->access_token);
-            if ($token === '') {
-                return;
-            }
             $encoded = rawurlencode($ref->gitlabProjectPath);
             Http::withToken($token)
-                ->put('https://gitlab.com/api/v4/projects/'.$encoded.'/hooks/'.$hookId, [
+                ->put($account->apiBaseUrl().'/api/v4/projects/'.$encoded.'/hooks/'.$hookId, [
                     'url' => $site->deployHookUrl(),
                     'push_events' => true,
                     'token' => $secret,

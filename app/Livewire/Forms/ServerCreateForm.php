@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Forms;
 
+use App\Support\Servers\ServerImageCatalog;
 use Livewire\Form;
 
 class ServerCreateForm extends Form
@@ -21,6 +22,13 @@ class ServerCreateForm extends Form
     public string $region = '';
 
     public string $size = '';
+
+    /**
+     * Provider-agnostic OS image key (e.g. "ubuntu-24-04") chosen on Step 3 for
+     * provider VM hosts. Empty means "use the provider default"; resolved to a
+     * native slug at provision time via {@see ServerImageCatalog}.
+     */
+    public string $os_image = '';
 
     public string $setup_script_key = '';
 
@@ -45,6 +53,27 @@ class ServerCreateForm extends Form
     public string $server_role = 'application';
 
     public string $cache_service = 'redis';
+
+    /** Dedicated cache host: allow connections from another server (VPC CIDR). */
+    public bool $cache_remote_access = false;
+
+    public string $cache_allowed_from = '';
+
+    public bool $cache_require_password = false;
+
+    public string $cache_password = '';
+
+    /** Dedicated database host: allow app servers on the VPC to connect. */
+    public bool $database_remote_access = true;
+
+    public string $database_allowed_from = '';
+
+    /** Initial database name provisioned on the dedicated database host. */
+    public string $database_initial_name = 'app';
+
+    public string $database_username = 'dply_app';
+
+    public string $database_password = '';
 
     public string $webserver = 'nginx';
 
@@ -76,6 +105,14 @@ class ServerCreateForm extends Form
     public bool $do_monitoring = false;
 
     public string $do_vpc_uuid = '';
+
+    /** Cached VPC list for the DO VPC dropdown — populated by loadDoVpcs(). */
+    public array $do_vpcs = [];
+
+    public bool $do_vpcs_loading = false;
+
+    /** Hetzner private network ID to attach at creation (gives a private IP on that network). */
+    public string $hetzner_network_id = '';
 
     public string $do_tags = '';
 
@@ -131,4 +168,10 @@ class ServerCreateForm extends Form
     public string $do_functions_action_kind = 'nodejs:18';
 
     public string $do_functions_action_main = 'index';
+
+    /**
+     * Org golden-server blueprint applied on Step 3. Empty when a built-in
+     * preset or hand-rolled stack is in use.
+     */
+    public string $server_blueprint_id = '';
 }

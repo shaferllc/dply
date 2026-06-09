@@ -1,0 +1,140 @@
+/* Docs spec/compare cards — lazy-loaded for slide-over + full /docs pages. */
+.docs-markdown-prose .docs-spec-list {
+    margin-block: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.docs-markdown-prose .docs-spec-card {
+    border-radius: 0.75rem;
+    border: 1px solid rgb(23 26 14 / 0.1);
+    background-color: rgb(225 216 172 / 0.2);
+    padding: 0.875rem;
+}
+
+html.dark .docs-markdown-prose .docs-spec-card {
+    border-color: rgb(167 166 154 / 0.2);
+    background-color: rgb(24 24 27 / 0.5);
+}
+
+.docs-markdown-prose .docs-spec-card__title {
+    font-size: 0.875rem;
+    line-height: 1.375;
+    font-weight: 600;
+    color: #171a0e;
+}
+
+html.dark .docs-markdown-prose .docs-spec-card__title {
+    color: #fdfcf9;
+}
+
+.docs-markdown-prose .docs-spec-card__fields {
+    margin-top: 0.625rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+}
+
+.docs-markdown-prose .docs-spec-card__fields dt {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #a7a69a;
+}
+
+.docs-markdown-prose .docs-spec-card__fields dd {
+    margin-top: 0.125rem;
+    font-size: 0.875rem;
+    line-height: 1.375;
+    color: #5d6259;
+}
+
+html.dark .docs-markdown-prose .docs-spec-card__fields dd {
+    color: rgb(167 166 154 / 0.9);
+}
+
+.docs-markdown-prose .docs-spec-card__fields dd.docs-spec-card__value-only {
+    margin-top: 0;
+}
+
+.docs-markdown-prose .docs-spec-card__fields dd code {
+    font-size: 0.75rem;
+}
+
+.docs-markdown-prose .docs-compare-list {
+    margin-block: 1rem;
+}
+
+.docs-markdown-prose .docs-compare-columns {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+}
+
+.docs-markdown-prose .docs-compare-card {
+    border-radius: 0.75rem;
+    border: 1px solid rgb(23 26 14 / 0.1);
+    background-color: rgb(225 216 172 / 0.2);
+    padding: 0.875rem;
+}
+
+html.dark .docs-markdown-prose .docs-compare-card {
+    border-color: rgb(167 166 154 / 0.2);
+    background-color: rgb(24 24 27 / 0.5);
+}
+
+.docs-markdown-prose .docs-compare-card__title {
+    font-size: 0.875rem;
+    line-height: 1.375;
+    font-weight: 600;
+    color: #171a0e;
+}
+
+html.dark .docs-markdown-prose .docs-compare-card__title {
+    color: #fdfcf9;
+}
+
+.docs-markdown-prose .docs-compare-card__list {
+    margin-top: 0.625rem;
+    list-style-type: disc;
+    padding-left: 1rem;
+    font-size: 0.875rem;
+    line-height: 1.375;
+    color: #5d6259;
+}
+
+.docs-markdown-prose .docs-compare-card__list > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.375rem;
+}
+
+html.dark .docs-markdown-prose .docs-compare-card__list {
+    color: rgb(167 166 154 / 0.9);
+}
+
+.docs-markdown-prose .docs-compare-card__matrix {
+    margin-top: 0.625rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+}
+
+.docs-markdown-prose .docs-compare-card__matrix dt {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #a7a69a;
+}
+
+.docs-markdown-prose .docs-compare-card__matrix dd {
+    margin-top: 0.125rem;
+    font-size: 0.875rem;
+    line-height: 1.375;
+    color: #5d6259;
+}
+
+html.dark .docs-markdown-prose .docs-compare-card__matrix dd {
+    color: rgb(167 166 154 / 0.9);
+}

@@ -11,11 +11,21 @@ class SiteDeploySyncGroup extends Model
 {
     use HasUlids;
 
+    public const ROLLOUT_PARALLEL = 'parallel';
+
+    public const ROLLOUT_SEQUENTIAL = 'sequential';
+
     protected $fillable = [
         'organization_id',
         'name',
         'leader_site_id',
+        'rollout_mode',
     ];
+
+    public function isSequential(): bool
+    {
+        return ($this->rollout_mode ?? self::ROLLOUT_PARALLEL) === self::ROLLOUT_SEQUENTIAL;
+    }
 
     public function organization(): BelongsTo
     {

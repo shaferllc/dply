@@ -46,6 +46,29 @@
                     wire:model.boolean="{{ $formKey }}.s3.use_path_style" />
                 <span class="text-sm text-brand-moss leading-relaxed">{{ __('Use path-style endpoint') }} <span class="text-brand-mist">({{ __('use a path suffix instead of a bucket subdomain') }})</span></span>
             </label>
+
+            @if (($form['provider'] ?? '') === \App\Models\BackupConfiguration::PROVIDER_AWS_S3)
+                @php $awsClasses = (array) config('object_storage.providers.aws_s3.storage_classes', []); @endphp
+                <div>
+                    <x-input-label :for="$formKey.'_s3_class'" :value="__('Storage class (cold storage)')" />
+                    <select :id="$formKey.'_s3_class'" wire:model.live="{{ $formKey }}.s3.storage_class" class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage">
+                        <option value="">{{ __('Standard (default)') }}</option>
+                        @foreach ($awsClasses as $classKey => $classMeta)
+                            @continue($classKey === 'STANDARD')
+                            <option value="{{ $classKey }}">{{ $classMeta['label'] ?? $classKey }}</option>
+                        @endforeach
+                    </select>
+                    @php $selClass = $awsClasses[$form['s3']['storage_class'] ?? ''] ?? null; @endphp
+                    @if ($selClass)
+                        <p @class(['mt-1 text-xs', 'text-amber-700' => ($selClass['restore'] ?? false), 'text-brand-moss' => ! ($selClass['restore'] ?? false)])>
+                            {{ $selClass['note'] ?? '' }}
+                        </p>
+                    @else
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('Backups are written once and rarely read — a colder class (e.g. Glacier Instant Retrieval) cuts storage cost while staying instantly downloadable.') }}</p>
+                    @endif
+                    <x-input-error :messages="$errors->get($formKey.'.s3.storage_class')" class="mt-2" />
+                </div>
+            @endif
         </div>
         @break
 

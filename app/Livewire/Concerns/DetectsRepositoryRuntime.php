@@ -9,12 +9,13 @@ use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePlan;
 use App\Services\Deploy\RuntimeDetection\RepositoryRuntimePreview;
 use App\Services\Deploy\ServerlessRepositoryCheckout;
 use App\Services\Deploy\ServerlessRuntimeDetector;
+use App\Services\Deploy\ServerlessTargetCapabilityResolver;
 use Throwable;
 
 /**
  * Shared URL-first runtime detection for the create flows.
  *
- * The VM site, Edge container, and serverless function create forms all want
+ * The VM site, Cloud container, and serverless function create forms all want
  * the same "paste a repo, see what dply detected" affordance. This concern
  * carries the detection state + the two detector entry points + the panel's
  * input shape so each flow renders an identical detection panel instead of
@@ -23,7 +24,7 @@ use Throwable;
  * Two detector backends feed one panel:
  *
  *   - {@see runDetection} — the general {@see RepositoryRuntimePreview}
- *     (dply.yaml manifest + runtime-detection engine). Used by VM + Edge.
+ *     (dply.yaml manifest + runtime-detection engine). Used by VM + Cloud.
  *   - {@see runServerlessDetection} — the serverless {@see ServerlessRuntimeDetector}
  *     (framework vs. raw-action). Used by serverless create + the VM
  *     functions-host path.
@@ -78,6 +79,15 @@ trait DetectsRepositoryRuntime
             return;
         }
 
+        // Detection clones the repo (or pulls package.json) — for giant
+        // monorepos like withastro/starlight this can blow past PHP's
+        // 30s default and crash the whole Livewire request. Bump the
+        // wall-clock cap so the worst case is a slow detect (not a
+        // 500 page that the operator has to refresh out of).
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(90);
+        }
+
         try {
             $plan = app(RepositoryRuntimePreview::class)->fromUrl($url, $branch);
         } catch (GitCloneException|Throwable $e) {
@@ -112,7 +122,7 @@ trait DetectsRepositoryRuntime
      * detector array into the same {@see $detectedPlan} shape.
      *
      * @param  array<string, mixed>  $capabilities  target capability map from
-     *                                              {@see \App\Services\Deploy\ServerlessTargetCapabilityResolver}
+     *                                              {@see ServerlessTargetCapabilityResolver}
      */
     public function runServerlessDetection(string $url, string $branch, string $subdirectory, array $capabilities): void
     {
@@ -162,7 +172,7 @@ trait DetectsRepositoryRuntime
 
     /**
      * Reconstruct a clone URL from either `owner/name` shorthand (what the
-     * Edge + serverless forms store) or a full URL. Empty input passes
+     * Cloud + serverless forms store) or a full URL. Empty input passes
      * through so callers can short-circuit.
      */
     public function normalizeToCloneUrl(string $repo): string
@@ -195,6 +205,7 @@ trait DetectsRepositoryRuntime
             'build_command' => $plan->buildCommand,
             'start_command' => $plan->startCommand,
             'app_port' => $plan->appPort,
+            'output_dir' => $plan->detection?->outputDirectory,
             'confidence' => $plan->confidence,
             'sources' => $plan->sources,
             'reasons' => $plan->reasons,

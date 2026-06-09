@@ -2,19 +2,23 @@
 
 namespace App\Services\Servers;
 
+use App\Jobs\ApplyFirewallJob;
 use App\Models\Server;
 use App\Models\ServerFirewallRule;
+use App\Services\HetznerService;
+use App\Support\Servers\HetznerCloudFirewallRules;
+use Illuminate\Support\Facades\Log;
 
 class ServerFirewallProvisioner
 {
     /**
      * Optional output callback set by callers that want per-command streaming during apply.
      * The callback receives one line at a time — usually a `> ufw …` header before the
-     * exec and the captured output indented after. Used by {@see \App\Jobs\ApplyFirewallJob}
+     * exec and the captured output indented after. Used by {@see ApplyFirewallJob}
      * to surface live progress in the workspace banner; in-request callers leave it null
      * and get the same buffered string return value as before.
      *
-     * @var (callable(string $type, string $line): void)|null
+     * @var (callable(string, string): void)|null
      */
     protected $outputCallback = null;
 
@@ -344,12 +348,16 @@ class ServerFirewallProvisioner
             return 'Skipped (rule disabled).';
         }
 
-        return app(ServerSshConnectionRunner::class)->run(
+        $result = app(ServerSshConnectionRunner::class)->run(
             $server,
             fn ($ssh): string => $this->applyRuleViaSsh($ssh, $server, $rule),
             $this->useRootSsh(),
             $this->fallbackToDeployUserSsh()
         );
+
+        $this->syncHetznerCloudFirewall($server);
+
+        return $result;
     }
 
     /**
@@ -402,12 +410,50 @@ class ServerFirewallProvisioner
 
         $fragment = $this->ufwRuleFragment($rule);
 
-        return app(ServerSshConnectionRunner::class)->run(
+        $result = app(ServerSshConnectionRunner::class)->run(
             $server,
             fn ($ssh): string => $ssh->exec($this->ufwExecLine($server, 'delete '.$fragment), 60),
             $this->useRootSsh(),
             $this->fallbackToDeployUserSsh()
         );
+
+        $this->syncHetznerCloudFirewall($server);
+
+        return $result;
+    }
+
+    /**
+     * After any UFW mutation on a Hetzner server, push the updated rule set to the
+     * Hetzner Cloud Firewall so the edge firewall matches the on-box UFW state.
+     * Best-effort — a Hetzner API failure never blocks the UFW operation.
+     */
+    private function syncHetznerCloudFirewall(Server $server): void
+    {
+        if ($server->provider->value !== 'hetzner') {
+            return;
+        }
+
+        $firewallId = (int) data_get($server->meta, 'hetzner_firewall_id', 0);
+        if ($firewallId === 0) {
+            return;
+        }
+
+        $credential = $server->providerCredential;
+        if (! $credential) {
+            return;
+        }
+
+        try {
+            $hetzner = new HetznerService($credential);
+            $rules = HetznerCloudFirewallRules::forServer($server->fresh() ?? $server);
+            $hetzner->setFirewallRules($firewallId, $rules);
+        } catch (\Throwable $e) {
+            Log::warning('ServerFirewallProvisioner: Hetzner cloud firewall sync failed', [
+                'server_id' => $server->id,
+                'firewall_id' => $firewallId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     public function status(Server $server): string

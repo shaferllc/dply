@@ -4,138 +4,250 @@ declare(strict_types=1);
 
 namespace App\Services\Edge;
 
-use App\Models\ProviderCredential;
+use App\Models\EdgeDeployment;
 use App\Models\Site;
-use Illuminate\Support\Str;
+use App\Support\Edge\FakeEdgeProvision;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
 
 /**
- * Synthetic backend used when DPLY_FAKE_CLOUD_PROVISION=true and the
- * org has no real DigitalOcean App Platform / AWS App Runner credential
- * connected. Lets dev installs (and the test suite) click through
- * /edge/create end to end without hitting real cloud APIs.
- *
- * No external I/O — every verb returns immediately. Backend ids are
- * synthetic UUIDs so persisted Site rows look right (so the UI / CLI
- * surfaces don't choke on null fields).
- *
- * The companion EdgeRouter::backendFor() opts in to this backend
- * automatically when fake-cloud is enabled and no real credential
- * is available; production traffic is unaffected.
+ * Local/test backend — stores artifacts on disk and host map in cache.
  */
 class FakeEdgeBackend implements EdgeBackend
 {
-    public function __construct(public string $providerKey = 'fake_edge') {}
-
     public function providerKey(): string
     {
-        return $this->providerKey;
+        return 'dply_edge';
     }
 
-    public function provision(Site $site, ProviderCredential $credential): array
+    public function publishDeployment(EdgeDeployment $deployment, Site $site, string $localArtifactDir): array
     {
-        return [
-            'backend_id' => 'fake-app-'.Str::random(10),
-            'live_url' => $this->syntheticLiveUrl($site),
-        ];
+        $dest = $this->artifactRoot($deployment->storage_prefix);
+        File::ensureDirectoryExists($dest);
+        File::copyDirectory($localArtifactDir, $dest);
+
+        return $this->writeHostMap($deployment, $site);
     }
 
-    public function provisionFromSource(Site $site, ProviderCredential $credential): array
+    public function republishDeployment(EdgeDeployment $deployment, Site $site): array
     {
-        return [
-            'backend_id' => 'fake-app-src-'.Str::random(10),
-            'live_url' => $this->syntheticLiveUrl($site),
-        ];
-    }
-
-    public function redeploy(Site $site, ProviderCredential $credential): array
-    {
-        return ['deployment_id' => 'fake-deploy-'.Str::random(8)];
-    }
-
-    public function updateImage(Site $site, ProviderCredential $credential, string $image): void
-    {
-        // No-op — image change is reflected on the Site row by the
-        // caller; nothing to push to a backend in fake mode.
-    }
-
-    public function updateEnvVars(Site $site, ProviderCredential $credential): void
-    {
-        // No-op — env vars live on the Site model in fake mode.
-    }
-
-    public function teardown(Site $site, ProviderCredential $credential): void
-    {
-        // No-op — idempotent.
-    }
-
-    public function inspect(Site $site, ProviderCredential $credential): array
-    {
-        return [
-            'phase' => 'ACTIVE',
-            'live_url' => $this->syntheticLiveUrl($site),
-            'raw' => ['fake' => true],
-        ];
+        return $this->writeHostMap($deployment, $site);
     }
 
     /**
-     * Mirror the union of DO + App Runner regions so the create form's
-     * region picker shows a familiar list in fake mode.
+     * @return array{live_url: string, cf_kv_version: int}
      */
-    public function regions(): array
+    private function writeHostMap(EdgeDeployment $deployment, Site $site): array
     {
+        $hostname = $site->edgeHostname();
+        $routing = $this->routingPayload($deployment, $site);
+        $map = $this->hostMap();
+        $map[$hostname] = $routing;
+
+        foreach ($this->readyCustomHostnames($site) as $customHost) {
+            $map[$customHost] = $routing;
+        }
+        Cache::put($this->hostMapKey(), $map, now()->addDay());
+
         return [
-            ['slug' => 'nyc', 'label' => 'New York (fake)'],
-            ['slug' => 'sfo', 'label' => 'San Francisco (fake)'],
-            ['slug' => 'ams', 'label' => 'Amsterdam (fake)'],
-            ['slug' => 'fra', 'label' => 'Frankfurt (fake)'],
+            'live_url' => 'https://'.$hostname,
+            'cf_kv_version' => (int) $deployment->cf_kv_version + 1,
         ];
     }
 
-    public function attachDomain(Site $site, ProviderCredential $credential, string $hostname): array
+    public function unpublish(Site $site): void
     {
-        return [[
-            'name' => $hostname,
-            'type' => 'CNAME',
-            'value' => 'fake-edge.dply.local',
-            'status' => 'PENDING_VALIDATION',
-        ]];
+        $map = $this->hostMap();
+        unset($map[$site->edgeHostname()]);
+        foreach ($this->readyCustomHostnames($site) as $customHost) {
+            unset($map[$customHost]);
+        }
+        Cache::put($this->hostMapKey(), $map, now()->addDay());
+
+        $deployments = $site->edgeDeployments()->get();
+        foreach ($deployments as $deployment) {
+            File::deleteDirectory($this->artifactRoot($deployment->storage_prefix));
+        }
     }
 
-    public function detachDomain(Site $site, ProviderCredential $credential, string $hostname): void
+    public function attachDomain(Site $site, string $hostname): array
     {
-        // No-op.
-    }
-
-    public function latestDeploymentLogs(Site $site, ProviderCredential $credential): array
-    {
-        return [
-            'content' => "fake-edge backend\n[build] resolved framework: laravel\n[build] composer install ok\n[deploy] starting container\n[deploy] healthcheck OK\n",
-            'url' => null,
-            'message' => null,
-        ];
-    }
-
-    public function recentDeployments(Site $site, ProviderCredential $credential, int $limit = 10): array
-    {
-        $now = now();
-        $entries = [];
-        for ($i = 0; $i < min(3, $limit); $i++) {
-            $entries[] = [
-                'id' => 'fake-dep-'.($i + 1),
-                'phase' => $i === 0 ? 'ACTIVE' : 'SUPERSEDED',
-                'started_at' => $now->copy()->subHours($i * 2)->toIso8601String(),
-                'finished_at' => $now->copy()->subHours($i * 2)->addMinutes(3)->toIso8601String(),
-                'cause' => $i === 0 ? 'manual' : 'auto',
-            ];
+        $entry = app(EdgeCustomDomainProvisioner::class)->provision($site, $hostname);
+        if ($entry === null) {
+            return [];
         }
 
-        return $entries;
+        return [
+            [
+                'name' => strtolower(trim($hostname)),
+                'type' => 'CNAME',
+                'value' => (string) ($entry['cname_target'] ?? $site->edgeHostname()),
+                'status' => (string) ($entry['dns_status'] ?? 'pending'),
+            ],
+        ];
     }
 
-    private function syntheticLiveUrl(Site $site): string
+    public function detachDomain(Site $site, string $hostname): void
     {
-        $slug = $site->slug ?: Str::slug($site->name) ?: 'app';
+        app(EdgeCustomDomainProvisioner::class)->remove($site, $hostname);
+    }
 
-        return 'https://'.$slug.'.fake-edge.dply.local';
+    public function inspect(Site $site): array
+    {
+        $meta = $site->edgeMeta();
+        $phase = match ($site->status) {
+            Site::STATUS_EDGE_ACTIVE => 'ACTIVE',
+            Site::STATUS_EDGE_PROVISIONING => 'BUILDING',
+            Site::STATUS_EDGE_FAILED => 'FAILED',
+            default => 'UNKNOWN',
+        };
+
+        return [
+            'phase' => $phase,
+            'live_url' => $site->edgeLiveUrl(),
+            'active_deployment_id' => is_string($meta['active_deployment_id'] ?? null) ? $meta['active_deployment_id'] : null,
+        ];
+    }
+
+    public function supportsSsr(): bool
+    {
+        return false;
+    }
+
+    public function localFilePath(EdgeDeployment $deployment, string $path): ?string
+    {
+        $file = $this->artifactRoot($deployment->storage_prefix).'/'.ltrim($path, '/');
+        if (! is_file($file)) {
+            return null;
+        }
+
+        return $file;
+    }
+
+    public function resolveActiveDeployment(Site $site): ?EdgeDeployment
+    {
+        $activeId = $site->edgeMeta()['active_deployment_id'] ?? null;
+        if (! is_string($activeId) || $activeId === '') {
+            return $site->edgeDeployments()->where('status', EdgeDeployment::STATUS_LIVE)->latest()->first();
+        }
+
+        return EdgeDeployment::query()->find($activeId);
+    }
+
+    private function artifactRoot(string $prefix): string
+    {
+        return rtrim(FakeEdgeProvision::storageRoot(), '/').'/'.trim($prefix, '/');
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    private function hostMap(): array
+    {
+        return Cache::get($this->hostMapKey(), []);
+    }
+
+    private function hostMapKey(): string
+    {
+        return 'edge:fake:host-map';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function routingPayload(EdgeDeployment $deployment, Site $site): array
+    {
+        $edgeMeta = $site->edgeMeta();
+        $routing = is_array($edgeMeta['routing'] ?? null) ? $edgeMeta['routing'] : [];
+        $isPreview = ! empty($edgeMeta['preview_parent_site_id']);
+        $widgetMeta = is_array($edgeMeta['comment_widget'] ?? null) ? $edgeMeta['comment_widget'] : [];
+        $widgetEnabled = $isPreview && (bool) ($widgetMeta['enabled'] ?? false);
+        if ($isPreview && ! $widgetEnabled) {
+            $parentId = $edgeMeta['preview_parent_site_id'] ?? null;
+            if (is_string($parentId)) {
+                $parent = Site::query()->find($parentId);
+                $parentMeta = $parent?->edgeMeta() ?? [];
+                $parentWidget = is_array($parentMeta['comment_widget'] ?? null) ? $parentMeta['comment_widget'] : [];
+                if ((bool) ($parentWidget['enabled'] ?? false)) {
+                    $widgetEnabled = true;
+                    $widgetMeta = array_merge($parentWidget, $widgetMeta);
+                }
+            }
+        }
+
+        $payload = [
+            'storage_prefix' => $deployment->storage_prefix,
+            'deployment_id' => $deployment->id,
+            'spa_fallback' => (bool) ($routing['spa_fallback'] ?? true),
+            'headers' => is_array($routing['headers'] ?? null) ? $routing['headers'] : [],
+            'is_preview' => $isPreview,
+            'comment_widget_enabled' => $widgetEnabled,
+        ];
+
+        if ($widgetEnabled) {
+            $token = is_string($widgetMeta['token'] ?? null) ? trim((string) $widgetMeta['token']) : '';
+            if ($token !== '') {
+                $payload['comment_widget_token'] = $token;
+            }
+            $apiBase = rtrim((string) config('app.url'), '/');
+            if ($apiBase !== '') {
+                $payload['comment_widget_api_base'] = $apiBase;
+            }
+        }
+
+        $images = is_array($edgeMeta['images'] ?? null) ? $edgeMeta['images'] : [];
+        $imageSecret = is_string($images['signing_secret'] ?? null) ? trim((string) $images['signing_secret']) : '';
+        if ($imageSecret !== '') {
+            $payload['image_signing_secret'] = $imageSecret;
+            $allowed = is_array($images['allowed_hosts'] ?? null) ? $images['allowed_hosts'] : [];
+            $payload['image_allowed_hosts'] = array_values(array_filter(array_map(
+                fn ($host) => is_string($host) && $host !== '' ? strtolower($host) : null,
+                $allowed,
+            )));
+        }
+
+        if (($edgeMeta['runtime_mode'] ?? 'static') === 'hybrid') {
+            $origin = is_array($edgeMeta['origin'] ?? null) ? $edgeMeta['origin'] : [];
+            $originUrl = trim((string) ($origin['url'] ?? ''));
+            if ($originUrl !== '') {
+                $payload['origin_url'] = $originUrl;
+                $routes = is_array($origin['routes'] ?? null) ? $origin['routes'] : [];
+                $payload['origin_routes'] = array_values(array_filter(array_map(
+                    fn ($route) => is_string($route) ? $route : null,
+                    $routes,
+                )));
+                $authSecret = is_string($origin['auth_secret'] ?? null) ? trim((string) $origin['auth_secret']) : '';
+                if ($authSecret !== '') {
+                    $payload['origin_auth_secret'] = $authSecret;
+                }
+                $failover = is_string($origin['failover_html'] ?? null) ? (string) $origin['failover_html'] : '';
+                if ($failover !== '') {
+                    $payload['origin_failover_html'] = $failover;
+                }
+            }
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function readyCustomHostnames(Site $site): array
+    {
+        $routing = is_array($site->edgeMeta()['routing'] ?? null) ? $site->edgeMeta()['routing'] : [];
+        $domains = is_array($routing['custom_domains'] ?? null) ? $routing['custom_domains'] : [];
+        $hosts = [];
+        foreach ($domains as $hostname => $info) {
+            if (! is_string($hostname) || $hostname === '') {
+                continue;
+            }
+            if (is_array($info) && ($info['dns_status'] ?? null) !== 'ready') {
+                continue;
+            }
+            $hosts[] = strtolower($hostname);
+        }
+
+        return $hosts;
     }
 }

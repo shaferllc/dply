@@ -144,11 +144,40 @@ class TaskServiceProvider extends ServiceProvider
             }
         }
 
-        // Validate temporary directory is writable
-        $tempDir = $config['temporary_directory'] ?: sys_get_temp_dir();
-        if (! is_dir($tempDir) || ! is_writable($tempDir)) {
-            throw new \InvalidArgumentException("TaskRunner temporary directory is not writable: {$tempDir}");
+        // Resolve a writable temp dir (Valet/macOS often cannot write /var/tmp/).
+        $tempDir = $this->resolveTemporaryDirectory();
+        config(['task-runner.temporary_directory' => $tempDir]);
+    }
+
+    /**
+     * Pick the first writable TaskRunner temp directory, creating app storage if needed.
+     */
+    protected function resolveTemporaryDirectory(): string
+    {
+        $configured = config('task-runner.temporary_directory');
+        $candidates = array_values(array_unique(array_filter([
+            is_string($configured) && $configured !== '' ? $configured : null,
+            storage_path('app/task-runner/temp'),
+            sys_get_temp_dir(),
+        ])));
+
+        $attempted = [];
+
+        foreach ($candidates as $dir) {
+            $attempted[] = $dir;
+
+            if (! is_dir($dir)) {
+                @mkdir($dir, 0755, true);
+            }
+
+            if (is_dir($dir) && is_writable($dir)) {
+                return $dir;
+            }
         }
+
+        throw new \InvalidArgumentException(
+            'TaskRunner temporary directory is not writable. Tried: '.implode(', ', $attempted)
+        );
     }
 
     /**

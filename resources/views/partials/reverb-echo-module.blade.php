@@ -58,10 +58,17 @@ if (server && server.enabled !== false) {
     } else if (!bypass && forceTLS && isLocal) {
         console.info('[dply] Echo disabled: wss to localhost — no Valet cert for localhost. Set REVERB_HOST to your *.test site (TLS Reverb) or REVERB_SCHEME=http + http:// app.');
     } else {
+        // Driver-aware: 'reverb' for local dev, 'pusher' for the dply realtime
+        // Worker (and any BYO Pusher-compatible relay) in production. Both ride
+        // pusher-js under the hood, so only the broadcaster preset differs.
+        const broadcaster = String(server.driver ?? 'reverb').toLowerCase() === 'pusher' ? 'pusher' : 'reverb';
         window.Pusher = Pusher;
         window.Echo = new Echo({
-            broadcaster: 'reverb',
+            broadcaster,
             key: String(server.key).trim(),
+            // pusher-js requires a non-empty cluster even with wsHost set; the
+            // relay ignores it. reverb doesn't need it but it's harmless there.
+            cluster: String(server.cluster ?? 'mt1'),
             wsHost,
             wsPort: port,
             wssPort: port,

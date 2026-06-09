@@ -11,12 +11,16 @@
     };
 @endphp
 <section class="dply-card overflow-hidden" wire:poll.5s>
-    <div class="flex flex-col gap-2 border-b border-brand-ink/10 p-6 sm:flex-row sm:items-baseline sm:justify-between sm:p-8">
-        <div>
-            <h2 class="text-lg font-semibold text-brand-ink">{{ __('Recent action logs') }}</h2>
-            <p class="mt-1 text-sm text-brand-moss">{{ __('Installs and per-service actions, newest first. Click a row to view the SSH output.') }}</p>
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <x-icon-badge>
+            <x-heroicon-o-clipboard-document-list class="h-5 w-5" aria-hidden="true" />
+        </x-icon-badge>
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Activity') }}</p>
+            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent action logs') }}</h2>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Installs and per-service actions, newest first. Click a row to view the SSH output.') }}</p>
         </div>
-        <p class="text-xs text-brand-mist">{{ trans_choice(':count entry|:count entries', $rows->count(), ['count' => $rows->count()]) }}</p>
+        <p class="ml-auto shrink-0 text-xs text-brand-mist">{{ trans_choice(':count entry|:count entries', $rows->count(), ['count' => $rows->count()]) }}</p>
     </div>
 
     @if ($rows->isEmpty())

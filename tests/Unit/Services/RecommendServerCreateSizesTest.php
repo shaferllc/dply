@@ -2,30 +2,41 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Services;
+namespace Tests\Unit\Services\RecommendServerCreateSizesTest;
 
 use App\Actions\Servers\RecommendServerCreateSizes;
-use Tests\TestCase;
 
-class RecommendServerCreateSizesTest extends TestCase
-{
-    public function test_marks_tiny_database_node_as_too_small(): void
-    {
-        $result = RecommendServerCreateSizes::run('database', [
-            ['value' => 'tiny', 'memory_mb' => 1024, 'vcpus' => 1, 'disk_gb' => 25],
-            ['value' => 'balanced', 'memory_mb' => 4096, 'vcpus' => 2, 'disk_gb' => 80],
-        ]);
+test('marks tiny database node as too small', function () {
+    $result = RecommendServerCreateSizes::run('database', [
+        ['value' => 'tiny', 'memory_mb' => 1024, 'vcpus' => 1, 'disk_gb' => 25],
+        ['value' => 'balanced', 'memory_mb' => 4096, 'vcpus' => 2, 'disk_gb' => 80],
+    ]);
 
-        $this->assertSame('too_small', $result['tiny']['state']);
-        $this->assertSame('good_starting_point', $result['balanced']['state']);
-    }
+    expect($result['tiny']['state'])->toBe('too_small');
+    expect($result['tiny']['label'])->toContain('Database server');
+    expect($result['balanced']['state'])->toBe('good_starting_point');
+    expect($result['balanced']['label'])->toContain('Database server');
+});
 
-    public function test_marks_large_plain_server_as_overkill(): void
-    {
-        $result = RecommendServerCreateSizes::run('plain', [
-            ['value' => 'large', 'memory_mb' => 16384, 'vcpus' => 8, 'disk_gb' => 320],
-        ]);
+test('marks large plain server as overkill', function () {
+    $result = RecommendServerCreateSizes::run('plain', [
+        ['value' => 'large', 'memory_mb' => 16384, 'vcpus' => 8, 'disk_gb' => 320],
+    ]);
 
-        $this->assertSame('overkill', $result['large']['state']);
-    }
-}
+    expect($result['large']['state'])->toBe('overkill');
+    expect($result['large']['label'])->toContain('Plain server');
+});
+
+test('redis role copy references redis server label', function () {
+    $result = RecommendServerCreateSizes::run('redis', [
+        ['value' => 'small', 'memory_mb' => 1024, 'vcpus' => 1, 'disk_gb' => 25],
+        ['value' => 'fit', 'memory_mb' => 4096, 'vcpus' => 2, 'disk_gb' => 80],
+    ]);
+
+    expect($result['small']['state'])->toBe('too_small');
+    expect($result['small']['label'])->toBe('Too small for Cache / key-value server');
+    expect($result['small']['detail'])->toContain('cache and queue');
+
+    expect($result['fit']['state'])->toBe('good_starting_point');
+    expect($result['fit']['label'])->toBe('Good for Cache / key-value server');
+});

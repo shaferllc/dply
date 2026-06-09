@@ -100,6 +100,30 @@ final class WebserverEngineInfo
                 'wire_protocol' => 'HTTP/1.1, HTTP/2, TCP, UDP',
                 'first_released' => '2001',
             ],
+            'envoy' => [
+                'label' => 'Envoy',
+                'tagline' => __('Cloud-native L7 proxy and service mesh data plane.'),
+                'description' => 'CNCF-graduated proxy designed for dynamic configuration, rich observability, and gRPC/HTTP routing. In dply\'s edge-proxy model it sits on :80 and forwards to Caddy site backends on high ports — same pattern as Traefik and HAProxy.',
+                'homepage_url' => 'https://www.envoyproxy.io',
+                'docs_url' => 'https://www.envoyproxy.io/docs/envoy/latest/',
+                'license' => 'Apache-2.0',
+                'maintainer' => 'CNCF / Envoy maintainers',
+                'best_for' => __('Teams already standardized on Envoy for edge routing, xDS, or mesh-adjacent patterns who want dply-managed host→backend wiring.'),
+                'wire_protocol' => 'HTTP/1.1, HTTP/2, HTTP/3, gRPC, TCP',
+                'first_released' => '2016',
+            ],
+            'openresty' => [
+                'label' => 'OpenResty',
+                'tagline' => __('nginx + LuaJIT programmable edge.'),
+                'description' => 'nginx extended with Lua for programmable routing, auth, and rate limits at the edge. Distinct from choosing nginx as the primary webserver — OpenResty would front :80 and proxy to Caddy backends when dply\'s edge-proxy install ships.',
+                'homepage_url' => 'https://openresty.org',
+                'docs_url' => 'https://openresty.org/en/getting-started.html',
+                'license' => 'BSD-2-Clause',
+                'maintainer' => 'OpenResty Inc.',
+                'best_for' => __('Operators who want Lua-driven edge logic (JWT gates, custom ACLs, A/B routing) without hand-rolling nginx configs on every site change.'),
+                'wire_protocol' => 'HTTP/1.1, HTTP/2, HTTP/3 (with modules)',
+                'first_released' => '2009',
+            ],
         ];
     }
 

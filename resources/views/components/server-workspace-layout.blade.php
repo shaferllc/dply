@@ -20,9 +20,14 @@
     @endif
 
     @php
+        // Read the active item label from the *role-aware* nav so role overrides
+        // (e.g. `caches` labelled "Redis" on a redis-role server) surface in the
+        // breadcrumb too. Falls back to the base nav for active keys the role
+        // filter would hide — defence in case of a stale deep link bookmark.
         $activePageItem = null;
         if (filled($active) && $active !== 'overview') {
-            foreach (config('server_workspace.nav', []) as $navItem) {
+            $roleAwareNav = server_workspace_nav_for_server($server);
+            foreach ($roleAwareNav as $navItem) {
                 if (is_array($navItem) && ($navItem['key'] ?? null) === $active) {
                     $activePageItem = [
                         'label' => __($navItem['label'] ?? ucfirst((string) $active)),
@@ -31,13 +36,24 @@
                     break;
                 }
             }
+            if ($activePageItem === null) {
+                foreach (config('server_workspace.nav', []) as $navItem) {
+                    if (is_array($navItem) && ($navItem['key'] ?? null) === $active) {
+                        $activePageItem = [
+                            'label' => __($navItem['label'] ?? ucfirst((string) $active)),
+                            'icon' => $navItem['icon'] ?? null,
+                        ];
+                        break;
+                    }
+                }
+            }
         }
 
         $workspaceBreadcrumbs = [
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'],
         ];
-        if ($server->workspace) {
+        if ($server->workspace && \Laravel\Pennant\Feature::active('surface.projects')) {
             $workspaceBreadcrumbs[] = [
                 'label' => $server->workspace->name,
                 'href' => route('projects.resources', $server->workspace),
@@ -66,15 +82,39 @@
         if ($activePageItem) {
             $workspaceBreadcrumbs[] = $activePageItem;
         }
+
+        $contextualDocSlug = app(\App\Support\Docs\ContextualDocResolver::class)
+            ->resolveForServerWorkspace(is_string($active) ? $active : null);
     @endphp
-    <x-breadcrumb-trail :items="$workspaceBreadcrumbs" />
+    {{-- Full-width breadcrumb at the very top of the workspace (above the sidebar
+         + content grid), matching the site pages. --}}
+    <x-slot:breadcrumb>
+        <x-breadcrumb-trail
+            :items="$workspaceBreadcrumbs"
+            doc-contextual
+            :contextual-doc-slug="$contextualDocSlug"
+        >
+            @if ($server->workspace || isset($headerActions))
+                <x-slot name="trailing">
+                    @isset($headerActions)
+                        {{ $headerActions }}
+                    @endisset
+                    @if ($server->workspace)
+                        @feature('surface.projects')
+                            <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
+                                {{ __('Open project workspace') }}
+                            </a>
+                        @endfeature
+                    @endif
+                </x-slot>
+            @endif
+        </x-breadcrumb-trail>
+    </x-slot:breadcrumb>
 
     <x-page-header
         :title="$contextSite ? $title.' — '.$contextSite->name : $title"
         :description="$description"
-        :doc-route="$docRoute"
-        :doc-slug="$docSlug"
-        :doc-label="$docLabel"
+        :show-documentation="false"
         :toolbar="(bool) $pageHeaderToolbar"
         :compact="(bool) $pageHeaderCompact"
         flush
@@ -84,18 +124,6 @@
                 {{ $headerLeading }}
             </x-slot>
         @endisset
-        @if ($server->workspace || isset($headerActions))
-            <x-slot name="actions">
-                @isset($headerActions)
-                    {{ $headerActions }}
-                @endisset
-                @if ($server->workspace)
-                    <a href="{{ route('projects.resources', $server->workspace) }}" wire:navigate class="inline-flex items-center justify-center rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
-                        {{ __('Open project workspace') }}
-                    </a>
-                @endif
-            </x-slot>
-        @endif
     </x-page-header>
 
     <div class="mt-6 space-y-8 sm:mt-8">

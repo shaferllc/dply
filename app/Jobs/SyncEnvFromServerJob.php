@@ -41,6 +41,7 @@ class SyncEnvFromServerJob implements ShouldBeUnique, ShouldQueue
     public function __construct(
         public string $siteId,
         public ?string $userId = null,
+        public ?string $seededConsoleRunId = null,
     ) {}
 
     public function uniqueId(): string
@@ -70,6 +71,7 @@ class SyncEnvFromServerJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
+        $this->bindConsoleRunId($this->seededConsoleRunId);
         $emit = $this->beginConsoleAction();
 
         try {
@@ -88,6 +90,15 @@ class SyncEnvFromServerJob implements ShouldBeUnique, ShouldQueue
                 'env_synced_at' => now(),
                 'env_cache_origin' => 'server',
             ])->save();
+
+            // The raw server .env re-introduces keys an attached binding owns
+            // (REDIS_*, MAIL_*, DB_*, …) as loose rows. Re-adopt so they stay
+            // managed under their resource instead of bouncing into the
+            // editable list after every sync.
+            $reAdopted = app(\App\Services\Deploy\SiteBindingManager::class)->reAdoptAll($site);
+            if ($reAdopted !== []) {
+                $emit->step('sync', sprintf('Re-adopted %d key(s) into connected resources.', count($reAdopted)));
+            }
 
             $count = count($parsed['variables']);
             if ($count === 0 && trim($raw) === '') {

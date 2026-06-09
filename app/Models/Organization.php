@@ -2,6 +2,12 @@
 
 namespace App\Models;
 
+use App\Enums\TrialState;
+use App\Services\Billing\OrganizationBillingStateComputer;
+use App\Support\Beta\BetaProgram;
+use App\Services\Billing\SubscriptionPlanResolver;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Database\Factories\OrganizationFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -30,15 +36,25 @@ class Organization extends Model
         'cron_maintenance_until',
         'cron_maintenance_note',
         'firewall_settings',
+        'edge_data_region',
         'database_workspace_settings',
         'insights_preferences',
         'services_preferences',
+        'alert_slack_webhook_url',
+        'alert_extra_emails',
+        // Billing entity. Used on Stripe invoices for this org's
+        // subscription. Migrated off users in 2026-05.
+        'invoice_email',
+        'vat_number',
+        'billing_currency',
+        'billing_details',
     ];
 
     protected function casts(): array
     {
         return [
             'trial_ends_at' => 'datetime',
+            'beta_joined_at' => 'datetime',
             'deploy_email_notifications_enabled' => 'boolean',
             'email_server_credentials_enabled' => 'boolean',
             'email_database_credentials_enabled' => 'boolean',
@@ -48,6 +64,7 @@ class Organization extends Model
             'database_workspace_settings' => 'array',
             'insights_preferences' => 'array',
             'services_preferences' => 'array',
+            'alert_extra_emails' => 'array',
         ];
     }
 
@@ -74,36 +91,71 @@ class Organization extends Model
      */
     public function onDplyTrial(): bool
     {
-        return $this->trialState() === \App\Enums\TrialState::ActiveTrial;
+        return $this->trialState() === TrialState::ActiveTrial;
     }
+
+    /**
+     * Per-request memo for {@see owesNothingThisCycle}.
+     */
+    private ?bool $owesNothingMemo = null;
 
     /**
      * Resolve the org's current subscription-lifecycle state. The single
      * source of truth for "what can this org do right now?" — see
      * App\Enums\TrialState for the full state machine.
      */
-    public function trialState(): \App\Enums\TrialState
+    public function trialState(): TrialState
     {
         // Includes the cancel grace period — Cashier's valid() stays true
         // until ends_at, so a just-canceled org keeps full access.
         if ($this->onAnyPaidPlan()) {
-            return \App\Enums\TrialState::Subscribed;
+            return TrialState::Subscribed;
+        }
+
+        // Closed-beta participants pay $0 with full access and are never paused:
+        // the trial/pause ladder only protects dply from cost on orgs that
+        // should be paying. Subscribed (early-subscribe) wins above; at the
+        // global cutover isBeta() flips false and the org rejoins this ladder
+        // (BetaGraduateCommand reseeds a fresh trial). NoTrial = free indefinitely.
+        if ($this->isBeta()) {
+            return TrialState::NoTrial;
         }
 
         $reference = $this->pauseLadderReference();
         if ($reference !== null) {
+            // Free-plan exemption: an org that owes nothing this cycle (Free
+            // plan, no managed products, no Edge usage) is never paused — the
+            // pause ladder only protects dply from cost on orgs that should be
+            // paying. Such an org simply lives on the free tier indefinitely.
+            if ($this->owesNothingThisCycle()) {
+                return TrialState::NoTrial;
+            }
+
             $softPauseDays = (int) config('subscription.standard.soft_pause_days', 30);
 
             return $reference->copy()->addDays($softPauseDays)->isPast()
-                ? \App\Enums\TrialState::ExpiredHard
-                : \App\Enums\TrialState::ExpiredSoft;
+                ? TrialState::ExpiredHard
+                : TrialState::ExpiredSoft;
         }
 
         if ($this->trial_ends_at === null) {
-            return \App\Enums\TrialState::NoTrial;
+            return TrialState::NoTrial;
         }
 
-        return \App\Enums\TrialState::ActiveTrial;
+        return TrialState::ActiveTrial;
+    }
+
+    /**
+     * True when the org's current fleet bills to nothing this cycle: a Free
+     * plan (within the free server ceiling) with no managed products and no
+     * Edge delivery usage. Memoized per request — recomputing on every
+     * {@see TrialState} call would be wasteful.
+     */
+    public function owesNothingThisCycle(): bool
+    {
+        return $this->owesNothingMemo ??= app(OrganizationBillingStateComputer::class)
+            ->compute($this)
+            ->isFree();
     }
 
     /**
@@ -117,7 +169,7 @@ class Organization extends Model
      *
      * A future-dated trial returns null (still an active trial, not paused).
      */
-    private function pauseLadderReference(): ?\Carbon\CarbonInterface
+    private function pauseLadderReference(): ?CarbonInterface
     {
         $subscription = $this->subscription('default');
         if ($subscription && $subscription->ended() && $subscription->ends_at !== null) {
@@ -157,7 +209,7 @@ class Organization extends Model
     /**
      * The date a canceled subscription's access ends. Null when not canceled.
      */
-    public function subscriptionEndsAt(): ?\Carbon\CarbonInterface
+    public function subscriptionEndsAt(): ?CarbonInterface
     {
         return $this->subscription('default')?->ends_at;
     }
@@ -167,7 +219,7 @@ class Organization extends Model
      * track (subscribed, active trial, no trial recorded). Useful for "agent
      * disconnects on {date}" UI copy.
      */
-    public function hardPauseStartsAt(): ?\Carbon\CarbonImmutable
+    public function hardPauseStartsAt(): ?CarbonImmutable
     {
         if ($this->onAnyPaidPlan()) {
             return null;
@@ -211,7 +263,94 @@ class Organization extends Model
      */
     public function acceptsMetrics(): bool
     {
-        return $this->trialState() !== \App\Enums\TrialState::ExpiredHard;
+        return $this->trialState() !== TrialState::ExpiredHard;
+    }
+
+    /**
+     * The flat plan the org is currently on, resolved from its billable BYO
+     * server count — the same basis the bill uses. Carries the plan's site
+     * ceiling (`max_sites`).
+     *
+     * @return array{key: string, label: string, price_cents: int, max_servers: ?int, max_sites: ?int}
+     */
+    public function currentSubscriptionPlan(): array
+    {
+        return app(SubscriptionPlanResolver::class)
+            ->resolveForServerCount($this->billablePlanServerCount());
+    }
+
+    /**
+     * Billable BYO server count used to pick the plan. Mirrors the filter in
+     * {@see OrganizationBillingStateComputer}: ready, past the new-server age
+     * grace, and excluding dply-managed logical hosts.
+     */
+    private function billablePlanServerCount(): int
+    {
+        $minAgeDays = max(0, (int) config('subscription.standard.min_billable_age_days', 1));
+        $ageCutoff = now()->subDays($minAgeDays);
+
+        return $this->servers()
+            ->where('status', Server::STATUS_READY)
+            ->where('created_at', '<=', $ageCutoff)
+            ->get()
+            ->reject(fn (Server $server) => $server->isManagedProductHost())
+            ->count();
+    }
+
+    /**
+     * The org's current plan site ceiling, or null when unlimited.
+     */
+    public function planSiteLimit(): ?int
+    {
+        // Beta orgs use the roomy beta site ceiling instead of the plan tier.
+        if ($this->isBeta()) {
+            return max(1, (int) config('subscription.standard.beta.sites', 25));
+        }
+
+        return $this->currentSubscriptionPlan()['max_sites'];
+    }
+
+    /**
+     * Number of sites that count against the plan's site ceiling. Preview
+     * deployments (Edge/Cloud) are scratch clones of a parent and never
+     * consume quota.
+     */
+    public function quotaCountedSiteCount(): int
+    {
+        return $this->sites()
+            ->get()
+            ->reject(fn (Site $site) => $site->isEdgePreview() || $site->isCloudPreview())
+            ->count();
+    }
+
+    /**
+     * True when the org has reached its plan's site ceiling.
+     */
+    public function siteLimitReached(): bool
+    {
+        $limit = $this->planSiteLimit();
+
+        return $limit !== null && $this->quotaCountedSiteCount() >= $limit;
+    }
+
+    /**
+     * Friendly upgrade prompt shown when site creation is blocked.
+     */
+    public function siteLimitMessage(): string
+    {
+        $plan = $this->currentSubscriptionPlan();
+        $limit = $plan['max_sites'];
+
+        if ($limit === null) {
+            return '';
+        }
+
+        return sprintf(
+            'Your %s plan includes %d %s. Add a server to move up to the next plan, or contact us to raise your limit.',
+            $plan['label'],
+            $limit,
+            $limit === 1 ? 'site' : 'sites',
+        );
     }
 
     /**
@@ -395,6 +534,21 @@ class Organization extends Model
         return $this->hasMany(Site::class);
     }
 
+    public function realtimeApps(): HasMany
+    {
+        return $this->hasMany(RealtimeApp::class);
+    }
+
+    public function billingSnapshots(): HasMany
+    {
+        return $this->hasMany(OrganizationBillingSnapshot::class);
+    }
+
+    public function billingSubscriptionSyncEvents(): HasMany
+    {
+        return $this->hasMany(BillingSubscriptionSyncEvent::class);
+    }
+
     public function scripts(): HasMany
     {
         return $this->hasMany(Script::class);
@@ -413,6 +567,11 @@ class Organization extends Model
     public function firewallRuleTemplates(): HasMany
     {
         return $this->hasMany(FirewallRuleTemplate::class);
+    }
+
+    public function serverBlueprints(): HasMany
+    {
+        return $this->hasMany(ServerBlueprint::class);
     }
 
     public function defaultSiteScript(): BelongsTo
@@ -516,6 +675,17 @@ class Organization extends Model
         return $this->memberRoleMemo[$userId] = $role;
     }
 
+    /**
+     * Seed the member-role memo from an organization_user pivot that was
+     * already loaded on this org instance (e.g. via $user->organizations()).
+     */
+    public function rememberMemberRoleFor(User $user, ?string $role): void
+    {
+        $userId = (string) $user->id;
+        $this->memberRoleMemo[$userId] = $role;
+        self::$memberRoleStaticMemo[(string) $this->id.':'.$userId] = $role;
+    }
+
     /** Drop the cross-instance member-role cache (between requests in long-running processes / tests). */
     public static function flushMemberRoleCache(): void
     {
@@ -538,22 +708,102 @@ class Organization extends Model
     }
 
     /**
-     * Maximum number of servers allowed. Always unlimited under the Standard
-     * model — trial-state gating (see canDeploy / acceptsMetrics) handles the
-     * cash-burning abuse case, so there's no need for an arbitrary server cap.
+     * True while this org is an active closed-beta participant: it redeemed an
+     * invite (`beta_joined_at` set) AND the global beta program is still open.
+     * After the cutover this flips false and the org rejoins the normal
+     * plan/trial lifecycle.
      */
-    public function maxServers(): int
+    public function isBeta(): bool
     {
-        return PHP_INT_MAX;
+        return $this->beta_joined_at !== null && BetaProgram::isOpen();
     }
 
     /**
-     * Maximum sites allowed. Always unlimited; the marketing page commits to
-     * "no per-site billing" and that's enforced here.
+     * True when the dply platform fee is waived this cycle: an active beta org
+     * that has NOT subscribed early. Opting into a paid plan turns the waiver
+     * off (the org wanted to pay) — but the free CX22 stays comped regardless,
+     * via the comped_until column. Drives the $0 plan price in billing.
+     */
+    public function betaFeeWaived(): bool
+    {
+        return $this->isBeta() && ! $this->onAnyPaidPlan();
+    }
+
+    /**
+     * BYO server ceiling for a beta org — generous enough to feel unlimited for
+     * a solo dev / small team, bounded so a leaked invite can't provision
+     * hundreds of boxes on a stolen cloud key via dply.
+     */
+    public function betaByoServerLimit(): int
+    {
+        return max(1, (int) config('subscription.standard.beta.byo_servers', 5));
+    }
+
+    /**
+     * Free dply-managed server ceiling for a beta org — the single free CX22.
+     */
+    public function betaManagedServerLimit(): int
+    {
+        return max(0, (int) config('subscription.standard.beta.managed_servers', 1));
+    }
+
+    /**
+     * BYO VMs that count against the beta BYO ceiling (excludes the free managed
+     * box and managed-product logical hosts).
+     */
+    public function byoServerCount(): int
+    {
+        return $this->servers()
+            ->where('hosting_backend', Server::HOSTING_BACKEND_BYO)
+            ->get()
+            ->reject(fn (Server $server) => $server->isManagedProductHost())
+            ->count();
+    }
+
+    /**
+     * dply-managed VMs the org currently holds (the free-CX22 grant counter).
+     */
+    public function managedServerCount(): int
+    {
+        return $this->servers()
+            ->where('hosting_backend', Server::HOSTING_BACKEND_DPLY)
+            ->get()
+            ->filter(fn (Server $server) => $server->isManagedVm())
+            ->count();
+    }
+
+    /**
+     * Whether the org can provision another free dply-managed server. During
+     * beta this enforces the single-CX22 grant; outside beta managed servers
+     * aren't capped here (availability is gated by the surface flag + platform
+     * config at the create flow).
+     */
+    public function canCreateManagedServer(): bool
+    {
+        if (! $this->isBeta()) {
+            return true;
+        }
+
+        return $this->managedServerCount() < $this->betaManagedServerLimit();
+    }
+
+    /**
+     * Maximum number of BYO servers allowed. Unlimited under the Standard model
+     * — trial-state gating handles the cash-burning abuse case — but bounded for
+     * beta orgs by the beta envelope.
+     */
+    public function maxServers(): int
+    {
+        return $this->isBeta() ? $this->betaByoServerLimit() : PHP_INT_MAX;
+    }
+
+    /**
+     * Maximum sites allowed on the org's current plan. Returns PHP_INT_MAX for
+     * the unlimited (Business / null) ceiling so callers can compare numerically.
      */
     public function maxSites(): int
     {
-        return PHP_INT_MAX;
+        return $this->planSiteLimit() ?? PHP_INT_MAX;
     }
 
     /**
@@ -561,15 +811,23 @@ class Organization extends Model
      */
     public function canCreateServer(): bool
     {
+        // Beta orgs are bounded by the BYO envelope (the free managed box is
+        // counted separately via canCreateManagedServer); otherwise unlimited.
+        if ($this->isBeta()) {
+            return $this->byoServerCount() < $this->maxServers();
+        }
+
         return $this->servers()->count() < $this->maxServers();
     }
 
     /**
-     * Whether the organization can create another site (under {@see maxSites()}).
+     * Whether the organization can create another site under its current
+     * plan's site ceiling. Preview deployments don't consume quota — see
+     * {@see quotaCountedSiteCount()}.
      */
     public function canCreateSite(): bool
     {
-        return $this->sites()->count() < $this->maxSites();
+        return ! $this->siteLimitReached();
     }
 
     /**
@@ -614,14 +872,45 @@ class Organization extends Model
     }
 
     /**
-     * True when the org is on the Standard plan (base price + per-server tiers).
+     * True when the org has an active dply Standard subscription — i.e. it
+     * carries any price dply owns under the plan model: a flat plan price
+     * (Starter/Pro/Business, monthly or yearly) or any a-la-carte managed
+     * product / Edge-usage price. A Free-plan org with no managed products has
+     * no Stripe subscription at all and returns false here.
      */
     public function onStandardSubscription(): bool
     {
-        return $this->subscriptionMatchesAnyPrice([
-            config('subscription.standard.stripe.base_monthly'),
-            config('subscription.standard.stripe.base_yearly'),
-        ]);
+        return $this->subscriptionMatchesAnyPrice($this->standardStripePriceIds());
+    }
+
+    /**
+     * Every Stripe price ID dply owns under the Standard plan model, across
+     * both billing intervals.
+     *
+     * @return list<?string>
+     */
+    private function standardStripePriceIds(): array
+    {
+        $stripe = (array) config('subscription.standard.stripe', []);
+
+        $ids = array_merge(
+            array_values((array) ($stripe['plans'] ?? [])),
+            array_values((array) ($stripe['plans_yearly'] ?? [])),
+            [
+                $stripe['serverless'] ?? null,
+                $stripe['serverless_yearly'] ?? null,
+                $stripe['cloud'] ?? null,
+                $stripe['cloud_yearly'] ?? null,
+                $stripe['edge'] ?? null,
+                $stripe['edge_yearly'] ?? null,
+                $stripe['edge_usage'] ?? null,
+            ],
+        );
+
+        return array_values(array_map(
+            fn ($id) => is_string($id) ? $id : null,
+            $ids,
+        ));
     }
 
     /**

@@ -32,8 +32,15 @@
         @if ($showCommandLine)
             <p class="mt-1 break-all font-mono text-xs text-slate-600">{{ $stepCommand }}</p>
         @endif
-        @if ($shouldRenderOutput)
-            <pre class="mt-2 max-h-64 overflow-auto rounded bg-slate-900 p-3 font-mono text-[11px] text-slate-100">{{ $stepOutput }}</pre>
+        @if ($stepOutput !== '')
+            <div x-data="{ open: @js($shouldRenderOutput) }" class="mt-2">
+                <button type="button" x-on:click="open = ! open"
+                    class="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-slate-900">
+                    <span class="font-mono" x-text="open ? '▾' : '▸'"></span>
+                    <span x-text="open ? @js(__('Hide output')) : @js(__('Show output'))"></span>
+                </button>
+                <pre x-show="open" x-cloak class="mt-1 max-h-96 overflow-auto rounded bg-slate-900 p-3 font-mono text-[11px] text-slate-100">{{ $stepOutput }}</pre>
+            </div>
         @endif
     </div>
 </li>

@@ -2,70 +2,41 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit;
+namespace Tests\Unit\SiteServerlessLimitsTest;
 
 use App\Models\Site;
-use PHPUnit\Framework\TestCase;
 
-class SiteServerlessLimitsTest extends TestCase
+function siteWithLimits(mixed $limits): Site
 {
-    private function siteWithLimits(mixed $limits): Site
-    {
-        $site = new Site;
-        $site->meta = ['serverless' => ['limits' => $limits]];
+    $site = new Site;
+    $site->meta = ['serverless' => ['limits' => $limits]];
 
-        return $site;
-    }
-
-    public function test_it_returns_platform_defaults_when_no_limits_are_stored(): void
-    {
-        $site = new Site;
-        $site->meta = [];
-
-        $this->assertSame([
-            'memory' => Site::SERVERLESS_DEFAULT_MEMORY_MB,
-            'timeout' => Site::SERVERLESS_DEFAULT_TIMEOUT_MS,
-            'concurrency' => Site::SERVERLESS_DEFAULT_CONCURRENCY,
-        ], $site->serverlessLimits());
-    }
-
-    public function test_it_passes_through_valid_stored_limits(): void
-    {
-        $limits = $this->siteWithLimits(['memory' => 1024, 'timeout' => 120000, 'concurrency' => 8])
-            ->serverlessLimits();
-
-        $this->assertSame(['memory' => 1024, 'timeout' => 120000, 'concurrency' => 8], $limits);
-    }
-
-    public function test_it_falls_back_to_default_memory_for_an_unsupported_value(): void
-    {
-        $this->assertSame(
-            Site::SERVERLESS_DEFAULT_MEMORY_MB,
-            $this->siteWithLimits(['memory' => 999])->serverlessLimits()['memory'],
-        );
-    }
-
-    public function test_it_clamps_timeout_into_the_allowed_range(): void
-    {
-        $this->assertSame(
-            Site::SERVERLESS_MAX_TIMEOUT_MS,
-            $this->siteWithLimits(['timeout' => 9_000_000])->serverlessLimits()['timeout'],
-        );
-        $this->assertSame(
-            Site::SERVERLESS_MIN_TIMEOUT_MS,
-            $this->siteWithLimits(['timeout' => 1])->serverlessLimits()['timeout'],
-        );
-    }
-
-    public function test_it_clamps_concurrency_into_the_allowed_range(): void
-    {
-        $this->assertSame(
-            Site::SERVERLESS_MAX_CONCURRENCY,
-            $this->siteWithLimits(['concurrency' => 999])->serverlessLimits()['concurrency'],
-        );
-        $this->assertSame(
-            1,
-            $this->siteWithLimits(['concurrency' => 0])->serverlessLimits()['concurrency'],
-        );
-    }
+    return $site;
 }
+test('it returns platform defaults when no limits are stored', function () {
+    $site = new Site;
+    $site->meta = [];
+
+    expect($site->serverlessLimits())->toBe([
+        'memory' => Site::SERVERLESS_DEFAULT_MEMORY_MB,
+        'timeout' => Site::SERVERLESS_DEFAULT_TIMEOUT_MS,
+        'concurrency' => Site::SERVERLESS_DEFAULT_CONCURRENCY,
+    ]);
+});
+test('it passes through valid stored limits', function () {
+    $limits = siteWithLimits(['memory' => 1024, 'timeout' => 120000, 'concurrency' => 8])
+        ->serverlessLimits();
+
+    expect($limits)->toBe(['memory' => 1024, 'timeout' => 120000, 'concurrency' => 8]);
+});
+test('it falls back to default memory for an unsupported value', function () {
+    expect(siteWithLimits(['memory' => 999])->serverlessLimits()['memory'])->toBe(Site::SERVERLESS_DEFAULT_MEMORY_MB);
+});
+test('it clamps timeout into the allowed range', function () {
+    expect(siteWithLimits(['timeout' => 9_000_000])->serverlessLimits()['timeout'])->toBe(Site::SERVERLESS_MAX_TIMEOUT_MS);
+    expect(siteWithLimits(['timeout' => 1])->serverlessLimits()['timeout'])->toBe(Site::SERVERLESS_MIN_TIMEOUT_MS);
+});
+test('it clamps concurrency into the allowed range', function () {
+    expect(siteWithLimits(['concurrency' => 999])->serverlessLimits()['concurrency'])->toBe(Site::SERVERLESS_MAX_CONCURRENCY);
+    expect(siteWithLimits(['concurrency' => 0])->serverlessLimits()['concurrency'])->toBe(1);
+});

@@ -32,7 +32,7 @@
                     <x-input-error :messages="$errors->get('laravel_horizon_notes')" class="mt-1" />
                 </div>
             </div>
-            <a href="{{ $daemonsUrl }}?preset=laravel-horizon" wire:navigate class="mt-3 inline-flex text-xs font-medium text-brand-forest underline">{{ __('Open Daemons with Horizon preset') }}</a>
+            <a href="{{ $daemonsUrl }}?preset=laravel-horizon" wire:navigate class="mt-3 inline-flex text-xs font-medium text-brand-forest underline">{{ __('Open Workers with Horizon preset') }}</a>
         </div>
     @endif
 

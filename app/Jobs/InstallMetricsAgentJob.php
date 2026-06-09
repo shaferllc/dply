@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Server;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use App\Services\Servers\SchedulerWrapperScript;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerMetricsGuestScript;
 use App\Services\Servers\ServerProvisionCommandBuilder;
@@ -53,7 +54,7 @@ class InstallMetricsAgentJob implements ShouldBeUnique, ShouldQueue
     public function handle(
         ExecuteRemoteTaskOnServer $remote,
         ServerMetricsGuestScript $script,
-        \App\Services\Servers\SchedulerWrapperScript $wrapper,
+        SchedulerWrapperScript $wrapper,
     ): void {
         if (! (bool) config('server_provision.install_metrics_agent', true)) {
             return;

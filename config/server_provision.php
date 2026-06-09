@@ -19,12 +19,88 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Optional regional apt mirror (opt-in, off by default)
+    |--------------------------------------------------------------------------
+    | When set, provisioning rewrites the Ubuntu archive/security sources to
+    | this mirror before the first apt update — provider regional mirrors are
+    | far faster than archive.ubuntu.com. Examples:
+    |   DigitalOcean: http://mirrors.digitalocean.com/ubuntu
+    |   Hetzner:      http://mirror.hetzner.com/ubuntu/packages
+    | Leave empty to keep the image's default sources. Set a wrong value and
+    | apt can't fetch, so only enable a mirror you know serves your region.
+    */
+    'apt_mirror' => env('DPLY_APT_MIRROR', ''),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Boot-time head start (cloud-init user_data) — opt-in, off by default
+    |--------------------------------------------------------------------------
+    | When on, freshly created servers run a small head-start script via
+    | cloud-init user_data at boot (apt update + base packages), overlapping the
+    | time the control plane spends waiting for IP + SSH. The SSH'd provision
+    | script then skip-fasts that work. SAFE TO LEAVE OFF: when off, no user_data
+    | is injected and the bootstrap's cooperative wait is a no-op. Validate on a
+    | throwaway droplet before enabling in prod (cloud-init timing is image-
+    | dependent). Wired for DigitalOcean + Hetzner.
+    */
+    'boot_head_start' => (bool) env('DPLY_BOOT_HEAD_START', false),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Defer certbot install off the provision critical path — opt-in, off
+    |--------------------------------------------------------------------------
+    | When on, provisioning does NOT install certbot up front; the cert-issuance
+    | path installs it on first use instead (the issuance builder always ensures
+    | certbot is present, so this is correctness-preserving either way). Saves a
+    | small amount of create-time. Off = current behavior (certbot at provision).
+    */
+    'defer_certbot' => (bool) env('DPLY_DEFER_CERTBOT', false),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Queue for server-provisioning jobs
+    |--------------------------------------------------------------------------
+    | Provisioning jobs (cloud create → poll IP → wait SSH → run setup) run on
+    | this queue. Default 'dply' = same as today. Set to 'dply-provision' (which
+    | Horizon already watches, at top priority) so a create doesn't wait behind
+    | routine control-plane jobs. Only use a queue Horizon actually watches, or
+    | the jobs will silently stall.
+    */
+    'queue' => env('DPLY_PROVISION_QUEUE', 'dply'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Parallel runtime installs — opt-in, off by default
+    |--------------------------------------------------------------------------
+    | mise runtime downloads (Node/Python/… — github/nodejs.org, NOT apt, so no
+    | dpkg-lock contention) run in the background and overlap the apt-heavy steps
+    | (PHP/MySQL). A single wait near the end joins them. Off = sequential (today).
+    | Validate on a throwaway droplet before enabling.
+    */
+    'parallel_runtimes' => (bool) env('DPLY_PARALLEL_RUNTIMES', false),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Package prefetch (combined parallel download) — opt-in, off by default
+    |--------------------------------------------------------------------------
+    | After the base apt update, pre-download the stack's stock-repo packages in
+    | one apt transaction (apt fetches them in parallel) so the per-component
+    | installs are disk-only. Additive + safe: anything not prefetched just
+    | downloads at install time as before. Off = current behavior.
+    */
+    'prefetch_packages' => (bool) env('DPLY_PREFETCH_PACKAGES', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Wait for SSH after cloud assigns a public IP (before stack setup)
     |--------------------------------------------------------------------------
     */
-    'ssh_ready_max_attempts' => max(5, (int) env('DPLY_SSH_READY_MAX_ATTEMPTS', 45)),
+    // Tighter cadence (4s) so the setup script starts within a couple of probes
+    // of sshd coming up, with the attempt count raised to preserve the same
+    // ~360s worst-case window (90 × 4s).
+    'ssh_ready_max_attempts' => max(5, (int) env('DPLY_SSH_READY_MAX_ATTEMPTS', 90)),
 
-    'ssh_ready_retry_seconds' => max(3, (int) env('DPLY_SSH_READY_RETRY_SECONDS', 8)),
+    'ssh_ready_retry_seconds' => max(3, (int) env('DPLY_SSH_READY_RETRY_SECONDS', 4)),
 
     /*
     | Log SSH readiness polling at info level every N attempts (1 = every attempt).
@@ -45,6 +121,24 @@ return [
     'deploy_ssh_user' => env('DPLY_SERVER_DEPLOY_SSH_USER', 'dply'),
 
     /*
+    |--------------------------------------------------------------------------
+    | Deploy user Git identity (global git config on the server)
+    |--------------------------------------------------------------------------
+    |
+    | Applied during provisioning when user.name / user.email are unset, and
+    | editable from Manage → Tools → Git. Used for commits made on the server
+    | (deploy hooks, manual git operations as the deploy user).
+    |
+    */
+    'configure_deploy_git_identity' => filter_var(env('DPLY_CONFIGURE_DEPLOY_GIT_IDENTITY', true), FILTER_VALIDATE_BOOLEAN),
+
+    'deploy_git_identity_name_suffix' => env('DPLY_DEPLOY_GIT_IDENTITY_NAME_SUFFIX', ' via Dply'),
+
+    'deploy_git_identity_email_domain' => env('DPLY_DEPLOY_GIT_EMAIL_DOMAIN', 'dply.host'),
+
+    'deploy_git_identity_email_local' => env('DPLY_DEPLOY_GIT_IDENTITY_EMAIL_LOCAL', 'deploy+{server_id}'),
+
+    /*
     | Install python3-minimal + deploy the metrics snapshot script
     | during provision so freshly-built servers start collecting
     | CPU/RAM/disk data automatically. Disable to keep the install
@@ -54,14 +148,16 @@ return [
 
     /*
     | Install the metrics agent INLINE during the bash provision script.
-    | When false (default), the inline step is skipped and the install
-    | runs over SSH after the journey completes via
-    | InstallMetricsAgentJob — saves 30–60s on the journey wall-clock at
-    | the cost of monitoring being unavailable for ~1 minute after the
-    | journey reads "ready". Set DPLY_SERVER_INSTALL_METRICS_AGENT_INLINE=true
-    | to force the inline behaviour back on.
+    | When true (default), the snapshot script + python3-minimal land as a
+    | provision step and RunSetupScriptJob's success path writes the env +
+    | crontab synchronously, so a freshly-built server starts collecting and
+    | pushing metrics the moment the journey reads "ready" — no waiting on a
+    | follow-up SSH job. Costs 30–60s of journey wall-clock for the apt +
+    | deploy. Set DPLY_SERVER_INSTALL_METRICS_AGENT_INLINE=false to defer the
+    | install to InstallMetricsAgentJob over SSH after the journey completes
+    | (faster journey, monitoring unavailable for ~1 minute afterward).
     */
-    'install_metrics_agent_inline' => (bool) env('DPLY_SERVER_INSTALL_METRICS_AGENT_INLINE', false),
+    'install_metrics_agent_inline' => (bool) env('DPLY_SERVER_INSTALL_METRICS_AGENT_INLINE', true),
 
     /*
     | Disable cloud-init's apt-daily / apt-daily-upgrade /
@@ -109,6 +205,12 @@ return [
     'install_composer' => true,
 
     'install_fail2ban' => true,
+
+    // Configure and enable OS-native automatic security updates
+    // (unattended-upgrades) at the end of provisioning. The base bootstrap
+    // preempts cloud-init's copy to avoid apt-lock contention during install;
+    // this re-enables it with a security-only, no-auto-reboot policy.
+    'install_unattended_upgrades' => (bool) env('DPLY_INSTALL_UNATTENDED_UPGRADES', true),
 
     /*
     |--------------------------------------------------------------------------

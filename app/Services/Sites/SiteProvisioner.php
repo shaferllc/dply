@@ -18,7 +18,7 @@ class SiteProvisioner
 
     public function __construct(
         private readonly TestingHostnameProvisioner $testingHostnameProvisioner,
-        private readonly SiteWebserverProvisionerRegistry $provisionerRegistry,
+        private readonly SiteWebserverConfigApplier $webserverConfigApplier,
         private readonly SiteRuntimeProvisionerRegistry $runtimeProvisionerRegistry,
         private readonly SiteReachabilityChecker $siteReachabilityChecker,
         private readonly DigitalOceanFunctionsSiteProvisioner $digitalOceanFunctionsSiteProvisioner,
@@ -58,6 +58,7 @@ class SiteProvisioner
                 ? 'configuring_docker_runtime'
                 : 'configuring_kubernetes_runtime';
             $runtimeTarget = $site->runtimeTarget();
+            $awaitingWebserverForVmDocker = $site->usesVmDockerRuntime();
 
             $this->appendLog($site, 'info', 'queued', 'Runtime provisioning worker started.', [
                 'runtime_profile' => $runtimeProfile,
@@ -113,6 +114,35 @@ class SiteProvisioner
             $this->appendLog($site, 'info', $state, 'Runtime deployment artifacts prepared. Waiting for the first deploy to publish the workload.', [
                 'runtime_profile' => $runtimeProfile,
             ]);
+            $this->revisionTracker->markApplied($site->fresh(), $this->contractBuilder->build($site->fresh())->revision(), 'runtime');
+
+            if (! $awaitingWebserverForVmDocker) {
+                return;
+            }
+        }
+
+        // Headless sites (webserver=none, e.g. a worker host) run deployed code
+        // with no HTTP front — skip testing hostname, vhost config, and HTTP
+        // reachability. The site is "active" once the first deploy lands the
+        // code; it still uses the same deploy pipeline as any other site.
+        if ($site->isHeadless()) {
+            $this->appendLog($site, 'info', 'queued', 'Headless provisioning worker started — no web server to configure.', [
+                'server_id' => (string) $site->server_id,
+            ]);
+
+            $site->update(['status' => Site::activeStatusForWebserver('none')]);
+
+            $this->updateProvisioning($site, [
+                'state' => 'ready',
+                'webserver' => 'none',
+                'started_at' => now()->toIso8601String(),
+                'configured_at' => now()->toIso8601String(),
+                'checked_at' => now()->toIso8601String(),
+                'host_checks' => [],
+                'error' => null,
+            ]);
+
+            $this->appendLog($site, 'info', 'ready', 'Headless site is ready. Run a deploy to install the code.');
             $this->revisionTracker->markApplied($site->fresh(), $this->contractBuilder->build($site->fresh())->revision(), 'runtime');
 
             return;
@@ -181,7 +211,7 @@ class SiteProvisioner
             'webserver' => $site->webserver(),
         ]);
 
-        $this->provisionerRegistry->for($site->webserver())->provision($site);
+        $this->webserverConfigApplier->apply($site);
 
         $site->refresh();
 
@@ -305,16 +335,21 @@ class SiteProvisioner
             ]);
 
             $previewHostname = $site->primaryPreviewDomain()?->hostname;
-            if ($previewHostname !== null && $previewHostname !== '') {
-                $certificate = $this->certificateRequestService->queuePrimaryPreviewAutoSsl($site->fresh(['previewDomains']));
-                if ($certificate) {
-                    $this->appendLog($site, 'info', 'ready', 'Queued automatic preview SSL after reachability succeeded.', [
+            if ($this->previewHostnameReachableForAutoSsl($site, $result)) {
+                $this->queueAutomaticPreviewSsl(
+                    $site,
+                    'ready',
+                    'Queued automatic preview SSL after preview hostname became reachable.',
+                    [
                         'hostname' => $previewHostname,
                         'matched_hostname' => $result['hostname'],
-                        'certificate_id' => $certificate->id,
-                    ]);
-                    ExecuteSiteCertificateJob::dispatch($certificate->id);
-                }
+                    ],
+                );
+            } elseif ($previewHostname !== null && $previewHostname !== '') {
+                $this->appendLog($site, 'info', 'ready', 'Site is reachable but the preview hostname is not ready for automatic SSL yet.', [
+                    'preview_hostname' => $previewHostname,
+                    'matched_hostname' => $result['hostname'],
+                ]);
             }
 
             return $result;
@@ -342,6 +377,14 @@ class SiteProvisioner
 
     public function markQueued(Site $site): void
     {
+        // First-ever provision (no prior state): freeze a domain-based vhost
+        // basename so the on-disk config is easy to find by hostname. Skipped on
+        // re-provision — a site provisioned before this existed keeps its legacy
+        // `dply-<id>-<slug>` filename rather than orphaning it for a renamed one.
+        if ($site->provisioningState() === null) {
+            $site->assignWebserverConfigBasename();
+        }
+
         $this->appendLog($site, 'info', 'queued', 'Provisioning job queued.');
 
         $this->updateProvisioning($site, [
@@ -452,6 +495,60 @@ class SiteProvisioner
                 return false;
             })
             ->all();
+    }
+
+    /**
+     * @param  array{ok: bool, hostname: ?string, url: ?string, error: ?string, checked_at: string, checks?: list<array{hostname: string, url: string, ok: bool, error: ?string}>}  $reachability
+     */
+    private function previewHostnameReachableForAutoSsl(Site $site, array $reachability): bool
+    {
+        $previewDomain = $site->primaryPreviewDomain();
+        if ($previewDomain === null || ! $previewDomain->auto_ssl) {
+            return false;
+        }
+
+        $previewHostname = trim((string) $previewDomain->hostname);
+        if ($previewHostname === '') {
+            return false;
+        }
+
+        if (($reachability['hostname'] ?? null) === $previewHostname) {
+            return true;
+        }
+
+        foreach ($reachability['checks'] ?? [] as $check) {
+            if (($check['hostname'] ?? null) === $previewHostname && ($check['ok'] ?? false)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    private function queueAutomaticPreviewSsl(Site $site, string $step, string $message, array $context = []): void
+    {
+        $previewDomain = $site->fresh(['previewDomains'])->primaryPreviewDomain();
+        if ($previewDomain === null || ! $previewDomain->auto_ssl || $previewDomain->hostname === '') {
+            return;
+        }
+
+        $certificate = $this->certificateRequestService->queuePrimaryPreviewAutoSsl($site->fresh(['previewDomains']));
+        if ($certificate === null) {
+            return;
+        }
+
+        if ($site->ssl_status === Site::SSL_NONE) {
+            $site->update(['ssl_status' => Site::SSL_PENDING]);
+        }
+
+        $this->appendLog($site, 'info', $step, $message, array_merge($context, [
+            'hostname' => $previewDomain->hostname,
+            'certificate_id' => $certificate->id,
+        ]));
+        ExecuteSiteCertificateJob::dispatch($certificate->id);
     }
 
     private function runPreflight(Site $site): void

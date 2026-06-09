@@ -5,12 +5,37 @@
     $engineLabel = $engineLabels[$engine] ?? ucfirst($engine);
     $selectedExtraDb = $databases->firstWhere('id', $extra_db_id ?? null);
 @endphp
-<div class="{{ $card ?? 'dply-card overflow-hidden' }} p-6 sm:p-8">
-    <h2 class="text-lg font-semibold text-brand-ink">{{ __(':engine database users', ['engine' => $engineLabel]) }}</h2>
-    <p class="mt-2 text-sm text-brand-moss leading-relaxed">{{ __('Each tracked database has a primary user created alongside it. Use the Actions menu on the database to copy connection details.') }}</p>
-
+<div class="{{ $card ?? 'dply-card overflow-hidden' }} overflow-hidden">
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <x-icon-badge>
+            <x-heroicon-o-users class="h-5 w-5" aria-hidden="true" />
+        </x-icon-badge>
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Users') }}</p>
+            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine database users', ['engine' => $engineLabel]) }}</h2>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Each tracked database has a primary user created alongside it. Use the Actions menu on the database to copy connection details.') }}</p>
+        </div>
+    </div>
+    <div class="px-6 py-6 sm:px-7">
     @if ($databases->isEmpty())
-        <p class="mt-6 text-sm text-brand-moss">{{ __('No :engine database users yet. Add a database to provision a user on the server.', ['engine' => $engineLabel]) }}</p>
+        <x-empty-state
+            borderless
+            icon="heroicon-o-users"
+            tone="sage"
+            :title="__('No :engine database users yet', ['engine' => $engineLabel])"
+            :description="__('Add a database on Basics to provision a primary user on the server. Extra users can be added here afterward.')"
+        >
+            <x-slot:actions>
+                <button
+                    type="button"
+                    wire:click="setWorkspaceTab('databases')"
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-forest/90"
+                >
+                    <x-heroicon-o-plus class="h-4 w-4" aria-hidden="true" />
+                    {{ __('Go to Basics') }}
+                </button>
+            </x-slot:actions>
+        </x-empty-state>
     @else
         <div class="mt-6 overflow-x-auto rounded-xl border border-brand-ink/10">
             <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
@@ -65,8 +90,12 @@
                     <x-input-error :messages="$errors->get('extra_username')" class="mt-1" />
                 </div>
                 <div>
-                    <x-input-label for="extra_password" value="{{ __('Password') }}" />
-                    <x-text-input id="extra_password" type="password" wire:model="extra_password" wire:loading.attr="disabled" wire:target="addExtraMysqlUser" class="mt-1 block w-full text-sm" />
+                    <x-password-field
+                        id="extra_password"
+                        :label="__('Password')"
+                        wire:model="extra_password"
+                        wire:target="addExtraMysqlUser"
+                    />
                     <x-input-error :messages="$errors->get('extra_password')" class="mt-1" />
                 </div>
                 @if ($engine !== 'postgres')
@@ -103,4 +132,5 @@
             @endforeach
         </div>
     @endif
+    </div>
 </div>

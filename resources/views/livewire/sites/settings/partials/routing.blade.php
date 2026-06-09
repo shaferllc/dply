@@ -22,19 +22,20 @@
 {{-- Top intro card + standalone tab strip, mirroring the SSH keys workspace:
      a dply-card heading with icon pill, then the shared underlined tablist
      between the intro and the per-tab content cards. --}}
-<section class="{{ $card }} p-6 sm:p-8">
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+<section class="{{ $card }}">
+    <div class="flex flex-col gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
         <div class="flex min-w-0 items-start gap-3">
-            <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                <x-heroicon-o-share class="h-5 w-5" />
-            </span>
+            <x-icon-badge>
+                <x-heroicon-o-share class="h-5 w-5" aria-hidden="true" />
+            </x-icon-badge>
             <div class="min-w-0">
-                <h2 class="text-lg font-semibold text-brand-ink">{{ $site->usesDockerRuntime() ? __('Networking') : __('Routing') }}</h2>
-                <p class="mt-1 text-sm leading-relaxed text-brand-moss">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ $site->usesDockerRuntime() ? __('Networking') : __('Routing') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $site->usesDockerRuntime() ? __('Inbound + outbound traffic') : __('Domains, DNS, aliases & redirects') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                     @if ($site->usesDockerRuntime())
                         {{ __('Manage published hostnames, custom domains, redirects, and preview endpoints from one networking workspace.') }}
                     @else
-                        {{ __('Manage customer domains, aliases, redirects, preview hostnames, and tenant publishing from one routing workspace while keeping certificates separate.') }}
+                        {{ __('Manage customer domains, DNS automation, aliases, redirects, preview hostnames, and tenant publishing from one routing workspace while keeping certificates separate.') }}
                     @endif
                 </p>
                 <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
@@ -48,20 +49,16 @@
     </div>
 </section>
 
-<x-server-workspace-tablist :aria-label="__('Routing sections')" class="mt-6 !mb-0">
+<x-server-workspace-tablist :aria-label="__('Routing sections')" class="mt-6">
     @foreach ($routingTabs as $tab)
         <x-server-workspace-tab
             as="a"
             id="routing-tab-{{ $tab }}"
             :active="$routingTab === $tab"
+            :icon="$routingTabIcons[$tab] ?? 'heroicon-o-share'"
             href="{{ route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'routing', 'tab' => $tab]) }}"
             wire:navigate
-        >
-            <span class="inline-flex items-center gap-1.5">
-                <x-dynamic-component :component="$routingTabIcons[$tab] ?? 'heroicon-o-share'" class="h-4 w-4" aria-hidden="true" />
-                {{ \Illuminate\Support\Str::headline($tab) }}
-            </span>
-        </x-server-workspace-tab>
+        >{{ $routingTabLabels[$tab] ?? \Illuminate\Support\Str::headline($tab) }}@if (in_array($tab, ['aliases', 'redirects', 'preview', 'tenants'], true) && workspace_surface_coming_soon('site_'.$tab))<span class="ml-1.5 rounded-full bg-brand-sage/20 px-1.5 py-0.5 text-[9px] font-bold uppercase leading-none tracking-wide text-brand-forest">{{ __('Soon') }}</span>@endif</x-server-workspace-tab>
     @endforeach
 </x-server-workspace-tablist>
 
@@ -70,13 +67,14 @@
 
     {{-- Domains: slim header card with count pill + Add CTA --}}
     <div class="{{ $card }} mt-6">
-        <div class="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+        <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                    <x-heroicon-o-globe-alt class="h-5 w-5" />
-                </span>
+                <x-icon-badge>
+                    <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
                 <div class="min-w-0">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Domains') }}</h2>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Domains') }}</h2>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Customer-facing hostnames. Aliases, redirects, preview, and tenant domains live in their own tabs so routing intent stays explicit.') }}</p>
                     <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
                         <span class="inline-flex items-center gap-1">
@@ -88,7 +86,7 @@
             </div>
             <div class="flex shrink-0 flex-wrap items-center gap-2">
                 <button type="button" x-on:click="$dispatch('open-modal', 'add-domain-modal')" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90">
-                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                    <x-heroicon-o-plus class="h-4 w-4" />
                     {{ __('Add domain') }}
                 </button>
             </div>
@@ -195,7 +193,7 @@
                         @else
                             <div class="flex flex-wrap items-center justify-between gap-3">
                                 <div class="flex min-w-0 items-center gap-3">
-                                    <span class="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sand/30 text-brand-forest sm:inline-flex">
+                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/40 text-brand-forest ring-brand-ink/10">
                                         <x-heroicon-o-globe-alt class="h-4 w-4" />
                                     </span>
                                     <div class="min-w-0">
@@ -218,12 +216,12 @@
                                 <div class="flex flex-wrap items-center gap-2">
                                     @if (! $hasSsl)
                                         <button type="button" wire:click="openQuickDomainSslModal('{{ $domain->hostname }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                            <x-heroicon-o-lock-closed class="h-3.5 w-3.5" />
+                                            <x-heroicon-o-lock-closed class="h-4 w-4" />
                                             {{ __('Add SSL') }}
                                         </button>
                                     @endif
                                     <button type="button" wire:click="editDomain('{{ $domain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-pencil-square class="h-4 w-4" />
                                         {{ __('Edit') }}
                                     </button>
                                     @if (! $domain->is_primary)
@@ -241,23 +239,47 @@
     </div>
 
     <x-cli-snippet class="mt-6" :commands="[
-        ['label' => __('Add'), 'command' => 'dply:site:domain-add '.$site->slug.' new.example.com --primary'],
-        ['label' => __('Remove'), 'command' => 'dply:site:domain-remove '.$site->slug.' old.example.com'],
-        ['label' => __('Print primary URL'), 'command' => 'dply:site:url '.$site->slug],
-        ['label' => __('Find by hostname'), 'command' => 'dply:fleet:domain-find example.com'],
+        ['label' => __('Add'), 'command' => 'dply sites:domains:add '.$site->slug.' new.example.com --primary'],
+        ['label' => __('Remove'), 'command' => 'dply sites:domains:remove '.$site->slug.' old.example.com'],
+        ['label' => __('Print primary URL'), 'command' => 'dply sites:url '.$site->slug],
+        ['label' => __('Find by hostname'), 'command' => 'dply fleet:domains:find example.com'],
     ]" />
 
+@elseif ($routingTab === 'dns')
+    @include('livewire.sites.settings.partials.routing._tab-dns')
+
+@elseif ($routingTab === 'aliases' && workspace_surface_coming_soon('site_aliases'))
+    <x-workspace-coming-soon
+        :server="$site->server"
+        icon="heroicon-o-link"
+        :title="__('Aliases')"
+        :description="__('Point extra hostnames at this site without duplicating any config — every alias serves the same app and shares its certificate.')"
+        :eyebrow="__('Aliases preview')"
+        :lines="[
+            ['tone' => 'cmd', 'text' => '~ $ dply aliases'],
+            ['tone' => 'muted', 'text' => 'www.example.com   → example.com'],
+            ['tone' => 'muted', 'text' => 'example.net       → example.com'],
+            ['tone' => 'ok', 'text' => '2 aliases · shared cert'],
+        ]"
+        :features="[
+            ['icon' => 'link', 'title' => __('Many hosts, one app'), 'body' => __('Add as many hostnames as you need — they all serve this exact site.')],
+            ['icon' => 'shield-check', 'title' => __('Shared certificate'), 'body' => __('Aliases ride the same TLS cert, no extra issuance to manage.')],
+            ['icon' => 'bolt', 'title' => __('Instant apply'), 'body' => __('Adding an alias rewrites the live webserver config automatically.')],
+            ['icon' => 'arrows-right-left', 'title' => __('www & apex'), 'body' => __('Cover the bare domain and its www twin in one move.')],
+        ]"
+    />
 @elseif ($routingTab === 'aliases')
     @php $aliasCount = $site->domainAliases->count(); @endphp
 
     <div class="{{ $card }} mt-6">
-        <div class="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+        <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                    <x-heroicon-o-link class="h-5 w-5" />
-                </span>
+                <x-icon-badge>
+                    <x-heroicon-o-link class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
                 <div class="min-w-0">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Domain aliases') }}</h2>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Domain aliases') }}</h2>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Aliases extend the webserver server_name list. They are not redirects and not automatically primary customer domains.') }}</p>
                     <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
                         <span class="inline-flex items-center gap-1">
@@ -269,7 +291,7 @@
             </div>
             <div class="flex shrink-0 flex-wrap items-center gap-2">
                 <button type="button" x-on:click="$dispatch('open-modal', 'add-alias-modal')" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90">
-                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                    <x-heroicon-o-plus class="h-4 w-4" />
                     {{ __('Add alias') }}
                 </button>
             </div>
@@ -287,6 +309,19 @@
         </div>
 
         <div class="px-6 py-6">
+            <div class="mb-5 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3 text-sm leading-6 text-brand-moss">
+                <p class="font-medium text-brand-ink">{{ __('What an alias does') }}</p>
+                <p class="mt-1">{{ __('An alias makes this site also answer on another hostname, serving the exact same content as your primary domain — dply adds it to the webserver’s server_name list. It does not redirect, and it does not become the primary customer domain.') }}</p>
+                <ul class="mt-2 list-disc space-y-1 pl-5">
+                    <li>{{ __('Point the hostname’s DNS at this server first (A or CNAME), same as any domain.') }}</li>
+                    <li>{{ __('Want www → apex (or any forwarding)? Use the Redirects tab instead — an alias serves content, it doesn’t forward.') }}</li>
+                </ul>
+                <p class="mt-3 font-medium text-brand-ink">{{ __('Examples') }}</p>
+                <ul class="mt-1 space-y-1">
+                    <li><code class="font-mono text-xs text-brand-ink">www.example.com</code> — {{ __('serve the site on www as well as the apex') }}</li>
+                    <li><code class="font-mono text-xs text-brand-ink">example.net</code> — {{ __('an alternate TLD showing the same site') }}</li>
+                </ul>
+            </div>
             <form wire:submit="addAlias" id="add-alias-form" class="space-y-4">
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
@@ -318,7 +353,7 @@
                     <div>
                         <x-input-label for="bulk_alias_input" :value="__('One per line: hostname or hostname,label')" />
                         <textarea id="bulk_alias_input" wire:model="bulk_alias_input" rows="6" class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-xs shadow-sm focus:border-brand-sage focus:ring-brand-sage/30" placeholder="alt.example.com&#10;marketing.example.com,Marketing site"></textarea>
-                        <p class="mt-1 text-xs text-brand-moss">{{ __('Existing hostnames are silently skipped.') }}</p>
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('Format: hostname or hostname,label — e.g. www.example.com or example.net,Alt TLD. Existing hostnames are silently skipped.') }}</p>
                         <x-input-error :messages="$errors->get('bulk_alias_input')" class="mt-1" />
                     </div>
                     <div class="flex justify-end">
@@ -384,7 +419,7 @@
                         @else
                             <div class="flex flex-wrap items-center justify-between gap-3">
                                 <div class="flex min-w-0 items-center gap-3">
-                                    <span class="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sand/30 text-brand-forest sm:inline-flex">
+                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/40 text-brand-forest ring-brand-ink/10">
                                         <x-heroicon-o-link class="h-4 w-4" />
                                     </span>
                                     <div class="min-w-0">
@@ -407,12 +442,12 @@
                                 <div class="flex flex-wrap items-center gap-2">
                                     @if (! $hasSsl)
                                         <button type="button" wire:click="openQuickDomainSslModal('{{ $alias->hostname }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                            <x-heroicon-o-lock-closed class="h-3.5 w-3.5" />
+                                            <x-heroicon-o-lock-closed class="h-4 w-4" />
                                             {{ __('Add SSL') }}
                                         </button>
                                     @endif
                                     <button type="button" wire:click="editAlias('{{ $alias->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-pencil-square class="h-4 w-4" />
                                         {{ __('Edit') }}
                                     </button>
                                     <button type="button" wire:click="confirmRemoveAlias('{{ $alias->id }}')" class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-brand-mist hover:border-red-200 hover:bg-red-50 hover:text-red-700" title="{{ __('Remove') }}" aria-label="{{ __('Remove') }}">
@@ -428,22 +463,43 @@
     </div>
 
     <x-cli-snippet class="mt-6" :commands="[
-        ['label' => __('Add'), 'command' => 'dply:site:alias-add '.$site->slug.' alt.example.com --label=Marketing'],
-        ['label' => __('Remove'), 'command' => 'dply:site:alias-remove '.$site->slug.' alt.example.com'],
-        ['label' => __('List'), 'command' => 'dply:site:alias-list '.$site->slug],
+        ['label' => __('Add'), 'command' => 'dply sites:aliases:add '.$site->slug.' alt.example.com --label=Marketing'],
+        ['label' => __('Remove'), 'command' => 'dply sites:aliases:remove '.$site->slug.' alt.example.com'],
+        ['label' => __('List'), 'command' => 'dply sites:aliases:list '.$site->slug],
     ]" />
 
+@elseif ($routingTab === 'redirects' && workspace_surface_coming_soon('site_redirects'))
+    <x-workspace-coming-soon
+        :server="$site->server"
+        icon="heroicon-o-arrow-uturn-right"
+        :title="__('Redirects')"
+        :description="__('Send old URLs, www/apex, or whole paths to their new home with managed 301/302 rules — applied to the live webserver config for you.')"
+        :eyebrow="__('Redirects preview')"
+        :lines="[
+            ['tone' => 'cmd', 'text' => '~ $ dply redirects'],
+            ['tone' => 'muted', 'text' => '301  /old-blog/*  → /blog/\$1'],
+            ['tone' => 'muted', 'text' => '301  www         → apex'],
+            ['tone' => 'ok', 'text' => '2 rules · live'],
+        ]"
+        :features="[
+            ['icon' => 'arrow-uturn-right', 'title' => __('301 & 302'), 'body' => __('Permanent or temporary redirects, your call per rule.')],
+            ['icon' => 'map', 'title' => __('Path & host'), 'body' => __('Match on hostname, path prefix, or an exact URL — with captures.')],
+            ['icon' => 'arrows-right-left', 'title' => __('www ↔ apex'), 'body' => __('Canonicalize to bare or www with a single toggle.')],
+            ['icon' => 'bolt', 'title' => __('Auto-applied'), 'body' => __('Rules land in the active webserver config the moment you save.')],
+        ]"
+    />
 @elseif ($routingTab === 'redirects')
     @php $redirectCount = $site->redirects->count(); @endphp
 
     <div class="{{ $card }} mt-6">
-        <div class="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+        <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                    <x-heroicon-o-arrow-uturn-right class="h-5 w-5" />
-                </span>
+                <x-icon-badge>
+                    <x-heroicon-o-arrow-uturn-right class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
                 <div class="min-w-0">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Redirects') }}</h2>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Redirects') }}</h2>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('HTTP 3xx redirects (browser-visible) and internal rewrites (transparent path remap). Bulk-paste accepts CSV-style rows for the HTTP variant.') }}</p>
                     <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
                         <span class="inline-flex items-center gap-1">
@@ -455,7 +511,7 @@
             </div>
             <div class="flex shrink-0 flex-wrap items-center gap-2">
                 <button type="button" x-on:click="$dispatch('open-modal', 'add-redirect-modal')" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90">
-                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                    <x-heroicon-o-plus class="h-4 w-4" />
                     {{ __('Add redirect') }}
                 </button>
             </div>
@@ -671,7 +727,7 @@
                         @else
                             <div class="flex flex-wrap items-start justify-between gap-3">
                                 <div class="flex min-w-0 items-start gap-3">
-                                    <span class="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sand/30 text-brand-forest sm:inline-flex">
+                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/40 text-brand-forest ring-brand-ink/10">
                                         <x-heroicon-o-arrow-uturn-right class="h-4 w-4" />
                                     </span>
                                     <div class="min-w-0">
@@ -695,7 +751,7 @@
                                 </div>
                                 <div class="flex flex-wrap items-center gap-2">
                                     <button type="button" wire:click="editRedirect('{{ $redirect->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-pencil-square class="h-4 w-4" />
                                         {{ __('Edit') }}
                                     </button>
                                     <button type="button" wire:click="confirmRemoveRedirect({{ $redirect->id }})" class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-brand-mist hover:border-red-200 hover:bg-red-50 hover:text-red-700" title="{{ __('Remove') }}" aria-label="{{ __('Remove') }}">
@@ -711,24 +767,45 @@
     </div>
 
     <x-cli-snippet class="mt-6" :commands="[
-        ['label' => __('Add'), 'command' => 'dply:site:redirect-add '.$site->slug.' /old /new --code=301'],
-        ['label' => __('Remove'), 'command' => 'dply:site:redirect-remove '.$site->slug.' /old'],
-        ['label' => __('List'), 'command' => 'dply:site:redirect-list '.$site->slug],
-        ['label' => __('Bulk import'), 'command' => 'dply:site:redirect-import '.$site->slug.' --file=redirects.csv'],
-        ['label' => __('Export CSV'), 'command' => 'dply:site:redirect-export '.$site->slug.' --to=redirects.csv'],
+        ['label' => __('Add'), 'command' => 'dply sites:redirects:add '.$site->slug.' /old /new --code=301'],
+        ['label' => __('Remove'), 'command' => 'dply sites:redirects:remove '.$site->slug.' /old'],
+        ['label' => __('List'), 'command' => 'dply sites:redirects:list '.$site->slug],
+        ['label' => __('Bulk import'), 'command' => 'dply sites:redirects:import '.$site->slug.' --file=redirects.csv'],
+        ['label' => __('Export CSV'), 'command' => 'dply sites:redirects:export '.$site->slug.' --to=redirects.csv'],
     ]" />
 
+@elseif ($routingTab === 'preview' && workspace_surface_coming_soon('site_preview'))
+    <x-workspace-coming-soon
+        :server="$site->server"
+        icon="heroicon-o-sparkles"
+        :title="__('Preview hostnames')"
+        :description="__('Hand out a shareable, auto-SSL preview URL for this site before you point real DNS — perfect for stakeholder review and staging links.')"
+        :eyebrow="__('Preview hostname preview')"
+        :lines="[
+            ['tone' => 'cmd', 'text' => '~ $ dply preview set'],
+            ['tone' => 'muted', 'text' => 'preview-7f3a.on-dply.cc → this site'],
+            ['tone' => 'muted', 'text' => 'tls: issued · auto-renew'],
+            ['tone' => 'ok', 'text' => 'shareable · live in seconds'],
+        ]"
+        :features="[
+            ['icon' => 'sparkles', 'title' => __('Shareable URL'), 'body' => __('A clean managed hostname you can send before real DNS is cut over.')],
+            ['icon' => 'lock-closed', 'title' => __('Automatic SSL'), 'body' => __('TLS is issued and renewed for the preview host with no setup.')],
+            ['icon' => 'globe-alt', 'title' => __('Managed DNS'), 'body' => __('The record is created and pointed at your server automatically.')],
+            ['icon' => 'arrow-path', 'title' => __('Throwaway'), 'body' => __('Spin one up for review, then retire it when you go live.')],
+        ]"
+    />
 @elseif ($routingTab === 'preview')
     @php $previewCount = $site->previewDomains->count(); @endphp
 
     <div class="{{ $card }} mt-6">
-        <div class="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+        <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                    <x-heroicon-o-eye class="h-5 w-5" />
-                </span>
+                <x-icon-badge>
+                    <x-heroicon-o-eye class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
                 <div class="min-w-0">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Preview domains') }}</h2>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Previews') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Preview domains') }}</h2>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Keep preview hostnames separate so reachability, auto-SSL, and cleanup stay scoped to testing traffic.') }}</p>
                     <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
                         <span class="inline-flex items-center gap-1">
@@ -746,7 +823,12 @@
             <div class="grid gap-4 sm:grid-cols-2">
                 <div>
                     <x-input-label for="preview_primary_hostname" :value="__('Primary preview hostname')" />
-                    <x-text-input id="preview_primary_hostname" wire:model="preview_primary_hostname" class="mt-1 block w-full font-mono text-sm" placeholder="preview.example.dply.cc" />
+                    @if ($this->previewHostnameLocked())
+                        <x-text-input id="preview_primary_hostname" :value="$preview_primary_hostname" readonly class="mt-1 block w-full cursor-not-allowed bg-brand-sand/20 font-mono text-sm text-brand-moss" />
+                        <p class="mt-1 text-[11px] text-brand-moss">{{ __('Auto-provisioned managed hostname — DNS and the certificate are tied to this exact name, so it can’t be renamed here.') }}</p>
+                    @else
+                        <x-text-input id="preview_primary_hostname" wire:model="preview_primary_hostname" class="mt-1 block w-full font-mono text-sm" placeholder="preview.example.dply.cc" />
+                    @endif
                     <x-input-error :messages="$errors->get('preview_primary_hostname')" class="mt-1" />
                 </div>
                 <div>
@@ -796,21 +878,42 @@
     </div>
 
     <x-cli-snippet class="mt-6" :commands="[
-        ['label' => __('Set preview'), 'command' => 'dply:site:preview-set '.$site->slug.' preview.example.dply.cc --label=Preview --auto-ssl'],
-        ['label' => __('Remove preview'), 'command' => 'dply:site:preview-remove '.$site->slug.' preview.example.dply.cc'],
+        ['label' => __('Set preview'), 'command' => 'dply sites:preview:set '.$site->slug.' preview.example.dply.cc --label=Preview --auto-ssl'],
+        ['label' => __('Remove preview'), 'command' => 'dply sites:preview:remove '.$site->slug.' preview.example.dply.cc'],
     ]" />
 
+@elseif ($routingTab === 'tenants' && workspace_surface_coming_soon('site_tenants'))
+    <x-workspace-coming-soon
+        :server="$site->server"
+        icon="heroicon-o-building-office-2"
+        :title="__('Tenants')"
+        :description="__('Serve many customers from one codebase — map each tenant to its own hostname with isolated routing and a managed preview URL apiece.')"
+        :eyebrow="__('Tenants preview')"
+        :lines="[
+            ['tone' => 'cmd', 'text' => '~ $ dply tenants'],
+            ['tone' => 'muted', 'text' => 'acme   → acme.app.com    ready'],
+            ['tone' => 'muted', 'text' => 'globex → globex.app.com  ready'],
+            ['tone' => 'ok', 'text' => '2 tenants · isolated routing'],
+        ]"
+        :features="[
+            ['icon' => 'building-office-2', 'title' => __('Per-tenant hosts'), 'body' => __('Each customer gets their own hostname pointed at the shared app.')],
+            ['icon' => 'lock-closed', 'title' => __('Isolated routing'), 'body' => __('Tenant hostnames route independently with their own TLS.')],
+            ['icon' => 'sparkles', 'title' => __('Preview per tenant'), 'body' => __('Hand each tenant a managed preview URL before their DNS is live.')],
+            ['icon' => 'square-3-stack-3d', 'title' => __('Bulk publish'), 'body' => __('Add, publish, and retire tenants without touching server config.')],
+        ]"
+    />
 @elseif ($routingTab === 'tenants')
     @php $tenantCount = $site->tenantDomains->count(); @endphp
 
     <div class="{{ $card }} mt-6">
-        <div class="flex flex-col gap-4 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">
+        <div class="flex flex-col gap-4 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
             <div class="flex min-w-0 items-start gap-3">
-                <span class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-forest ring-1 ring-brand-ink/10 sm:inline-flex">
-                    <x-heroicon-o-building-office-2 class="h-5 w-5" />
-                </span>
+                <x-icon-badge>
+                    <x-heroicon-o-building-office-2 class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
                 <div class="min-w-0">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Tenant domains') }}</h2>
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Tenants') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Tenant domains') }}</h2>
                     <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Multi-tenant hostnames published at the webserver. Your application is responsible for resolving the tenant from the hostname or tenant key.') }}</p>
                     <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-brand-mist">
                         <span class="inline-flex items-center gap-1">
@@ -822,7 +925,7 @@
             </div>
             <div class="flex shrink-0 flex-wrap items-center gap-2">
                 <button type="button" x-on:click="$dispatch('open-modal', 'add-tenant-modal')" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm shadow-brand-forest/20 transition-colors hover:bg-brand-forest/90">
-                    <x-heroicon-o-plus class="h-3.5 w-3.5" />
+                    <x-heroicon-o-plus class="h-4 w-4" />
                     {{ __('Add tenant') }}
                 </button>
             </div>
@@ -840,6 +943,20 @@
         </div>
 
         <div class="px-6 py-6">
+            <div class="mb-5 rounded-xl border border-brand-ink/10 bg-brand-sand/15 px-4 py-3 text-sm leading-6 text-brand-moss">
+                <p class="font-medium text-brand-ink">{{ __('What a tenant domain does') }}</p>
+                <p class="mt-1">{{ __('Map many customer hostnames to this one app so a single deployment serves all of them (multi-tenant SaaS). dply adds each hostname to the webserver’s server_name so the site answers for it; your app then decides which tenant a request belongs to — usually from the incoming Host header.') }}</p>
+                <ul class="mt-2 list-disc space-y-1 pl-5">
+                    <li>{{ __('Hostname — the customer’s domain, pointed at this server by DNS (e.g. app.acme.com).') }}</li>
+                    <li>{{ __('Tenant key & Label — your own reference labels. dply stores them but does not inject them into requests, so resolve the tenant from the Host header in your app code.') }}</li>
+                    <li>{{ __('After adding a tenant, use “Create testing URL” on its row to get a managed *.on-dply.cc hostname pointed at this app — preview it as that tenant before the customer’s real DNS is live.') }}</li>
+                </ul>
+                <p class="mt-3 font-medium text-brand-ink">{{ __('Examples') }}</p>
+                <ul class="mt-1 space-y-1">
+                    <li><code class="font-mono text-xs text-brand-ink">app.acme.com</code> — {{ __('key “acme”, label “Acme Corp”') }}</li>
+                    <li><code class="font-mono text-xs text-brand-ink">portal.beta.io</code> — {{ __('key “beta” (label optional)') }}</li>
+                </ul>
+            </div>
             <form wire:submit="addTenantDomain" id="add-tenant-form" class="space-y-4">
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
@@ -876,7 +993,7 @@
                     <div>
                         <x-input-label for="bulk_tenant_input" :value="__('One per line: hostname,key,label')" />
                         <textarea id="bulk_tenant_input" wire:model="bulk_tenant_input" rows="6" class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-xs shadow-sm focus:border-brand-sage focus:ring-brand-sage/30" placeholder="acme.example.com,acme,Acme Corp&#10;beta.example.com,beta"></textarea>
-                        <p class="mt-1 text-xs text-brand-moss">{{ __('Existing hostnames are silently skipped. Key and label are optional.') }}</p>
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('Format: hostname,key,label — key & label optional. e.g. app.acme.com,acme,Acme Corp. Lines starting with # are ignored; hostnames already in use are skipped.') }}</p>
                         <x-input-error :messages="$errors->get('bulk_tenant_input')" class="mt-1" />
                     </div>
                     <div class="flex justify-end">
@@ -943,7 +1060,7 @@
                         @else
                             <div class="flex flex-wrap items-start justify-between gap-3">
                                 <div class="flex min-w-0 items-start gap-3">
-                                    <span class="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-sand/30 text-brand-forest sm:inline-flex">
+                                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/40 text-brand-forest ring-brand-ink/10">
                                         <x-heroicon-o-building-office-2 class="h-4 w-4" />
                                     </span>
                                     <div class="min-w-0">
@@ -959,11 +1076,35 @@
                                         @if ($tenantDomain->comment)
                                             <p class="mt-1 whitespace-pre-line text-[11px] italic text-brand-mist"># {{ $tenantDomain->comment }}</p>
                                         @endif
+                                        @if ($tenantDomain->testingHostname())
+                                            @php $tenantTestStatus = $tenantDomain->testingDnsStatus() ?? 'pending'; @endphp
+                                            <p class="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-brand-moss">
+                                                <x-heroicon-o-beaker class="h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
+                                                <a href="https://{{ $tenantDomain->testingHostname() }}" target="_blank" rel="noopener" class="font-mono text-brand-ink hover:underline">{{ $tenantDomain->testingHostname() }}</a>
+                                                <span @class([
+                                                    'rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em]',
+                                                    'bg-emerald-100 text-emerald-900' => $tenantTestStatus === 'ready',
+                                                    'bg-rose-100 text-rose-900' => $tenantTestStatus === 'failed',
+                                                    'bg-amber-100 text-amber-900' => ! in_array($tenantTestStatus, ['ready', 'failed'], true),
+                                                ])>{{ __('testing DNS: :s', ['s' => $tenantTestStatus]) }}</span>
+                                            </p>
+                                        @endif
                                     </div>
                                 </div>
                                 <div class="flex flex-wrap items-center gap-2">
+                                    @if ($tenantDomain->testingHostname())
+                                        <button type="button" wire:click="removeTenantTestingHostname('{{ $tenantDomain->id }}')" wire:loading.attr="disabled" wire:target="removeTenantTestingHostname('{{ $tenantDomain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-moss shadow-sm hover:bg-brand-sand/40" title="{{ __('Delete the managed testing hostname for this tenant') }}">
+                                            <x-heroicon-o-beaker class="h-4 w-4" />
+                                            {{ __('Remove testing URL') }}
+                                        </button>
+                                    @else
+                                        <button type="button" wire:click="provisionTenantTestingHostname('{{ $tenantDomain->id }}')" wire:loading.attr="disabled" wire:target="provisionTenantTestingHostname('{{ $tenantDomain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-forest/30 bg-brand-forest/5 px-2.5 py-1 text-[11px] font-semibold text-brand-forest shadow-sm hover:bg-brand-forest/10" title="{{ __('Provision a dply testing-domain hostname pointed at this app for this tenant') }}">
+                                            <x-heroicon-o-beaker class="h-4 w-4" />
+                                            {{ __('Create testing URL') }}
+                                        </button>
+                                    @endif
                                     <button type="button" wire:click="editTenantDomain('{{ $tenantDomain->id }}')" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
-                                        <x-heroicon-o-pencil-square class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-pencil-square class="h-4 w-4" />
                                         {{ __('Edit') }}
                                     </button>
                                     <button type="button" wire:click="confirmRemoveTenantDomain('{{ $tenantDomain->id }}')" class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-transparent text-brand-mist hover:border-red-200 hover:bg-red-50 hover:text-red-700" title="{{ __('Remove') }}" aria-label="{{ __('Remove') }}">
@@ -979,9 +1120,9 @@
     </div>
 
     <x-cli-snippet class="mt-6" :commands="[
-        ['label' => __('Add'), 'command' => 'dply:site:tenant-add '.$site->slug.' acme.example.com --key=acme --label=Acme'],
-        ['label' => __('Remove'), 'command' => 'dply:site:tenant-remove '.$site->slug.' acme.example.com'],
-        ['label' => __('List'), 'command' => 'dply:site:tenant-list '.$site->slug],
+        ['label' => __('Add'), 'command' => 'dply sites:tenants:add '.$site->slug.' acme.example.com --key=acme --label=Acme'],
+        ['label' => __('Remove'), 'command' => 'dply sites:tenants:remove '.$site->slug.' acme.example.com'],
+        ['label' => __('List'), 'command' => 'dply sites:tenants:list '.$site->slug],
     ]" />
 
 @endif
@@ -1045,7 +1186,7 @@
             @if (! empty($rename_plan['manual']))
                 <div class="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3">
                     <p class="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-900">
-                        <x-heroicon-m-information-circle class="h-3.5 w-3.5" />
+                        <x-heroicon-m-information-circle class="h-4 w-4" />
                         {{ __('Cannot be fixed from here') }}
                     </p>
                     <ul class="mt-2 space-y-1 text-sm text-amber-900">

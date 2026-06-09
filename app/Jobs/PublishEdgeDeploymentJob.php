@@ -1,0 +1,283 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Jobs;
+
+use App\Models\EdgeDeployment;
+use App\Models\Site;
+use App\Services\Edge\EdgeDeploymentPruner;
+use App\Services\Edge\EdgeGithubCheckRunService;
+use App\Services\Edge\EdgeGithubPullRequestCommenter;
+use App\Services\Edge\EdgeMiddlewareBundleUploader;
+use App\Services\Edge\EdgeRouter;
+use App\Services\Edge\EdgeSsrBundleUploader;
+use App\Services\Edge\EdgeTestingHostnameProvisioner;
+use App\Services\Edge\EnsureEdgeRepoDomains;
+use App\Services\Edge\OriginHealthcheckRunner;
+use App\Services\Notifications\NotificationPublisher;
+use App\Support\ProductLine\ProductLineKillSwitches;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\File;
+use Throwable;
+
+class PublishEdgeDeploymentJob implements ShouldQueue
+{
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
+
+    public int $tries = 3;
+
+    public function __construct(
+        public string $deploymentId,
+        public string $localArtifactDir,
+        /**
+         * Path to the JSON sidecar BuildEdgeSiteJob writes when the
+         * build is SSR-mode — contains the bundled worker.js module
+         * source. Null for static + hybrid deploys.
+         */
+        public ?string $ssrBundlePath = null,
+        /**
+         * Sidecar for an esbuild-bundled middleware module (P10a).
+         * Null when the repo has no middleware.{ts,js} or when the
+         * runtime is SSR (the SSR Worker handles middleware itself).
+         */
+        public ?string $middlewareBundlePath = null,
+    ) {}
+
+    public function handle(): void
+    {
+        $deployment = EdgeDeployment::query()->find($this->deploymentId);
+        if ($deployment === null) {
+            return;
+        }
+
+        $site = Site::query()->find($deployment->site_id);
+        if ($site === null) {
+            return;
+        }
+
+        if (ProductLineKillSwitches::blocksEdgeDelivery()) {
+            $this->markFailed($site, $deployment, 'Edge delivery is paused by platform administrators.');
+            $this->cleanupLocalArtifact();
+
+            return;
+        }
+
+        $backend = EdgeRouter::backendFor($site);
+        if ($backend === null) {
+            $this->markFailed($site, $deployment, 'No edge backend available.');
+
+            return;
+        }
+
+        $deployment->update(['status' => EdgeDeployment::STATUS_PUBLISHING]);
+
+        // Atomic gate for hybrid sites: confirm the origin answers before
+        // we flip KV to point at this deployment. Without this, an unhealthy
+        // origin would start receiving Worker-proxied traffic the moment KV
+        // propagates. Static sites bypass — there's nothing to healthcheck.
+        if (($site->edgeMeta()['runtime_mode'] ?? 'static') === 'hybrid') {
+            $health = app(OriginHealthcheckRunner::class)->run($site->fresh());
+            if (! $health['ok']) {
+                $this->markFailed($site, $deployment, $health['message']);
+                $this->cleanupLocalArtifact();
+
+                return;
+            }
+        }
+
+        try {
+            // SSR: ship the bundled worker.js into the dispatch
+            // namespace BEFORE we publish KV — that way the host map
+            // is never pointing at a script that hasn't landed yet.
+            // Script name gets persisted to deployment.meta.ssr so
+            // the publisher payload includes it on the very first
+            // host map write.
+            // Middleware: upload before the host map publish (same
+            // reasoning as SSR — never let KV point at a script that
+            // isn't live yet). No-op when no sidecar was produced.
+            app(EdgeMiddlewareBundleUploader::class)
+                ->uploadFromSidecar($deployment, $site, $this->middlewareBundlePath);
+            $deployment->refresh();
+
+            if (($site->edgeMeta()['runtime_mode'] ?? 'static') === 'ssr') {
+                app(EdgeSsrBundleUploader::class)
+                    ->uploadFromSidecar($deployment, $site, $this->ssrBundlePath);
+                $deployment->refresh();
+            }
+
+            $result = $backend->publishDeployment($deployment, $site, $this->localArtifactDir);
+
+            EdgeDeployment::query()
+                ->where('site_id', $site->id)
+                ->where('status', EdgeDeployment::STATUS_LIVE)
+                ->update(['status' => EdgeDeployment::STATUS_SUPERSEDED]);
+
+            $deployment->update([
+                'status' => EdgeDeployment::STATUS_LIVE,
+                'published_at' => now(),
+                'cf_kv_version' => $result['cf_kv_version'],
+            ]);
+
+            $meta = $site->edgeMeta();
+            $meta['live_url'] = $result['live_url'];
+            $meta['active_deployment_id'] = $deployment->id;
+            $hostname = parse_url((string) ($result['live_url'] ?? ''), PHP_URL_HOST);
+            if (is_string($hostname) && $hostname !== '') {
+                $routing = is_array($meta['routing'] ?? null) ? $meta['routing'] : [];
+                $routing['hostname'] = strtolower($hostname);
+                $meta['routing'] = $routing;
+            }
+            unset($meta['last_error'], $meta['last_error_at']);
+
+            $site->update([
+                'status' => Site::STATUS_EDGE_ACTIVE,
+                'edge_backend_id' => (string) ($site->edge_backend_id ?: $deployment->id),
+                'meta' => array_merge(is_array($site->meta) ? $site->meta : [], ['edge' => $meta]),
+            ]);
+
+            try {
+                app(EdgeTestingHostnameProvisioner::class)->provision($site->fresh());
+            } catch (Throwable) {
+                // DNS is best-effort — KV publish already succeeded.
+            }
+
+            try {
+                app(EdgeDeploymentPruner::class)->prune($site->fresh());
+            } catch (Throwable) {
+                // Pruning is best-effort — old artifacts will be retried next publish.
+            }
+
+            // Auto-attach any custom domains declared in dply.yaml's
+            // `domains:` block that aren't attached yet. Removing a
+            // domain from the file does NOT detach — detaches are
+            // explicit only (dashboard / API).
+            try {
+                app(EnsureEdgeRepoDomains::class)->ensure($site->fresh(), $deployment->fresh());
+            } catch (Throwable) {
+                // Best-effort; declared domains can be retried on next deploy.
+            }
+
+            // Mark the matching GitHub Check Run + update the PR
+            // comment with the live URL. Wrapped — GitHub flake must
+            // not fail a successful publish.
+            $liveUrl = is_string($result['live_url'] ?? null) ? (string) $result['live_url'] : null;
+            try {
+                app(EdgeGithubCheckRunService::class)->complete($site->fresh(), 'success', $liveUrl);
+            } catch (Throwable) {
+                // Check Run update is best-effort.
+            }
+            try {
+                app(EdgeGithubPullRequestCommenter::class)->upsert($site->fresh(), 'success', $liveUrl);
+            } catch (Throwable) {
+                // PR comment update is best-effort.
+            }
+
+            // P9b: edge.deploy.succeeded — fan out to subscribed
+            // notification channels (Slack / Discord / email / webhook).
+            // Best-effort; downstream channel failures are isolated by
+            // NotificationRoutingResolver, so we just need to avoid
+            // letting publisher exceptions kill an otherwise-good deploy.
+            try {
+                $commit = $deployment->git_commit
+                    ? substr((string) $deployment->git_commit, 0, 7)
+                    : null;
+                app(NotificationPublisher::class)->publish(
+                    eventKey: 'edge.deploy.succeeded',
+                    subject: $site->fresh(),
+                    title: $commit !== null
+                        ? "Edge deploy live: {$site->name} ({$commit})"
+                        : "Edge deploy live: {$site->name}",
+                    body: $liveUrl,
+                    url: $liveUrl,
+                    metadata: [
+                        'deployment_id' => (string) $deployment->id,
+                        'commit' => $deployment->git_commit,
+                        'branch' => $deployment->git_branch,
+                        'live_url' => $liveUrl,
+                        'duration_ms' => $deployment->published_at && $deployment->created_at
+                            ? max(0, $deployment->published_at->diffInMilliseconds($deployment->created_at))
+                            : null,
+                    ],
+                );
+            } catch (Throwable) {
+                // Notification publish is best-effort.
+            }
+        } catch (Throwable $e) {
+            $this->markFailed($site, $deployment, $e->getMessage());
+
+            throw $e;
+        } finally {
+            $this->cleanupLocalArtifact();
+        }
+    }
+
+    private function cleanupLocalArtifact(): void
+    {
+        if (is_dir($this->localArtifactDir) && str_contains($this->localArtifactDir, sys_get_temp_dir())) {
+            File::deleteDirectory(dirname($this->localArtifactDir));
+        }
+        if ($this->ssrBundlePath !== null && is_file($this->ssrBundlePath)) {
+            @unlink($this->ssrBundlePath);
+        }
+        if ($this->middlewareBundlePath !== null && is_file($this->middlewareBundlePath)) {
+            @unlink($this->middlewareBundlePath);
+        }
+    }
+
+    private function markFailed(Site $site, EdgeDeployment $deployment, string $message): void
+    {
+        $meta = $site->edgeMeta();
+        $meta['last_error'] = $message;
+        $meta['last_error_at'] = now()->toIso8601String();
+        $site->update([
+            'status' => Site::STATUS_EDGE_FAILED,
+            'meta' => array_merge(is_array($site->meta) ? $site->meta : [], ['edge' => $meta]),
+        ]);
+        $deployment->update([
+            'status' => EdgeDeployment::STATUS_FAILED,
+            'failed_at' => now(),
+            'failure_reason' => $message,
+        ]);
+
+        try {
+            app(EdgeGithubCheckRunService::class)->complete($site->fresh(), 'failure');
+        } catch (Throwable) {
+            // Check Run update is best-effort.
+        }
+        try {
+            app(EdgeGithubPullRequestCommenter::class)->upsert($site->fresh(), 'failure');
+        } catch (Throwable) {
+            // PR comment update is best-effort.
+        }
+
+        // P9b: edge.deploy.failed — fan out to subscribed channels.
+        // Body carries the failure reason so the operator sees
+        // *why* the deploy died in their Slack / inbox without
+        // having to open the dashboard.
+        try {
+            app(NotificationPublisher::class)->publish(
+                eventKey: 'edge.deploy.failed',
+                subject: $site->fresh(),
+                title: "Edge deploy failed: {$site->name}",
+                body: $message,
+                url: route('sites.show', ['server' => $site->server_id, 'site' => $site->id, 'section' => 'edge-deploys']),
+                metadata: [
+                    'deployment_id' => (string) $deployment->id,
+                    'commit' => $deployment->git_commit,
+                    'branch' => $deployment->git_branch,
+                    'failure_reason' => $message,
+                ],
+            );
+        } catch (Throwable) {
+            // Notification publish is best-effort.
+        }
+    }
+}

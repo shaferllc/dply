@@ -4,14 +4,19 @@ namespace App\Livewire\Sites;
 
 use App\Jobs\RunSiteUptimeMonitorCheckJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\DismissesConsoleActionRun;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Sites\Concerns\ManagesUptimeNotifications;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteUptimeMonitor;
 use App\Services\Serverless\FunctionStatsRangeQuery;
 use App\Services\Sites\SiteUptimeCheckUrlResolver;
+use App\Services\Sites\SiteUptimeHistorySummary;
 use App\Services\Sites\UptimeProbeRegionResolver;
+use App\Services\Sites\UptimeProbeWorkerResolver;
+use App\Services\Status\MonitorOperationalState;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
@@ -25,23 +30,55 @@ use Livewire\Component;
 class Monitor extends Component
 {
     use ConfirmsActionWithModal;
+    use CreatesNotificationChannelInline;
     use DismissesConsoleActionRun;
     use DispatchesToastNotifications;
+    use ManagesUptimeNotifications;
 
     protected function consoleActionSubject(): Model
     {
         return $this->site;
     }
 
+    /** @var list<string> */
+    public const MONITOR_TABS = ['monitors', 'alerts'];
+
     public Server $server;
 
     public Site $site;
 
+    /** Active workspace tab: monitors | alerts. */
+    #[Url(as: 'tab', except: 'monitors')]
+    public string $monitorTab = 'monitors';
+
+    /** Monitor being edited in the modal; null while adding a new one. */
+    public ?string $editingMonitorId = null;
+
     public string $newLabel = '';
+
+    public string $newCheckType = SiteUptimeMonitor::CHECK_HTTP;
 
     public string $newPath = '';
 
     public string $newProbeRegion = 'eu-amsterdam';
+
+    /** Selected probe worker key for a new monitor; null when none configured. */
+    public ?string $newProbeWorker = null;
+
+    // HTTP assertion config (empty = off).
+    public string $newKeyword = '';
+
+    public string $newMatchMode = SiteUptimeMonitor::MATCH_CONTAIN;
+
+    public string $newExpectedStatus = '';
+
+    public string $newResponseThresholdMs = '';
+
+    // SSL config (empty = use the site_uptime default warn window).
+    public string $newSslWarnDays = '';
+
+    /** Per-monitor inline history detail toggled open by the user. */
+    public ?string $expandedMonitorId = null;
 
     /** Function-activity chart window: 1h | 24h | 7d (serverless only). */
     #[Url]
@@ -57,11 +94,20 @@ class Monitor extends Component
         $this->server = $server;
         $this->site = $site->load('uptimeMonitors');
 
-        // Default the probe region to the one nearest the host, not EU.
-        $this->newProbeRegion = app(UptimeProbeRegionResolver::class)->forSite($this->site);
+        // Default the probe worker to the one nearest the host; the region
+        // label follows the worker (falling back to nearest region when no
+        // worker is configured).
+        $workerResolver = app(UptimeProbeWorkerResolver::class);
+        $this->newProbeWorker = $workerResolver->forSite($this->site);
+        $this->newProbeRegion = $workerResolver->regionFor($this->newProbeWorker)
+            ?? app(UptimeProbeRegionResolver::class)->forSite($this->site);
 
         if (! FunctionStatsRangeQuery::isValidRange($this->statsRange)) {
             $this->statsRange = FunctionStatsRangeQuery::defaultRange();
+        }
+
+        if (! in_array($this->monitorTab, self::MONITOR_TABS, true)) {
+            $this->monitorTab = 'monitors';
         }
 
         $this->ensureFunctionUptimeMonitor();
@@ -83,12 +129,17 @@ class Monitor extends Component
             return;
         }
 
+        $workerResolver = app(UptimeProbeWorkerResolver::class);
+        $worker = $workerResolver->forSite($this->site);
+
         $monitor = SiteUptimeMonitor::query()->firstOrCreate(
             ['site_id' => $this->site->id, 'sort_order' => 0],
             [
                 'label' => __('Homepage check'),
                 'path' => null,
-                'probe_region' => app(UptimeProbeRegionResolver::class)->forSite($this->site),
+                'probe_region' => $workerResolver->regionFor($worker)
+                    ?? app(UptimeProbeRegionResolver::class)->forSite($this->site),
+                'probe_worker' => $worker,
             ],
         );
 
@@ -97,6 +148,11 @@ class Monitor extends Component
         if ($monitor->wasRecentlyCreated) {
             RunSiteUptimeMonitorCheckJob::dispatchWithConsoleAction($this->site, $monitor, auth()->id());
         }
+    }
+
+    public function setMonitorWorkspaceTab(string $tab): void
+    {
+        $this->monitorTab = in_array($tab, self::MONITOR_TABS, true) ? $tab : 'monitors';
     }
 
     public function setStatsRange(string $range): void
@@ -109,41 +165,160 @@ class Monitor extends Component
     /** Re-renders, which re-queries the function-activity series. */
     public function refreshStats(): void {}
 
-    public function addMonitor(SiteUptimeCheckUrlResolver $resolver): void
+    /** Reset the form to add-mode defaults and open the modal. */
+    public function startAddMonitor(): void
     {
         Gate::authorize('update', $this->site);
 
-        $regions = array_keys(config('site_uptime.probe_regions', []));
+        $this->resetMonitorForm();
+        $this->resetErrorBag();
+        $this->dispatch('open-modal', 'uptime-monitor-modal');
+    }
 
-        $this->validate([
+    /** Populate the form from an existing monitor and open the modal in edit-mode. */
+    public function editMonitor(string $monitorId): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $monitor = SiteUptimeMonitor::query()
+            ->where('site_id', $this->site->id)
+            ->findOrFail($monitorId);
+
+        $this->editingMonitorId = $monitor->id;
+        $this->newLabel = (string) $monitor->label;
+        $this->newCheckType = $monitor->isSslCheck() ? SiteUptimeMonitor::CHECK_SSL : SiteUptimeMonitor::CHECK_HTTP;
+        $this->newPath = (string) ($monitor->path ?? '');
+        $this->newProbeWorker = $monitor->probe_worker;
+        $this->newKeyword = (string) ($monitor->keywordAssertion() ?? '');
+        $this->newMatchMode = $monitor->keywordMatchMode();
+        $this->newExpectedStatus = $monitor->expectedStatus() !== null ? (string) $monitor->expectedStatus() : '';
+        $this->newResponseThresholdMs = $monitor->responseThresholdMs() !== null ? (string) $monitor->responseThresholdMs() : '';
+        $sslDays = is_array($monitor->config) ? ($monitor->config['ssl_warn_days'] ?? null) : null;
+        $this->newSslWarnDays = is_numeric($sslDays) ? (string) (int) $sslDays : '';
+
+        $this->resetErrorBag();
+        $this->dispatch('open-modal', 'uptime-monitor-modal');
+    }
+
+    public function saveMonitor(SiteUptimeCheckUrlResolver $resolver): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $workerResolver = app(UptimeProbeWorkerResolver::class);
+        $workerOptions = $workerResolver->options();
+        $isSsl = $this->newCheckType === SiteUptimeMonitor::CHECK_SSL;
+
+        $rules = [
             'newLabel' => 'required|string|max:120',
-            'newPath' => 'nullable|string|max:2048',
-            'newProbeRegion' => ['required', 'string', Rule::in($regions)],
-        ]);
+            'newCheckType' => ['required', Rule::in([SiteUptimeMonitor::CHECK_HTTP, SiteUptimeMonitor::CHECK_SSL])],
+        ];
+        if (! $isSsl) {
+            $rules['newPath'] = 'nullable|string|max:2048';
+            $rules['newKeyword'] = 'nullable|string|max:255';
+            $rules['newMatchMode'] = ['nullable', Rule::in([SiteUptimeMonitor::MATCH_CONTAIN, SiteUptimeMonitor::MATCH_NOT_CONTAIN])];
+            $rules['newExpectedStatus'] = 'nullable|integer|min:100|max:599';
+            $rules['newResponseThresholdMs'] = 'nullable|integer|min:1|max:120000';
+        } else {
+            $rules['newSslWarnDays'] = 'nullable|integer|min:1|max:90';
+        }
+        // Only require a worker when some are configured; with none the feature
+        // falls back to the central egress (null worker → default queue).
+        if ($workerOptions !== []) {
+            $rules['newProbeWorker'] = ['required', 'string', Rule::in(array_keys($workerOptions))];
+        }
 
-        $path = $this->normalizePathInput($this->newPath);
+        $this->validate($rules);
+
         if ($resolver->resolveBaseUrl($this->site) === null) {
             $this->addError('newLabel', __('Add a primary domain, preview hostname, or publication URL before creating monitors.'));
 
             return;
         }
 
-        $maxOrder = (int) $this->site->uptimeMonitors()->max('sort_order');
+        $worker = $workerOptions !== [] ? $this->newProbeWorker : null;
+        $region = $workerResolver->regionFor($worker)
+            ?? app(UptimeProbeRegionResolver::class)->forSite($this->site);
 
-        $created = SiteUptimeMonitor::query()->create([
-            'site_id' => $this->site->id,
+        $attributes = [
             'label' => $this->newLabel,
-            'path' => $path,
-            'probe_region' => $this->newProbeRegion,
-            'sort_order' => $maxOrder + 1,
+            'check_type' => $isSsl ? SiteUptimeMonitor::CHECK_SSL : SiteUptimeMonitor::CHECK_HTTP,
+            'path' => $isSsl ? null : $this->normalizePathInput($this->newPath),
+            'config' => $this->buildConfig($isSsl),
+            'probe_region' => $region,
+            'probe_worker' => $worker,
+        ];
+
+        if ($this->editingMonitorId !== null) {
+            $monitor = SiteUptimeMonitor::query()
+                ->where('site_id', $this->site->id)
+                ->findOrFail($this->editingMonitorId);
+            $monitor->update($attributes);
+            $this->toastSuccess(__('Monitor updated.'));
+        } else {
+            $monitor = SiteUptimeMonitor::query()->create($attributes + [
+                'site_id' => $this->site->id,
+                'sort_order' => (int) $this->site->uptimeMonitors()->max('sort_order') + 1,
+            ]);
+            $this->toastSuccess(__('Monitor added.'));
+        }
+
+        $this->resetMonitorForm();
+        $this->site->load('uptimeMonitors');
+        $this->dispatch('close-modal', 'uptime-monitor-modal');
+
+        // Re-run immediately so the new config takes effect and the row updates.
+        RunSiteUptimeMonitorCheckJob::dispatchWithConsoleAction($this->site, $monitor, auth()->id());
+    }
+
+    /**
+     * Type-specific config blob; only non-empty knobs are stored.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function buildConfig(bool $isSsl): ?array
+    {
+        $config = [];
+
+        if ($isSsl) {
+            if ($this->newSslWarnDays !== '') {
+                $config['ssl_warn_days'] = (int) $this->newSslWarnDays;
+            }
+
+            return $config === [] ? null : $config;
+        }
+
+        $keyword = trim($this->newKeyword);
+        if ($keyword !== '') {
+            $config['keyword'] = $keyword;
+            $config['match_mode'] = $this->newMatchMode === SiteUptimeMonitor::MATCH_NOT_CONTAIN
+                ? SiteUptimeMonitor::MATCH_NOT_CONTAIN
+                : SiteUptimeMonitor::MATCH_CONTAIN;
+        }
+        if ($this->newExpectedStatus !== '') {
+            $config['expected_status'] = (int) $this->newExpectedStatus;
+        }
+        if ($this->newResponseThresholdMs !== '') {
+            $config['response_threshold_ms'] = (int) $this->newResponseThresholdMs;
+        }
+
+        return $config === [] ? null : $config;
+    }
+
+    private function resetMonitorForm(): void
+    {
+        $this->reset([
+            'editingMonitorId', 'newLabel', 'newCheckType', 'newPath',
+            'newKeyword', 'newMatchMode', 'newExpectedStatus', 'newResponseThresholdMs', 'newSslWarnDays',
         ]);
 
-        $this->reset('newLabel', 'newPath');
-        $this->site->load('uptimeMonitors');
-        $this->dispatch('close-modal', 'add-uptime-monitor-modal');
-        $this->toastSuccess(__('Monitor added.'));
+        $workerResolver = app(UptimeProbeWorkerResolver::class);
+        $this->newProbeWorker = $workerResolver->forSite($this->site);
+    }
 
-        RunSiteUptimeMonitorCheckJob::dispatchWithConsoleAction($this->site, $created, auth()->id());
+    /** Toggle the inline history detail for a monitor row. */
+    public function toggleHistory(string $monitorId): void
+    {
+        $this->expandedMonitorId = $this->expandedMonitorId === $monitorId ? null : $monitorId;
     }
 
     public function runCheckNow(string $monitorId): void
@@ -193,6 +368,7 @@ class Monitor extends Component
     public function render(SiteUptimeCheckUrlResolver $resolver): View
     {
         $probeRegions = config('site_uptime.probe_regions', []);
+        $probeWorkerOptions = app(UptimeProbeWorkerResolver::class)->options();
         $baseUrl = $resolver->resolveBaseUrl($this->site);
         $hostnameDisplay = $baseUrl !== null ? (parse_url($baseUrl, PHP_URL_HOST) ?: $baseUrl) : null;
 
@@ -211,8 +387,22 @@ class Monitor extends Component
             ? app(FunctionStatsRangeQuery::class)->forSite($this->site, $this->statsRange)
             : null;
 
+        // Inline history for the expanded monitor only — keeps the page cheap
+        // when nothing is expanded.
+        $expandedHistory = null;
+        if ($this->expandedMonitorId !== null) {
+            $expanded = $this->site->uptimeMonitors->firstWhere('id', $this->expandedMonitorId);
+            if ($expanded !== null) {
+                $expandedHistory = app(SiteUptimeHistorySummary::class)->forMonitor($expanded);
+            }
+        }
+
+        $operationalState = app(MonitorOperationalState::class);
+        $onAlertsTab = $this->monitorTab === 'alerts';
+
         return view('livewire.sites.monitor', [
             'probeRegions' => is_array($probeRegions) ? $probeRegions : [],
+            'probeWorkerOptions' => $probeWorkerOptions,
             'resolvedBaseUrl' => $baseUrl,
             'hostnameDisplay' => $hostnameDisplay,
             'settingsSidebarItems' => $settingsSidebarItems,
@@ -224,6 +414,11 @@ class Monitor extends Component
             'runtimePublication' => $runtimePublication,
             'runtimeMode' => $runtimeMode,
             'functionStats' => $functionStats,
+            'expandedHistory' => $expandedHistory,
+            'operationalState' => $operationalState,
+            'uptimeNotifChannels' => $onAlertsTab ? $this->assignableUptimeNotificationChannels() : collect(),
+            'uptimeNotifSubscriptions' => $onAlertsTab ? $this->uptimeNotificationSubscriptions() : collect(),
+            'uptimeNotifEventLabels' => $onAlertsTab ? $this->uptimeEventLabels() : [],
         ]);
     }
 

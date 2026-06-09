@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Livewire\Servers\Concerns;
 
 use App\Jobs\ServerManageRemoteSshJob;
+use App\Livewire\Servers\WorkspaceManage;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerManageAction;
+use App\Support\Servers\ServerDockerRemoteInspector;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
@@ -16,7 +18,7 @@ use Illuminate\Support\Str;
  * config('server_manage.service_actions') or config('server_manage.dangerous_actions'))
  * against the current server, banner-only flow.
  *
- * Equivalent to the queued path of {@see \App\Livewire\Servers\WorkspaceManage::runAllowlistedAction()},
+ * Equivalent to the queued path of {@see WorkspaceManage::runAllowlistedAction()},
  * trimmed of the legacy "Command output" panel and SSH-stream overlay. The seeded
  * `manage_action` ConsoleAction row drives the page-top console-action banner partial
  * on whichever workspace owns the button (Databases for `mysql_*`, Caches for `redis_info`).
@@ -31,8 +33,14 @@ trait RunsAllowlistedManageAction
     /** Polling target while a queued manage task is in flight. */
     public ?string $manageRemoteTaskId = null;
 
-    public function runAllowlistedManageAction(string $key): void
-    {
+    public function runAllowlistedManageAction(
+        string $key,
+        ?string $containerId = null,
+        ?string $imageRef = null,
+        ?string $execCommand = null,
+        ?string $composeProject = null,
+        ?string $composeConfig = null,
+    ): void {
         $this->authorize('update', $this->server);
 
         if ($this->currentUserIsDeployer()) {
@@ -57,6 +65,51 @@ trait RunsAllowlistedManageAction
         }
 
         $script = (string) $def['script'];
+        if (str_contains($script, '__DPLY_CONTAINER_ID__')) {
+            if (! is_string($containerId) || ! $this->isValidDockerContainerRef($containerId)) {
+                $this->toastError(__('Invalid container.'));
+
+                return;
+            }
+            $script = str_replace('__DPLY_CONTAINER_ID__', $containerId, $script);
+        }
+
+        if (str_contains($script, '__DPLY_IMAGE_REF__')) {
+            if (! is_string($imageRef) || ! $this->isValidDockerImageRef($imageRef)) {
+                $this->toastError(__('Invalid image reference.'));
+
+                return;
+            }
+            $script = str_replace('__DPLY_IMAGE_REF__', $imageRef, $script);
+        }
+
+        if (str_contains($script, '__DPLY_EXEC_COMMAND__')) {
+            if (! is_string($execCommand) || ! $this->isValidDockerExecCommand($execCommand)) {
+                $this->toastError(__('Invalid command.'));
+
+                return;
+            }
+            $script = str_replace('__DPLY_EXEC_COMMAND__', escapeshellarg($execCommand), $script);
+        }
+
+        if (str_contains($script, '__DPLY_COMPOSE_PROJECT__')) {
+            if (! is_string($composeProject) || ! $this->isValidDockerComposeProjectName($composeProject)) {
+                $this->toastError(__('Invalid compose project.'));
+
+                return;
+            }
+            $script = str_replace('__DPLY_COMPOSE_PROJECT__', $composeProject, $script);
+        }
+
+        if (str_contains($script, '__DPLY_COMPOSE_CONFIG__')) {
+            if (! is_string($composeConfig) || ! $this->isValidDockerComposeConfigPath($composeConfig)) {
+                $this->toastError(__('Invalid compose config path.'));
+
+                return;
+            }
+            $script = str_replace('__DPLY_COMPOSE_CONFIG__', $composeConfig, $script);
+        }
+
         $meta = $this->server->meta ?? [];
 
         // PHP-FPM service actions need to know which apt-managed php version's unit
@@ -207,5 +260,30 @@ trait RunsAllowlistedManageAction
         ]);
 
         return (string) $row->id;
+    }
+
+    protected function isValidDockerContainerRef(string $containerId): bool
+    {
+        return (bool) preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$/', $containerId);
+    }
+
+    protected function isValidDockerImageRef(string $imageRef): bool
+    {
+        return (bool) preg_match('/^[a-zA-Z0-9@][a-zA-Z0-9@:._\/-]{0,255}$/', $imageRef);
+    }
+
+    protected function isValidDockerExecCommand(string $command): bool
+    {
+        return app(ServerDockerRemoteInspector::class)->isValidExecCommand($command);
+    }
+
+    protected function isValidDockerComposeProjectName(string $project): bool
+    {
+        return app(ServerDockerRemoteInspector::class)->isValidComposeProjectName($project);
+    }
+
+    protected function isValidDockerComposeConfigPath(string $path): bool
+    {
+        return app(ServerDockerRemoteInspector::class)->isValidComposeConfigPath($path);
     }
 }

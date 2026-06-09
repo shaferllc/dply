@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\Servers\GetProviderCredentialsForServerType;
 use App\Enums\ServerProvider;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
@@ -29,6 +30,19 @@ class ProviderCredential extends Model
         return [
             'credentials' => 'encrypted:array',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        $flushMemo = static function (ProviderCredential $credential): void {
+            GetProviderCredentialsForServerType::forgetOrganizationProvider(
+                (string) $credential->organization_id,
+                (string) $credential->provider,
+            );
+        };
+
+        static::saved($flushMemo);
+        static::deleted($flushMemo);
     }
 
     public function user(): BelongsTo

@@ -91,11 +91,15 @@
 @endphp
 
 @if (! empty($portRows))
-    <div class="dply-card overflow-hidden p-6 sm:p-8">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+    <div class="dply-card overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <x-icon-badge>
+                <x-heroicon-o-signal class="h-5 w-5" aria-hidden="true" />
+            </x-icon-badge>
             <div class="min-w-0">
-                <h3 class="text-base font-semibold text-brand-ink">{{ __('Listening ports') }}</h3>
-                <p class="mt-1 text-sm text-brand-moss">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Ports') }}</p>
+                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Listening ports') }}</h3>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                     {{ __('From `ss -lntp` on the host. Use this to sanity-check which process is bound where before adding or tightening firewall rules.') }}
                 </p>
             </div>
@@ -105,10 +109,10 @@
                     wire:click="refreshListeningPorts"
                     wire:loading.attr="disabled"
                     wire:target="refreshListeningPorts"
-                    class="inline-flex shrink-0 items-center justify-center gap-1.5 self-start rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
+                    class="ml-auto inline-flex shrink-0 items-center justify-center gap-1.5 self-start rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                    <x-heroicon-o-arrow-path wire:loading.remove wire:target="refreshListeningPorts" class="h-3.5 w-3.5" />
-                    <span wire:loading wire:target="refreshListeningPorts" class="inline-flex h-3.5 w-3.5 items-center justify-center">
+                    <x-heroicon-o-arrow-path wire:loading.remove wire:target="refreshListeningPorts" class="h-4 w-4" />
+                    <span wire:loading wire:target="refreshListeningPorts" class="inline-flex h-4 w-4 items-center justify-center">
                         <x-spinner variant="forest" size="sm" />
                     </span>
                     <span wire:loading.remove wire:target="refreshListeningPorts">{{ __('Refresh ports') }}</span>
@@ -116,7 +120,8 @@
                 </button>
             @endif
         </div>
-        <div class="mt-4 overflow-hidden rounded-xl border border-brand-ink/10">
+        <div class="px-6 py-6 sm:px-7">
+        <div class="overflow-hidden rounded-xl border border-brand-ink/10">
             <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
                 <thead class="bg-brand-sand/30 text-left text-[11px] uppercase tracking-wide text-brand-mist">
                     <tr>
@@ -143,6 +148,7 @@
                     @endforeach
                 </tbody>
             </table>
+        </div>
         </div>
     </div>
 @endif

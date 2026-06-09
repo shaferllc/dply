@@ -70,6 +70,23 @@ class CertificateRequestService
             return null;
         }
 
+        $failed = SiteCertificate::query()
+            ->where('site_id', $site->id)
+            ->where('preview_domain_id', $previewDomain->id)
+            ->where('scope_type', SiteCertificate::SCOPE_PREVIEW)
+            ->where('status', SiteCertificate::STATUS_FAILED)
+            ->latest('updated_at')
+            ->first();
+
+        if ($failed !== null) {
+            $failed->forceFill([
+                'status' => SiteCertificate::STATUS_PENDING,
+                'last_output' => null,
+            ])->save();
+
+            return $failed->fresh();
+        }
+
         return $this->create([
             'site_id' => $site->id,
             'preview_domain_id' => $previewDomain->id,

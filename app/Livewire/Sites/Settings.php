@@ -3,66 +3,96 @@
 namespace App\Livewire\Sites;
 
 use App\Enums\SiteType;
+use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Jobs\AssignSystemUserToSiteJob;
 use App\Jobs\ExecuteSiteCertificateJob;
-use App\Jobs\ProvisionSiteSystemdUnitsJob;
+use App\Jobs\ProvisionTenantTestingHostnameJob;
+use App\Jobs\ResetSiteOpcacheJob;
 use App\Jobs\RunSiteDeploymentJob;
+use App\Jobs\ScanServerLiveCertsJob;
 use App\Jobs\SiteResetPermissionsJob;
 use App\Jobs\SyncBasicAuthFromServerJob;
-use App\Jobs\TearDownSiteSystemdUnitJob;
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\DismissesConsoleActionRun;
 use App\Livewire\Concerns\ManagesContainerSite;
+use App\Livewire\Concerns\ManagesSiteBindings;
+use App\Livewire\Concerns\ManagesSiteLogging;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
-use App\Models\NotificationChannel;
-use App\Models\NotificationSubscription;
+use App\Livewire\Sites\Concerns\ManagesErrorsNotifications;
+use App\Livewire\Sites\Concerns\ManagesSiteLogo;
+use App\Models\ErrorEvent;
 use App\Models\NotificationWebhookDestination;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteAccessGate;
+use App\Models\SiteAccessGatePassword;
 use App\Models\SiteBasicAuthUser;
 use App\Models\SiteCertificate;
 use App\Models\SiteDeployment;
 use App\Models\SiteDomain;
 use App\Models\SiteDomainAlias;
 use App\Models\SitePreviewDomain;
-use App\Models\SiteProcess;
 use App\Models\SiteTenantDomain;
 use App\Models\Snapshot;
 use App\Models\Workspace;
+use App\Services\AzureDnsService;
+use App\Services\Certificates\CertificateRepairService;
 use App\Services\Certificates\CertificateRequestService;
 use App\Services\Cloudflare\CloudflareDnsService;
 use App\Services\Deploy\DeploymentContractBuilder;
 use App\Services\Deploy\DeploymentPreflightValidator;
 use App\Services\DigitalOceanService;
+use App\Services\GcpDnsService;
+use App\Services\HetznerService;
+use App\Services\LinodeService;
 use App\Services\Notifications\AssignableNotificationChannels;
 use App\Services\RemoteCli\Artisan;
 use App\Services\RemoteCli\RemoteCliPermissionDeniedException;
+use App\Services\Route53Service;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerPasswdUserLister;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Servers\ServerSystemUserService;
+use App\Services\Servers\WebserverCertsAggregator;
 use App\Services\Sites\LaravelConsoleExecutor;
 use App\Services\Sites\LaravelSiteSshSetupRunner;
+use App\Services\Sites\SiteAccessGateLoginLogReader;
+use App\Services\Sites\SiteAccessGateService;
+use App\Services\Sites\SiteAppServerProbe;
 use App\Services\Sites\SiteDeploySyncGroupManager;
+use App\Services\Sites\SiteOpcacheManager;
+use App\Services\Sites\SitePhpFpmProbe;
+use App\Services\Sites\SiteReachabilityChecker;
 use App\Services\Sites\SiteScopedCommandWrapper;
-use App\Services\Sites\SiteSystemdProvisioner;
-use App\Services\Sites\SiteSystemdUnitBuilder;
 use App\Services\Snapshots\LocalDiskDestination;
 use App\Services\Snapshots\SnapshotService;
 use App\Services\SshConnection;
 use App\Support\HostnameValidator;
+use App\Support\NotificationSubscriptionMatrix;
+use App\Support\SiteErrorsNotificationKeys;
+use App\Support\Sites\SiteSettingsViewData;
+use App\Support\SiteSettingsSidebar;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 
 class Settings extends Show
 {
+    use CreatesNotificationChannelInline;
     use DismissesConsoleActionRun;
     use ManagesContainerSite;
+    use ManagesSiteBindings;
+    use ManagesSiteLogging;
+    use ManagesSiteLogo;
     use StreamsRemoteSshLivewire;
 
     protected function consoleActionSubject(): Model
@@ -70,7 +100,7 @@ class Settings extends Show
         return $this->site;
     }
 
-    private const ROUTING_TABS = ['domains', 'aliases', 'redirects', 'preview', 'tenants'];
+    private const ROUTING_TABS = ['domains', 'dns', 'aliases', 'redirects', 'preview', 'tenants'];
 
     private const LEGACY_ROUTING_SECTIONS = [
         'domains' => 'domains',
@@ -80,16 +110,70 @@ class Settings extends Show
         'tenants' => 'tenants',
     ];
 
-    /** @var list<string> */
+    private const LEGACY_RUNTIME_SECTIONS = [
+        'runtime-php' => 'php',
+        'runtime-ruby' => 'ruby',
+        'runtime-static' => 'static',
+    ];
+
+    /**
+     * Site events routable from the central Settings → Notifications matrix. The
+     * site.errors.* keys are ALSO editable from the Errors → Notifications tab
+     * ({@see ManagesErrorsNotifications}); both
+     * surfaces write the same Site subscriptions, so they stay in sync. Keep this
+     * list aligned with {@see SiteErrorsNotificationKeys::eventKeys()}.
+     *
+     * @var list<string>
+     */
     private const SITE_NOTIFICATION_EVENT_KEYS = [
         'site.deployments',
         'site.deployment_started',
-        'site.uptime',
+        'site.uptime.down',
+        'site.uptime.degraded',
+        'site.ssl.expiring',
+        'site.errors.deploy_failed',
+        'site.errors.operation_failed',
     ];
 
     public string $section = 'general';
 
     public string $routingTab = 'domains';
+
+    public string $runtimeTab = 'overview';
+
+    /**
+     * Live runtime health for the Runtime → Overview card, keyed by 'kind':
+     *   - 'fpm':  dedicated PHP-FPM pool {running, socket_present, conf_present, workers, max_children, php_version, pool}
+     *   - 'port': long-running app server {listening, port}
+     * Loaded deferred via {@see loadRuntimeHealth()} (wire:init) so the SSH probe
+     * stays off the render path; null until the probe runs / when there's nothing
+     * to probe / when the probe couldn't reach the server.
+     *
+     * @var array<string, mixed>|null
+     */
+    public ?array $runtimeHealth = null;
+
+    /** Whether {@see loadRuntimeHealth()} has run yet (drives the "checking…" state). */
+    public bool $runtimeHealthLoaded = false;
+
+    /**
+     * Live OPcache status for the Runtime → Overview card, read from the FPM
+     * worker (not CLI) via {@see SiteOpcacheManager}. Loaded deferred by
+     * {@see loadOpcacheStatus()} (wire:init); null until probed / when the site
+     * has no dedicated pool / when FPM couldn't be reached.
+     *
+     * @var array<string, mixed>|null
+     */
+    public ?array $opcacheStatus = null;
+
+    /** Whether {@see loadOpcacheStatus()} has run yet (drives the "checking…" state). */
+    public bool $opcacheStatusLoaded = false;
+
+    /** @var list<string> */
+    public const NOTIF_TABS = ['subscriptions', 'webhooks'];
+
+    /** Sub-tab on the Notifications section (Subscriptions / Integration webhooks). */
+    public string $notifTab = 'subscriptions';
 
     public string $settings_primary_domain = '';
 
@@ -130,6 +214,17 @@ class Settings extends Show
     public string $bulk_basic_auth_input = '';
 
     public string $bulk_basic_auth_path = '/';
+
+    public string $access_gate_method = '';
+
+    public string $form_gate_password = '';
+
+    public string $new_form_gate_label = '';
+
+    /** @var list<array{at: string, label: string, credential_id: string, hostname: string, ip: string|null, user_agent: string|null}> */
+    public array $form_gate_login_log = [];
+
+    public bool $form_gate_login_log_loaded = false;
 
     public string $new_tenant_hostname = '';
 
@@ -200,6 +295,32 @@ class Settings extends Show
 
     public string $quick_ssl_provider_type = SiteCertificate::PROVIDER_LETSENCRYPT;
 
+    /** Last reachability result for the hostname in the quick-SSL modal (null = not checked). */
+    public ?array $quick_ssl_reachability = null;
+
+    /** Operator override to request SSL anyway when the domain isn't reachable yet (DNS propagating). */
+    public bool $quick_ssl_force = false;
+
+    /**
+     * Live Caddy-managed certificates read from the box. Caddy obtains and
+     * renews these itself (automatic HTTPS), so they never flow through
+     * certbot and have no SiteCertificate paths — we surface the real
+     * issuer/expiry by scanning Caddy's data dir over SSH.
+     *
+     * @var list<array<string, mixed>>
+     */
+    public array $caddy_managed_certs = [];
+
+    public bool $caddy_managed_certs_loaded = false;
+
+    public bool $caddy_managed_certs_scanning = false;
+
+    public bool $caddy_managed_certs_unreadable = false;
+
+    public ?string $caddy_managed_certs_error = null;
+
+    public ?string $caddy_managed_certs_scanned_at_iso = null;
+
     public ?string $laravel_ssh_setup_pending_action = null;
 
     public ?string $laravel_ssh_setup_error = null;
@@ -216,6 +337,14 @@ class Settings extends Show
      * @var list<array{username: string, site_count: int}>
      */
     public array $system_user_remote_rows = [];
+
+    /**
+     * True once we have a definitive account list for the picker — either a
+     * fresh SSH probe ran or we seeded a non-empty snapshot from the DB. Gates
+     * the "No regular Linux users" empty state so it never shows before a list
+     * has actually been fetched (the rows array is empty on first render too).
+     */
+    public bool $system_users_loaded = false;
 
     public ?string $system_user_list_error = null;
 
@@ -284,11 +413,16 @@ class Settings extends Show
 
     public int $laravel_log_tail_lines = 500;
 
-    /** @var list<string> */
-    public array $site_notification_channel_ids = [];
-
-    /** @var list<string> */
-    public array $site_notification_event_keys = [];
+    /**
+     * Per-channel event routing for the central matrix: channel id → list of
+     * subscribed event keys. Lets different events go to different channels in one
+     * place (replaces the old cartesian channels×events selection). Save reconciles
+     * each shown channel to its selection and never touches channels not listed
+     * here, so it stays in sync with the per-feature Notifications tabs.
+     *
+     * @var array<string, list<string>>
+     */
+    public array $channelEventSelections = [];
 
     public string $site_int_hook_name = '';
 
@@ -308,23 +442,21 @@ class Settings extends Show
 
     public bool $site_int_evt_uptime_recovered = true;
 
+    public bool $site_int_evt_uptime_degraded = true;
+
+    public bool $site_int_evt_ssl_expiring = true;
+
     public string $sync_group_name_input = '';
 
     public string $sync_group_add_site_id = '';
 
     public string $sync_group_leader_site_id = '';
 
-    /**
-     * New SiteProcess form. The user fills these in and clicks "Add" to
-     * materialize a row. Type is one of SiteProcess::TYPE_WORKER /
-     * TYPE_SCHEDULER / TYPE_CUSTOM — the auto-created `web` row is
-     * managed by the Site::created hook, not this form.
-     */
-    public string $new_site_process_type = 'worker';
+    /** Worker mode: serve a locked-down "runs workers" page instead of the app. */
+    public bool $worker_mode = false;
 
-    public string $new_site_process_name = '';
-
-    public string $new_site_process_command = '';
+    /** Optional custom HTML for the worker page; empty = built-in dply page. */
+    public string $worker_page_html = '';
 
     public function mount(Server $server, Site $site, ?string $section = null): void
     {
@@ -332,7 +464,7 @@ class Settings extends Show
             abort(404);
         }
 
-        if ($server->organization_id !== auth()->user()->currentOrganization()?->id) {
+        if ($site->usesEdgeRuntime()) {
             abort(404);
         }
 
@@ -371,6 +503,30 @@ class Settings extends Show
             return;
         }
 
+        if ($section === 'dns') {
+            $this->redirect(route('sites.show', [
+                'server' => $server,
+                'site' => $site,
+                'section' => 'routing',
+                'tab' => 'dns',
+                ...collect(request()->query())->except('section')->all(),
+            ]), navigate: true);
+
+            return;
+        }
+
+        if (array_key_exists($section, self::LEGACY_RUNTIME_SECTIONS)) {
+            $this->redirect(route('sites.show', [
+                'server' => $server,
+                'site' => $site,
+                'section' => 'runtime',
+                'tab' => self::LEGACY_RUNTIME_SECTIONS[$section],
+                ...collect(request()->query())->except('section')->all(),
+            ]), navigate: true);
+
+            return;
+        }
+
         if ($section === 'webhooks') {
             $this->redirect(route('sites.show', [
                 'server' => $server,
@@ -402,6 +558,10 @@ class Settings extends Show
 
         $this->section = $section;
         $this->routingTab = $this->resolveRoutingTab(request()->query('tab'));
+        $this->runtimeTab = $this->resolveRuntimeTabForSite($site, request()->query('tab'));
+        $this->notifTab = in_array((string) request()->query('tab'), self::NOTIF_TABS, true)
+            ? (string) request()->query('tab')
+            : 'subscriptions';
 
         $laravelTabQuery = request()->query('laravel_tab');
         if (is_string($laravelTabQuery) && in_array($laravelTabQuery, ['commands', 'octane', 'reverb', 'logs', 'setup', 'schedule', 'migrations', 'pail'], true)) {
@@ -413,7 +573,11 @@ class Settings extends Show
         // redundant refresh here.
         $this->syncGeneralSettingsForm(skipRefresh: true);
         $this->syncPreviewSettingsForm();
-        if ($this->section === 'dns') {
+        if ($this->section === 'basic-auth') {
+            $this->site->loadMissing(['accessGate', 'accessGatePasswords', 'basicAuthUsers']);
+            $this->access_gate_method = $this->site->resolvedAccessGateMethod();
+        }
+        if ($this->section === 'routing' && $this->routingTab === 'dns') {
             $this->syncDnsSettingsForm();
         }
 
@@ -421,11 +585,37 @@ class Settings extends Show
             $this->loadLaravelArtisanDiscovery(false);
         }
 
-        $this->loadSiteNotificationPreferences();
+        if ($this->section === 'notifications') {
+            $this->loadSiteNotificationPreferences();
+        }
 
         if ($this->section === 'repository') {
             $this->syncRepositorySyncUiState();
         }
+
+        if ($this->section === 'system-user') {
+            $this->seedSystemUsersFromStore();
+        }
+    }
+
+    /**
+     * Pre-fill the system-user picker from the last persisted /etc/passwd
+     * snapshot so a returning operator sees existing accounts immediately —
+     * no SSH on the render path. "Load system users" then re-probes live.
+     */
+    protected function seedSystemUsersFromStore(): void
+    {
+        if (! $this->shouldShowSystemUserPanel()) {
+            return;
+        }
+
+        $rows = app(ServerSystemUserService::class)->storedSystemUsersWithMetadata($this->server);
+        if ($rows === []) {
+            return;
+        }
+
+        $this->system_user_remote_rows = $rows;
+        $this->system_users_loaded = true;
     }
 
     protected function syncRepositorySyncUiState(): void
@@ -534,16 +724,34 @@ class Settings extends Show
         ]), navigate: true);
     }
 
+    public function setNotificationsTab(string $tab): void
+    {
+        $this->notifTab = in_array($tab, self::NOTIF_TABS, true) ? $tab : 'subscriptions';
+    }
+
+    /**
+     * After the reusable inline modal ({@see CreatesNotificationChannelInline})
+     * creates a channel, refresh the matrix so the new channel appears as a row
+     * ready to route — without leaving the page. Jump to the Subscriptions tab so
+     * the new channel is visible.
+     */
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId = ''): void
+    {
+        if ($this->section === 'notifications') {
+            $this->notifTab = 'subscriptions';
+            $this->loadSiteNotificationPreferences();
+        }
+    }
+
     protected function loadSiteNotificationPreferences(): void
     {
-        $subs = NotificationSubscription::query()
-            ->where('subscribable_type', Site::class)
-            ->where('subscribable_id', $this->site->id)
-            ->whereIn('event_key', self::SITE_NOTIFICATION_EVENT_KEYS)
-            ->get();
-
-        $this->site_notification_channel_ids = $subs->pluck('notification_channel_id')->unique()->values()->map(fn ($id) => (string) $id)->all();
-        $this->site_notification_event_keys = $subs->pluck('event_key')->unique()->values()->all();
+        $this->channelEventSelections = NotificationSubscriptionMatrix::load(
+            Site::class,
+            (string) $this->site->id,
+            self::SITE_NOTIFICATION_EVENT_KEYS,
+            AssignableNotificationChannels::forUser(auth()->user(), $this->site->organization),
+        );
     }
 
     public function saveSiteNotificationSubscriptions(): void
@@ -556,67 +764,24 @@ class Settings extends Show
             return;
         }
 
-        $inRule = implode(',', self::SITE_NOTIFICATION_EVENT_KEYS);
-
-        $this->validate([
-            'site_notification_channel_ids' => ['array'],
-            'site_notification_channel_ids.*' => ['string', 'exists:notification_channels,id'],
-            'site_notification_event_keys' => ['array'],
-            'site_notification_event_keys.*' => ['string', 'in:'.$inRule],
-        ], [], [
-            'site_notification_channel_ids' => __('channels'),
-            'site_notification_event_keys' => __('events'),
-        ]);
-
-        $org = auth()->user()?->currentOrganization();
-        $allowedChannelIds = AssignableNotificationChannels::forUser(auth()->user(), $org)
-            ->pluck('id')
-            ->map(fn ($id) => (string) $id)
-            ->all();
-
-        foreach ($this->site_notification_channel_ids as $channelId) {
-            if (! in_array((string) $channelId, $allowedChannelIds, true)) {
-                $this->addError('site_notification_channel_ids', __('Invalid channel selected.'));
-
-                return;
-            }
-        }
-
-        NotificationSubscription::query()
-            ->where('subscribable_type', Site::class)
-            ->where('subscribable_id', $this->site->id)
-            ->whereIn('event_key', self::SITE_NOTIFICATION_EVENT_KEYS)
-            ->delete();
-
-        if ($this->site_notification_channel_ids === [] || $this->site_notification_event_keys === []) {
-            $this->dispatch('notify', message: __('Site notification subscriptions updated.'));
-            $this->loadSiteNotificationPreferences();
-
-            return;
-        }
-
-        foreach ($this->site_notification_channel_ids as $channelId) {
-            $channel = NotificationChannel::query()->findOrFail((string) $channelId);
-            Gate::authorize('manageNotificationChannels', $channel->owner);
-
-            foreach ($this->site_notification_event_keys as $eventKey) {
-                NotificationSubscription::query()->create([
-                    'notification_channel_id' => $channel->id,
-                    'subscribable_type' => Site::class,
-                    'subscribable_id' => $this->site->id,
-                    'event_key' => $eventKey,
-                ]);
-            }
-        }
+        $changed = NotificationSubscriptionMatrix::save(
+            Site::class,
+            (string) $this->site->id,
+            self::SITE_NOTIFICATION_EVENT_KEYS,
+            AssignableNotificationChannels::forUser(auth()->user(), auth()->user()?->currentOrganization()),
+            $this->channelEventSelections,
+        );
 
         $this->loadSiteNotificationPreferences();
 
-        $auditOrg = $this->site->server?->organization ?? auth()->user()?->currentOrganization();
-        if ($auditOrg) {
-            audit_log($auditOrg, auth()->user(), 'site.notifications.subscriptions_updated', $this->site, null, [
-                'channel_ids' => array_values(array_map('strval', $this->site_notification_channel_ids)),
-                'event_keys' => array_values($this->site_notification_event_keys),
-            ]);
+        if ($changed['changed'] > 0) {
+            $auditOrg = $this->site->server?->organization ?? auth()->user()?->currentOrganization();
+            if ($auditOrg) {
+                audit_log($auditOrg, auth()->user(), 'site.notifications.subscriptions_updated', $this->site, null, [
+                    'added' => $changed['added'],
+                    'removed' => $changed['removed'],
+                ]);
+            }
         }
 
         $this->dispatch('notify', message: __('Site notification subscriptions saved.'));
@@ -657,6 +822,12 @@ class Settings extends Show
         if ($this->site_int_evt_uptime_recovered) {
             $events[] = 'uptime_recovered';
         }
+        if ($this->site_int_evt_uptime_degraded) {
+            $events[] = 'uptime_degraded';
+        }
+        if ($this->site_int_evt_ssl_expiring) {
+            $events[] = 'ssl_expiring';
+        }
 
         $created = NotificationWebhookDestination::query()->create([
             'organization_id' => $this->site->organization_id,
@@ -689,6 +860,8 @@ class Settings extends Show
         $this->site_int_evt_deploy_started = false;
         $this->site_int_evt_uptime_down = true;
         $this->site_int_evt_uptime_recovered = true;
+        $this->site_int_evt_uptime_degraded = true;
+        $this->site_int_evt_ssl_expiring = true;
 
         $this->dispatch('notify', message: __('Webhook destination saved.'));
     }
@@ -746,12 +919,16 @@ class Settings extends Show
 
     public function updatedSection(string $value): void
     {
-        if ($value === 'dns') {
+        if ($value === 'routing' && $this->routingTab === 'dns') {
             $this->syncDnsSettingsForm();
         }
         if ($value === 'runtime' || $value === 'laravel-stack' || $value === 'system-user') {
             $this->syncGeneralSettingsForm();
             $this->syncFormFromSite();
+        }
+
+        if ($value === 'system-user') {
+            $this->seedSystemUsersFromStore();
         }
 
         if ($value === 'laravel-stack' && $this->site->isLaravelFrameworkDetected() && $this->laravel_tab === 'commands') {
@@ -767,6 +944,87 @@ class Settings extends Show
     {
         parent::syncFormFromSite();
         $this->syncLaravelConsoleForm();
+        $this->worker_mode = $this->site->isWorkerSite();
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $this->worker_page_html = (string) ($meta['worker_page_html'] ?? '');
+    }
+
+    /**
+     * Whether the worker-mode toggle is offered for this site. It's a VM
+     * webserver concern only — container/serverless/edge sites don't serve from
+     * a Caddy vhost, and headless (webserver=none) sites have no web front at
+     * all. Worker hosts default the toggle ON; any VM site can opt in.
+     */
+    #[Computed]
+    public function canConfigureWorkerMode(): bool
+    {
+        return $this->server->isVmHost()
+            && ! $this->site->usesFunctionsRuntime()
+            && ! $this->site->usesEdgeRuntime()
+            && ! $this->site->usesDockerRuntime()
+            && ! $this->site->usesKubernetesRuntime()
+            && $this->site->webserver() !== 'none';
+    }
+
+    /**
+     * Persist the worker-mode override on the site and re-apply the webserver
+     * config so Caddy switches between the normal vhost and the locked-down
+     * worker page. Setting it to the host-role default clears the override so
+     * the site tracks its host again.
+     */
+    public function saveWorkerMode(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->canConfigureWorkerMode()) {
+            $this->toastError(__('Worker mode applies to VM sites served by a web server.'));
+
+            return;
+        }
+
+        $this->validate([
+            'worker_page_html' => 'nullable|string|max:100000',
+        ]);
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+
+        // Clear the override when the choice matches the host-role default so the
+        // site keeps following its host; otherwise pin the explicit value.
+        $hostDefault = $this->server->isWorkerHost();
+        if ($this->worker_mode === $hostDefault) {
+            unset($meta['worker_mode']);
+        } else {
+            $meta['worker_mode'] = $this->worker_mode;
+        }
+
+        // Custom worker page: store when non-empty, clear to fall back to the
+        // built-in dply page.
+        $customHtml = trim($this->worker_page_html);
+        if ($customHtml === '') {
+            unset($meta['worker_page_html']);
+        } else {
+            $meta['worker_page_html'] = $customHtml;
+        }
+
+        $this->site->update(['meta' => $meta]);
+        $this->site->refresh();
+        $this->syncFormFromSite();
+
+        ApplySiteWebserverConfigJob::dispatch(
+            (string) $this->site->id,
+            (string) auth()->id(),
+        );
+
+        $org = $this->site->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.worker_mode.updated', $this->site, null, [
+                'worker_mode' => $this->worker_mode,
+            ]);
+        }
+
+        $this->toastSuccess($this->worker_mode
+            ? __('Worker mode on — re-applying the web server to lock the site down.')
+            : __('Worker mode off — re-applying the web server to restore the site.'));
     }
 
     protected function syncLaravelConsoleForm(): void
@@ -1275,6 +1533,165 @@ class Settings extends Show
         $this->finalizeRoutingMutation(__('Laravel stack settings saved.'));
     }
 
+    private function runtimeHealthCacheKey(): string
+    {
+        return 'dply.site-runtime-health:'.$this->site->id;
+    }
+
+    /**
+     * Deferred (wire:init) loader for the Runtime → Overview live-health card.
+     * Kept OFF render() so renders + console wire:polls never block on SSH; the
+     * probe is one inline-bash roundtrip, cached briefly so rapid re-entries
+     * (tab nav, double fire) coalesce. The probe kind (FPM pool vs. app-server
+     * port) is decided by {@see Site::runtimeHealthProbeKind()} so the loader and
+     * the card always agree; no-ops to a "loaded but empty" state when there's
+     * nothing to probe.
+     */
+    public function loadRuntimeHealth(SitePhpFpmProbe $fpmProbe, SiteAppServerProbe $portProbe): void
+    {
+        $this->runtimeHealthLoaded = true;
+        $this->runtimeHealth = null;
+
+        $kind = $this->site->runtimeHealthProbeKind();
+        if ($kind === null || ! $this->server->hostCapabilities()->supportsSsh()) {
+            return;
+        }
+        if ($kind === 'fpm' && ! $this->server->hostCapabilities()->supportsMachinePhpManagement()) {
+            return;
+        }
+
+        try {
+            $this->runtimeHealth = Cache::remember(
+                $this->runtimeHealthCacheKey(),
+                15,
+                function () use ($kind, $fpmProbe, $portProbe): ?array {
+                    $result = $kind === 'fpm'
+                        ? $fpmProbe->probe($this->site)
+                        : $portProbe->probe($this->site);
+
+                    return $result === null ? null : ['kind' => $kind] + $result;
+                },
+            );
+        } catch (\Throwable) {
+            $this->runtimeHealth = null;
+        }
+    }
+
+    /** Force-refresh the Overview live-health card (button on the card). */
+    public function refreshRuntimeHealth(SitePhpFpmProbe $fpmProbe, SiteAppServerProbe $portProbe): void
+    {
+        Cache::forget($this->runtimeHealthCacheKey());
+        $this->runtimeHealthLoaded = false;
+        $this->loadRuntimeHealth($fpmProbe, $portProbe);
+    }
+
+    /**
+     * Re-apply this site's webserver config, which rewrites the dedicated pool
+     * conf and reloads php-fpm (idempotent — only changed files reload). Surfaced
+     * as a "Reload pool" button on the Overview FPM card. Queued + watched via
+     * the console banner, never inline {@see [[feedback_queue_ssh_operations]]}.
+     */
+    public function reloadFpmPool(): void
+    {
+        $this->authorize('update', $this->site);
+        if (! $this->site->usesDedicatedPhpFpmPool() || ! $this->server->hostCapabilities()->supportsMachinePhpManagement()) {
+            $this->toastError(__('This site has no dedicated PHP-FPM pool to reload.'));
+
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('webserver_config', __('Reloading PHP-FPM pool'));
+        ApplySiteWebserverConfigJob::dispatch(
+            (string) $this->site->id,
+            (string) (auth()->id() ?? ''),
+            (string) $run->id,
+        );
+
+        // The reload churns live worker state, so drop the cached probe — the
+        // next card render (or Refresh) re-reads it.
+        Cache::forget($this->runtimeHealthCacheKey());
+        $this->runtimeHealthLoaded = false;
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            __('PHP-FPM pool reloaded.'),
+            __('PHP-FPM pool reload failed.'),
+        );
+        $this->toastConsoleActionQueued();
+    }
+
+    private function opcacheStatusCacheKey(): string
+    {
+        return 'dply.site-opcache:'.$this->site->id;
+    }
+
+    /**
+     * Deferred (wire:init) loader for the Overview OPcache card. Reads the live
+     * FPM cache via {@see SiteOpcacheManager} (FastCGI to the pool socket) off
+     * the render path; cached briefly so re-entries coalesce.
+     */
+    public function loadOpcacheStatus(SiteOpcacheManager $opcache): void
+    {
+        $this->opcacheStatusLoaded = true;
+        $this->opcacheStatus = null;
+
+        if (! $this->site->usesDedicatedPhpFpmPool() || ! $this->server->hostCapabilities()->supportsMachinePhpManagement()) {
+            return;
+        }
+
+        try {
+            $this->opcacheStatus = Cache::remember(
+                $this->opcacheStatusCacheKey(),
+                15,
+                fn () => $opcache->status($this->site),
+            );
+        } catch (\Throwable) {
+            $this->opcacheStatus = null;
+        }
+    }
+
+    /** Force-refresh the OPcache card (button on the card). */
+    public function refreshOpcacheStatus(SiteOpcacheManager $opcache): void
+    {
+        Cache::forget($this->opcacheStatusCacheKey());
+        $this->opcacheStatusLoaded = false;
+        $this->loadOpcacheStatus($opcache);
+    }
+
+    /**
+     * Flush this site's FPM OPcache. Queued + watched via the console banner so
+     * the SSH work stays off the request {@see [[feedback_queue_ssh_operations]]}.
+     */
+    public function resetOpcache(): void
+    {
+        $this->authorize('update', $this->site);
+        if (! $this->site->usesDedicatedPhpFpmPool() || ! $this->server->hostCapabilities()->supportsMachinePhpManagement()) {
+            $this->toastError(__('This site has no dedicated PHP-FPM pool whose OPcache can be flushed.'));
+
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('opcache_reset', __('Flushing OPcache'));
+        ResetSiteOpcacheJob::dispatch(
+            (string) $this->site->id,
+            (string) (auth()->id() ?? ''),
+            (string) $run->id,
+        );
+
+        // Stats change the moment it flushes — drop the cache so the card re-reads.
+        Cache::forget($this->opcacheStatusCacheKey());
+        $this->opcacheStatusLoaded = false;
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            __('OPcache flushed.'),
+            __('OPcache flush failed.'),
+        );
+        $this->toastConsoleActionQueued();
+    }
+
     public function saveRuntimePreferences(): void
     {
         $this->authorize('update', $this->site);
@@ -1431,6 +1848,15 @@ class Settings extends Show
             : self::ROUTING_TABS[0];
     }
 
+    private function resolveRuntimeTabForSite(Site $site, mixed $tab): string
+    {
+        $allowed = array_keys(SiteSettingsSidebar::runtimeTabsFor($site));
+
+        return is_string($tab) && in_array($tab, $allowed, true)
+            ? $tab
+            : 'overview';
+    }
+
     private function syncGeneralSettingsForm(bool $skipRefresh = false): void
     {
         // Skip the refresh when the caller has just refreshed (mount path —
@@ -1521,7 +1947,7 @@ class Settings extends Show
             $appDoToken = trim((string) config('services.digitalocean.token'));
 
             if ($credForApi === null && $appDoToken === '') {
-                $this->addError('settings_dns_zone', __('Add a DNS provider credential under Server providers (DigitalOcean or Cloudflare), or configure an app-level DigitalOcean token, to use a custom DNS zone.'));
+                $this->addError('settings_dns_zone', __('Add a DNS provider credential under Server providers (DigitalOcean, Hetzner, Linode, Vultr, AWS, Google Cloud, Azure, or Cloudflare), or configure an app-level DigitalOcean token, to use a custom DNS zone.'));
 
                 return;
             }
@@ -1532,6 +1958,48 @@ class Settings extends Show
                         $service = new DigitalOceanService($credForApi);
                         if (! $service->domainExistsInAccount($zone)) {
                             $this->addError('settings_dns_zone', __('That domain was not found in this DigitalOcean account. Add it under DigitalOcean Networking → Domains first.'));
+
+                            return;
+                        }
+                    } elseif ($credForApi->provider === 'hetzner') {
+                        $hetzner = new HetznerService($credForApi);
+                        if (! $hetzner->zoneExists($zone)) {
+                            $this->addError('settings_dns_zone', __('That zone was not found in this Hetzner Cloud project. Add it under Hetzner Console → DNS first.'));
+
+                            return;
+                        }
+                    } elseif ($credForApi->provider === 'linode') {
+                        $linode = new LinodeService($credForApi);
+                        if (! $linode->domainExists($zone)) {
+                            $this->addError('settings_dns_zone', __('That domain was not found in this Linode account. Add it under Linode → Domains first.'));
+
+                            return;
+                        }
+                    } elseif ($credForApi->provider === 'vultr') {
+                        $vultr = new VultrService($credForApi);
+                        if (! $vultr->domainExists($zone)) {
+                            $this->addError('settings_dns_zone', __('That domain was not found in this Vultr account. Add it under Vultr → DNS first.'));
+
+                            return;
+                        }
+                    } elseif ($credForApi->provider === 'aws') {
+                        $route53 = new Route53Service($credForApi);
+                        if (! $route53->hostedZoneExists($zone)) {
+                            $this->addError('settings_dns_zone', __('That hosted zone was not found in this AWS account. Create it in Route 53 first.'));
+
+                            return;
+                        }
+                    } elseif ($credForApi->provider === 'gcp') {
+                        $gcpDns = new GcpDnsService($credForApi);
+                        if (! $gcpDns->zoneExists($zone)) {
+                            $this->addError('settings_dns_zone', __('That zone was not found in this Google Cloud project. Add a Cloud DNS managed zone first.'));
+
+                            return;
+                        }
+                    } elseif ($credForApi->provider === 'azure') {
+                        $azure = new AzureDnsService($credForApi);
+                        if (! $azure->zoneExists($zone)) {
+                            $this->addError('settings_dns_zone', __('That zone was not found in this Azure account. Add it under Azure DNS first.'));
 
                             return;
                         }
@@ -1572,6 +2040,21 @@ class Settings extends Show
      * intentionally edited from Routing > Domains now — keeping the cascade
      * (cert re-issue, container backend cycle) next to its trigger.
      */
+    /**
+     * Re-apply the site's nginx vhost without changing any setting. The recovery
+     * for "site deploys but 502s" — a missing/stale vhost falling through to the
+     * default server. Streams the apply over the page's console banner.
+     */
+    public function rebuildWebserverConfig(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $this->finalizeRoutingMutation(
+            __('Webserver config rebuilt — the site vhost was re-applied.'),
+            __('Rebuilding webserver config …'),
+        );
+    }
+
     public function saveWebDirectory(): void
     {
         $this->authorize('update', $this->site);
@@ -1591,7 +2074,7 @@ class Settings extends Show
     /**
      * Update the site display name and slug. Mirrors `dply:site:rename` semantics
      * (the CLI command at app/Console/Commands/RenameSiteCommand.php): updates
-     * the row only — the on-disk path under `/var/www/<slug>` is intentionally
+     * the row only — the on-disk path under `/home/dply/<domain>` is intentionally
      * left untouched, since that affects deployments mid-flight.
      */
     public function saveSiteIdentity(): void
@@ -1853,6 +2336,9 @@ class Settings extends Show
             return;
         }
 
+        app(SiteAccessGateService::class)->ensureBasicAuthMethod($this->site);
+        $this->access_gate_method = SiteAccessGate::METHOD_BASIC_AUTH;
+
         $pathRules = ['required', 'string', 'max:512'];
         if (! $this->site->basicAuthSupportsPathPrefixes()) {
             $pathRules[] = Rule::in(['/', '']);
@@ -1863,7 +2349,10 @@ class Settings extends Show
                 'required',
                 'string',
                 'max:128',
-                Rule::unique('site_basic_auth_users', 'username')->where('site_id', $this->site->id),
+                Rule::unique('site_basic_auth_users', 'username')
+                    ->where(fn ($query) => $query
+                        ->where('site_id', $this->site->id)
+                        ->whereNull('pending_removal_at')),
             ],
             'new_basic_auth_password' => ['required', 'string', 'min:8', 'max:255'],
             'new_basic_auth_path' => $pathRules,
@@ -1882,20 +2371,38 @@ class Settings extends Show
             return;
         }
 
-        SiteBasicAuthUser::query()->create([
-            'site_id' => $this->site->id,
-            'username' => trim($validated['new_basic_auth_username']),
-            'password_hash' => Hash::make($validated['new_basic_auth_password']),
-            'path' => $path,
-            'sort_order' => (int) ($this->site->basicAuthUsers()->max('sort_order') ?? 0) + 1,
-        ]);
+        $username = trim($validated['new_basic_auth_username']);
+        $passwordHash = $this->site->hashBasicAuthPassword($validated['new_basic_auth_password']);
+
+        $pendingRow = $this->site->basicAuthUsers()
+            ->where('username', $username)
+            ->whereNotNull('pending_removal_at')
+            ->first();
+
+        if ($pendingRow !== null) {
+            $pendingRow->forceFill([
+                'password_hash' => $passwordHash,
+                'path' => $path,
+                'pending_removal_at' => null,
+            ])->save();
+            $savedMessage = __('Basic authentication user restored.');
+        } else {
+            SiteBasicAuthUser::query()->create([
+                'site_id' => $this->site->id,
+                'username' => $username,
+                'password_hash' => $passwordHash,
+                'path' => $path,
+                'sort_order' => (int) ($this->site->basicAuthUsers()->max('sort_order') ?? 0) + 1,
+            ]);
+            $savedMessage = __('Basic authentication user saved.');
+        }
 
         $this->new_basic_auth_username = '';
         $this->new_basic_auth_password = '';
         $this->new_basic_auth_path = '/';
         $this->site->load('basicAuthUsers');
         $this->dispatch('close-modal', 'add-basic-auth-modal');
-        $this->finalizeRoutingMutation(__('Basic authentication user saved.'), __('Adding credential to :host …', ['host' => $this->site->server?->name ?? $this->site->name]));
+        $this->finalizeRoutingMutation($savedMessage, __('Adding credential to :host …', ['host' => $this->site->server?->name ?? $this->site->name]));
     }
 
     /**
@@ -1954,6 +2461,258 @@ class Settings extends Show
         $this->new_basic_auth_password = Str::password(20);
     }
 
+    public function generateFormGatePassword(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->form_gate_password = Str::password(20);
+    }
+
+    public function selectAccessGateMethod(string $method): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->site->supportsAccessGateProvisioning()) {
+            return;
+        }
+
+        if (! in_array($method, [
+            SiteAccessGate::METHOD_OFF,
+            SiteAccessGate::METHOD_BASIC_AUTH,
+            SiteAccessGate::METHOD_FORM_PASSWORD,
+        ], true)) {
+            return;
+        }
+
+        if ($method === SiteAccessGate::METHOD_FORM_PASSWORD && ! $this->site->webserverSupportsFormPasswordGate()) {
+            $this->toastError(__('Password gate is not available for OpenLiteSpeed in this release.'));
+
+            return;
+        }
+
+        $live = $this->site->resolvedAccessGateMethod();
+        if ($method === $live && $method !== SiteAccessGate::METHOD_FORM_PASSWORD) {
+            $this->access_gate_method = $method;
+
+            return;
+        }
+
+        if ($method === SiteAccessGate::METHOD_FORM_PASSWORD && $live !== SiteAccessGate::METHOD_FORM_PASSWORD) {
+            if ($live === SiteAccessGate::METHOD_BASIC_AUTH && $this->site->enforceableBasicAuthUsers()->isNotEmpty()) {
+                $this->openConfirmActionModal(
+                    'prepareFormPasswordGate',
+                    [],
+                    __('Switch to password gate?'),
+                    __('HTTP basic auth credentials will be removed on the next webserver apply. Enter a new shared password below, then save.'),
+                    __('Switch method'),
+                    true,
+                );
+
+                return;
+            }
+
+            $this->access_gate_method = SiteAccessGate::METHOD_FORM_PASSWORD;
+
+            return;
+        }
+
+        if ($live === SiteAccessGate::METHOD_FORM_PASSWORD && $method !== SiteAccessGate::METHOD_FORM_PASSWORD) {
+            $this->openConfirmActionModal(
+                'applyAccessGateMethod',
+                [$method],
+                __('Switch access method?'),
+                __('The password gate will be removed on the next webserver apply.'),
+                __('Switch method'),
+                $method === SiteAccessGate::METHOD_OFF,
+            );
+
+            return;
+        }
+
+        if ($live === SiteAccessGate::METHOD_BASIC_AUTH && $this->site->enforceableBasicAuthUsers()->isNotEmpty() && $method === SiteAccessGate::METHOD_OFF) {
+            $this->openConfirmActionModal(
+                'applyAccessGateMethod',
+                [$method],
+                __('Turn off access protection?'),
+                __('All basic auth credentials will be removed on the next webserver apply.'),
+                __('Turn off protection'),
+                true,
+            );
+
+            return;
+        }
+
+        $this->applyAccessGateMethod($method);
+    }
+
+    public function prepareFormPasswordGate(): void
+    {
+        $this->authorize('update', $this->site);
+        app(SiteAccessGateService::class)->markAllBasicAuthUsersForRemoval($this->site);
+        $this->access_gate_method = SiteAccessGate::METHOD_FORM_PASSWORD;
+        $this->site->load('basicAuthUsers');
+    }
+
+    public function applyAccessGateMethod(string $method): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->site->supportsAccessGateProvisioning()) {
+            return;
+        }
+
+        $service = app(SiteAccessGateService::class);
+
+        if ($method === SiteAccessGate::METHOD_OFF) {
+            $service->markAllBasicAuthUsersForRemoval($this->site);
+            $service->disable($this->site);
+            $this->access_gate_method = SiteAccessGate::METHOD_OFF;
+            $this->site->load(['accessGate', 'basicAuthUsers']);
+            $this->finalizeRoutingMutation(__('Access protection turned off.'));
+
+            return;
+        }
+
+        if ($method === SiteAccessGate::METHOD_BASIC_AUTH) {
+            $wasForm = $this->site->usesFormPasswordGate();
+            app(SiteAccessGateService::class)->markAllFormGatePasswordsForRemoval($this->site);
+            $gate = SiteAccessGate::query()->firstOrNew(['site_id' => $this->site->id]);
+            if (! $gate->exists) {
+                $gate->cookie_secret = Str::random(48);
+            }
+            $gate->method = SiteAccessGate::METHOD_BASIC_AUTH;
+            $gate->password_salt = null;
+            $gate->password_verifier = null;
+            $gate->save();
+            $this->access_gate_method = SiteAccessGate::METHOD_BASIC_AUTH;
+            $this->site->load(['accessGate', 'basicAuthUsers']);
+
+            if ($wasForm) {
+                $this->finalizeRoutingMutation(__('Switched to HTTP basic auth.'));
+            }
+
+            return;
+        }
+
+        $this->access_gate_method = SiteAccessGate::METHOD_FORM_PASSWORD;
+    }
+
+    public function saveFormGatePassword(): void
+    {
+        $this->addFormGatePassword();
+    }
+
+    public function addFormGatePassword(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->site->supportsAccessGateProvisioning()) {
+            $this->toastError(__('Access protection is not available for this site runtime.'));
+
+            return;
+        }
+
+        if (! $this->site->webserverSupportsFormPasswordGate()) {
+            $this->toastError(__('Password gate is not available for OpenLiteSpeed in this release.'));
+
+            return;
+        }
+
+        $validated = $this->validate([
+            'new_form_gate_label' => ['required', 'string', 'max:64'],
+            'form_gate_password' => ['required', 'string', 'min:8', 'max:255'],
+        ], [], [
+            'new_form_gate_label' => __('label'),
+            'form_gate_password' => __('password'),
+        ]);
+
+        app(SiteAccessGateService::class)->addFormGatePassword(
+            $this->site,
+            $validated['new_form_gate_label'],
+            $validated['form_gate_password'],
+        );
+
+        $this->new_form_gate_label = '';
+        $this->form_gate_password = '';
+        $this->access_gate_method = SiteAccessGate::METHOD_FORM_PASSWORD;
+        $this->form_gate_login_log_loaded = false;
+        $this->dispatch('close-modal', 'add-form-gate-modal');
+        $this->site->load(['accessGate', 'accessGatePasswords', 'basicAuthUsers']);
+        $this->finalizeRoutingMutation(
+            __('Password gate credential saved.'),
+            __('Applying password gate on :host …', ['host' => $this->site->server?->name ?? $this->site->name]),
+        );
+    }
+
+    public function loadFormGateLoginLog(): void
+    {
+        $this->authorize('view', $this->site);
+
+        if (! $this->site->usesFormPasswordGate()) {
+            $this->form_gate_login_log = [];
+            $this->form_gate_login_log_loaded = true;
+
+            return;
+        }
+
+        $this->form_gate_login_log = app(SiteAccessGateLoginLogReader::class)->recent($this->site);
+        $this->form_gate_login_log_loaded = true;
+    }
+
+    public function confirmRemoveFormGatePassword(string $passwordId): void
+    {
+        $this->authorize('update', $this->site);
+
+        $row = SiteAccessGatePassword::query()
+            ->where('site_id', $this->site->id)
+            ->where('id', $passwordId)
+            ->first();
+
+        if ($row === null || $row->isPendingRemoval()) {
+            return;
+        }
+
+        $this->openConfirmActionModal(
+            'removeFormGatePassword',
+            [$passwordId],
+            __('Remove password gate credential?'),
+            __(':label will stop working after the next webserver apply.', ['label' => $row->label]),
+            __('Remove credential'),
+            true,
+        );
+    }
+
+    public function removeFormGatePassword(string $passwordId): void
+    {
+        $this->authorize('update', $this->site);
+
+        app(SiteAccessGateService::class)->markFormGatePasswordForRemoval($this->site, $passwordId);
+        $this->site->load(['accessGate', 'accessGatePasswords']);
+
+        if ($this->site->enforceableAccessGatePasswords()->isEmpty()) {
+            $gate = $this->site->accessGate;
+            if ($gate !== null) {
+                $gate->method = SiteAccessGate::METHOD_FORM_PASSWORD;
+                $gate->save();
+            }
+        }
+
+        $this->finalizeRoutingMutation(__('Password gate credential marked for removal.'));
+    }
+
+    public function disableFormGatePassword(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $this->openConfirmActionModal(
+            'applyAccessGateMethod',
+            [SiteAccessGate::METHOD_OFF],
+            __('Remove password gate?'),
+            __('Visitors will reach the site without the login form after the next webserver apply.'),
+            __('Remove gate'),
+            true,
+        );
+    }
+
     /**
      * Dispatches a backgrounded job that walks the server, finds every .htpasswd
      * inside the site repo, and imports the user entries Dply doesn't already
@@ -1976,14 +2735,21 @@ class Settings extends Show
         // once the worker calls beginConsoleAction(), which is async — the
         // banner reads from the DB on parent render and would stay empty until
         // the user navigated or another action triggered a re-render.
-        $this->seedQueuedConsoleAction('basic_auth_sync');
+        $run = $this->seedQueuedConsoleAction('basic_auth_sync');
 
         SyncBasicAuthFromServerJob::dispatch(
             $this->site->id,
             (string) (auth()->id() ?? ''),
+            (string) $run->id,
         );
 
-        $this->toastSuccess(__('Sync queued — track progress in the banner at the top of this page.'));
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            __('Basic-auth sync finished.'),
+            __('Basic-auth sync did not finish.'),
+        );
+        $this->toastConsoleActionQueued();
     }
 
     // seedQueuedConsoleAction lives on Show.php and is inherited — see
@@ -2024,7 +2790,7 @@ class Settings extends Show
             return;
         }
 
-        $user->password_hash = Hash::make($customPassword);
+        $user->password_hash = $this->site->hashBasicAuthPassword($customPassword);
         $user->save();
 
         $this->site->load('basicAuthUsers');
@@ -2063,7 +2829,7 @@ class Settings extends Show
             return;
         }
 
-        $existing = $this->site->basicAuthUsers()->pluck('username')->all();
+        $existing = $this->site->basicAuthUsers()->notPendingRemoval()->pluck('username')->all();
         $seen = [];
         $created = 0;
         $skipped = 0;
@@ -2092,7 +2858,7 @@ class Settings extends Show
 
                 continue;
             }
-            if (in_array($username, $existing, true) || in_array($username, $seen, true)) {
+            if (in_array($username, $seen, true)) {
                 $skipped++;
 
                 continue;
@@ -2106,7 +2872,30 @@ class Settings extends Show
 
                 continue;
             }
-            $hash = $alreadyHashed ? $secret : Hash::make($secret);
+            $hash = $alreadyHashed ? $secret : $this->site->hashBasicAuthPassword($secret);
+
+            $pendingRow = $this->site->basicAuthUsers()
+                ->where('username', $username)
+                ->whereNotNull('pending_removal_at')
+                ->first();
+
+            if ($pendingRow !== null) {
+                $pendingRow->forceFill([
+                    'password_hash' => $hash,
+                    'path' => $path,
+                    'pending_removal_at' => null,
+                ])->save();
+                $seen[] = $username;
+                $created++;
+
+                continue;
+            }
+
+            if (in_array($username, $existing, true)) {
+                $skipped++;
+
+                continue;
+            }
 
             SiteBasicAuthUser::query()->create([
                 'site_id' => $this->site->id,
@@ -2116,6 +2905,7 @@ class Settings extends Show
                 'sort_order' => ++$sortBase,
             ]);
             $seen[] = $username;
+            $existing[] = $username;
             $created++;
         }
 
@@ -2210,9 +3000,64 @@ class Settings extends Show
     {
         $this->authorize('update', $this->site);
 
-        $this->site->tenantDomains()->findOrFail($tenantDomainId)->delete();
+        $tenant = $this->site->tenantDomains()->findOrFail($tenantDomainId);
+
+        // If the tenant has a managed testing hostname, tear its DNS record down
+        // and delete the row from a queued job (DNS API + webserver re-apply both
+        // belong off the web request); otherwise delete inline as before.
+        if ($tenant->testingHostname() !== null) {
+            ProvisionTenantTestingHostnameJob::dispatch(
+                (string) $this->site->id,
+                (string) $tenant->id,
+                remove: true,
+                userId: (string) (auth()->id() ?? ''),
+                deleteTenantRow: true,
+            );
+            $this->toastSuccess(__('Removing tenant domain and its testing hostname…'));
+
+            return;
+        }
+
+        $tenant->delete();
         $this->site->load('tenantDomains');
         $this->finalizeRoutingMutation('Tenant domain removed.');
+    }
+
+    /**
+     * Provision a managed testing-domain hostname for this tenant so the app can
+     * be reached as the tenant on a dply testing zone before the customer's DNS
+     * is pointed. Queued: it makes a DNS API call then re-applies the vhost.
+     */
+    public function provisionTenantTestingHostname(string $tenantDomainId): void
+    {
+        $this->authorize('update', $this->site);
+
+        $tenant = $this->site->tenantDomains()->findOrFail($tenantDomainId);
+
+        ProvisionTenantTestingHostnameJob::dispatch(
+            (string) $this->site->id,
+            (string) $tenant->id,
+            remove: false,
+            userId: (string) (auth()->id() ?? ''),
+        );
+
+        $this->toastSuccess(__('Creating a testing URL for this tenant… DNS and the webserver update in the background.'));
+    }
+
+    public function removeTenantTestingHostname(string $tenantDomainId): void
+    {
+        $this->authorize('update', $this->site);
+
+        $tenant = $this->site->tenantDomains()->findOrFail($tenantDomainId);
+
+        ProvisionTenantTestingHostnameJob::dispatch(
+            (string) $this->site->id,
+            (string) $tenant->id,
+            remove: true,
+            userId: (string) (auth()->id() ?? ''),
+        );
+
+        $this->toastSuccess(__('Removing this tenant’s testing URL…'));
     }
 
     public function editTenantDomain(string $tenantDomainId): void
@@ -2336,9 +3181,31 @@ class Settings extends Show
         $this->finalizeRoutingMutation(__(':count tenant(s) imported.', ['count' => $imported]));
     }
 
+    /**
+     * The primary preview hostname is a dply-managed, auto-provisioned subdomain
+     * — there's a real DNS record + Let's Encrypt cert tied to that exact name on
+     * the testing domain. It can't be freely renamed from this form (doing so
+     * wouldn't re-provision DNS/SSL, it would just relabel a row and orphan the
+     * live record), so the hostname field is locked and only the label / auto-SSL
+     * / HTTPS-redirect options are editable.
+     */
+    public function previewHostnameLocked(): bool
+    {
+        $this->site->loadMissing('previewDomains');
+        $primary = $this->site->primaryPreviewDomain();
+
+        return $primary !== null && (bool) $primary->managed_by_dply;
+    }
+
     public function savePreviewSettings(): void
     {
         $this->authorize('update', $this->site);
+
+        // Pin a managed preview's hostname to its provisioned value before
+        // validating/saving — the form can only change the label and toggles.
+        if ($this->previewHostnameLocked()) {
+            $this->preview_primary_hostname = (string) $this->site->primaryPreviewDomain()->hostname;
+        }
 
         $validated = $this->validate([
             'preview_primary_hostname' => [
@@ -2425,11 +3292,27 @@ class Settings extends Show
 
         $this->quick_ssl_domain_hostname = $normalized;
         $this->quick_ssl_provider_type = SiteCertificate::PROVIDER_LETSENCRYPT;
+        $this->quick_ssl_force = false;
+        $this->quick_ssl_reachability = app(SiteReachabilityChecker::class)->checkHostname($this->site, $normalized);
         $this->dispatch('open-modal', 'quick-domain-ssl-modal');
+    }
+
+    public function recheckQuickDomainSslReachability(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $hostname = strtolower(trim((string) $this->quick_ssl_domain_hostname));
+        if ($hostname === '') {
+            return;
+        }
+
+        $this->quick_ssl_reachability = app(SiteReachabilityChecker::class)->checkHostname($this->site, $hostname);
     }
 
     public function closeQuickDomainSslModal(): void
     {
+        $this->quick_ssl_reachability = null;
+        $this->quick_ssl_force = false;
         $this->dispatch('close-modal', 'quick-domain-ssl-modal');
     }
 
@@ -2467,6 +3350,20 @@ class Settings extends Show
         if ($existing) {
             $this->toastError(__('SSL is already configured or in progress for :domain.', ['domain' => $hostname]));
             $this->closeQuickDomainSslModal();
+
+            return;
+        }
+
+        // An HTTP-01 challenge only succeeds if the domain already resolves to
+        // this server and answers on port 80 — otherwise the CA can't reach the
+        // challenge file. Gate the request on a live reachability check so we
+        // don't queue a cert that's guaranteed to fail. The operator can still
+        // override (e.g. DNS is mid-propagation) via the modal checkbox.
+        $reachability = app(SiteReachabilityChecker::class)->checkHostname($this->site, $hostname);
+        $this->quick_ssl_reachability = $reachability;
+        if (! $reachability['ok'] && ! $this->quick_ssl_force) {
+            $this->addError('quick_ssl_domain_hostname', $reachability['error']
+                ?? __('This domain is not reachable here yet — point it at this server before requesting SSL.'));
 
             return;
         }
@@ -2703,6 +3600,160 @@ class Settings extends Show
     }
 
     /**
+     * Whether this site is fronted by Caddy terminating TLS with its built-in
+     * automatic HTTPS — i.e. Caddy owns the certificate, not certbot. Edge-proxy
+     * layouts (Envoy/HAProxy/Traefik in front of a Caddy backend) terminate TLS
+     * at the front, so they don't count.
+     */
+    public function siteUsesCaddyAutoHttps(): bool
+    {
+        return $this->site->webserver() === 'caddy' && ! $this->server->hasEdgeProxy();
+    }
+
+    /**
+     * Surface the live Caddy-managed certificate(s) for this site's hostnames.
+     * The cross-engine SSH sweep runs async in {@see ScanServerLiveCertsJob}
+     * (shared with the server cert surfaces); this reads the cached result and
+     * filters it to this site, polling via {@see pollCaddyManagedCerts()} while a
+     * scan is in flight — SSH never runs in the request.
+     */
+    public function loadCaddyManagedCerts(bool $forceFresh = false): void
+    {
+        $this->authorize('view', $this->site);
+
+        if (! $this->siteUsesCaddyAutoHttps()) {
+            $this->caddy_managed_certs = [];
+            $this->caddy_managed_certs_loaded = true;
+            $this->caddy_managed_certs_scanning = false;
+
+            return;
+        }
+
+        if (! $this->server->isReady() || empty($this->server->ssh_private_key)) {
+            $this->caddy_managed_certs_error = __('Provisioning and SSH must be ready before reading Caddy certificates.');
+            $this->caddy_managed_certs_loaded = true;
+            $this->caddy_managed_certs_scanning = false;
+
+            return;
+        }
+
+        $aggregator = app(WebserverCertsAggregator::class);
+        $cached = $forceFresh ? null : $aggregator->cached($this->server);
+        if ($cached !== null) {
+            $this->applyCaddyManagedCerts($cached);
+
+            return;
+        }
+
+        $aggregator->dispatchScan($this->server, $forceFresh);
+        $this->caddy_managed_certs_scanning = true;
+        $this->caddy_managed_certs_loaded = false;
+        $this->caddy_managed_certs_error = null;
+    }
+
+    /** Driven by wire:poll while a scan is in flight; resolves once the job caches a result. */
+    public function pollCaddyManagedCerts(): void
+    {
+        if (! $this->caddy_managed_certs_scanning) {
+            return;
+        }
+
+        $cached = app(WebserverCertsAggregator::class)->cached($this->server);
+        if ($cached !== null) {
+            $this->applyCaddyManagedCerts($cached);
+        }
+    }
+
+    public function refreshCaddyManagedCerts(): void
+    {
+        $this->loadCaddyManagedCerts(forceFresh: true);
+    }
+
+    /**
+     * Filter the cross-engine sweep down to this site's Caddy-managed certs.
+     *
+     * @param  array{certs: list<array<string, mixed>>, scanned_at: ?CarbonImmutable, unreadable: bool}  $result
+     */
+    private function applyCaddyManagedCerts(array $result): void
+    {
+        $hostnames = collect($this->site->webserverHostnames())
+            ->filter()
+            ->map(fn (string $host): string => strtolower(trim($host)))
+            ->filter()
+            ->values()
+            ->all();
+
+        $certs = array_values(array_filter($result['certs'], function (array $row) use ($hostnames): bool {
+            if (($row['engine_hint'] ?? null) !== 'caddy') {
+                return false;
+            }
+
+            $haystack = strtolower(($row['path'] ?? '').' '.($row['subject'] ?? ''));
+            foreach ($hostnames as $host) {
+                if (str_contains($haystack, $host)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }));
+
+        $this->caddy_managed_certs = array_map(function (array $row): array {
+            $row['expires_at'] = $row['expires_at'] instanceof CarbonImmutable
+                ? $row['expires_at']->toIso8601String()
+                : null;
+
+            return $row;
+        }, $certs);
+        $this->caddy_managed_certs_scanned_at_iso = $result['scanned_at'] instanceof CarbonImmutable
+            ? $result['scanned_at']->toIso8601String()
+            : null;
+        $this->caddy_managed_certs_unreadable = (bool) $result['unreadable'];
+        $this->caddy_managed_certs_loaded = true;
+        $this->caddy_managed_certs_scanning = false;
+        $this->caddy_managed_certs_error = null;
+    }
+
+    public function retryCertificate(string $certificateId, CertificateRepairService $repairService): void
+    {
+        $this->repairCertificate($certificateId, $repairService);
+    }
+
+    public function repairCertificate(string $certificateId, CertificateRepairService $repairService): void
+    {
+        $this->authorize('update', $this->site);
+
+        $certificate = $this->site->certificates()->findOrFail($certificateId);
+
+        try {
+            // Seed before dispatch so the certificates-section SSL banner appears
+            // on this re-render; ExecuteSiteCertificateJob::beginConsoleAction()
+            // reuses the row instead of waiting for the worker to create one.
+            $run = $this->seedQueuedConsoleAction('ssl');
+
+            $repairService->repair($this->site, $certificate, auth()->id(), (string) $run->id);
+        } catch (\InvalidArgumentException $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+            $this->site->load('certificates');
+
+            return;
+        }
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            __('Certificate repair finished.'),
+            __('Certificate repair did not finish.'),
+        );
+        $this->toastConsoleActionQueued();
+        $this->site->load('certificates');
+    }
+
+    /**
      * @param  array<string, mixed>  $validated
      * @return list<string>
      */
@@ -2745,6 +3796,7 @@ class Settings extends Show
 
         try {
             $this->system_user_remote_rows = $service->listPasswdUsersWithSiteCounts($this->server->fresh(), $lister);
+            $this->system_users_loaded = true;
         } catch (\Throwable $e) {
             $this->system_user_list_error = $e->getMessage();
             $this->system_user_remote_rows = [];
@@ -2858,197 +3910,6 @@ class Settings extends Show
     }
 
     /**
-     * Add a SiteProcess (worker / scheduler / custom) to the site.
-     *
-     * The auto-created `web` row is owned by the Site::created hook —
-     * users edit its command via the start_command field, not this
-     * form. The form only accepts non-web types so a duplicate web
-     * SiteProcess can't appear (the relation already enforces unique
-     * `(site_id, name)`, but we belt-and-suspenders here for clarity).
-     */
-    public function addSiteProcess(): void
-    {
-        $this->authorize('update', $this->site);
-
-        $allowedTypes = [SiteProcess::TYPE_WORKER, SiteProcess::TYPE_SCHEDULER, SiteProcess::TYPE_CUSTOM];
-        $validated = $this->validate([
-            'new_site_process_type' => ['required', 'string', 'in:'.implode(',', $allowedTypes)],
-            'new_site_process_name' => ['required', 'string', 'max:64', 'regex:/^[a-zA-Z0-9_-]+$/'],
-            'new_site_process_command' => ['required', 'string', 'max:2000'],
-        ], attributes: [
-            'new_site_process_type' => __('process type'),
-            'new_site_process_name' => __('process name'),
-            'new_site_process_command' => __('process command'),
-        ]);
-
-        $name = trim($validated['new_site_process_name']);
-        if ($name === 'web') {
-            $this->addError(
-                'new_site_process_name',
-                __('The name "web" is reserved for the upstream process.'),
-            );
-
-            return;
-        }
-
-        if ($this->site->processes()->where('name', $name)->exists()) {
-            $this->addError(
-                'new_site_process_name',
-                __('A process named ":name" already exists for this site.', ['name' => $name]),
-            );
-
-            return;
-        }
-
-        $this->site->processes()->create([
-            'type' => $validated['new_site_process_type'],
-            'name' => $name,
-            'command' => trim($validated['new_site_process_command']),
-            'scale' => 1,
-            'is_active' => true,
-        ]);
-
-        // Re-provision systemd units so the new process gets its own unit
-        // file installed without waiting for the next deploy. The job
-        // skips PHP/static sites internally so this is safe to call
-        // unconditionally for non-PHP runtimes.
-        if (! in_array($this->site->runtimeKey(), ['php', 'static', null], true)) {
-            ProvisionSiteSystemdUnitsJob::dispatch($this->site->id);
-        }
-
-        $this->new_site_process_name = '';
-        $this->new_site_process_command = '';
-        $this->new_site_process_type = SiteProcess::TYPE_WORKER;
-
-        $this->toastSuccess(__('Process :name added.', ['name' => $name]));
-    }
-
-    /**
-     * Remove a non-web SiteProcess. The web row is the upstream the
-     * NGINX vhost depends on — deleting it would break routing — so
-     * the method refuses to touch it.
-     *
-     * Side effect: dispatches TearDownSiteSystemdUnitJob to disable +
-     * remove the matching systemd unit file on the server. Computed
-     * from the live process before deletion (the unit name is derived
-     * from the process name), then queued so the SSH round-trip
-     * doesn't block the form response.
-     */
-    public function removeSiteProcess(string $id): void
-    {
-        $this->authorize('update', $this->site);
-
-        $process = $this->site->processes()->whereKey($id)->first();
-        if ($process === null) {
-            return;
-        }
-
-        if ($process->type === SiteProcess::TYPE_WEB) {
-            $this->toastError(__('The web process is managed by dply and cannot be removed from this UI.'));
-
-            return;
-        }
-
-        $name = $process->name;
-        $unitName = app(SiteSystemdUnitBuilder::class)
-            ->processUnitName($this->site, $process);
-        $process->delete();
-
-        // For non-PHP/static sites, dispatch the per-unit teardown so
-        // the systemd unit file goes away alongside the row. PHP and
-        // static runtimes never had a unit installed in the first
-        // place, so dispatching for them is a guaranteed no-op (the
-        // job's runtime guard would skip).
-        if (! in_array($this->site->runtimeKey(), ['php', 'static', null], true)) {
-            TearDownSiteSystemdUnitJob::dispatch($this->site->id, $unitName);
-        }
-
-        $this->toastSuccess(__('Process :name removed.', ['name' => $name]));
-    }
-
-    /**
-     * Flip a SiteProcess between active and inactive.
-     *
-     * Active is the default; flipping to inactive prevents the deploy
-     * pipeline from registering / starting the unit (the systemd unit
-     * file is still removed/refreshed when the process is added or
-     * removed, but skipped from `systemctl enable --now` when the row
-     * is inactive). Useful for temporarily silencing a worker without
-     * deleting + recreating the row.
-     *
-     * Refuses to deactivate the auto-created `web` row — that would
-     * disable the upstream NGINX proxies to and 502 the site. The user
-     * can deactivate workers / schedulers / custom processes only.
-     */
-    public function toggleSiteProcessActive(string $id): void
-    {
-        $this->authorize('update', $this->site);
-
-        $process = $this->site->processes()->whereKey($id)->first();
-        if ($process === null) {
-            return;
-        }
-
-        $next = ! (bool) $process->is_active;
-        if ($process->type === SiteProcess::TYPE_WEB && ! $next) {
-            $this->toastError(__('The web process must stay active.'));
-
-            return;
-        }
-
-        $process->update(['is_active' => $next]);
-
-        $this->toastSuccess($next
-            ? __('Process :name reactivated.', ['name' => $process->name])
-            : __('Process :name deactivated.', ['name' => $process->name]),
-        );
-    }
-
-    /**
-     * Update a SiteProcess's scale (number of replicas).
-     *
-     * Per the strategy memo: "scale (default 1, implemented via systemd
-     *
-     * @.service templates)". The data-layer update lands here; the
-     * actual systemd template + multi-instance enable happens on the
-     * next deploy / re-converge — re-running ProvisionSiteSystemdUnitsJob
-     * picks up the new scale value when it builds the unit content.
-     *
-     * Bounds: 1 (minimum, "process exists") to 16 (a reasonable cap
-     * for single-server scale; horizontal scale beyond that wants more
-     * servers, not more replicas on one).
-     */
-    public function setSiteProcessScale(string $id, int $scale): void
-    {
-        $this->authorize('update', $this->site);
-
-        if ($scale < 1 || $scale > 16) {
-            $this->toastError(__('Scale must be between 1 and 16.'));
-
-            return;
-        }
-
-        $process = $this->site->processes()->whereKey($id)->first();
-        if ($process === null) {
-            return;
-        }
-
-        $process->update(['scale' => $scale]);
-
-        // Re-provision the unit so the next deploy emits the right
-        // number of @{N}.service instances. Skipped for PHP/static —
-        // those don't have systemd units to reflect scale into.
-        if (! in_array($this->site->runtimeKey(), ['php', 'static', null], true)) {
-            ProvisionSiteSystemdUnitsJob::dispatch($this->site->id);
-        }
-
-        $this->toastSuccess(__('Scale set to :n for :name.', [
-            'n' => $scale,
-            'name' => $process->name,
-        ]));
-    }
-
-    /**
      * Recent SiteDeployment rows that carry structured phase_results
      * (i.e. went through the new DeployPhaseRunner). Used by the
      * settings.blade.php "Recent deployments" panel so the view stays
@@ -3065,117 +3926,161 @@ class Settings extends Show
     }
 
     /**
-     * Most recent SiteDeployment for the dashboard's "Last deploy"
-     * badge. Computed in PHP because Blade's @php(...) inline form
-     * trips on the method-chain length of `$site->latestDeployment()`.
+     * Most recent SiteDeployment for the general tab "Last deploy" badge.
+     *
+     * @property-read SiteDeployment|null $latestDeployment
      */
-    public function getLatestDeploymentProperty()
+    #[Computed]
+    public function latestDeployment(): ?SiteDeployment
     {
         return $this->site->latestDeployment();
     }
 
-    /**
-     * Restart a single non-web SiteProcess via systemctl.
-     *
-     * Mirror of the dply:site:restart-process CLI — both routes call
-     * SiteSystemdProvisioner::restartUnit so UI and CLI behavior
-     * stay aligned. Refuses to touch the web row (NGINX upstream —
-     * the deploy pipeline's restart phase owns that). Refuses for
-     * PHP/static sites that have no systemd units.
-     */
-    public function restartSiteProcess(string $id): void
-    {
-        $this->authorize('update', $this->site);
-
-        $runtime = $this->site->runtimeKey();
-        if (in_array($runtime, ['php', 'static', null], true)) {
-            $this->toastError(__('PHP and static sites have no systemd units to restart.'));
-
-            return;
-        }
-
-        $process = $this->site->processes()->whereKey($id)->first();
-        if ($process === null) {
-            return;
-        }
-        if ($process->type === SiteProcess::TYPE_WEB) {
-            $this->toastError(__('The web process is owned by the deploy pipeline; trigger the restart phase instead.'));
-
-            return;
-        }
-
-        $unitName = app(SiteSystemdUnitBuilder::class)
-            ->processUnitName($this->site, $process);
-
-        try {
-            app(SiteSystemdProvisioner::class)->restartUnit($this->site, $unitName);
-        } catch (\Throwable $e) {
-            $this->toastError(__('Restart failed: :msg', ['msg' => $e->getMessage()]));
-
-            return;
-        }
-
-        $this->toastSuccess(__('Restarted :name.', ['name' => $process->name]));
-    }
-
     public function render(): View
     {
+        $this->resolveWatchedConsoleAction();
+
         if (! $this->site->isReadyForWorkspace()) {
             return parent::render();
         }
 
-        // loadMissing instead of load: earlier lifecycle hooks (mount,
-        // syncGeneralSettingsForm, syncPreviewSettingsForm) already loadMissing some of
-        // these — reloading them in render() doubled queries on every render.
-        $this->site->loadMissing([
-            'domains',
-            'domainAliases',
-            'basicAuthUsers',
-            'previewDomains',
-            'dnsProviderCredential',
-            'certificates.previewDomain',
-            'deployments',
-            'redirects',
-            'tenantDomains',
-            'deployHooks',
-            'deploySteps',
-            'webhookDeliveryLogs',
-            'workspace.variables',
-        ]);
+        $section = $this->section;
+
+        $this->site->loadMissing($this->relationsForSettingsSection($section));
+        $this->server->loadMissing('workspace');
 
         $org = $this->site->organization;
+        $needsDeploymentSurface = $this->sectionNeedsDeploymentSurface($section);
 
-        return view('livewire.sites.settings', [
+        $deploymentContract = $needsDeploymentSurface
+            ? app(DeploymentContractBuilder::class)->build($this->site)
+            : null;
+        $deploymentPreflight = $needsDeploymentSurface
+            ? app(DeploymentPreflightValidator::class)->validate($this->site)
+            : [];
+
+        $viewData = [
             'tabs' => config('site_settings.workspace_tabs', []),
             'routingTabs' => self::ROUTING_TABS,
             'deployHookUrl' => $this->site->deployHookUrl(),
-            'assignableNotificationChannels' => AssignableNotificationChannels::forUser(auth()->user(), $org),
-            'siteNotificationEventLabels' => config('notification_events.categories.site.events', []),
-            'siteIntegrationWebhookDestinations' => NotificationWebhookDestination::query()
+            'deploymentContract' => $deploymentContract,
+            'deploymentPreflight' => $deploymentPreflight,
+        ];
+
+        if ($section === 'notifications') {
+            $viewData['assignableNotificationChannels'] = AssignableNotificationChannels::forUser(auth()->user(), $org);
+            // The per-channel matrix groups the site's own events and the error-stream
+            // events (the latter also editable from the Errors → Notifications tab).
+            $viewData['notificationEventGroups'] = [
+                [
+                    'label' => __('Deploys & uptime'),
+                    'events' => (array) config('notification_events.categories.site.events', []),
+                ],
+                [
+                    'label' => __('Error stream'),
+                    'events' => (array) config('notification_events.categories.site_errors.events', []),
+                ],
+            ];
+            $viewData['siteIntegrationWebhookDestinations'] = NotificationWebhookDestination::query()
                 ->where('organization_id', $this->site->organization_id)
                 ->where('site_id', $this->site->id)
                 ->orderBy('name')
-                ->get(),
-            'deploymentContract' => app(DeploymentContractBuilder::class)->build($this->site),
-            'deploymentPreflight' => app(DeploymentPreflightValidator::class)->validate($this->site),
-            'availableWorkspaces' => Workspace::query()
+                ->get();
+        }
+
+        if (in_array($section, ['settings', 'general'], true)) {
+            $viewData['availableWorkspaces'] = Workspace::query()
                 ->where('organization_id', $this->site->organization_id)
                 ->orderBy('name')
-                ->get(['id', 'name']),
-            'providerCredentials' => ProviderCredential::query()
+                ->get(['id', 'name']);
+        }
+
+        if ($section === 'certificates' || ($section === 'routing' && $this->routingTab === 'dns')) {
+            $viewData['providerCredentials'] = ProviderCredential::query()
                 ->where('organization_id', $this->site->organization_id)
                 ->whereIn('provider', ProviderCredential::dnsAutomationProviderKeys())
                 ->orderBy('name')
-                ->get(['id', 'name', 'provider']),
-            'sitePhpData' => $this->server->hostCapabilities()->supportsMachinePhpManagement()
-                ? app(ServerPhpManager::class)->sitePhpData($this->server, $this->site)
-                : null,
-            'repositorySyncGroup' => app(SiteDeploySyncGroupManager::class)->findGroupForSite($this->site)?->load(['sites.server', 'leader']),
-            'organizationSites' => Site::query()
+                ->get(['id', 'name', 'provider']);
+        }
+
+        if (
+            $section === 'runtime'
+            && $this->runtimeTab === 'php'
+            && $this->server->hostCapabilities()->supportsMachinePhpManagement()
+        ) {
+            $viewData['sitePhpData'] = app(ServerPhpManager::class)->sitePhpData($this->server, $this->site);
+        }
+
+        if ($section === 'runtime' && $this->runtimeTab === 'overview') {
+            // Cheap indexed read (site_id, occurred_at) — safe on the render path.
+            // The Overview shows a short tail; the full stream lives on the Errors tab.
+            $viewData['runtimeRecentErrors'] = ErrorEvent::query()
+                ->where('site_id', (string) $this->site->id)
+                ->whereNull('dismissed_at')
+                ->orderByDesc('occurred_at')
+                ->limit(5)
+                ->get();
+        }
+
+        if (in_array($section, ['deploy', 'repository', 'pipeline'], true)) {
+            $viewData['repositorySyncGroup'] = app(SiteDeploySyncGroupManager::class)->findGroupForSite($this->site)?->load(['sites.server', 'leader']);
+            $viewData['organizationSites'] = Site::query()
                 ->where('organization_id', $this->site->organization_id)
                 ->with('server:id,name')
                 ->orderBy('name')
-                ->get(),
-        ]);
+                ->get();
+        }
+
+        return view('livewire.sites.settings', array_merge(
+            SiteSettingsViewData::for(
+                $this->server,
+                $this->site,
+                $section,
+                $deploymentContract,
+                $deploymentPreflight,
+                auth()->user(),
+            ),
+            $viewData,
+        ));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function relationsForSettingsSection(string $section): array
+    {
+        $shared = ['certificates', 'certificates.previewDomain'];
+
+        $sectionRelations = match ($section) {
+            'general' => ['domains', 'domainAliases', 'deployments', 'previewDomains', 'workspace'],
+            'settings' => ['workspace', 'workspace.variables'],
+            'routing' => ['domains', 'domainAliases', 'redirects', 'tenantDomains', 'previewDomains', 'dnsProviderCredential'],
+            'certificates' => ['previewDomains'],
+            'repository' => ['deployments'],
+            'pipeline' => ['deployHooks', 'deploySteps'],
+            'deploy' => ['deployHooks', 'deploySteps', 'deployments'],
+            'environment' => ['workspace', 'workspace.variables'],
+            'logs' => ['deployments', 'webhookDeliveryLogs'],
+            'notifications' => ['notificationSubscriptions'],
+            'basic-auth' => ['basicAuthUsers', 'accessGate', 'accessGatePasswords'],
+            'laravel-stack', 'rails-stack' => ['workspace', 'workspace.variables'],
+            default => [],
+        };
+
+        return array_values(array_unique(array_merge($shared, $sectionRelations)));
+    }
+
+    private function sectionNeedsDeploymentSurface(string $section): bool
+    {
+        return in_array($section, [
+            'general',
+            'deploy',
+            'repository',
+            'pipeline',
+            'runtime',
+            'environment',
+            'laravel-stack',
+            'rails-stack',
+        ], true);
     }
 }

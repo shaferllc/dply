@@ -1,6 +1,11 @@
 {
   "permissions": {
     "allow": [
+      "Bash(ssh dply-app:*)",
+      "Bash(ssh dply-worker-1:*)",
+      "Bash(/usr/bin/ssh dply-app:*)",
+      "Bash(/usr/bin/ssh dply-worker-1:*)",
+      "Bash(./deploy.sh:*)",
       "Bash(php artisan *)",
       "Bash(php -r ' *)",
       "Bash(./vendor/bin/phpunit --filter=ServerWorkspaceNavTest)",
@@ -26,7 +31,21 @@
       "Bash(/Users/tomshafer/Projects/Apps/dply/vendor/bin/phpunit /Users/tomshafer/Projects/Apps/dply/tests/Feature/ServerWorkspaceSshKeysTest.php --filter test_add_key_writes_audit_event)",
       "Bash(/Users/tomshafer/Projects/Apps/dply/vendor/bin/phpunit /Users/tomshafer/Projects/Apps/dply/tests/Feature/ServerWorkspaceSshKeysTest.php /Users/tomshafer/Projects/Apps/dply/tests/Feature/SyncAuthorizedKeysJobTest.php /Users/tomshafer/Projects/Apps/dply/tests/Feature/SshKeysTest.php)",
       "Bash(/Users/tomshafer/Projects/Apps/dply/vendor/bin/phpunit /Users/tomshafer/Projects/Apps/dply/tests/Feature/WorkspaceFirewallTest.php /Users/tomshafer/Projects/Apps/dply/tests/Feature/ApplyFirewallJobTest.php /Users/tomshafer/Projects/Apps/dply/tests/Unit/Services/ServerFirewallProvisionerTest.php /Users/tomshafer/Projects/Apps/dply/tests/Feature/Api/FirewallApiTest.php)",
-      "mcp__context7__resolve-library-id"
+      "mcp__context7__resolve-library-id",
+      "Bash(./vendor/bin/pest tests/Feature/EdgeSiteSettingsTest.php --filter=\"hybrid origin\")",
+      "Bash(./vendor/bin/pest --version)",
+      "Bash(./vendor/bin/pest --testsuite=Edge)",
+      "Bash(./vendor/bin/pest --testsuite=Edge --stop-on-failure)",
+      "Bash(grep -n 'edgeSiteAccessRule\\\\|mount\\\\|$site\\\\b' app/Livewire/Concerns/ManagesEdgeDeploymentLifecycle.php)",
+      "Bash(grep -nE \"sites\\\\..*audit|sites/\\\\{|sites\\\\..*export\" routes/web.php)",
+      "Bash(gh auth *)",
+      "Bash(composer --version)",
+      "Read(//Users/tomshafer/Projects/Apps/**)",
+      "Bash(composer create-project *)",
+      "Bash(composer update *)",
+      "Bash(./dply --version)",
+      "Bash(/opt/homebrew/bin/gh repo *)",
+      "Bash(grep -nE 'protected \\\\$fillable' /Users/tomshafer/Projects/Apps/dply/app/Models/ForgeSite.php /Users/tomshafer/Projects/Apps/dply/app/Models/PloiSite.php /Users/tomshafer/Projects/Apps/dply/app/Models/PloiServer.php)"
     ]
   }
 }

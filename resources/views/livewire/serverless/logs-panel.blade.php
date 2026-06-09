@@ -18,12 +18,15 @@
         'deploy' => 'heroicon-o-rocket-launch',
     ];
 @endphp
-<div class="dply-card p-6 sm:p-8 space-y-5">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-        <div>
-            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Logs') }}</p>
-            <h2 class="mt-1 text-lg font-bold text-brand-ink">{{ $tabs[$tab] }}</h2>
-            <p class="mt-1 text-sm text-brand-moss">
+<div class="dply-card overflow-hidden">
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <x-icon-badge>
+            <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
+        </x-icon-badge>
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Logs') }}</p>
+            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $tabs[$tab] }}</h2>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                 @switch($tab)
                     @case('visits')
                         {{ __('Organic HTTP traffic — every request real users made, reported by the function as it served them.') }}
@@ -40,11 +43,12 @@
             </p>
         </div>
         <button type="button" wire:click="refreshLogs" wire:loading.attr="disabled"
-                class="inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:border-brand-sage/40">
+                class="ml-auto shrink-0 inline-flex items-center rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:border-brand-sage/40">
             {{ __('Refresh') }}
         </button>
     </div>
 
+    <div class="px-6 py-6 sm:px-7 space-y-5">
     {{-- Tab bar — every log source a DigitalOcean Functions host exposes. --}}
     <x-server-workspace-tablist :aria-label="__('Log sources')" class="!mb-0">
         @foreach ($tabs as $key => $label)
@@ -231,4 +235,5 @@
             </ul>
         @endif
     @endif
+    </div>
 </div>

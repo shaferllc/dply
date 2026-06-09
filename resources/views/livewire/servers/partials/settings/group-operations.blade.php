@@ -1,84 +1,24 @@
 @php
-    $maintenanceWeekdays = config('server_settings.maintenance_weekdays', []);
     $serverEventLabels = config('notification_events.categories.server.events', []);
     $hasLegacyNotes = is_string($server->meta['notif_routing_note'] ?? null) && trim((string) $server->meta['notif_routing_note']) !== '';
     $subscriptionsByChannel = collect($serverNotifSubscriptions)->groupBy('notification_channel_id');
 @endphp
 
 <section id="settings-group-ops" class="space-y-6" aria-labelledby="settings-group-ops-title">
-    @include('livewire.servers.partials.settings._intro', [
-        'headingId' => 'settings-group-ops-title',
-        'kicker' => __('Operations'),
-        'title' => __('Alerts & planned downtime'),
-        'description' => __('Maintenance windows now gate disruptive actions (firewall apply, supervisor restart-all) with a confirm prompt outside the window. Notification routing pins channels to this server\'s server-scoped events.'),
-    ])
-
-    <div id="settings-maintenance" class="{{ $card }} scroll-mt-24 p-6 sm:p-8">
-        <h3 class="text-lg font-semibold text-brand-ink">{{ __('Maintenance window') }}</h3>
-        <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-            {{ __('When you prefer disruptive work (upgrades, reboots). Times use your Dply timezone preference in the “Timezone & notes” section below, not the server OS clock.') }}
-        </p>
-        <form wire:submit="saveMaintenanceWindow" class="mt-6 space-y-5">
-            <fieldset @disabled(! $this->canEditServerSettings)>
-                <legend class="text-sm font-medium text-brand-ink">{{ __('Preferred days') }}</legend>
-                <div class="mt-2 flex flex-wrap gap-3">
-                    @foreach ($maintenanceWeekdays as $key => $label)
-                        <label class="inline-flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/15 px-3 py-2 text-sm">
-                            <input type="checkbox" wire:model="settingsMaintenanceDays" value="{{ $key }}" class="rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage" />
-                            <span>{{ $label }}</span>
-                        </label>
-                    @endforeach
-                </div>
-                <x-input-error :messages="$errors->get('settingsMaintenanceDays')" class="mt-2" />
-            </fieldset>
-            <div class="grid gap-5 sm:grid-cols-2">
-                <div>
-                    <x-input-label for="settings-maint-start" value="{{ __('Start (local)') }}" />
-                    <input
-                        id="settings-maint-start"
-                        type="time"
-                        wire:model="settingsMaintenanceStart"
-                        class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
-                        @disabled(! $this->canEditServerSettings)
-                    />
-                    <x-input-error :messages="$errors->get('settingsMaintenanceStart')" class="mt-2" />
-                </div>
-                <div>
-                    <x-input-label for="settings-maint-end" value="{{ __('End (local)') }}" />
-                    <input
-                        id="settings-maint-end"
-                        type="time"
-                        wire:model="settingsMaintenanceEnd"
-                        class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
-                        @disabled(! $this->canEditServerSettings)
-                    />
-                    <x-input-error :messages="$errors->get('settingsMaintenanceEnd')" class="mt-2" />
-                </div>
+    <div id="settings-notifications" class="{{ $card }} scroll-mt-24">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <x-icon-badge>
+                <x-heroicon-o-chat-bubble-left-right class="h-5 w-5" aria-hidden="true" />
+            </x-icon-badge>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Routing') }}</p>
+                <h2 id="settings-group-ops-title" class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Notification routing') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                    {{ __('Pick which org notification channels (Slack, PagerDuty, email, webhook, …) should receive notifications for this server\'s server-scoped events. Each row binds one channel to one event; remove a row to unsubscribe.') }}
+                </p>
             </div>
-            <div>
-                <x-input-label for="settings-maint-note" value="{{ __('Note') }}" />
-                <textarea
-                    id="settings-maint-note"
-                    wire:model="settingsMaintenanceNote"
-                    rows="3"
-                    class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
-                    @disabled(! $this->canEditServerSettings)
-                ></textarea>
-                <x-input-error :messages="$errors->get('settingsMaintenanceNote')" class="mt-2" />
-            </div>
-            @if ($this->canEditServerSettings)
-                <div class="flex justify-end">
-                    <x-primary-button type="submit" wire:loading.attr="disabled">{{ __('Save maintenance window') }}</x-primary-button>
-                </div>
-            @endif
-        </form>
-    </div>
-
-    <div id="settings-notifications" class="{{ $card }} scroll-mt-24 p-6 sm:p-8">
-        <h3 class="text-lg font-semibold text-brand-ink">{{ __('Notification routing') }}</h3>
-        <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-            {{ __('Pick which org notification channels (Slack, PagerDuty, email, webhook, …) should receive notifications for this server\'s server-scoped events. Each row binds one channel to one event; remove a row to unsubscribe.') }}
-        </p>
+        </div>
+        <div class="px-6 py-6 sm:px-7">
 
         <div class="mt-6">
             @if ($subscriptionsByChannel->isEmpty())
@@ -145,7 +85,7 @@
                                 wire:click="openCreateChannelModal"
                                 class="inline-flex items-center gap-1.5 text-xs font-medium text-brand-ink hover:text-brand-sage"
                             >
-                                <x-heroicon-o-plus-circle class="h-3.5 w-3.5" aria-hidden="true" />
+                                <x-heroicon-o-plus-circle class="h-4 w-4" aria-hidden="true" />
                                 {{ __('Create new channel') }}
                             </button>
                             <span class="text-[10px] text-brand-mist">·</span>
@@ -200,5 +140,6 @@
                 </div>
             </div>
         @endif
+        </div>
     </div>
 </section>

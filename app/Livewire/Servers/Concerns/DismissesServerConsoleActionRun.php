@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Servers\Concerns;
 
+use App\Livewire\Concerns\DismissesConsoleActionRun;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 
@@ -11,12 +12,12 @@ use App\Models\Server;
  * subjects (one ServerCacheService per engine, one ServerDatabaseEngine per
  * engine, one ServerSystemdServiceState per unit, etc.).
  *
- * The single-subject variant {@see \App\Livewire\Concerns\DismissesConsoleActionRun}
+ * The single-subject variant {@see DismissesConsoleActionRun}
  * assumes the component has one subject and rejects any dismiss whose row
  * doesn't match. Per-row workspaces have many subjects on screen, so we verify
  * "the row's subject belongs to this server" instead. The host component
  * exposes `$server` (already true for every workspace via
- * {@see \App\Livewire\Servers\Concerns\InteractsWithServerWorkspace}).
+ * {@see InteractsWithServerWorkspace}).
  *
  * In-flight non-stale rows are still protected — a click can never clobber a
  * running worker — matching the original trait's behavior.

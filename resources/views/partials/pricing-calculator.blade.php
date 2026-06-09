@@ -1,16 +1,17 @@
 @php
-    $tierSpecs = [
-        'xs' => '≤1 vCPU · ≤2 GB',
-        's' => '2 vCPU · ≤4 GB',
-        'm' => '≤4 vCPU · ≤8 GB',
-        'l' => '≤8 vCPU · ≤16 GB',
-        'xl' => 'Above L',
-    ];
     $presets = [
-        ['label' => 'Solo dev', 'hint' => '1 small server', 'counts' => ['xs' => 1, 's' => 0, 'm' => 0, 'l' => 0, 'xl' => 0]],
-        ['label' => 'Side project', 'hint' => '1 modest server', 'counts' => ['xs' => 0, 's' => 0, 'm' => 1, 'l' => 0, 'xl' => 0]],
-        ['label' => 'Small team', 'hint' => '3 mid-size servers', 'counts' => ['xs' => 0, 's' => 0, 'm' => 3, 'l' => 0, 'xl' => 0]],
-        ['label' => 'Growing fleet', 'hint' => '5 mid + 2 big servers', 'counts' => ['xs' => 0, 's' => 0, 'm' => 5, 'l' => 2, 'xl' => 0]],
+        ['label' => 'Solo dev', 'hint' => '1 server', 'servers' => 1, 'edge' => 0, 'cloud' => 0, 'serverless' => 0],
+        ['label' => 'Side project', 'hint' => '2 servers + 1 Edge site', 'servers' => 2, 'edge' => 1, 'cloud' => 0, 'serverless' => 0],
+        ['label' => 'Small team', 'hint' => '5 servers + 2 Cloud apps', 'servers' => 5, 'edge' => 0, 'cloud' => 2, 'serverless' => 0],
+        ['label' => 'Growing fleet', 'hint' => '12 servers, mixed managed', 'servers' => 12, 'edge' => 3, 'cloud' => 2, 'serverless' => 4],
+    ];
+
+    // Managed surfaces that aren't live yet render as "coming soon": the row is
+    // shown but its stepper is disabled, and presets won't pre-fill a count for it.
+    $surfaceAvailable = [
+        'edge' => \Laravel\Pennant\Feature::active('surface.edge'),
+        'cloud' => \Laravel\Pennant\Feature::active('surface.cloud'),
+        'serverless' => \Laravel\Pennant\Feature::active('surface.serverless'),
     ];
 @endphp
 
@@ -25,11 +26,15 @@
                         <span class="text-5xl font-bold tracking-tight text-brand-ink" x-text="fmt(billedTotal)"></span>
                         <span class="text-lg text-brand-moss" x-text="annual ? '/yr' : '/mo'"></span>
                     </div>
-                    <p class="mt-2 text-sm text-brand-moss" x-show="!annual" x-cloak>
+                    <p class="mt-2 text-sm text-brand-moss">
+                        You're on the <span class="font-semibold text-brand-ink" x-text="effectivePlan.label"></span> plan.
+                        <span x-show="needsPaidForManaged" x-cloak class="text-brand-forest">Managed products need a paid plan, so Free is bumped up.</span>
+                    </p>
+                    <p class="mt-1 text-sm text-brand-moss" x-show="!annual" x-cloak>
                         <span class="font-semibold text-brand-forest" x-text="fmt(monthlyTotal * 12 * annualPct / 100)"></span>
                         / yr saved if you switch to annual billing.
                     </p>
-                    <p class="mt-2 text-sm text-brand-moss" x-show="annual" x-cloak>
+                    <p class="mt-1 text-sm text-brand-moss" x-show="annual" x-cloak>
                         <span x-text="fmt(billedTotal / 12)"></span> / mo effective ({{ $annualPct }}% off monthly).
                     </p>
                 </div>
@@ -45,14 +50,14 @@
             <span class="text-xs font-semibold uppercase tracking-wider text-brand-ink/60 mr-2">Quick picks</span>
             @foreach ($presets as $preset)
                 <button type="button"
-                        @click="counts = {{ json_encode($preset['counts']) }}"
+                        @click="servers = {{ $preset['servers'] }}; edge = {{ $surfaceAvailable['edge'] ? $preset['edge'] : 0 }}; cloud = {{ $surfaceAvailable['cloud'] ? $preset['cloud'] : 0 }}; serverless = {{ $surfaceAvailable['serverless'] ? $preset['serverless'] : 0 }}"
                         class="inline-flex flex-col items-start rounded-lg border border-brand-ink/10 bg-white px-3 py-1.5 hover:border-brand-gold/40 hover:bg-brand-cream/40 transition-colors text-left">
                     <span class="text-xs font-semibold text-brand-ink">{{ $preset['label'] }}</span>
                     <span class="text-[10px] text-brand-moss/80">{{ $preset['hint'] }}</span>
                 </button>
             @endforeach
             <button type="button"
-                    @click="counts = { xs: 0, s: 0, m: 0, l: 0, xl: 0 }"
+                    @click="servers = 1; edge = 0; cloud = 0; serverless = 0"
                     class="inline-flex items-center rounded-lg px-3 py-1.5 text-xs text-brand-moss hover:text-brand-ink transition-colors ml-auto">
                 Reset
             </button>
@@ -60,35 +65,85 @@
 
         {{-- Stepper rows --}}
         <div class="px-8 py-6 space-y-2">
-            @foreach ($tierSpecs as $key => $spec)
-                <div class="flex items-center gap-4 rounded-lg hover:bg-brand-cream/30 transition-colors px-3 py-2">
+            {{-- Servers drive the plan --}}
+            <div class="flex items-center gap-4 rounded-lg bg-brand-cream/30 px-3 py-3">
+                <div class="flex-1 min-w-0">
+                    <div class="text-sm font-semibold text-brand-ink">BYO servers</div>
+                    <div class="text-xs text-brand-moss">Sets your plan — <span x-text="effectivePlan.label"></span></div>
+                </div>
+                <div class="text-sm font-semibold text-brand-ink tabular-nums w-24 text-right" x-text="planPrice > 0 ? fmt(planPrice) + '/mo' : 'Free'"></div>
+                <div class="inline-flex items-center gap-1">
+                    <button type="button"
+                            @click="servers = Math.max(1, servers - 1)"
+                            class="inline-flex items-center justify-center w-8 h-8 rounded-md border border-brand-ink/15 bg-white text-brand-ink hover:border-brand-gold/40 hover:bg-brand-cream/40 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            :disabled="servers <= 1">
+                        <span class="text-lg leading-none">−</span>
+                    </button>
+                    <input type="number" min="1" step="1"
+                           x-model.number="servers"
+                           class="w-14 rounded-md border border-brand-ink/15 bg-white px-2 py-1.5 text-sm text-center tabular-nums focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/40 focus:outline-none">
+                    <button type="button"
+                            @click="servers = servers + 1"
+                            class="inline-flex items-center justify-center w-8 h-8 rounded-md border border-brand-ink/15 bg-white text-brand-ink hover:border-brand-gold/40 hover:bg-brand-cream/40 transition-colors">
+                        <span class="text-lg leading-none">+</span>
+                    </button>
+                </div>
+            </div>
+
+            {{-- Managed products --}}
+            @foreach ([
+                ['key' => 'edge', 'label' => 'dply Edge sites', 'priceVar' => 'edgePrice', 'unit' => 'per site'],
+                ['key' => 'cloud', 'label' => 'dply Cloud apps', 'priceVar' => 'cloudPrice', 'unit' => 'per app'],
+                ['key' => 'serverless', 'label' => 'Serverless functions', 'priceVar' => 'serverlessPrice', 'unit' => 'per function'],
+            ] as $row)
+                @php $comingSoon = ! ($surfaceAvailable[$row['key']] ?? false); @endphp
+                <div @class([
+                    'flex items-center gap-4 rounded-lg transition-colors px-3 py-2',
+                    'hover:bg-brand-cream/30' => ! $comingSoon,
+                    'opacity-70' => $comingSoon,
+                ])>
                     <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-3">
-                            <span class="inline-flex items-center justify-center min-w-[2.5rem] rounded-md bg-brand-sand/30 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-brand-ink">{{ $key }}</span>
-                            <span class="text-sm text-brand-ink">{{ $spec }}</span>
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm text-brand-ink">{{ $row['label'] }}</span>
+                            @if ($comingSoon)
+                                <span class="shrink-0 rounded-full bg-brand-gold/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-gold ring-1 ring-inset ring-brand-gold/25">{{ __('Coming soon') }}</span>
+                            @endif
                         </div>
+                        <div class="text-xs text-brand-moss"><span x-text="fmt({{ $row['priceVar'] }})"></span> {{ $row['unit'] }} / mo</div>
                     </div>
-                    <div class="tabular-nums w-24 text-right leading-tight">
-                        <div class="text-sm text-brand-ink" x-text="fmt(tiers['{{ $key }}'] / 30) + '/day'"></div>
-                        <div class="text-xs text-brand-moss" x-text="fmt(tiers['{{ $key }}']) + '/mo'"></div>
-                    </div>
-                    <div class="inline-flex items-center gap-1">
-                        <button type="button"
-                                @click="counts['{{ $key }}'] = Math.max(0, (counts['{{ $key }}'] || 0) - 1)"
-                                class="inline-flex items-center justify-center w-8 h-8 rounded-md border border-brand-ink/15 bg-white text-brand-ink hover:border-brand-gold/40 hover:bg-brand-cream/40 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                                :disabled="(counts['{{ $key }}'] || 0) === 0">
-                            <span class="text-lg leading-none">−</span>
-                        </button>
-                        <input type="number" min="0" step="1"
-                               x-model.number="counts['{{ $key }}']"
-                               class="w-14 rounded-md border border-brand-ink/15 bg-white px-2 py-1.5 text-sm text-center tabular-nums focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/40 focus:outline-none">
-                        <button type="button"
-                                @click="counts['{{ $key }}'] = (counts['{{ $key }}'] || 0) + 1"
-                                class="inline-flex items-center justify-center w-8 h-8 rounded-md border border-brand-ink/15 bg-white text-brand-ink hover:border-brand-gold/40 hover:bg-brand-cream/40 transition-colors">
-                            <span class="text-lg leading-none">+</span>
-                        </button>
-                    </div>
-                    <div class="text-sm font-semibold text-brand-ink tabular-nums w-20 text-right" x-text="fmt((counts['{{ $key }}'] || 0) * tiers['{{ $key }}'])"></div>
+                    @if ($comingSoon)
+                        <div class="text-sm text-brand-moss/70 tabular-nums w-24 text-right">—</div>
+                        <div class="inline-flex items-center gap-1 opacity-50">
+                            <button type="button" disabled aria-disabled="true"
+                                    class="inline-flex items-center justify-center w-8 h-8 rounded-md border border-brand-ink/15 bg-white text-brand-ink/40 cursor-not-allowed">
+                                <span class="text-lg leading-none">−</span>
+                            </button>
+                            <input type="number" value="0" disabled aria-disabled="true"
+                                   class="w-14 rounded-md border border-brand-ink/15 bg-brand-cream/30 px-2 py-1.5 text-sm text-center tabular-nums text-brand-ink/40 cursor-not-allowed">
+                            <button type="button" disabled aria-disabled="true"
+                                    class="inline-flex items-center justify-center w-8 h-8 rounded-md border border-brand-ink/15 bg-white text-brand-ink/40 cursor-not-allowed">
+                                <span class="text-lg leading-none">+</span>
+                            </button>
+                        </div>
+                    @else
+                        <div class="text-sm font-semibold text-brand-ink tabular-nums w-24 text-right" x-text="fmt(({{ $row['key'] }} || 0) * {{ $row['priceVar'] }})"></div>
+                        <div class="inline-flex items-center gap-1">
+                            <button type="button"
+                                    @click="{{ $row['key'] }} = Math.max(0, ({{ $row['key'] }} || 0) - 1)"
+                                    class="inline-flex items-center justify-center w-8 h-8 rounded-md border border-brand-ink/15 bg-white text-brand-ink hover:border-brand-gold/40 hover:bg-brand-cream/40 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                    :disabled="({{ $row['key'] }} || 0) === 0">
+                                <span class="text-lg leading-none">−</span>
+                            </button>
+                            <input type="number" min="0" step="1"
+                                   x-model.number="{{ $row['key'] }}"
+                                   class="w-14 rounded-md border border-brand-ink/15 bg-white px-2 py-1.5 text-sm text-center tabular-nums focus:border-brand-gold focus:ring-1 focus:ring-brand-gold/40 focus:outline-none">
+                            <button type="button"
+                                    @click="{{ $row['key'] }} = ({{ $row['key'] }} || 0) + 1"
+                                    class="inline-flex items-center justify-center w-8 h-8 rounded-md border border-brand-ink/15 bg-white text-brand-ink hover:border-brand-gold/40 hover:bg-brand-cream/40 transition-colors">
+                                <span class="text-lg leading-none">+</span>
+                            </button>
+                        </div>
+                    @endif
                 </div>
             @endforeach
         </div>
@@ -96,17 +151,18 @@
         {{-- Breakdown footer --}}
         <div class="px-8 py-5 bg-brand-cream/40 border-t border-brand-ink/10 text-sm">
             <div class="flex items-center justify-between">
-                <span class="text-brand-moss">Organization base</span>
-                <span class="font-semibold text-brand-ink tabular-nums" x-text="fmt(base)"></span>
+                <span class="text-brand-moss"><span x-text="effectivePlan.label"></span> plan (<span x-text="servers"></span> <span x-text="servers === 1 ? 'server' : 'servers'"></span>)</span>
+                <span class="tabular-nums font-semibold text-brand-ink" x-text="planPrice > 0 ? fmt(planPrice) : 'Free'"></span>
             </div>
             <div class="flex items-center justify-between mt-1.5">
-                <span class="text-brand-moss">Server fees (<span x-text="['xs','s','m','l','xl'].reduce((n,k) => n + (counts[k]||0), 0)"></span> servers)</span>
-                <span class="font-semibold text-brand-ink tabular-nums" x-text="fmt(serverSubtotal)"></span>
+                <span class="text-brand-moss">Managed products</span>
+                <span class="font-semibold text-brand-ink tabular-nums" x-text="fmt(managedTotal)"></span>
             </div>
             <div x-show="annual" x-cloak class="flex items-center justify-between mt-1.5 text-brand-forest">
                 <span>Annual discount ({{ $annualPct }}%)</span>
                 <span class="font-semibold tabular-nums" x-text="'−' + fmt(monthlyTotal * 12 * annualPct / 100)"></span>
             </div>
+            <p class="mt-3 text-xs text-brand-moss/80">Plus metered Edge delivery usage where applicable. Servers under one day old aren't counted.</p>
         </div>
     </div>
 </section>

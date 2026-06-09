@@ -3,111 +3,78 @@
 namespace App\Livewire\Servers;
 
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\EmitsPanelEvent;
 use App\Livewire\Servers\Concerns\ChecksSupervisorInstallStatus;
 use App\Livewire\Servers\Concerns\GuardsDisruptiveActions;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\ManagesSupervisorPrograms;
+use App\Livewire\Servers\Concerns\RunsServerSupervisorHealthScan;
 use App\Models\OrganizationSupervisorProgramTemplate;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SupervisorProgram;
 use App\Models\SupervisorProgramAuditLog;
-use App\Services\Servers\LaravelQueueWorkCommandBuilder;
+use App\Services\Servers\ServerDaemonSloPanel;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\Servers\SupervisorDaemonAudit;
 use App\Services\Servers\SupervisorProvisioner;
+use App\Support\Servers\DaemonWorkspaceViewData;
 use App\Support\SupervisorEnvFormatter;
 use Illuminate\Contracts\View\View;
+use App\Jobs\RunSupervisorOperationJob;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 use Livewire\Component;
+use Livewire\WithPagination;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceDaemons extends Component
 {
+    use RendersWorkspacePlaceholder;
     use ChecksSupervisorInstallStatus;
     use ConfirmsActionWithModal;
+    use EmitsPanelEvent;
+    use WithPagination;
     use GuardsDisruptiveActions;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
-
-    public string $new_sv_slug = '';
-
-    public string $new_sv_type = 'queue';
-
-    public string $new_sv_command = 'php artisan queue:work --sleep=3 --tries=3';
-
-    public string $new_sv_directory = '';
-
-    public string $new_sv_user = 'dply';
-
-    public int $new_sv_numprocs = 1;
-
-    public string $new_sv_env_lines = '';
-
-    public string $new_sv_stdout_logfile = '';
-
-    public ?string $new_sv_site_id = null;
-
-    /**
-     * @var 'quick'|'advanced' Storage values: 'quick' = structured builder (granular fields),
-     *                         'advanced' = raw command. UX labels are inverted (raw command is the friendlier "Quick"
-     *                         default) — see workspace-daemons.blade.php. Default to the raw-command path so a brand-new
-     *                         program shows a single command box rather than 10 queue-specific knobs.
-     */
-    public string $queue_builder_mode = 'advanced';
-
-    public string $quick_php_binary = 'php';
-
-    public string $quick_queue_connection = '';
-
-    public string $quick_queue_name = 'default';
-
-    public int $quick_timeout = 60;
-
-    public int $quick_sleep = 3;
-
-    public int $quick_tries = 3;
-
-    public int $quick_backoff = 0;
-
-    public int $quick_memory = 128;
-
-    public int $quick_max_time = 3600;
-
-    public string $quick_app_env = 'production';
-
-    /** When set (site route or overlaps query site), scope program list and defaults. */
-    public ?string $context_site_id = null;
+    use ManagesSupervisorPrograms;
+    use RunsServerSupervisorHealthScan;
 
     /** @var 'site'|'all' Only when {@see} is set. */
     public string $programs_list_scope = 'all';
 
     public bool $siteContextUnavailable = false;
 
-    public ?int $new_sv_priority = null;
-
-    public ?int $new_sv_startsecs = null;
-
-    public ?int $new_sv_stopwaitsecs = null;
-
-    public string $new_sv_autorestart = '';
-
-    public bool $new_sv_redirect_stderr = true;
-
-    public string $new_sv_stderr_logfile = '';
-
     /** @var 'programs'|'service'|'sync'|'logs'|'inspect'|'activity' */
+    #[Url(as: 'tab', keep: false)]
     public string $daemons_workspace_tab = 'programs';
 
     /** @var 'preview'|'drift'|'output' */
+    #[Url(as: 'subtab', keep: false)]
     public string $daemons_sync_subtab = 'preview';
 
     public string $supervisor_service_output = '';
 
-    public string $last_supervisor_sync_output = '';
+    /** Run ID of the active background supervisor operation (sync/install/restart). */
+    public ?string $daemon_op_run_id = null;
+
+    public bool $daemon_op_busy = false;
+
+    /** null = unknown, 'active' = running, 'inactive' = stopped */
+    public ?string $supervisor_service_state = null;
+
+    /** null = unknown, 'enabled' = starts on boot, 'disabled' = does not */
+    public ?string $supervisor_boot_state = null;
 
     public ?string $inspect_supervisor_body = null;
 
@@ -132,8 +99,6 @@ class WorkspaceDaemons extends Component
     /** @var array<int, string> */
     public array $preflight_messages = [];
 
-    public ?string $editing_program_id = null;
-
     public string $template_save_name = '';
 
     public string $copy_source_program_id = '';
@@ -141,6 +106,10 @@ class WorkspaceDaemons extends Component
     public string $copy_target_server_id = '';
 
     public string $copy_new_slug = '';
+
+    public string $import_from_site_id = '';
+
+    public string $import_to_site_id = '';
 
     public function mount(Server $server, ?Site $site = null): void
     {
@@ -151,8 +120,7 @@ class WorkspaceDaemons extends Component
         }
 
         $this->bootWorkspace($server);
-        $this->new_sv_user = $this->defaultProgramUser();
-        $this->new_sv_directory = $this->defaultProgramDirectory();
+        $this->initSupervisorProgramFormDefaults();
         $this->initSupervisorInstallStatus($server);
 
         $resolvedSiteId = $site?->id;
@@ -193,7 +161,51 @@ class WorkspaceDaemons extends Component
                 'action-cable',
             ], true)) {
             $this->applySupervisorPreset($preset);
+
+            // Deep-linked "Add worker" entry points (e.g. the pipeline review
+            // "queue restart without program" fix) pass ?open=worker so the
+            // pre-filled create-worker modal pops on arrival.
+            if (request()->query('open') === 'worker') {
+                $this->dispatch('open-modal', $this->supervisorProgramModalName());
+            }
         }
+
+        // #[Url] may not have initialised before mount() — honour the raw query param too.
+        $tab = request()->query('tab');
+        if (is_string($tab) && $tab !== '') {
+            $this->setDaemonsWorkspaceTab($tab);
+        }
+
+        if ($this->daemons_workspace_tab === 'service' && $this->supervisor_installed === true) {
+            try {
+                $provisioner = app(SupervisorProvisioner::class);
+                $activeOut = $provisioner->manageSupervisorService($server, 'is-active');
+                $this->supervisor_service_state = (str_contains(strtolower(trim($activeOut)), 'active') && ! str_contains(strtolower(trim($activeOut)), 'inactive'))
+                    ? 'active'
+                    : 'inactive';
+                $enabledOut = $provisioner->manageSupervisorService($server, 'is-enabled');
+                $this->supervisor_boot_state = str_contains(strtolower(trim($enabledOut)), 'enabled') ? 'enabled' : 'disabled';
+            } catch (\Throwable) {
+                // Non-fatal — leave state as null
+            }
+        }
+    }
+
+    /**
+     * This workspace is only reachable at the site-scoped route
+     * (servers/{server}/sites/{site}/daemons), so a context site is always set.
+     * Lock new programs to it: the "Add program" form drops its site picker and
+     * saves are pinned to this site (see ManagesSupervisorPrograms).
+     */
+    protected function supervisorProgramsLockSiteId(): bool
+    {
+        return $this->context_site_id !== null;
+    }
+
+    public function setDaemonsWorkspaceTab(string $tab): void
+    {
+        $allowed = ['programs', 'service', 'sync', 'logs', 'inspect', 'activity'];
+        $this->daemons_workspace_tab = in_array($tab, $allowed, true) ? $tab : 'programs';
     }
 
     /**
@@ -207,29 +219,112 @@ class WorkspaceDaemons extends Component
             && ! $site->usesKubernetesRuntime();
     }
 
-    public function updatedNewSvType(string $value): void
-    {
-        if ($value !== 'queue') {
-            $this->queue_builder_mode = 'advanced';
-        }
-    }
-
     public function updatedDaemonsWorkspaceTab(string $value): void
     {
         if ($value !== 'logs') {
             $this->log_follow_enabled = false;
         }
+
+        if ($value === 'service') {
+            $this->loadSupervisorServiceStates(app(SupervisorProvisioner::class));
+        }
+    }
+
+    public function loadSupervisorServiceStates(SupervisorProvisioner $provisioner): void
+    {
+        $this->authorize('view', $this->server);
+
+        if ($this->supervisor_installed !== true) {
+            return;
+        }
+
+        try {
+            $server = $this->server->fresh();
+            $activeOut = $provisioner->manageSupervisorService($server, 'is-active');
+            $this->supervisor_service_state = (str_contains(strtolower(trim($activeOut)), 'active') && ! str_contains(strtolower(trim($activeOut)), 'inactive'))
+                ? 'active'
+                : 'inactive';
+
+            $enabledOut = $provisioner->manageSupervisorService($server, 'is-enabled');
+            $this->supervisor_boot_state = str_contains(strtolower(trim($enabledOut)), 'enabled') ? 'enabled' : 'disabled';
+        } catch (\Throwable) {
+            // Non-fatal — buttons stay in default state
+        }
+    }
+
+    public function pollDaemonOperation(): void
+    {
+        if ($this->daemon_op_run_id === null || ! $this->daemon_op_busy) {
+            return;
+        }
+
+        $payload = Cache::get(RunSupervisorOperationJob::cacheKey($this->daemon_op_run_id));
+        if (! is_array($payload)) {
+            return;
+        }
+
+        $status = (string) ($payload['status'] ?? 'running');
+        $output = (string) ($payload['output'] ?? '');
+
+        if (! in_array($status, ['done', 'failed'], true)) {
+            return;
+        }
+
+        $lines = array_values(array_filter(explode("\n", $output)));
+        $this->daemon_op_busy = false;
+        $this->daemon_op_run_id = null;
+
+        if ($status === 'done') {
+            $this->last_supervisor_sync_output = $output;
+            $this->emitPanelEvent(__('Operation completed.'), $lines, 'completed');
+            // Install/sync may have changed the package state — re-check so the
+            // "not installed" banner clears and the tabs become usable.
+            $this->server->refresh();
+            $this->supervisor_installed = $this->server->supervisor_package_status === Server::SUPERVISOR_PACKAGE_INSTALLED;
+            $this->refreshProgramStatusMap();
+        } else {
+            $this->emitPanelEvent($output ?: __('Operation failed.'), $lines, 'failed');
+        }
+    }
+
+    protected function dispatchDaemonOperation(string $operation): void
+    {
+        $this->authorize('update', $this->server);
+        $runId = (string) \Illuminate\Support\Str::ulid();
+        $this->daemon_op_run_id = $runId;
+        $this->daemon_op_busy = true;
+
+        $label = match ($operation) {
+            'sync'        => __('Syncing Supervisor config…'),
+            'install'     => __('Installing Supervisor…'),
+            'restart_all' => __('Restarting all programs…'),
+            default       => __('Running operation…'),
+        };
+        $this->emitPanelEvent($label, [], 'running');
+
+        RunSupervisorOperationJob::dispatch($this->server->id, $operation, $runId);
     }
 
     public function supervisorServiceAction(SupervisorProvisioner $provisioner, string $action): void
     {
         $readOnly = in_array($action, ['status', 'is-active', 'is-enabled'], true);
         $this->authorize($readOnly ? 'view' : 'update', $this->server);
-        if (! $readOnly) {
-        }
         try {
             $out = $provisioner->manageSupervisorService($this->server->fresh(), $action);
             $this->supervisor_service_output = $out;
+
+            // Infer state so Start/Stop buttons can be shown contextually.
+            match ($action) {
+                'start'      => $this->supervisor_service_state = 'active',
+                'stop'       => $this->supervisor_service_state = 'inactive',
+                'is-active'  => $this->supervisor_service_state = (str_contains(strtolower(trim($out)), 'active') && ! str_contains(strtolower(trim($out)), 'inactive')) ? 'active' : 'inactive',
+                'status'     => $this->supervisor_service_state = str_contains($out, 'Active: active') ? 'active' : (str_contains($out, 'Active: inactive') || str_contains($out, 'Active: failed') ? 'inactive' : $this->supervisor_service_state),
+                'enable'     => $this->supervisor_boot_state = 'enabled',
+                'disable'    => $this->supervisor_boot_state = 'disabled',
+                'is-enabled' => $this->supervisor_boot_state = str_contains(strtolower(trim($out)), 'enabled') ? 'enabled' : 'disabled',
+                default      => null,
+            };
+
             if (! $readOnly) {
                 SupervisorDaemonAudit::log($this->server->fresh(), null, 'supervisor_service_'.$action, [
                     'output' => Str::limit($out, 2000),
@@ -240,463 +335,6 @@ class WorkspaceDaemons extends Component
             $this->supervisor_service_output = '';
             $this->toastError($e->getMessage());
         }
-    }
-
-    public function applySupervisorPreset(string $preset): void
-    {
-        $this->authorize('update', $this->server);
-        match ($preset) {
-            'laravel-queue' => $this->applyLaravelQueuePresetQuick(),
-            'laravel-horizon' => $this->applySupervisorPresetValues(
-                'laravel-horizon',
-                'horizon',
-                'php artisan horizon',
-                $this->defaultAppDirectory()
-            ),
-            'reverb' => $this->applySupervisorPresetValues(
-                'laravel-reverb',
-                'custom',
-                'php artisan reverb:start',
-                $this->defaultAppDirectory()
-            ),
-            'laravel-schedule' => $this->applySupervisorPresetValues(
-                'laravel-schedule',
-                'custom',
-                'php artisan schedule:work',
-                $this->defaultAppDirectory()
-            ),
-            'laravel-octane' => $this->applyLaravelOctanePreset(),
-            'nodejs' => $this->applySupervisorPresetValues(
-                'nodejs-app',
-                'custom',
-                'node server.js',
-                $this->defaultAppDirectory()
-            ),
-            'sidekiq' => $this->applySupervisorPresetValues(
-                'sidekiq',
-                'custom',
-                'bundle exec sidekiq -C config/sidekiq.yml',
-                $this->defaultAppDirectory()
-            ),
-            'solid-queue' => $this->applySupervisorPresetValues(
-                'solid-queue',
-                'custom',
-                'bin/jobs',
-                $this->defaultAppDirectory()
-            ),
-            'action-cable' => $this->applySupervisorPresetValues(
-                'action-cable',
-                'custom',
-                'bundle exec puma -p 28080 cable/config.ru',
-                $this->defaultAppDirectory()
-            ),
-            default => null,
-        };
-        $this->toastSuccess(__('Preset loaded — adjust directory if needed, then add the program.'));
-    }
-
-    protected function applyLaravelQueuePresetQuick(): void
-    {
-        $this->queue_builder_mode = 'quick';
-        $this->quick_php_binary = 'php';
-        $this->quick_queue_connection = '';
-        $this->quick_queue_name = 'default';
-        $this->quick_timeout = 60;
-        $this->quick_sleep = 3;
-        $this->quick_tries = 3;
-        $this->quick_backoff = 0;
-        $this->quick_memory = 128;
-        $this->quick_max_time = 3600;
-        $this->quick_app_env = 'production';
-        $this->new_sv_type = 'queue';
-        $this->new_sv_slug = 'laravel-queue';
-        $this->new_sv_numprocs = 1;
-        $this->resetExpertFormFields();
-
-        $dir = $this->defaultAppDirectory();
-        $user = $this->defaultProgramUser();
-        if ($this->new_sv_site_id !== null && $this->new_sv_site_id !== '') {
-            $site = Site::query()
-                ->where('server_id', $this->server->id)
-                ->find($this->new_sv_site_id);
-            if ($site !== null) {
-                $dir = rtrim($site->effectiveRepositoryPath(), '/').'/current';
-                $user = $site->effectiveSystemUser($this->server);
-            }
-        }
-        $this->new_sv_directory = $dir;
-        $this->new_sv_user = $user;
-
-        $this->new_sv_command = (new LaravelQueueWorkCommandBuilder(
-            phpBinary: $this->quick_php_binary,
-            connection: $this->quick_queue_connection,
-            queue: $this->quick_queue_name,
-            timeout: $this->quick_timeout,
-            sleep: $this->quick_sleep,
-            tries: $this->quick_tries,
-            backoff: $this->quick_backoff,
-            memory: $this->quick_memory,
-            maxTime: $this->quick_max_time,
-        ))->build();
-    }
-
-    protected function applyLaravelOctanePreset(): void
-    {
-        $command = 'php artisan octane:start --server=swoole --host=127.0.0.1 --port=8000';
-        $directory = $this->defaultAppDirectory();
-
-        if ($this->new_sv_site_id !== null && $this->new_sv_site_id !== '') {
-            $site = Site::query()
-                ->where('server_id', $this->server->id)
-                ->find($this->new_sv_site_id);
-            if ($site !== null && $site->shouldShowOctaneRuntimeUi()) {
-                $command = $site->octaneSupervisorCommand();
-                $directory = rtrim($site->effectiveRepositoryPath(), '/').'/current';
-            }
-        }
-
-        $this->applySupervisorPresetValues(
-            'laravel-octane',
-            'custom',
-            $command,
-            $directory
-        );
-    }
-
-    protected function applySupervisorPresetValues(string $slug, string $type, string $command, string $directory): void
-    {
-        $this->queue_builder_mode = 'advanced';
-        $this->new_sv_slug = $slug;
-        $this->new_sv_type = $type;
-        $this->new_sv_command = $command;
-        $this->new_sv_directory = $directory;
-        $this->new_sv_user = $this->defaultProgramUser();
-        $this->new_sv_numprocs = 1;
-        $this->resetExpertFormFields();
-    }
-
-    protected function resetExpertFormFields(): void
-    {
-        $this->new_sv_priority = null;
-        $this->new_sv_startsecs = null;
-        $this->new_sv_stopwaitsecs = null;
-        $this->new_sv_autorestart = '';
-        $this->new_sv_redirect_stderr = true;
-        $this->new_sv_stderr_logfile = '';
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    protected function rulesForProgramFormQuickQueue(): array
-    {
-        return [
-            'quick_php_binary' => ['required', 'string', 'max:128'],
-            'quick_queue_connection' => ['nullable', 'string', 'max:64'],
-            'quick_queue_name' => ['required', 'string', 'max:128'],
-            'quick_timeout' => ['required', 'integer', 'min:1', 'max:86400'],
-            'quick_sleep' => ['required', 'integer', 'min:0', 'max:3600'],
-            'quick_tries' => ['required', 'integer', 'min:0', 'max:100'],
-            'quick_backoff' => ['required', 'integer', 'min:0', 'max:86400'],
-            'quick_memory' => ['required', 'integer', 'min:16', 'max:8192'],
-            'quick_max_time' => ['required', 'integer', 'min:0', 'max:86400'],
-            'quick_app_env' => ['nullable', 'string', 'max:64'],
-        ];
-    }
-
-    /**
-     * Best guess at which Linux user a Supervisor program should run as on this server.
-     * Prefers the configured deploy user (matches the bootstrap's `useradd dply`); falls back
-     * to whatever ssh_user is on the server row, then 'dply' as a last resort.
-     */
-    protected function defaultProgramUser(): string
-    {
-        $candidate = (string) config('server_provision.deploy_ssh_user', 'dply');
-        $candidate = trim($candidate) !== '' ? trim($candidate) : 'dply';
-
-        // The Server's ssh_user reflects what auth currently uses; on a finished provision it
-        // is typically the deploy user, so honour that if the config disagrees.
-        $serverUser = trim((string) ($this->server->ssh_user ?? ''));
-        if ($serverUser !== '' && $serverUser !== 'root') {
-            return $serverUser;
-        }
-
-        return $candidate;
-    }
-
-    /**
-     * Default Working directory for a fresh, generic program — i.e. when the user
-     * hasn't picked a Laravel/Node/Sidekiq preset yet. Just the deploy user's home.
-     * Server-only daemons (system tasks, monitoring sidecars, etc.) shouldn't be
-     * pointed at an app `current/` symlink that may not exist.
-     */
-    protected function defaultProgramDirectory(): string
-    {
-        return '/home/'.$this->defaultProgramUser();
-    }
-
-    /**
-     * Working directory for application-style presets (queue worker, Horizon, Octane,
-     * Reverb, schedule:work, Node, Sidekiq) — points at the canonical Dply app layout
-     * the bootstrap creates: /home/<deploy_user>/apps/<server-slug>/current.
-     */
-    protected function defaultAppDirectory(): string
-    {
-        $user = $this->defaultProgramUser();
-        $name = trim((string) ($this->server->name ?? '')) !== ''
-            ? Str::slug($this->server->name)
-            : 'app';
-
-        return '/home/'.$user.'/apps/'.$name.'/current';
-    }
-
-    protected function rulesForProgramForm(): array
-    {
-        return [
-            'new_sv_slug' => 'required|string|max:64|regex:/^[a-z0-9\-]+$/',
-            // new_sv_type is no longer user-editable; presets set it, otherwise it stays 'custom'.
-            'new_sv_command' => 'required|string|max:2000',
-            'new_sv_directory' => 'required|string|max:512',
-            'new_sv_user' => 'required|string|max:64',
-            'new_sv_numprocs' => 'required|integer|min:1|max:32',
-            'new_sv_env_lines' => 'nullable|string|max:12000',
-            'new_sv_stdout_logfile' => 'nullable|string|max:512',
-            'new_sv_site_id' => [
-                'nullable',
-                'ulid',
-                Rule::exists('sites', 'id')->where(fn ($q) => $q->where('server_id', $this->server->id)),
-            ],
-            'new_sv_priority' => 'nullable|integer|min:1|max:999',
-            'new_sv_startsecs' => 'nullable|integer|min:0|max:3600',
-            'new_sv_stopwaitsecs' => 'nullable|integer|min:0|max:86400',
-            'new_sv_autorestart' => 'nullable|string|max:32',
-            'new_sv_redirect_stderr' => 'boolean',
-            'new_sv_stderr_logfile' => 'nullable|string|max:512',
-        ];
-    }
-
-    protected function resolveSiteForQueueBuilder(): ?Site
-    {
-        $id = $this->new_sv_site_id ?: $this->context_site_id;
-        if ($id === null || $id === '') {
-            return null;
-        }
-
-        return Site::query()->where('server_id', $this->server->id)->whereKey($id)->first();
-    }
-
-    /**
-     * When quick queue mode is on, map structured fields into command/directory/user/env.
-     */
-    protected function syncQuickQueueBuilderIntoForm(): bool
-    {
-        if ($this->queue_builder_mode !== 'quick' || $this->new_sv_type !== 'queue') {
-            return true;
-        }
-
-        $this->validate($this->rulesForProgramFormQuickQueue());
-
-        $site = $this->resolveSiteForQueueBuilder();
-        if ($site === null) {
-            $this->addError('new_sv_site_id', __('Select a related site so Dply can set the app directory and system user for this worker.'));
-
-            return false;
-        }
-
-        $this->new_sv_command = (new LaravelQueueWorkCommandBuilder(
-            phpBinary: $this->quick_php_binary,
-            connection: $this->quick_queue_connection,
-            queue: $this->quick_queue_name,
-            timeout: $this->quick_timeout,
-            sleep: $this->quick_sleep,
-            tries: $this->quick_tries,
-            backoff: $this->quick_backoff,
-            memory: $this->quick_memory,
-            maxTime: $this->quick_max_time,
-        ))->build();
-
-        $this->new_sv_directory = rtrim($site->effectiveRepositoryPath(), '/').'/current';
-        $this->new_sv_user = $site->effectiveSystemUser($this->server);
-        $this->new_sv_site_id = $site->id;
-
-        if (trim($this->new_sv_slug) === '') {
-            $this->new_sv_slug = 'laravel-queue-'.Str::slug($this->quick_queue_name !== '' ? $this->quick_queue_name : 'default');
-        }
-
-        $env = SupervisorEnvFormatter::parseLines($this->new_sv_env_lines);
-        if (trim($this->quick_app_env) !== '') {
-            $env['APP_ENV'] = trim($this->quick_app_env);
-        }
-        $lines = [];
-        foreach ($env as $k => $v) {
-            $lines[] = $k.'='.$v;
-        }
-        $this->new_sv_env_lines = implode("\n", $lines);
-
-        return true;
-    }
-
-    protected function programAttributesFromForm(): array
-    {
-        $env = SupervisorEnvFormatter::parseLines($this->new_sv_env_lines);
-
-        return [
-            'site_id' => $this->new_sv_site_id !== null && $this->new_sv_site_id !== '' ? $this->new_sv_site_id : null,
-            'slug' => $this->new_sv_slug,
-            'program_type' => $this->new_sv_type,
-            'command' => $this->new_sv_command,
-            'directory' => $this->new_sv_directory,
-            'user' => $this->new_sv_user,
-            'numprocs' => $this->new_sv_numprocs,
-            'is_active' => true,
-            'env_vars' => $env === [] ? null : $env,
-            'stdout_logfile' => $this->new_sv_stdout_logfile !== '' ? $this->new_sv_stdout_logfile : null,
-            'priority' => $this->new_sv_priority,
-            'startsecs' => $this->new_sv_startsecs,
-            'stopwaitsecs' => $this->new_sv_stopwaitsecs,
-            'autorestart' => $this->new_sv_autorestart !== '' ? $this->new_sv_autorestart : null,
-            'redirect_stderr' => $this->new_sv_redirect_stderr,
-            'stderr_logfile' => $this->new_sv_stderr_logfile !== '' ? $this->new_sv_stderr_logfile : null,
-        ];
-    }
-
-    public function saveSupervisorProgram(): void
-    {
-        $this->authorize('update', $this->server);
-        if (! $this->syncQuickQueueBuilderIntoForm()) {
-            return;
-        }
-
-        $this->validate($this->rulesForProgramForm());
-
-        $attrs = $this->programAttributesFromForm();
-
-        if ($this->editing_program_id !== null) {
-            $prog = SupervisorProgram::query()
-                ->where('server_id', $this->server->id)
-                ->whereKey($this->editing_program_id)
-                ->first();
-            if (! $prog) {
-                $this->toastError(__('Program not found.'));
-                $this->cancelEditProgram();
-
-                return;
-            }
-            $oldSnapshot = [
-                'slug' => $prog->slug,
-                'program_type' => $prog->program_type,
-                'command' => $prog->command,
-                'directory' => $prog->directory,
-                'user' => $prog->user,
-                'numprocs' => $prog->numprocs,
-                'site_id' => $prog->site_id,
-            ];
-            $prog->update($attrs);
-            SupervisorDaemonAudit::log($this->server->fresh(), $prog->fresh(), 'program_updated', [
-                'old' => $oldSnapshot,
-                'new' => array_intersect_key($attrs, $oldSnapshot),
-            ]);
-            $this->toastSuccess(__('Program updated. Sync Supervisor on the server to apply changes.'));
-            $this->cancelEditProgram();
-        } else {
-            $type = $this->new_sv_type;
-            $nproc = $this->new_sv_numprocs;
-            $created = SupervisorProgram::query()->create(array_merge($attrs, [
-                'server_id' => $this->server->id,
-            ]));
-            SupervisorDaemonAudit::log($this->server->fresh(), $created->fresh(), 'program_created', [
-                'slug' => $created->slug,
-                'program_type' => $created->program_type,
-                'numprocs' => $created->numprocs,
-                'site_id' => $created->site_id,
-            ]);
-            $this->cancelEditProgram();
-            $this->resetDefaultsForNewProgramForm();
-            $msg = __('Program saved. Sync Supervisor on the server to apply changes.');
-            if ($type === 'horizon' && $nproc > 1) {
-                $msg .= ' '.__('Note: Horizon usually runs with numprocs 1; scaling is typically done inside Horizon.');
-            }
-            if ($type === 'queue' && $nproc > 4) {
-                $msg .= ' '.__('Note: Many queue workers are often better as separate programs or Horizon.');
-            }
-            $this->toastSuccess($msg);
-        }
-
-    }
-
-    protected function resetDefaultsForNewProgramForm(): void
-    {
-        // 'custom' is the safe default — the user-facing Program type field was removed; presets
-        // override this when applied (laravel-queue → 'queue', laravel-horizon → 'horizon', etc.).
-        $this->new_sv_type = 'custom';
-        // Default new programs to the raw-command path (UX label "Quick") rather than
-        // the queue-specific granular builder. Users on non-Laravel-queue workloads
-        // never wanted those 10 knobs as their first impression.
-        $this->queue_builder_mode = 'advanced';
-        $this->quick_php_binary = 'php';
-        $this->quick_queue_connection = '';
-        $this->quick_queue_name = 'default';
-        $this->quick_timeout = 60;
-        $this->quick_sleep = 3;
-        $this->quick_tries = 3;
-        $this->quick_backoff = 0;
-        $this->quick_memory = 128;
-        $this->quick_max_time = 3600;
-        $this->quick_app_env = 'production';
-        $this->new_sv_command = 'php artisan queue:work --sleep=3 --tries=3';
-        $this->new_sv_directory = '/var/www/app/current';
-        $this->new_sv_user = 'www-data';
-        $this->new_sv_numprocs = 1;
-        $this->new_sv_site_id = $this->context_site_id;
-        if ($this->context_site_id !== null && ($ctx = Site::query()->where('server_id', $this->server->id)->whereKey($this->context_site_id)->first())) {
-            $this->new_sv_directory = rtrim($ctx->effectiveRepositoryPath(), '/').'/current';
-            $this->new_sv_user = $ctx->effectiveSystemUser($this->server);
-        }
-    }
-
-    public function beginEditProgram(string $id): void
-    {
-        $this->authorize('update', $this->server);
-        $prog = SupervisorProgram::query()
-            ->where('server_id', $this->server->id)
-            ->whereKey($id)
-            ->first();
-        if (! $prog) {
-            return;
-        }
-        $this->editing_program_id = $prog->id;
-        $this->new_sv_slug = $prog->slug;
-        $this->new_sv_type = $prog->program_type;
-        $this->new_sv_command = $prog->command;
-        $this->new_sv_directory = $prog->directory;
-        $this->new_sv_user = $prog->user;
-        $this->new_sv_numprocs = (int) $prog->numprocs;
-        $this->new_sv_site_id = $prog->site_id;
-        $this->new_sv_stdout_logfile = $prog->stdout_logfile ?? '';
-        $this->new_sv_stderr_logfile = $prog->stderr_logfile ?? '';
-        $this->new_sv_priority = $prog->priority;
-        $this->new_sv_startsecs = $prog->startsecs;
-        $this->new_sv_stopwaitsecs = $prog->stopwaitsecs;
-        $this->new_sv_autorestart = $prog->autorestart ?? '';
-        $this->new_sv_redirect_stderr = $prog->redirect_stderr ?? true;
-        $env = is_array($prog->env_vars) ? $prog->env_vars : [];
-        $lines = [];
-        foreach ($env as $k => $v) {
-            $lines[] = $k.'='.$v;
-        }
-        $this->new_sv_env_lines = implode("\n", $lines);
-        $this->queue_builder_mode = 'advanced';
-        $this->toastSuccess(__('Editing — change fields and save.'));
-    }
-
-    public function cancelEditProgram(): void
-    {
-        $this->editing_program_id = null;
-        $this->new_sv_slug = '';
-        $this->new_sv_stdout_logfile = '';
-        $this->resetDefaultsForNewProgramForm();
-        $this->new_sv_env_lines = '';
-        $this->resetExpertFormFields();
     }
 
     public function saveOrgTemplate(): void
@@ -876,9 +514,230 @@ class WorkspaceDaemons extends Component
         $this->toastSuccess(__('Program copied to the target server. Open that server’s Daemons page and sync Supervisor.'));
     }
 
+    public function importProgramFromSite(string $programId): void
+    {
+        $this->authorize('update', $this->server);
+
+        $targetSite = $this->resolveImportTargetSite();
+        if ($targetSite === null) {
+            $this->toastError(__('Choose a destination site for the import.'));
+
+            return;
+        }
+
+        $this->validate([
+            'import_from_site_id' => [
+                'required',
+                'ulid',
+                Rule::exists('sites', 'id')->where(fn ($q) => $q->where('server_id', $this->server->id)),
+            ],
+        ]);
+
+        if ($this->import_from_site_id === $targetSite->id) {
+            $this->toastError(__('Choose a different site than the import destination.'));
+
+            return;
+        }
+
+        $sourceSite = Site::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($this->import_from_site_id)
+            ->first();
+
+        if ($sourceSite === null) {
+            $this->toastError(__('Source site not found.'));
+
+            return;
+        }
+
+        $source = SupervisorProgram::query()
+            ->where('server_id', $this->server->id)
+            ->where('site_id', $sourceSite->id)
+            ->whereKey($programId)
+            ->first();
+
+        if ($source === null) {
+            $this->toastError(__('Source program not found.'));
+
+            return;
+        }
+
+        $created = $this->duplicateProgramForSite($source, $sourceSite, $targetSite);
+
+        SupervisorDaemonAudit::log($this->server->fresh(), $created, 'program_imported_from_site', [
+            'source_site_id' => $sourceSite->id,
+            'target_site_id' => $targetSite->id,
+            'source_program_id' => $source->id,
+        ]);
+
+        $this->toastSuccess(__('Imported :slug for :site. Sync Supervisor to apply on the server.', [
+            'slug' => $created->slug,
+            'site' => $targetSite->name,
+        ]));
+    }
+
+    public function importAllProgramsFromSite(): void
+    {
+        $this->authorize('update', $this->server);
+
+        $targetSite = $this->resolveImportTargetSite();
+        if ($targetSite === null) {
+            $this->toastError(__('Choose a destination site for the import.'));
+
+            return;
+        }
+
+        $this->validate([
+            'import_from_site_id' => [
+                'required',
+                'ulid',
+                Rule::exists('sites', 'id')->where(fn ($q) => $q->where('server_id', $this->server->id)),
+            ],
+        ]);
+
+        if ($this->import_from_site_id === $targetSite->id) {
+            $this->toastError(__('Choose a different site than the import destination.'));
+
+            return;
+        }
+
+        $sourceSite = Site::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($this->import_from_site_id)
+            ->first();
+
+        if ($sourceSite === null) {
+            $this->toastError(__('Source site not found.'));
+
+            return;
+        }
+
+        $sources = SupervisorProgram::query()
+            ->where('server_id', $this->server->id)
+            ->where('site_id', $sourceSite->id)
+            ->orderBy('slug')
+            ->get();
+
+        if ($sources->isEmpty()) {
+            $this->toastError(__('No programs are linked to the source site.'));
+
+            return;
+        }
+
+        $imported = 0;
+        foreach ($sources as $source) {
+            $created = $this->duplicateProgramForSite($source, $sourceSite, $targetSite);
+            SupervisorDaemonAudit::log($this->server->fresh(), $created, 'program_imported_from_site', [
+                'source_site_id' => $sourceSite->id,
+                'target_site_id' => $targetSite->id,
+                'source_program_id' => $source->id,
+            ]);
+            $imported++;
+        }
+
+        $this->toastSuccess(trans_choice(
+            'Imported :count program into :site. Sync Supervisor to apply on the server.|Imported :count programs into :site. Sync Supervisor to apply on the server.',
+            $imported,
+            ['count' => $imported, 'site' => $targetSite->name],
+        ));
+    }
+
+    protected function resolveImportTargetSite(): ?Site
+    {
+        $targetSiteId = $this->context_site_id ?: ($this->import_to_site_id !== '' ? $this->import_to_site_id : null);
+        if ($targetSiteId === null) {
+            return null;
+        }
+
+        return Site::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($targetSiteId)
+            ->first();
+    }
+
+    protected function duplicateProgramForSite(
+        SupervisorProgram $source,
+        Site $sourceSite,
+        Site $targetSite,
+    ): SupervisorProgram {
+        $slug = $this->resolveUniqueProgramSlug($source->slug, $targetSite);
+
+        return SupervisorProgram::query()->create([
+            'server_id' => $this->server->id,
+            'site_id' => $targetSite->id,
+            'slug' => $slug,
+            'program_type' => $source->program_type,
+            'command' => $this->remapSiteScopedValue($source->command, $sourceSite, $targetSite),
+            'directory' => $this->remapSiteScopedValue($source->directory, $sourceSite, $targetSite),
+            'user' => $targetSite->effectiveSystemUser($this->server),
+            'numprocs' => $source->numprocs,
+            'is_active' => $source->is_active,
+            'env_vars' => $source->env_vars,
+            'stdout_logfile' => $source->stdout_logfile !== null && $source->stdout_logfile !== ''
+                ? $this->remapSiteScopedValue($source->stdout_logfile, $sourceSite, $targetSite)
+                : null,
+            'stderr_logfile' => $source->stderr_logfile !== null && $source->stderr_logfile !== ''
+                ? $this->remapSiteScopedValue($source->stderr_logfile, $sourceSite, $targetSite)
+                : null,
+            'priority' => $source->priority,
+            'startsecs' => $source->startsecs,
+            'stopwaitsecs' => $source->stopwaitsecs,
+            'autorestart' => $source->autorestart,
+            'redirect_stderr' => $source->redirect_stderr ?? true,
+        ]);
+    }
+
+    protected function resolveUniqueProgramSlug(string $baseSlug, Site $targetSite): string
+    {
+        $slug = Str::limit($baseSlug, 64, '');
+        if (! SupervisorProgram::query()->where('server_id', $this->server->id)->where('slug', $slug)->exists()) {
+            return $slug;
+        }
+
+        $suffix = Str::slug($targetSite->slug ?: $targetSite->name) ?: 'site';
+        $candidate = Str::limit(rtrim($baseSlug, '-').'-'.$suffix, 64, '');
+        if (! SupervisorProgram::query()->where('server_id', $this->server->id)->where('slug', $candidate)->exists()) {
+            return $candidate;
+        }
+
+        $i = 2;
+        do {
+            $candidate = Str::limit(rtrim($baseSlug, '-').'-'.$suffix.'-'.$i, 64, '');
+            $i++;
+        } while (SupervisorProgram::query()->where('server_id', $this->server->id)->where('slug', $candidate)->exists());
+
+        return $candidate;
+    }
+
+    protected function remapSiteScopedValue(string $value, Site $fromSite, Site $toSite): string
+    {
+        $fromBase = rtrim($fromSite->effectiveRepositoryPath(), '/');
+        $toBase = rtrim($toSite->effectiveRepositoryPath(), '/');
+
+        if ($fromBase === '' || $fromBase === $toBase) {
+            return $value;
+        }
+
+        if (str_contains($value, $fromBase)) {
+            return str_replace($fromBase, $toBase, $value);
+        }
+
+        if ($value === $fromBase.'/current' || $value === $fromBase) {
+            return $toBase.'/current';
+        }
+
+        return $value;
+    }
+
     public function loadProgramStatuses(SupervisorProvisioner $provisioner): void
     {
         $this->authorize('view', $this->server);
+        $this->refreshProgramStatusMap($provisioner);
+    }
+
+    protected function refreshProgramStatusMap(?SupervisorProvisioner $provisioner = null): void
+    {
+        $provisioner ??= app(SupervisorProvisioner::class);
         $this->program_status_map = [];
         if (! $this->server->isReady() || empty($this->server->ssh_private_key)) {
             return;
@@ -886,8 +745,8 @@ class WorkspaceDaemons extends Component
         try {
             $out = $provisioner->fetchSupervisorctlStatus($this->server->fresh());
             $this->program_status_map = $provisioner->parseManagedProgramStatuses($this->server->fresh(), $out);
-        } catch (\Throwable $e) {
-            $this->toastError($e->getMessage());
+        } catch (\Throwable) {
+            // Non-fatal — statuses stay empty
         }
     }
 
@@ -911,10 +770,20 @@ class WorkspaceDaemons extends Component
         $this->authorize('update', $this->server);
         try {
             $out = $provisioner->stopProgramGroup($this->server->fresh(), $id);
+            if ($provisioner->indicatesUnregisteredProgram($out)) {
+                $this->toastUnregisteredProgram();
+
+                return;
+            }
             $prog = SupervisorProgram::query()->where('server_id', $this->server->id)->whereKey($id)->first();
             SupervisorDaemonAudit::log($this->server->fresh(), $prog, 'stop_one', ['output' => Str::limit($out, 500)]);
             $this->toastSuccess(__('Stop: :out', ['out' => Str::limit($out, 500)]));
         } catch (\Throwable $e) {
+            if ($provisioner->indicatesUnregisteredProgram($e->getMessage())) {
+                $this->toastUnregisteredProgram();
+
+                return;
+            }
             $this->toastError($e->getMessage());
         }
     }
@@ -924,77 +793,56 @@ class WorkspaceDaemons extends Component
         $this->authorize('update', $this->server);
         try {
             $out = $provisioner->startProgramGroup($this->server->fresh(), $id);
+            if ($provisioner->indicatesUnregisteredProgram($out)) {
+                $this->toastUnregisteredProgram();
+
+                return;
+            }
             $prog = SupervisorProgram::query()->where('server_id', $this->server->id)->whereKey($id)->first();
             SupervisorDaemonAudit::log($this->server->fresh(), $prog, 'start_one', ['output' => Str::limit($out, 500)]);
             $this->toastSuccess(__('Start: :out', ['out' => Str::limit($out, 500)]));
         } catch (\Throwable $e) {
-            $this->toastError($e->getMessage());
-        }
-    }
+            if ($provisioner->indicatesUnregisteredProgram($e->getMessage())) {
+                $this->toastUnregisteredProgram();
 
-    public function deleteSupervisorProgram(string $id, SupervisorProvisioner $provisioner): void
-    {
-        $this->authorize('update', $this->server);
-        $prog = SupervisorProgram::query()->where('server_id', $this->server->id)->whereKey($id)->first();
-        if ($prog) {
-            $snapshot = [
-                'slug' => $prog->slug,
-                'program_type' => $prog->program_type,
-                'command' => $prog->command,
-                'directory' => $prog->directory,
-                'user' => $prog->user,
-                'numprocs' => $prog->numprocs,
-                'site_id' => $prog->site_id,
-            ];
-            $provisioner->deleteConfigFile($this->server, $prog->id);
-            $prog->delete();
-            SupervisorDaemonAudit::log($this->server->fresh(), null, 'program_deleted', $snapshot);
-        }
-        if ($this->editing_program_id === $id) {
-            $this->cancelEditProgram();
-        }
-        $this->toastSuccess(__('Removed. Sync Supervisor to reload on the server.'));
-    }
-
-    public function installSupervisorPackage(SupervisorProvisioner $provisioner): void
-    {
-        $this->authorize('update', $this->server);
-        try {
-            $out = $provisioner->installSupervisorPackage($this->server->fresh());
-            $this->last_supervisor_sync_output = trim($out);
-            $this->server->refresh();
-            $this->supervisor_installed = $provisioner->isSupervisorPackageInstalled($this->server->fresh());
-            if ($this->supervisor_installed) {
-                $this->server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_INSTALLED]);
-            } else {
-                $this->server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_MISSING]);
+                return;
             }
-            SupervisorDaemonAudit::log($this->server->fresh(), null, 'package_install_attempted', [
-                'installed' => (bool) $this->supervisor_installed,
-                'output' => Str::limit($out, 1000),
-            ]);
-            $this->toastSuccess(__('Supervisor was installed on the server. You can add programs and sync.'));
-        } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
-            $this->supervisor_installed = false;
         }
     }
 
-    public function syncSupervisor(SupervisorProvisioner $provisioner): void
+    /**
+     * Re-register a single program that is missing from supervisorctl ("NOT
+     * REPORTED"): (re)write its conf on the box and run reread/update, then
+     * re-probe statuses so the row reflects the real state. Remediation for the
+     * "no such process" failure on Start/Stop.
+     */
+    public function syncOneProgram(string $id, SupervisorProvisioner $provisioner): void
     {
         $this->authorize('update', $this->server);
         try {
-            $this->server->refresh();
-            $out = $provisioner->sync($this->server);
-            $trimmed = trim($out);
-            $this->last_supervisor_sync_output = $trimmed;
-            SupervisorDaemonAudit::log($this->server->fresh(), null, 'supervisor_sync', ['output' => Str::limit($trimmed, 2000)]);
-            $this->toastSuccess(__('Supervisor sync: :snippet', ['snippet' => Str::limit($trimmed, 800)]));
-            $this->supervisor_installed = true;
-            $this->server->update(['supervisor_package_status' => Server::SUPERVISOR_PACKAGE_INSTALLED]);
+            $result = $provisioner->syncProgramResult($this->server->fresh(), $id);
+            $prog = SupervisorProgram::query()->where('server_id', $this->server->id)->whereKey($id)->first();
+            SupervisorDaemonAudit::log($this->server->fresh(), $prog, 'sync_one', [
+                'output' => Str::limit($result['log'], 800),
+                'state' => $result['state'],
+                'ok' => $result['ok'],
+            ]);
+            // Re-probe first so the row's state badge and Start/Stop gating update.
+            $this->loadProgramStatuses($provisioner);
+            if ($result['ok']) {
+                $this->toastSuccess($result['message']);
+            } else {
+                $this->toastError($result['message']);
+            }
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
         }
+    }
+
+    protected function toastUnregisteredProgram(): void
+    {
+        $this->toastError(__('This program isn’t registered with Supervisor on the server (no such process). Use Sync to re-apply its config to the host, then try again.'));
     }
 
     public function loadPreviewSync(SupervisorProvisioner $provisioner): void
@@ -1019,6 +867,38 @@ class WorkspaceDaemons extends Component
         }
     }
 
+    public string $log_tail_slug = '';
+
+    public function openProgramLogs(string $programId, SupervisorProvisioner $provisioner): void
+    {
+        $this->authorize('view', $this->server);
+
+        $program = SupervisorProgram::query()
+            ->where('server_id', $this->server->id)
+            ->whereKey($programId)
+            ->first();
+
+        if ($program === null) {
+            $this->toastError(__('Program not found.'));
+
+            return;
+        }
+
+        $this->log_tail_program_id = $program->id;
+        $this->log_tail_slug = $program->slug;
+        $this->log_which = 'stdout';
+        $this->log_follow_enabled = false;
+        $this->log_tail_body = '';
+        $this->dispatch('open-modal', 'daemon-program-logs-modal');
+        $this->tailProgramLog($provisioner);
+    }
+
+    public function closeProgramLogsModal(): void
+    {
+        $this->log_follow_enabled = false;
+        $this->dispatch('close-modal', 'daemon-program-logs-modal');
+    }
+
     public function tailProgramLog(SupervisorProvisioner $provisioner): void
     {
         $this->authorize('view', $this->server);
@@ -1035,6 +915,7 @@ class WorkspaceDaemons extends Component
 
             return;
         }
+        $this->log_tail_slug = $prog->slug;
         try {
             $this->log_tail_body = $this->log_which === 'stderr'
                 ? $provisioner->tailProgramStderrLog($this->server->fresh(), $prog, 200)
@@ -1045,9 +926,18 @@ class WorkspaceDaemons extends Component
         }
     }
 
+    public function updatedLogWhich(): void
+    {
+        if ($this->log_tail_program_id === null) {
+            return;
+        }
+
+        $this->tailProgramLog(app(SupervisorProvisioner::class));
+    }
+
     public function refreshLogTailFollow(SupervisorProvisioner $provisioner): void
     {
-        if (! $this->log_follow_enabled || $this->log_tail_program_id === null || $this->daemons_workspace_tab !== 'logs') {
+        if (! $this->log_follow_enabled || $this->log_tail_program_id === null) {
             return;
         }
         $this->tailProgramLog($provisioner);
@@ -1058,27 +948,32 @@ class WorkspaceDaemons extends Component
         $this->authorize('update', $this->server);
         try {
             $out = $provisioner->restartProgramGroup($this->server->fresh(), $id);
+            if ($provisioner->indicatesUnregisteredProgram($out)) {
+                $this->toastUnregisteredProgram();
+
+                return;
+            }
             $prog = SupervisorProgram::query()->where('server_id', $this->server->id)->whereKey($id)->first();
             SupervisorDaemonAudit::log($this->server->fresh(), $prog, 'restart_one', ['output' => Str::limit($out, 500)]);
             $this->toastSuccess(__('Restart: :out', ['out' => Str::limit($out, 500)]));
         } catch (\Throwable $e) {
+            if ($provisioner->indicatesUnregisteredProgram($e->getMessage())) {
+                $this->toastUnregisteredProgram();
+
+                return;
+            }
             $this->toastError($e->getMessage());
         }
     }
 
-    public function restartAllPrograms(SupervisorProvisioner $provisioner, bool $override = false): void
+    public function restartAllPrograms(bool $override = false): void
     {
         $this->authorize('update', $this->server);
         if (! $this->disruptiveActionAllowed(__('Restart all programs'), $override)) {
             return;
         }
-        try {
-            $out = $provisioner->restartAllManagedPrograms($this->server->fresh());
-            SupervisorDaemonAudit::log($this->server->fresh(), null, 'restart_all', ['output' => Str::limit($out, 1200)]);
-            $this->toastSuccess(__('Restart all: :out', ['out' => Str::limit($out, 1200)]));
-        } catch (\Throwable $e) {
-            $this->toastError($e->getMessage());
-        }
+        SupervisorDaemonAudit::log($this->server->fresh(), null, 'restart_all_queued', []);
+        $this->dispatchDaemonOperation('restart_all');
     }
 
     public function loadSupervisorInspect(SupervisorProvisioner $provisioner): void
@@ -1144,20 +1039,18 @@ class WorkspaceDaemons extends Component
     public function render(): View
     {
         $this->server->refresh();
-        $this->server->load(['supervisorPrograms']);
+        // Eager-load each program's site so effectiveDirectory() (which resolves
+        // the working dir from the site for site-scoped programs) doesn't N+1.
+        $this->server->load(['supervisorPrograms.site']);
 
         $orgId = $this->server->organization_id;
-        $templates = $orgId
-            ? OrganizationSupervisorProgramTemplate::query()->where('organization_id', $orgId)->orderBy('name')->get()
-            : collect();
 
         $auditLogs = $orgId
             ? SupervisorProgramAuditLog::query()
                 ->where('server_id', $this->server->id)
                 ->with('user')
                 ->latest('created_at')
-                ->limit(40)
-                ->get()
+                ->paginate(20)
             : collect();
 
         $orgServersForCopy = $orgId
@@ -1168,7 +1061,19 @@ class WorkspaceDaemons extends Component
                 ->get(['id', 'name'])
             : collect();
 
-        $sitesForServer = $this->server->sites()->orderBy('name')->get(['id', 'name']);
+        $sitesForServer = $this->server->sites()->orderBy('name')->get(['id', 'name', 'slug']);
+
+        $importTargetSiteId = $this->context_site_id ?: ($this->import_to_site_id !== '' ? $this->import_to_site_id : null);
+        $sitesForImport = $importTargetSiteId !== null
+            ? $sitesForServer->where('id', '!=', $importTargetSiteId)->values()
+            : $sitesForServer;
+
+        $importSourcePrograms = ($this->import_from_site_id !== '' && $importTargetSiteId !== null && $this->import_from_site_id !== $importTargetSiteId)
+            ? $this->server->supervisorPrograms
+                ->where('site_id', $this->import_from_site_id)
+                ->sortBy('slug')
+                ->values()
+            : collect();
 
         $allPrograms = $this->server->supervisorPrograms;
         $filteredSupervisorPrograms = ($this->context_site_id !== null && $this->programs_list_scope === 'site')
@@ -1177,6 +1082,10 @@ class WorkspaceDaemons extends Component
 
         $contextSiteModel = $this->context_site_id !== null
             ? Site::query()->where('server_id', $this->server->id)->whereKey($this->context_site_id)->first()
+            : null;
+
+        $daemonSloReport = ($contextSiteModel === null && Feature::active('workspace.daemon_slo'))
+            ? app(ServerDaemonSloPanel::class)->forServer($this->server)
             : null;
 
         // Header at-a-glance counts. Computed against the visible (filtered) set so the
@@ -1189,18 +1098,51 @@ class WorkspaceDaemons extends Component
             'total_processes' => (int) $filteredSupervisorPrograms->where('is_active', true)->sum('numprocs'),
         ];
 
-        return view('livewire.servers.workspace-daemons', [
-            'deletionSummary' => $this->showRemoveServerModal
-                ? ServerRemovalAdvisor::summary($this->server)
-                : null,
-            'orgTemplates' => $templates,
-            'auditLogs' => $auditLogs,
-            'orgServersForCopy' => $orgServersForCopy,
-            'sitesForServer' => $sitesForServer,
-            'filteredSupervisorPrograms' => $filteredSupervisorPrograms,
-            'contextSiteModel' => $contextSiteModel,
-            'restartAllConfirmMessage' => $this->disruptiveConfirmMessage(__('Restart all programs')),
-            'daemonsStats' => $stats,
-        ]);
+        // Workers managed by systemd (SiteProcess → dply-site-*.service), NOT by
+        // Supervisor — these never show in the program list above, which is the
+        // #1 "where's my Horizon worker?" confusion. Surface them read-only so
+        // operators know they exist and where to manage them.
+        $systemdWorkers = Site::query()
+            ->where('server_id', $this->server->id)
+            ->when($this->context_site_id !== null, fn ($q) => $q->whereKey($this->context_site_id))
+            ->with(['processes' => fn ($q) => $q->where('is_active', true)->where('type', '!=', \App\Models\SiteProcess::TYPE_WEB)])
+            ->orderBy('name')
+            ->get(['id', 'name', 'slug', 'server_id'])
+            ->flatMap(fn (Site $site) => $site->processes->map(fn ($p) => [
+                'site_id' => (string) $site->id,
+                'site_name' => $site->name,
+                'name' => $p->name,
+                'type' => $p->type,
+                'command' => (string) $p->command,
+            ]))
+            ->values();
+
+        return view('livewire.servers.workspace-daemons', array_merge(
+            DaemonWorkspaceViewData::for($this->server, $this),
+            [
+                'systemdWorkers' => $systemdWorkers,
+                'serverIsWorkerHost' => $this->server->isWorkerHost(),
+                'deletionSummary' => $this->showRemoveServerModal
+                    ? ServerRemovalAdvisor::summary($this->server)
+                    : null,
+                'auditLogs' => $auditLogs,
+                'orgServersForCopy' => $orgServersForCopy,
+                'sitesForServer' => $sitesForServer,
+                // Hide the "Related site" picker when the program is (or will be)
+                // this site's: adding always pins to this site, and editing one of
+                // this site's own programs stays locked. Only editing another
+                // site's program (reachable via the "all programs" peek) shows the
+                // picker, so its real site stays visible.
+                'lockSiteId' => $this->context_site_id !== null
+                    && ($this->editing_program_id === null || $this->new_sv_site_id === $this->context_site_id),
+                'sitesForImport' => $sitesForImport,
+                'importSourcePrograms' => $importSourcePrograms,
+                'filteredSupervisorPrograms' => $filteredSupervisorPrograms,
+                'contextSiteModel' => $contextSiteModel,
+                'restartAllConfirmMessage' => $this->disruptiveConfirmMessage(__('Restart all programs')),
+                'daemonsStats' => $stats,
+                'daemonSloReport' => $daemonSloReport,
+            ],
+        ));
     }
 }

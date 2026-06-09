@@ -1,64 +1,59 @@
 <?php
 
-namespace Tests\Feature\Auth;
+namespace Tests\Feature\Auth\RegistrationTest;
 
 use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Livewire\Auth\Register;
 use App\Models\Organization;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Pennant\Feature;
 use Livewire\Livewire;
-use Tests\Concerns\WithFeatures;
-use Tests\TestCase;
 
-class RegistrationTest extends TestCase
-{
-    use RefreshDatabase;
-    use WithFeatures;
+uses(RefreshDatabase::class);
 
-    protected array $features = ['global.signups_open'];
+beforeEach(function () {
+    Feature::define('global.signups_open', fn () => true);
+    Feature::flushCache();
+});
 
-    public function test_registration_screen_can_be_rendered(): void
-    {
-        // Bypass RedirectGuestsToComingSoon — non-local environments
-        // (incl. testing) bounce guest traffic to /coming-soon by default.
-        $response = $this->withoutMiddleware([RedirectGuestsToComingSoon::class])
-            ->get('/register');
+test('registration screen can be rendered', function () {
+    // Bypass RedirectGuestsToComingSoon — non-local environments
+    // (incl. testing) bounce guest traffic to /coming-soon by default.
+    $response = $this->withoutMiddleware([RedirectGuestsToComingSoon::class])
+        ->get('/register');
 
-        $response->assertStatus(200);
-    }
+    $response->assertStatus(200);
+});
 
-    public function test_new_users_can_register(): void
-    {
-        Livewire::test(Register::class)
-            ->set('form.name', 'Test User')
-            ->set('form.email', 'test@example.com')
-            ->set('form.password', 'password')
-            ->set('form.password_confirmation', 'password')
-            ->call('submit')
-            ->assertRedirect(route('verification.notice', absolute: false));
+test('new users can register', function () {
+    Livewire::test(Register::class)
+        ->set('form.name', 'Test User')
+        ->set('form.email', 'test@example.com')
+        ->set('form.password', 'password')
+        ->set('form.password_confirmation', 'password')
+        ->call('submit')
+        ->assertRedirect(route('verification.notice', absolute: false));
 
-        $this->assertAuthenticated();
-    }
+    $this->assertAuthenticated();
+});
 
-    public function test_registration_creates_a_default_workspace_organization(): void
-    {
-        Livewire::test(Register::class)
-            ->set('form.name', 'Test User')
-            ->set('form.email', 'test@example.com')
-            ->set('form.password', 'password')
-            ->set('form.password_confirmation', 'password')
-            ->call('submit');
+test('registration creates a default workspace organization', function () {
+    Livewire::test(Register::class)
+        ->set('form.name', 'Test User')
+        ->set('form.email', 'test@example.com')
+        ->set('form.password', 'password')
+        ->set('form.password_confirmation', 'password')
+        ->call('submit');
 
-        $user = auth()->user();
+    $user = auth()->user();
 
-        $this->assertNotNull($user);
-        $this->assertDatabaseHas('organizations', [
-            'name' => "Test User's Workspace",
-        ]);
+    expect($user)->not->toBeNull();
+    $this->assertDatabaseHas('organizations', [
+        'name' => "Test User's Workspace",
+    ]);
 
-        $org = Organization::query()->where('name', "Test User's Workspace")->first();
-        $this->assertNotNull($org);
-        $this->assertTrue($org->hasMember($user));
-        $this->assertSame($org->id, session('current_organization_id'));
-    }
-}
+    $org = Organization::query()->where('name', "Test User's Workspace")->first();
+    expect($org)->not->toBeNull();
+    expect($org->hasMember($user))->toBeTrue();
+    expect(session('current_organization_id'))->toBe($org->id);
+});

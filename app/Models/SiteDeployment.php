@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class SiteDeployment extends Model
 {
@@ -19,6 +20,8 @@ class SiteDeployment extends Model
     public const TRIGGER_API = 'api';
 
     public const TRIGGER_SYNC_PEER = 'sync_peer';
+
+    public const TRIGGER_SCHEDULE = 'schedule';
 
     public const STATUS_RUNNING = 'running';
 
@@ -196,5 +199,10 @@ class SiteDeployment extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    public function ephemeralCredential(): HasOne
+    {
+        return $this->hasOne(SiteDeploymentEphemeralCredential::class);
     }
 }

@@ -13,16 +13,19 @@
     };
 @endphp
 
-<section class="dply-card p-6 sm:p-8 space-y-4">
-    <div class="flex flex-wrap items-start justify-between gap-4">
+<section class="dply-card overflow-hidden">
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <x-icon-badge>
+            <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
+        </x-icon-badge>
         <div class="min-w-0">
-            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('DNS & hostname') }}</p>
-            <h2 class="mt-1 text-lg font-bold text-brand-ink">{{ $host ?: __('No hostname yet') }}</h2>
-            <p class="mt-1 text-sm text-brand-moss">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('DNS & hostname') }}</p>
+            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ $host ?: __('No hostname yet') }}</h2>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                 {{ __('Friendly hostname for the function. Resolves through the dply edge to the raw DigitalOcean Functions URL — DO Functions has no custom-domain support, so dply\'s app proxies the request.') }}
             </p>
         </div>
-        <div class="flex shrink-0 items-center gap-2">
+        <div class="ml-auto flex shrink-0 items-center gap-2">
             <span class="inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold {{ $statusBadge }}">{{ $statusLabel }}</span>
             <button
                 type="button"
@@ -32,13 +35,14 @@
                 class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-wait disabled:opacity-60"
                 title="{{ __('Re-run the DNS provisioner against this site. Idempotent — creates the record if missing, refreshes it otherwise.') }}"
             >
-                <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" wire:target="provisionNow" />
+                <x-heroicon-o-arrow-path class="h-4 w-4" wire:loading.class="animate-spin" wire:target="provisionNow" />
                 <span wire:loading.remove wire:target="provisionNow">{{ __('Provision DNS now') }}</span>
                 <span wire:loading wire:target="provisionNow">{{ __('Provisioning…') }}</span>
             </button>
         </div>
     </div>
 
+    <div class="px-6 py-6 sm:px-7 space-y-4">
     @if ($status === 'ready')
         @if ($coveredByWildcard)
             <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950">
@@ -105,7 +109,7 @@
                         wire:confirm="{{ __('This will permanently delete every DNS record at this exact name in DigitalOcean, then re-run the provisioner. Continue?') }}"
                         class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-rose-900 px-3 py-1.5 text-xs font-semibold text-rose-50 shadow-sm hover:bg-rose-950 disabled:cursor-wait disabled:opacity-60"
                     >
-                        <x-heroicon-o-trash class="h-3.5 w-3.5" wire:loading.class="animate-pulse" wire:target="forcePurgeAndProvision" />
+                        <x-heroicon-o-trash class="h-4 w-4" wire:loading.class="animate-pulse" wire:target="forcePurgeAndProvision" />
                         <span wire:loading.remove wire:target="forcePurgeAndProvision">{{ __('Force-purge & retry') }}</span>
                         <span wire:loading wire:target="forcePurgeAndProvision">{{ __('Purging…') }}</span>
                     </button>
@@ -117,24 +121,35 @@
             </p>
         </div>
     @elseif ($status === 'skipped')
-        <div class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-            <p class="font-semibold">{{ __('DNS provisioning skipped') }}</p>
-            <p class="mt-1">
-                @switch($reason)
-                    @case('missing_token')
-                        {{ __('No DigitalOcean token configured. Set DIGITALOCEAN_TOKEN in dply\'s environment, then retry.') }}
-                        @break
-                    @case('unconfigured_zone')
-                        {{ __('The hostname\'s zone isn\'t in DPLY_TESTING_DOMAINS. Add it (e.g. `dply.host`) to dply\'s environment, then retry.') }}
-                        @break
-                    @default
-                        {{ __('See deploy log for details.') }}
-                @endswitch
-            </p>
-        </div>
+        <section class="dply-card overflow-hidden border-amber-200">
+            <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                <div class="flex items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
+                        <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('DNS provisioning skipped') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            @switch($reason)
+                                @case('missing_token')
+                                    {{ __('No DigitalOcean token configured. Set DIGITALOCEAN_TOKEN in dply\'s environment, then retry.') }}
+                                    @break
+                                @case('unconfigured_zone')
+                                    {{ __('The hostname\'s zone isn\'t in DPLY_TESTING_DOMAINS. Add it (e.g. `dply.host`) to dply\'s environment, then retry.') }}
+                                    @break
+                                @default
+                                    {{ __('See deploy log for details.') }}
+                            @endswitch
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
     @else
         <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/20 p-4 text-sm text-brand-moss">
             {{ __('DNS not provisioned yet. The next deploy will attempt it, or click "Provision DNS now" to run it immediately.') }}
         </div>
     @endif
+    </div>
 </section>

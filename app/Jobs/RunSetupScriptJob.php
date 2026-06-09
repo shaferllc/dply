@@ -5,25 +5,37 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Actions\Servers\CreateServerProvisionRun;
+use App\Actions\Servers\SeedProvisionedEnginesForServer;
 use App\Actions\Servers\UpsertServerProvisionArtifact;
 use App\Enums\ServerProvider;
 use App\Models\Server;
+use App\Models\ServerAuthorizedKey;
+use App\Models\ServerCredentialShare;
 use App\Models\ServerProvisionRun;
+use App\Models\UserSshKey;
 use App\Modules\TaskRunner\AnonymousTask;
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Exceptions\TaskExecutionException;
+use App\Modules\TaskRunner\Jobs\TaskTimeoutJob;
 use App\Modules\TaskRunner\Models\Task as TaskRunnerTaskModel;
 use App\Modules\TaskRunner\TaskDispatcher;
 use App\Modules\TaskRunner\TrackTaskInBackground;
+use App\Notifications\RedisServerProvisionedNotification;
 use App\Notifications\ServerProvisionedCredentialsNotification;
+use App\Notifications\ServerProvisionFailedNotification;
 use App\Observers\TaskRunnerTaskObserver;
+use App\Services\Notifications\NotificationPublisher;
 use App\Services\Servers\Bootstrap\ServerBootstrapStrategyResolver;
 use App\Services\Servers\FirewallRuleTemplateApplicator;
+use App\Services\Servers\ServerAptLockBash;
 use App\Services\Servers\ServerMetricsGuestPushService;
+use App\Services\Servers\ServerProvisionCommandBuilder;
 use App\Support\Servers\ProvisionPipelineLog;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 
 /**
  * Runs stack provisioning from servers.meta (wizard choices), then optional setup_scripts recipes.
@@ -41,7 +53,9 @@ class RunSetupScriptJob implements ShouldQueue
 
     public function __construct(
         public Server $server
-    ) {}
+    ) {
+        $this->onQueue(config('server_provision.queue', 'dply'));
+    }
 
     /** Cap on automatic retries for transient provisioning failures (network/apt timeouts, etc.). */
     public const MAX_AUTO_RETRY_ATTEMPTS = 3;
@@ -87,6 +101,25 @@ class RunSetupScriptJob implements ShouldQueue
                 $creator->notify(new ServerProvisionedCredentialsNotification($server->fresh() ?? $server));
             }
 
+            // Dedicated redis servers get a tailored "your cache is live" email
+            // with a reveal-once link to the AUTH password (never emailed
+            // directly). Always sent for redis hosts — this is the feature the
+            // operator opted into when picking the redis profile. Idempotent
+            // via a meta flag so retries don't re-issue links.
+            $redisServer = $server->fresh() ?? $server;
+            if ($creator
+                && filled($creator->email)
+                && $redisServer->isRedisServer()
+                && blank(data_get($redisServer->meta, 'redis_provisioned_email_sent_at'))
+            ) {
+                $share = ServerCredentialShare::issue($redisServer, $creator);
+                $creator->notify(new RedisServerProvisionedNotification($redisServer, $share->token));
+
+                $redisMeta = $redisServer->meta ?? [];
+                $redisMeta['redis_provisioned_email_sent_at'] = now()->toIso8601String();
+                $redisServer->update(['meta' => $redisMeta]);
+            }
+
             // Kick off insights immediately so the workspace lands with a
             // populated heartbeat / metrics-missing baseline instead of an
             // empty state that requires the operator to hit "Refresh"
@@ -110,16 +143,17 @@ class RunSetupScriptJob implements ShouldQueue
             // Wire up the metrics push pipeline. Two paths converge here
             // depending on whether the inline metrics step ran during
             // the bash provision:
-            //   - inline=true  → bash already installed Python + the
-            //     snapshot script. syncPushArtifactsAfterInstall just
-            //     writes the env file + crontab block.
-            //   - inline=false (default) → bash skipped the agent.
-            //     Dispatch InstallMetricsAgentJob to SSH the install
-            //     bash on a separate connection AFTER the journey reads
-            //     "ready". That job dispatches the env/cron deploy on
-            //     success, so the post-install state ends up identical
-            //     either way; the user just gets ~30–60s back on the
-            //     wall-clock.
+            //   - inline=true (default) → bash already installed Python +
+            //     the snapshot script. syncPushArtifactsAfterInstall just
+            //     writes the env file + crontab block, so the server starts
+            //     pushing metrics the moment the journey reads "ready".
+            //   - inline=false → bash skipped the agent. Dispatch
+            //     InstallMetricsAgentJob to SSH the install bash on a
+            //     separate connection AFTER the journey reads "ready". That
+            //     job dispatches the env/cron deploy on success, so the
+            //     post-install state ends up identical either way; the user
+            //     just gets ~30–60s back on the wall-clock at the cost of
+            //     ~1 minute with no monitoring.
             if ((bool) config('server_provision.install_metrics_agent', true)
                 && ! empty($server->ip_address)
                 && $server->isVmHost()
@@ -204,7 +238,7 @@ class RunSetupScriptJob implements ShouldQueue
             // packages and started the services; this is the missing data
             // bridge. Idempotent — only inserts when the row is absent.
             try {
-                app(\App\Actions\Servers\SeedProvisionedEnginesForServer::class)
+                app(SeedProvisionedEnginesForServer::class)
                     ->execute($server->fresh() ?? $server);
             } catch (\Throwable $e) {
                 ProvisionPipelineLog::warning('server.provision.engine_seed_failed', $server, [
@@ -225,7 +259,7 @@ class RunSetupScriptJob implements ShouldQueue
                 channelSubject: sprintf('[dply] Server is ready: %s', $server->name ?: $server->id),
                 inboxTitle: sprintf('Server "%s" is ready', $server->name ?: $server->id),
                 inboxBody: 'Provisioning finished. Open the server overview to start adding sites or connect via SSH.',
-                actionUrl: \Illuminate\Support\Facades\URL::route('servers.overview', $server),
+                actionUrl: URL::route('servers.overview', $server),
                 actionLabel: 'Open server',
                 bodyLines: static::successBodyLines($server),
             );
@@ -252,7 +286,7 @@ class RunSetupScriptJob implements ShouldQueue
         $excerpt = static::extractLastProvisionError($server);
         if ($creator && filled($creator->email)) {
             try {
-                $creator->notify(new \App\Notifications\ServerProvisionFailedNotification($server->fresh() ?? $server, $excerpt));
+                $creator->notify(new ServerProvisionFailedNotification($server->fresh() ?? $server, $excerpt));
             } catch (\Throwable $e) {
                 ProvisionPipelineLog::warning('server.provision.failure_email_send_failed', $server, [
                     'error' => $e->getMessage(),
@@ -265,7 +299,7 @@ class RunSetupScriptJob implements ShouldQueue
             sprintf('Address: %s', $server->ip_address ?: '—'),
         ];
         if (is_string($excerpt) && trim($excerpt) !== '') {
-            $failureBodyLines[] = 'Last error: '.\Illuminate\Support\Str::limit(trim($excerpt), 400);
+            $failureBodyLines[] = 'Last error: '.Str::limit(trim($excerpt), 400);
         }
 
         static::dispatchProvisionEvent(
@@ -274,7 +308,7 @@ class RunSetupScriptJob implements ShouldQueue
             channelSubject: sprintf('[dply] Server provisioning failed: %s', $server->name ?: $server->id),
             inboxTitle: sprintf('Server "%s" failed to provision', $server->name ?: $server->id),
             inboxBody: 'Provisioning stopped before finishing. Open the journey to see the failing step and retry.',
-            actionUrl: \Illuminate\Support\Facades\URL::route('servers.journey', $server),
+            actionUrl: URL::route('servers.journey', $server),
             actionLabel: 'Open journey',
             bodyLines: $failureBodyLines,
         );
@@ -322,7 +356,7 @@ class RunSetupScriptJob implements ShouldQueue
         }
 
         try {
-            app(\App\Services\Notifications\NotificationPublisher::class)->publish(
+            app(NotificationPublisher::class)->publish(
                 eventKey: $eventKey,
                 subject: $server,
                 title: $inboxTitle,
@@ -448,7 +482,7 @@ class RunSetupScriptJob implements ShouldQueue
      * Pre-populate ServerAuthorizedKey panel rows for the creator's profile
      * keys that opted into new-server provisioning. These keys are written
      * directly into the deploy user's authorized_keys by the bootstrap script
-     * (see {@see \App\Services\Servers\ServerProvisionCommandBuilder::dplyDeployUserBootstrap()});
+     * (see {@see ServerProvisionCommandBuilder::dplyDeployUserBootstrap()});
      * mirroring them as panel rows here keeps the workspace SSH Keys page
      * truthful and prevents the next user-initiated Sync from treating the
      * bootstrap-installed keys as drift and removing them.
@@ -474,7 +508,7 @@ class RunSetupScriptJob implements ShouldQueue
 
         foreach ($rows as $userKey) {
             $pk = trim((string) $userKey->public_key);
-            if ($pk === '' || ! \App\Models\UserSshKey::publicKeyLooksValid($pk)) {
+            if ($pk === '' || ! UserSshKey::publicKeyLooksValid($pk)) {
                 continue;
             }
 
@@ -482,10 +516,10 @@ class RunSetupScriptJob implements ShouldQueue
             // synchronizer's convention (see ServerAuthorizedKeysSynchronizer).
             // The deploy user is ssh_user at this point because
             // applyProvisionOutcomeToServer already flipped it.
-            \App\Models\ServerAuthorizedKey::query()->updateOrCreate(
+            ServerAuthorizedKey::query()->updateOrCreate(
                 [
                     'server_id' => $server->id,
-                    'managed_key_type' => \App\Models\UserSshKey::class,
+                    'managed_key_type' => UserSshKey::class,
                     'managed_key_id' => $userKey->id,
                     'target_linux_user' => '',
                 ],
@@ -588,13 +622,17 @@ class RunSetupScriptJob implements ShouldQueue
             '/Temporary failure resolving/i',
             '/Could not resolve host/i',
             '/Failed to fetch /i',
-            '/E: Unable to (?:fetch|locate) /i',
+            '/E: Unable to fetch /i',
             '/Sub-process .* returned an error code/i',
             '/Hash Sum mismatch/i',
             '/network is unreachable/i',
             '/No route to host/i',
             '/SSL_connect: Connection reset/i',
             '/curl: \(\d+\) (?:Could not|Operation timed out|Failed to|Recv failure)/i',
+            '/Could not get lock/i',
+            '/Unable to acquire the dpkg frontend lock/i',
+            '/is held by process/i',
+            '/\/var\/lib\/dpkg\/lock-frontend/i',
         ];
 
         $hardErrorPatterns = [
@@ -611,10 +649,23 @@ class RunSetupScriptJob implements ShouldQueue
             }
         }
 
+        // "Unable to locate package X" means the package name isn't in any
+        // configured repo — a hard error that retrying won't fix. The same
+        // message also appears when the apt index download failed (a transient
+        // network blip), so only treat it as hard when there's NO fetch failure.
+        if (preg_match('/E: Unable to locate package/i', $output) === 1
+            && preg_match('/(Failed to fetch|Could not connect|Temporary failure resolving|Could not resolve host|InRelease)/i', $output) !== 1) {
+            return false;
+        }
+
         foreach ($transientPatterns as $pattern) {
             if (preg_match($pattern, $output) === 1) {
                 return true;
             }
+        }
+
+        if (ServerAptLockBash::outputLooksLikeAptLockFailure($output)) {
+            return true;
         }
 
         return false;
@@ -631,10 +682,6 @@ class RunSetupScriptJob implements ShouldQueue
         }
 
         if (empty($server->ip_address) || ! filled($server->ssh_private_key)) {
-            return false;
-        }
-
-        if ($server->provider === ServerProvider::FlyIo) {
             return false;
         }
 
@@ -790,6 +837,15 @@ class RunSetupScriptJob implements ShouldQueue
                     'task_runner_task_id' => $taskModel->id,
                     'provision_run_id' => $run->id,
                 ]);
+
+                // The background start succeeded; the box now streams output and
+                // POSTs a terminal webhook when the script finishes. Schedule a
+                // timeout backstop in case that callback never arrives (silent
+                // OOM/reboot). This is the fast path; the every-minute
+                // SweepStalledTasksCommand is the durable net if this delayed
+                // job is lost across a Horizon restart.
+                TaskTimeoutJob::dispatch($taskModel)
+                    ->delay(now()->addSeconds(($taskModel->timeout ?: 3600) + 120));
             }
         } catch (TaskExecutionException $e) {
             ProvisionPipelineLog::warning('server.provision.run_setup.task_runner_exception', $server, [
@@ -1119,6 +1175,45 @@ dply_repair_dpkg_state() {
       || { echo "[dply] ERROR: even --force-all purge failed; manual intervention required." >&2; return 1; }
     echo "[dply] purge complete; downstream install steps will reinstall."
   fi
+}
+
+# Lock-aware `apt-get update` with retry. A bare `apt-get update -y` under
+# `set -e` aborts the whole provision on a transient mirror/lock blip — and a
+# third-party repo (caddy/keydb/dragonfly/pgdg) that's briefly slow is exactly
+# that. Retries on lock contention and on E:/Err: output, then returns success
+# regardless so the following install step (which has its own retry and fails
+# hard on genuinely-missing packages) decides the real outcome.
+dply_apt_update() {
+  local attempt log marker=/var/lib/dply/apt-updated.stamp
+  # Skip the network round-trip when no apt source has changed since the last
+  # successful update. apt-get update re-fetches EVERY configured source each
+  # call, so 5-7 sequential updates (one per third-party repo) re-download the
+  # same indexes. With this guard, the common stack (all packages from the
+  # distro repo) does exactly one update, and a stack that adds N third-party
+  # repos updates only when a new .list/keyring actually appears.
+  if [ -f "\${marker}" ] \\
+     && [ -z "\$(find /etc/apt/sources.list /etc/apt/sources.list.d /etc/apt/keyrings -newer "\${marker}" 2>/dev/null | head -n1)" ]; then
+    echo "[dply] apt sources unchanged since last update — skipping apt-get update."
+    return 0
+  fi
+  for attempt in 1 2 3 4; do
+    dply_wait_for_apt_locks || return 1
+    log=\$(apt-get update -y 2>&1) || true
+    echo "\${log}"
+    if echo "\${log}" | grep -qE "Could not get lock|Unable to acquire the dpkg frontend lock|is held by process"; then
+      echo "[dply] apt-get update hit a lock (attempt \${attempt}/4) — retrying in 10s."
+      sleep 10
+      continue
+    fi
+    if ! echo "\${log}" | grep -qE "^(E:|Err:)"; then
+      mkdir -p /var/lib/dply && touch "\${marker}"
+      return 0
+    fi
+    echo "[dply] apt-get update reported errors (attempt \${attempt}/4) — retrying in 10s."
+    sleep 10
+  done
+  echo "[dply] WARNING: apt-get update still failing after retries; continuing — package installs will retry or fail explicitly." >&2
+  return 0
 }
 
 BASH;

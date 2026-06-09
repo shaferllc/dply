@@ -1,5 +1,54 @@
 <?php
 
+use App\Services\Servers\ServerConfigFileCatalog;
+use App\Support\Servers\CaddyRuntimeOwnership;
+
+$caddyRuntimeOwnershipScript = trim(CaddyRuntimeOwnership::shell());
+
+/**
+ * Apache syntax check — Debian ships `apache2ctl`; RHEL uses `httpd -t`.
+ * Exits 1 with a clear message when no Apache binary is on PATH.
+ */
+$apacheConfigtestScript = <<<'BASH'
+if command -v apache2ctl >/dev/null 2>&1; then (sudo -n apache2ctl configtest 2>&1 || apache2ctl configtest 2>&1); elif command -v apachectl >/dev/null 2>&1; then (sudo -n apachectl configtest 2>&1 || apachectl configtest 2>&1); elif command -v httpd >/dev/null 2>&1; then (sudo -n httpd -t 2>&1 || httpd -t 2>&1); else echo "Apache is not installed on this host — cannot run configtest." >&2; exit 1; fi
+BASH;
+
+/**
+ * PHP ini / FPM pool validation. $PATHX is set by the config editor dry-run
+ * script before this hook runs — FPM paths use php-fpm -t; CLI ini uses php -c.
+ */
+$phpConfigValidateScript = <<<'BASH'
+if echo "$PATHX" | grep -q '/fpm/'; then
+  (sudo -n php-fpm8.4 -t 2>&1 || php-fpm8.4 -t 2>&1 || sudo -n php-fpm8.3 -t 2>&1 || php-fpm8.3 -t 2>&1 || sudo -n php-fpm -t 2>&1 || php-fpm -t 2>&1)
+else
+  (sudo -n php -c "$PATHX" -m 2>&1 || php -c "$PATHX" -m 2>&1)
+fi
+BASH;
+
+/**
+ * MySQL/MariaDB cnf validation — works for my.cnf and mariadb.conf.d fragments.
+ */
+$mysqlConfigValidateScript = <<<'BASH'
+if command -v mysqld >/dev/null 2>&1; then
+  (sudo -n mysqld --validate-config --defaults-file="$PATHX" 2>&1 || mysqld --validate-config --defaults-file="$PATHX" 2>&1)
+elif command -v mariadbd >/dev/null 2>&1; then
+  (sudo -n mariadbd --validate-config --defaults-file="$PATHX" 2>&1 || mariadbd --validate-config --defaults-file="$PATHX" 2>&1)
+else
+  echo "MySQL/MariaDB is not installed on this host — cannot validate." >&2
+  exit 1
+fi
+BASH;
+
+/** APT drop-in snippet syntax check via apt-config. */
+$aptConfigValidateScript = <<<'BASH'
+APT_CONFIG="$PATHX" apt-config dump >/dev/null 2>&1 && echo "[ok] APT configuration syntax looks valid."
+BASH;
+
+/** Redis config — uses the staged path ($PATHX) after dry-run swap. */
+$redisConfigValidateScript = <<<'BASH'
+(sudo -n redis-server "$PATHX" --test-memory 1 2>&1 || redis-server "$PATHX" --test-memory 1 2>&1)
+BASH;
+
 /**
  * Server “Manage” workspace: allowlisted read paths and fixed service scripts only.
  * No user-controlled shell fragments.
@@ -23,6 +72,9 @@ return [
     /** How often the worker writes partial SSH output to cache while the command runs. */
     'remote_task_cache_flush_seconds' => (float) env('SERVER_MANAGE_REMOTE_TASK_CACHE_FLUSH', 0.5),
 
+    /** Seconds before a cached webserver live-state probe (nginx -T, etc.) is treated as stale. */
+    'webserver_live_state_cache_seconds' => (int) env('DPLY_WEBSERVER_LIVE_STATE_CACHE_SECONDS', 60),
+
     /**
      * When true, a new manage task for the same server + task name invalidates the previous job so it
      * exits instead of blocking the worker or finishing after the UI moved on to the newer request.
@@ -33,6 +85,15 @@ return [
      * If a job stays in "queued" longer than this (seconds), the UI hints that a queue worker may be down.
      */
     'remote_task_stalled_queued_seconds' => (int) env('SERVER_MANAGE_REMOTE_TASK_STALLED_QUEUED', 45),
+
+    /**
+     * When a manage SSH script fails with apt/dpkg lock contention (exit 100 or lock
+     * messages), re-queue the same job with backoff up to this many attempts.
+     */
+    'apt_auto_retry_max_attempts' => max(1, min(6, (int) env('SERVER_MANAGE_APT_AUTO_RETRY_MAX', 3))),
+
+    /** Seconds between apt-lock auto-retries (multiplied by attempt number). */
+    'apt_auto_retry_delay_seconds' => max(5, min(120, (int) env('SERVER_MANAGE_APT_AUTO_RETRY_DELAY', 15))),
 
     /**
      * Run manage previews and service scripts as root over SSH (TaskRunner). Requires the stored
@@ -52,6 +113,8 @@ return [
         '/usr/local/lsws/conf/',
         '/etc/traefik/',
         '/etc/haproxy/',
+        '/etc/envoy/',
+        '/etc/openresty/',
         '/etc/mysql/',
         '/etc/mariadb/',
         '/etc/redis/',
@@ -67,6 +130,9 @@ return [
 
     /** Max bytes read when previewing a config file over SSH. */
     'config_preview_max_bytes' => 48_000,
+
+    /** Minutes to keep per-path config file contents in cache for faster reloads. */
+    'config_file_content_cache_minutes' => 30,
 
     /**
      * Configuration files to preview (first N bytes via head -c).
@@ -140,7 +206,7 @@ return [
                 '/etc/apache2/mods-available/*.conf',
                 '/etc/apache2/ports.conf',
             ],
-            'validate' => '(sudo -n apachectl configtest 2>&1 || apachectl configtest 2>&1)',
+            'validate' => $apacheConfigtestScript,
             'reload' => '(sudo -n systemctl reload apache2 || systemctl reload apache2) 2>&1',
             'log_dir' => '/var/log/apache2',
             'access_log' => '/var/log/apache2/access.log',
@@ -195,6 +261,28 @@ return [
             'access_log' => '/var/log/haproxy.log',
             'error_log' => null,
             'journal_unit' => 'haproxy',
+        ],
+        'envoy' => [
+            'main' => '/etc/envoy/envoy.yaml',
+            'globs' => [],
+            'validate' => '(sudo -n envoy --mode validate -c /etc/envoy/envoy.yaml 2>&1 || envoy --mode validate -c /etc/envoy/envoy.yaml 2>&1)',
+            'reload' => '(sudo -n systemctl restart envoy || systemctl restart envoy) 2>&1',
+            'log_dir' => null,
+            'access_log' => null,
+            'error_log' => null,
+            'journal_unit' => 'envoy',
+        ],
+        'openresty' => [
+            'main' => '/etc/openresty/nginx.conf',
+            'globs' => [
+                '/etc/openresty/conf.d/*.conf',
+            ],
+            'validate' => '(sudo -n openresty -t 2>&1 || openresty -t 2>&1)',
+            'reload' => '(sudo -n systemctl reload openresty || systemctl reload openresty) 2>&1',
+            'log_dir' => '/var/log/openresty',
+            'access_log' => '/var/log/openresty/access.log',
+            'error_log' => '/var/log/openresty/error.log',
+            'journal_unit' => 'openresty',
         ],
     ],
 
@@ -302,6 +390,136 @@ fi
 BASH,
             'rerun_probe_after_finish' => true,
         ],
+        'repair_caddy_php_fpm_upstream' => [
+            'label' => 'Repair PHP-FPM for Caddy',
+            'description' => 'Start php{version}-fpm, fix Caddy log/runtime ownership, grant caddy socket access, reload Caddy.',
+            'confirm' => 'Start or restart PHP-FPM for this upstream, ensure the caddy user can reach the unix socket, and reload Caddy?',
+            'timeout' => 240,
+            'rerun_probe_after_finish' => true,
+            'refresh_webserver_live_state_after_finish' => true,
+            'script' => $caddyRuntimeOwnershipScript."\n".<<<'BASH'
+V="${DPLY_PHP_VERSION:-8.3}"
+UPSTREAM="${DPLY_UPSTREAM_PHP_VERSION:-}"
+UNIT="php${V}-fpm"
+SOCK="/run/php/php${V}-fpm.sock"
+ADDED_WWWDATA=0
+
+php_fpm_unit_exists() {
+  local ver="$1"
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl list-unit-files "php${ver}-fpm.service" 2>/dev/null | grep -q "^php${ver}-fpm.service"
+    return $?
+  fi
+  [ -d "/etc/php/${ver}/fpm" ]
+}
+
+detect_latest_php_fpm() {
+  local versions=""
+  for d in /etc/php/*/fpm; do
+    [ -d "$d" ] || continue
+    local ver
+    ver="$(basename "$(dirname "$d")")"
+    php_fpm_unit_exists "$ver" || continue
+    versions="${versions}${ver}"$'\n'
+  done
+  printf '%s' "$versions" | awk 'NF' | sort -V | tail -n 1
+}
+
+restart_php_fpm() {
+  local ver="$1"
+  local unit="php${ver}-fpm"
+  if command -v systemctl >/dev/null 2>&1; then
+    if ! php_fpm_unit_exists "$ver"; then
+      return 1
+    fi
+    (sudo -n systemctl enable "$unit" 2>/dev/null || true)
+    (sudo -n systemctl restart "$unit" || systemctl restart "$unit") 2>&1
+    return $?
+  fi
+  (sudo -n service "$unit" restart || service "$unit" restart) 2>&1
+}
+
+rewrite_caddy_php_sockets() {
+  local from="$1"
+  local to="$2"
+  local changed=0
+  while IFS= read -r f; do
+    [ -f "$f" ] || continue
+    if grep -q "php${from}-fpm" "$f" 2>/dev/null; then
+      (sudo -n sed -i "s/php${from}-fpm/php${to}-fpm/g" "$f" || sed -i "s/php${from}-fpm/php${to}-fpm/g" "$f") 2>&1
+      changed=1
+    fi
+  done < <(find /etc/caddy -type f \( -name '*.caddy' -o -name 'Caddyfile' \) 2>/dev/null)
+  if [ "$changed" = "1" ]; then
+    echo "[dply] Updated Caddy configs from php${from}-fpm to php${to}-fpm."
+  fi
+}
+
+rewrite_all_stale_caddy_php() {
+  local target="$1"
+  for from in $(grep -rohE 'php[0-9]+\.[0-9]+-fpm' /etc/caddy 2>/dev/null | sed 's/-fpm//' | sed 's/php//' | sort -u); do
+    [ "$from" = "$target" ] && continue
+    rewrite_caddy_php_sockets "$from" "$target"
+  done
+}
+
+if ! php_fpm_unit_exists "$V"; then
+  AUTO="$(detect_latest_php_fpm)"
+  if [ -n "$AUTO" ]; then
+    echo "[dply] php${V}-fpm is not installed — using php${AUTO}-fpm instead." >&2
+    if [ -z "$UPSTREAM" ]; then
+      UPSTREAM="$V"
+    fi
+    V="$AUTO"
+    UNIT="php${V}-fpm"
+    SOCK="/run/php/php${V}-fpm.sock"
+  fi
+fi
+
+if [ -n "$UPSTREAM" ] && [ "$UPSTREAM" != "$V" ]; then
+  rewrite_caddy_php_sockets "$UPSTREAM" "$V"
+else
+  rewrite_all_stale_caddy_php "$V"
+fi
+
+if ! restart_php_fpm "$V"; then
+  echo "[error] php${V}-fpm is not installed on this server." >&2
+  exit 1
+fi
+if getent group www-data >/dev/null 2>&1 && id -u caddy >/dev/null 2>&1; then
+  if ! id -nG caddy 2>/dev/null | tr ' ' '\n' | grep -qx www-data; then
+    (sudo -n usermod -aG www-data caddy || usermod -aG www-data caddy) 2>&1
+    ADDED_WWWDATA=1
+  fi
+fi
+if [ ! -S "$SOCK" ]; then
+  echo "[error] PHP-FPM socket not found: $SOCK" >&2
+  exit 1
+fi
+if sudo -u caddy test -S "$SOCK" 2>/dev/null; then
+  echo "[ok] caddy can access $SOCK"
+else
+  echo "[warn] caddy still cannot read $SOCK — check pool listen.owner and listen.mode" >&2
+fi
+if command -v systemctl >/dev/null 2>&1; then
+  if [ "$ADDED_WWWDATA" = "1" ]; then
+    (sudo -n systemctl restart caddy || systemctl restart caddy) 2>&1
+  else
+    (sudo -n systemctl reload caddy || sudo -n systemctl restart caddy || systemctl reload caddy || systemctl restart caddy) 2>&1
+  fi
+else
+  if [ "$ADDED_WWWDATA" = "1" ]; then
+    (sudo -n service caddy restart || service caddy restart) 2>&1
+  else
+    (sudo -n service caddy reload || service caddy reload) 2>&1
+  fi
+fi
+if command -v caddy >/dev/null 2>&1; then
+  (sudo -n caddy validate --config /etc/caddy/Caddyfile 2>&1 || caddy validate --config /etc/caddy/Caddyfile 2>&1)
+fi
+echo "[ok] PHP ${V} FPM repair finished — refresh Upstreams to verify health."
+BASH
+        ],
 
         // Note: every *_test_config script wraps the parse-only validator in a
         // `cmd && echo "[ok] …" || { echo "[error] …"; exit 1; }` trailer so
@@ -382,10 +600,10 @@ BASH
         ],
         'apache_test_config' => [
             'label' => 'Test Apache config',
-            'description' => 'Runs apachectl configtest to validate without reloading.',
+            'description' => 'Runs Apache configtest (apache2ctl / apachectl / httpd -t) without reloading.',
             'confirm' => 'Test the Apache configuration now?',
             'timeout' => 60,
-            'script' => '(sudo -n apachectl configtest 2>&1 || apachectl configtest 2>&1)',
+            'script' => $apacheConfigtestScript,
         ],
 
         // ---------------------------------------------------------------
@@ -597,10 +815,10 @@ BASH
         ],
         'start_traefik' => [
             'label' => 'Start Traefik',
-            'description' => 'systemctl start traefik.',
+            'description' => 'systemctl enable --now traefik.',
             'confirm' => 'Start the Traefik service?',
             'timeout' => 60,
-            'script' => '(sudo -n systemctl start traefik || systemctl start traefik) 2>&1',
+            'script' => '(sudo -n systemctl enable --now traefik || systemctl enable --now traefik) 2>&1',
             'rerun_probe_after_finish' => true,
         ],
         'stop_traefik' => [
@@ -690,6 +908,143 @@ BASH
             'confirm' => 'Disable HAProxy from starting at boot? The running service will keep running until stopped.',
             'timeout' => 60,
             'script' => '(sudo -n systemctl disable haproxy || systemctl disable haproxy) 2>&1',
+        ],
+
+        // Envoy service actions. Static config changes require a restart;
+        // `envoy --mode validate` is the native parse-only check.
+        'restart_envoy' => [
+            'label' => 'Restart Envoy',
+            'description' => 'systemctl restart envoy. Brief connection drop while the daemon restarts.',
+            'confirm' => 'Restart Envoy now? Sites may briefly show errors.',
+            'timeout' => 120,
+            'script' => <<<'BASH'
+if command -v systemctl >/dev/null 2>&1; then
+  (sudo -n systemctl restart envoy || systemctl restart envoy) 2>&1
+else
+  (sudo -n service envoy restart || service envoy restart) 2>&1
+fi
+BASH
+        ],
+        'reload_envoy' => [
+            'label' => 'Reload Envoy',
+            'description' => 'Restarts Envoy to pick up /etc/envoy/envoy.yaml changes.',
+            'confirm' => 'Restart Envoy to apply configuration changes?',
+            'timeout' => 120,
+            'script' => <<<'BASH'
+if command -v systemctl >/dev/null 2>&1; then
+  (sudo -n systemctl restart envoy || systemctl restart envoy) 2>&1
+else
+  (sudo -n service envoy restart || service envoy restart) 2>&1
+fi
+BASH
+        ],
+        'envoy_test_config' => [
+            'label' => 'Test Envoy config',
+            'description' => 'Runs `envoy --mode validate -c /etc/envoy/envoy.yaml` (parse-only).',
+            'confirm' => 'Test the Envoy configuration now?',
+            'timeout' => 60,
+            'script' => '(sudo -n envoy --mode validate -c /etc/envoy/envoy.yaml 2>&1 || envoy --mode validate -c /etc/envoy/envoy.yaml 2>&1)',
+        ],
+        'apply_edge_backend_configs' => [
+            'label' => 'Apply webserver config',
+            'description' => 'Rebuild every site\'s Caddy *-backend and *-tls configs, remove legacy :80 Caddy files, regenerate edge routing, and reload Caddy + the edge proxy. Use when preview URLs or HTTPS stop working after edge cutover.',
+            'confirm' => 'Regenerate Caddy backend configs, TLS :443 fronts, and edge routing for every site on this server?',
+            'timeout' => 600,
+            'refresh_webserver_live_state_after_finish' => true,
+            'rerun_probe_after_finish' => true,
+            'script' => 'echo "[dply] dispatched via ApplyEdgeBackendConfigsJob"',
+        ],
+        'start_envoy' => [
+            'label' => 'Start Envoy',
+            'description' => 'systemctl start envoy.',
+            'confirm' => 'Start the Envoy service?',
+            'timeout' => 60,
+            'script' => '(sudo -n systemctl start envoy || systemctl start envoy) 2>&1',
+            'rerun_probe_after_finish' => true,
+        ],
+        'stop_envoy' => [
+            'label' => 'Stop Envoy',
+            'description' => 'systemctl stop envoy. Sites routed through Envoy will be unavailable.',
+            'confirm' => 'Stop Envoy? Sites routed through Envoy will be unavailable until you start it again.',
+            'timeout' => 60,
+            'script' => '(sudo -n systemctl stop envoy || systemctl stop envoy) 2>&1',
+            'rerun_probe_after_finish' => true,
+        ],
+        'enable_envoy' => [
+            'label' => 'Enable Envoy at boot',
+            'description' => 'systemctl enable envoy.',
+            'confirm' => 'Enable Envoy to start automatically at boot?',
+            'timeout' => 60,
+            'script' => '(sudo -n systemctl enable envoy || systemctl enable envoy) 2>&1',
+        ],
+        'disable_envoy' => [
+            'label' => 'Disable Envoy at boot',
+            'description' => 'systemctl disable envoy. Does not stop the running service.',
+            'confirm' => 'Disable Envoy from starting at boot? The running service will keep running until stopped.',
+            'timeout' => 60,
+            'script' => '(sudo -n systemctl disable envoy || systemctl disable envoy) 2>&1',
+        ],
+
+        'restart_openresty' => [
+            'label' => 'Restart OpenResty',
+            'description' => 'systemctl restart openresty. Brief connection drop while the daemon restarts.',
+            'confirm' => 'Restart OpenResty now? Edge routing may briefly drop connections.',
+            'timeout' => 120,
+            'script' => <<<'BASH'
+if command -v systemctl >/dev/null 2>&1; then
+  (sudo -n systemctl restart openresty || systemctl restart openresty) 2>&1
+else
+  (sudo -n service openresty restart || service openresty restart) 2>&1
+fi
+BASH,
+        ],
+        'reload_openresty' => [
+            'label' => 'Reload OpenResty',
+            'description' => 'Graceful reload of /etc/openresty/nginx.conf.',
+            'confirm' => 'Reload OpenResty configuration?',
+            'timeout' => 120,
+            'script' => <<<'BASH'
+if command -v systemctl >/dev/null 2>&1; then
+  (sudo -n systemctl reload openresty || systemctl reload openresty) 2>&1
+else
+  (sudo -n openresty -s reload || openresty -s reload) 2>&1
+fi
+BASH,
+        ],
+        'openresty_test_config' => [
+            'label' => 'Test OpenResty config',
+            'description' => 'Runs `openresty -t` (parse-only).',
+            'confirm' => 'Run OpenResty configuration syntax test?',
+            'timeout' => 60,
+            'script' => '(sudo -n openresty -t 2>&1 || openresty -t 2>&1)',
+        ],
+        'start_openresty' => [
+            'label' => 'Start OpenResty',
+            'description' => 'systemctl start openresty.',
+            'confirm' => 'Start OpenResty now?',
+            'timeout' => 60,
+            'script' => '(sudo -n systemctl start openresty || systemctl start openresty) 2>&1',
+        ],
+        'stop_openresty' => [
+            'label' => 'Stop OpenResty',
+            'description' => 'systemctl stop openresty. Sites routed through OpenResty will be unavailable.',
+            'confirm' => 'Stop OpenResty now? Edge routing will be unavailable.',
+            'timeout' => 60,
+            'script' => '(sudo -n systemctl stop openresty || systemctl stop openresty) 2>&1',
+        ],
+        'enable_openresty' => [
+            'label' => 'Enable OpenResty at boot',
+            'description' => 'systemctl enable openresty.',
+            'confirm' => 'Enable OpenResty to start automatically at boot?',
+            'timeout' => 60,
+            'script' => '(sudo -n systemctl enable openresty || systemctl enable openresty) 2>&1',
+        ],
+        'disable_openresty' => [
+            'label' => 'Disable OpenResty at boot',
+            'description' => 'systemctl disable openresty. Does not stop the running service.',
+            'confirm' => 'Disable OpenResty from starting at boot? The running service will keep running until stopped.',
+            'timeout' => 60,
+            'script' => '(sudo -n systemctl disable openresty || systemctl disable openresty) 2>&1',
         ],
 
         // ---------------------------------------------------------------
@@ -873,6 +1228,49 @@ BASH,
             'script' => '(sudo -n bash -c "echo show info | socat /run/haproxy/admin.sock stdio" 2>&1 || echo "(socat not installed or stats socket missing)")',
         ],
 
+        'envoy_version' => [
+            'label' => 'Envoy version',
+            'description' => '`envoy --version` — build version.',
+            'confirm' => 'Show Envoy version?',
+            'timeout' => 10,
+            'script' => '(sudo -n envoy --version 2>&1 || envoy --version 2>&1 || /usr/local/bin/envoy --version 2>&1)',
+        ],
+        'envoy_show_config' => [
+            'label' => 'Show Envoy config',
+            'description' => 'Dump /etc/envoy/envoy.yaml — full edge config with listeners and clusters.',
+            'confirm' => 'Show Envoy config?',
+            'timeout' => 10,
+            'script' => '(sudo -n cat /etc/envoy/envoy.yaml 2>&1 || cat /etc/envoy/envoy.yaml 2>&1)',
+        ],
+        'envoy_show_runtime_info' => [
+            'label' => 'Envoy runtime info',
+            'description' => 'Query the admin interface at 127.0.0.1:9901/server_info.',
+            'confirm' => 'Query Envoy runtime info?',
+            'timeout' => 10,
+            'script' => '(sudo -n curl -sf http://127.0.0.1:9901/server_info 2>&1 || curl -sf http://127.0.0.1:9901/server_info 2>&1 || echo "(admin interface unavailable — is envoy running?)")',
+        ],
+        'openresty_version' => [
+            'label' => 'OpenResty version',
+            'description' => '`openresty -V` — build version + compiled modules.',
+            'confirm' => 'Show OpenResty build version?',
+            'timeout' => 30,
+            'script' => '(sudo -n openresty -V 2>&1 || openresty -V 2>&1)',
+        ],
+        'openresty_show_config' => [
+            'label' => 'Show OpenResty config',
+            'description' => 'Dump /etc/openresty/nginx.conf — full edge config with server and upstream blocks.',
+            'confirm' => 'Show the live OpenResty nginx.conf?',
+            'timeout' => 30,
+            'script' => '(sudo -n cat /etc/openresty/nginx.conf 2>&1 || cat /etc/openresty/nginx.conf 2>&1)',
+        ],
+        'openresty_show_runtime_info' => [
+            'label' => 'OpenResty stub_status',
+            'description' => 'Fetch localhost stub_status counters used by dply live-state probes.',
+            'confirm' => 'Fetch OpenResty stub_status from 127.0.0.1:9149?',
+            'timeout' => 30,
+            'script' => '(sudo -n curl -sf http://127.0.0.1:9149/nginx_status 2>&1 || curl -sf http://127.0.0.1:9149/nginx_status 2>&1 || echo "(stub_status unavailable — is openresty running?)")',
+        ],
+
         'apt_upgrade' => [
             'label' => 'Install all upgrades',
             'description' => 'apt-get -y upgrade. Long-running; may restart services.',
@@ -1033,6 +1431,44 @@ BASH,
             'rerun_probe_after_finish' => true,
         ],
 
+        'mise_prune' => [
+            'label' => 'Prune unused runtimes',
+            'description' => 'Remove mise runtime installs that are no longer referenced by any config or .tool-versions pin.',
+            'confirm' => 'Prune unused mise runtime installs for the deploy user? Active global defaults and pinned versions are kept; orphaned installs are removed.',
+            'timeout' => 300,
+            'script' => <<<'BASH'
+set -e
+DEPLOY_USER="__DPLY_DEPLOY_USER__"
+if [ -z "$DEPLOY_USER" ] || [ "$DEPLOY_USER" = "root" ]; then
+  echo "No deploy user configured; cannot prune mise runtimes." >&2
+  exit 1
+fi
+echo "[dply] pruning unused mise installs for $DEPLOY_USER"
+sudo -u "$DEPLOY_USER" -H bash -lc 'mise prune -y'
+echo "[dply] prune complete"
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'mise_reshim' => [
+            'label' => 'Rebuild mise shims',
+            'description' => 'Regenerate shims under ~/.local/share/mise/shims after manual changes or a broken PATH.',
+            'confirm' => 'Rebuild mise shims for the deploy user? Safe repair step — does not change installed versions.',
+            'timeout' => 120,
+            'script' => <<<'BASH'
+set -e
+DEPLOY_USER="__DPLY_DEPLOY_USER__"
+if [ -z "$DEPLOY_USER" ] || [ "$DEPLOY_USER" = "root" ]; then
+  echo "No deploy user configured; cannot rebuild mise shims." >&2
+  exit 1
+fi
+echo "[dply] rebuilding mise shims for $DEPLOY_USER"
+sudo -u "$DEPLOY_USER" -H bash -lc 'mise reshim'
+echo "[dply] reshim complete"
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
         'install_docker' => [
             'label' => 'Install Docker service',
             'description' => 'Docker Engine via the upstream get.docker.com convenience script.',
@@ -1056,16 +1492,291 @@ BASH,
             'rerun_probe_after_finish' => true,
         ],
 
+        'repair_docker' => [
+            'label' => 'Upgrade Docker Engine',
+            'description' => 'Refresh docker-ce / containerd packages via apt when apt lists an upgrade.',
+            'confirm' => 'Upgrade Docker Engine via apt? Installs the latest available docker-ce, docker-ce-cli, and containerd.io packages already on this server.',
+            'timeout' => 600,
+            'script' => <<<'BASH'
+set -e
+if command -v docker >/dev/null 2>&1; then
+  echo "Current: $(docker --version 2>&1 | head -n 1)"
+fi
+(sudo -n apt-get update -y || apt-get update -y) >/dev/null
+pkgs=""
+for p in docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker.io; do
+  if apt-cache show "$p" >/dev/null 2>&1; then
+    pkgs="$pkgs $p"
+  fi
+done
+if [ -z "$pkgs" ]; then
+  echo "No docker apt packages found to upgrade." >&2
+  exit 1
+fi
+# shellcheck disable=SC2086
+(sudo -n apt-get install -y --only-upgrade $pkgs || apt-get install -y --only-upgrade $pkgs)
+echo "Installed: $(docker --version 2>&1 | head -n 1)"
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'docker_container_start' => [
+            'label' => 'Start container',
+            'description' => 'docker start for one container ID or name.',
+            'confirm' => 'Start this container on the server?',
+            'timeout' => 120,
+            'script' => <<<'BASH'
+set -e
+CID=__DPLY_CONTAINER_ID__
+if [ -z "$CID" ]; then
+  echo "Missing container id." >&2
+  exit 1
+fi
+sudo -n docker start "$CID"
+docker ps --filter "id=$CID" --filter "name=$CID" --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'docker_container_stop' => [
+            'label' => 'Stop container',
+            'description' => 'docker stop for one container ID or name.',
+            'confirm' => 'Stop this container? Running processes inside will be sent SIGTERM.',
+            'timeout' => 180,
+            'script' => <<<'BASH'
+set -e
+CID=__DPLY_CONTAINER_ID__
+if [ -z "$CID" ]; then
+  echo "Missing container id." >&2
+  exit 1
+fi
+sudo -n docker stop "$CID"
+docker ps -a --filter "id=$CID" --filter "name=$CID" --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'docker_container_restart' => [
+            'label' => 'Restart container',
+            'description' => 'docker restart for one container ID or name.',
+            'confirm' => 'Restart this container? It will stop then start again.',
+            'timeout' => 180,
+            'script' => <<<'BASH'
+set -e
+CID=__DPLY_CONTAINER_ID__
+if [ -z "$CID" ]; then
+  echo "Missing container id." >&2
+  exit 1
+fi
+sudo -n docker restart "$CID"
+docker ps --filter "id=$CID" --filter "name=$CID" --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'docker_container_rm' => [
+            'label' => 'Remove container',
+            'description' => 'docker rm -f for one stopped or running container.',
+            'confirm' => 'Remove this container from the server? This deletes the container record — not the image.',
+            'timeout' => 180,
+            'script' => <<<'BASH'
+set -e
+CID=__DPLY_CONTAINER_ID__
+if [ -z "$CID" ]; then
+  echo "Missing container id." >&2
+  exit 1
+fi
+sudo -n docker rm -f "$CID"
+echo "Removed container $CID"
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'docker_container_exec' => [
+            'label' => 'Run command in container',
+            'description' => 'Non-interactive docker exec sh -c for one container.',
+            'confirm' => 'Run this command inside the container? Output streams to the console banner below.',
+            'timeout' => 900,
+            'script' => <<<'BASH'
+set -e
+CID=__DPLY_CONTAINER_ID__
+if [ -z "$CID" ]; then
+  echo "Missing container id." >&2
+  exit 1
+fi
+sudo -n docker exec "$CID" sh -c __DPLY_EXEC_COMMAND__
+BASH,
+        ],
+
+        'docker_compose_up' => [
+            'label' => 'Compose up',
+            'description' => 'docker compose up -d for one tracked project.',
+            'confirm' => 'Start or recreate services for compose project :project?',
+            'timeout' => 1800,
+            'script' => <<<'BASH'
+set -e
+PROJECT=__DPLY_COMPOSE_PROJECT__
+CONFIG=__DPLY_COMPOSE_CONFIG__
+if [ -z "$PROJECT" ] || [ -z "$CONFIG" ]; then
+  echo "Missing compose project or config." >&2
+  exit 1
+fi
+DIR=$(dirname "$CONFIG")
+if docker compose version >/dev/null 2>&1; then
+  cd "$DIR" && sudo -n docker compose -p "$PROJECT" -f "$CONFIG" up -d --build
+elif command -v docker-compose >/dev/null 2>&1; then
+  cd "$DIR" && sudo -n docker-compose -p "$PROJECT" -f "$CONFIG" up -d --build
+else
+  echo "docker compose not available." >&2
+  exit 1
+fi
+docker compose -p "$PROJECT" -f "$CONFIG" ps 2>/dev/null || docker-compose -p "$PROJECT" -f "$CONFIG" ps 2>/dev/null || true
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'docker_compose_down' => [
+            'label' => 'Compose down',
+            'description' => 'docker compose down for one tracked project.',
+            'confirm' => 'Stop and remove containers for compose project :project? Named volumes are kept.',
+            'timeout' => 600,
+            'script' => <<<'BASH'
+set -e
+PROJECT=__DPLY_COMPOSE_PROJECT__
+CONFIG=__DPLY_COMPOSE_CONFIG__
+if [ -z "$PROJECT" ] || [ -z "$CONFIG" ]; then
+  echo "Missing compose project or config." >&2
+  exit 1
+fi
+DIR=$(dirname "$CONFIG")
+if docker compose version >/dev/null 2>&1; then
+  cd "$DIR" && sudo -n docker compose -p "$PROJECT" -f "$CONFIG" down
+elif command -v docker-compose >/dev/null 2>&1; then
+  cd "$DIR" && sudo -n docker-compose -p "$PROJECT" -f "$CONFIG" down
+else
+  echo "docker compose not available." >&2
+  exit 1
+fi
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'docker_compose_restart' => [
+            'label' => 'Compose restart',
+            'description' => 'docker compose restart for one tracked project.',
+            'confirm' => 'Restart all services in compose project :project?',
+            'timeout' => 600,
+            'script' => <<<'BASH'
+set -e
+PROJECT=__DPLY_COMPOSE_PROJECT__
+CONFIG=__DPLY_COMPOSE_CONFIG__
+if [ -z "$PROJECT" ] || [ -z "$CONFIG" ]; then
+  echo "Missing compose project or config." >&2
+  exit 1
+fi
+DIR=$(dirname "$CONFIG")
+if docker compose version >/dev/null 2>&1; then
+  cd "$DIR" && sudo -n docker compose -p "$PROJECT" -f "$CONFIG" restart
+elif command -v docker-compose >/dev/null 2>&1; then
+  cd "$DIR" && sudo -n docker-compose -p "$PROJECT" -f "$CONFIG" restart
+else
+  echo "docker compose not available." >&2
+  exit 1
+fi
+docker compose -p "$PROJECT" -f "$CONFIG" ps 2>/dev/null || docker-compose -p "$PROJECT" -f "$CONFIG" ps 2>/dev/null || true
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'docker_image_pull' => [
+            'label' => 'Pull image',
+            'description' => 'docker pull for a repository:tag or digest reference.',
+            'confirm' => 'Pull this image onto the server?',
+            'timeout' => 900,
+            'script' => <<<'BASH'
+set -e
+REF=__DPLY_IMAGE_REF__
+if [ -z "$REF" ]; then
+  echo "Missing image reference." >&2
+  exit 1
+fi
+sudo -n docker pull "$REF"
+docker images --filter "reference=$REF" --format 'table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}'
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'docker_image_rm' => [
+            'label' => 'Remove image',
+            'description' => 'docker rmi for one image ID or repository:tag.',
+            'confirm' => 'Remove this image from the server? Containers using it must be removed first.',
+            'timeout' => 300,
+            'script' => <<<'BASH'
+set -e
+REF=__DPLY_IMAGE_REF__
+if [ -z "$REF" ]; then
+  echo "Missing image reference." >&2
+  exit 1
+fi
+sudo -n docker rmi "$REF"
+docker system df
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'docker_image_prune' => [
+            'label' => 'Prune dangling images',
+            'description' => 'docker image prune -f — removes dangling images only.',
+            'confirm' => 'Prune dangling Docker images on this server? Tagged images in use are kept.',
+            'timeout' => 300,
+            'script' => <<<'BASH'
+set -e
+if ! command -v docker >/dev/null 2>&1; then
+  echo "docker not installed." >&2
+  exit 1
+fi
+sudo -n docker image prune -f
+docker system df
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'docker_volume_prune' => [
+            'label' => 'Prune unused volumes',
+            'description' => 'docker volume prune -f — removes volumes not used by any container.',
+            'confirm' => 'Prune unused Docker volumes? Data in unused volumes will be deleted permanently.',
+            'timeout' => 300,
+            'script' => <<<'BASH'
+set -e
+sudo -n docker volume prune -f
+docker system df
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'docker_system_prune' => [
+            'label' => 'System prune',
+            'description' => 'docker system prune -af — removes stopped containers, unused networks, dangling images, and build cache.',
+            'confirm' => 'Run Docker system prune on this server? Stopped containers, unused networks, dangling images, and build cache will be removed. Named volumes are kept unless you prune them separately.',
+            'timeout' => 600,
+            'script' => <<<'BASH'
+set -e
+sudo -n docker system prune -af
+docker system df
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
         'install_wp_cli' => [
             'label' => 'Install WordPress CLI',
             'description' => 'wp-cli (https://wp-cli.org) — command-line interface for managing WordPress sites.',
-            'confirm' => 'Install or reinstall wp-cli at /usr/local/bin/wp? Pulls the latest phar from wp-cli.org.',
+            'confirm' => 'Install wp-cli at /usr/local/bin/wp? Pulls the latest phar from wp-cli.org.',
             'timeout' => 120,
             'script' => <<<'BASH'
 set -e
 if command -v wp >/dev/null 2>&1; then
   echo "wp-cli already installed: $(wp --version 2>&1 | head -n 1)"
-  echo "Reinstalling to pick up the latest release …"
+  exit 0
 fi
 # Mirrors ScaffoldPrerequisites::ensureWpCli — the scaffold pipeline calls
 # the same install path automatically when scaffolding a WordPress site.
@@ -1073,6 +1784,139 @@ curl --silent --show-error --location --output /tmp/wp-cli.phar https://raw.gith
 chmod +x /tmp/wp-cli.phar
 sudo -n mv /tmp/wp-cli.phar /usr/local/bin/wp
 wp --info --allow-root 2>&1 | head -n 10
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'update_wp_cli' => [
+            'label' => 'Update wp-cli',
+            'description' => 'Pull the latest wp-cli phar from wp-cli.org and replace /usr/local/bin/wp.',
+            'confirm' => 'Update wp-cli to the latest release? The current phar at /usr/local/bin/wp is replaced in place.',
+            'timeout' => 120,
+            'script' => <<<'BASH'
+set -e
+if command -v wp >/dev/null 2>&1; then
+  echo "Current: $(wp --version 2>&1 | head -n 1)"
+fi
+curl --silent --show-error --location --output /tmp/wp-cli.phar https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+chmod +x /tmp/wp-cli.phar
+sudo -n mv /tmp/wp-cli.phar /usr/local/bin/wp
+echo "Installed: $(wp --version 2>&1 | head -n 1)"
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'install_composer' => [
+            'label' => 'Install Composer',
+            'description' => 'Composer (https://getcomposer.org) — PHP dependency manager.',
+            'confirm' => 'Install Composer at /usr/local/bin/composer? Uses the official getcomposer.org installer.',
+            'timeout' => 180,
+            'script' => <<<'BASH'
+set -e
+if command -v composer >/dev/null 2>&1; then
+  echo "Composer already installed: $(composer --version 2>&1 | head -n 1)"
+  echo "Skipping reinstall — remove /usr/local/bin/composer first if you need a clean rebuild."
+  exit 0
+fi
+if ! command -v php >/dev/null 2>&1; then
+  echo "PHP is not installed on this server — install PHP before Composer." >&2
+  exit 1
+fi
+curl --silent --show-error --fail --location --output /tmp/composer-setup.php https://getcomposer.org/installer
+php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
+rm -f /tmp/composer-setup.php
+composer --version 2>&1 | head -n 1
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'install_git' => [
+            'label' => 'Install Git',
+            'description' => 'Git version control CLI via apt.',
+            'confirm' => 'Install Git on this server? Uses apt to install the git package.',
+            'timeout' => 180,
+            'script' => <<<'BASH'
+set -e
+if command -v git >/dev/null 2>&1; then
+  echo "Git already installed: $(git --version 2>&1 | head -n 1)"
+  exit 0
+fi
+apt-get update -y
+apt-get install -y --no-install-recommends git
+git --version 2>&1 | head -n 1
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'repair_git' => [
+            'label' => 'Upgrade Git',
+            'description' => 'Refresh the apt git package — picks up security releases from the distro repo.',
+            'confirm' => 'Upgrade Git via apt? Installs the latest available git package from apt; safe on preinstalled servers.',
+            'timeout' => 180,
+            'script' => <<<'BASH'
+set -e
+if command -v git >/dev/null 2>&1; then
+  echo "Current: $(git --version 2>&1 | head -n 1)"
+fi
+(sudo -n apt-get update -y || apt-get update -y) >/dev/null
+(sudo -n apt-get install -y --no-install-recommends git || apt-get install -y --no-install-recommends git)
+echo "Installed: $(git --version 2>&1 | head -n 1)"
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'install_redis_cli' => [
+            'label' => 'Install redis-cli',
+            'description' => 'redis-tools / redis-server client package for cache inspection.',
+            'confirm' => 'Install redis-cli on this server? Installs redis-tools (and redis-server if needed) via apt.',
+            'timeout' => 300,
+            'script' => <<<'BASH'
+set -e
+if command -v redis-cli >/dev/null 2>&1; then
+  echo "redis-cli already installed: $(redis-cli --version 2>&1 | head -n 1)"
+  exit 0
+fi
+if command -v valkey-cli >/dev/null 2>&1; then
+  echo "valkey-cli already installed: $(valkey-cli --version 2>&1 | head -n 1)"
+  exit 0
+fi
+apt-get update -y
+if apt-get install -y --no-install-recommends redis-tools; then
+  :
+elif apt-get install -y --no-install-recommends redis-server; then
+  :
+else
+  apt-get install -y --no-install-recommends valkey-tools || apt-get install -y --no-install-recommends valkey-server
+fi
+(command -v redis-cli >/dev/null 2>&1 && redis-cli --version 2>&1 | head -n 1) \
+  || (command -v valkey-cli >/dev/null 2>&1 && valkey-cli --version 2>&1 | head -n 1)
+BASH,
+            'rerun_probe_after_finish' => true,
+        ],
+
+        'repair_redis_cli' => [
+            'label' => 'Upgrade redis-cli',
+            'description' => 'Refresh redis-tools or valkey-tools via apt when a newer release is available.',
+            'confirm' => 'Upgrade redis-cli via apt? Installs the latest redis-tools or valkey-tools package from apt.',
+            'timeout' => 300,
+            'script' => <<<'BASH'
+set -e
+if command -v redis-cli >/dev/null 2>&1; then
+  echo "Current: $(redis-cli --version 2>&1 | head -n 1)"
+elif command -v valkey-cli >/dev/null 2>&1; then
+  echo "Current: $(valkey-cli --version 2>&1 | head -n 1)"
+fi
+(sudo -n apt-get update -y || apt-get update -y) >/dev/null
+if apt-cache show redis-tools >/dev/null 2>&1; then
+  (sudo -n apt-get install -y --no-install-recommends redis-tools || apt-get install -y --no-install-recommends redis-tools)
+elif apt-cache show valkey-tools >/dev/null 2>&1; then
+  (sudo -n apt-get install -y --no-install-recommends valkey-tools || apt-get install -y --no-install-recommends valkey-tools)
+else
+  (sudo -n apt-get install -y --no-install-recommends redis-tools || apt-get install -y --no-install-recommends redis-tools) \
+    || (sudo -n apt-get install -y --no-install-recommends valkey-tools || apt-get install -y --no-install-recommends valkey-tools)
+fi
+(command -v redis-cli >/dev/null 2>&1 && echo "Installed: $(redis-cli --version 2>&1 | head -n 1)") \
+  || (command -v valkey-cli >/dev/null 2>&1 && echo "Installed: $(valkey-cli --version 2>&1 | head -n 1)")
 BASH,
             'rerun_probe_after_finish' => true,
         ],
@@ -1097,9 +1941,294 @@ BASH
         'weekly' => 'Weekly',
     ],
 
+    /*
+    | mise-managed language runtimes shown on Manage → Tools. Keys must match
+    | mise plugin names (`mise ls-remote <key>`). PHP is intentionally omitted
+    | (ondrej/php apt path).
+    */
+    'mise_runtimes' => [
+        'node' => [
+            'label' => 'Node.js',
+            'placeholder' => '20.16.0',
+            'hint' => 'Numeric major or full semver (e.g. 20, 20.16.0, lts).',
+        ],
+        'python' => [
+            'label' => 'Python',
+            'placeholder' => '3.12.5',
+            'hint' => 'Major.minor or full version (e.g. 3.12, 3.12.5).',
+        ],
+        'ruby' => [
+            'label' => 'Ruby',
+            'placeholder' => '3.3.4',
+            'hint' => 'Major.minor.patch (e.g. 3.3.4). Pre-builds take 30–60s on small droplets.',
+        ],
+        'go' => [
+            'label' => 'Go',
+            'placeholder' => '1.23.0',
+            'hint' => 'Major.minor or full version (e.g. 1.23, 1.23.0).',
+        ],
+        'bun' => [
+            'label' => 'Bun',
+            'placeholder' => '1.2.0',
+            'hint' => 'Full semver (e.g. 1.2.0). JavaScript runtime + toolkit.',
+        ],
+        'deno' => [
+            'label' => 'Deno',
+            'placeholder' => '2.1.0',
+            'hint' => 'Full semver (e.g. 2.1.0). Secure JS/TS runtime.',
+        ],
+        'java' => [
+            'label' => 'Java',
+            'placeholder' => '21.0.2',
+            'hint' => 'Temurin/OpenJDK via mise (e.g. 21, 21.0.2).',
+        ],
+    ],
+
+    /*
+    | ServerInventoryProbeScript and optionally a service_actions install key.
+    | card=hero renders the full-width mise panel; card=generic renders a grid card.
+    */
+    'tool_catalog' => [
+        'mise' => [
+            'slug' => 'mise',
+            'label' => 'mise (dev tool version manager)',
+            'description' => 'Installs Node, Python, Ruby, Go, Bun, Deno, Java per project via .tool-versions / .mise.toml. dply installs mise from the official apt repo during provisioning — this surface is here for repair / version refresh, not first-install.',
+            'docs_url' => 'https://mise.jdx.dev',
+            'icon' => 'heroicon-o-cube-transparent',
+            'probe_key' => 'mise',
+            'action_key' => 'install_mise',
+            'preinstalled' => true,
+            'card' => 'hero',
+        ],
+        'composer' => [
+            'slug' => 'composer',
+            'label' => 'Composer',
+            'description' => 'PHP dependency manager for Laravel and other PHP projects. Installed during provisioning when PHP is present; use Install when the binary is missing.',
+            'docs_url' => 'https://getcomposer.org',
+            'icon' => 'heroicon-o-code-bracket-square',
+            'probe_key' => 'composer',
+            'action_key' => 'install_composer',
+            'action_when' => 'missing',
+            'requires_php' => true,
+            'preinstalled' => true,
+            'card' => 'generic',
+        ],
+        'git' => [
+            'slug' => 'git',
+            'label' => 'Git',
+            'description' => 'Version control CLI — preinstalled on dply servers. Upgrade below when apt has a newer release; connect GitHub/GitLab/Bitbucket under Source control for deploy credentials.',
+            'docs_url' => 'https://git-scm.com',
+            'icon' => 'heroicon-o-code-bracket',
+            'probe_key' => 'git',
+            'action_key' => 'install_git',
+            'action_when' => 'missing',
+            'present_action_key' => 'repair_git',
+            'show_source_control_link' => true,
+            'preinstalled' => true,
+            'card' => 'generic',
+        ],
+        'docker' => [
+            'slug' => 'docker',
+            'label' => 'Docker Engine',
+            'description' => 'Container runtime + CLI. Install when missing, upgrade when apt has docker-ce releases, and open Docker to list containers and images.',
+            'docs_url' => 'https://docs.docker.com/engine/install/',
+            'icon' => 'heroicon-o-square-3-stack-3d',
+            'probe_key' => 'docker',
+            'action_key' => 'install_docker',
+            'action_when' => 'missing',
+            'present_action_key' => 'repair_docker',
+            'show_docker_workspace_link' => true,
+            'card' => 'generic',
+            // Service-only boxes (dedicated cache/db) shouldn't get an "install
+            // Docker" prompt — they're not for running containers.
+            'hide_for_server_roles' => ['redis', 'database'],
+        ],
+        'wp_cli' => [
+            'slug' => 'wp_cli',
+            'label' => 'wp-cli (WordPress CLI)',
+            'description' => 'Command-line interface for managing WordPress sites — plugins, themes, users, search-replace. dply\'s WordPress scaffold installs this automatically on first scaffold; use Update below to pull the latest phar when wp is already present.',
+            'docs_url' => 'https://wp-cli.org',
+            'icon' => 'heroicon-o-code-bracket',
+            'probe_key' => 'wp_cli',
+            'action_key' => 'install_wp_cli',
+            'action_when' => 'missing',
+            'present_action_key' => 'update_wp_cli',
+            'show_run_link' => true,
+            'card' => 'generic',
+            'hide_for_server_roles' => ['redis', 'database'],
+        ],
+        'redis_cli' => [
+            'slug' => 'redis_cli',
+            'label' => 'redis-cli',
+            'description' => 'Redis wire-protocol CLI for cache inspection. Installed with Redis/Valkey during provisioning; use Install when the CLI is missing and Upgrade when apt has a newer redis-tools or valkey-tools release. Open Caches for stats, key browser, and REPL.',
+            'docs_url' => 'https://redis.io/docs/latest/develop/tools/cli/',
+            'icon' => 'heroicon-o-circle-stack',
+            'probe_key' => 'redis_cli',
+            'action_key' => 'install_redis_cli',
+            'action_when' => 'missing',
+            'present_action_key' => 'repair_redis_cli',
+            'show_when_redis_relevant' => true,
+            'preinstalled' => true,
+            'card' => 'generic',
+        ],
+    ],
+
     /**
      * Server "Manage" workspace sub-pages (URL segment after /manage/). Order matches the tab bar.
      */
+    /**
+     * Unified configuration editor catalog — grouped file discovery for
+     * {@see ServerConfigFileCatalog}. Webserver group
+     * uses live SSH discovery via {@see RemoteWebserverConfigService}; other
+     * groups list static entries and optional globs (always allowlist-checked).
+     */
+    'config_file_catalog' => [
+        'webserver' => [
+            'label' => 'Webserver',
+            'discover_engines' => true,
+            'file_type' => 'nginx',
+        ],
+        'php' => [
+            'label' => 'PHP',
+            'file_type' => 'ini',
+            'entries' => [
+                ['label' => 'php.ini (CLI)', 'path' => '/etc/php/8.3/cli/php.ini', 'file_type' => 'ini', 'hint' => 'PHP settings for CLI — deploy scripts, artisan, and cron.'],
+                ['label' => 'php.ini (FPM)', 'path' => '/etc/php/8.3/fpm/php.ini', 'file_type' => 'ini', 'hint' => 'PHP settings for FPM — affects every web request.'],
+                ['label' => 'www.conf (FPM pool)', 'path' => '/etc/php/8.3/fpm/pool.d/www.conf', 'file_type' => 'ini', 'hint' => 'Default FPM pool — workers, user, and socket PHP sites use.'],
+            ],
+            'globs' => [
+                '/etc/php/*/fpm/php.ini',
+                '/etc/php/*/fpm/pool.d/*.conf',
+            ],
+        ],
+        'redis_db' => [
+            'label' => 'Redis & DB',
+            'file_type' => 'conf',
+            'entries' => [
+                ['label' => 'redis.conf', 'path' => '/etc/redis/redis.conf', 'hint' => 'Redis server — memory, persistence, bind address, and eviction.'],
+                ['label' => 'my.cnf', 'path' => '/etc/mysql/my.cnf', 'hint' => 'MySQL/MariaDB server defaults and global options.'],
+            ],
+            'globs' => [
+                '/etc/mysql/mariadb.conf.d/*.cnf',
+            ],
+        ],
+        'system' => [
+            'label' => 'System',
+            'file_type' => 'conf',
+            'entries' => [
+                ['label' => 'sshd_config', 'path' => '/etc/ssh/sshd_config', 'hint' => 'SSH daemon — ports, auth methods, and access controls.'],
+                ['label' => 'unattended-upgrades', 'path' => '/etc/apt/apt.conf.d/50unattended-upgrades', 'hint' => 'Which packages auto-update and reboot policy.'],
+                ['label' => '20auto-upgrades', 'path' => '/etc/apt/apt.conf.d/20auto-upgrades', 'hint' => 'Enables or pauses unattended security upgrades.'],
+            ],
+        ],
+        'supervisor' => [
+            'label' => 'Supervisor',
+            'file_type' => 'ini',
+            'entries' => [
+                ['label' => 'supervisord.conf', 'path' => '/etc/supervisor/supervisord.conf', 'hint' => 'Supervisor main config — socket, logging, and include paths.'],
+            ],
+            'globs' => [
+                '/etc/supervisor/conf.d/*.conf',
+            ],
+        ],
+    ],
+
+    /**
+     * Validation hooks for non-webserver config paths. Longest prefix match wins.
+     */
+    'config_validation_hooks' => [
+        'exact' => [
+            '/etc/ssh/sshd_config' => [
+                'validate' => '(sudo -n sshd -t 2>&1 || sshd -t 2>&1)',
+                'success_contains' => [],
+                'failure_contains' => ['fatal', 'missing', 'bad configuration'],
+                'validate_timeout' => 30,
+            ],
+        ],
+        'prefixes' => [
+            '/etc/nginx/' => [
+                'engine' => 'nginx',
+            ],
+            '/etc/caddy/' => [
+                'engine' => 'caddy',
+            ],
+            '/etc/apache2/' => [
+                'engine' => 'apache',
+            ],
+            '/usr/local/lsws/conf/' => [
+                'engine' => 'openlitespeed',
+            ],
+            '/etc/traefik/' => [
+                'engine' => 'traefik',
+            ],
+            '/etc/haproxy/' => [
+                'engine' => 'haproxy',
+            ],
+            '/etc/envoy/' => [
+                'engine' => 'envoy',
+            ],
+            '/etc/openresty/' => [
+                'engine' => 'openresty',
+            ],
+            '/etc/mysql/' => [
+                'validate' => $mysqlConfigValidateScript,
+                'success_contains' => [],
+                'failure_contains' => ['error', 'unknown variable', 'failed', 'cannot'],
+                'validate_timeout' => 45,
+            ],
+            '/etc/mariadb/' => [
+                'validate' => $mysqlConfigValidateScript,
+                'success_contains' => [],
+                'failure_contains' => ['error', 'unknown variable', 'failed', 'cannot'],
+                'validate_timeout' => 45,
+            ],
+            '/etc/redis/' => [
+                'validate' => $redisConfigValidateScript,
+                'success_contains' => [],
+                'failure_contains' => ['err', 'fatal', 'failed', 'wrong number'],
+                'validate_timeout' => 30,
+            ],
+            '/etc/php/' => [
+                'validate' => $phpConfigValidateScript,
+                'success_contains' => [],
+                'failure_contains' => ['error', 'failed', 'emerg', 'parse error', 'unknown'],
+                'validate_timeout' => 45,
+            ],
+            '/etc/apt/apt.conf.d/' => [
+                'validate' => $aptConfigValidateScript,
+                'success_contains' => ['[ok]'],
+                'failure_contains' => ['error', 'invalid', 'couldn\'t', 'could not'],
+                'validate_timeout' => 30,
+            ],
+            '/etc/supervisor/' => [
+                'validate' => '(sudo -n supervisorctl reread 2>&1 && sudo -n supervisorctl status 2>&1 || supervisorctl reread 2>&1)',
+                'success_contains' => [],
+                'failure_contains' => ['error', 'no such file', 'invalid', 'parse error'],
+                'validate_timeout' => 30,
+            ],
+        ],
+    ],
+
+    /**
+     * Static autocomplete snippets keyed by file type for CodeMirror v1.
+     *
+     * @var array<string, list<array{label: string, insert: string, type?: string, detail?: string}>>
+     */
+    'config_autocomplete_snippets' => [
+        'nginx' => [
+            ['label' => 'server block', 'insert' => "server {\n    listen 80;\n    server_name example.com;\n    root /var/www/html;\n\n    location / {\n        try_files \$uri \$uri/ =404;\n    }\n}\n", 'detail' => 'Basic HTTP server'],
+            ['label' => 'upstream', 'insert' => "upstream backend {\n    server 127.0.0.1:8080;\n}\n", 'detail' => 'Upstream group'],
+        ],
+        'ini' => [
+            ['label' => 'memory_limit', 'insert' => "memory_limit = 256M\n", 'detail' => 'PHP memory limit'],
+            ['label' => 'supervisor program', 'insert' => "[program:example]\ncommand=/usr/bin/example\nautostart=true\nautorestart=true\n", 'detail' => 'Supervisor program block'],
+        ],
+        'conf' => [
+            ['label' => 'bind redis', 'insert' => "bind 127.0.0.1 ::1\n", 'detail' => 'Local-only Redis bind'],
+        ],
+        'default' => [],
+    ],
+
     'workspace_tabs' => [
         'overview' => ['label' => 'Overview', 'icon' => 'squares-2x2'],
         // 'services' sub-tab retired: it duplicated the standalone /servers/{id}/services
@@ -1112,10 +2241,26 @@ BASH
         // action moved to the Caches workspace (redis Stats subtab); the MySQL
         // processlist action + DB connection-hints form moved to the Databases
         // workspace (MySQL Info subtab). mount() redirects /manage/data for back-compat.
+        // When workspace.patch_advisor is on, the Updates tab is hidden and
+        // /manage/updates redirects to Patches; this entry remains for orgs
+        // with the feature disabled.
         'updates' => ['label' => 'Updates', 'icon' => 'arrow-path'],
         'tools' => ['label' => 'Tools', 'icon' => 'wrench-screwdriver'],
-        'configuration' => ['label' => 'Configuration', 'icon' => 'document-text'],
+        // 'configuration' sub-tab retired: it never rendered its own content —
+        // mount() unconditionally redirects ?section=configuration to the
+        // dedicated Configuration workspace (servers.configuration), so the tab
+        // was only ever a redirect link. The mount() redirect stays for
+        // back-compat deep links; the group-configuration partial is now dead.
         'danger' => ['label' => 'Danger', 'icon' => 'exclamation-triangle'],
     ],
+
+    /**
+     * When true, Manage auto-queues an inventory/probe refresh on load (and while
+     * provisioning finishes) so Overview populates without a manual Refresh state click.
+     */
+    'inventory_probe_refresh_on_load' => (bool) env('SERVER_MANAGE_INVENTORY_PROBE_REFRESH_ON_LOAD', true),
+
+    /** wire:poll interval (seconds) while SSH is not ready or probe meta is empty. */
+    'inventory_probe_poll_seconds' => max(3, (int) env('SERVER_MANAGE_INVENTORY_PROBE_POLL_SECONDS', 5)),
 
 ];

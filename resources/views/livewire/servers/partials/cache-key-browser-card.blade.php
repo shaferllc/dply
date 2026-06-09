@@ -12,6 +12,10 @@
     'error' => null,
     'replUnlocked' => false,
     'card' => 'dply-card overflow-hidden',
+    /** Current page of the in-memory SCAN buffer. Drives slice + prev/next. */
+    'keysTablePage' => 1,
+    /** True when the keys list was hydrated from session on mount, not freshly SCANned. */
+    'fromCache' => false,
 ])
 
 @php
@@ -20,22 +24,26 @@
     $patternModalName = 'cache-pattern-reference-'.$engine;
 @endphp
 
-<div class="{{ $card }} p-6 sm:p-8" wire:key="cache-key-browser-{{ $engine }}">
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div class="min-w-0">
-            <h3 class="text-lg font-semibold text-brand-ink">{{ __(':engine — key browser', ['engine' => $engineLabel]) }}</h3>
-            <p class="mt-2 text-sm text-brand-moss">{{ __('SCAN-based key explorer. Walks the keyspace in pages without locking the engine the way KEYS * does.') }}</p>
-        </div>
-        <div class="flex shrink-0 flex-wrap gap-2 self-start whitespace-nowrap">
-            @if ($loaded)
-                <button type="button" wire:click="hideKeyBrowser" class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-sm font-medium text-brand-ink hover:bg-brand-sand/40">
-                    <x-heroicon-o-eye-slash class="h-3.5 w-3.5" aria-hidden="true" />
-                    {{ __('Hide') }}
-                </button>
-            @endif
+{{-- Strip `overflow-hidden` from the card root so the autocomplete dropdown
+     (positioned `absolute top-full z-20` under the Pattern input) can paint
+     past the card's bottom edge. With overflow-hidden in place, z-index does
+     nothing — the dropdown gets clipped flush at the card border and the
+     visible portion looks like it's "hiding behind" the next workspace card.
+     The header still uses bg-brand-sand/20 + border-b which naturally
+     respects rounded corners, so visually nothing else changes. --}}
+<div class="{{ str_replace('overflow-hidden', 'overflow-visible', $card) }}" wire:key="cache-key-browser-{{ $engine }}">
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <x-icon-badge>
+            <x-heroicon-o-magnifying-glass class="h-5 w-5" aria-hidden="true" />
+        </x-icon-badge>
+        <div class="min-w-0 flex-1">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Keys') }}</p>
+            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __(':engine — key browser', ['engine' => $engineLabel]) }}</h3>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('SCAN-based key explorer. Walks the keyspace in pages without locking the engine the way KEYS * does.') }}</p>
         </div>
     </div>
 
+    <div class="px-6 py-6 sm:px-7">
     <x-explainer class="mt-4">
         <p>{{ __('Each page runs SCAN with a small COUNT for up to 5 iterations server-side, returning the keys it found. The cursor in the response lets the next "Load more" continue exactly where it left off. Under heavy write traffic SCAN can repeat keys across pages — the explorer dedupes them client-side.') }}</p>
         <p>
@@ -203,15 +211,99 @@
         </div>
     </x-modal>
 
+    {{-- Active-scan banner. SCAN walks the keyspace in bounded iterations
+         server-side (see CacheServiceKeyExplorer::MAX_SCAN_ITERATIONS). For a
+         large keyspace the per-Search round-trip can take a couple of seconds
+         which previously showed nothing in-body except the "Scanning…" label
+         on the button. This block surfaces the pattern, an explainer line so
+         the operator knows SCAN is non-blocking, and a skeleton table that
+         lines up with the real result table that lands next. --}}
+    <div wire:loading wire:target="searchKeyBrowser,loadKeyBrowserPage" class="mt-4">
+        <div class="flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-xs text-sky-900">
+            <svg class="mt-0.5 h-4 w-4 shrink-0 animate-spin text-sky-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" opacity="0.25" />
+                <path d="M22 12a10 10 0 0 1-10 10" stroke-linecap="round" />
+            </svg>
+            <div class="min-w-0">
+                <p class="font-semibold">
+                    {{ __('Scanning') }} <code class="rounded bg-white/70 px-1.5 py-0.5 font-mono text-[11px] text-sky-900 ring-1 ring-sky-200">{{ $pattern ?: '*' }}</code>{{ __(' on the engine…') }}
+                </p>
+                <p class="mt-0.5 text-sky-800/90">{{ __('Walks the keyspace in bounded SCAN iterations (non-blocking — KEYS * would lock the engine). Empty result so far means no matches in the slice scanned this pass; hit "Load more" if you need to keep walking.') }}</p>
+            </div>
+        </div>
+        <div class="mt-3 overflow-hidden rounded-xl border border-brand-ink/10">
+            <div class="bg-brand-sand/40 px-4 py-3 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Key') }}</div>
+            <div class="space-y-2 bg-white p-4">
+                @foreach (range(1, 5) as $i)
+                    <div class="h-3 w-{{ $i % 2 === 0 ? 'full' : '3/4' }} animate-pulse rounded bg-brand-ink/10"></div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+
     @if ($error)
-        <p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-800">{{ $error }}</p>
+        <div wire:loading.remove wire:target="searchKeyBrowser,loadKeyBrowserPage">
+            <p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-relaxed text-rose-800">{{ $error }}</p>
+        </div>
     @endif
 
     @if ($loaded && empty($keys) && ! $error)
-        <p class="mt-4 text-sm text-brand-moss">{{ __('No keys matched the pattern.') }}</p>
+        {{-- Matches-empty empty state. Same dashed-border pattern as the
+             other cards' idle/empty surfaces so the operator immediately
+             recognises this as a "no data" state rather than "load failed". --}}
+        <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-8 text-center" wire:loading.remove wire:target="searchKeyBrowser,loadKeyBrowserPage">
+            <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-magnifying-glass class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <p class="mt-3 text-sm font-semibold text-brand-ink">{{ __('No keys matched') }}</p>
+            <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
+                {{ __('SCAN walked the keyspace with pattern') }}
+                <code class="rounded bg-white/70 px-1 py-0.5 font-mono text-[11px] text-brand-ink ring-1 ring-brand-ink/10">{{ $pattern ?: '*' }}</code>
+                {{ __('and came back empty. Try a broader pattern like') }} <code class="rounded bg-white/70 px-1 py-0.5 font-mono text-[11px] text-brand-ink ring-1 ring-brand-ink/10">*</code>, {{ __('or open the') }} <strong>{{ __('Pattern guide') }}</strong> {{ __('for common shapes.') }}
+            </p>
+        </div>
+    @endif
+
+    @if (! $loaded && empty($keys) && ! $error)
+        {{-- Pre-search idle state. Hides during wire:loading so the
+             scanning skeleton above takes over the moment Search fires. --}}
+        <div class="mt-4 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-6 py-8 text-center" wire:loading.remove wire:target="searchKeyBrowser,loadKeyBrowserPage">
+            <span class="mx-auto flex h-10 w-10 items-center justify-center rounded-2xl bg-brand-sage/15 text-brand-forest ring-1 ring-brand-sage/25">
+                <x-heroicon-o-magnifying-glass class="h-5 w-5" aria-hidden="true" />
+            </span>
+            <p class="mt-3 text-sm font-semibold text-brand-ink">{{ __('No search yet') }}</p>
+            <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-brand-moss">
+                {{ __('Pick a pattern above (default') }}
+                <code class="rounded bg-white/70 px-1 py-0.5 font-mono text-[11px] text-brand-ink ring-1 ring-brand-ink/10">*</code>
+                {{ __('matches everything) and hit') }}
+                <span class="inline-flex items-center gap-1 rounded-md bg-brand-ink px-1.5 py-0.5 align-middle text-[11px] font-medium text-white">{{ __('Search') }}</span>
+                {{ __('to walk the keyspace via SCAN — non-blocking, paginated, safe to run on a busy engine.') }}
+            </p>
+        </div>
     @endif
 
     @if (! empty($keys))
+        <div wire:loading.remove wire:target="searchKeyBrowser,loadKeyBrowserPage">
+        @if ($fromCache ?? false)
+            <p class="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50/70 px-3 py-2 text-xs text-amber-900">
+                <x-heroicon-o-clock class="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span>{{ __('Showing your previous SCAN result for') }} <code class="rounded bg-white/60 px-1 py-0.5 font-mono">{{ $pattern ?: '*' }}</code>. {{ __('Click') }} <strong>{{ __('Search') }}</strong> {{ __('to refresh.') }}</span>
+            </p>
+        @endif
+        @php
+            // Client-side pagination of the SCAN buffer. Slicing is free
+            // (everything's already in memory) and prev/next never re-hits
+            // the engine. "Load more" still continues the SCAN cursor and
+            // appends to $keys — that's separate from the page index.
+            $pageSize = \App\Livewire\Servers\WorkspaceCaches::KEYS_TABLE_PAGE_SIZE;
+            $keysCount = count($keys);
+            $keysPageCount = max(1, (int) ceil($keysCount / $pageSize));
+            $keysCurrentPage = max(1, min((int) ($keysTablePage ?? 1), $keysPageCount));
+            $keysStartIndex = ($keysCurrentPage - 1) * $pageSize;
+            $keysSlice = array_slice($keys, $keysStartIndex, $pageSize);
+            $keysRangeStart = $keysStartIndex + 1;
+            $keysRangeEnd = min($keysStartIndex + $pageSize, $keysCount);
+        @endphp
         <div class="mt-4 overflow-x-auto rounded-xl border border-brand-ink/10">
             <table class="min-w-full divide-y divide-brand-ink/10 text-sm">
                 <thead class="bg-brand-sand/40 text-left text-xs font-semibold uppercase tracking-wide text-brand-mist">
@@ -221,7 +313,7 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-brand-ink/10 bg-white">
-                    @foreach ($keys as $key)
+                    @foreach ($keysSlice as $key)
                         <tr @class([
                             'bg-brand-sand/30' => $selected === $key,
                         ])>
@@ -255,24 +347,50 @@
             </table>
         </div>
 
-        <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-brand-moss">
-            <span>{{ __('Showing :count keys', ['count' => count($keys)]) }}</span>
-            @if (! $complete)
-                <button
-                    type="button"
-                    wire:click="loadKeyBrowserPage"
-                    wire:loading.attr="disabled"
-                    wire:target="loadKeyBrowserPage"
-                    class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1.5 font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
-                >
-                    <x-heroicon-o-arrow-down class="h-3 w-3" />
-                    <span wire:loading.remove wire:target="loadKeyBrowserPage">{{ __('Load more') }}</span>
-                    <span wire:loading wire:target="loadKeyBrowserPage">{{ __('Loading…') }}</span>
-                </button>
-            @else
-                <span class="text-brand-mist">{{ __('Scan complete.') }}</span>
-            @endif
+        <div class="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-brand-moss">
+            <span>{{ __('Showing :start–:end of :count keys', ['start' => $keysRangeStart, 'end' => $keysRangeEnd, 'count' => $keysCount]) }}</span>
+            <div class="flex flex-wrap items-center gap-3">
+                @if ($keysPageCount > 1)
+                    <div class="inline-flex items-center gap-1">
+                        <button
+                            type="button"
+                            wire:click="setKeysTablePage({{ $keysCurrentPage - 1 }})"
+                            @disabled($keysCurrentPage <= 1)
+                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            <x-heroicon-m-chevron-left class="h-3 w-3" />
+                            {{ __('Prev') }}
+                        </button>
+                        <span class="px-2 font-mono text-brand-moss">{{ $keysCurrentPage }} / {{ $keysPageCount }}</span>
+                        <button
+                            type="button"
+                            wire:click="setKeysTablePage({{ $keysCurrentPage + 1 }})"
+                            @disabled($keysCurrentPage >= $keysPageCount)
+                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            {{ __('Next') }}
+                            <x-heroicon-m-chevron-right class="h-3 w-3" />
+                        </button>
+                    </div>
+                @endif
+                @if (! $complete)
+                    <button
+                        type="button"
+                        wire:click="loadKeyBrowserPage"
+                        wire:loading.attr="disabled"
+                        wire:target="loadKeyBrowserPage"
+                        class="inline-flex items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1.5 font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
+                    >
+                        <x-heroicon-o-arrow-down class="h-3 w-3" />
+                        <span wire:loading.remove wire:target="loadKeyBrowserPage">{{ __('Load more') }}</span>
+                        <span wire:loading wire:target="loadKeyBrowserPage">{{ __('Loading…') }}</span>
+                    </button>
+                @else
+                    <span class="text-brand-mist">{{ __('Scan complete.') }}</span>
+                @endif
+            </div>
         </div>
+        </div>{{-- /wire:loading.remove wrapper for keys block --}}
     @endif
 
     @if ($selected !== null)
@@ -347,4 +465,5 @@
             @endif
         </div>
     @endif
+    </div>
 </div>

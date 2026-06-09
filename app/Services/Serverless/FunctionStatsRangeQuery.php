@@ -6,11 +6,13 @@ namespace App\Services\Serverless;
 
 use App\Models\FunctionInvocation;
 use App\Models\Site;
+use App\Services\Servers\ServerMetricsRangeQuery;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 /**
  * Bucketed time-series of a serverless function's activity, for the Monitor
- * dashboard — the function counterpart to {@see \App\Services\Servers\ServerMetricsRangeQuery}.
+ * dashboard — the function counterpart to {@see ServerMetricsRangeQuery}.
  *
  * `function_invocations` is dply's source of truth for what hit a function
  * (the DO activations list API is empty). Given a Site + named range, this
@@ -129,7 +131,7 @@ final class FunctionStatsRangeQuery
     /**
      * Whole-window totals + a per-source split.
      *
-     * @param  \Illuminate\Support\Collection<int, FunctionInvocation>  $rows
+     * @param  Collection<int, FunctionInvocation>  $rows
      * @return array{invocations: int, errors: int, error_rate: int, avg_duration: int, p95_duration: int, cold: int, cold_rate: int, by_source: array<string, int>}
      */
     private function summary($rows): array

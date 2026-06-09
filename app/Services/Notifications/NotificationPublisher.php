@@ -23,6 +23,11 @@ class NotificationPublisher
      *                                           through those channels directly (e.g. always-send
      *                                           fan-out for provision failure) and the subscription
      *                                           pipe would otherwise produce a duplicate message.
+     * @param  list<string>  $excludeRecipientUserIds  User ULIDs to skip when fanning out the
+     *                                           in-app inbox. Use when the caller has already
+     *                                           delivered this event to those users via a sibling
+     *                                           publish (e.g. a site error's site-scoped dispatch
+     *                                           covers stakeholders the server roll-up would repeat).
      */
     public function publish(
         string $eventKey,
@@ -35,6 +40,7 @@ class NotificationPublisher
         ?User $actor = null,
         ?array $recipientUsers = null,
         array $excludeChannelIds = [],
+        array $excludeRecipientUserIds = [],
     ): NotificationEvent {
         $definition = $this->registry->definition($eventKey);
         $context = array_replace($this->contextResolver->resolve($subject), $contextOverrides);
@@ -63,7 +69,7 @@ class NotificationPublisher
             'occurred_at' => now(),
         ]);
 
-        $this->routingResolver->route($event, $recipientUserIds, $excludeChannelIds);
+        $this->routingResolver->route($event, $recipientUserIds, $excludeChannelIds, $excludeRecipientUserIds);
 
         return $event;
     }

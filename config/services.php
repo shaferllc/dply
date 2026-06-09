@@ -37,6 +37,15 @@ return [
 
     'digitalocean' => [
         'default_image' => env('DIGITALOCEAN_DEFAULT_IMAGE', 'ubuntu-24-04-x64'),
+
+        // Region → pre-baked snapshot-id map (JSON), e.g.
+        //   {"nyc1":"171234567","sfo3":"171234568"}
+        // When a new server's region has an entry, provisioning launches from
+        // that snapshot (stack preinstalled) instead of stock Ubuntu and the
+        // setup script skip-fasts. Bake with `php artisan dply:do:snapshot:bake`
+        // per region; snapshots are region-scoped on DigitalOcean. Empty = off.
+        'baked_snapshots' => env('DIGITALOCEAN_BAKED_SNAPSHOTS', ''),
+
         'ssh_user' => env('DIGITALOCEAN_SSH_USER', 'root'),
         /*
          * Optional personal access token for listing regions & sizes on the server create
@@ -44,12 +53,17 @@ return [
          * uses the selected ProviderCredential.
          */
         'token' => env('DIGITALOCEAN_TOKEN'),
-        'auto_testing_hostname_enabled' => (bool) env('DPLY_AUTO_TESTING_HOSTNAME_ENABLED', false),
+        'auto_testing_hostname_enabled' => true,
+        /*
+         * Universal testing-zone pool (DO). Legacy callers still read from
+         * here — the provider-routing logic in TestingHostnameProvisioner
+         * folds these into services.dply.testing_domains.digitalocean.
+         */
         'testing_domains' => array_values(array_filter(array_map(
             static fn (string $value): string => trim($value),
             explode(',', (string) env('DPLY_TESTING_DOMAINS', ''))
         ))),
-        'testing_domain_strategy' => env('DPLY_TESTING_DOMAIN_STRATEGY', 'deterministic'),
+        'testing_domain_strategy' => 'deterministic',
         /*
          * DNS target for a deployed serverless function's friendly hostname
          * ({slug}.{testing-domain}). An IP becomes an A record; a hostname
@@ -79,17 +93,47 @@ return [
 
     'hetzner' => [
         'default_image' => env('HETZNER_DEFAULT_IMAGE', 'ubuntu-24.04'),
+
+        // Pre-baked snapshot for the fast path. Hetzner Cloud snapshots are
+        // GLOBAL across locations, so this is a single snapshot id (not a
+        // per-region map like DigitalOcean), e.g. HETZNER_BAKED_SNAPSHOT=171234567.
+        // New non-managed servers then launch from it and skip-fast the setup
+        // script. A JSON region→id map is also accepted if you ever want it.
+        'baked_snapshots' => env('HETZNER_BAKED_SNAPSHOT', ''),
+
         'ssh_user' => env('HETZNER_SSH_USER', 'root'),
+        // Create + attach a dply-managed Cloud Firewall at provision time so SSH
+        // (and service ports) are reachable at Hetzner's edge. Disable to rely on
+        // the project's own firewall posture.
+        'manage_cloud_firewall' => env('HETZNER_MANAGE_CLOUD_FIREWALL', true),
     ],
 
     'linode' => [
         'default_image' => env('LINODE_DEFAULT_IMAGE', 'linode/ubuntu24.04'),
         'ssh_user' => env('LINODE_SSH_USER', 'root'),
+
+        /*
+         * App-level Linode (Akamai Connected Cloud) API token for "global" ops with
+         * no connected customer credential — catalog (regions/types) browsing before
+         * a credential is linked. Mirrors services.digitalocean.token /
+         * services.vultr.token. Per-server provisioning still uses each server's
+         * own ProviderCredential.
+         */
+        'token' => env('LINODE_TOKEN'),
     ],
 
     'vultr' => [
         'default_os_id' => env('VULTR_DEFAULT_OS_ID', 2152), // Ubuntu 24.04 LTS
         'ssh_user' => env('VULTR_SSH_USER', 'root'),
+
+        /*
+         * App-level Vultr API token for "global" operations that aren't tied to a
+         * connected customer credential — catalog (regions/plans) browsing before a
+         * credential is linked, and any control-plane reads. Mirrors
+         * services.digitalocean.token. Per-server provisioning still uses the
+         * server's own ProviderCredential.
+         */
+        'token' => env('VULTR_TOKEN'),
     ],
 
     'upcloud' => [
@@ -97,64 +141,44 @@ return [
         'ssh_user' => env('UPCLOUD_SSH_USER', 'root'),
     ],
 
-    'scaleway' => [
-        'default_image' => env('SCALEWAY_DEFAULT_IMAGE', 'ubuntu_jammy'),
-        'ssh_user' => env('SCALEWAY_SSH_USER', 'root'),
-    ],
-
-    'equinix_metal' => [
-        'default_os' => env('EQUINIX_METAL_DEFAULT_OS', 'ubuntu_22_04'),
-        'ssh_user' => env('EQUINIX_METAL_SSH_USER', 'root'),
-    ],
-
     'ovh' => [
-        'ssh_user' => env('OVH_SSH_USER', 'root'),
-    ],
-
-    'rackspace' => [
-        'ssh_user' => env('RACKSPACE_SSH_USER', 'root'),
-    ],
-
-    'fly_io' => [
-        'api_host' => env('FLY_API_HOSTNAME', 'https://api.machines.dev'),
-        'default_image' => env('FLY_DEFAULT_IMAGE', 'registry-1.docker.io/library/ubuntu:22.04'),
-        'default_vm_size' => env('FLY_DEFAULT_VM_SIZE', 'shared-cpu-1x'),
-        'ssh_user' => env('FLY_SSH_USER', 'root'),
-    ],
-
-    'render' => [
-        'ssh_user' => env('RENDER_SSH_USER', 'root'),
-    ],
-
-    'railway' => [
-        'ssh_user' => env('RAILWAY_SSH_USER', 'root'),
-    ],
-
-    'coolify' => [
-        'ssh_user' => env('COOLIFY_SSH_USER', 'root'),
-    ],
-
-    'cap_rover' => [
-        'ssh_user' => env('CAP_ROVER_SSH_USER', 'root'),
+        // OVH Public Cloud Ubuntu images default to the `ubuntu` login user.
+        'ssh_user' => env('OVH_SSH_USER', 'ubuntu'),
+        // Image name matched (case-insensitive substring) against the project's
+        // image catalogue at provision time. See OvhService::resolveImageId().
+        'default_image' => env('OVH_DEFAULT_IMAGE', 'Ubuntu 24.04'),
     ],
 
     'aws' => [
         'default_region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
-        'default_image' => env('AWS_EC2_DEFAULT_IMAGE', 'ami-0c55b159cbfafe1f0'),
+        /** When unset, resolveDefaultImageId() reads the regional Ubuntu SSM parameter. */
+        'default_image' => env('AWS_EC2_DEFAULT_IMAGE'),
+        'ami_ssm_parameter' => env(
+            'AWS_EC2_AMI_SSM_PARAMETER',
+            '/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id'
+        ),
+        /** Existing security group with SSH ingress; when unset, Dply creates/finds dply-provision. */
+        'security_group_id' => env('AWS_EC2_SECURITY_GROUP_ID'),
+        'provision_security_group' => env('AWS_EC2_PROVISION_SECURITY_GROUP', true),
+        'provision_security_group_name' => env('AWS_EC2_PROVISION_SECURITY_GROUP_NAME', 'dply-provision'),
         'ssh_user' => env('AWS_EC2_SSH_USER', 'ubuntu'),
-    ],
-
-    'gcp' => [
-        'default_zone' => env('GCP_DEFAULT_ZONE', 'us-central1-a'),
-        'ssh_user' => env('GCP_SSH_USER', 'ubuntu'),
     ],
 
     'azure' => [
         'ssh_user' => env('AZURE_SSH_USER', 'azureuser'),
+        'default_resource_group' => env('AZURE_DEFAULT_RESOURCE_GROUP', 'dply'),
+        'image_publisher' => env('AZURE_IMAGE_PUBLISHER', 'Canonical'),
+        'image_offer' => env('AZURE_IMAGE_OFFER', 'ubuntu-24_04-lts'),
+        'image_sku' => env('AZURE_IMAGE_SKU', 'server'),
+        'image_version' => env('AZURE_IMAGE_VERSION', 'latest'),
+        'os_disk_type' => env('AZURE_OS_DISK_TYPE', 'Standard_LRS'),
     ],
 
     'oracle' => [
         'ssh_user' => env('ORACLE_SSH_USER', 'ubuntu'),
+        'default_shape' => env('ORACLE_DEFAULT_SHAPE', 'VM.Standard.E2.1.Micro'),
+        'default_availability_domain' => env('ORACLE_DEFAULT_AVAILABILITY_DOMAIN', ''),
+        'default_image_id' => env('ORACLE_DEFAULT_IMAGE_ID', ''),
     ],
 
     'github' => [
@@ -177,6 +201,40 @@ return [
         'client_secret' => env('GITLAB_CLIENT_SECRET'),
         'redirect' => env('GITLAB_REDIRECT_URI', env('APP_URL').'/auth/gitlab/callback'),
         'scopes' => array_values(array_filter(array_map('trim', explode(',', (string) env('GITLAB_SCOPES', 'read_user,api'))))),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Dply testing-hostname pools by DNS provider
+    |--------------------------------------------------------------------------
+    |
+    | Per-provider lists of Dply-owned zones used to mint testing URLs for
+    | newly provisioned sites. When an organization has a credential for one
+    | of these providers connected, TestingHostnameProvisioner will use that
+    | provider's pool + credential so the testing record lives where the
+    | operator's existing DNS already is. Falls back to the digitalocean
+    | pool (services.digitalocean.token or an org-level DO credential) when
+    | no provider-specific match is available.
+    |
+    | Each env var is a comma-separated list of zones Dply controls on the
+    | given provider, e.g. DPLY_TESTING_DOMAINS_HETZNER="dply.forum".
+    |
+    */
+    'dply' => [
+        'testing_domains' => [
+            'digitalocean' => array_values(array_unique(array_filter(array_merge(
+                array_map(static fn (string $v): string => strtolower(trim($v)), explode(',', (string) env('DPLY_TESTING_DOMAINS', ''))),
+                array_map(static fn (string $v): string => strtolower(trim($v)), explode(',', (string) env('DPLY_TESTING_DOMAINS_DIGITALOCEAN', ''))),
+            )))),
+            'hetzner' => array_values(array_filter(array_map(
+                static fn (string $v): string => strtolower(trim($v)),
+                explode(',', (string) env('DPLY_TESTING_DOMAINS_HETZNER', ''))
+            ))),
+            'cloudflare' => array_values(array_filter(array_map(
+                static fn (string $v): string => strtolower(trim($v)),
+                explode(',', (string) env('DPLY_TESTING_DOMAINS_CLOUDFLARE', ''))
+            ))),
+        ],
     ],
 
 ];

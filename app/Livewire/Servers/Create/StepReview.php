@@ -6,10 +6,11 @@ namespace App\Livewire\Servers\Create;
 
 use App\Actions\Servers\StoreServerFromCreateForm;
 use App\Jobs\Imports\RunMigrationStepJob;
-use App\Models\Organization;
 use App\Livewire\Forms\ServerCreateForm;
 use App\Livewire\Servers\Concerns\InteractsWithServerCreateDraft;
 use App\Livewire\Servers\Concerns\ServerCreateActions;
+use App\Models\ForgeServer;
+use App\Models\ForgeSite;
 use App\Models\ImportServerMigration;
 use App\Models\PloiServer;
 use App\Models\PloiSite;
@@ -103,7 +104,7 @@ class StepReview extends Component
      */
     protected function hydratePloiMigrationSelection(string $sourceId, array $payload, $org): void
     {
-        $ploiServer = \App\Models\PloiServer::query()
+        $ploiServer = PloiServer::query()
             ->with('sites')
             ->whereHas('providerCredential', fn ($q) => $q->where('organization_id', $org->getKey()))
             ->find($sourceId);
@@ -131,7 +132,7 @@ class StepReview extends Component
      */
     protected function hydrateForgeMigrationSelection(string $sourceId, array $payload, $org): void
     {
-        $forgeServer = \App\Models\ForgeServer::query()
+        $forgeServer = ForgeServer::query()
             ->with('sites')
             ->whereHas('providerCredential', fn ($q) => $q->where('organization_id', $org->getKey()))
             ->find($sourceId);
@@ -299,7 +300,7 @@ class StepReview extends Component
      */
     /**
      * @param  array<string, bool>|null  $explicitSelection  Site ulid → selected map
-     *         from the wizard. Null falls back to all-eligible-sites default.
+     *                                                       from the wizard. Null falls back to all-eligible-sites default.
      */
     protected function kickOffPloiMigration(string $migrationSourceId, Server $server, $user, ?array $explicitSelection = null): ?ImportServerMigration
     {
@@ -355,7 +356,7 @@ class StepReview extends Component
                 return null;
             }
 
-            $migration = (new MigrationPlanner())->plan(
+            $migration = (new MigrationPlanner)->plan(
                 source: $ploiServer,
                 selectedSiteIds: $selectedSiteIds,
                 targetServerId: $server->id,
@@ -408,7 +409,7 @@ class StepReview extends Component
                 return null;
             }
 
-            $forgeServer = \App\Models\ForgeServer::query()
+            $forgeServer = ForgeServer::query()
                 ->with('providerCredential')
                 ->whereHas('providerCredential', fn ($q) => $q->where('organization_id', $org->getKey()))
                 ->find($migrationSourceId);
@@ -417,7 +418,7 @@ class StepReview extends Component
                 return null;
             }
 
-            $eligibleSiteIds = \App\Models\ForgeSite::query()
+            $eligibleSiteIds = ForgeSite::query()
                 ->where('forge_server_id', $forgeServer->id)
                 ->where('removed_from_source', false)
                 ->whereIn('site_type', ['laravel', 'php'])
@@ -441,7 +442,7 @@ class StepReview extends Component
                 return null;
             }
 
-            $migration = (new MigrationPlanner())->plan(
+            $migration = (new MigrationPlanner)->plan(
                 source: $forgeServer,
                 selectedSiteIds: $selectedSiteIds,
                 targetServerId: $server->id,
@@ -479,8 +480,6 @@ class StepReview extends Component
             'digitalocean_functions' => __('DigitalOcean Functions host added. Create a site to wire its runtime and deploy settings.'),
             'aws_lambda' => __('AWS Lambda target added. Create a site to wire its runtime and Bref deploy settings.'),
             'digitalocean_kubernetes' => __('DigitalOcean Kubernetes target added. Create a site to prepare manifests and cluster runtime settings.'),
-            'equinix_metal' => __('Bare metal can take 5–10 minutes.'),
-            'fly_io' => __('Fly.io machine is being created.'),
             'aws' => __('AWS EC2 instance is being created. This usually takes 1–2 minutes.'),
             'custom' => __('Server added.'),
             default => __('Server is being created. This usually takes 1–2 minutes.'),

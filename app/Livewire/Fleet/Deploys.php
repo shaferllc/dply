@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Livewire\Fleet;
 
+use App\Livewire\Concerns\RequiresFeature;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Url;
-use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 /**
@@ -29,6 +29,7 @@ class Deploys extends Component
     use RequiresFeature;
 
     protected string $requiredFeature = 'surface.fleet';
+
     #[Url(as: 'tab', except: 'running')]
     public string $tab = 'running';
 

@@ -6,13 +6,16 @@ namespace App\Jobs;
 
 use App\Models\ConsoleAction;
 use App\Models\Server;
+use App\Models\User;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\RemoteWebserverConfigService;
+use App\Services\Servers\ServerWebserverConfigEditor;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -45,9 +48,12 @@ class RunWebserverConfigOpJob implements ShouldQueue
         public string $path,
         public string $contents = '',
         public string $backupPath = '',
+        public ?string $userId = null,
+        public bool $recordRevision = false,
+        public ?string $revisionSummary = null,
     ) {}
 
-    public function handle(RemoteWebserverConfigService $service): void
+    public function handle(RemoteWebserverConfigService $service, \App\Services\Notifications\ServerWebserverNotificationDispatcher $notifications): void
     {
         $server = Server::query()->find($this->serverId);
         if ($server === null) {
@@ -79,7 +85,7 @@ class RunWebserverConfigOpJob implements ShouldQueue
         // Livewire component can pick it up on its next poll-driven
         // render and drop it into the editor buffer.
         if ($this->op === 'read') {
-            \Illuminate\Support\Facades\Cache::put(
+            Cache::put(
                 self::readResultCacheKey($this->consoleActionId),
                 $result,
                 now()->addMinutes(5),
@@ -95,6 +101,43 @@ class RunWebserverConfigOpJob implements ShouldQueue
         $ok = (bool) ($result['ok'] ?? $result['validate_ok'] ?? false);
         $errBlob = $ok ? null : (string) ($result['output'] ?? $result['validate_output'] ?? '');
 
+        if ($ok && $this->op === 'write' && $this->recordRevision) {
+            app(ServerWebserverConfigEditor::class)->recordWrite(
+                $server,
+                $this->engine,
+                $this->path,
+                $this->contents,
+                $this->userId !== null ? User::query()->find($this->userId) : null,
+                $this->revisionSummary,
+            );
+
+            Cache::put(
+                self::writeResultCacheKey($this->consoleActionId),
+                ['contents' => $this->contents],
+                now()->addMinutes(5),
+            );
+        }
+
+        if ($ok && $this->op === 'validate') {
+            Cache::put(
+                self::validateResultCacheKey($this->consoleActionId),
+                $result,
+                now()->addMinutes(5),
+            );
+        }
+
+        // A successful write/restore changed the live config file — notify
+        // subscribers. (validate/read don't mutate, so they don't fire.)
+        if ($ok && in_array($this->op, ['write', 'restore'], true)) {
+            $notifications->notify(
+                $server,
+                'config_saved',
+                [__(':engine config: :path', ['engine' => $this->engine, 'path' => $this->path])],
+                $this->userId !== null ? User::query()->find($this->userId) : null,
+                ['engine' => $this->engine, 'path' => $this->path, 'op' => $this->op],
+            );
+        }
+
         $this->markConsole(
             $ok ? ConsoleAction::STATUS_COMPLETED : ConsoleAction::STATUS_FAILED,
             error: $errBlob,
@@ -104,6 +147,16 @@ class RunWebserverConfigOpJob implements ShouldQueue
     public static function readResultCacheKey(string $consoleActionId): string
     {
         return 'dply.webserver-config-read:'.$consoleActionId;
+    }
+
+    public static function writeResultCacheKey(string $consoleActionId): string
+    {
+        return 'dply.webserver-config-write:'.$consoleActionId;
+    }
+
+    public static function validateResultCacheKey(string $consoleActionId): string
+    {
+        return 'dply.webserver-config-validate:'.$consoleActionId;
     }
 
     public function failed(?\Throwable $e): void

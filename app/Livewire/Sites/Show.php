@@ -2,39 +2,50 @@
 
 namespace App\Livewire\Sites;
 
+use App\Actions\Edge\RedeployEdgeSite;
 use App\Enums\SiteRedirectKind;
 use App\Jobs\ApplySiteWebserverConfigJob;
-use App\Jobs\AttachEdgeDomainJob;
-use App\Jobs\DetachEdgeDomainJob;
+use App\Jobs\AttachCloudDomainJob;
+use App\Jobs\DetachCloudDomainJob;
 use App\Jobs\ExecuteSiteCertificateJob;
+use App\Jobs\InstallServerWebserverJob;
 use App\Jobs\IssueSiteSslJob;
 use App\Jobs\ProvisionSiteJob;
 use App\Jobs\PushSiteEnvJob;
 use App\Jobs\RemoveSiteRepositoryJob;
-use App\Jobs\RunSiteDeploymentJob;
+use App\Jobs\RestartSiteProvisioningJob;
+use App\Jobs\ScanSiteEnvRequirementsJob;
 use App\Jobs\SyncEnvFromServerJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\Edge\ManagesEdgeRedeploy;
 use App\Livewire\Concerns\ManagesServerlessRuntime;
+use App\Livewire\Concerns\MountsSiteWorkspace;
+use App\Livewire\Concerns\OptimizesPipeline;
+use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
+use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
+use App\Livewire\Sites\Concerns\HandlesSiteRemovalFlow;
+use App\Livewire\Sites\Concerns\InteractsWithScaffoldJourney;
+use App\Livewire\Sites\Concerns\ManagesSiteDeployExecution;
+use App\Livewire\Sites\Concerns\ManagesSiteDeployHooks;
+use App\Livewire\Sites\Concerns\ManagesSiteDeploySteps;
 use App\Models\ConsoleAction;
 use App\Models\InsightFinding;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteAuditEvent;
 use App\Models\SiteCertificate;
-use App\Models\SiteDeployHook;
-use App\Models\SiteDeployment;
-use App\Models\SiteDeployStep;
 use App\Models\SiteDomain;
 use App\Models\SiteRedirect;
-use App\Models\SiteRelease;
-use App\Models\SocialAccount;
+use App\Services\Certificates\CertificateRepairService;
+use App\Services\Certificates\CertificateRequestService;
 use App\Services\Deploy\DeploymentContractBuilder;
 use App\Services\Deploy\DeploymentPreflightValidator;
 use App\Services\Deploy\ServerlessRepositoryCheckout;
 use App\Services\Deploy\ServerlessRuntimeDetector;
 use App\Services\Deploy\ServerlessTargetCapabilityResolver;
 use App\Services\Deploy\SiteRuntimeActionExecutor;
+use App\Services\Edge\EdgeSiteCanceller;
 use App\Services\RemoteCli\RiskLevel;
 use App\Services\RemoteCli\SiteAuditWriter;
 use App\Services\Servers\ServerPhpManager;
@@ -42,15 +53,15 @@ use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
 use App\Services\Sites\PrimaryHostnameRenamePlanner;
 use App\Services\Sites\RepositoryWebhookProvisioner;
-use App\Services\Sites\SiteDeploySyncCoordinator;
+use App\Services\Sites\SitePhpRuntimeDirectivesBuilder;
 use App\Services\Sites\SiteProvisioner;
 use App\Services\Sites\SiteProvisioningCanceller;
-use App\Services\Sites\SiteReleaseRollback;
-use App\Services\Certificates\CertificateRequestService;
+use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use App\Support\HostnameValidator;
 use App\Support\SiteDeployKeyGenerator;
 use App\Support\SiteRedirectConfigSupport;
+use App\Support\Sites\SiteShowViewData;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
@@ -65,7 +76,17 @@ class Show extends Component
 {
     use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
+    use HandlesSiteRemovalFlow;
+    use InteractsWithScaffoldJourney;
+    use ManagesEdgeRedeploy;
     use ManagesServerlessRuntime;
+    use ManagesSiteDeployExecution;
+    use ManagesSiteDeployHooks;
+    use ManagesSiteDeploySteps;
+    use MountsSiteWorkspace;
+    use OptimizesPipeline;
+    use RefreshesLinkedSourceControlAccounts;
+    use WatchesConsoleActionOutcomes;
 
     public Server $server;
 
@@ -135,11 +156,14 @@ class Show extends Component
     /** Mirrors {@see Site::$deploy_strategy} `atomic` for the zero-downtime card UI. */
     public bool $zero_downtime_enabled = false;
 
+    /** Per-deploy ephemeral SSH credentials (site meta `deploy.ephemeral_credentials`). */
+    public bool $ephemeral_deploy_credentials_enabled = false;
+
     public bool $deploy_health_enabled = false;
 
     public bool $deploy_health_auto_rollback = false;
 
-    public string $deploy_health_path = '/health';
+    public string $deploy_health_path = '/up';
 
     public int $deploy_health_expect_status = 200;
 
@@ -205,6 +229,24 @@ class Show extends Component
 
     public string $php_max_execution_time = '';
 
+    public string $php_post_max_size = '';
+
+    public string $php_max_input_time = '';
+
+    public string $php_max_input_vars = '';
+
+    public string $php_max_file_uploads = '';
+
+    public string $php_timezone = '';
+
+    public string $fpm_pm = 'dynamic';
+
+    public string $fpm_max_children = '';
+
+    public string $fpm_max_requests = '';
+
+    public string $fpm_request_terminate_timeout = '';
+
     /** Localhost port for reverse-proxy runtimes (Node, Rails, Puma, containers, etc.). */
     public string $runtime_app_port = '';
 
@@ -240,6 +282,22 @@ class Show extends Component
      * Stored on the Site row's `env_file_path` column when saved.
      */
     public string $env_file_path_override = '';
+
+    /**
+     * Modal inputs for the "Add missing variables" flow, keyed by the missing
+     * required env KEY. Pre-seeded from the scanner's .env.example samples when
+     * the modal opens; only non-empty entries are written on submit.
+     *
+     * @var array<string, string>
+     */
+    public array $missing_env_values = [];
+
+    /**
+     * Scratch buffer for the "paste a .env to auto-fill" box in the missing
+     * variables modal. Parsed by {@see fillMissingFromPaste()} into the
+     * matching {@see $missing_env_values} inputs; never persisted directly.
+     */
+    public string $missing_env_paste = '';
 
     public string $new_redirect_from = '';
 
@@ -282,20 +340,6 @@ class Show extends Component
 
     public string $editing_redirect_comment = '';
 
-    public string $new_hook_phase = 'after_clone';
-
-    public string $new_hook_script = '';
-
-    public int $new_hook_order = 0;
-
-    public int $new_hook_timeout_seconds = 900;
-
-    public string $new_deploy_step_type = SiteDeployStep::TYPE_COMPOSER_INSTALL;
-
-    public string $new_deploy_step_command = '';
-
-    public int $new_deploy_step_timeout = 900;
-
     public string $webhook_allowed_ips_text = '';
 
     /** @var 'github'|'gitlab'|'bitbucket'|'custom' */
@@ -326,23 +370,23 @@ class Show extends Component
 
     public function mount(Server $server, Site $site): void
     {
-        if ($site->server_id !== $server->id) {
-            abort(404);
-        }
-        if ($server->organization_id !== request()->user()?->currentOrganization()?->id) {
-            abort(404);
+        $this->mountSiteWorkspace($server, $site);
+        $this->syncFormFromSite();
+
+        if ($this->site->usesEdgeRuntime()) {
+            return;
         }
 
-        $this->authorize('view', $site);
-        $this->server = $server;
-        $this->site = $site;
-        $this->syncFormFromSite();
         $this->loadFunctionsSourceControlState(app(SourceControlRepositoryBrowser::class));
         $this->refreshFunctionsDetection();
     }
 
     protected function syncFormFromSite(): void
     {
+        if ($this->site->usesEdgeRuntime()) {
+            return;
+        }
+
         $functionsConfig = $this->site->functionsConfig();
         $this->git_repository_url = (string) ($this->site->git_repository_url ?? '');
         $this->git_branch = (string) ($this->site->git_branch ?: 'main');
@@ -363,9 +407,10 @@ class Show extends Component
         $this->deploy_strategy = (string) ($this->site->deploy_strategy ?? 'simple');
         $this->zero_downtime_enabled = $this->deploy_strategy === 'atomic';
         $dm = is_array($this->site->meta) ? $this->site->meta : [];
+        $this->ephemeral_deploy_credentials_enabled = (bool) data_get($dm, 'deploy.ephemeral_credentials', false);
         $this->deploy_health_enabled = (bool) ($dm['deploy_health_enabled'] ?? false);
         $this->deploy_health_auto_rollback = (bool) ($dm['deploy_health_auto_rollback'] ?? false);
-        $this->deploy_health_path = (string) ($dm['deploy_health_path'] ?? '/health');
+        $this->deploy_health_path = (string) ($dm['deploy_health_path'] ?? '/up');
         $this->deploy_health_expect_status = (int) ($dm['deploy_health_expect_status'] ?? 200);
         $this->deploy_health_attempts = (int) ($dm['deploy_health_attempts'] ?? 5);
         $this->deploy_health_delay_ms = (int) ($dm['deploy_health_delay_ms'] ?? 500);
@@ -403,6 +448,16 @@ class Show extends Component
         $this->php_memory_limit = (string) ($phpRuntime['memory_limit'] ?? '');
         $this->php_upload_max_filesize = (string) ($phpRuntime['upload_max_filesize'] ?? '');
         $this->php_max_execution_time = (string) ($phpRuntime['max_execution_time'] ?? '');
+        $this->php_post_max_size = (string) ($phpRuntime['post_max_size'] ?? '');
+        $this->php_max_input_time = (string) ($phpRuntime['max_input_time'] ?? '');
+        $this->php_max_input_vars = (string) ($phpRuntime['max_input_vars'] ?? '');
+        $this->php_max_file_uploads = (string) ($phpRuntime['max_file_uploads'] ?? '');
+        $this->php_timezone = (string) ($phpRuntime['timezone'] ?? '');
+        $fpmPool = $this->site->phpFpmPoolSettings();
+        $this->fpm_pm = $fpmPool['pm'];
+        $this->fpm_max_children = (string) $fpmPool['max_children'];
+        $this->fpm_max_requests = (string) $fpmPool['max_requests'];
+        $this->fpm_request_terminate_timeout = (string) $fpmPool['request_terminate_timeout'];
         $this->runtime_app_port = $this->site->app_port !== null ? (string) $this->site->app_port : '';
         $ips = $this->site->webhook_allowed_ips;
         $this->webhook_allowed_ips_text = is_array($ips) && $ips !== []
@@ -459,7 +514,25 @@ class Show extends Component
             'php_version' => ['required', 'string'],
             'php_memory_limit' => ['nullable', 'string', 'max:32', 'regex:/^\d+[KMG]?$/i'],
             'php_upload_max_filesize' => ['nullable', 'string', 'max:32', 'regex:/^\d+[KMG]?$/i'],
+            'php_post_max_size' => ['nullable', 'string', 'max:32', 'regex:/^\d+[KMG]?$/i', function (string $attribute, mixed $value, callable $fail): void {
+                // PHP requires post_max_size >= upload_max_filesize, else uploads
+                // silently fail. `0` means unlimited, so it always satisfies.
+                if (! is_string($value) || $value === '' || $this->php_upload_max_filesize === '') {
+                    return;
+                }
+                $post = SitePhpRuntimeDirectivesBuilder::shorthandBytes($value);
+                if ($post === 0) {
+                    return;
+                }
+                if ($post < SitePhpRuntimeDirectivesBuilder::shorthandBytes($this->php_upload_max_filesize)) {
+                    $fail(__('Post max size must be at least as large as the upload max filesize.'));
+                }
+            }],
             'php_max_execution_time' => ['nullable', 'integer', 'min:1', 'max:3600'],
+            'php_max_input_time' => ['nullable', 'integer', 'min:-1', 'max:3600'],
+            'php_max_input_vars' => ['nullable', 'integer', 'min:1', 'max:100000'],
+            'php_max_file_uploads' => ['nullable', 'integer', 'min:1', 'max:1000'],
+            'php_timezone' => ['nullable', 'string', 'timezone'],
         ];
 
         if ($installedVersions !== []) {
@@ -470,13 +543,20 @@ class Show extends Component
             'php_version.in' => __('Choose a PHP version that is currently installed on this server.'),
             'php_memory_limit.regex' => __('Use a PHP size like 256M or 1G.'),
             'php_upload_max_filesize.regex' => __('Use a PHP size like 64M or 1G.'),
+            'php_post_max_size.regex' => __('Use a PHP size like 64M or 1G.'),
+            'php_timezone.timezone' => __('Choose a valid PHP timezone like UTC or America/New_York.'),
         ]);
 
         $meta = is_array($this->site->meta) ? $this->site->meta : [];
         $meta['php_runtime'] = [
             'memory_limit' => $validated['php_memory_limit'] !== '' ? $validated['php_memory_limit'] : null,
             'upload_max_filesize' => $validated['php_upload_max_filesize'] !== '' ? $validated['php_upload_max_filesize'] : null,
+            'post_max_size' => $validated['php_post_max_size'] !== '' ? $validated['php_post_max_size'] : null,
             'max_execution_time' => $validated['php_max_execution_time'] !== '' ? (string) $validated['php_max_execution_time'] : null,
+            'max_input_time' => $validated['php_max_input_time'] !== '' ? (string) $validated['php_max_input_time'] : null,
+            'max_input_vars' => $validated['php_max_input_vars'] !== '' ? (string) $validated['php_max_input_vars'] : null,
+            'max_file_uploads' => $validated['php_max_file_uploads'] !== '' ? (string) $validated['php_max_file_uploads'] : null,
+            'timezone' => $validated['php_timezone'] !== '' ? $validated['php_timezone'] : null,
         ];
 
         // PHP-version writes now flow through runtime_version (the
@@ -496,11 +576,75 @@ class Show extends Component
                 'runtime_version' => $validated['php_version'],
                 'memory_limit' => $meta['php_runtime']['memory_limit'] ?? null,
                 'upload_max_filesize' => $meta['php_runtime']['upload_max_filesize'] ?? null,
+                'post_max_size' => $meta['php_runtime']['post_max_size'] ?? null,
                 'max_execution_time' => $meta['php_runtime']['max_execution_time'] ?? null,
+                'max_input_time' => $meta['php_runtime']['max_input_time'] ?? null,
+                'max_input_vars' => $meta['php_runtime']['max_input_vars'] ?? null,
+                'max_file_uploads' => $meta['php_runtime']['max_file_uploads'] ?? null,
+                'timezone' => $meta['php_runtime']['timezone'] ?? null,
             ]);
         }
 
-        $this->toastSuccess('PHP settings saved.');
+        // Push the new limits (and any version switch) to the box. The
+        // FastCGI PHP_VALUE directives are rebuilt and the webserver reloaded;
+        // without this the form would only persist meta and change nothing.
+        if ($this->shouldAutoReapplyManagedWebserverConfig()) {
+            ApplySiteWebserverConfigJob::dispatch($this->site->id);
+            $this->toastSuccess(__('PHP settings saved. Webserver config queued.'));
+        } else {
+            $this->toastSuccess(__('PHP settings saved.'));
+        }
+
+        $this->syncFormFromSite();
+    }
+
+    public function savePhpFpmPool(): void
+    {
+        $this->authorize('update', $this->site);
+        if (! $this->server->hostCapabilities()->supportsMachinePhpManagement()) {
+            $this->toastError(__('This host runtime does not expose PHP-FPM pool settings.'));
+
+            return;
+        }
+
+        $validated = $this->validate([
+            'fpm_pm' => ['required', 'string', 'in:dynamic,static,ondemand'],
+            'fpm_max_children' => ['required', 'integer', 'min:1', 'max:1000'],
+            'fpm_max_requests' => ['required', 'integer', 'min:0', 'max:100000'],
+            'fpm_request_terminate_timeout' => ['required', 'integer', 'min:1', 'max:3600'],
+        ], [], [
+            'fpm_pm' => 'process manager',
+            'fpm_max_children' => 'max children',
+            'fpm_max_requests' => 'max requests',
+            'fpm_request_terminate_timeout' => 'request terminate timeout',
+        ]);
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $old = $this->site->phpFpmPoolSettings();
+        $meta['php_fpm_pool'] = [
+            'pm' => $validated['fpm_pm'],
+            'max_children' => (int) $validated['fpm_max_children'],
+            'max_requests' => (int) $validated['fpm_max_requests'],
+            'request_terminate_timeout' => (int) $validated['fpm_request_terminate_timeout'],
+        ];
+        $this->site->meta = $meta;
+        $this->site->save();
+
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.php_fpm_pool_updated', $this->site, $old, $meta['php_fpm_pool']);
+        }
+
+        // The pool conf is rewritten + php-fpm reloaded as the first step of the
+        // webserver apply (before the vhost), so the running pool picks up the
+        // new sizing/timeout without a socket gap.
+        if ($this->shouldAutoReapplyManagedWebserverConfig()) {
+            ApplySiteWebserverConfigJob::dispatch($this->site->id);
+            $this->toastSuccess(__('PHP-FPM pool saved. Webserver config queued.'));
+        } else {
+            $this->toastSuccess(__('PHP-FPM pool saved.'));
+        }
+
         $this->syncFormFromSite();
     }
 
@@ -569,13 +713,24 @@ class Show extends Component
         // (before the worker picks the job up), and so we can stamp the per-action
         // label. The job's beginConsoleAction() reuses this row instead of
         // creating a new one.
-        $this->seedQueuedConsoleAction('webserver_config', $bannerLabel);
+        $run = $this->seedQueuedConsoleAction('webserver_config', $bannerLabel);
 
         // Queued: errors surface via the apply banner (status=failed) on the next
         // poll, not as inline toasts. Inline-running this used to time out HTTP requests
         // because SSH/nginx work was happening synchronously on the web worker.
-        ApplySiteWebserverConfigJob::dispatch($this->site->id);
-        $this->toastSuccess($successMessage.' '.__('Webserver config queued.'));
+        ApplySiteWebserverConfigJob::dispatch(
+            $this->site->id,
+            (string) (auth()->id() ?? ''),
+            (string) $run->id,
+        );
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            $successMessage,
+            __('Webserver config could not be applied on the server.'),
+        );
+        $this->toastConsoleActionQueued();
     }
 
     /**
@@ -618,7 +773,7 @@ class Show extends Component
             'kind' => $kind,
             'status' => ConsoleAction::STATUS_QUEUED,
             'label' => $label,
-            'user_id' => request()->user()?->id ?? 0,
+            'user_id' => request()->user()?->id,
             'output' => ['v' => (int) config('console_actions.current_version', 1), 'lines' => []],
         ]);
     }
@@ -669,6 +824,21 @@ class Show extends Component
             return;
         }
 
+        if ($this->site->usesEdgeRuntime()) {
+            try {
+                (new RedeployEdgeSite)->handle($this->site->fresh());
+            } catch (\Throwable $e) {
+                $this->toastError($e->getMessage());
+
+                return;
+            }
+
+            $this->site->refresh();
+            $this->toastSuccess(__('Edge build queued again.'));
+
+            return;
+        }
+
         $this->site->status = Site::STATUS_PENDING;
         $this->site->save();
 
@@ -679,9 +849,78 @@ class Show extends Component
         $this->toastSuccess(__('Site provisioning has been queued again.'));
     }
 
+    public function openRestartProvisioningFreshModal(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if ($this->site->usesEdgeRuntime()) {
+            return;
+        }
+
+        $this->openConfirmActionModal(
+            'restartProvisioningFresh',
+            [],
+            __('Restart provisioning from scratch?'),
+            __('This removes the testing DNS record, any certificates issued so far, and web server configuration written for this site on the server, then runs the full install again. Domains and site settings in Dply are kept.'),
+            __('Restart fresh'),
+            true,
+        );
+    }
+
+    public function restartProvisioningFresh(SiteProvisioner $siteProvisioner): void
+    {
+        $this->authorize('update', $this->site);
+
+        $this->site->refresh();
+
+        if ($this->site->usesEdgeRuntime()) {
+            $this->toastError(__('Use Edge build controls to restart an Edge site.'));
+
+            return;
+        }
+
+        if ($this->site->isReadyForWorkspace()) {
+            $this->toastError(__('This site is already configured. Delete it from site settings if you want to remove it entirely.'));
+
+            return;
+        }
+
+        // The actual cleanup runs synchronous SSH (vhost teardown,
+        // placeholder index removal, testing-DNS delete) which can take
+        // 30–60s and would block the Livewire response, leaving the
+        // operator staring at a spinner that never resolves. Queue it
+        // instead and write a "restart queued" log line so the journey
+        // poll immediately reflects that something happened.
+        $siteProvisioner->appendLog(
+            $this->site,
+            'info',
+            'restart',
+            'Restart queued. Cleanup and re-provisioning will run in the background.',
+        );
+        $siteProvisioner->markQueued($this->site);
+
+        RestartSiteProvisioningJob::dispatch((string) $this->site->id);
+
+        $this->site->refresh();
+        $this->toastSuccess(__('Restart queued — provisioning will run in the background.'));
+    }
+
     public function openCancelProvisioningModal(): void
     {
         $this->authorize('update', $this->site);
+
+        if ($this->site->usesEdgeRuntime()) {
+            $this->openConfirmActionModal(
+                'cancelProvisioning',
+                [],
+                __('Cancel Edge build?'),
+                __('This stops the build, removes any partial deployment from the edge network, and deletes the pending site. If you cancel this dialog, the build keeps running.'),
+                __('Cancel and remove site'),
+                true,
+            );
+
+            return;
+        }
 
         $this->openConfirmActionModal(
             'cancelProvisioning',
@@ -693,7 +932,7 @@ class Show extends Component
         );
     }
 
-    public function cancelProvisioning(SiteProvisioningCanceller $canceller): void
+    public function cancelProvisioning(SiteProvisioningCanceller $canceller, EdgeSiteCanceller $edgeCanceller): void
     {
         $this->authorize('update', $this->site);
 
@@ -706,6 +945,13 @@ class Show extends Component
         }
 
         try {
+            if ($this->site->usesEdgeRuntime()) {
+                $edgeCanceller->cancel($this->site->fresh(['server', 'domains']));
+                $this->redirect(route('edge.index'), navigate: true);
+
+                return;
+            }
+
             $canceller->cancel($this->site->fresh(['server', 'domains']));
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
@@ -714,30 +960,6 @@ class Show extends Component
         }
 
         $this->redirect(route('sites.create', $this->server), navigate: true);
-    }
-
-    public function deployNow(): void
-    {
-        $this->authorize('update', $this->site);
-        try {
-            RunSiteDeploymentJob::dispatchSync($this->site, SiteDeployment::TRIGGER_MANUAL);
-            $this->site->refresh();
-            $this->toastSuccess(config('insights.queue_after_deploy', true)
-                ? __('Deployment finished. Server and site insight runs have been queued.')
-                : __('Deployment finished.'));
-        } catch (\Throwable $e) {
-            $this->toastError($e->getMessage());
-        }
-    }
-
-    public function queueDeploy(SiteDeploySyncCoordinator $coordinator): void
-    {
-        $this->authorize('update', $this->site);
-        $coordinator->dispatchManualForGroup($this->site->fresh());
-        $base = __('Deployment queued. If another run is in progress, the new one may be recorded as skipped. Refresh deployments below.');
-        $this->toastSuccess(config('insights.queue_after_deploy', true)
-            ? $base.' '.__('After a successful deploy, server and site insight runs are queued automatically.')
-            : $base);
     }
 
     public function runRuntimeAction(string $action, SiteRuntimeActionExecutor $executor): void
@@ -764,19 +986,6 @@ class Show extends Component
             $this->site->refresh();
             $this->toastError($e->getMessage());
         }
-    }
-
-    public function getDeployLockInfoProperty(): ?array
-    {
-        return Cache::get('site-deploy-active:'.$this->site->id);
-    }
-
-    public function releaseDeployLock(): void
-    {
-        $this->authorize('update', $this->site);
-        Cache::lock('site-deploy:'.$this->site->id)->forceRelease();
-        Cache::forget('site-deploy-active:'.$this->site->id);
-        $this->toastSuccess('Deploy lock cleared. If a worker is still running, stop it on the queue host; otherwise you can deploy again.');
     }
 
     /**
@@ -861,7 +1070,7 @@ class Show extends Component
         $site->forceFill(['meta' => $meta])->save();
     }
 
-    public function retryCertificate(string $certificateId): void
+    public function retryCertificate(string $certificateId, CertificateRepairService $repairService): void
     {
         $this->authorize('update', $this->site);
         $certificate = SiteCertificate::query()
@@ -869,13 +1078,18 @@ class Show extends Component
             ->findOrFail($certificateId);
 
         try {
-            ExecuteSiteCertificateJob::dispatchSync($certificate->id);
+            $repairService->repair($this->site, $certificate, auth()->id());
             $this->site->refresh();
-            $this->toastSuccess(__('Certificate retry finished.'));
+            $this->toastSuccess(__('Certificate repair finished.'));
         } catch (\Throwable $e) {
             $this->site->refresh();
             $this->toastError($e->getMessage());
         }
+    }
+
+    public function repairCertificate(string $certificateId, CertificateRepairService $repairService): void
+    {
+        $this->retryCertificate($certificateId, $repairService);
     }
 
     public function saveGit(): void
@@ -1005,8 +1219,9 @@ class Show extends Component
             return;
         }
 
-        $account = $this->git_source_control_account_id !== ''
-            ? SocialAccount::query()->where('user_id', request()->user()?->id ?? 0)->findOrFail($this->git_source_control_account_id)
+        $user = request()->user();
+        $account = $this->git_source_control_account_id !== '' && $user !== null
+            ? app(GitIdentityResolver::class)->forId($user, $this->git_source_control_account_id)
             : null;
         if ($account === null) {
             $this->toastError(__('Select a connected source control account first.'));
@@ -1088,8 +1303,9 @@ class Show extends Component
             return;
         }
 
-        $account = request()->user()?->socialAccounts()->findOrFail($value);
-        if (! $account) {
+        $user = request()->user();
+        $account = $user !== null ? app(GitIdentityResolver::class)->forId($user, $value) : null;
+        if ($account === null) {
             return;
         }
 
@@ -1259,14 +1475,17 @@ class Show extends Component
             return;
         }
 
-        $this->seedQueuedConsoleAction('env_push');
+        $run = $this->seedQueuedConsoleAction('env_push');
 
         PushSiteEnvJob::dispatch(
             $this->site->id,
             (string) (auth()->id() ?? ''),
+            (string) $run->id,
         );
 
-        $this->toastSuccess(__('Push queued — track progress in the banner at the top of this page.'));
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction($run, __('Environment file pushed to server.'), __('Environment push did not finish.'));
+        $this->toastConsoleActionQueued();
     }
 
     /**
@@ -1306,11 +1525,13 @@ class Show extends Component
             return;
         }
 
-        $this->seedQueuedConsoleAction('env_sync');
+        $run = $this->seedQueuedConsoleAction('env_sync');
         SyncEnvFromServerJob::dispatch(
             $this->site->id,
             (string) (auth()->id() ?? ''),
+            (string) $run->id,
         );
+        $this->watchConsoleAction($run, __('Environment synced from server.'), __('Environment sync did not finish.'));
     }
 
     /**
@@ -1329,14 +1550,17 @@ class Show extends Component
             return;
         }
 
-        $this->seedQueuedConsoleAction('env_sync');
+        $run = $this->seedQueuedConsoleAction('env_sync');
 
         SyncEnvFromServerJob::dispatch(
             $this->site->id,
             (string) (auth()->id() ?? ''),
+            (string) $run->id,
         );
 
-        $this->toastSuccess(__('Env sync queued — track progress in the banner at the top of this page.'));
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction($run, __('Environment synced from server.'), __('Environment sync did not finish.'));
+        $this->toastConsoleActionQueued();
     }
 
     /**
@@ -1360,10 +1584,20 @@ class Show extends Component
         $this->site->forceFill(['env_file_path' => $newPath])->save();
         $this->env_file_path_override = $newPath;
 
-        $this->seedQueuedConsoleAction('env_push');
-        PushSiteEnvJob::dispatch($this->site->id, (string) (auth()->id() ?? ''));
+        $run = $this->seedQueuedConsoleAction('env_push');
+        PushSiteEnvJob::dispatch(
+            $this->site->id,
+            (string) (auth()->id() ?? ''),
+            (string) $run->id,
+        );
 
-        $this->toastSuccess(__('Relocating .env to :path — see banner for progress.', ['path' => $newPath]));
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            __('Relocated .env to :path.', ['path' => $newPath]),
+            __('Relocating .env to :path did not finish.', ['path' => $newPath]),
+        );
+        $this->toastConsoleActionQueued();
     }
 
     /**
@@ -1427,6 +1661,26 @@ class Show extends Component
         }
 
         $this->toastSuccess($message.' '.__('Use “Apply webserver config now” on the Routing tab if the document root should match this strategy.'));
+    }
+
+    public function saveEphemeralDeployCredentials(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! ephemeral_deploy_credentials_active($this->site->organization)) {
+            return;
+        }
+
+        $this->validate([
+            'ephemeral_deploy_credentials_enabled' => 'boolean',
+        ]);
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        data_set($meta, 'deploy.ephemeral_credentials', $this->ephemeral_deploy_credentials_enabled);
+        $this->site->update(['meta' => $meta]);
+        $this->site->refresh();
+
+        $this->toastSuccess(__('Ephemeral deploy credentials settings saved.'));
     }
 
     public function shouldShowSystemUserPanel(): bool
@@ -1497,7 +1751,7 @@ class Show extends Component
         $meta = is_array($this->site->meta) ? $this->site->meta : [];
         $path = trim($this->deploy_health_path);
         if ($path === '') {
-            $path = '/health';
+            $path = '/up';
         }
         $meta['deploy_health_enabled'] = $this->deploy_health_enabled;
         $meta['deploy_health_auto_rollback'] = $this->deploy_health_auto_rollback;
@@ -1662,6 +1916,7 @@ class Show extends Component
         }
 
         $this->bulk_env_input = '';
+        $this->dispatch('close-modal', 'paste-env-modal');
         $this->autoPushAfterCacheMutation(__(':count variable(s) imported.', ['count' => $count]));
     }
 
@@ -1786,14 +2041,20 @@ class Show extends Component
             return;
         }
 
-        $this->seedQueuedConsoleAction('env_push');
+        $run = $this->seedQueuedConsoleAction('env_push');
 
         PushSiteEnvJob::dispatch(
             $this->site->id,
             (string) (auth()->id() ?? ''),
+            (string) $run->id,
         );
 
-        $this->toastSuccess($savedMessage.' '.__('Pushing to server — see banner.'));
+        $this->watchConsoleAction(
+            $run,
+            $savedMessage.' '.__('Pushed to server.'),
+            __('Push to server did not finish.'),
+        );
+        $this->toastSuccess($savedMessage.' '.__('Pushing to server — the console banner will confirm when it finishes.'));
     }
 
     public function toggleRevealEnvVar(string $key): void
@@ -1805,6 +2066,260 @@ class Show extends Component
             return;
         }
         $this->revealed_env_keys[] = $key;
+    }
+
+    /**
+     * Re-scan the deployed code for required env vars. SSH-bound, so it runs
+     * as a backgrounded job whose progress streams to the console banner —
+     * same shape as Sync from server. Each deploy also refreshes this list
+     * automatically; this is the manual escape hatch.
+     */
+    public function rescanEnvRequirements(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->server->hostCapabilities()->supportsEnvPushToHost()) {
+            $this->toastError(__('This host runtime has no on-disk code to scan.'));
+
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('env_scan');
+
+        ScanSiteEnvRequirementsJob::dispatch(
+            $this->site->id,
+            (string) (auth()->id() ?? ''),
+            (string) $run->id,
+        );
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction($run, __('Environment requirements re-scanned.'), __('Environment scan did not finish.'));
+        $this->toastConsoleActionQueued();
+    }
+
+    /**
+     * Open the "Add missing variables" modal, seeding each input with the
+     * .env.example sample value (if any) so the operator can confirm or edit
+     * rather than type from scratch.
+     */
+    public function openMissingEnvModal(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $present = $this->presentNonEmptyEnvKeys();
+        $inherited = $this->site->workspace?->variables->pluck('env_key')->map(fn ($k) => (string) $k)->all() ?? [];
+
+        $seed = [];
+        foreach ($this->site->missingRequiredEnvKeys($present, $inherited) as $entry) {
+            $seed[$entry['key']] = (string) ($entry['example'] ?? '');
+        }
+        $this->missing_env_values = $seed;
+
+        $this->dispatch('open-modal', 'add-missing-env-modal');
+    }
+
+    /**
+     * Bulk-add the still-missing required keys the operator filled in via the
+     * modal. Blank inputs are skipped (they can be added later); the rest merge
+     * into the env cache and auto-push, reusing the same write path as
+     * addEnvVar / bulkImport.
+     */
+    public function addMissingEnvVars(DotEnvFileParser $parser, DotEnvFileWriter $writer): void
+    {
+        $this->authorize('update', $this->site);
+
+        $additions = [];
+        foreach ($this->missing_env_values as $key => $value) {
+            $key = trim((string) $key);
+            $value = (string) $value;
+            if ($key === '' || ! preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $key) || trim($value) === '') {
+                continue;
+            }
+            $additions[$key] = $value;
+        }
+
+        if ($additions === []) {
+            $this->toastError(__('Enter a value for at least one variable.'));
+
+            return;
+        }
+
+        $parsed = $parser->parse((string) ($this->site->env_file_content ?? ''));
+        $map = array_merge($parsed['variables'], $additions);
+
+        $this->site->forceFill([
+            'env_file_content' => $writer->render($map, $parsed['comments']),
+            'env_cache_origin' => 'local-edit',
+        ])->save();
+
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.env.bulk_imported', $this->site, null, [
+                'imported_count' => count($additions),
+                'imported_keys' => array_keys($additions),
+            ]);
+        }
+
+        $this->missing_env_values = [];
+        $this->dispatch('close-modal', 'add-missing-env-modal');
+        $this->autoPushAfterCacheMutation(__(':count variable(s) added.', ['count' => count($additions)]));
+    }
+
+    /**
+     * Keys already set with a non-empty value in the env cache — used to work
+     * out which required keys are still missing.
+     *
+     * @return list<string>
+     */
+    private function presentNonEmptyEnvKeys(): array
+    {
+        $parsed = app(DotEnvFileParser::class)->parse((string) ($this->site->env_file_content ?? ''));
+
+        $keys = [];
+        foreach ($parsed['variables'] as $key => $value) {
+            if (trim((string) $value) !== '') {
+                $keys[] = (string) $key;
+            }
+        }
+
+        return $keys;
+    }
+
+    /** Disable the required-env gate for this site (no-deploy variant). */
+    public function ignoreMissingEnv(): void
+    {
+        $this->authorize('update', $this->site);
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta['skip_env_gate'] = true;
+        unset($meta['deploy_blocked_env']);
+        $this->site->forceFill(['meta' => $meta])->save();
+        $this->toastSuccess(__('Ignoring missing required variables for this site — deploys won\'t be blocked by them.'));
+    }
+
+    /** Re-enable the required-env gate. */
+    public function enableEnvGate(): void
+    {
+        $this->authorize('update', $this->site);
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        unset($meta['skip_env_gate']);
+        $this->site->forceFill(['meta' => $meta])->save();
+        $this->toastSuccess(__('Required-env check re-enabled. Deploys stop if required variables are missing.'));
+    }
+
+    /** Whether the required-env gate is currently disabled. */
+    public function envGateSkipped(): bool
+    {
+        return ($this->site->meta['skip_env_gate'] ?? false) === true;
+    }
+
+    /** True when this site is passing raw 5xx through instead of the branded page. */
+    public function serverErrorsExposed(): bool
+    {
+        return \App\Support\Sites\SiteManagedErrorPageSupport::serverErrorsExposed($this->site);
+    }
+
+    /**
+     * Operator debugging aid: stop intercepting 5xx with the branded
+     * "temporarily unavailable" page so the real error shows — the framework
+     * debug page on an app 500, or the webserver's own 502/503/504 when the
+     * upstream is down. Off by default; re-applies the managed webserver config
+     * so the change takes effect on the box.
+     */
+    public function exposeServerErrors(): void
+    {
+        $this->authorize('update', $this->site);
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta[\App\Support\Sites\SiteManagedErrorPageSupport::META_EXPOSE_FLAG] = true;
+        $this->site->forceFill(['meta' => $meta])->save();
+        $this->finalizeRoutingMutation(
+            __('Showing raw server errors for this site — visitors see the real 5xx page until you turn this back off.'),
+            __('Exposing raw server errors …'),
+        );
+    }
+
+    /** Restore the branded managed error page (hide raw 5xx errors again). */
+    public function hideServerErrors(): void
+    {
+        $this->authorize('update', $this->site);
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        unset($meta[\App\Support\Sites\SiteManagedErrorPageSupport::META_EXPOSE_FLAG]);
+        $this->site->forceFill(['meta' => $meta])->save();
+        $this->finalizeRoutingMutation(
+            __('Branded error page restored — raw server errors are hidden again.'),
+            __('Restoring branded error page …'),
+        );
+    }
+
+    public function confirmIgnoreMissingEnv(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->openConfirmActionModal(
+            method: 'ignoreMissingEnv',
+            title: __('Ignore missing variables?'),
+            message: __('Stop blocking and warning on the missing required variables for this site. Deploys will proceed even if they are unset — it\'s on you if the app errors. You can re-enable this later.'),
+            confirmLabel: __('Ignore them'),
+        );
+    }
+
+    public function confirmIgnoreEnvKey(string $key): void
+    {
+        $this->authorize('update', $this->site);
+        $key = trim($key);
+        if ($key === '') {
+            return;
+        }
+        $this->openConfirmActionModal(
+            method: 'ignoreEnvKey',
+            arguments: [$key],
+            title: __('Ignore :key?', ['key' => $key]),
+            message: __('Mark :key as intentionally unset for this site. It won\'t count as a missing required variable or block deploys. You can un-ignore it later.', ['key' => $key]),
+            confirmLabel: __('Ignore'),
+        );
+    }
+
+    /** Per-variable ignore: mark one required key as intentionally unset. */
+    public function ignoreEnvKey(string $key): void
+    {
+        $this->authorize('update', $this->site);
+        $key = trim($key);
+        if ($key === '') {
+            return;
+        }
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $ignored = array_values(array_unique([...((array) ($meta['ignored_env_keys'] ?? [])), $key]));
+        $meta['ignored_env_keys'] = $ignored;
+        if (isset($meta['deploy_blocked_env']['keys']) && is_array($meta['deploy_blocked_env']['keys'])) {
+            $meta['deploy_blocked_env']['keys'] = array_values(array_filter(
+                $meta['deploy_blocked_env']['keys'],
+                static fn ($e): bool => is_array($e) && (string) ($e['key'] ?? '') !== $key,
+            ));
+            if ($meta['deploy_blocked_env']['keys'] === []) {
+                unset($meta['deploy_blocked_env']);
+            }
+        }
+        $this->site->forceFill(['meta' => $meta])->save();
+        $this->toastSuccess(__(':key will be ignored — deploys won\'t require it.', ['key' => $key]));
+    }
+
+    /** Undo a per-variable ignore. */
+    public function unignoreEnvKey(string $key): void
+    {
+        $this->authorize('update', $this->site);
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta['ignored_env_keys'] = array_values(array_filter(
+            (array) ($meta['ignored_env_keys'] ?? []),
+            static fn ($k): bool => (string) $k !== trim($key),
+        ));
+        $this->site->forceFill(['meta' => $meta])->save();
+        $this->toastSuccess(__(':key is no longer ignored.', ['key' => $key]));
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function ignoredEnvKeys(): array
+    {
+        return array_values(array_map('strval', (array) ($this->site->meta['ignored_env_keys'] ?? [])));
     }
 
     public function addRedirectRule(): void
@@ -2094,135 +2609,6 @@ class Show extends Component
         $this->finalizeRoutingMutation('Redirect removed.');
     }
 
-    public function addDeployHook(): void
-    {
-        $this->authorize('update', $this->site);
-        $this->validate([
-            'new_hook_phase' => 'required|in:before_clone,after_clone,after_activate',
-            'new_hook_script' => 'required|string|max:16000',
-            'new_hook_order' => 'integer|min:0|max:999',
-            'new_hook_timeout_seconds' => 'required|integer|min:30|max:3600',
-        ]);
-        SiteDeployHook::query()->create([
-            'site_id' => $this->site->id,
-            'phase' => $this->new_hook_phase,
-            'script' => $this->new_hook_script,
-            'sort_order' => $this->new_hook_order,
-            'timeout_seconds' => $this->new_hook_timeout_seconds,
-        ]);
-        $this->new_hook_script = '';
-        $this->new_hook_order = 0;
-        $this->new_hook_timeout_seconds = 900;
-        $this->toastSuccess('Deploy hook added.');
-    }
-
-    public function deleteDeployHook(int $id): void
-    {
-        $this->authorize('update', $this->site);
-        SiteDeployHook::query()->where('site_id', $this->site->id)->whereKey($id)->delete();
-        $this->toastSuccess('Hook removed.');
-    }
-
-    public function addDeployPipelineStep(): void
-    {
-        $this->authorize('update', $this->site);
-        $types = array_keys(SiteDeployStep::typeLabels());
-        $this->validate([
-            'new_deploy_step_type' => 'required|string|in:'.implode(',', $types),
-            'new_deploy_step_command' => 'nullable|string|max:4000',
-            'new_deploy_step_timeout' => 'required|integer|min:30|max:3600',
-        ]);
-        $needsCustom = in_array($this->new_deploy_step_type, [
-            SiteDeployStep::TYPE_NPM_RUN,
-            SiteDeployStep::TYPE_CUSTOM,
-        ], true);
-        if ($needsCustom && trim($this->new_deploy_step_command) === '') {
-            $this->addError('new_deploy_step_command', 'This step type needs a value in the command field.');
-
-            return;
-        }
-        SiteDeployStep::query()->create([
-            'site_id' => $this->site->id,
-            'sort_order' => (int) ($this->site->deploySteps()->max('sort_order') ?? 0) + 1,
-            'step_type' => $this->new_deploy_step_type,
-            'custom_command' => trim($this->new_deploy_step_command) !== '' ? trim($this->new_deploy_step_command) : null,
-            'timeout_seconds' => $this->new_deploy_step_timeout,
-        ]);
-        $this->new_deploy_step_command = '';
-        $this->new_deploy_step_timeout = 900;
-        $this->toastSuccess('Deploy pipeline step added. Runs after git, before the post-deploy command.');
-    }
-
-    public function deleteDeployPipelineStep(int $id): void
-    {
-        $this->authorize('update', $this->site);
-        SiteDeployStep::query()->where('site_id', $this->site->id)->whereKey($id)->delete();
-        $this->toastSuccess('Pipeline step removed.');
-    }
-
-    public function moveDeployStepUp(int $id): void
-    {
-        $this->authorize('update', $this->site);
-        $ids = SiteDeployStep::query()->where('site_id', $this->site->id)->orderBy('sort_order', 'asc')->pluck('id')->all();
-        $pos = array_search($id, $ids, true);
-        if ($pos === false || $pos === 0) {
-            return;
-        }
-        [$ids[$pos - 1], $ids[$pos]] = [$ids[$pos], $ids[$pos - 1]];
-        foreach ($ids as $i => $stepId) {
-            SiteDeployStep::query()->whereKey($stepId)->update(['sort_order' => $i + 1]);
-        }
-        $this->toastSuccess('Pipeline order updated.');
-    }
-
-    public function moveDeployStepDown(int $id): void
-    {
-        $this->authorize('update', $this->site);
-        $ids = SiteDeployStep::query()->where('site_id', $this->site->id)->orderBy('sort_order', 'asc')->pluck('id')->all();
-        $pos = array_search($id, $ids, true);
-        if ($pos === false || $pos >= count($ids) - 1) {
-            return;
-        }
-        [$ids[$pos + 1], $ids[$pos]] = [$ids[$pos], $ids[$pos + 1]];
-        foreach ($ids as $i => $stepId) {
-            SiteDeployStep::query()->whereKey($stepId)->update(['sort_order' => $i + 1]);
-        }
-        $this->toastSuccess('Pipeline order updated.');
-    }
-
-    public function confirmRollbackRelease(int|string $releaseId): void
-    {
-        $this->authorize('update', $this->site);
-
-        $this->openConfirmActionModal(
-            'rollbackRelease',
-            [(string) $releaseId],
-            __('Rollback release'),
-            __('Point current symlink at this release?'),
-            __('Rollback'),
-            true,
-        );
-    }
-
-    public function rollbackRelease(int|string $releaseId, SiteReleaseRollback $rollback): void
-    {
-        $this->authorize('update', $this->site);
-        if (! $this->server->hostCapabilities()->supportsReleaseRollback()) {
-            $this->toastError(__('This host runtime does not support release rollback via server symlinks.'));
-
-            return;
-        }
-
-        try {
-            $release = SiteRelease::query()->where('site_id', $this->site->id)->findOrFail($releaseId);
-            $rollback->rollbackTo($this->site, $release);
-            $this->site->refresh();
-            $this->toastSuccess('Rolled back active release symlink. Re-install Nginx if document root changed.');
-        } catch (\Throwable $e) {
-            $this->toastError($e->getMessage());
-        }
-    }
-
     public function addDomain(): void
     {
         $this->authorize('update', $this->site);
@@ -2402,8 +2788,8 @@ class Show extends Component
         }
         if ($cycleBackend) {
             $cascadeKeys[] = 'cycle_backend';
-            DetachEdgeDomainJob::dispatch($this->site->id, $old);
-            AttachEdgeDomainJob::dispatch($this->site->id, $new);
+            DetachCloudDomainJob::dispatch($this->site->id, $old);
+            AttachCloudDomainJob::dispatch($this->site->id, $new);
         }
 
         $this->recordRenameAudit($old, $new, $cascadeKeys, $rewriteDnsZone);
@@ -2538,11 +2924,17 @@ class Show extends Component
     {
         $this->authorize('update', $this->site);
 
+        $domain = SiteDomain::query()->where('site_id', $this->site->id)->find($domainId);
+        $hostname = $domain?->hostname ?? __('this domain');
+
         $this->openConfirmActionModal(
             'removeDomain',
             [(string) $domainId],
-            __('Remove domain'),
-            __('Remove this domain?'),
+            __('Remove :host', ['host' => $hostname]),
+            __('Remove “:host” from :site? Its web-server config and any SSL certificate covering only this hostname are removed, and the site stops responding on it. Visitors hit this hostname will no longer reach the site. DNS records at your provider are not changed — delete those separately if you no longer use the domain. This cannot be undone.', [
+                'host' => $hostname,
+                'site' => $this->site->name,
+            ]),
             __('Remove domain'),
             true,
         );
@@ -2582,12 +2974,42 @@ class Show extends Component
         $this->finalizeRoutingMutation('Domain removed.');
     }
 
-    public function deleteSite(): void
+    /**
+     * Retrofit Caddy onto the server when the install profile left it
+     * webserver=none (e.g. legacy queue_worker provisions). Dispatches
+     * {@see InstallServerWebserverJob}, which SSHes in, installs
+     * Caddy, updates server meta, and re-queues provisioning for sites
+     * stuck on the headless path.
+     */
+    public function installServerWebserver(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ((string) ($this->server->meta['webserver'] ?? '') !== 'none') {
+            $this->toastError(__('Caddy is already installed on this server.'));
+
+            return;
+        }
+
+        // Stamp a "pending" flag so a refresh / second click shows the
+        // button as in-flight rather than re-queuing the install.
+        $meta = is_array($this->server->meta) ? $this->server->meta : [];
+        $meta['webserver_install_pending'] = true;
+        $this->server->forceFill(['meta' => $meta])->save();
+
+        InstallServerWebserverJob::dispatch($this->server->id, 'caddy');
+
+        $this->toastSuccess(__('Caddy install queued. The page will refresh once the server reports back.'));
+    }
+
+    public function deleteSite(): mixed
     {
         $this->authorize('delete', $this->site);
         $organization = $this->site->server?->organization;
+        $server = $this->site->server;
+        $siteName = $this->site->name;
         $snapshot = [
-            'name' => $this->site->name,
+            'name' => $siteName,
             'slug' => $this->site->slug,
             'server_id' => (string) $this->site->server_id,
             'type' => $this->site->type instanceof \BackedEnum ? $this->site->type->value : (string) $this->site->type,
@@ -2607,7 +3029,16 @@ class Show extends Component
             );
         }
 
-        $this->redirect(route('servers.show', $this->server), navigate: true);
+        // Hard redirect (no navigate: true) — Livewire's SPA-style soft
+        // navigation re-hydrates the current component before the redirect
+        // URL takes over, and the re-hydration tries to look up the just-
+        // deleted Site → 404. A plain HTTP redirect avoids that round trip.
+        session()->flash('success', __('Site :name was removed.', ['name' => $siteName]));
+
+        // Back to the server's own sites list (not the all-servers index).
+        return $server !== null
+            ? redirect()->route('servers.sites', ['server' => $server->id])
+            : redirect()->route('servers.index');
     }
 
     public function confirmSuspendSite(): void
@@ -2705,37 +3136,102 @@ class Show extends Component
 
     public function render(): View
     {
-        $this->site->load([
+        $this->resolveWatchedConsoleAction();
+
+        $ready = $this->site->isReadyForWorkspace();
+        $activeTab = $this->resolveDashboardTab();
+
+        $relations = [
             'domains',
             'domainAliases',
-            'basicAuthUsers',
-            'tenantDomains',
             'previewDomains',
             'certificates',
-            'deployments' => fn ($q) => $q->limit(25),
-            'webhookDeliveryLogs' => fn ($q) => $q->limit(30),
-            'redirects',
-            'deployHooks',
-            'deploySteps',
-            'releases' => fn ($q) => $q->orderByDesc('id')->limit(30),
-            'previewDomains',
             'certificates.previewDomain',
-        ]);
+        ];
+
+        if ($ready) {
+            $relations[] = 'workspace';
+
+            if ($activeTab === 'deploys') {
+                $relations['deployments'] = fn ($q) => $q->limit(25);
+                $relations['releases'] = fn ($q) => $q->orderByDesc('id')->limit(30);
+            } else {
+                $relations['deployments'] = fn ($q) => $q->limit(1);
+            }
+        }
+
+        if ($this->site->usesEdgeRuntime()) {
+            $relations['edgeDeployments'] = fn ($q) => $q->limit($ready ? 10 : 1);
+        }
+
+        $this->site->load($relations);
+        $this->server->loadMissing('workspace');
 
         $openSiteInsightsCount = InsightFinding::query()
             ->where('site_id', $this->site->id)
             ->where('status', InsightFinding::STATUS_OPEN)
             ->count();
 
-        return view('livewire.sites.show', [
-            'deployHookUrl' => $this->site->deployHookUrl(),
-            'openSiteInsightsCount' => $openSiteInsightsCount,
-            'deploymentContract' => app(DeploymentContractBuilder::class)->build($this->site),
-            'deploymentPreflight' => app(DeploymentPreflightValidator::class)->validate($this->site),
-            'sitePhpData' => $this->server->hostCapabilities()->supportsMachinePhpManagement()
-                ? app(ServerPhpManager::class)->sitePhpData($this->server, $this->site)
-                : null,
-        ]);
+        $deploymentContract = $ready
+            ? app(DeploymentContractBuilder::class)->build($this->site)
+            : null;
+        $deploymentPreflight = $ready
+            ? app(DeploymentPreflightValidator::class)->validate($this->site)
+            : [];
+
+        $sitePhpData = $this->server->hostCapabilities()->supportsMachinePhpManagement()
+            ? app(ServerPhpManager::class)->sitePhpData($this->server, $this->site)
+            : null;
+
+        // The scaffold-install partial needs its step/retry/reveal payload —
+        // whether it owns the pre-workspace surface (brand-new scaffold) OR is
+        // shown as a banner inside an already-provisioned site's workspace while
+        // an install runs.
+        $scaffoldData = ($this->site->isScaffoldJourneyActive() || $this->site->isScaffoldInstalling())
+            ? $this->scaffoldJourneyData()
+            : [];
+
+        return view('livewire.sites.show', array_merge(
+            SiteShowViewData::for(
+                $this->server,
+                $this->site,
+                $this,
+                $deploymentContract,
+                $deploymentPreflight,
+                $activeTab,
+            ),
+            [
+                'deployHookUrl' => $this->site->deployHookUrl(),
+                'openSiteInsightsCount' => $openSiteInsightsCount,
+                'deploymentContract' => $deploymentContract,
+                'deploymentPreflight' => $deploymentPreflight,
+                'sitePhpData' => $sitePhpData,
+            ],
+            $scaffoldData,
+        ));
+    }
+
+    private function resolveDashboardTab(): string
+    {
+        if (! $this->site->isReadyForWorkspace()) {
+            return 'overview';
+        }
+
+        $showRuntimeTab = $this->site->usesFunctionsRuntime()
+            || $this->site->usesDockerRuntime()
+            || $this->site->usesKubernetesRuntime();
+        $showSslTab = ! $this->site->usesDockerRuntime()
+            && ($this->site->primaryPreviewDomain() || $this->site->certificates()->exists());
+
+        $allowed = ['overview', 'deploys', 'logs'];
+        if ($showRuntimeTab) {
+            $allowed[] = 'runtime';
+        }
+        if ($showSslTab) {
+            $allowed[] = 'ssl';
+        }
+
+        return in_array($this->dashboard_tab, $allowed, true) ? $this->dashboard_tab : 'overview';
     }
 
     private function loadFunctionsSourceControlState(SourceControlRepositoryBrowser $repositoryBrowser): void
@@ -2760,9 +3256,17 @@ class Show extends Component
             return;
         }
 
-        $account = request()->user()?->socialAccounts()->findOrFail($this->functions_source_control_account_id);
+        $user = request()->user();
+        $account = $user !== null
+            ? app(GitIdentityResolver::class)->forId($user, $this->functions_source_control_account_id)
+            : null;
         $this->availableFunctionsRepositories = $account
             ? $repositoryBrowser->repositoriesForAccount($account)
             : [];
+    }
+
+    protected function afterLinkedSourceControlAccountsRefreshed(): void
+    {
+        $this->loadFunctionsSourceControlState(app(SourceControlRepositoryBrowser::class));
     }
 }

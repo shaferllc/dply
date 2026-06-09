@@ -7,9 +7,13 @@ use App\Jobs\DeleteOrphanSystemUsersJob;
 use App\Jobs\DeleteServerSystemUserJob;
 use App\Jobs\SyncServerSystemUsersJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\DismissesConsoleActionRun;
+use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\ManagesSystemUserNotifications;
+use App\Livewire\Sites\Show;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Services\Servers\ServerSystemUserService;
@@ -17,19 +21,29 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
-use App\Livewire\Concerns\RequiresFeature;
+use Livewire\Attributes\On;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceSystemUsers extends Component
 {
+    use RendersWorkspacePlaceholder;
     use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.system_users';
+
     use ConfirmsActionWithModal;
+    use CreatesNotificationChannelInline;
     use DismissesConsoleActionRun;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use ManagesSystemUserNotifications;
+
+    /** Active in-page sub-tab: 'accounts' (the user list) or 'notifications' (event routing). */
+    public string $activeTab = 'accounts';
 
     protected function consoleActionSubject(): Model
     {
@@ -68,6 +82,18 @@ class WorkspaceSystemUsers extends Component
     }
 
     /**
+     * Fired by {@see CreatesNotificationChannelInline} after the inline modal
+     * creates a channel. Jump to the Notifications tab and pre-select the new
+     * channel so the operator can finish wiring it to events in one motion.
+     */
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId): void
+    {
+        $this->activeTab = 'notifications';
+        $this->notif_channel_id = $channelId;
+    }
+
+    /**
      * Dispatches a queued sync against the server's `/etc/passwd`. The console
      * banner picks up progress/errors via the {@see SyncServerSystemUsersJob}
      * console_actions run; the table re-hydrates from DB on every poll because
@@ -95,7 +121,7 @@ class WorkspaceSystemUsers extends Component
 
     /**
      * Seeds a queued console_actions row for the server-scoped system_user
-     * banner. Mirrors the helper on {@see \App\Livewire\Sites\Show::seedQueuedConsoleAction()}
+     * banner. Mirrors the helper on {@see Show::seedQueuedConsoleAction()}
      * but scoped to a Server subject; auto-dismisses any prior terminal rows so
      * the banner always shows the current run, not a stale completion.
      */
@@ -324,7 +350,11 @@ class WorkspaceSystemUsers extends Component
             $this->pending_remove_usernames = [];
         }
 
-        return view('livewire.servers.workspace-system-users');
+        return view('livewire.servers.workspace-system-users', [
+            'notifChannels' => $this->assignableSystemUserNotificationChannels(),
+            'notifSubscriptions' => $this->systemUserNotificationSubscriptions(),
+            'notifEventLabels' => $this->systemUserEventLabels(),
+        ]);
     }
 
     private function hasInFlightSystemUserAction(): bool

@@ -1,0 +1,310 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models\Concerns\Site;
+
+use App\Models\Site;
+use App\Support\Edge\EdgeRepoRoot;
+use App\Support\Edge\EdgeTestingDomains;
+use App\Support\Preview\UnifiedPreviewHostname;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
+
+/**
+ * Extracted from {@see Site}. Composed back into the model via `use`.
+ */
+trait ManagesEdgeHosting
+{
+    public function usesOrgCloudflareEdge(): bool
+    {
+        return $this->edge_backend === 'org_cloudflare';
+    }
+
+    public function edgeBackendLabel(): string
+    {
+        return match ($this->edge_backend) {
+            'org_cloudflare' => __('Your Cloudflare account'),
+            'dply_edge' => __('Dply Edge (managed)'),
+            default => (string) ($this->edge_backend ?: __('Unknown')),
+        };
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function edgeMeta(): array
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+
+        return is_array($meta['edge'] ?? null) ? $meta['edge'] : [];
+    }
+
+    public function edgeLiveUrl(): ?string
+    {
+        $url = $this->edgeMeta()['live_url'] ?? null;
+
+        return is_string($url) && $url !== '' ? $url : null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function edgeGuardrail(): ?array
+    {
+        $guardrail = $this->edgeMeta()['guardrail'] ?? null;
+
+        return is_array($guardrail) && $guardrail !== [] ? $guardrail : null;
+    }
+
+    /**
+     * Merge a new guardrail meta blob into edgeMeta and persist. Returns the
+     * previous state ('ok'|'warn'|'over') so the caller can detect a
+     * transition before/after the write (used by the evaluator cron to
+     * decide whether to fan out a notification).
+     *
+     * @param  array<string, mixed>  $guardrail
+     */
+    public function updateEdgeGuardrail(array $guardrail): ?string
+    {
+        $previous = $this->edgeGuardrail()['state'] ?? null;
+
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $edge = is_array($meta['edge'] ?? null) ? $meta['edge'] : [];
+        $edge['guardrail'] = $guardrail;
+        $meta['edge'] = $edge;
+
+        $this->update(['meta' => $meta]);
+
+        return is_string($previous) ? $previous : null;
+    }
+
+    public function edgeHostname(): string
+    {
+        $routing = is_array($this->edgeMeta()['routing'] ?? null) ? $this->edgeMeta()['routing'] : [];
+        $hostname = trim((string) ($routing['hostname'] ?? ''));
+        if ($hostname !== '') {
+            return strtolower($hostname);
+        }
+
+        $liveUrl = $this->edgeLiveUrl();
+        if ($liveUrl !== null) {
+            $host = parse_url($liveUrl, PHP_URL_HOST);
+            if (is_string($host) && $host !== '') {
+                return strtolower($host);
+            }
+        }
+
+        $hostnames = app(UnifiedPreviewHostname::class);
+        if ($hostnames->enabled()) {
+            return $hostnames->canonicalHostname($this);
+        }
+
+        $testingDomain = EdgeTestingDomains::defaultApex();
+        $slug = (string) ($this->slug ?: Str::slug((string) $this->name)) ?: 'site';
+        $suffix = substr(strtolower((string) $this->id), -6);
+
+        return strtolower($slug.'-'.$suffix.'.'.$testingDomain);
+    }
+
+    public function edgeRepoRoot(): string
+    {
+        $source = is_array($this->edgeMeta()['source'] ?? null) ? $this->edgeMeta()['source'] : [];
+        $repoRoot = is_string($source['repo_root'] ?? null) ? $source['repo_root'] : '';
+
+        return EdgeRepoRoot::normalize($repoRoot);
+    }
+
+    /**
+     * Hostnames that receive CDN traffic for this Edge site (default delivery + custom domains).
+     *
+     * @return list<string>
+     */
+    public function edgeUsageHostnames(): array
+    {
+        return array_keys($this->edgeUsageHostnameZones());
+    }
+
+    /**
+     * @return array<string, string> hostname => Cloudflare zone apex for analytics
+     */
+    public function edgeUsageHostnameZones(): array
+    {
+        if (! $this->usesEdgeRuntime()) {
+            return [];
+        }
+
+        $zones = [];
+        $primary = strtolower(trim($this->edgeHostname()));
+        if ($primary !== '') {
+            $zones[$primary] = $this->edgeAnalyticsZoneForHostname($primary) ?? $primary;
+        }
+
+        $routing = is_array($this->edgeMeta()['routing'] ?? null) ? $this->edgeMeta()['routing'] : [];
+        $customDomains = is_array($routing['custom_domains'] ?? null) ? $routing['custom_domains'] : [];
+
+        foreach ($customDomains as $key => $domain) {
+            $hostname = is_string($key) && $key !== ''
+                ? strtolower(trim($key))
+                : strtolower(trim((string) (is_array($domain) ? ($domain['hostname'] ?? '') : '')));
+
+            if ($hostname === '') {
+                continue;
+            }
+
+            $zones[$hostname] = $this->edgeAnalyticsZoneForHostname($hostname, is_array($domain) ? $domain : []);
+        }
+
+        return $zones;
+    }
+
+    /**
+     * @param  array<string, mixed>  $customDomainEntry
+     */
+    public function edgeAnalyticsZoneForHostname(string $hostname, array $customDomainEntry = []): ?string
+    {
+        $hostname = strtolower(trim($hostname));
+        if ($hostname === '') {
+            return null;
+        }
+
+        $routing = is_array($this->edgeMeta()['routing'] ?? null) ? $this->edgeMeta()['routing'] : [];
+        $customDomains = is_array($routing['custom_domains'] ?? null) ? $routing['custom_domains'] : [];
+        $entry = $customDomainEntry !== []
+            ? $customDomainEntry
+            : (is_array($customDomains[$hostname] ?? null) ? $customDomains[$hostname] : []);
+
+        foreach (['analytics_zone', 'zone'] as $key) {
+            $zone = strtolower(trim((string) ($entry[$key] ?? '')));
+            if ($zone !== '') {
+                return $zone;
+            }
+        }
+
+        return EdgeTestingDomains::analyticsZoneForHost($hostname)
+            ?? self::deriveRegistrableDomain($hostname);
+    }
+
+    public static function deriveRegistrableDomain(string $hostname): string
+    {
+        $labels = explode('.', strtolower(trim($hostname)));
+        if (count($labels) < 2) {
+            return strtolower(trim($hostname));
+        }
+
+        return implode('.', array_slice($labels, -2));
+    }
+
+    public function isEdgePreview(): bool
+    {
+        $parentId = $this->edgeMeta()['preview_parent_site_id'] ?? null;
+
+        return is_string($parentId) && $parentId !== '';
+    }
+
+    public function isDplyCloudSite(): bool
+    {
+        return $this->container_backend === 'dply_cloud';
+    }
+
+    public function isCloudPreview(): bool
+    {
+        $container = is_array($this->meta['container'] ?? null) ? $this->meta['container'] : [];
+        $parentId = $container['preview_parent_site_id'] ?? null;
+
+        return is_string($parentId) && $parentId !== '';
+    }
+
+    public function edgeGithubHookUrl(): string
+    {
+        return route('hooks.edge.github', ['site' => $this->id]);
+    }
+
+    /**
+     * Rough monthly cost estimate for the container site, in USD.
+     * Based on backend × size_tier × instance_count, using public
+     * list pricing as of 2026-05. Returns 0 for non-container sites.
+     *
+     * Not authoritative — used as a "ballpark" surface in the
+     * dashboard / CLI so operators can compare fleets without
+     * digging into the cloud billing console.
+     */
+    public function estimatedMonthlyCostUsd(): int
+    {
+        if ($this->container_backend === null) {
+            return 0;
+        }
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $tier = (string) ($meta['container']['size_tier'] ?? 'small');
+        $instances = is_int($meta['container']['instance_count'] ?? null)
+            ? (int) $meta['container']['instance_count']
+            : 1;
+
+        // Per-instance pricing rough estimates. DO's instance_size_slug
+        // pricing is monthly + flat; App Runner is per-vCPU-hour for
+        // active time so this is more uncertain (we assume active 24/7).
+        $perInstance = match ($this->container_backend) {
+            'digitalocean_app_platform' => match ($tier) {
+                'medium' => 10,
+                'large' => 25,
+                'xlarge' => 50,
+                default => 5,
+            },
+            'aws_app_runner' => match ($tier) {
+                'medium' => 50,
+                'large' => 100,
+                'xlarge' => 200,
+                default => 25,
+            },
+            default => 0,
+        };
+
+        return $perInstance * max(1, $instances);
+    }
+
+    public function containerLiveUrl(): ?string
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+
+        // Prefer the branded dply subdomain (e.g. `acme-api-x4k2p.on-dply.cloud`)
+        // once it's attached as a PRIMARY domain on the backend. While the
+        // domain is still pending validation/cert issuance, fall back to the
+        // backend's default ingress (e.g. `*.ondigitalocean.app`) so users
+        // can hit the app immediately.
+        $subdomain = $meta['container']['dply_subdomain'] ?? null;
+        $subdomainAttached = (bool) ($meta['container']['dply_subdomain_attached'] ?? false);
+        if ($subdomainAttached && is_string($subdomain) && $subdomain !== '') {
+            return 'https://'.$subdomain;
+        }
+
+        $url = $meta['container']['live_url'] ?? null;
+
+        return is_string($url) && $url !== '' ? $url : null;
+    }
+
+    /**
+     * Generate a stable, brand-canonical hostname for a cloud site
+     * (e.g. `acme-api-x4k2p.on-dply.cloud`). All dply cloud apps land
+     * under `on-dply.cloud` regardless of which backend (DO App
+     * Platform / AWS App Runner) actually runs them, so the public
+     * URL stays consistent if we migrate a site between backends.
+     */
+    public static function generateDplyCloudSubdomain(string $name, string $id): string
+    {
+        $slug = strtolower((string) preg_replace('/[^a-z0-9]+/i', '-', $name));
+        $slug = trim($slug, '-');
+        $slug = $slug === '' ? 'app' : substr($slug, 0, 32);
+        $shortId = strtolower(substr($id, -5));
+
+        return $slug.'-'.$shortId.'.on-dply.cloud';
+    }
+
+    public function mergeEdgeMeta(array $patch): void
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $current = is_array($meta['edge'] ?? null) ? $meta['edge'] : [];
+        $meta['edge'] = array_merge($current, $patch);
+        $this->meta = $meta;
+    }
+}

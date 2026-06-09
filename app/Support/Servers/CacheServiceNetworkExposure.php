@@ -32,9 +32,23 @@ use Illuminate\Support\Str;
  */
 class CacheServiceNetworkExposure
 {
+    /** @var array<string, ServerFirewallRule|null> Request-scoped memo for findManagedRule(). */
+    private static array $managedRuleMemo = [];
+
     public function __construct(
         private readonly ExecuteRemoteTaskOnServer $executor,
     ) {}
+
+    public static function flushManagedRuleMemo(?ServerCacheService $row = null): void
+    {
+        if ($row === null) {
+            self::$managedRuleMemo = [];
+
+            return;
+        }
+
+        unset(self::$managedRuleMemo[self::managedRuleMemoKey($row)]);
+    }
 
     /**
      * Tag identifying the firewall rule managed by this exposure flow. Searching for a rule
@@ -43,6 +57,19 @@ class CacheServiceNetworkExposure
     public static function firewallRuleTag(ServerCacheService $row): string
     {
         return sprintf('cache:%s:%s:%d', $row->engine, $row->name, (int) $row->port);
+    }
+
+    /**
+     * @return array{exposed: bool, rule: ?ServerFirewallRule}
+     */
+    public function resolveExposure(ServerCacheService $row): array
+    {
+        $rule = $this->findManagedRule($row);
+
+        return [
+            'exposed' => $rule !== null,
+            'rule' => $rule,
+        ];
     }
 
     /**
@@ -60,12 +87,27 @@ class CacheServiceNetworkExposure
      */
     public function findManagedRule(ServerCacheService $row): ?ServerFirewallRule
     {
+        $memoKey = self::managedRuleMemoKey($row);
+
+        if (array_key_exists($memoKey, self::$managedRuleMemo)) {
+            return self::$managedRuleMemo[$memoKey];
+        }
+
         $tag = self::firewallRuleTag($row);
 
-        return ServerFirewallRule::query()
+        $rule = ServerFirewallRule::query()
             ->where('server_id', $row->server_id)
             ->whereJsonContains('tags', $tag)
             ->first();
+
+        self::$managedRuleMemo[$memoKey] = $rule;
+
+        return $rule;
+    }
+
+    private static function managedRuleMemoKey(ServerCacheService $row): string
+    {
+        return (string) $row->server_id.':'.self::firewallRuleTag($row);
     }
 
     /**
@@ -83,7 +125,7 @@ class CacheServiceNetworkExposure
 
         $rule = $this->findManagedRule($row);
         if ($rule === null) {
-            ServerFirewallRule::query()->create([
+            $rule = ServerFirewallRule::query()->create([
                 'server_id' => $server->id,
                 'name' => sprintf('Cache · %s (%s)', ucfirst($row->engine), $row->name),
                 'port' => (int) $row->port,
@@ -103,6 +145,8 @@ class CacheServiceNetworkExposure
             ]);
         }
 
+        self::$managedRuleMemo[self::managedRuleMemoKey($row)] = $rule->fresh();
+
         $this->dispatchApply($server, $userId);
     }
 
@@ -120,6 +164,8 @@ class CacheServiceNetworkExposure
         if ($rule !== null) {
             $rule->delete();
         }
+
+        self::$managedRuleMemo[self::managedRuleMemoKey($row)] = null;
 
         $this->dispatchApply($server, $userId);
     }

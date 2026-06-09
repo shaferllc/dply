@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Contracts\RemoteShell;
 use App\Models\Site;
+use App\Models\SiteDeployment;
 use App\Services\Deploy\SyncCustomSiteDeployStep;
 use App\Services\SshConnectionFactory;
 use Illuminate\Bus\Queueable;
@@ -64,6 +65,13 @@ class ProvisionCustomSiteJob implements ShouldQueue
             ])->save();
 
             $stepSync->sync($site->fresh(['deployScript']));
+
+            // Git-mode sites have code on the box now — run the first deployment
+            // so the deploy script (composer/build/queue restart) actually runs.
+            // No-repo mode has nothing to deploy until CI pushes code in.
+            if ($site->isCustomGitMode()) {
+                RunSiteDeploymentJob::dispatch($site->fresh(), SiteDeployment::TRIGGER_MANUAL);
+            }
         } catch (Throwable $e) {
             Log::error('Custom site provisioning failed', [
                 'site_id' => $site->id,
@@ -117,6 +125,27 @@ class ProvisionCustomSiteJob implements ShouldQueue
         $urlEsc = escapeshellarg($url);
         $branchEsc = escapeshellarg($branch);
         $userEsc = escapeshellarg($user);
+        $refKind = $site->gitRefKind();
+
+        if ($refKind === 'commit') {
+            // Full clone so the SHA is in history, then check it out detached.
+            // No `git pull` — SHAs/tags are immutable refs.
+            $shell->exec(
+                "sudo -u {$userEsc} bash -lc 'cd {$pathEsc} && if [ -d .git ]; then git fetch --all --prune && git checkout {$branchEsc}; else git clone {$urlEsc} . && git checkout {$branchEsc}; fi'",
+                240
+            );
+
+            return;
+        }
+
+        if ($refKind === 'tag') {
+            $shell->exec(
+                "sudo -u {$userEsc} bash -lc 'cd {$pathEsc} && if [ -d .git ]; then git fetch --all --prune && git checkout {$branchEsc}; else git clone {$urlEsc} . && git checkout {$branchEsc}; fi'",
+                240
+            );
+
+            return;
+        }
 
         $shell->exec(
             "sudo -u {$userEsc} bash -lc 'cd {$pathEsc} && if [ -d .git ]; then git fetch --all --prune && git checkout {$branchEsc} && git pull --ff-only; else git clone --branch {$branchEsc} {$urlEsc} .; fi'",

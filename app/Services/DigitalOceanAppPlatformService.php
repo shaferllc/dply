@@ -14,12 +14,12 @@ use RuntimeException;
  *
  * Docs: https://docs.digitalocean.com/reference/api/api-reference/#tag/Apps
  *
- * Used by the dply edge layer to provision/redeploy container apps
+ * Used by the dply cloud layer to provision/redeploy container apps
  * on DO. The api_token credential here is the same shape as the
  * regular DigitalOcean credential — App Platform shares the
  * read+write token scope with droplets/dns/etc.
  *
- * Methods are intentionally minimal — just what the dply edge
+ * Methods are intentionally minimal — just what the dply cloud
  * deploy/redeploy/teardown flow needs. We're not trying to expose
  * the full DO Apps surface.
  */
@@ -45,7 +45,17 @@ class DigitalOceanAppPlatformService
      * spec (autoscaling, multiple components, env-from-secret) can
      * patch the app after creation via updateApp().
      *
+     * When $autoscaling is non-null the web service emits an
+     * `autoscaling` block and OMITS the fixed `instance_count` — the
+     * two are mutually exclusive on App Platform. $healthCheck, when
+     * non-null, adds a `health_check` block to the web service.
+     *
      * @param  array<string, string>  $envVars
+     * @param  list<array<string, mixed>>  $workers  Optional `workers`
+     *                                               components (background processes — queue workers / scheduler)
+     *                                               to add to the spec alongside the web service.
+     * @param  array<string, mixed>|null  $autoscaling  Optional `autoscaling` block.
+     * @param  array<string, mixed>|null  $healthCheck  Optional `health_check` block.
      * @return array{id: string, default_ingress: ?string}
      */
     public function createApp(
@@ -57,6 +67,12 @@ class DigitalOceanAppPlatformService
         array $buildEnvVars = [],
         int $instanceCount = 1,
         string $instanceSizeSlug = 'basic-xxs',
+        array $workers = [],
+        ?array $autoscaling = null,
+        ?array $healthCheck = null,
+        array $jobs = [],
+        array $alerts = [],
+        ?string $registryCredentials = null,
     ): array {
         $envSpec = [];
         foreach ($envVars as $k => $v) {
@@ -66,34 +82,47 @@ class DigitalOceanAppPlatformService
             $envSpec[] = ['key' => $k, 'value' => $v, 'scope' => 'BUILD_TIME'];
         }
 
-        [, $repository, $tag] = $this->parseImageRef($image);
-
-        $body = [
-            'spec' => [
-                'name' => $appName,
-                'region' => $region,
-                'services' => [[
-                    'name' => 'web',
-                    'image' => [
-                        'registry_type' => 'DOCKER_HUB',
-                        'repository' => $repository,
-                        'tag' => $tag,
-                    ],
-                    'http_port' => $port,
-                    'instance_count' => max(1, $instanceCount),
-                    'instance_size_slug' => $instanceSizeSlug,
-                    'envs' => $envSpec,
-                ]],
-            ],
+        $service = [
+            'name' => 'web',
+            'image' => self::imageSpecBlock($image, $registryCredentials),
+            'http_port' => $port,
+            'instance_size_slug' => $instanceSizeSlug,
+            'envs' => $envSpec,
         ];
+        // Autoscaling and a fixed instance_count are mutually
+        // exclusive on App Platform — emit exactly one.
+        if ($autoscaling !== null) {
+            $service['autoscaling'] = $autoscaling;
+        } else {
+            $service['instance_count'] = max(1, $instanceCount);
+        }
+        if ($healthCheck !== null) {
+            $service['health_check'] = $healthCheck;
+        }
 
-        $response = $this->request('post', '/apps', $body);
+        $spec = [
+            'name' => $appName,
+            'region' => $region,
+            'services' => [$service],
+        ];
+        if ($workers !== []) {
+            $spec['workers'] = array_values($workers);
+        }
+        if ($jobs !== []) {
+            $spec['jobs'] = array_values($jobs);
+        }
+        if ($alerts !== []) {
+            $spec['alerts'] = array_values($alerts);
+        }
+
+        $response = $this->request('post', '/apps', ['spec' => $spec]);
         $this->assertSuccess($response, 'create app');
         $data = $response->json('app') ?? [];
 
         return [
             'id' => (string) ($data['id'] ?? ''),
             'default_ingress' => $data['default_ingress'] ?? null,
+            'alerts' => is_array($data['spec']['alerts'] ?? null) ? $data['spec']['alerts'] : [],
         ];
     }
 
@@ -107,6 +136,11 @@ class DigitalOceanAppPlatformService
      * `repo` is `owner/name` exactly as DO expects.
      *
      * @param  array<string, string>  $envVars
+     * @param  list<array<string, mixed>>  $workers  Optional `workers`
+     *                                               components (background processes — queue workers / scheduler)
+     *                                               to add to the spec alongside the web service.
+     * @param  array<string, mixed>|null  $autoscaling  Optional `autoscaling` block (omits fixed instance_count).
+     * @param  array<string, mixed>|null  $healthCheck  Optional `health_check` block.
      * @return array{id: string, default_ingress: ?string}
      */
     public function createAppFromSource(
@@ -121,6 +155,11 @@ class DigitalOceanAppPlatformService
         array $buildEnvVars = [],
         int $instanceCount = 1,
         string $instanceSizeSlug = 'basic-xxs',
+        array $workers = [],
+        ?array $autoscaling = null,
+        ?array $healthCheck = null,
+        array $jobs = [],
+        array $alerts = [],
     ): array {
         $envSpec = [];
         foreach ($envVars as $k => $v) {
@@ -138,30 +177,100 @@ class DigitalOceanAppPlatformService
                 'deploy_on_push' => $deployOnPush,
             ],
             'http_port' => $port,
-            'instance_count' => max(1, $instanceCount),
             'instance_size_slug' => $instanceSizeSlug,
             'envs' => $envSpec,
         ];
+        // Autoscaling and a fixed instance_count are mutually
+        // exclusive on App Platform — emit exactly one.
+        if ($autoscaling !== null) {
+            $service['autoscaling'] = $autoscaling;
+        } else {
+            $service['instance_count'] = max(1, $instanceCount);
+        }
+        if ($healthCheck !== null) {
+            $service['health_check'] = $healthCheck;
+        }
 
         if (is_string($dockerfilePath) && $dockerfilePath !== '') {
             $service['dockerfile_path'] = $dockerfilePath;
         }
 
-        $body = [
-            'spec' => [
-                'name' => $appName,
-                'region' => $region,
-                'services' => [$service],
-            ],
+        $spec = [
+            'name' => $appName,
+            'region' => $region,
+            'services' => [$service],
         ];
+        if ($workers !== []) {
+            $spec['workers'] = array_values($workers);
+        }
+        if ($jobs !== []) {
+            $spec['jobs'] = array_values($jobs);
+        }
+        if ($alerts !== []) {
+            $spec['alerts'] = array_values($alerts);
+        }
 
-        $response = $this->request('post', '/apps', $body);
+        $response = $this->request('post', '/apps', ['spec' => $spec]);
         $this->assertSuccess($response, 'create app from source');
         $data = $response->json('app') ?? [];
 
         return [
             'id' => (string) ($data['id'] ?? ''),
             'default_ingress' => $data['default_ingress'] ?? null,
+            'alerts' => is_array($data['spec']['alerts'] ?? null) ? $data['spec']['alerts'] : [],
+        ];
+    }
+
+    /**
+     * Update the destinations for an existing alert. DO assigns each
+     * alert in the app spec a generated ID; pass that here along with
+     * the slack_webhooks/emails block to wire notifications. Called
+     * after createApp returns the alert IDs.
+     *
+     * @param  array{slack_webhooks?: list<array{url: string, channel?: string}>, emails?: list<string>}  $destinations
+     */
+    public function updateAlertDestinations(string $appId, string $alertId, array $destinations): void
+    {
+        $response = $this->request(
+            'post',
+            '/apps/'.$appId.'/alerts/'.$alertId.'/destinations',
+            $destinations,
+        );
+        $this->assertSuccess($response, 'update alert destinations');
+    }
+
+    /**
+     * POST /apps/propose — run a spec through DO's validators and get
+     * back the estimated monthly cost without actually creating the
+     * app. Used by the dply Cloud Create form to show live cost and
+     * to catch spec mismatches (autoscaling-on-Basic, invalid regions,
+     * missing image creds) before the user submits.
+     *
+     * Returns {ok, app_cost, error?} so the form can render either
+     * a price or an inline error message.
+     *
+     * @param  array<string, mixed>  $spec
+     * @return array{ok: bool, app_cost: ?float, error: ?string}
+     */
+    public function proposeApp(array $spec): array
+    {
+        $response = $this->request('post', '/apps/propose', ['spec' => $spec]);
+
+        if ($response->status() >= 400) {
+            $body = $response->json();
+            $message = is_array($body) && is_string($body['message'] ?? null)
+                ? $body['message']
+                : $response->body();
+
+            return ['ok' => false, 'app_cost' => null, 'error' => $message];
+        }
+
+        $cost = $response->json('app_cost');
+
+        return [
+            'ok' => true,
+            'app_cost' => is_numeric($cost) ? (float) $cost : null,
+            'error' => null,
         ];
     }
 
@@ -178,6 +287,38 @@ class DigitalOceanAppPlatformService
         $deployments = $response->json('deployments') ?? [];
 
         return is_array($deployments) ? array_values($deployments) : [];
+    }
+
+    /**
+     * Fetch a single deployment by id — phases, per-component progress,
+     * created/started/finished timestamps. Used by the dply deploy
+     * detail page to show the full rollout story.
+     *
+     * @return array<string, mixed>
+     */
+    public function getDeployment(string $appId, string $deploymentId): array
+    {
+        $response = $this->request('get', '/apps/'.$appId.'/deployments/'.$deploymentId);
+        $this->assertSuccess($response, 'get deployment');
+        $deployment = $response->json('deployment') ?? [];
+
+        return is_array($deployment) ? $deployment : [];
+    }
+
+    /**
+     * Cancel an in-progress deployment. Idempotent — DO returns 422
+     * for deployments that already terminated (success/failure), so
+     * we treat 2xx and 422 both as a no-op success.
+     */
+    public function cancelDeployment(string $appId, string $deploymentId): void
+    {
+        $response = $this->request('post', '/apps/'.$appId.'/deployments/'.$deploymentId.'/cancel', []);
+
+        if ($response->status() === 422) {
+            // Already terminal — nothing to cancel. Don't error.
+            return;
+        }
+        $this->assertSuccess($response, 'cancel deployment');
     }
 
     /**
@@ -210,6 +351,97 @@ class DigitalOceanAppPlatformService
             : (is_string($payload['live_url'] ?? null) ? (string) $payload['live_url'] : null);
 
         return ['deployment_id' => $deploymentId, 'url' => $url];
+    }
+
+    /**
+     * Fetch RUN (runtime) logs for the active deployment of an app.
+     *
+     * DO's active-deployment logs endpoint
+     * (/v2/apps/{app_id}/components/{component_name}/logs) returns
+     * `historic_urls` (archived log files) and/or a `live_url`
+     * (real-time stream). We surface whichever archive URL is set —
+     * the operator / dashboard fetches the actual text from it.
+     *
+     * type=RUN selects live runtime logs; type=RUN_RESTARTED would
+     * return crash logs. The component defaults to "web" — the name
+     * the dply provision flow always gives the web service.
+     *
+     * @return array{url: ?string, live_url: ?string}
+     */
+    public function getRuntimeLogs(string $appId, string $component = 'web'): array
+    {
+        $path = '/apps/'.$appId.'/components/'.rawurlencode($component).'/logs?type=RUN';
+        $response = $this->request('get', $path);
+        $this->assertSuccess($response, 'get runtime logs');
+        $payload = $response->json() ?? [];
+
+        $url = is_array($payload['historic_urls'] ?? null) && isset($payload['historic_urls'][0])
+            ? (string) $payload['historic_urls'][0]
+            : null;
+        $liveUrl = is_string($payload['live_url'] ?? null) ? (string) $payload['live_url'] : null;
+
+        return ['url' => $url, 'live_url' => $liveUrl];
+    }
+
+    /**
+     * Fetch an App Platform monitoring metric for an app over a
+     * UNIX-timestamp window. $metric is the DO metric path segment —
+     * one of: 'cpu_percentage', 'memory_percentage', 'restart_count'.
+     *
+     * The response is Prometheus-style: a `matrix` result where each
+     * series carries a `values` array of [unix-ts, "string-value"]
+     * pairs. We flatten the first series into {t, v} points; an empty
+     * or unexpected response degrades to an empty list.
+     *
+     * Docs: GET /v2/monitoring/metrics/apps/{metric}
+     *
+     * @return list<array{t: int, v: float}>
+     */
+    public function getAppMetric(string $appId, string $metric, int $start, int $end, string $component = 'web'): array
+    {
+        $query = http_build_query([
+            'app_id' => $appId,
+            'app_component' => $component,
+            'start' => (string) $start,
+            'end' => (string) $end,
+        ]);
+        $response = $this->request('get', '/monitoring/metrics/apps/'.$metric.'?'.$query);
+        $this->assertSuccess($response, 'get app metric '.$metric);
+
+        $payload = $response->json() ?? [];
+        $result = $payload['data']['result'] ?? null;
+        if (! is_array($result) || $result === []) {
+            return [];
+        }
+
+        // Prefer the series matching our component; fall back to the
+        // first series when no label match (single-component apps).
+        $series = null;
+        foreach ($result as $entry) {
+            if (is_array($entry) && (string) ($entry['metric']['app_component'] ?? '') === $component) {
+                $series = $entry;
+                break;
+            }
+        }
+        if ($series === null) {
+            $series = is_array($result[0] ?? null) ? $result[0] : null;
+        }
+        if (! is_array($series) || ! is_array($series['values'] ?? null)) {
+            return [];
+        }
+
+        $points = [];
+        foreach ($series['values'] as $pair) {
+            if (! is_array($pair) || count($pair) < 2) {
+                continue;
+            }
+            $points[] = [
+                't' => (int) $pair[0],
+                'v' => (float) $pair[1],
+            ];
+        }
+
+        return $points;
     }
 
     /**
@@ -340,7 +572,7 @@ class DigitalOceanAppPlatformService
     /**
      * Available DO App Platform regions. Pulled directly from the
      * DO public list — keeping it local avoids a round trip on the
-     * region picker and matches how FlyIoService::getRegions does it.
+     * region picker.
      *
      * @return list<array{slug: string, label: string}>
      */
@@ -368,6 +600,14 @@ class DigitalOceanAppPlatformService
      */
     public function parseImageRef(string $image): array
     {
+        return self::parseImageRefStatic($image);
+    }
+
+    /**
+     * @return array{0: string, 1: string, 2: string}
+     */
+    public static function parseImageRefStatic(string $image): array
+    {
         // The tag, if present, is after the last `:` — but only when
         // that colon is *after* the last `/` (otherwise it's a port
         // on the registry host, e.g. "localhost:5000/img").
@@ -390,6 +630,66 @@ class DigitalOceanAppPlatformService
         }
 
         return [$registry, $repository, $tag];
+    }
+
+    /**
+     * Build DO App Platform's `image` block for a Docker image ref.
+     * DO requires `registry` (account/namespace) and `repository` (image
+     * name) as separate fields — packing the namespace into `repository`
+     * trips "Image does not exist or is private" at create time.
+     *
+     *   "nginxdemos/hello:latest"              → DOCKER_HUB, registry=nginxdemos, repository=hello
+     *   "nginx:1.27"                           → DOCKER_HUB, repository=library/nginx
+     *   "ghcr.io/acme/api:v1"                  → GHCR, registry=acme, repository=api
+     *   "registry.digitalocean.com/acme/api:v1" → DOCR, registry=acme, repository=api
+     *
+     * When `$registryCredentials` is supplied it's threaded into the
+     * spec verbatim (DO accepts a `username:token` string for GHCR
+     * and Docker Hub private repos). DOCR doesn't need credentials —
+     * the app's DO PAT authenticates against DOCR transparently when
+     * its scope covers `registry:read`.
+     *
+     * @return array<string, string>
+     */
+    public static function imageSpecBlock(string $image, ?string $registryCredentials = null): array
+    {
+        [$registryHost, $repository, $tag] = self::parseImageRefStatic($image);
+
+        $registryType = match (true) {
+            $registryHost === 'registry.digitalocean.com' => 'DOCR',
+            $registryHost === 'ghcr.io' => 'GHCR',
+            str_ends_with($registryHost, 'docker.io') => 'DOCKER_HUB',
+            default => 'DOCKER_HUB',
+        };
+
+        $block = [
+            'registry_type' => $registryType,
+            'repository' => $repository,
+            'tag' => $tag,
+        ];
+
+        // For registries that namespace by account (DOCR, GHCR, Docker
+        // Hub user repos), DO wants `registry` (account) and
+        // `repository` (image name) split. The Docker Hub `library/*`
+        // namespace is special-cased — DO accepts the packed form for
+        // those and the explicit split for everything else.
+        if (in_array($registryType, ['DOCR', 'GHCR'], true) && str_contains($repository, '/')) {
+            [$namespace, $name] = explode('/', $repository, 2);
+            $block['registry'] = $namespace;
+            $block['repository'] = $name;
+        } elseif ($registryType === 'DOCKER_HUB' && str_contains($repository, '/')) {
+            [$namespace, $name] = explode('/', $repository, 2);
+            if ($namespace !== 'library') {
+                $block['registry'] = $namespace;
+                $block['repository'] = $name;
+            }
+        }
+
+        if (is_string($registryCredentials) && $registryCredentials !== '') {
+            $block['registry_credentials'] = $registryCredentials;
+        }
+
+        return $block;
     }
 
     /**

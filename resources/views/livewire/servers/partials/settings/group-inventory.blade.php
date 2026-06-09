@@ -1,43 +1,6 @@
 @php
     $osVersions = $osVersions ?? config('server_settings.os_versions', []);
 
-    // Parse `apt list --upgradable` preview into structured rows.
-    // Format: package/source[,source ...] new_version arch [upgradable from: current]
-    $upgradableRows = [];
-    $securityCount = 0;
-    if (! empty($pkgPreview)) {
-        foreach (explode("\n", $pkgPreview) as $line) {
-            $line = trim($line);
-            if ($line === '' || str_starts_with($line, 'Listing') || str_starts_with($line, '[dply]')) {
-                continue;
-            }
-            if (preg_match('#^([^/\s]+)/(\S+)\s+(\S+)\s+(\S+)(?:\s+\[upgradable from:\s*(.+?)\])?$#', $line, $m)) {
-                $sources = $m[2];
-                $isSecurity = (bool) preg_match('/-security|esm-/i', $sources);
-                if ($isSecurity) {
-                    $securityCount++;
-                }
-                $upgradableRows[] = [
-                    'name' => $m[1],
-                    'sources' => $sources,
-                    'new_version' => $m[3],
-                    'arch' => $m[4],
-                    'current_version' => $m[5] ?? null,
-                    'is_security' => $isSecurity,
-                ];
-            } else {
-                $upgradableRows[] = [
-                    'name' => $line,
-                    'sources' => null,
-                    'new_version' => null,
-                    'arch' => null,
-                    'current_version' => null,
-                    'is_security' => false,
-                ];
-            }
-        }
-    }
-
     // Split extended snapshot into named sections (script emits `\n---\n` between blocks).
     $extSections = [];
     if (! empty($extSnap)) {
@@ -62,25 +25,39 @@
 @endphp
 
 <section id="settings-group-inventory" class="space-y-4" aria-labelledby="settings-group-inventory-title">
-    @include('livewire.servers.partials.settings._intro', [
-        'headingId' => 'settings-group-inventory-title',
-        'kicker' => __('Host'),
-        'title' => __('Inventory & provider snapshot'),
-        'description' => __('Dply can SSH in and read OS/package state on Debian-based images (apt). Provider metadata comes from provisioning. None of this changes the server—it is visibility for your team.'),
-    ])
+    <div id="settings-updates" class="{{ $card }} scroll-mt-24 overflow-hidden">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <x-icon-badge>
+                <x-heroicon-o-clipboard-document-list class="h-5 w-5" aria-hidden="true" />
+            </x-icon-badge>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Inventory') }}</p>
+                <h2 id="settings-group-inventory-title" class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Inventory & provider snapshot') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Dply can SSH in and read OS/package state on Debian-based images (apt). Provider metadata comes from provisioning. Pending updates and package lists live on Patches — this tab is for scan controls and host metadata.') }}</p>
+            </div>
+        </div>
 
-    <div id="settings-updates" class="{{ $card }} scroll-mt-24 overflow-hidden p-6 sm:p-8">
+        <div class="px-6 py-6 sm:px-7">
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div class="max-w-2xl">
-                <h3 class="text-lg font-semibold text-brand-ink">{{ __('Refresh & scan') }}</h3>
+                <h3 class="text-base font-semibold text-brand-ink">{{ __('Refresh & scan') }}</h3>
                 <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                    {{ __('Run a fresh check over SSH to count upgradable packages, detect reboot flags, and optionally capture disk/memory/uptime. Automatic unattended upgrades are configured under Manage, not here.') }}
+                    {{ __('Run a fresh check over SSH to count upgradable packages, detect reboot flags, and optionally capture disk/memory/uptime. Apt actions and unattended-upgrades live on Patches.') }}
                 </p>
                 <p class="mt-3 text-sm">
-                    <a
-                        href="{{ route('servers.manage', ['server' => $server, 'section' => 'updates']) }}#manage-os-updates"
-                        class="font-medium text-brand-forest underline decoration-brand-sage/40 underline-offset-2 hover:text-brand-ink"
-                    >{{ __('Configure automatic security updates (Manage)') }}</a>
+                    @feature('workspace.patch_advisor')
+                        <a
+                            href="{{ route('servers.patches', [$server, 'tab' => 'settings']) }}"
+                            wire:navigate
+                            class="font-medium text-brand-forest underline decoration-brand-sage/40 underline-offset-2 hover:text-brand-ink"
+                        >{{ __('Configure automatic security updates (Patches)') }}</a>
+                    @else
+                        <a
+                            href="{{ route('servers.manage', ['server' => $server, 'section' => 'updates']) }}#manage-os-updates"
+                            wire:navigate
+                            class="font-medium text-brand-forest underline decoration-brand-sage/40 underline-offset-2 hover:text-brand-ink"
+                        >{{ __('Configure automatic security updates (Manage)') }}</a>
+                    @endfeature
                 </p>
             </div>
             @if ($this->canEditServerSettings)
@@ -179,6 +156,44 @@
             </form>
         </div>
 
+        @if ($upgrades !== null || $reboot !== null)
+            <div class="mt-8 rounded-xl border border-brand-ink/10 bg-white p-5">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h4 class="text-sm font-semibold text-brand-ink">{{ __('Pending updates') }}</h4>
+                        <p class="mt-1 text-sm text-brand-moss">
+                            @if ($upgrades !== null)
+                                {{ trans_choice(':count package can be updated.|:count packages can be updated.', $upgrades, ['count' => $upgrades]) }}
+                            @endif
+                            @if ($reboot !== null)
+                                · {{ __('Reboot pending') }}:
+                                <span class="font-medium text-brand-ink">{{ $reboot ? __('Yes') : __('No') }}</span>
+                            @endif
+                        </p>
+                    </div>
+                    @feature('workspace.patch_advisor')
+                        <a
+                            href="{{ route('servers.patches', $server) }}"
+                            wire:navigate
+                            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                        >
+                            {{ __('Open Patches') }}
+                            <x-heroicon-m-arrow-up-right class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        </a>
+                    @else
+                        <a
+                            href="{{ route('servers.manage', ['server' => $server, 'section' => 'updates']) }}"
+                            wire:navigate
+                            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                        >
+                            {{ __('Manage → Updates') }}
+                            <x-heroicon-m-arrow-up-right class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        </a>
+                    @endfeature
+                </div>
+            </div>
+        @endif
+
         <div class="mt-8 border-t border-brand-ink/10 pt-8">
             <h4 class="text-sm font-semibold uppercase tracking-wide text-brand-mist">{{ __('Provider & lifecycle') }}</h4>
             <dl class="mt-4 grid gap-4 sm:grid-cols-2 text-sm">
@@ -212,30 +227,8 @@
         </div>
 
         <div class="mt-8 border-t border-brand-ink/10 pt-8">
-            <h4 class="text-sm font-semibold uppercase tracking-wide text-brand-mist">{{ __('Packages & OS detection') }}</h4>
+            <h4 class="text-sm font-semibold uppercase tracking-wide text-brand-mist">{{ __('OS label') }}</h4>
             <dl class="mt-4 grid gap-4 sm:grid-cols-2 text-sm">
-                <div>
-                    <dt class="text-brand-mist">{{ __('Available updates (apt)') }}</dt>
-                    <dd class="mt-0.5 font-medium text-brand-ink">
-                        @if ($upgrades !== null)
-                            {{ trans_choice(':count package can be updated.|:count packages can be updated.', $upgrades, ['count' => $upgrades]) }}
-                        @else
-                            {{ __('Run “Refresh inventory” on a Debian/Ubuntu host to count upgradable packages.') }}
-                        @endif
-                    </dd>
-                </div>
-                <div>
-                    <dt class="text-brand-mist">{{ __('Reboot pending') }}</dt>
-                    <dd class="mt-0.5 font-medium text-brand-ink">
-                        @if ($reboot === null)
-                            {{ __('Unknown') }}
-                        @elseif ($reboot)
-                            {{ __('Yes') }}
-                        @else
-                            {{ __('No') }}
-                        @endif
-                    </dd>
-                </div>
                 <div>
                     <dt class="text-brand-mist">{{ __('OS label (in Dply)') }}</dt>
                     <dd class="mt-0.5 font-medium text-brand-ink">{{ $osVersions[$meta['os_version'] ?? ''] ?? ($meta['os_version'] ?? '—') }}</dd>
@@ -261,78 +254,6 @@
             </dl>
         </div>
 
-        @if (! empty($upgradableRows))
-            <div
-                class="mt-8 border-t border-brand-ink/10 pt-8"
-                x-data="{ filter: 'all', q: '' }"
-            >
-                <div class="flex flex-wrap items-end justify-between gap-3">
-                    <div>
-                        <h4 class="text-sm font-semibold text-brand-ink">{{ __('Outdated packages') }}</h4>
-                        <p class="mt-1 text-xs text-brand-moss">
-                            {{ trans_choice(':count package can be upgraded.|:count packages can be upgraded.', count($upgradableRows), ['count' => count($upgradableRows)]) }}
-                            @if ($securityCount > 0)
-                                · <span class="font-medium text-red-700">{{ trans_choice(':n flagged as security|:n flagged as security', $securityCount, ['n' => $securityCount]) }}</span>
-                            @endif
-                            · {{ __('From apt list — not an install plan.') }}
-                        </p>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-2">
-                        <div class="inline-flex rounded-lg border border-brand-ink/15 bg-white p-0.5 text-xs">
-                            <button type="button" x-on:click="filter = 'all'" :class="filter === 'all' ? 'bg-brand-sage/15 text-brand-ink' : 'text-brand-moss hover:text-brand-ink'" class="rounded-md px-2.5 py-1 font-medium">{{ __('All') }}</button>
-                            <button type="button" x-on:click="filter = 'security'" :class="filter === 'security' ? 'bg-red-100 text-red-800' : 'text-brand-moss hover:text-brand-ink'" class="rounded-md px-2.5 py-1 font-medium">{{ __('Security') }}</button>
-                        </div>
-                        <input
-                            type="search"
-                            x-model="q"
-                            placeholder="{{ __('Filter by name…') }}"
-                            class="w-44 rounded-md border border-brand-ink/15 bg-white px-2.5 py-1 text-xs text-brand-ink shadow-sm focus:border-brand-sage focus:outline-none focus:ring-2 focus:ring-brand-sage/30"
-                        />
-                    </div>
-                </div>
-
-                <div class="mt-3 max-h-80 overflow-auto rounded-lg border border-brand-ink/10">
-                    <table class="min-w-full divide-y divide-brand-ink/10 text-xs">
-                        <thead class="sticky top-0 bg-brand-sand/30 text-left text-[11px] uppercase tracking-wide text-brand-mist">
-                            <tr>
-                                <th class="px-3 py-2 font-semibold">{{ __('Package') }}</th>
-                                <th class="px-3 py-2 font-semibold">{{ __('Current') }}</th>
-                                <th class="px-3 py-2 font-semibold">{{ __('New') }}</th>
-                                <th class="px-3 py-2 font-semibold">{{ __('Source') }}</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-brand-ink/5">
-                            @foreach ($upgradableRows as $row)
-                                <tr
-                                    x-show="(filter === 'all' || {{ $row['is_security'] ? 'true' : 'false' }}) && (q === '' || @js($row['name']).toLowerCase().includes(q.toLowerCase()))"
-                                    class="{{ $row['is_security'] ? 'bg-red-50/40' : 'bg-white' }}"
-                                >
-                                    <td class="px-3 py-1.5 font-mono text-brand-ink">
-                                        {{ $row['name'] }}
-                                        @if ($row['is_security'])
-                                            <span class="ml-1 inline-flex items-center rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-800">{{ __('Security') }}</span>
-                                        @endif
-                                    </td>
-                                    <td class="px-3 py-1.5 font-mono text-brand-moss">{{ $row['current_version'] ?? '—' }}</td>
-                                    <td class="px-3 py-1.5 font-mono text-brand-ink">{{ $row['new_version'] ?? '—' }}</td>
-                                    <td class="px-3 py-1.5 font-mono text-brand-mist">{{ $row['sources'] ?? '—' }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        @elseif ($pkgPreview !== null && $pkgPreview !== '')
-            <div class="mt-8 border-t border-brand-ink/10 pt-8">
-                <h4 class="text-sm font-semibold text-brand-ink">{{ __('Packages that may be upgraded (preview)') }}</h4>
-                <p class="mt-1 text-xs text-brand-moss">{{ __('Could not parse apt output — showing raw preview.') }}</p>
-                <pre
-                    class="mt-3 max-h-64 overflow-auto rounded-lg border border-brand-ink/10 bg-brand-sand/15 p-3 font-mono text-[11px] leading-relaxed text-brand-ink whitespace-pre-wrap break-all"
-                    data-settings-upgradable-preview
-                >{{ $pkgPreview }}</pre>
-            </div>
-        @endif
-
         @if (! empty($extSections))
             <div class="mt-8 border-t border-brand-ink/10 pt-8">
                 <h4 class="text-sm font-semibold text-brand-ink">{{ __('Host snapshot') }}</h4>
@@ -354,5 +275,6 @@
                 >{{ $extSnap }}</pre>
             </div>
         @endif
+        </div>
     </div>
 </section>

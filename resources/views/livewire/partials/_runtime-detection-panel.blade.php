@@ -3,7 +3,7 @@
 
     Keyed entirely off the $detectedPlan array populated by the
     DetectsRepositoryRuntime concern. Rendered identically by the VM site,
-    Edge container, and serverless function create flows.
+    Cloud container, and serverless function create flows.
 
     Optional include data:
       - $detectionInstallable (bool) — render the VM-only "install runtime on
@@ -55,6 +55,12 @@
                 <div>
                     <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Build command') }}</dt>
                     <dd class="mt-1 font-mono text-xs text-emerald-950 break-all">{{ $detectedPlan['build_command'] }}</dd>
+                </div>
+            @endif
+            @if (! empty($detectedPlan['output_dir']))
+                <div>
+                    <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">{{ __('Output directory') }}</dt>
+                    <dd class="mt-1 font-mono text-xs text-emerald-950 break-all">{{ $detectedPlan['output_dir'] }}</dd>
                 </div>
             @endif
             @if (! empty($detectedPlan['start_command']))

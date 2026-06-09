@@ -6,6 +6,7 @@ use App\Models\ConsoleAction;
 use App\Models\Site;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Sites\Contracts\SiteWebserverProvisioner;
+use App\Support\Servers\CaddyRuntimeOwnership;
 use Illuminate\Support\Str;
 
 class SiteCaddyProvisioner extends AbstractSiteWebserverProvisioner implements SiteWebserverProvisioner
@@ -41,7 +42,13 @@ class SiteCaddyProvisioner extends AbstractSiteWebserverProvisioner implements S
             $this->installPlaceholderPage($site, $ssh, $emit);
         }
         $this->ensureSuspendedPage($site, $ssh, $emit);
+        $this->ensureWorkerPage($site, $ssh, $emit);
+        $this->ensureManagedErrorPages($site, $ssh, $emit);
         $this->syncBasicAuthHtpasswdFiles($site, $ssh, $emit);
+        $this->syncAccessGateFiles($site, $ssh, $emit);
+        // Pool first: the php_fastcgi below points at this pool's socket, so it
+        // must exist (and php-fpm reloaded) before Caddy reloads onto it.
+        $this->ensurePhpFpmPool($site, $ssh, $emit);
         if ($this->writeSystemFileIfChanged($server, $ssh, $configFile, $config)) {
             $emit->step('caddy', 'writing site config: '.$configFile);
         }
@@ -51,9 +58,11 @@ class SiteCaddyProvisioner extends AbstractSiteWebserverProvisioner implements S
             $this->privilegedCommand(
                 $server,
                 sprintf(
-                    'mkdir -p /etc/caddy/sites-enabled /var/log/caddy && touch /etc/caddy/Caddyfile && (grep -Fqx %1$s /etc/caddy/Caddyfile || printf "\n%%s\n" %2$s >> /etc/caddy/Caddyfile) && caddy validate --config /etc/caddy/Caddyfile && (systemctl reload caddy 2>/dev/null || service caddy reload 2>/dev/null || systemctl restart caddy)',
+                    'mkdir -p /etc/caddy/sites-enabled /var/log/caddy && touch /etc/caddy/Caddyfile && (grep -Fqx %1$s /etc/caddy/Caddyfile || printf "\n%%s\n" %2$s >> /etc/caddy/Caddyfile) && %3$s && %4$s && (systemctl is-active --quiet caddy && systemctl reload caddy 2>/dev/null || systemctl restart caddy 2>/dev/null || service caddy restart 2>/dev/null)',
                     escapeshellarg($importLine),
-                    escapeshellarg($importLine)
+                    escapeshellarg($importLine),
+                    CaddyRuntimeOwnership::shell(),
+                    CaddyRuntimeOwnership::validateCommand(),
                 )
             )
         ), 120);

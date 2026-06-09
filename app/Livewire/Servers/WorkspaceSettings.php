@@ -11,18 +11,24 @@ use App\Models\NotificationSubscription;
 use App\Models\OutboundWebhookDelivery;
 use App\Models\Server;
 use App\Services\Notifications\AssignableNotificationChannels;
+use App\Services\Servers\ServerCostCard;
 use App\Services\Servers\ServerHealthProbe;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\Webhooks\OutboundWebhookDispatcher;
 use Illuminate\Contracts\View\View;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceSettings extends Component
 {
+    use RendersWorkspacePlaceholder;
     use CreatesNotificationChannelInline;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
@@ -43,7 +49,13 @@ class WorkspaceSettings extends Component
             return;
         }
 
-        $allowed = array_keys(config('server_settings.workspace_tabs', []));
+        if ($section === 'inventory' && Feature::active('workspace.patch_advisor')) {
+            $this->redirect(route('servers.patches', $server), navigate: true);
+
+            return;
+        }
+
+        $allowed = array_keys($this->settingsWorkspaceTabs());
         if (! in_array($section, $allowed, true)) {
             abort(404);
         }
@@ -51,7 +63,6 @@ class WorkspaceSettings extends Component
         $this->section = $section;
 
         $this->bootWorkspace($server);
-        $this->server->refresh();
         $this->syncSettingsFormFromServer();
         $this->syncExtendedServerSettingsFromServer();
     }
@@ -78,6 +89,8 @@ class WorkspaceSettings extends Component
     public function checkHealth(ServerHealthProbe $probe): void
     {
         $this->authorize('view', $this->server);
+
+        set_time_limit(45);
 
         if ($this->server->status !== Server::STATUS_READY || empty($this->server->ip_address)) {
             $this->testConnectionResult = [
@@ -169,9 +182,27 @@ class WorkspaceSettings extends Component
         $this->toastSuccess(__('Delivery requeued.'));
     }
 
+    /**
+     * Override the trait placeholder so the Settings sub-tab strip stays
+     * visible (with the destination section highlighted) while the body
+     * lazy-loads — only the content area below the sub-tabs skeletons.
+     */
+    public function placeholder(): View
+    {
+        return view('livewire.servers.partials.workspace-subtab-placeholder', [
+            'server' => $this->server,
+            'active' => 'settings',
+            'title' => __('Settings'),
+            'tabs' => $this->settingsWorkspaceTabs(),
+            'section' => $this->section,
+            'routeName' => 'servers.settings',
+            'idPrefix' => 'settings-tab-',
+            'ariaLabel' => __('Settings categories'),
+        ]);
+    }
+
     public function render(): View
     {
-        $this->server->refresh();
         $this->server->load([
             'sites.domains',
             'serverDatabases',
@@ -204,8 +235,17 @@ class WorkspaceSettings extends Component
                 ->values();
         }
 
+        $costReport = null;
+        if ($this->section === 'governance'
+            && Feature::active('workspace.server_cost')
+            && $this->server->isVmHost()
+            && ! $this->server->isManagedProductHost()) {
+            $costReport = app(ServerCostCard::class)->forServer($this->server);
+        }
+
         return view('livewire.servers.workspace-settings', [
             'section' => $this->section,
+            'settingsTabs' => $this->settingsWorkspaceTabs(),
             'workspaces' => $this->workspacesForCurrentServerOrg(),
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
@@ -213,6 +253,21 @@ class WorkspaceSettings extends Component
             'webhookDeliveries' => $webhookDeliveries,
             'serverNotifSubscriptions' => $serverNotifSubscriptions,
             'assignableChannels' => $assignableChannels,
+            'costReport' => $costReport,
         ]);
+    }
+
+    /**
+     * @return array<string, array{label: string, icon: string}>
+     */
+    protected function settingsWorkspaceTabs(): array
+    {
+        $tabs = config('server_settings.workspace_tabs', []);
+
+        if (Feature::active('workspace.patch_advisor')) {
+            unset($tabs['inventory']);
+        }
+
+        return $tabs;
     }
 }

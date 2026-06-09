@@ -6,7 +6,12 @@ use App\Enums\SiteRedirectKind;
 use App\Enums\SiteType;
 use App\Models\Site;
 use App\Models\SiteBasicAuthUser;
+use App\Services\Servers\ServerPhpManager;
 use App\Support\SiteRedirectConfigSupport;
+use App\Support\Sites\OpenLiteSpeedTlsPaths;
+use App\Support\Sites\SiteAccessGateConfigSupport;
+use App\Support\Sites\SiteManagedErrorPageSupport;
+use App\Support\Sites\VmDockerSiteConfigSupport;
 use Illuminate\Support\Collection;
 
 class CaddySiteConfigBuilder
@@ -17,34 +22,62 @@ class CaddySiteConfigBuilder
             return '';
         }
 
-        $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers']);
+        $site->loadMissing(['server', 'domains', 'domainAliases', 'tenantDomains', 'redirects', 'basicAuthUsers', 'accessGate']);
 
-        $hostnames = collect($listenPort === null ? $site->webserverHostnames() : [])
+        $hostnames = collect($site->webserverHostnames())
             ->filter()
             ->unique()
             ->values();
         if ($hostnames->isEmpty()) {
-            if ($listenPort === null) {
-                throw new \InvalidArgumentException('Add at least one domain before installing Caddy.');
-            }
+            throw new \InvalidArgumentException('Add at least one domain before installing Caddy.');
         }
 
-        $hosts = $listenPort === null ? $hostnames->implode(', ') : ':'.$listenPort;
+        if (VmDockerSiteConfigSupport::applies($site)) {
+            return $this->vmDockerReverseProxyBlock($site, $listenPort, $hostnames);
+        }
+
+        // Bind each hostname to the listen port (e.g. example.test:8080). A bare
+        // `:8080` site block is catch-all on that port — importing several of
+        // those during a webserver switch makes `caddy validate` fail with
+        // "ambiguous site definition". Nginx/Apache keep server names and only
+        // change the listen port; Caddy needs host:port pairs for the same model.
+        $hosts = $listenPort === null
+            ? $hostnames->implode(', ')
+            : $hostnames
+                ->map(fn (string $host): string => 'http://'.$host.':'.$listenPort)
+                ->implode(', ');
         $basename = $site->webserverConfigBasename();
 
         if ($site->isSuspended()) {
             return $this->suspendedSiteBlock($hosts, $basename, $site);
         }
 
+        // Worker hosts run Caddy only to attach a testing URL — they never serve
+        // a web app, so the deployed code must not be browsable. Serve the static
+        // "this runs workers" page for every request instead of the doc root.
+        if ($site->isWorkerSite()) {
+            return $this->workerSiteBlock($hosts, $basename, $site);
+        }
+
         $root = $site->effectiveDocumentRoot();
-        $phpSock = str_replace(
-            '{version}',
-            $site->phpVersion() ?? '8.3',
-            config('sites.php_fpm_socket')
-        );
+        $site->loadMissing('server');
+        $phpVersion = $site->server !== null
+            ? app(ServerPhpManager::class)->resolveCaddyPhpVersion($site->server, $site->phpVersion())
+            : ($site->phpVersion() ?? '8.3');
+        // Dedicated-pool PHP sites get their own version-free socket; anything
+        // else (legacy/edge) keeps the shared per-version socket.
+        $phpSock = $site->usesDedicatedPhpFpmPool()
+            ? $site->phpFpmListenSocketPath()
+            : str_replace(
+                '{version}',
+                $phpVersion,
+                config('sites.php_fpm_socket')
+            );
         $redirectLines = $this->redirectLines($site);
         $basicAuth = $this->caddyBasicAuthBlocks($site);
+        $formGate = SiteAccessGateConfigSupport::caddyBlocks($site);
         $dotfileDeny = $this->caddyDotfileDenyBlock();
+        $managedErrors = SiteManagedErrorPageSupport::caddyBlock($site);
 
         if ($site->type === SiteType::Php && $site->octane_port) {
             $port = (int) $site->octane_port;
@@ -52,7 +85,7 @@ class CaddySiteConfigBuilder
 
             return <<<CADDY
 {$hosts} {
-{$redirectLines}{$reverb}{$basicAuth}{$dotfileDeny}    encode zstd gzip
+{$managedErrors}{$redirectLines}{$reverb}{$basicAuth}{$formGate}{$dotfileDeny}    encode zstd gzip
     log {
         output file /var/log/caddy/{$basename}-access.log
     }
@@ -63,21 +96,31 @@ CADDY;
 
         $reverbPhp = $site->type === SiteType::Php ? $this->reverbHandleDirective($site) : '';
 
+        // Per-site PHP ini overrides are passed as a PHP_VALUE env var. When
+        // present, php_fastcgi grows a block to carry them; otherwise it stays
+        // the bare one-liner.
+        $phpEnv = $site->type === SiteType::Php
+            ? app(SitePhpRuntimeDirectivesBuilder::class)->caddyEnvDirective($site)
+            : '';
+        $phpFastcgi = $phpEnv !== ''
+            ? "php_fastcgi unix//{$phpSock} {\n{$phpEnv}    }"
+            : "php_fastcgi unix//{$phpSock}";
+
         return match ($site->type) {
             SiteType::Php => <<<CADDY
 {$hosts} {
-{$redirectLines}{$reverbPhp}{$basicAuth}{$dotfileDeny}    root * {$root}
+{$managedErrors}{$redirectLines}{$reverbPhp}{$basicAuth}{$formGate}{$dotfileDeny}    root * {$root}
     encode zstd gzip
     log {
         output file /var/log/caddy/{$basename}-access.log
     }
-    php_fastcgi unix//{$phpSock}
+    {$phpFastcgi}
     file_server
 }
 CADDY,
             SiteType::Static => <<<CADDY
 {$hosts} {
-{$redirectLines}{$basicAuth}{$dotfileDeny}    root * {$root}
+{$managedErrors}{$redirectLines}{$basicAuth}{$formGate}{$dotfileDeny}    root * {$root}
     encode zstd gzip
     log {
         output file /var/log/caddy/{$basename}-access.log
@@ -87,7 +130,7 @@ CADDY,
 CADDY,
             SiteType::Node => <<<CADDY
 {$hosts} {
-{$redirectLines}{$basicAuth}{$dotfileDeny}    encode zstd gzip
+{$managedErrors}{$redirectLines}{$basicAuth}{$formGate}{$dotfileDeny}    encode zstd gzip
     log {
         output file /var/log/caddy/{$basename}-access.log
     }
@@ -127,6 +170,10 @@ CADDY;
      */
     protected function caddyBasicAuthBlocks(Site $site): string
     {
+        if (SiteAccessGateConfigSupport::usesFormPasswordGate($site)) {
+            return '';
+        }
+
         $users = $site->enforceableBasicAuthUsers();
         if ($users->isEmpty()) {
             return '';
@@ -193,6 +240,28 @@ CADDY;
         return str_starts_with($hash, '$2y$')
             || str_starts_with($hash, '$2a$')
             || str_starts_with($hash, '$2b$');
+    }
+
+    /**
+     * Locked-down block for a worker host: rewrite every request to the single
+     * worker page and serve it statically. No php_fastcgi, no doc-root file
+     * serving — the deployed code stays unreachable over HTTP.
+     */
+    private function workerSiteBlock(string $hosts, string $basename, Site $site): string
+    {
+        $root = $site->workerStaticRoot();
+
+        return <<<CADDY
+{$hosts} {
+    root * {$root}
+    rewrite * /index.html
+    encode zstd gzip
+    log {
+        output file /var/log/caddy/{$basename}-access.log
+    }
+    file_server
+}
+CADDY;
     }
 
     private function suspendedSiteBlock(string $hosts, string $basename, Site $site): string
@@ -271,5 +340,90 @@ CADDY;
         }
 
         return implode("\n", $lines)."\n";
+    }
+
+    /**
+     * @param  Collection<int, string>  $hostnames
+     */
+    protected function vmDockerReverseProxyBlock(Site $site, ?int $listenPort, Collection $hostnames): string
+    {
+        $hosts = $listenPort === null
+            ? $hostnames->implode(', ')
+            : $hostnames
+                ->map(fn (string $host): string => 'http://'.$host.':'.$listenPort)
+                ->implode(', ');
+        $basename = $site->webserverConfigBasename();
+        $port = VmDockerSiteConfigSupport::upstreamPort($site);
+        $redirectLines = $this->redirectLines($site);
+        $basicAuth = $this->caddyBasicAuthBlocks($site);
+        $formGate = SiteAccessGateConfigSupport::caddyBlocks($site);
+        $dotfileDeny = $this->caddyDotfileDenyBlock();
+        $managedErrors = SiteManagedErrorPageSupport::caddyBlock($site);
+
+        if ($site->isSuspended()) {
+            return $this->suspendedSiteBlock($hosts, $basename, $site);
+        }
+
+        return <<<CADDY
+{$hosts} {
+{$managedErrors}{$redirectLines}{$basicAuth}{$formGate}{$dotfileDeny}    encode zstd gzip
+    log {
+        output file /var/log/caddy/{$basename}-access.log
+    }
+    reverse_proxy 127.0.0.1:{$port}
+}
+CADDY;
+    }
+
+    /**
+     * HTTPS-only Caddy front for edge-proxy mode: terminates TLS on :443 and
+     * forwards to the per-site backend on a high port. Envoy/HAProxy keep :80.
+     */
+    public function buildEdgeTlsFront(Site $site, int $backendPort): string
+    {
+        if ($site->type === SiteType::Custom) {
+            return '';
+        }
+
+        if (! OpenLiteSpeedTlsPaths::siteEdgeTlsFrontReady($site)) {
+            return '';
+        }
+
+        if (! OpenLiteSpeedTlsPaths::siteExpectsTls($site)) {
+            return '';
+        }
+
+        $paths = OpenLiteSpeedTlsPaths::resolve($site);
+        if ($paths === null) {
+            return '';
+        }
+
+        $site->loadMissing(['domains', 'domainAliases', 'tenantDomains', 'previewDomains']);
+
+        $hostnames = collect($site->webserverHostnames())
+            ->filter()
+            ->unique()
+            ->values();
+        if ($hostnames->isEmpty()) {
+            return '';
+        }
+
+        $httpsHosts = $hostnames
+            ->map(fn (string $host): string => 'https://'.$host)
+            ->implode(', ');
+        $basename = $site->webserverConfigBasename();
+        $site->loadMissing('basicAuthUsers');
+        $basicAuth = $this->caddyBasicAuthBlocks($site);
+        $formGate = SiteAccessGateConfigSupport::caddyBlocks($site);
+
+        return <<<CADDY
+{$httpsHosts} {
+    tls {$paths['certFile']} {$paths['keyFile']}
+    log {
+        output file /var/log/caddy/{$basename}-tls-access.log
+    }
+{$basicAuth}{$formGate}    reverse_proxy 127.0.0.1:{$backendPort}
+}
+CADDY;
     }
 }

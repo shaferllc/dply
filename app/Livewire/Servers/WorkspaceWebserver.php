@@ -4,11 +4,86 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers;
 
+use App\Enums\SiteType;
+use App\Jobs\RunWebserverConfigOpJob;
+use App\Jobs\ServerManageRemoteSshJob;
+use App\Livewire\Concerns\CreatesNotificationChannelInline;
+use App\Livewire\Servers\Concerns\LoadsLiveServerCerts;
+use App\Livewire\Servers\Concerns\ManagesWebserverConfigRevisions;
+use App\Livewire\Servers\Concerns\ManagesWebserverNotifications;
+use App\Models\ConsoleAction;
 use App\Models\Server;
+use App\Models\ServerManageAction;
+use App\Services\ConsoleActions\ConsoleEmitter;
+use App\Services\Servers\ApacheCustomVhostsConfig;
+use App\Services\Servers\ApacheEngineCacheConfig;
+use App\Services\Servers\ApacheEngineCachePurger;
+use App\Services\Servers\ApacheGlobalOptionsConfig;
+use App\Services\Servers\ApacheModulesConfig;
+use App\Services\Servers\CaddyCustomRoutesConfig;
+use App\Services\Servers\CaddyGlobalOptionsConfig;
+use App\Services\Servers\CaddyModulesManager;
+use App\Services\Servers\EnvoyCustomClustersConfig;
+use App\Services\Servers\EnvoyCustomListenersConfig;
+use App\Services\Servers\EnvoyCustomVirtualHostsConfig;
+use App\Services\Servers\EnvoyStaticConfigOptions;
+use App\Services\Servers\HaproxyBackendsConfig;
+use App\Services\Servers\HaproxyFrontendsConfig;
+use App\Services\Servers\HaproxyGlobalOptionsConfig;
+use App\Services\Servers\LiveState\ApacheLiveStateProbe;
+use App\Services\Servers\LiveState\CaddyLiveStateProbe;
+use App\Services\Servers\LiveState\EngineLiveStateProbe;
+use App\Services\Servers\LiveState\EnvoyLiveStateProbe;
+use App\Services\Servers\LiveState\HaproxyLiveStateProbe;
+use App\Services\Servers\LiveState\NginxLiveStateProbe;
+use App\Services\Servers\LiveState\OlsLiveStateProbe;
+use App\Services\Servers\LiveState\OpenRestyLiveStateProbe;
+use App\Services\Servers\LiveState\TraefikLiveStateProbe;
+use App\Services\Servers\NginxAccessLogParser;
+use App\Services\Servers\NginxCustomHostsConfig;
+use App\Services\Servers\NginxEngineCacheConfig;
+use App\Services\Servers\NginxEngineCachePurger;
+use App\Services\Servers\NginxGlobalOptionsConfig;
+use App\Services\Servers\NginxModulesConfig;
+use App\Services\Servers\NginxUpstreamsConfig;
+use App\Services\Servers\OpenLiteSpeedCacheModuleConfig;
+use App\Services\Servers\OpenLiteSpeedExtAppsConfig;
+use App\Services\Servers\OpenLiteSpeedListenersConfig;
+use App\Services\Servers\OpenLiteSpeedLscachePurger;
+use App\Services\Servers\OpenLiteSpeedModulesConfig;
+use App\Services\Servers\OpenLiteSpeedVhostsConfig;
+use App\Services\Servers\OpenRestyCustomServersConfig;
+use App\Services\Servers\OpenRestyCustomUpstreamsConfig;
+use App\Services\Servers\OpenRestyStaticConfigOptions;
 use App\Services\Servers\RemoteWebserverConfigService;
 use App\Services\Servers\ServerManageSshExecutor;
+use App\Services\Servers\ServerManageToolsReport;
+use App\Services\Servers\ServerMetricsRangeQuery;
+use App\Services\Servers\ServerPhpManager;
+use App\Services\Servers\ServerRemovalAdvisor;
+use App\Services\Servers\ServerWebserverConfigEditor;
+use App\Services\Servers\TraefikCustomMiddlewaresConfig;
+use App\Services\Servers\TraefikCustomRoutesConfig;
+use App\Services\Servers\TraefikDashboardExposure;
+use App\Services\Servers\TraefikDynamicConfigInventory;
+use App\Services\Servers\TraefikEntrypointsConfig;
+use App\Services\Servers\TraefikHttpServicesConfig;
+use App\Services\Servers\TraefikProvidersConfig;
+use App\Services\Servers\TraefikStaticConfigOptions;
+use App\Services\Servers\TraefikTcpRoutesConfig;
+use App\Services\Servers\TraefikUdpRoutesConfig;
+use App\Services\Servers\WebserverConfigDriftDetector;
+use App\Services\Sites\SiteCaddyProvisioner;
+use App\Services\SshConnection;
+use App\Support\Servers\CaddyPhpFpmUpstreamAddress;
+use App\Support\Servers\ServerConsoleActionLookup;
+use App\Support\Servers\WebserverWorkspaceViewData;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 
 /**
@@ -23,9 +98,9 @@ use Livewire\Attributes\Url;
  *   - `mount()` accepts no `?section` query string (this isn't a sub-tab
  *     anymore) — section is fixed at 'web' so the parent's render share +
  *     trait-internal asserts continue working.
- *   - `render()` points at a dedicated `workspace-webserver.blade.php` view
- *     that wraps the group-web partial in {@see <x-server-workspace-layout>}
- *     with `active="webserver"` (sidebar highlight).
+ *   - `render()` points at `workspace-webserver.blade.php`, a thin orchestrator
+ *     that lazy-renders tab partials under `partials/webserver/` inside
+ *     {@see <x-server-workspace-layout>} with `active="webserver"`.
  *   - Adds Tools / Logs / Config sub-tabs and their backing Livewire methods
  *     (load/save/validate/restore for config; tail for logs). Path safety and
  *     atomic-write semantics live in {@see RemoteWebserverConfigService}.
@@ -36,6 +111,11 @@ use Livewire\Attributes\Url;
 #[Layout('layouts.app')]
 class WorkspaceWebserver extends WorkspaceManage
 {
+    use CreatesNotificationChannelInline;
+    use LoadsLiveServerCerts;
+    use ManagesWebserverConfigRevisions;
+    use ManagesWebserverNotifications;
+
     /**
      * Second-level tab within this workspace — mirrors WorkspaceDatabases /
      * WorkspaceCaches: an "overview" tab, one tab per webserver in the
@@ -88,6 +168,19 @@ class WorkspaceWebserver extends WorkspaceManage
     /** Cached backup listing for the loaded file (path => row). */
     public array $config_backups = [];
 
+    /**
+     * Config-file picker listing for the active engine. Loaded via wire:init
+     * when the Config sub-tab opens — NOT inside render(), so the pickup poll
+     * (and any other wire:poll) doesn't trigger an inline SSH listing on every
+     * tick (which blocked the request and produced "status: null" poll errors).
+     *
+     * @var array<int, array<string, mixed>>
+     */
+    public array $webserverConfigFilesRaw = [];
+
+    /** False until the first listing load finishes, so the picker shows a "discovering" state rather than a misleading "no files". */
+    public bool $webserverConfigFilesLoaded = false;
+
     // ---- Log viewer state --------------------------------------------
 
     /** Which log to read: 'access', 'error', or 'journal'. */
@@ -101,6 +194,9 @@ class WorkspaceWebserver extends WorkspaceManage
 
     /** When true, the Logs tab adds a wire:poll so the buffer refreshes every few seconds. */
     public bool $log_live = false;
+
+    /** When true, force the raw text dump even for parseable nginx access logs. */
+    public bool $log_raw = false;
 
     /**
      * Time range for the per-engine Overview health charts. One of the
@@ -195,6 +291,23 @@ class WorkspaceWebserver extends WorkspaceManage
         'certFile' => '',
     ];
 
+    // ---- OLS Modules toggle (Modules sub-tab on the OpenLiteSpeed engine).
+    /**
+     * Per-module: ['name', 'enabled', 'protected', 'on_disk', 'type']
+     *
+     * @var list<array{name: string, enabled: bool, protected: bool, on_disk: bool, type: string}>
+     */
+    public array $ols_modules_list = [];
+
+    public bool $ols_modules_loaded = false;
+
+    public ?string $ols_modules_flash = null;
+
+    public ?string $ols_modules_error = null;
+
+    /** Active type filter on the modules table: 'all' or one of the classify() outputs. */
+    public string $ols_modules_filter = 'all';
+
     // ---- Caddy Global Options form (Admin sub-tab on the Caddy engine).
     /** @var array<string, string> */
     public array $caddy_globals_form = [];
@@ -219,6 +332,65 @@ class WorkspaceWebserver extends WorkspaceManage
 
     /** @var array<string, string> */
     public array $caddy_snippets_new = ['name' => '', 'body' => ''];
+
+    // ---- Caddy Modules (Modules sub-tab on the Caddy engine).
+    /**
+     * @var list<array{id: string, namespace: string, kind: string}>
+     */
+    public array $caddy_modules_installed = [];
+
+    /**
+     * @var list<array{
+     *     path: string,
+     *     version: string,
+     *     label: string,
+     *     description: string,
+     *     repo: string,
+     *     docs_url: string,
+     *     module_ids: list<string>,
+     *     compiled: bool,
+     * }>
+     */
+    public array $caddy_modules_plugins = [];
+
+    public bool $caddy_modules_loaded = false;
+
+    public ?string $caddy_modules_flash = null;
+
+    public ?string $caddy_modules_error = null;
+
+    public string $caddy_modules_filter = 'all';
+
+    public string $caddy_modules_search = '';
+
+    public bool $caddy_modules_show_add = false;
+
+    /** @var array{path: string, version: string} */
+    public array $caddy_modules_new = ['path' => '', 'version' => ''];
+
+    public ?string $caddy_modules_caddy_version = null;
+
+    public bool $caddy_modules_custom_binary = false;
+
+    public bool $caddy_modules_show_browse = false;
+
+    public string $caddy_modules_browse_search = '';
+
+    public ?string $caddy_modules_browse_error = null;
+
+    /** @var array<string, array{label: string, description: string}> */
+    public array $caddy_modules_available_catalog = [];
+
+    /**
+     * @var list<array{
+     *     path: string,
+     *     repo: string,
+     *     label: string,
+     *     description: string,
+     *     module_ids: list<string>,
+     * }>
+     */
+    public array $caddy_modules_browse_packages = [];
 
     // ---- nginx Global Options form (Workers sub-tab on the nginx engine).
     /** @var array<string, string> */
@@ -259,6 +431,30 @@ class WorkspaceWebserver extends WorkspaceManage
 
     /** Active type filter on the modules table: 'all' or one of the classify() outputs. */
     public string $apache_modules_filter = 'all';
+
+    /**
+     * Custom Apache vhosts keyed by slug → VirtualHost fields.
+     *
+     * @var array<string, array{server_name: string, server_aliases: string, document_root: string, php_socket: string}>
+     */
+    public array $apache_custom_vhosts_form = [];
+
+    public bool $apache_custom_vhosts_loaded = false;
+
+    public ?string $apache_custom_vhosts_flash = null;
+
+    public ?string $apache_custom_vhosts_error = null;
+
+    public bool $apache_custom_vhosts_show_add = false;
+
+    /** @var array{slug: string, server_name: string, server_aliases: string, document_root: string, php_socket: string} */
+    public array $apache_custom_vhosts_new = [
+        'slug' => '',
+        'server_name' => '',
+        'server_aliases' => '',
+        'document_root' => '',
+        'php_socket' => '',
+    ];
 
     // ---- HAProxy Global Options form (Runtime sub-tab on the HAProxy edge proxy).
     /** @var array<string, string> */
@@ -315,22 +511,9 @@ class WorkspaceWebserver extends WorkspaceManage
     /** @var array<string, string> */
     public array $haproxy_backends_new = ['name' => '', 'servers' => '', 'balance' => 'roundrobin'];
 
-    // ---- Cross-engine TLS certificates dashboard (Overview tab card).
-    /**
-     * The aggregated list. Each entry: path / subject / issuer / not_after /
-     * expires_at / days_until_expiry / urgency / engine_hint / error.
-     *
-     * @var list<array<string, mixed>>
-     */
-    public array $tls_certs = [];
-
-    public ?string $tls_certs_scanned_at_iso = null;
-
-    public bool $tls_certs_unreadable = false;
-
-    public bool $tls_certs_loaded = false;
-
-    public ?string $tls_certs_error = null;
+    // ---- Cross-engine TLS certificates dashboard (Health tab card).
+    // State + loader live in LoadsLiveServerCerts ($liveCerts*), shared with the
+    // server cert-inventory page; the SSH sweep runs async in ScanServerLiveCertsJob.
 
     // ---- Site smoke-test results (Overview tab card).
     /**
@@ -382,6 +565,252 @@ class WorkspaceWebserver extends WorkspaceManage
 
     public ?string $traefik_static_error = null;
 
+    /** @var list<array{path: string, basename: string, size: int, modified_at: ?string}> */
+    public array $traefik_dynamic_files = [];
+
+    public bool $traefik_dynamic_loaded = false;
+
+    public ?string $traefik_dynamic_error = null;
+
+    /** @var array<string, string> */
+    public array $traefik_providers_form = [];
+
+    /** @var list<array{key: string, label: string, summary: string}> */
+    public array $traefik_providers_configured = [];
+
+    public bool $traefik_providers_loaded = false;
+
+    public ?string $traefik_providers_flash = null;
+
+    public ?string $traefik_providers_error = null;
+
+    /** @var array{enabled: string, path: string, username: string, password: string} */
+    public array $traefik_dashboard_form = [
+        'enabled' => '0',
+        'path' => '/traefik-dashboard',
+        'username' => '',
+        'password' => '',
+    ];
+
+    public bool $traefik_dashboard_loaded = false;
+
+    public ?string $traefik_dashboard_flash = null;
+
+    public ?string $traefik_dashboard_error = null;
+
+    /** @var array<string, array{hosts: string, upstream: string, rule: string, middlewares: string}> */
+    public array $traefik_custom_routes_form = [];
+
+    public bool $traefik_custom_routes_loaded = false;
+
+    public ?string $traefik_custom_routes_flash = null;
+
+    public ?string $traefik_custom_routes_error = null;
+
+    public bool $traefik_custom_routes_show_add = false;
+
+    /** @var array{slug: string, hosts: string, upstream: string, rule: string, middlewares: string} */
+    public array $traefik_custom_routes_new = [
+        'slug' => '',
+        'hosts' => '',
+        'upstream' => '',
+        'rule' => '',
+        'middlewares' => '',
+    ];
+
+    /** @var array<string, array{type: string, prefix: string, scheme: string, header_key: string, header_value: string, users: string}> */
+    public array $traefik_custom_middlewares_form = [];
+
+    public bool $traefik_custom_middlewares_loaded = false;
+
+    public ?string $traefik_custom_middlewares_flash = null;
+
+    public ?string $traefik_custom_middlewares_error = null;
+
+    public bool $traefik_custom_middlewares_show_add = false;
+
+    /** @var array{slug: string, type: string, prefix: string, scheme: string, header_key: string, header_value: string, users: string} */
+    public array $traefik_custom_middlewares_new = [
+        'slug' => '',
+        'type' => 'stripPrefix',
+        'prefix' => '/',
+        'scheme' => 'https',
+        'header_key' => '',
+        'header_value' => '',
+        'users' => '',
+    ];
+
+    /** @var array<string, array{name: string, address: string}> */
+    public array $traefik_entrypoints_form = [];
+
+    public bool $traefik_entrypoints_loaded = false;
+
+    public ?string $traefik_entrypoints_flash = null;
+
+    public ?string $traefik_entrypoints_error = null;
+
+    public bool $traefik_entrypoints_show_add = false;
+
+    /** @var array{name: string, address: string} */
+    public array $traefik_entrypoints_new = ['name' => '', 'address' => ':8080'];
+
+    /** @var array<string, array{rule: string, entry_points: string, server_address: string}> */
+    public array $traefik_tcp_routes_form = [];
+
+    public bool $traefik_tcp_routes_loaded = false;
+
+    public ?string $traefik_tcp_routes_flash = null;
+
+    public ?string $traefik_tcp_routes_error = null;
+
+    public bool $traefik_tcp_routes_show_add = false;
+
+    /** @var array{slug: string, rule: string, entry_points: string, server_address: string} */
+    public array $traefik_tcp_routes_new = ['slug' => '', 'rule' => 'HostSNI(`*`)', 'entry_points' => 'web', 'server_address' => ''];
+
+    /** @var array<string, array{entry_points: string, server_address: string}> */
+    public array $traefik_udp_routes_form = [];
+
+    public bool $traefik_udp_routes_loaded = false;
+
+    public ?string $traefik_udp_routes_flash = null;
+
+    public ?string $traefik_udp_routes_error = null;
+
+    public bool $traefik_udp_routes_show_add = false;
+
+    /** @var array{slug: string, entry_points: string, server_address: string} */
+    public array $traefik_udp_routes_new = ['slug' => '', 'entry_points' => 'web', 'server_address' => ''];
+
+    /** @var array<string, array{servers: string}> */
+    public array $traefik_http_services_form = [];
+
+    public bool $traefik_http_services_loaded = false;
+
+    public ?string $traefik_http_services_flash = null;
+
+    public ?string $traefik_http_services_error = null;
+
+    public bool $traefik_http_services_show_add = false;
+
+    /** @var array{slug: string, servers: string} */
+    public array $traefik_http_services_new = ['slug' => '', 'servers' => ''];
+
+    /** @var array<string, string> */
+    public array $envoy_static_form = [];
+
+    public bool $envoy_static_loaded = false;
+
+    public ?string $envoy_static_flash = null;
+
+    public ?string $envoy_static_error = null;
+
+    /** @var array<string, array{endpoints: list<string>, values: array<string, string>}> */
+    public array $envoy_clusters_form = [];
+
+    /** @var array<string, string> */
+    public array $envoy_clusters_endpoints_text = [];
+
+    public bool $envoy_clusters_loaded = false;
+
+    public ?string $envoy_clusters_flash = null;
+
+    public ?string $envoy_clusters_error = null;
+
+    public bool $envoy_clusters_show_add = false;
+
+    /** @var array{name: string, endpoints: string, connect_timeout: string, lb_policy: string} */
+    public array $envoy_clusters_new = [
+        'name' => '',
+        'endpoints' => '',
+        'connect_timeout' => '5s',
+        'lb_policy' => 'ROUND_ROBIN',
+    ];
+
+    /** @var array<string, array{domains: list<string>, cluster: string}> */
+    public array $envoy_virtualhosts_form = [];
+
+    /** @var array<string, string> */
+    public array $envoy_virtualhosts_domains_text = [];
+
+    public bool $envoy_virtualhosts_loaded = false;
+
+    public ?string $envoy_virtualhosts_flash = null;
+
+    public ?string $envoy_virtualhosts_error = null;
+
+    public bool $envoy_virtualhosts_show_add = false;
+
+    /** @var array{name: string, domains: string, cluster: string} */
+    public array $envoy_virtualhosts_new = [
+        'name' => '',
+        'domains' => '',
+        'cluster' => '',
+    ];
+
+    /** @var array<string, array{address: string, port: int|string, mode: string, default_cluster: string}> */
+    public array $envoy_listeners_form = [];
+
+    public bool $envoy_listeners_loaded = false;
+
+    public ?string $envoy_listeners_flash = null;
+
+    public ?string $envoy_listeners_error = null;
+
+    public bool $envoy_listeners_show_add = false;
+
+    /** @var array{name: string, address: string, port: string, mode: string, default_cluster: string} */
+    public array $envoy_listeners_new = [
+        'name' => '',
+        'address' => '0.0.0.0',
+        'port' => '',
+        'mode' => 'shared',
+        'default_cluster' => '',
+    ];
+
+    /** @var array<string, string> */
+    public array $openresty_static_form = [];
+
+    public bool $openresty_static_loaded = false;
+
+    public ?string $openresty_static_flash = null;
+
+    public ?string $openresty_static_error = null;
+
+    /** @var array<string, array{servers: list<string>}> */
+    public array $openresty_upstreams_form = [];
+
+    /** @var array<string, string> */
+    public array $openresty_upstreams_servers_text = [];
+
+    public bool $openresty_upstreams_loaded = false;
+
+    public ?string $openresty_upstreams_flash = null;
+
+    public ?string $openresty_upstreams_error = null;
+
+    public bool $openresty_upstreams_show_add = false;
+
+    /** @var array{name: string, servers: string} */
+    public array $openresty_upstreams_new = ['name' => '', 'servers' => ''];
+
+    /** @var array<string, array{server_names: list<string>, upstream: string}> */
+    public array $openresty_servers_form = [];
+
+    /** @var array<string, string> */
+    public array $openresty_servers_names_text = [];
+
+    public bool $openresty_servers_loaded = false;
+
+    public ?string $openresty_servers_flash = null;
+
+    public ?string $openresty_servers_error = null;
+
+    public bool $openresty_servers_show_add = false;
+
+    /** @var array{name: string, server_names: string, upstream: string} */
+    public array $openresty_servers_new = ['name' => '', 'server_names' => '', 'upstream' => ''];
+
     // ---- nginx Upstreams editor (Upstreams sub-tab on the nginx engine).
     /**
      * Per-upstream: ['servers' => list<string>, 'values' => array<string,string>]
@@ -409,6 +838,107 @@ class WorkspaceWebserver extends WorkspaceManage
 
     /** @var array<string, string> */
     public array $nginx_upstreams_new = ['name' => '', 'servers' => ''];
+
+    /**
+     * Custom nginx hosts keyed by slug → server block fields.
+     *
+     * @var array<string, array{server_names: string, listen: string, root: string, upstream: string}>
+     */
+    public array $nginx_custom_hosts_form = [];
+
+    public bool $nginx_custom_hosts_loaded = false;
+
+    public ?string $nginx_custom_hosts_flash = null;
+
+    public ?string $nginx_custom_hosts_error = null;
+
+    public bool $nginx_custom_hosts_show_add = false;
+
+    /** @var array{slug: string, server_names: string, listen: string, root: string, upstream: string} */
+    public array $nginx_custom_hosts_new = [
+        'slug' => '',
+        'server_names' => '',
+        'listen' => "80\n[::]:80",
+        'root' => '',
+        'upstream' => '',
+    ];
+
+    // ---- nginx dynamic modules (Modules sub-tab on the nginx engine).
+    /**
+     * @var list<array{
+     *     name: string,
+     *     conf_file: string,
+     *     enabled: bool,
+     *     protected: bool,
+     *     type: string,
+     *     source: string,
+     *     package: string,
+     *     installed: bool,
+     *     so_path: string,
+     * }>
+     */
+    public array $nginx_modules_list = [];
+
+    /** @var list<array{name: string, type: string}> */
+    public array $nginx_modules_builtins = [];
+
+    public bool $nginx_modules_loaded = false;
+
+    public bool $nginx_modules_supports_dynamic = false;
+
+    public ?string $nginx_modules_flash = null;
+
+    public ?string $nginx_modules_error = null;
+
+    public string $nginx_modules_filter = 'all';
+
+    /** @var array<string, string> */
+    public array $nginx_cache_form = [];
+
+    public bool $nginx_cache_loaded = false;
+
+    public ?string $nginx_cache_flash = null;
+
+    public ?string $nginx_cache_error = null;
+
+    /** @var array<string, mixed> */
+    public array $nginx_cache_meta = [];
+
+    /** @var array<string, mixed> */
+    public array $apache_cache_status = [];
+
+    public bool $apache_cache_loaded = false;
+
+    public bool $apache_mod_cache_enabled = false;
+
+    public ?string $apache_cache_flash = null;
+
+    public ?string $apache_cache_error = null;
+
+    /**
+     * Custom Caddy routes keyed by slug → site block fields.
+     *
+     * @var array<string, array{hosts: string, root: string, upstream: string}>
+     */
+    public array $caddy_custom_routes_form = [];
+
+    public bool $caddy_custom_routes_loaded = false;
+
+    public ?string $caddy_custom_routes_flash = null;
+
+    public ?string $caddy_custom_routes_error = null;
+
+    public bool $caddy_custom_routes_show_add = false;
+
+    /** @var array{slug: string, hosts: string, root: string, upstream: string} */
+    public array $caddy_custom_routes_new = [
+        'slug' => '',
+        'hosts' => '',
+        'root' => '',
+        'upstream' => '',
+    ];
+
+    public bool $engine_live_state_loading = false;
 
     // ---- OLS Vhosts form (Vhosts sub-tab on the OpenLiteSpeed engine).
     /**
@@ -444,58 +974,25 @@ class WorkspaceWebserver extends WorkspaceManage
         if ($this->workspace_tab === 'openlitespeed' && $this->engine_subtab === 'cache') {
             $this->loadOlsCacheConfig();
         }
+        if ($this->workspace_tab === 'nginx' && $this->engine_subtab === 'cache') {
+            $this->loadNginxCacheConfig();
+        }
+        if ($this->workspace_tab === 'apache' && $this->engine_subtab === 'cache') {
+            $this->loadApacheCacheConfig();
+        }
 
-        // Eager-load the Overview cards (TLS certs + drift detector) so
-        // they paint with data on first render. Services cache for 60s so
-        // subsequent navigations are cheap.
-        if ($this->workspace_tab === 'overview' && $this->serverOpsReady()) {
-            $this->loadTlsCertsDashboard();
+        // Eager-load the Health tab's drift detector so it paints on first
+        // render. The TLS cert card loads async via the shared partial's
+        // wire:init (loadLiveCerts) so its SSH sweep stays off the request.
+        if ($this->workspace_tab === 'health' && $this->serverOpsReady()) {
             $this->loadDriftDetector();
         }
-        if ($this->workspace_tab === 'openlitespeed' && $this->engine_subtab === 'extapps') {
-            $this->loadOlsExtAppsConfig();
-        }
-        if ($this->workspace_tab === 'openlitespeed' && $this->engine_subtab === 'listeners') {
-            $this->loadOlsListenersConfig();
-        }
-        if ($this->workspace_tab === 'openlitespeed' && $this->engine_subtab === 'vhosts') {
-            $this->loadOlsVhostsConfig();
-        }
-        if ($this->workspace_tab === 'caddy' && $this->engine_subtab === 'admin') {
-            $this->loadCaddyGlobalsConfig();
-        }
-        if ($this->workspace_tab === 'caddy' && $this->engine_subtab === 'snippets') {
-            $this->loadCaddySnippetsConfig();
-        }
-        if ($this->workspace_tab === 'nginx' && $this->engine_subtab === 'workers') {
-            $this->loadNginxGlobalsConfig();
-        }
-        if ($this->workspace_tab === 'apache' && $this->engine_subtab === 'workers') {
-            $this->loadApacheGlobalsConfig();
-        }
-        if ($this->workspace_tab === 'nginx' && $this->engine_subtab === 'upstreams') {
-            $this->loadNginxUpstreamsConfig();
-        }
-        if ($this->workspace_tab === 'apache' && $this->engine_subtab === 'modules') {
-            $this->loadApacheModulesConfig();
-        }
-        if ($this->workspace_tab === 'haproxy' && $this->engine_subtab === 'runtime') {
-            $this->loadHaproxyGlobalsConfig();
-        }
-        if ($this->workspace_tab === 'traefik' && $this->engine_subtab === 'providers') {
-            $this->loadTraefikStaticConfig();
-        }
-        if ($this->workspace_tab === 'haproxy' && $this->engine_subtab === 'frontends') {
-            $this->loadHaproxyFrontendsConfig();
-        }
-        if ($this->workspace_tab === 'haproxy' && $this->engine_subtab === 'backends') {
-            $this->loadHaproxyBackendsConfig();
-        }
+        // Other engine sub-tab data loads deferred via wire:init → loadActiveEngineSubtabData().
     }
 
     public function setWorkspaceTab(string $tab): void
     {
-        $allowed = ['overview', 'nginx', 'caddy', 'apache', 'openlitespeed', 'traefik', 'haproxy', 'advanced'];
+        $allowed = ['overview', 'change', 'health', 'nginx', 'caddy', 'apache', 'openlitespeed', 'advanced', 'notifications'];
         $this->workspace_tab = in_array($tab, $allowed, true) ? $tab : 'overview';
         // Reset the sub-tab on every top-level switch so the operator always
         // lands on the actionable view first. Skipping this would leave
@@ -504,22 +1001,21 @@ class WorkspaceWebserver extends WorkspaceManage
         $this->resetConfigEditorState();
         $this->resetLogViewerState();
 
-        // Eager-load the TLS dashboard + drift detector when landing on
-        // Overview so the cards paint with data on first render rather
-        // than blanking until the operator clicks "Rescan".
-        if ($this->workspace_tab === 'overview' && $this->serverOpsReady()) {
-            $this->loadTlsCertsDashboard();
+        if ($this->workspace_tab === 'health' && $this->serverOpsReady()) {
             $this->loadDriftDetector();
         }
     }
 
     /**
-     * Force a fresh SSH scan (bypassing the 60s cache) — wired to the
-     * "Rescan" button on the Overview TLS card.
+     * Fired by {@see CreatesNotificationChannelInline} after the inline modal
+     * creates a channel. Jump to the Notifications tab and pre-select the new
+     * channel so the operator can finish wiring it to events in one motion.
      */
-    public function refreshTlsCertsDashboard(): void
+    #[On('notification-channel-created')]
+    public function onNotificationChannelCreated(string $channelId): void
     {
-        $this->loadTlsCertsDashboard(forceFresh: true);
+        $this->workspace_tab = 'notifications';
+        $this->notif_channel_id = $channelId;
     }
 
     /**
@@ -528,186 +1024,257 @@ class WorkspaceWebserver extends WorkspaceManage
      */
     public function setEngineMetricsRange(string $range): void
     {
-        $allowed = array_keys(\App\Services\Servers\ServerMetricsRangeQuery::RANGES);
+        $allowed = array_keys(ServerMetricsRangeQuery::RANGES);
         $this->engine_metrics_range = in_array($range, $allowed, true) ? $range : '1h';
     }
 
     public function setEngineSubtab(string $subtab): void
     {
-        // Engine-specific live-state sub-tabs (Vhosts/Listeners/etc.) live
-        // alongside the common ones (overview/info/logs/config). The Tools
-        // sub-tab was retired — its diagnostic buttons now render inline in
-        // the Overview's Tools row. We keep 'tools' silently mapping to
-        // overview so an old bookmark / URL doesn't break the render.
+        $this->engine_subtab = $subtab;
+    }
+
+    public function updatedEngineSubtab(): void
+    {
         $allowed = [
             'overview', 'info', 'logs', 'config',
             // OLS
-            'vhosts', 'listeners', 'extapps', 'cache',
+            'vhosts', 'listeners', 'extapps', 'modules', 'cache',
             // nginx
-            'hosts', 'upstreams', 'certs', 'workers',
+            'hosts', 'upstreams', 'certs', 'modules', 'workers',
             // caddy (routes/upstreams/certs share with nginx; admin + snippets are unique)
-            'routes', 'admin', 'snippets',
+            'routes', 'admin', 'snippets', 'modules',
             // apache (vhosts/workers/certs shared; modules unique)
             'modules',
             // traefik
-            'routers', 'services', 'middlewares', 'providers',
+            'routers', 'services', 'middlewares', 'entrypoints',
+            'tcprouters', 'tcpservices', 'udprouters', 'udpservices', 'tls', 'providers',
+            'static', 'dynamic',
             // haproxy
             'frontends', 'backends', 'ssl', 'runtime',
+            // envoy
+            'listeners', 'clusters', 'runtime', 'virtualhosts', 'stats', 'static',
         ];
-        if ($subtab === 'tools') {
-            $subtab = 'overview';
+
+        if ($this->engine_subtab === 'tools') {
+            $this->engine_subtab = 'overview';
         }
-        $this->engine_subtab = in_array($subtab, $allowed, true) ? $subtab : 'overview';
+
+        if (! in_array($this->engine_subtab, $allowed, true)) {
+            $this->engine_subtab = 'overview';
+        }
+
         if ($this->engine_subtab !== 'config') {
             $this->resetConfigEditorState();
         }
         if ($this->engine_subtab !== 'logs') {
             $this->resetLogViewerState();
         }
-        if ($this->engine_subtab !== 'cache') {
-            $this->ols_cache_loaded = false;
-            $this->ols_cache_form = [];
-            $this->ols_cache_flash = null;
-            $this->ols_cache_error = null;
-        } elseif ($this->workspace_tab === 'openlitespeed') {
+
+        // Close transient sub-tab UI; keep loaded SSH snapshots until explicit refresh.
+        if ($this->engine_subtab !== 'listeners') {
+            $this->ols_listeners_show_add = false;
+        }
+        if ($this->engine_subtab !== 'snippets') {
+            $this->caddy_snippets_show_add = false;
+        }
+        if (! ($this->workspace_tab === 'caddy' && $this->engine_subtab === 'modules')) {
+            $this->caddy_modules_show_add = false;
+            $this->caddy_modules_show_browse = false;
+        }
+        if ($this->engine_subtab !== 'routes') {
+            $this->caddy_custom_routes_show_add = false;
+        }
+        if ($this->engine_subtab !== 'upstreams') {
+            $this->nginx_upstreams_show_add = false;
+        }
+        if ($this->engine_subtab !== 'hosts') {
+            $this->nginx_custom_hosts_show_add = false;
+        }
+        if ($this->engine_subtab !== 'vhosts') {
+            $this->apache_custom_vhosts_show_add = false;
+        }
+        if ($this->engine_subtab !== 'frontends') {
+            $this->haproxy_frontends_show_add = false;
+        }
+        if ($this->engine_subtab !== 'backends') {
+            $this->haproxy_backends_show_add = false;
+        }
+    }
+
+    /**
+     * Deferred loader for the active engine sub-tab. Wired from wire:init so
+     * {@see setEngineSubtab()} can paint the tab highlight before SSH work.
+     */
+    public function loadActiveEngineSubtabData(): void
+    {
+        if (! $this->serverOpsReady()) {
+            return;
+        }
+
+        $tab = $this->workspace_tab;
+        $sub = $this->engine_subtab;
+
+        if ($tab === 'openlitespeed' && $sub === 'cache' && ! $this->ols_cache_loaded) {
             $this->loadOlsCacheConfig();
         }
-
-        if ($this->engine_subtab !== 'extapps') {
-            $this->ols_extapps_loaded = false;
-            $this->ols_extapps_form = [];
-            $this->ols_extapps_identity = [];
-            $this->ols_extapps_flash = null;
-            $this->ols_extapps_error = null;
-        } elseif ($this->workspace_tab === 'openlitespeed') {
+        if ($tab === 'openlitespeed' && $sub === 'extapps' && ! $this->ols_extapps_loaded) {
             $this->loadOlsExtAppsConfig();
         }
-
-        if ($this->engine_subtab !== 'listeners') {
-            $this->ols_listeners_loaded = false;
-            $this->ols_listeners_form = [];
-            $this->ols_listeners_identity = [];
-            $this->ols_listeners_maps = [];
-            $this->ols_listeners_flash = null;
-            $this->ols_listeners_error = null;
-            $this->ols_listeners_show_add = false;
-        } elseif ($this->workspace_tab === 'openlitespeed') {
+        if ($tab === 'openlitespeed' && $sub === 'listeners' && ! $this->ols_listeners_loaded) {
             $this->loadOlsListenersConfig();
         }
-
-        if ($this->engine_subtab !== 'vhosts') {
-            $this->ols_vhosts_loaded = false;
-            $this->ols_vhosts_form = [];
-            $this->ols_vhosts_identity = [];
-            $this->ols_vhosts_flash = null;
-            $this->ols_vhosts_error = null;
-        } elseif ($this->workspace_tab === 'openlitespeed') {
+        if ($tab === 'openlitespeed' && $sub === 'vhosts' && ! $this->ols_vhosts_loaded) {
             $this->loadOlsVhostsConfig();
         }
-
-        // Caddy global options live on the Admin sub-tab (alongside the
-        // version/admin endpoint live-state we already render there).
-        if ($this->engine_subtab !== 'admin') {
-            $this->caddy_globals_loaded = false;
-            $this->caddy_globals_form = [];
-            $this->caddy_globals_flash = null;
-            $this->caddy_globals_error = null;
-        } elseif ($this->workspace_tab === 'caddy') {
+        if ($tab === 'openlitespeed' && $sub === 'modules' && ! $this->ols_modules_loaded) {
+            $this->loadOlsModulesConfig();
+        }
+        if ($tab === 'caddy' && $sub === 'admin' && ! $this->caddy_globals_loaded) {
             $this->loadCaddyGlobalsConfig();
         }
-
-        if ($this->engine_subtab !== 'snippets') {
-            $this->caddy_snippets_loaded = false;
-            $this->caddy_snippets_form = [];
-            $this->caddy_snippets_flash = null;
-            $this->caddy_snippets_error = null;
-            $this->caddy_snippets_show_add = false;
-        } elseif ($this->workspace_tab === 'caddy') {
+        if ($tab === 'caddy' && $sub === 'snippets' && ! $this->caddy_snippets_loaded) {
             $this->loadCaddySnippetsConfig();
         }
-
-        if ($this->engine_subtab !== 'upstreams') {
-            $this->nginx_upstreams_loaded = false;
-            $this->nginx_upstreams_form = [];
-            $this->nginx_upstreams_servers_text = [];
-            $this->nginx_upstreams_flash = null;
-            $this->nginx_upstreams_error = null;
-            $this->nginx_upstreams_show_add = false;
-        } elseif ($this->workspace_tab === 'nginx') {
+        if ($tab === 'caddy' && $sub === 'modules' && ! $this->caddy_modules_loaded) {
+            $this->loadCaddyModulesInventory();
+        }
+        if ($tab === 'caddy' && $sub === 'routes' && ! $this->caddy_custom_routes_loaded) {
+            $this->loadCaddyCustomRoutesConfig();
+        }
+        if ($tab === 'nginx' && $sub === 'upstreams' && ! $this->nginx_upstreams_loaded) {
             $this->loadNginxUpstreamsConfig();
         }
-
-        if ($this->engine_subtab !== 'modules') {
-            $this->apache_modules_loaded = false;
-            $this->apache_modules_list = [];
-            $this->apache_modules_flash = null;
-            $this->apache_modules_error = null;
-        } elseif ($this->workspace_tab === 'apache') {
+        if ($tab === 'nginx' && $sub === 'hosts' && ! $this->nginx_custom_hosts_loaded) {
+            $this->loadNginxCustomHostsConfig();
+        }
+        if ($tab === 'nginx' && $sub === 'modules' && ! $this->nginx_modules_loaded) {
+            $this->loadNginxModulesConfig();
+        }
+        if ($tab === 'nginx' && $sub === 'cache' && ! $this->nginx_cache_loaded) {
+            $this->loadNginxCacheConfig();
+        }
+        if ($tab === 'apache' && $sub === 'modules' && ! $this->apache_modules_loaded) {
             $this->loadApacheModulesConfig();
         }
-
-        if ($this->engine_subtab !== 'runtime') {
-            $this->haproxy_globals_loaded = false;
-            $this->haproxy_globals_form = [];
-            $this->haproxy_globals_flash = null;
-            $this->haproxy_globals_error = null;
-        } elseif ($this->workspace_tab === 'haproxy') {
+        if ($tab === 'apache' && $sub === 'cache' && ! $this->apache_cache_loaded) {
+            $this->loadApacheCacheConfig();
+        }
+        if ($tab === 'apache' && $sub === 'vhosts' && ! $this->apache_custom_vhosts_loaded) {
+            $this->loadApacheCustomVhostsConfig();
+        }
+        if ($tab === 'haproxy' && $sub === 'runtime' && ! $this->haproxy_globals_loaded) {
             $this->loadHaproxyGlobalsConfig();
         }
-
-        if ($this->engine_subtab !== 'frontends') {
-            $this->haproxy_frontends_loaded = false;
-            $this->haproxy_frontends_form = [];
-            $this->haproxy_frontends_binds_text = [];
-            $this->haproxy_frontends_flash = null;
-            $this->haproxy_frontends_error = null;
-            $this->haproxy_frontends_show_add = false;
-        } elseif ($this->workspace_tab === 'haproxy') {
+        if ($tab === 'haproxy' && $sub === 'frontends' && ! $this->haproxy_frontends_loaded) {
             $this->loadHaproxyFrontendsConfig();
         }
-
-        if ($this->engine_subtab !== 'backends') {
-            $this->haproxy_backends_loaded = false;
-            $this->haproxy_backends_form = [];
-            $this->haproxy_backends_servers_text = [];
-            $this->haproxy_backends_flash = null;
-            $this->haproxy_backends_error = null;
-            $this->haproxy_backends_show_add = false;
-        } elseif ($this->workspace_tab === 'haproxy') {
+        if ($tab === 'haproxy' && $sub === 'backends' && ! $this->haproxy_backends_loaded) {
             $this->loadHaproxyBackendsConfig();
         }
-
-        // Traefik static config lives on the Providers sub-tab (since that's
-        // where the file-provider that loads /etc/traefik/dynamic/* is
-        // declared — natural home for the rest of the static settings).
-        if ($this->engine_subtab !== 'providers') {
-            $this->traefik_static_loaded = false;
-            $this->traefik_static_form = [];
-            $this->traefik_static_flash = null;
-            $this->traefik_static_error = null;
-        } elseif ($this->workspace_tab === 'traefik') {
+        if ($tab === 'traefik' && $sub === 'static' && ! $this->traefik_static_loaded) {
             $this->loadTraefikStaticConfig();
         }
-
-        // nginx global options live on the Workers sub-tab (same row as
-        // the runtime worker counters from stub_status). Apache reuses the
-        // same Workers sub-tab for its global options + MPM tuning.
-        if ($this->engine_subtab !== 'workers') {
-            $this->nginx_globals_loaded = false;
-            $this->nginx_globals_form = [];
-            $this->nginx_globals_flash = null;
-            $this->nginx_globals_error = null;
-            $this->apache_globals_loaded = false;
-            $this->apache_globals_form = [];
-            $this->apache_globals_flash = null;
-            $this->apache_globals_error = null;
-        } else {
-            if ($this->workspace_tab === 'nginx') {
+        if ($tab === 'traefik' && $sub === 'dynamic' && ! $this->traefik_dynamic_loaded) {
+            $this->loadTraefikDynamicConfigs();
+        }
+        if ($tab === 'traefik' && $sub === 'overview') {
+            $this->ensureEngineLiveState();
+            if (! $this->traefik_dashboard_loaded) {
+                $this->loadTraefikDashboardConfig();
+            }
+        }
+        if ($tab === 'traefik' && $sub === 'providers' && ! $this->traefik_providers_loaded) {
+            $this->loadTraefikProvidersConfig();
+        }
+        if ($tab === 'traefik' && $sub === 'routers' && ! $this->traefik_custom_routes_loaded) {
+            $this->loadTraefikCustomRoutesConfig();
+        }
+        if ($tab === 'traefik' && $sub === 'middlewares' && ! $this->traefik_custom_middlewares_loaded) {
+            $this->loadTraefikCustomMiddlewaresConfig();
+        }
+        if ($tab === 'traefik' && $sub === 'entrypoints' && ! $this->traefik_entrypoints_loaded) {
+            $this->loadTraefikEntrypointsConfig();
+        }
+        if ($tab === 'traefik' && in_array($sub, ['tcprouters', 'tcpservices'], true) && ! $this->traefik_tcp_routes_loaded) {
+            $this->loadTraefikTcpRoutesConfig();
+        }
+        if ($tab === 'traefik' && in_array($sub, ['udprouters', 'udpservices'], true) && ! $this->traefik_udp_routes_loaded) {
+            $this->loadTraefikUdpRoutesConfig();
+        }
+        if ($tab === 'traefik' && $sub === 'services' && ! $this->traefik_http_services_loaded) {
+            $this->loadTraefikHttpServicesConfig();
+        }
+        if ($tab === 'envoy' && $sub === 'overview') {
+            $this->ensureEngineLiveState();
+        }
+        if ($tab === 'envoy' && $sub === 'static' && ! $this->envoy_static_loaded) {
+            $this->loadEnvoyStaticConfig();
+        }
+        if ($tab === 'envoy' && $sub === 'clusters' && ! $this->envoy_clusters_loaded) {
+            $this->loadEnvoyClustersConfig();
+        }
+        if ($tab === 'envoy' && $sub === 'virtualhosts' && ! $this->envoy_virtualhosts_loaded) {
+            $this->loadEnvoyVirtualHostsConfig();
+        }
+        if ($tab === 'envoy' && $sub === 'listeners' && ! $this->envoy_listeners_loaded) {
+            $this->loadEnvoyListenersConfig();
+        }
+        if ($tab === 'openresty' && $sub === 'overview') {
+            $this->ensureEngineLiveState();
+        }
+        if ($tab === 'openresty' && $sub === 'static' && ! $this->openresty_static_loaded) {
+            $this->loadOpenRestyStaticConfig();
+        }
+        if ($tab === 'openresty' && $sub === 'upstreams' && ! $this->openresty_upstreams_loaded) {
+            $this->loadOpenRestyUpstreamsConfig();
+        }
+        if ($tab === 'openresty' && $sub === 'servers' && ! $this->openresty_servers_loaded) {
+            $this->loadOpenRestyServersConfig();
+        }
+        if ($sub === 'workers') {
+            if ($tab === 'nginx' && ! $this->nginx_globals_loaded) {
                 $this->loadNginxGlobalsConfig();
-            } elseif ($this->workspace_tab === 'apache') {
+            } elseif ($tab === 'apache' && ! $this->apache_globals_loaded) {
                 $this->loadApacheGlobalsConfig();
             }
         }
+
+        if ($sub === 'config' && $this->engineSupportsConfig($tab) && ! $this->webserverConfigFilesLoaded) {
+            $this->loadWebserverConfigFiles();
+        }
+
+        if ($this->isEngineLiveStateSubtab($sub, $tab)) {
+            $this->ensureEngineLiveState();
+        }
+    }
+
+    /**
+     * Discover the config-file picker listing for the active engine over SSH.
+     * Called from wire:init (loadActiveEngineSubtabData) when the Config sub-tab
+     * opens — deliberately NOT from render(), so renders + wire:polls stay free
+     * of SSH. Cached briefly so rapid re-entries coalesce.
+     */
+    public function loadWebserverConfigFiles(): void
+    {
+        if (! $this->engineSupportsConfig($this->workspace_tab) || ! $this->serverOpsReady()) {
+            $this->webserverConfigFilesRaw = [];
+            $this->webserverConfigFilesLoaded = true;
+
+            return;
+        }
+
+        $cacheKey = 'dply.webserver-config-files:'.$this->server->id.':'.$this->workspace_tab;
+        try {
+            $this->webserverConfigFilesRaw = Cache::remember(
+                $cacheKey,
+                10,
+                fn () => app(RemoteWebserverConfigService::class)->listFiles($this->server, $this->workspace_tab),
+            );
+        } catch (\Throwable) {
+            $this->webserverConfigFilesRaw = [];
+        }
+
+        $this->webserverConfigFilesLoaded = true;
     }
 
     /**
@@ -727,7 +1294,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\OpenLiteSpeedCacheModuleConfig::class)->read($this->server);
+            $result = app(OpenLiteSpeedCacheModuleConfig::class)->read($this->server);
             $this->ols_cache_form = $result['values'];
             $this->ols_cache_loaded = true;
             $this->ols_cache_error = null;
@@ -741,6 +1308,88 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->ols_cache_error = __('Failed to read cache config: :msg', ['msg' => $e->getMessage()]);
             $this->ols_cache_loaded = false;
         }
+    }
+
+    public function loadOlsModulesConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->ols_modules_error = __('Provisioning and SSH must be ready before listing modules.');
+
+            return;
+        }
+
+        try {
+            $result = app(OpenLiteSpeedModulesConfig::class)->read($this->server);
+            $this->ols_modules_list = $result['modules'];
+            $this->ols_modules_loaded = true;
+            $this->ols_modules_flash = null;
+            $this->ols_modules_error = null;
+            if (! empty($result['unreadable'])) {
+                $this->ols_modules_error = __('Could not read /usr/local/lsws/modules or httpd_config.conf — check sudo permissions for the deploy user.');
+            }
+        } catch (\Throwable $e) {
+            $this->ols_modules_error = __('Failed to read modules: :msg', ['msg' => $e->getMessage()]);
+            $this->ols_modules_loaded = false;
+        }
+    }
+
+    public function toggleOlsModule(string $name, bool $enable): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->ols_modules_error = __('Deployers cannot toggle OpenLiteSpeed modules.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->ols_modules_error = __('Provisioning and SSH must be ready before toggling modules.');
+
+            return;
+        }
+
+        $this->ols_modules_flash = null;
+        $this->ols_modules_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __(':verb OpenLiteSpeed module: :name', ['verb' => $enable ? 'Enable' : 'Disable', 'name' => $name]),
+        );
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new ConsoleEmitter($consoleId);
+
+        try {
+            app(OpenLiteSpeedModulesConfig::class)
+                ->toggle($this->server, $name, $enable, $emitter);
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->ols_modules_flash = __('Module :name :state and OpenLiteSpeed reloaded.', ['name' => $name, 'state' => $enable ? 'enabled' : 'disabled']);
+            $this->loadOlsModulesConfig();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->ols_modules_error = $e->getMessage();
+        }
+    }
+
+    public function setOlsModulesFilter(string $filter): void
+    {
+        $this->ols_modules_filter = in_array($filter, ['all', 'perf', 'security', 'other'], true) ? $filter : 'all';
     }
 
     /**
@@ -776,18 +1425,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save OpenLiteSpeed cache config'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\OpenLiteSpeedCacheModuleConfig::class)
+            app(OpenLiteSpeedCacheModuleConfig::class)
                 ->save($this->server, $this->ols_cache_form, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -797,13 +1446,225 @@ class WorkspaceWebserver extends WorkspaceManage
             // round-tripped from on/off) so the form reflects what's on disk.
             $this->loadOlsCacheConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
             ]);
             $this->ols_cache_error = $e->getMessage();
+        }
+    }
+
+    public function purgeOlsLscacheConfirmed(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->ols_cache_error = __('Deployers cannot purge server cache.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->ols_cache_error = __('Provisioning and SSH must be ready before purging LSCache.');
+
+            return;
+        }
+
+        $this->ols_cache_flash = null;
+        $this->ols_cache_error = null;
+
+        try {
+            app(OpenLiteSpeedLscachePurger::class)->purgeAll($this->server);
+            $this->ols_cache_flash = __('LSCache storage purged on the server.');
+        } catch (\Throwable $e) {
+            $this->ols_cache_error = $e->getMessage();
+        }
+    }
+
+    public function loadNginxCacheConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->nginx_cache_error = __('Provisioning and SSH must be ready before reading cache settings.');
+
+            return;
+        }
+
+        try {
+            $result = app(NginxEngineCacheConfig::class)->read($this->server);
+            $this->nginx_cache_form = $result['values'];
+            $this->nginx_cache_meta = [
+                'fcgi_path' => $result['fcgi_path'],
+                'proxy_path' => $result['proxy_path'],
+                'fcgi_zone' => $result['fcgi_zone'],
+                'proxy_zone' => $result['proxy_zone'],
+                'conf_path' => $result['conf_path'],
+            ];
+            $this->nginx_cache_loaded = true;
+            $this->nginx_cache_error = null;
+            $this->nginx_cache_flash = null;
+        } catch (\Throwable $e) {
+            $this->nginx_cache_error = __('Failed to read cache settings: :msg', ['msg' => $e->getMessage()]);
+            $this->nginx_cache_loaded = false;
+        }
+    }
+
+    public function saveNginxCacheConfig(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->nginx_cache_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->nginx_cache_error = __('Provisioning and SSH must be ready before saving cache settings.');
+
+            return;
+        }
+
+        $this->nginx_cache_flash = null;
+        $this->nginx_cache_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Save nginx engine cache config'),
+        );
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new ConsoleEmitter($consoleId);
+
+        try {
+            app(NginxEngineCacheConfig::class)->save($this->server, $this->nginx_cache_form, $emitter);
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->nginx_cache_flash = __('Cache zones saved and nginx reloaded.');
+            $this->loadNginxCacheConfig();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->nginx_cache_error = $e->getMessage();
+        }
+    }
+
+    public function purgeNginxEngineCacheConfirmed(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->nginx_cache_error = __('Deployers cannot purge server cache.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->nginx_cache_error = __('Provisioning and SSH must be ready before purging cache.');
+
+            return;
+        }
+
+        $this->nginx_cache_flash = null;
+        $this->nginx_cache_error = null;
+
+        try {
+            app(NginxEngineCachePurger::class)->purgeAll($this->server);
+            $this->nginx_cache_flash = __('FastCGI and proxy cache storage purged on the server.');
+        } catch (\Throwable $e) {
+            $this->nginx_cache_error = $e->getMessage();
+        }
+    }
+
+    public function loadApacheCacheConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->apache_cache_error = __('Provisioning and SSH must be ready before reading cache settings.');
+
+            return;
+        }
+
+        try {
+            $status = app(ApacheEngineCacheConfig::class)->read($this->server);
+            $this->apache_cache_status = $status;
+            $this->apache_mod_cache_enabled = (bool) ($status['apache_mod_cache_enabled'] ?? false);
+            $this->apache_cache_loaded = true;
+            $this->apache_cache_error = null;
+            $this->apache_cache_flash = null;
+        } catch (\Throwable $e) {
+            $this->apache_cache_error = __('Failed to read cache settings: :msg', ['msg' => $e->getMessage()]);
+            $this->apache_cache_loaded = false;
+        }
+    }
+
+    public function saveApacheCacheConfig(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->apache_cache_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->apache_cache_error = __('Provisioning and SSH must be ready before saving cache settings.');
+
+            return;
+        }
+
+        $this->apache_cache_flash = null;
+        $this->apache_cache_error = null;
+
+        try {
+            app(ApacheEngineCacheConfig::class)->saveModCacheFlag($this->server, $this->apache_mod_cache_enabled);
+            $this->apache_cache_flash = __('Apache cache preferences saved.');
+            $this->loadApacheCacheConfig();
+        } catch (\Throwable $e) {
+            $this->apache_cache_error = $e->getMessage();
+        }
+    }
+
+    public function purgeApacheEngineCacheConfirmed(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->apache_cache_error = __('Deployers cannot purge server cache.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->apache_cache_error = __('Provisioning and SSH must be ready before purging cache.');
+
+            return;
+        }
+
+        $this->apache_cache_flash = null;
+        $this->apache_cache_error = null;
+
+        try {
+            app(ApacheEngineCachePurger::class)->purgeAll($this->server);
+            $this->apache_cache_flash = __('Apache disk cache storage purged on the server.');
+        } catch (\Throwable $e) {
+            $this->apache_cache_error = $e->getMessage();
         }
     }
 
@@ -821,7 +1682,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\OpenLiteSpeedExtAppsConfig::class)->read($this->server);
+            $result = app(OpenLiteSpeedExtAppsConfig::class)->read($this->server);
             $form = [];
             $identity = [];
             foreach ($result['apps'] as $app) {
@@ -872,18 +1733,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save OpenLiteSpeed ExtApp config'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\OpenLiteSpeedExtAppsConfig::class)
+            app(OpenLiteSpeedExtAppsConfig::class)
                 ->save($this->server, $this->ols_extapps_form, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -891,8 +1752,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->ols_extapps_flash = __('ExtApp config saved and OpenLiteSpeed reloaded.');
             $this->loadOlsExtAppsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -938,18 +1799,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Add OpenLiteSpeed ExtApp: :name', ['name' => trim($this->ols_extapps_new_app['name'] ?? '')]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\OpenLiteSpeedExtAppsConfig::class)
+            app(OpenLiteSpeedExtAppsConfig::class)
                 ->addApp($this->server, $this->ols_extapps_new_app, [], $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -959,8 +1820,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->ols_extapps_new_app = ['name' => '', 'type' => 'lsapi', 'address' => '', 'path' => ''];
             $this->loadOlsExtAppsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -969,7 +1830,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
     }
 
-    public function loadCaddyGlobalsConfig(): void
+    public function loadCaddyGlobalsConfig(bool $forceFresh = false): void
     {
         $this->authorize('view', $this->server);
 
@@ -979,8 +1840,12 @@ class WorkspaceWebserver extends WorkspaceManage
             return;
         }
 
+        if ($this->caddy_globals_loaded && ! $forceFresh) {
+            return;
+        }
+
         try {
-            $result = app(\App\Services\Servers\CaddyGlobalOptionsConfig::class)->read($this->server);
+            $result = app(CaddyGlobalOptionsConfig::class)->read($this->server);
             $this->caddy_globals_form = $result['values'];
             $this->caddy_globals_loaded = true;
             $this->caddy_globals_flash = null;
@@ -1019,18 +1884,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save Caddy global options'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\CaddyGlobalOptionsConfig::class)
+            app(CaddyGlobalOptionsConfig::class)
                 ->save($this->server, $this->caddy_globals_form, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -1038,8 +1903,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->caddy_globals_flash = __('Caddy global options saved and Caddy reloaded.');
             $this->loadCaddyGlobalsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -1071,12 +1936,12 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Site smoke test'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
             $result = app(\App\Services\Servers\WebserverSmokeTestRunner::class)->run($this->server, $emitter);
@@ -1090,15 +1955,15 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->smoke_truncated = (bool) $result['truncated'];
             $this->smoke_loaded = true;
 
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
             ]);
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -1118,7 +1983,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\WebserverConfigDriftDetector::class)->detect($this->server, $forceFresh);
+            $result = app(WebserverConfigDriftDetector::class)->detect($this->server, $forceFresh);
             $this->drift_results = $result['results'];
             $this->drift_engine = $result['engine'];
             $this->drift_scanned_at_iso = $result['scanned_at']->toIso8601String();
@@ -1139,36 +2004,6 @@ class WorkspaceWebserver extends WorkspaceManage
         $this->loadDriftDetector(forceFresh: true);
     }
 
-    public function loadTlsCertsDashboard(bool $forceFresh = false): void
-    {
-        $this->authorize('view', $this->server);
-
-        if (! $this->serverOpsReady()) {
-            $this->tls_certs_error = __('Provisioning and SSH must be ready before scanning TLS certs.');
-
-            return;
-        }
-
-        try {
-            $result = app(\App\Services\Servers\WebserverCertsAggregator::class)->aggregate($this->server, $forceFresh);
-            $this->tls_certs = array_map(function (array $row): array {
-                $row['expires_at'] = $row['expires_at'] instanceof \Carbon\CarbonImmutable
-                    ? $row['expires_at']->toIso8601String()
-                    : null;
-
-                return $row;
-            }, $result['certs']);
-            $this->tls_certs_scanned_at_iso = $result['scanned_at'] instanceof \Carbon\CarbonImmutable
-                ? $result['scanned_at']->toIso8601String()
-                : null;
-            $this->tls_certs_unreadable = $result['unreadable'];
-            $this->tls_certs_loaded = true;
-            $this->tls_certs_error = null;
-        } catch (\Throwable $e) {
-            $this->tls_certs_error = __('Failed to scan TLS certs: :msg', ['msg' => $e->getMessage()]);
-            $this->tls_certs_loaded = false;
-        }
-    }
 
     public function loadHaproxyBackendsConfig(): void
     {
@@ -1181,7 +2016,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\HaproxyBackendsConfig::class)->read($this->server);
+            $result = app(HaproxyBackendsConfig::class)->read($this->server);
             $form = [];
             $serversText = [];
             foreach ($result['backends'] as $b) {
@@ -1235,18 +2070,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save HAProxy backends'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\HaproxyBackendsConfig::class)
+            app(HaproxyBackendsConfig::class)
                 ->save($this->server, $this->haproxy_backends_form, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -1254,8 +2089,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->haproxy_backends_flash = __('Backends saved and HAProxy reloaded.');
             $this->loadHaproxyBackendsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -1308,19 +2143,19 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Add HAProxy backend: :name', ['name' => trim($name)]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
             $values = ['balance' => $balance];
-            app(\App\Services\Servers\HaproxyBackendsConfig::class)
+            app(HaproxyBackendsConfig::class)
                 ->addBackend($this->server, $name, $servers, $values, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -1330,8 +2165,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->haproxy_backends_new = ['name' => '', 'servers' => '', 'balance' => 'roundrobin'];
             $this->loadHaproxyBackendsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -1363,18 +2198,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Remove HAProxy backend: :name', ['name' => $name]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\HaproxyBackendsConfig::class)
+            app(HaproxyBackendsConfig::class)
                 ->removeBackend($this->server, $name, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -1382,8 +2217,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->haproxy_backends_flash = __('Backend :name removed and HAProxy reloaded.', ['name' => $name]);
             $this->loadHaproxyBackendsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -1403,7 +2238,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\HaproxyFrontendsConfig::class)->read($this->server);
+            $result = app(HaproxyFrontendsConfig::class)->read($this->server);
             $form = [];
             $bindsText = [];
             foreach ($result['frontends'] as $f) {
@@ -1458,18 +2293,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save HAProxy frontends'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\HaproxyFrontendsConfig::class)
+            app(HaproxyFrontendsConfig::class)
                 ->save($this->server, $this->haproxy_frontends_form, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -1477,8 +2312,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->haproxy_frontends_flash = __('Frontends saved and HAProxy reloaded.');
             $this->loadHaproxyFrontendsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -1531,22 +2366,22 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Add HAProxy frontend: :name', ['name' => trim($name)]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
             $values = [];
             if ($defaultBackend !== '') {
                 $values['default_backend'] = $defaultBackend;
             }
-            app(\App\Services\Servers\HaproxyFrontendsConfig::class)
+            app(HaproxyFrontendsConfig::class)
                 ->addFrontend($this->server, $name, $binds, $values, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -1556,8 +2391,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->haproxy_frontends_new = ['name' => '', 'binds' => '', 'default_backend' => ''];
             $this->loadHaproxyFrontendsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -1589,18 +2424,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Remove HAProxy frontend: :name', ['name' => $name]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\HaproxyFrontendsConfig::class)
+            app(HaproxyFrontendsConfig::class)
                 ->removeFrontend($this->server, $name, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -1608,8 +2443,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->haproxy_frontends_flash = __('Frontend :name removed and HAProxy reloaded.', ['name' => $name]);
             $this->loadHaproxyFrontendsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -1629,7 +2464,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\TraefikStaticConfigOptions::class)->read($this->server);
+            $result = app(TraefikStaticConfigOptions::class)->read($this->server);
             $this->traefik_static_form = $result['values'];
             $this->traefik_static_loaded = true;
             $this->traefik_static_flash = null;
@@ -1641,6 +2476,128 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->traefik_static_error = __('Failed to read Traefik static config: :msg', ['msg' => $e->getMessage()]);
             $this->traefik_static_loaded = false;
         }
+    }
+
+    public function repairTraefikAdminApi(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot repair Traefik config.'));
+
+            return;
+        }
+
+        if ($this->server->edgeProxy() !== 'traefik') {
+            $this->toastError(__('This server does not have Traefik as its edge proxy.'));
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->toastError(__('Provisioning and SSH must be ready.'));
+
+            return;
+        }
+
+        if ($this->hasInflightEdgeProxyAction() || $this->hasInflightWebserverSwitch()) {
+            $this->toastError(__('Another webserver action is in flight — wait for it to finish.'));
+
+            return;
+        }
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Repair Traefik API entry point'));
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            app(TraefikStaticConfigOptions::class)
+                ->repairAdminApiDefaults($this->server, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->toastSuccess(__('Traefik static config reset to dply defaults. Try the dashboard link again.'));
+            $this->loadTraefikStaticConfig();
+            $this->refreshTraefikLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->toastError($e->getMessage());
+        }
+    }
+
+    public function startTraefikService(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot start Traefik.'));
+
+            return;
+        }
+
+        if ($this->server->edgeProxy() !== 'traefik') {
+            $this->toastError(__('This server does not have Traefik as its edge proxy.'));
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->toastError(__('Provisioning and SSH must be ready.'));
+
+            return;
+        }
+
+        if ($this->hasInflightEdgeProxyAction() || $this->hasInflightWebserverSwitch()) {
+            $this->toastError(__('Another webserver action is in flight — wait for it to finish.'));
+
+            return;
+        }
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Start Traefik'));
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            app(TraefikStaticConfigOptions::class)
+                ->startTraefikService($this->server, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->toastSuccess(__('Traefik is running. Try the dashboard link again.'));
+            $this->refreshTraefikLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->toastError($e->getMessage());
+        }
+    }
+
+    private function refreshTraefikLiveStateAfterServiceAction(): void
+    {
+        if ($this->server->edgeProxy() !== 'traefik') {
+            return;
+        }
+
+        $this->ensureEngineLiveState(forceFresh: true);
     }
 
     public function saveTraefikStaticConfig(): void
@@ -1666,18 +2623,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save Traefik static config (restart required)'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\TraefikStaticConfigOptions::class)
+            app(TraefikStaticConfigOptions::class)
                 ->save($this->server, $this->traefik_static_form, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -1685,14 +2642,1972 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->traefik_static_flash = __('Traefik static config saved and Traefik restarted.');
             $this->loadTraefikStaticConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
             ]);
             $this->traefik_static_error = $e->getMessage();
         }
+    }
+
+    public function loadTraefikDynamicConfigs(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->traefik_dynamic_error = __('Provisioning and SSH must be ready before listing dynamic config files.');
+
+            return;
+        }
+
+        try {
+            $this->traefik_dynamic_files = app(TraefikDynamicConfigInventory::class)->list($this->server);
+            $this->traefik_dynamic_loaded = true;
+            $this->traefik_dynamic_error = null;
+        } catch (\Throwable $e) {
+            $this->traefik_dynamic_error = __('Failed to list dynamic configs: :msg', ['msg' => $e->getMessage()]);
+            $this->traefik_dynamic_loaded = false;
+        }
+    }
+
+    public function loadTraefikProvidersConfig(): void
+    {
+        $this->authorize('view', $this->server);
+        if (! $this->serverOpsReady()) {
+            $this->traefik_providers_error = __('Provisioning and SSH must be ready before reading providers.');
+
+            return;
+        }
+        try {
+            $result = app(TraefikProvidersConfig::class)->read($this->server);
+            $this->traefik_providers_form = $result['values'];
+            $this->traefik_providers_configured = $result['configured'];
+            $this->traefik_providers_loaded = true;
+            $this->traefik_providers_flash = null;
+            $this->traefik_providers_error = $result['unreadable']
+                ? __('Could not read traefik.yml.')
+                : null;
+        } catch (\Throwable $e) {
+            $this->traefik_providers_error = $e->getMessage();
+            $this->traefik_providers_loaded = false;
+        }
+    }
+
+    public function saveTraefikProvidersConfig(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer()) {
+            $this->traefik_providers_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+        if (! $this->serverOpsReady()) {
+            $this->traefik_providers_error = __('Provisioning and SSH must be ready.');
+
+            return;
+        }
+        $this->traefik_providers_flash = null;
+        $this->traefik_providers_error = null;
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Save Traefik providers'));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(TraefikProvidersConfig::class)->save($this->server, $this->traefik_providers_form, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->traefik_providers_flash = __('Providers saved and Traefik restarted.');
+            $this->loadTraefikProvidersConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->traefik_providers_error = $e->getMessage();
+        }
+    }
+
+    public function installTraefikDockerProvider(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer()) {
+            $this->traefik_providers_error = __('Deployers cannot install packages.');
+
+            return;
+        }
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Install Docker for Traefik provider'));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(TraefikProvidersConfig::class)->installDocker($this->server, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->traefik_providers_flash = __('Docker installed. Enable the Docker provider below and save.');
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->traefik_providers_error = $e->getMessage();
+        }
+    }
+
+    public function loadTraefikDashboardConfig(): void
+    {
+        $this->authorize('view', $this->server);
+        if (! $this->serverOpsReady()) {
+            return;
+        }
+        try {
+            $state = app(TraefikDashboardExposure::class)->read($this->server);
+            $this->traefik_dashboard_form = [
+                'enabled' => $state['enabled'] ? '1' : '0',
+                'path' => $state['path'],
+                'username' => $state['username'],
+                'password' => '',
+            ];
+            $this->traefik_dashboard_loaded = true;
+            $this->traefik_dashboard_error = null;
+        } catch (\Throwable $e) {
+            $this->traefik_dashboard_error = $e->getMessage();
+        }
+    }
+
+    public function saveTraefikDashboardConfig(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer()) {
+            $this->traefik_dashboard_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+        if (! $this->serverOpsReady()) {
+            $this->traefik_dashboard_error = __('Provisioning and SSH must be ready.');
+
+            return;
+        }
+        $this->traefik_dashboard_flash = null;
+        $this->traefik_dashboard_error = null;
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Update Traefik dashboard exposure'));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(TraefikDashboardExposure::class)->sync($this->server, [
+                'enabled' => ($this->traefik_dashboard_form['enabled'] ?? '0') === '1',
+                'path' => (string) ($this->traefik_dashboard_form['path'] ?? '/traefik-dashboard'),
+                'username' => (string) ($this->traefik_dashboard_form['username'] ?? ''),
+                'password' => (string) ($this->traefik_dashboard_form['password'] ?? ''),
+            ], new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->traefik_dashboard_flash = __('Dashboard exposure updated.');
+            $this->traefik_dashboard_form['password'] = '';
+            $this->loadTraefikDashboardConfig();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->traefik_dashboard_error = $e->getMessage();
+        }
+    }
+
+    public function loadTraefikCustomRoutesConfig(): void
+    {
+        $this->authorize('view', $this->server);
+        if (! $this->serverOpsReady()) {
+            $this->traefik_custom_routes_error = __('Provisioning and SSH must be ready.');
+
+            return;
+        }
+        try {
+            $result = app(TraefikCustomRoutesConfig::class)->read($this->server);
+            $form = [];
+            foreach ($result['routes'] as $route) {
+                $slug = (string) ($route['slug'] ?? '');
+                if ($slug === '') {
+                    continue;
+                }
+                $form[$slug] = [
+                    'hosts' => implode(' ', $route['hosts'] ?? []),
+                    'upstream' => (string) ($route['upstream'] ?? ''),
+                    'rule' => (string) ($route['rule'] ?? ''),
+                    'middlewares' => implode(' ', $route['middlewares'] ?? []),
+                ];
+            }
+            $this->traefik_custom_routes_form = $form;
+            $this->traefik_custom_routes_loaded = true;
+            $this->traefik_custom_routes_error = $result['unreadable'] ? __('Could not read custom route files.') : null;
+        } catch (\Throwable $e) {
+            $this->traefik_custom_routes_error = $e->getMessage();
+            $this->traefik_custom_routes_loaded = false;
+        }
+    }
+
+    public function openAddTraefikCustomRouteForm(): void
+    {
+        $this->traefik_custom_routes_show_add = true;
+        $this->traefik_custom_routes_new = ['slug' => '', 'hosts' => '', 'upstream' => '', 'rule' => '', 'middlewares' => ''];
+    }
+
+    public function cancelAddTraefikCustomRouteForm(): void
+    {
+        $this->traefik_custom_routes_show_add = false;
+    }
+
+    public function submitAddTraefikCustomRoute(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            $this->traefik_custom_routes_error = __('Cannot add route right now.');
+
+            return;
+        }
+        $slug = (string) ($this->traefik_custom_routes_new['slug'] ?? '');
+        $fields = $this->traefikCustomRouteFieldsFromRow($this->traefik_custom_routes_new);
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add Traefik custom route: :slug', ['slug' => $slug]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(TraefikCustomRoutesConfig::class)->add($this->server, $slug, $fields, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->traefik_custom_routes_flash = __('Custom route added.');
+            $this->traefik_custom_routes_show_add = false;
+            $this->loadTraefikCustomRoutesConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->traefik_custom_routes_error = $e->getMessage();
+        }
+    }
+
+    public function saveTraefikCustomRoute(string $slug): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! isset($this->traefik_custom_routes_form[$slug])) {
+            return;
+        }
+        $fields = $this->traefikCustomRouteFieldsFromRow($this->traefik_custom_routes_form[$slug]);
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Save Traefik custom route: :slug', ['slug' => $slug]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(TraefikCustomRoutesConfig::class)->save($this->server, $slug, $fields, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->traefik_custom_routes_flash = __('Route saved.');
+            $this->loadTraefikCustomRoutesConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->traefik_custom_routes_error = $e->getMessage();
+        }
+    }
+
+    public function removeTraefikCustomRoute(string $slug): void
+    {
+        $this->authorize('update', $this->server);
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Remove Traefik custom route: :slug', ['slug' => $slug]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(TraefikCustomRoutesConfig::class)->remove($this->server, $slug, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->traefik_custom_routes_flash = __('Route removed.');
+            $this->loadTraefikCustomRoutesConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->traefik_custom_routes_error = $e->getMessage();
+        }
+    }
+
+    public function loadTraefikCustomMiddlewaresConfig(): void
+    {
+        $this->authorize('view', $this->server);
+        if (! $this->serverOpsReady()) {
+            $this->traefik_custom_middlewares_error = __('Provisioning and SSH must be ready.');
+
+            return;
+        }
+        try {
+            $result = app(TraefikCustomMiddlewaresConfig::class)->read($this->server);
+            $form = [];
+            foreach ($result['middlewares'] as $row) {
+                $slug = (string) ($row['slug'] ?? '');
+                if ($slug === '') {
+                    continue;
+                }
+                $form[$slug] = [
+                    'type' => (string) ($row['type'] ?? 'stripPrefix'),
+                    'prefix' => '/',
+                    'scheme' => 'https',
+                    'header_key' => '',
+                    'header_value' => '',
+                    'users' => '',
+                ];
+            }
+            $this->traefik_custom_middlewares_form = $form;
+            $this->traefik_custom_middlewares_loaded = true;
+            $this->traefik_custom_middlewares_error = null;
+        } catch (\Throwable $e) {
+            $this->traefik_custom_middlewares_error = $e->getMessage();
+            $this->traefik_custom_middlewares_loaded = false;
+        }
+    }
+
+    public function openAddTraefikCustomMiddlewareForm(): void
+    {
+        $this->traefik_custom_middlewares_show_add = true;
+        $this->traefik_custom_middlewares_new = [
+            'slug' => '', 'type' => 'stripPrefix', 'prefix' => '/', 'scheme' => 'https',
+            'header_key' => '', 'header_value' => '', 'users' => '',
+        ];
+    }
+
+    public function cancelAddTraefikCustomMiddlewareForm(): void
+    {
+        $this->traefik_custom_middlewares_show_add = false;
+    }
+
+    public function submitAddTraefikCustomMiddleware(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+        $slug = (string) ($this->traefik_custom_middlewares_new['slug'] ?? '');
+        $fields = $this->traefikCustomMiddlewareFieldsFromRow($this->traefik_custom_middlewares_new);
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add Traefik middleware: :slug', ['slug' => $slug]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(TraefikCustomMiddlewaresConfig::class)->add($this->server, $slug, $fields, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->traefik_custom_middlewares_flash = __('Middleware added.');
+            $this->traefik_custom_middlewares_show_add = false;
+            $this->loadTraefikCustomMiddlewaresConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->traefik_custom_middlewares_error = $e->getMessage();
+        }
+    }
+
+    public function saveTraefikCustomMiddleware(string $slug): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! isset($this->traefik_custom_middlewares_form[$slug])) {
+            return;
+        }
+        $fields = $this->traefikCustomMiddlewareFieldsFromRow($this->traefik_custom_middlewares_form[$slug]);
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Save Traefik middleware: :slug', ['slug' => $slug]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(TraefikCustomMiddlewaresConfig::class)->save($this->server, $slug, $fields, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->traefik_custom_middlewares_flash = __('Middleware saved.');
+            $this->loadTraefikCustomMiddlewaresConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->traefik_custom_middlewares_error = $e->getMessage();
+        }
+    }
+
+    public function removeTraefikCustomMiddleware(string $slug): void
+    {
+        $this->authorize('update', $this->server);
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Remove Traefik middleware: :slug', ['slug' => $slug]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(TraefikCustomMiddlewaresConfig::class)->remove($this->server, $slug, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->traefik_custom_middlewares_flash = __('Middleware removed.');
+            $this->loadTraefikCustomMiddlewaresConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->traefik_custom_middlewares_error = $e->getMessage();
+        }
+    }
+
+    /**
+     * @param  array{hosts?: string, upstream?: string, rule?: string, middlewares?: string}  $row
+     * @return array{hosts: string, upstream: string, rule?: string, middlewares?: string}
+     */
+    private function traefikCustomRouteFieldsFromRow(array $row): array
+    {
+        return [
+            'hosts' => (string) ($row['hosts'] ?? ''),
+            'upstream' => (string) ($row['upstream'] ?? ''),
+            'rule' => trim((string) ($row['rule'] ?? '')),
+            'middlewares' => trim((string) ($row['middlewares'] ?? '')),
+        ];
+    }
+
+    /**
+     * @param  array{type?: string, prefix?: string, scheme?: string, header_key?: string, header_value?: string, users?: string}  $row
+     * @return array{type: string, prefix?: string, scheme?: string, header_key?: string, header_value?: string, users?: string}
+     */
+    private function traefikCustomMiddlewareFieldsFromRow(array $row): array
+    {
+        return [
+            'type' => (string) ($row['type'] ?? 'stripPrefix'),
+            'prefix' => (string) ($row['prefix'] ?? '/'),
+            'scheme' => (string) ($row['scheme'] ?? 'https'),
+            'header_key' => (string) ($row['header_key'] ?? ''),
+            'header_value' => (string) ($row['header_value'] ?? ''),
+            'users' => (string) ($row['users'] ?? ''),
+        ];
+    }
+
+    public function loadTraefikEntrypointsConfig(): void
+    {
+        $this->authorize('view', $this->server);
+        if (! $this->serverOpsReady()) {
+            $this->traefik_entrypoints_error = __('Provisioning and SSH must be ready.');
+
+            return;
+        }
+        try {
+            $result = app(TraefikEntrypointsConfig::class)->read($this->server);
+            $form = [];
+            foreach ($result['entrypoints'] as $ep) {
+                $form[(string) $ep['name']] = ['name' => (string) $ep['name'], 'address' => (string) $ep['address']];
+            }
+            $this->traefik_entrypoints_form = $form;
+            $this->traefik_entrypoints_loaded = true;
+            $this->traefik_entrypoints_error = $result['unreadable'] ? __('Could not read traefik.yml.') : null;
+        } catch (\Throwable $e) {
+            $this->traefik_entrypoints_error = $e->getMessage();
+            $this->traefik_entrypoints_loaded = false;
+        }
+    }
+
+    public function openAddTraefikEntrypointForm(): void
+    {
+        $this->traefik_entrypoints_show_add = true;
+        $this->traefik_entrypoints_new = ['name' => '', 'address' => ':8080'];
+    }
+
+    public function cancelAddTraefikEntrypointForm(): void
+    {
+        $this->traefik_entrypoints_show_add = false;
+    }
+
+    public function submitAddTraefikEntrypoint(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+        $name = (string) ($this->traefik_entrypoints_new['name'] ?? '');
+        $address = (string) ($this->traefik_entrypoints_new['address'] ?? '');
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add Traefik entry point: :name', ['name' => $name]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(TraefikEntrypointsConfig::class)->add($this->server, $name, $address, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->traefik_entrypoints_flash = __('Entry point added.');
+            $this->traefik_entrypoints_show_add = false;
+            $this->loadTraefikEntrypointsConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->traefik_entrypoints_error = $e->getMessage();
+        }
+    }
+
+    public function saveTraefikEntrypoint(string $name): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! isset($this->traefik_entrypoints_form[$name])) {
+            return;
+        }
+        $address = (string) ($this->traefik_entrypoints_form[$name]['address'] ?? '');
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Save Traefik entry point: :name', ['name' => $name]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(TraefikEntrypointsConfig::class)->save($this->server, $name, $address, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->traefik_entrypoints_flash = __('Entry point saved.');
+            $this->loadTraefikEntrypointsConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->traefik_entrypoints_error = $e->getMessage();
+        }
+    }
+
+    public function removeTraefikEntrypoint(string $name): void
+    {
+        $this->authorize('update', $this->server);
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Remove Traefik entry point: :name', ['name' => $name]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(TraefikEntrypointsConfig::class)->remove($this->server, $name, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->traefik_entrypoints_flash = __('Entry point removed.');
+            $this->loadTraefikEntrypointsConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->traefik_entrypoints_error = $e->getMessage();
+        }
+    }
+
+    public function loadTraefikTcpRoutesConfig(): void
+    {
+        $this->authorize('view', $this->server);
+        if (! $this->serverOpsReady()) {
+            return;
+        }
+        try {
+            $result = app(TraefikTcpRoutesConfig::class)->read($this->server);
+            $form = [];
+            foreach ($result['routes'] as $route) {
+                $slug = (string) ($route['slug'] ?? '');
+                $form[$slug] = [
+                    'rule' => (string) ($route['rule'] ?? ''),
+                    'entry_points' => implode(' ', $route['entry_points'] ?? []),
+                    'server_address' => (string) ($route['server_address'] ?? ''),
+                ];
+            }
+            $this->traefik_tcp_routes_form = $form;
+            $this->traefik_tcp_routes_loaded = true;
+            $this->traefik_tcp_routes_error = null;
+        } catch (\Throwable $e) {
+            $this->traefik_tcp_routes_error = $e->getMessage();
+            $this->traefik_tcp_routes_loaded = false;
+        }
+    }
+
+    public function openAddTraefikTcpRouteForm(): void
+    {
+        $this->traefik_tcp_routes_show_add = true;
+    }
+
+    public function cancelAddTraefikTcpRouteForm(): void
+    {
+        $this->traefik_tcp_routes_show_add = false;
+    }
+
+    public function submitAddTraefikTcpRoute(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+        $slug = (string) ($this->traefik_tcp_routes_new['slug'] ?? '');
+        $fields = [
+            'rule' => (string) ($this->traefik_tcp_routes_new['rule'] ?? ''),
+            'entry_points' => (string) ($this->traefik_tcp_routes_new['entry_points'] ?? ''),
+            'server_address' => (string) ($this->traefik_tcp_routes_new['server_address'] ?? ''),
+        ];
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add Traefik TCP route: :slug', ['slug' => $slug]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(TraefikTcpRoutesConfig::class)->add($this->server, $slug, $fields, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->traefik_tcp_routes_flash = __('TCP route added.');
+            $this->traefik_tcp_routes_show_add = false;
+            $this->loadTraefikTcpRoutesConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->traefik_tcp_routes_error = $e->getMessage();
+        }
+    }
+
+    public function saveTraefikTcpRoute(string $slug): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! isset($this->traefik_tcp_routes_form[$slug])) {
+            return;
+        }
+        $row = $this->traefik_tcp_routes_form[$slug];
+        $fields = ['rule' => (string) ($row['rule'] ?? ''), 'entry_points' => (string) ($row['entry_points'] ?? ''), 'server_address' => (string) ($row['server_address'] ?? '')];
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Save Traefik TCP route: :slug', ['slug' => $slug]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(TraefikTcpRoutesConfig::class)->save($this->server, $slug, $fields, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->traefik_tcp_routes_flash = __('TCP route saved.');
+            $this->loadTraefikTcpRoutesConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->traefik_tcp_routes_error = $e->getMessage();
+        }
+    }
+
+    public function removeTraefikTcpRoute(string $slug): void
+    {
+        $this->authorize('update', $this->server);
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Remove Traefik TCP route: :slug', ['slug' => $slug]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(TraefikTcpRoutesConfig::class)->remove($this->server, $slug, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->traefik_tcp_routes_flash = __('TCP route removed.');
+            $this->loadTraefikTcpRoutesConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->traefik_tcp_routes_error = $e->getMessage();
+        }
+    }
+
+    public function loadTraefikUdpRoutesConfig(): void
+    {
+        $this->authorize('view', $this->server);
+        if (! $this->serverOpsReady()) {
+            return;
+        }
+        try {
+            $result = app(TraefikUdpRoutesConfig::class)->read($this->server);
+            $form = [];
+            foreach ($result['routes'] as $route) {
+                $slug = (string) ($route['slug'] ?? '');
+                $form[$slug] = [
+                    'entry_points' => implode(' ', $route['entry_points'] ?? []),
+                    'server_address' => (string) ($route['server_address'] ?? ''),
+                ];
+            }
+            $this->traefik_udp_routes_form = $form;
+            $this->traefik_udp_routes_loaded = true;
+            $this->traefik_udp_routes_error = null;
+        } catch (\Throwable $e) {
+            $this->traefik_udp_routes_error = $e->getMessage();
+            $this->traefik_udp_routes_loaded = false;
+        }
+    }
+
+    public function openAddTraefikUdpRouteForm(): void
+    {
+        $this->traefik_udp_routes_show_add = true;
+    }
+
+    public function cancelAddTraefikUdpRouteForm(): void
+    {
+        $this->traefik_udp_routes_show_add = false;
+    }
+
+    public function submitAddTraefikUdpRoute(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+        $slug = (string) ($this->traefik_udp_routes_new['slug'] ?? '');
+        $fields = [
+            'entry_points' => (string) ($this->traefik_udp_routes_new['entry_points'] ?? ''),
+            'server_address' => (string) ($this->traefik_udp_routes_new['server_address'] ?? ''),
+        ];
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add Traefik UDP route: :slug', ['slug' => $slug]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(TraefikUdpRoutesConfig::class)->add($this->server, $slug, $fields, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->traefik_udp_routes_flash = __('UDP route added.');
+            $this->traefik_udp_routes_show_add = false;
+            $this->loadTraefikUdpRoutesConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->traefik_udp_routes_error = $e->getMessage();
+        }
+    }
+
+    public function saveTraefikUdpRoute(string $slug): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! isset($this->traefik_udp_routes_form[$slug])) {
+            return;
+        }
+        $row = $this->traefik_udp_routes_form[$slug];
+        $fields = ['entry_points' => (string) ($row['entry_points'] ?? ''), 'server_address' => (string) ($row['server_address'] ?? '')];
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Save Traefik UDP route: :slug', ['slug' => $slug]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(TraefikUdpRoutesConfig::class)->save($this->server, $slug, $fields, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->traefik_udp_routes_flash = __('UDP route saved.');
+            $this->loadTraefikUdpRoutesConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->traefik_udp_routes_error = $e->getMessage();
+        }
+    }
+
+    public function removeTraefikUdpRoute(string $slug): void
+    {
+        $this->authorize('update', $this->server);
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Remove Traefik UDP route: :slug', ['slug' => $slug]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(TraefikUdpRoutesConfig::class)->remove($this->server, $slug, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->traefik_udp_routes_flash = __('UDP route removed.');
+            $this->loadTraefikUdpRoutesConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->traefik_udp_routes_error = $e->getMessage();
+        }
+    }
+
+    public function loadTraefikHttpServicesConfig(): void
+    {
+        $this->authorize('view', $this->server);
+        if (! $this->serverOpsReady()) {
+            return;
+        }
+        try {
+            $result = app(TraefikHttpServicesConfig::class)->read($this->server);
+            $form = [];
+            foreach ($result['services'] as $svc) {
+                $slug = (string) ($svc['slug'] ?? '');
+                $form[$slug] = ['servers' => implode("\n", $svc['servers'] ?? [])];
+            }
+            $this->traefik_http_services_form = $form;
+            $this->traefik_http_services_loaded = true;
+            $this->traefik_http_services_error = null;
+        } catch (\Throwable $e) {
+            $this->traefik_http_services_error = $e->getMessage();
+            $this->traefik_http_services_loaded = false;
+        }
+    }
+
+    public function openAddTraefikHttpServiceForm(): void
+    {
+        $this->traefik_http_services_show_add = true;
+        $this->traefik_http_services_new = ['slug' => '', 'servers' => ''];
+    }
+
+    public function cancelAddTraefikHttpServiceForm(): void
+    {
+        $this->traefik_http_services_show_add = false;
+    }
+
+    public function submitAddTraefikHttpService(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+        $slug = (string) ($this->traefik_http_services_new['slug'] ?? '');
+        $fields = ['servers' => (string) ($this->traefik_http_services_new['servers'] ?? '')];
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add Traefik HTTP service: :slug', ['slug' => $slug]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(TraefikHttpServicesConfig::class)->add($this->server, $slug, $fields, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->traefik_http_services_flash = __('HTTP service added.');
+            $this->traefik_http_services_show_add = false;
+            $this->loadTraefikHttpServicesConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->traefik_http_services_error = $e->getMessage();
+        }
+    }
+
+    public function saveTraefikHttpService(string $slug): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! isset($this->traefik_http_services_form[$slug])) {
+            return;
+        }
+        $fields = ['servers' => (string) ($this->traefik_http_services_form[$slug]['servers'] ?? '')];
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Save Traefik HTTP service: :slug', ['slug' => $slug]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(TraefikHttpServicesConfig::class)->save($this->server, $slug, $fields, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->traefik_http_services_flash = __('HTTP service saved.');
+            $this->loadTraefikHttpServicesConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->traefik_http_services_error = $e->getMessage();
+        }
+    }
+
+    public function removeTraefikHttpService(string $slug): void
+    {
+        $this->authorize('update', $this->server);
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Remove Traefik HTTP service: :slug', ['slug' => $slug]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(TraefikHttpServicesConfig::class)->remove($this->server, $slug, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->traefik_http_services_flash = __('HTTP service removed.');
+            $this->loadTraefikHttpServicesConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->traefik_http_services_error = $e->getMessage();
+        }
+    }
+
+    public function loadEnvoyStaticConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->envoy_static_error = __('Provisioning and SSH must be ready before reading envoy.yaml.');
+
+            return;
+        }
+
+        try {
+            $result = app(EnvoyStaticConfigOptions::class)->read($this->server);
+            $this->envoy_static_form = $result['values'];
+            $this->envoy_static_loaded = true;
+            $this->envoy_static_flash = null;
+            $this->envoy_static_error = $result['unreadable']
+                ? __('Could not read /etc/envoy/envoy.yaml — check sudo permissions for the deploy user.')
+                : null;
+        } catch (\Throwable $e) {
+            $this->envoy_static_error = __('Failed to read Envoy static config: :msg', ['msg' => $e->getMessage()]);
+            $this->envoy_static_loaded = false;
+        }
+    }
+
+    public function saveEnvoyStaticConfig(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->envoy_static_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->envoy_static_error = __('Provisioning and SSH must be ready before saving envoy.yaml.');
+
+            return;
+        }
+
+        $this->envoy_static_flash = null;
+        $this->envoy_static_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Save Envoy static settings'),
+        );
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new ConsoleEmitter($consoleId);
+
+        try {
+            app(EnvoyStaticConfigOptions::class)
+                ->save($this->server, $this->envoy_static_form, $emitter);
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->envoy_static_flash = __('Envoy static settings saved and Envoy restarted.');
+            $this->loadEnvoyStaticConfig();
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_static_error = $e->getMessage();
+        }
+    }
+
+    public function repairEnvoyAdminApi(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot repair Envoy config.'));
+
+            return;
+        }
+
+        if ($this->server->edgeProxy() !== 'envoy') {
+            $this->toastError(__('This server does not have Envoy as its edge proxy.'));
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->toastError(__('Provisioning and SSH must be ready.'));
+
+            return;
+        }
+
+        if ($this->hasInflightEdgeProxyAction() || $this->hasInflightWebserverSwitch()) {
+            $this->toastError(__('Another webserver action is in flight — wait for it to finish.'));
+
+            return;
+        }
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Repair Envoy admin interface'));
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            app(EnvoyStaticConfigOptions::class)
+                ->repairAdminDefaults($this->server, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->toastSuccess(__('Envoy admin defaults restored on 127.0.0.1:9901.'));
+            $this->loadEnvoyStaticConfig();
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->toastError($e->getMessage());
+        }
+    }
+
+    public function startEnvoyService(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot start Envoy.'));
+
+            return;
+        }
+
+        if ($this->server->edgeProxy() !== 'envoy') {
+            $this->toastError(__('This server does not have Envoy as its edge proxy.'));
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->toastError(__('Provisioning and SSH must be ready.'));
+
+            return;
+        }
+
+        if ($this->hasInflightEdgeProxyAction() || $this->hasInflightWebserverSwitch()) {
+            $this->toastError(__('Another webserver action is in flight — wait for it to finish.'));
+
+            return;
+        }
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Start Envoy'));
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            app(EnvoyStaticConfigOptions::class)
+                ->startEnvoyService($this->server, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->toastSuccess(__('Envoy is running. Try the admin link again.'));
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->toastError($e->getMessage());
+        }
+    }
+
+    public function drainEnvoyListeners(): void
+    {
+        $this->runEnvoyAdminPostAction(
+            __('Drain Envoy listeners'),
+            '/drain_listeners?graceful',
+            __('Envoy listeners are draining — existing connections finish before new ones are accepted.'),
+        );
+    }
+
+    public function healthcheckFailEnvoy(): void
+    {
+        $this->runEnvoyAdminPostAction(
+            __('Fail Envoy health checks'),
+            '/healthcheck/fail',
+            __('Envoy health checks marked failed — upstreams should stop receiving new traffic if wired to health status.'),
+        );
+    }
+
+    private function runEnvoyAdminPostAction(string $title, string $path, string $successMessage): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot run Envoy maintenance actions.'));
+
+            return;
+        }
+
+        if ($this->server->edgeProxy() !== 'envoy' || ! $this->serverOpsReady()) {
+            $this->toastError(__('Provisioning and SSH must be ready.'));
+
+            return;
+        }
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), $title);
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new ConsoleEmitter($consoleId);
+
+        try {
+            $ssh = new SshConnection($this->server);
+            $script = sprintf(
+                'curl -4sf --max-time 10 -X POST %s 2>&1 || curl -4sf --max-time 10 %s 2>&1',
+                escapeshellarg('http://127.0.0.1:9901'.$path),
+                escapeshellarg('http://127.0.0.1:9901'.$path),
+            );
+            $output = $ssh->exec($script, 20);
+            if (($ssh->lastExecExitCode() ?? 1) !== 0) {
+                throw new \RuntimeException(trim((string) $output) !== '' ? trim((string) $output) : 'Envoy admin request failed.');
+            }
+            $emitter->info(trim((string) $output));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->toastSuccess($successMessage);
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->toastError($e->getMessage());
+        }
+    }
+
+    private function refreshEnvoyLiveStateAfterServiceAction(): void
+    {
+        if ($this->server->edgeProxy() !== 'envoy') {
+            return;
+        }
+
+        $this->ensureEngineLiveState(forceFresh: true);
+    }
+
+    public function loadEnvoyClustersConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->envoy_clusters_error = __('Provisioning and SSH must be ready before reading envoy.yaml.');
+
+            return;
+        }
+
+        try {
+            $clusters = app(EnvoyCustomClustersConfig::class)->read($this->server);
+            $form = [];
+            $text = [];
+            foreach ($clusters as $cluster) {
+                $name = (string) ($cluster['name'] ?? '');
+                if ($name === '') {
+                    continue;
+                }
+                $form[$name] = [
+                    'endpoints' => $cluster['endpoints'] ?? [],
+                    'values' => [
+                        'connect_timeout' => (string) ($cluster['connect_timeout'] ?? '5s'),
+                        'lb_policy' => (string) ($cluster['lb_policy'] ?? 'ROUND_ROBIN'),
+                    ],
+                ];
+                $text[$name] = implode("\n", $cluster['endpoints'] ?? []);
+            }
+            $this->envoy_clusters_form = $form;
+            $this->envoy_clusters_endpoints_text = $text;
+            $this->envoy_clusters_loaded = true;
+            $this->envoy_clusters_flash = null;
+            $this->envoy_clusters_error = null;
+        } catch (\Throwable $e) {
+            $this->envoy_clusters_error = __('Failed to read custom clusters: :msg', ['msg' => $e->getMessage()]);
+            $this->envoy_clusters_loaded = false;
+        }
+    }
+
+    public function saveEnvoyClustersConfig(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->envoy_clusters_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->envoy_clusters_error = __('Provisioning and SSH must be ready.');
+
+            return;
+        }
+
+        $clusters = [];
+        foreach ($this->envoy_clusters_endpoints_text as $name => $raw) {
+            if (! isset($this->envoy_clusters_form[$name])) {
+                continue;
+            }
+            $endpoints = array_values(array_filter(
+                array_map('trim', preg_split('/\R/', (string) $raw) ?: []),
+                fn (string $line): bool => $line !== '',
+            ));
+            $values = $this->envoy_clusters_form[$name]['values'] ?? [];
+            $clusters[] = [
+                'name' => $name,
+                'endpoints' => $endpoints,
+                'connect_timeout' => (string) ($values['connect_timeout'] ?? '5s'),
+                'lb_policy' => (string) ($values['lb_policy'] ?? 'ROUND_ROBIN'),
+            ];
+        }
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Save Envoy custom clusters'));
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            app(EnvoyCustomClustersConfig::class)
+                ->save($this->server, $clusters, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_clusters_flash = __('Custom clusters saved and edge routing regenerated.');
+            $this->loadEnvoyClustersConfig();
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_clusters_error = $e->getMessage();
+        }
+    }
+
+    public function openAddEnvoyClusterForm(): void
+    {
+        $this->envoy_clusters_show_add = true;
+        $this->envoy_clusters_new = [
+            'name' => '',
+            'endpoints' => '',
+            'connect_timeout' => '5s',
+            'lb_policy' => 'ROUND_ROBIN',
+        ];
+        $this->envoy_clusters_error = null;
+        $this->envoy_clusters_flash = null;
+    }
+
+    public function cancelAddEnvoyClusterForm(): void
+    {
+        $this->envoy_clusters_show_add = false;
+    }
+
+    public function submitAddEnvoyCluster(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+
+        $name = trim((string) ($this->envoy_clusters_new['name'] ?? ''));
+        $endpoints = array_values(array_filter(
+            array_map('trim', preg_split('/\R/', (string) ($this->envoy_clusters_new['endpoints'] ?? '')) ?: []),
+            fn (string $line): bool => $line !== '',
+        ));
+        $values = [
+            'connect_timeout' => (string) ($this->envoy_clusters_new['connect_timeout'] ?? '5s'),
+            'lb_policy' => (string) ($this->envoy_clusters_new['lb_policy'] ?? 'ROUND_ROBIN'),
+        ];
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add Envoy cluster: :name', ['name' => $name]));
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            app(EnvoyCustomClustersConfig::class)
+                ->addCluster($this->server, $name, $endpoints, $values, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_clusters_flash = __('Cluster added.');
+            $this->envoy_clusters_show_add = false;
+            $this->loadEnvoyClustersConfig();
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_clusters_error = $e->getMessage();
+        }
+    }
+
+    public function removeEnvoyCluster(string $name): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Remove Envoy cluster: :name', ['name' => $name]));
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            app(EnvoyCustomClustersConfig::class)
+                ->removeCluster($this->server, $name, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_clusters_flash = __('Cluster removed.');
+            $this->loadEnvoyClustersConfig();
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_clusters_error = $e->getMessage();
+        }
+    }
+
+    public function loadEnvoyVirtualHostsConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->envoy_virtualhosts_error = __('Provisioning and SSH must be ready before reading virtual hosts.');
+
+            return;
+        }
+
+        try {
+            $virtualHosts = app(EnvoyCustomVirtualHostsConfig::class)->read($this->server);
+            $form = [];
+            $text = [];
+            foreach ($virtualHosts as $row) {
+                $name = (string) ($row['name'] ?? '');
+                if ($name === '') {
+                    continue;
+                }
+                $form[$name] = [
+                    'domains' => $row['domains'] ?? [],
+                    'cluster' => (string) ($row['cluster'] ?? ''),
+                ];
+                $text[$name] = implode("\n", $row['domains'] ?? []);
+            }
+            $this->envoy_virtualhosts_form = $form;
+            $this->envoy_virtualhosts_domains_text = $text;
+            $this->envoy_virtualhosts_loaded = true;
+            $this->envoy_virtualhosts_flash = null;
+            $this->envoy_virtualhosts_error = null;
+        } catch (\Throwable $e) {
+            $this->envoy_virtualhosts_error = __('Failed to read custom virtual hosts: :msg', ['msg' => $e->getMessage()]);
+            $this->envoy_virtualhosts_loaded = false;
+        }
+    }
+
+    public function saveEnvoyVirtualHostsConfig(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->envoy_virtualhosts_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->envoy_virtualhosts_error = __('Provisioning and SSH must be ready.');
+
+            return;
+        }
+
+        $virtualHosts = [];
+        foreach ($this->envoy_virtualhosts_domains_text as $name => $raw) {
+            if (! isset($this->envoy_virtualhosts_form[$name])) {
+                continue;
+            }
+            $domains = array_values(array_filter(
+                array_map('trim', preg_split('/[\s,]+/', (string) $raw) ?: []),
+                fn (string $d): bool => $d !== '',
+            ));
+            $virtualHosts[] = [
+                'name' => $name,
+                'domains' => $domains,
+                'cluster' => trim((string) ($this->envoy_virtualhosts_form[$name]['cluster'] ?? '')),
+            ];
+        }
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Save Envoy custom virtual hosts'));
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            app(EnvoyCustomVirtualHostsConfig::class)
+                ->save($this->server, $virtualHosts, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_virtualhosts_flash = __('Custom virtual hosts saved and edge routing regenerated.');
+            $this->loadEnvoyVirtualHostsConfig();
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_virtualhosts_error = $e->getMessage();
+        }
+    }
+
+    public function openAddEnvoyVirtualHostForm(): void
+    {
+        $this->envoy_virtualhosts_show_add = true;
+        $this->envoy_virtualhosts_new = [
+            'name' => '',
+            'domains' => '',
+            'cluster' => '',
+        ];
+        $this->envoy_virtualhosts_error = null;
+        $this->envoy_virtualhosts_flash = null;
+    }
+
+    public function cancelAddEnvoyVirtualHostForm(): void
+    {
+        $this->envoy_virtualhosts_show_add = false;
+    }
+
+    public function submitAddEnvoyVirtualHost(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+
+        $name = trim((string) ($this->envoy_virtualhosts_new['name'] ?? ''));
+        $domains = array_values(array_filter(
+            array_map('trim', preg_split('/[\s,]+/', (string) ($this->envoy_virtualhosts_new['domains'] ?? '')) ?: []),
+            fn (string $d): bool => $d !== '',
+        ));
+        $cluster = trim((string) ($this->envoy_virtualhosts_new['cluster'] ?? ''));
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add Envoy virtual host: :name', ['name' => $name]));
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            app(EnvoyCustomVirtualHostsConfig::class)
+                ->add($this->server, $name, $domains, $cluster, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_virtualhosts_flash = __('Virtual host added.');
+            $this->envoy_virtualhosts_show_add = false;
+            $this->loadEnvoyVirtualHostsConfig();
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_virtualhosts_error = $e->getMessage();
+        }
+    }
+
+    public function removeEnvoyVirtualHost(string $name): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Remove Envoy virtual host: :name', ['name' => $name]));
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            app(EnvoyCustomVirtualHostsConfig::class)
+                ->remove($this->server, $name, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_virtualhosts_flash = __('Virtual host removed.');
+            $this->loadEnvoyVirtualHostsConfig();
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_virtualhosts_error = $e->getMessage();
+        }
+    }
+
+    public function loadEnvoyListenersConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->envoy_listeners_error = __('Provisioning and SSH must be ready before reading listeners.');
+
+            return;
+        }
+
+        try {
+            $listeners = app(EnvoyCustomListenersConfig::class)->read($this->server);
+            $form = [];
+            foreach ($listeners as $row) {
+                $name = (string) ($row['name'] ?? '');
+                if ($name === '') {
+                    continue;
+                }
+                $form[$name] = [
+                    'address' => (string) ($row['address'] ?? '0.0.0.0'),
+                    'port' => (int) ($row['port'] ?? 0),
+                    'mode' => (string) ($row['mode'] ?? EnvoyCustomListenersConfig::MODE_SHARED),
+                    'default_cluster' => (string) ($row['default_cluster'] ?? ''),
+                ];
+            }
+            $this->envoy_listeners_form = $form;
+            $this->envoy_listeners_loaded = true;
+            $this->envoy_listeners_flash = null;
+            $this->envoy_listeners_error = null;
+        } catch (\Throwable $e) {
+            $this->envoy_listeners_error = __('Failed to read custom listeners: :msg', ['msg' => $e->getMessage()]);
+            $this->envoy_listeners_loaded = false;
+        }
+    }
+
+    public function saveEnvoyListenersConfig(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->envoy_listeners_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->envoy_listeners_error = __('Provisioning and SSH must be ready.');
+
+            return;
+        }
+
+        $listeners = [];
+        foreach ($this->envoy_listeners_form as $name => $values) {
+            $listeners[] = [
+                'name' => $name,
+                'address' => trim((string) ($values['address'] ?? '0.0.0.0')) ?: '0.0.0.0',
+                'port' => (int) ($values['port'] ?? 0),
+                'mode' => trim((string) ($values['mode'] ?? EnvoyCustomListenersConfig::MODE_SHARED)),
+                'default_cluster' => trim((string) ($values['default_cluster'] ?? '')),
+            ];
+        }
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Save Envoy custom listeners'));
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            app(EnvoyCustomListenersConfig::class)
+                ->save($this->server, $listeners, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_listeners_flash = __('Custom listeners saved and edge routing regenerated.');
+            $this->loadEnvoyListenersConfig();
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_listeners_error = $e->getMessage();
+        }
+    }
+
+    public function openAddEnvoyListenerForm(): void
+    {
+        $this->envoy_listeners_show_add = true;
+        $this->envoy_listeners_new = [
+            'name' => '',
+            'address' => '0.0.0.0',
+            'port' => '',
+            'mode' => EnvoyCustomListenersConfig::MODE_SHARED,
+            'default_cluster' => '',
+        ];
+        $this->envoy_listeners_error = null;
+        $this->envoy_listeners_flash = null;
+    }
+
+    public function cancelAddEnvoyListenerForm(): void
+    {
+        $this->envoy_listeners_show_add = false;
+    }
+
+    public function submitAddEnvoyListener(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+
+        $fields = [
+            'name' => trim((string) ($this->envoy_listeners_new['name'] ?? '')),
+            'address' => trim((string) ($this->envoy_listeners_new['address'] ?? '0.0.0.0')) ?: '0.0.0.0',
+            'port' => (int) ($this->envoy_listeners_new['port'] ?? 0),
+            'mode' => trim((string) ($this->envoy_listeners_new['mode'] ?? EnvoyCustomListenersConfig::MODE_SHARED)),
+            'default_cluster' => trim((string) ($this->envoy_listeners_new['default_cluster'] ?? '')),
+        ];
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add Envoy listener: :name', ['name' => $fields['name']]));
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            app(EnvoyCustomListenersConfig::class)
+                ->add($this->server, $fields, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_listeners_flash = __('Listener added.');
+            $this->envoy_listeners_show_add = false;
+            $this->loadEnvoyListenersConfig();
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_listeners_error = $e->getMessage();
+        }
+    }
+
+    public function removeEnvoyListener(string $name): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Remove Envoy listener: :name', ['name' => $name]));
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        try {
+            app(EnvoyCustomListenersConfig::class)
+                ->remove($this->server, $name, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_listeners_flash = __('Listener removed.');
+            $this->loadEnvoyListenersConfig();
+            $this->refreshEnvoyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->envoy_listeners_error = $e->getMessage();
+        }
+    }
+
+    public function loadOpenRestyStaticConfig(): void
+    {
+        $this->authorize('view', $this->server);
+        if (! $this->serverOpsReady()) {
+            $this->openresty_static_error = __('Provisioning and SSH must be ready before reading OpenResty settings.');
+
+            return;
+        }
+        try {
+            $result = app(OpenRestyStaticConfigOptions::class)->read($this->server);
+            $this->openresty_static_form = $result['values'];
+            $this->openresty_static_loaded = true;
+            $this->openresty_static_flash = null;
+            $this->openresty_static_error = null;
+        } catch (\Throwable $e) {
+            $this->openresty_static_error = __('Failed to read OpenResty settings: :msg', ['msg' => $e->getMessage()]);
+            $this->openresty_static_loaded = false;
+        }
+    }
+
+    public function saveOpenRestyStaticConfig(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Save OpenResty static settings'));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(OpenRestyStaticConfigOptions::class)->save($this->server, $this->openresty_static_form, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->openresty_static_flash = __('OpenResty static settings saved and edge routing regenerated.');
+            $this->loadOpenRestyStaticConfig();
+            $this->refreshOpenRestyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->openresty_static_error = $e->getMessage();
+        }
+    }
+
+    public function loadOpenRestyUpstreamsConfig(): void
+    {
+        $this->authorize('view', $this->server);
+        if (! $this->serverOpsReady()) {
+            $this->openresty_upstreams_error = __('Provisioning and SSH must be ready.');
+
+            return;
+        }
+        try {
+            $rows = app(OpenRestyCustomUpstreamsConfig::class)->read($this->server);
+            $form = [];
+            $text = [];
+            foreach ($rows as $row) {
+                $name = (string) ($row['name'] ?? '');
+                if ($name === '') {
+                    continue;
+                }
+                $form[$name] = ['servers' => $row['servers'] ?? []];
+                $text[$name] = implode("\n", $row['servers'] ?? []);
+            }
+            $this->openresty_upstreams_form = $form;
+            $this->openresty_upstreams_servers_text = $text;
+            $this->openresty_upstreams_loaded = true;
+            $this->openresty_upstreams_flash = null;
+            $this->openresty_upstreams_error = null;
+        } catch (\Throwable $e) {
+            $this->openresty_upstreams_error = $e->getMessage();
+            $this->openresty_upstreams_loaded = false;
+        }
+    }
+
+    public function saveOpenRestyUpstreamsConfig(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+        $upstreams = [];
+        foreach ($this->openresty_upstreams_servers_text as $name => $raw) {
+            if (! isset($this->openresty_upstreams_form[$name])) {
+                continue;
+            }
+            $servers = array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', (string) $raw) ?: []), fn (string $s): bool => $s !== ''));
+            $upstreams[] = ['name' => $name, 'servers' => $servers];
+        }
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Save OpenResty custom upstreams'));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(OpenRestyCustomUpstreamsConfig::class)->save($this->server, $upstreams, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->openresty_upstreams_flash = __('Custom upstreams saved and edge routing regenerated.');
+            $this->loadOpenRestyUpstreamsConfig();
+            $this->refreshOpenRestyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->openresty_upstreams_error = $e->getMessage();
+        }
+    }
+
+    public function openAddOpenRestyUpstreamForm(): void
+    {
+        $this->openresty_upstreams_show_add = true;
+        $this->openresty_upstreams_new = ['name' => '', 'servers' => ''];
+        $this->openresty_upstreams_error = null;
+        $this->openresty_upstreams_flash = null;
+    }
+
+    public function cancelAddOpenRestyUpstreamForm(): void
+    {
+        $this->openresty_upstreams_show_add = false;
+    }
+
+    public function submitAddOpenRestyUpstream(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+        $name = trim((string) ($this->openresty_upstreams_new['name'] ?? ''));
+        $servers = array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', (string) ($this->openresty_upstreams_new['servers'] ?? '')) ?: []), fn (string $s): bool => $s !== ''));
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add OpenResty upstream: :name', ['name' => $name]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(OpenRestyCustomUpstreamsConfig::class)->add($this->server, $name, $servers, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->openresty_upstreams_flash = __('Upstream added.');
+            $this->openresty_upstreams_show_add = false;
+            $this->loadOpenRestyUpstreamsConfig();
+            $this->refreshOpenRestyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->openresty_upstreams_error = $e->getMessage();
+        }
+    }
+
+    public function removeOpenRestyUpstream(string $name): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Remove OpenResty upstream: :name', ['name' => $name]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(OpenRestyCustomUpstreamsConfig::class)->remove($this->server, $name, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->openresty_upstreams_flash = __('Upstream removed.');
+            $this->loadOpenRestyUpstreamsConfig();
+            $this->refreshOpenRestyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->openresty_upstreams_error = $e->getMessage();
+        }
+    }
+
+    public function loadOpenRestyServersConfig(): void
+    {
+        $this->authorize('view', $this->server);
+        if (! $this->serverOpsReady()) {
+            $this->openresty_servers_error = __('Provisioning and SSH must be ready.');
+
+            return;
+        }
+        try {
+            $rows = app(OpenRestyCustomServersConfig::class)->read($this->server);
+            $form = [];
+            $text = [];
+            foreach ($rows as $row) {
+                $name = (string) ($row['name'] ?? '');
+                if ($name === '') {
+                    continue;
+                }
+                $form[$name] = ['server_names' => $row['server_names'] ?? [], 'upstream' => (string) ($row['upstream'] ?? '')];
+                $text[$name] = implode("\n", $row['server_names'] ?? []);
+            }
+            $this->openresty_servers_form = $form;
+            $this->openresty_servers_names_text = $text;
+            $this->openresty_servers_loaded = true;
+            $this->openresty_servers_flash = null;
+            $this->openresty_servers_error = null;
+        } catch (\Throwable $e) {
+            $this->openresty_servers_error = $e->getMessage();
+            $this->openresty_servers_loaded = false;
+        }
+    }
+
+    public function saveOpenRestyServersConfig(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+        $servers = [];
+        foreach ($this->openresty_servers_names_text as $name => $raw) {
+            if (! isset($this->openresty_servers_form[$name])) {
+                continue;
+            }
+            $serverNames = array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', (string) $raw) ?: []), fn (string $d): bool => $d !== ''));
+            $servers[] = [
+                'name' => $name,
+                'server_names' => $serverNames,
+                'upstream' => trim((string) ($this->openresty_servers_form[$name]['upstream'] ?? '')),
+            ];
+        }
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Save OpenResty custom servers'));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(OpenRestyCustomServersConfig::class)->save($this->server, $servers, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->openresty_servers_flash = __('Custom server blocks saved and edge routing regenerated.');
+            $this->loadOpenRestyServersConfig();
+            $this->refreshOpenRestyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->openresty_servers_error = $e->getMessage();
+        }
+    }
+
+    public function openAddOpenRestyServerForm(): void
+    {
+        $this->openresty_servers_show_add = true;
+        $this->openresty_servers_new = ['name' => '', 'server_names' => '', 'upstream' => ''];
+        $this->openresty_servers_error = null;
+        $this->openresty_servers_flash = null;
+    }
+
+    public function cancelAddOpenRestyServerForm(): void
+    {
+        $this->openresty_servers_show_add = false;
+    }
+
+    public function submitAddOpenRestyServer(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+        $name = trim((string) ($this->openresty_servers_new['name'] ?? ''));
+        $serverNames = array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', (string) ($this->openresty_servers_new['server_names'] ?? '')) ?: []), fn (string $d): bool => $d !== ''));
+        $upstream = trim((string) ($this->openresty_servers_new['upstream'] ?? ''));
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Add OpenResty server: :name', ['name' => $name]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(OpenRestyCustomServersConfig::class)->add($this->server, $name, $serverNames, $upstream, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->openresty_servers_flash = __('Server block added.');
+            $this->openresty_servers_show_add = false;
+            $this->loadOpenRestyServersConfig();
+            $this->refreshOpenRestyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->openresty_servers_error = $e->getMessage();
+        }
+    }
+
+    public function removeOpenRestyServer(string $name): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->currentUserIsDeployer() || ! $this->serverOpsReady()) {
+            return;
+        }
+        $consoleId = $this->seedManageConsoleAction($this->server->fresh(), __('Remove OpenResty server: :name', ['name' => $name]));
+        DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_RUNNING, 'started_at' => now(), 'updated_at' => now()]);
+        try {
+            app(OpenRestyCustomServersConfig::class)->remove($this->server, $name, new ConsoleEmitter($consoleId));
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_COMPLETED, 'finished_at' => now(), 'updated_at' => now()]);
+            $this->openresty_servers_flash = __('Server block removed.');
+            $this->loadOpenRestyServersConfig();
+            $this->refreshOpenRestyLiveStateAfterServiceAction();
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update(['status' => ConsoleAction::STATUS_FAILED, 'finished_at' => now(), 'error' => mb_substr($e->getMessage(), 0, 2000), 'updated_at' => now()]);
+            $this->openresty_servers_error = $e->getMessage();
+        }
+    }
+
+    private function refreshOpenRestyLiveStateAfterServiceAction(): void
+    {
+        if ($this->server->edgeProxy() !== 'openresty') {
+            return;
+        }
+        $this->ensureEngineLiveState(forceFresh: true);
+    }
+
+    private function mergeTraefikStaticEntrypointsIntoMeta(): void
+    {
+        $server = $this->server->fresh();
+        $meta = is_array($server->meta) ? $server->meta : [];
+        $state = data_get($meta, 'webserver_live_state.traefik');
+        if (! is_array($state)) {
+            return;
+        }
+        $units = is_array($state['units'] ?? null) ? $state['units'] : [];
+        if (($units['entrypoints'] ?? []) !== []) {
+            return;
+        }
+        $read = app(TraefikEntrypointsConfig::class)->read($server);
+        if ($read['entrypoints'] === []) {
+            return;
+        }
+        $units['entrypoints'] = array_map(static fn (array $ep): array => [
+            'name' => $ep['name'],
+            'address' => $ep['address'],
+            'transport' => 'static',
+            'status' => 'configured',
+        ], $read['entrypoints']);
+        $state['units'] = $units;
+        $meta['webserver_live_state']['traefik'] = $state;
+        $server->update(['meta' => $meta]);
     }
 
     public function loadHaproxyGlobalsConfig(): void
@@ -1706,7 +4621,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\HaproxyGlobalOptionsConfig::class)->read($this->server);
+            $result = app(HaproxyGlobalOptionsConfig::class)->read($this->server);
             $this->haproxy_globals_form = $result['values'];
             $this->haproxy_globals_loaded = true;
             $this->haproxy_globals_flash = null;
@@ -1743,18 +4658,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save HAProxy global options'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\HaproxyGlobalOptionsConfig::class)
+            app(HaproxyGlobalOptionsConfig::class)
                 ->save($this->server, $this->haproxy_globals_form, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -1762,8 +4677,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->haproxy_globals_flash = __('HAProxy global options saved and HAProxy reloaded.');
             $this->loadHaproxyGlobalsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -1783,7 +4698,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\ApacheModulesConfig::class)->read($this->server);
+            $result = app(ApacheModulesConfig::class)->read($this->server);
             $this->apache_modules_list = $result['modules'];
             $this->apache_modules_loaded = true;
             $this->apache_modules_flash = null;
@@ -1820,18 +4735,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __(':verb Apache module: :name', ['verb' => $enable ? 'Enable' : 'Disable', 'name' => $name]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\ApacheModulesConfig::class)
+            app(ApacheModulesConfig::class)
                 ->toggle($this->server, $name, $enable, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -1839,8 +4754,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->apache_modules_flash = __('Module :name :state and Apache reloaded.', ['name' => $name, 'state' => $enable ? 'enabled' : 'disabled']);
             $this->loadApacheModulesConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -1851,7 +4766,100 @@ class WorkspaceWebserver extends WorkspaceManage
 
     public function setApacheModulesFilter(string $filter): void
     {
-        $this->apache_modules_filter = in_array($filter, ['all', 'mpm', 'tls', 'auth', 'proxy', 'perf', 'observability', 'core', 'other'], true) ? $filter : 'all';
+        $this->apache_modules_filter = in_array($filter, ['all', 'mpm', 'tls', 'auth', 'proxy', 'perf', 'security', 'observability', 'core', 'other'], true) ? $filter : 'all';
+    }
+
+    public function loadNginxModulesConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->nginx_modules_error = __('Provisioning and SSH must be ready before listing modules.');
+
+            return;
+        }
+
+        try {
+            $result = app(NginxModulesConfig::class)->read($this->server);
+            $this->nginx_modules_list = $result['modules'];
+            $this->nginx_modules_builtins = $result['builtins'];
+            $this->nginx_modules_supports_dynamic = (bool) $result['supports_dynamic'];
+            $this->nginx_modules_loaded = true;
+            $this->nginx_modules_flash = null;
+            $this->nginx_modules_error = null;
+            if (! empty($result['unreadable'])) {
+                $this->nginx_modules_error = __('Could not read nginx modules from the server — check SSH/sudo access.');
+            } elseif (! $result['supports_dynamic']) {
+                $this->nginx_modules_error = __('This nginx install does not use Debian-style dynamic modules. Use a distro nginx package (Ubuntu/Debian) to manage `libnginx-mod-*` modules here.');
+            }
+        } catch (\Throwable $e) {
+            $this->nginx_modules_error = __('Failed to read modules: :msg', ['msg' => $e->getMessage()]);
+            $this->nginx_modules_loaded = false;
+        }
+    }
+
+    public function toggleNginxModule(string $name, bool $enable): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->nginx_modules_error = __('Deployers cannot manage nginx modules.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->nginx_modules_error = __('Provisioning and SSH must be ready before changing modules.');
+
+            return;
+        }
+
+        $this->nginx_modules_flash = null;
+        $this->nginx_modules_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __(':verb nginx module: :name', ['verb' => $enable ? 'Enable' : 'Disable', 'name' => $name]),
+        );
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new ConsoleEmitter($consoleId);
+
+        try {
+            app(NginxModulesConfig::class)
+                ->toggle($this->server, $name, $enable, $emitter);
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'error' => null,
+                'updated_at' => now(),
+            ]);
+            $this->nginx_modules_flash = __('Module :name :state and nginx reloaded.', [
+                'name' => $name,
+                'state' => $enable ? __('enabled') : __('disabled'),
+            ]);
+            $this->loadNginxModulesConfig();
+            if ($this->isEngineLiveStateSubtab('modules', 'nginx')) {
+                $this->ensureEngineLiveState(forceFresh: true);
+            }
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->nginx_modules_error = $e->getMessage();
+        }
+    }
+
+    public function setNginxModulesFilter(string $filter): void
+    {
+        $allowed = ['all', 'stream', 'mail', 'tls', 'geo', 'content', 'auth', 'perf', 'security', 'observability', 'other'];
+        $this->nginx_modules_filter = in_array($filter, $allowed, true) ? $filter : 'all';
     }
 
     public function loadNginxUpstreamsConfig(): void
@@ -1865,7 +4873,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\NginxUpstreamsConfig::class)->read($this->server);
+            $result = app(NginxUpstreamsConfig::class)->read($this->server);
             $form = [];
             $serversText = [];
             foreach ($result['upstreams'] as $u) {
@@ -1920,18 +4928,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save nginx upstreams'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\NginxUpstreamsConfig::class)
+            app(NginxUpstreamsConfig::class)
                 ->save($this->server, $this->nginx_upstreams_form, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -1939,8 +4947,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->nginx_upstreams_flash = __('Upstreams saved and nginx reloaded.');
             $this->loadNginxUpstreamsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -1992,18 +5000,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Add nginx upstream: :name', ['name' => trim($name)]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\NginxUpstreamsConfig::class)
+            app(NginxUpstreamsConfig::class)
                 ->addUpstream($this->server, $name, $servers, [], $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -2013,8 +5021,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->nginx_upstreams_new = ['name' => '', 'servers' => ''];
             $this->loadNginxUpstreamsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -2046,18 +5054,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Remove nginx upstream: :name', ['name' => $name]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\NginxUpstreamsConfig::class)
+            app(NginxUpstreamsConfig::class)
                 ->removeUpstream($this->server, $name, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -2065,8 +5073,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->nginx_upstreams_flash = __('Upstream :name removed and nginx reloaded.', ['name' => $name]);
             $this->loadNginxUpstreamsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -2086,7 +5094,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\ApacheGlobalOptionsConfig::class)->read($this->server);
+            $result = app(ApacheGlobalOptionsConfig::class)->read($this->server);
             $this->apache_globals_form = $result['values'];
             $this->apache_globals_mpm = $result['mpm'];
             $this->apache_globals_loaded = true;
@@ -2124,18 +5132,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save Apache global options'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\ApacheGlobalOptionsConfig::class)
+            app(ApacheGlobalOptionsConfig::class)
                 ->save($this->server, $this->apache_globals_form, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -2143,8 +5151,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->apache_globals_flash = __('Apache global options saved and apache2 reloaded.');
             $this->loadApacheGlobalsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -2164,7 +5172,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\NginxGlobalOptionsConfig::class)->read($this->server);
+            $result = app(NginxGlobalOptionsConfig::class)->read($this->server);
             $this->nginx_globals_form = $result['values'];
             $this->nginx_globals_loaded = true;
             $this->nginx_globals_flash = null;
@@ -2201,18 +5209,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save nginx global options'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\NginxGlobalOptionsConfig::class)
+            app(NginxGlobalOptionsConfig::class)
                 ->save($this->server, $this->nginx_globals_form, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -2220,8 +5228,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->nginx_globals_flash = __('nginx global options saved and nginx reloaded.');
             $this->loadNginxGlobalsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -2230,7 +5238,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
     }
 
-    public function loadCaddySnippetsConfig(): void
+    public function loadCaddySnippetsConfig(bool $forceFresh = false): void
     {
         $this->authorize('view', $this->server);
 
@@ -2240,24 +5248,65 @@ class WorkspaceWebserver extends WorkspaceManage
             return;
         }
 
+        if ($this->caddy_snippets_loaded && ! $forceFresh) {
+            return;
+        }
+
+        $this->caddy_snippets_flash = null;
+        $this->caddy_snippets_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Read Caddy snippets'),
+        );
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new ConsoleEmitter($consoleId);
+
         try {
-            $result = app(\App\Services\Servers\CaddySnippetsConfig::class)->read($this->server);
+            $result = app(CaddySnippetsConfig::class)->read($this->server, $emitter);
             $form = [];
             foreach ($result['snippets'] as $snippet) {
                 $form[$snippet['name']] = $snippet['body'];
             }
             $this->caddy_snippets_form = $form;
             $this->caddy_snippets_loaded = true;
-            $this->caddy_snippets_flash = null;
-            $this->caddy_snippets_error = null;
             if (! empty($result['unreadable'])) {
                 $this->caddy_snippets_error = __('Could not read /etc/caddy/Caddyfile — check sudo permissions for the deploy user.');
+                DB::table('console_actions')->where('id', $consoleId)->update([
+                    'status' => ConsoleAction::STATUS_FAILED,
+                    'finished_at' => now(),
+                    'error' => mb_substr((string) $this->caddy_snippets_error, 0, 2000),
+                    'updated_at' => now(),
+                ]);
             } elseif (empty($result['snippets'])) {
                 $this->caddy_snippets_flash = __('No snippet blocks found in the Caddyfile yet.');
+                DB::table('console_actions')->where('id', $consoleId)->update([
+                    'status' => ConsoleAction::STATUS_COMPLETED,
+                    'finished_at' => now(),
+                    'error' => null,
+                    'updated_at' => now(),
+                ]);
+            } else {
+                DB::table('console_actions')->where('id', $consoleId)->update([
+                    'status' => ConsoleAction::STATUS_COMPLETED,
+                    'finished_at' => now(),
+                    'error' => null,
+                    'updated_at' => now(),
+                ]);
             }
         } catch (\Throwable $e) {
             $this->caddy_snippets_error = __('Failed to read snippets: :msg', ['msg' => $e->getMessage()]);
             $this->caddy_snippets_loaded = false;
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
         }
     }
 
@@ -2284,18 +5333,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save Caddy snippets'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\CaddySnippetsConfig::class)
+            app(CaddySnippetsConfig::class)
                 ->save($this->server, $this->caddy_snippets_form, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -2303,8 +5352,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->caddy_snippets_flash = __('Snippets saved and Caddy reloaded.');
             $this->loadCaddySnippetsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -2350,23 +5399,23 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Add Caddy snippet: :name', ['name' => trim($this->caddy_snippets_new['name'] ?? '')]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\CaddySnippetsConfig::class)
+            app(CaddySnippetsConfig::class)
                 ->addSnippet(
                     $this->server,
                     (string) ($this->caddy_snippets_new['name'] ?? ''),
                     (string) ($this->caddy_snippets_new['body'] ?? ''),
                     $emitter,
                 );
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -2376,8 +5425,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->caddy_snippets_new = ['name' => '', 'body' => ''];
             $this->loadCaddySnippetsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -2409,18 +5458,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Remove Caddy snippet: :name', ['name' => $name]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\CaddySnippetsConfig::class)
+            app(CaddySnippetsConfig::class)
                 ->removeSnippet($this->server, $name, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -2428,8 +5477,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->caddy_snippets_flash = __('Snippet (:name) removed and Caddy reloaded.', ['name' => $name]);
             $this->loadCaddySnippetsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -2437,6 +5486,485 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->caddy_snippets_error = $e->getMessage();
         }
     }
+
+    public function loadCaddyModulesInventory(bool $forceFresh = false): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->caddy_modules_error = __('Provisioning and SSH must be ready before listing Caddy modules.');
+
+            return;
+        }
+
+        if ($this->caddy_modules_loaded && ! $forceFresh) {
+            return;
+        }
+
+        $this->caddy_modules_flash = null;
+        $this->caddy_modules_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Read Caddy modules'),
+        );
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new ConsoleEmitter($consoleId);
+
+        try {
+            $result = app(CaddyModulesManager::class)->read($this->server, $emitter);
+            $this->caddy_modules_installed = $result['modules'];
+            $this->caddy_modules_plugins = $result['plugins'];
+            $this->caddy_modules_caddy_version = $result['caddy_version'];
+            $this->caddy_modules_custom_binary = (bool) $result['custom_binary'];
+            $this->caddy_modules_loaded = true;
+
+            if (! empty($result['unreadable'])) {
+                $this->caddy_modules_error = __('Could not run `caddy list-modules` on the server.');
+                DB::table('console_actions')->where('id', $consoleId)->update([
+                    'status' => ConsoleAction::STATUS_FAILED,
+                    'finished_at' => now(),
+                    'error' => mb_substr((string) $this->caddy_modules_error, 0, 2000),
+                    'updated_at' => now(),
+                ]);
+            } else {
+                DB::table('console_actions')->where('id', $consoleId)->update([
+                    'status' => ConsoleAction::STATUS_COMPLETED,
+                    'finished_at' => now(),
+                    'error' => null,
+                    'updated_at' => now(),
+                ]);
+            }
+
+            try {
+                $this->refreshCaddyModulesCatalogState();
+            } catch (\Throwable) {
+                // Registry refresh is best-effort — inventory still loaded.
+            }
+        } catch (\Throwable $e) {
+            $this->caddy_modules_error = __('Failed to read modules: :msg', ['msg' => $e->getMessage()]);
+            $this->caddy_modules_loaded = false;
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+        }
+    }
+
+    public function refreshCaddyModulesInventory(): void
+    {
+        $this->loadCaddyModulesInventory(forceFresh: true);
+    }
+
+    public function setCaddyModulesFilter(string $filter): void
+    {
+        $this->caddy_modules_filter = in_array($filter, ['all', 'handlers', 'matchers', 'tls', 'storage', 'dns', 'core', 'other'], true)
+            ? $filter
+            : 'all';
+    }
+
+    public function resetCaddyModulesCompiledFilters(): void
+    {
+        $this->caddy_modules_filter = 'all';
+        $this->caddy_modules_search = '';
+    }
+
+    public function openCaddyModuleBrowse(): void
+    {
+        $this->caddy_modules_show_browse = true;
+        $this->caddy_modules_browse_search = '';
+        $this->caddy_modules_browse_error = null;
+        $this->refreshCaddyModulesCatalogState();
+    }
+
+    public function closeCaddyModuleBrowse(): void
+    {
+        $this->caddy_modules_show_browse = false;
+        $this->caddy_modules_browse_search = '';
+        $this->caddy_modules_browse_packages = [];
+        $this->caddy_modules_browse_error = null;
+    }
+
+    public function updatedCaddyModulesBrowseSearch(): void
+    {
+        $this->refreshCaddyModulesBrowseList();
+    }
+
+    public function refreshCaddyModulesCatalogState(): void
+    {
+        $this->caddy_modules_available_catalog = app(CaddyModulesManager::class)->availableCatalog(
+            $this->caddy_modules_plugins,
+            $this->caddy_modules_installed,
+        );
+
+        if ($this->caddy_modules_show_browse) {
+            $this->refreshCaddyModulesBrowseList();
+        }
+    }
+
+    public function refreshCaddyModulesBrowseList(): void
+    {
+        if (! $this->caddy_modules_show_browse) {
+            return;
+        }
+
+        try {
+            $this->caddy_modules_browse_packages = app(CaddyModulesManager::class)->browsePackages(
+                $this->caddy_modules_plugins,
+                $this->caddy_modules_installed,
+                $this->caddy_modules_browse_search,
+            );
+            $this->caddy_modules_browse_error = null;
+        } catch (\Throwable $e) {
+            $this->caddy_modules_browse_packages = [];
+            $this->caddy_modules_browse_error = __('Could not load community modules: :msg', ['msg' => $e->getMessage()]);
+        }
+    }
+
+    public function openAddCaddyModuleForm(): void
+    {
+        $this->caddy_modules_show_add = true;
+        $this->caddy_modules_new = ['path' => '', 'version' => ''];
+        $this->caddy_modules_error = null;
+        $this->caddy_modules_flash = null;
+    }
+
+    public function cancelAddCaddyModuleForm(): void
+    {
+        $this->caddy_modules_show_add = false;
+        $this->caddy_modules_new = ['path' => '', 'version' => ''];
+    }
+
+    public function queueCatalogCaddyModule(string $path): void
+    {
+        $this->openConfirmInstallCaddyModule($path);
+    }
+
+    public function requestAddCaddyModule(): void
+    {
+        $this->openConfirmInstallCaddyModule(
+            (string) ($this->caddy_modules_new['path'] ?? ''),
+            (string) ($this->caddy_modules_new['version'] ?? ''),
+        );
+    }
+
+    public function openConfirmInstallCaddyModule(string $path, string $version = '', bool $rebuild = true): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot modify Caddy modules.'));
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->toastError(__('Provisioning and SSH must be ready before adding a Caddy plugin.'));
+
+            return;
+        }
+
+        $path = trim($path);
+        $version = trim($version);
+
+        try {
+            $info = app(CaddyModulesManager::class)->packageInfoForInstall($path);
+        } catch (\Throwable $e) {
+            $this->caddy_modules_error = $e->getMessage();
+
+            return;
+        }
+
+        foreach ($this->caddy_modules_plugins as $plugin) {
+            if (($plugin['path'] ?? '') === $path) {
+                $this->toastError(__('That plugin is already in the build manifest.'));
+
+                return;
+            }
+        }
+
+        $this->caddy_modules_error = null;
+
+        $this->openConfirmActionModal(
+            'installCaddyModuleConfirmed',
+            [$path, $version, $rebuild],
+            __('Install Caddy plugin?'),
+            __('Review the plugin details below. Confirming adds it to your custom build manifest and compiles it into the Caddy binary with xcaddy on the server.'),
+            $rebuild ? __('Add & rebuild') : __('Add to manifest'),
+            false,
+            $this->caddyModuleInstallModalDetails($info, $version, $rebuild),
+        );
+    }
+
+    public function installCaddyModuleConfirmed(string $path, string $version = '', bool $rebuild = true): void
+    {
+        $this->caddy_modules_new = ['path' => $path, 'version' => $version];
+        $this->submitAddCaddyModule(rebuild: $rebuild);
+    }
+
+    /**
+     * @param  array{
+     *     path: string,
+     *     repo: string,
+     *     label: string,
+     *     description: string,
+     *     module_ids: list<string>,
+     *     docs_url: string,
+     * }  $info
+     * @return list<array{label: string, value: string, mono?: bool, multiline?: bool, link?: bool}>
+     */
+    protected function caddyModuleInstallModalDetails(array $info, string $version = '', bool $rebuild = true): array
+    {
+        $details = [
+            ['label' => (string) __('Plugin'), 'value' => (string) $info['label']],
+            ['label' => (string) __('Package'), 'value' => (string) $info['path'], 'mono' => true],
+        ];
+
+        if ($version !== '') {
+            $details[] = ['label' => (string) __('Version pin'), 'value' => $version, 'mono' => true];
+        }
+
+        if (($info['description'] ?? '') !== '') {
+            $details[] = ['label' => (string) __('About'), 'value' => (string) $info['description'], 'multiline' => true];
+        }
+
+        if (($info['module_ids'] ?? []) !== []) {
+            $details[] = [
+                'label' => (string) __('Module IDs'),
+                'value' => implode("\n", $info['module_ids']),
+                'mono' => true,
+                'multiline' => true,
+            ];
+        }
+
+        if (($info['repo'] ?? '') !== '') {
+            $details[] = ['label' => (string) __('Repository'), 'value' => (string) $info['repo'], 'mono' => true, 'link' => true];
+        }
+
+        if (($info['docs_url'] ?? '') !== '') {
+            $details[] = ['label' => (string) __('Documentation'), 'value' => (string) $info['docs_url'], 'link' => true];
+        }
+
+        $details[] = [
+            'label' => (string) __('Build impact'),
+            'value' => $rebuild
+                ? (string) __('Queues an xcaddy rebuild on the server, validates the new binary against your Caddyfile, installs it, and restarts Caddy. This usually takes several minutes.')
+                : (string) __('Adds the plugin to the manifest only — rebuild Caddy manually when you are ready.'),
+            'multiline' => true,
+        ];
+
+        return $details;
+    }
+
+    public function submitAddCaddyModule(bool $rebuild = true): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->caddy_modules_error = __('Deployers cannot modify Caddy modules.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->caddy_modules_error = __('Provisioning and SSH must be ready before adding a Caddy plugin.');
+
+            return;
+        }
+
+        $this->caddy_modules_flash = null;
+        $this->caddy_modules_error = null;
+
+        try {
+            $this->server = app(CaddyModulesManager::class)->addPlugin(
+                $this->server,
+                (string) ($this->caddy_modules_new['path'] ?? ''),
+                (string) ($this->caddy_modules_new['version'] ?? ''),
+            );
+            $this->caddy_modules_show_add = false;
+            $this->caddy_modules_new = ['path' => '', 'version' => ''];
+            $this->loadCaddyModulesInventory();
+
+            if ($rebuild) {
+                $this->queueCaddyModulesRebuild();
+            } else {
+                $this->caddy_modules_flash = __('Plugin added to the build manifest. Rebuild Caddy to compile it in.');
+            }
+        } catch (\Throwable $e) {
+            $this->caddy_modules_error = $e->getMessage();
+        }
+    }
+
+    public function removeCaddyModulePlugin(string $path): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->caddy_modules_error = __('Deployers cannot modify Caddy modules.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->caddy_modules_error = __('Provisioning and SSH must be ready before removing a Caddy plugin.');
+
+            return;
+        }
+
+        $this->caddy_modules_flash = null;
+        $this->caddy_modules_error = null;
+
+        try {
+            $this->server = app(CaddyModulesManager::class)->removePlugin($this->server, $path);
+            $remaining = app(CaddyModulesManager::class)->manifestPlugins($this->server);
+            $this->loadCaddyModulesInventory();
+
+            if ($remaining === []) {
+                $this->queueRestoreCaddyPackageBinary();
+                $this->caddy_modules_flash = __('Last plugin removed — restoring the apt Caddy package.');
+            } else {
+                $this->queueCaddyModulesRebuild();
+            }
+        } catch (\Throwable $e) {
+            $this->caddy_modules_error = $e->getMessage();
+        }
+    }
+
+    public function queueCaddyModulesRebuild(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot rebuild Caddy.'));
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->toastError(__('Provisioning and SSH must be ready before rebuilding Caddy.'));
+
+            return;
+        }
+
+        $plugins = app(CaddyModulesManager::class)->manifestPlugins($this->server);
+        if ($plugins === []) {
+            $this->toastError(__('Add at least one plugin before rebuilding.'));
+
+            return;
+        }
+
+        $this->caddy_modules_flash = null;
+        $this->caddy_modules_error = null;
+
+        $label = __('Rebuild Caddy with plugins');
+        $this->dispatchQueuedManageScript(
+            $this->server->fresh() ?? $this->server,
+            'manage-config:caddy-modules-rebuild',
+            app(CaddyModulesManager::class)->rebuildScript($this->server),
+            (int) config('caddy_modules.rebuild_timeout_seconds', 900),
+            __('Custom Caddy build finished.'),
+            $label,
+            $label,
+        );
+    }
+
+    public function queueRestoreCaddyPackageBinary(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->toastError(__('Deployers cannot restore the Caddy package.'));
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->toastError(__('Provisioning and SSH must be ready before restoring Caddy.'));
+
+            return;
+        }
+
+        $this->server = app(CaddyModulesManager::class)->clearManifest($this->server);
+
+        $label = __('Restore apt Caddy package');
+        $this->dispatchQueuedManageScript(
+            $this->server->fresh() ?? $this->server,
+            'manage-config:caddy-modules-restore',
+            app(CaddyModulesManager::class)->restorePackageScript(),
+            600,
+            __('Caddy package restored.'),
+            $label,
+            $label,
+        );
+    }
+
+    /**
+     * @return array{active: bool, message: string, mode: ?string}
+     */
+    public function caddyModulesBuildState(): array
+    {
+        $tasks = [
+            'manage-config:caddy-modules-rebuild' => [
+                'running' => (string) __('Building custom Caddy binary…'),
+                'queued' => (string) __('Queued Caddy rebuild…'),
+                'mode' => 'rebuild',
+            ],
+            'manage-config:caddy-modules-restore' => [
+                'running' => (string) __('Restoring apt Caddy package…'),
+                'queued' => (string) __('Queued package restore…'),
+                'mode' => 'restore',
+            ],
+        ];
+
+        if ($this->manageRemoteTaskId !== null && $this->manageRemoteTaskId !== '') {
+            $taskName = (string) ($this->manageRemoteTaskName ?? '');
+            if (isset($tasks[$taskName])) {
+                $payload = Cache::get(ServerManageRemoteSshJob::cacheKey($this->manageRemoteTaskId));
+                if (is_array($payload)) {
+                    $status = (string) ($payload['status'] ?? '');
+                    if (in_array($status, ['queued', 'running'], true)) {
+                        return [
+                            'active' => true,
+                            'message' => $status === 'queued'
+                                ? $tasks[$taskName]['queued']
+                                : $tasks[$taskName]['running'],
+                            'mode' => $tasks[$taskName]['mode'],
+                        ];
+                    }
+                }
+            }
+        }
+
+        $running = ServerManageAction::query()
+            ->where('server_id', $this->server->id)
+            ->whereIn('task_name', array_keys($tasks))
+            ->whereIn('status', [ServerManageAction::STATUS_QUEUED, ServerManageAction::STATUS_RUNNING])
+            ->orderByDesc('created_at')
+            ->first();
+
+        if ($running !== null && isset($tasks[$running->task_name])) {
+            $meta = $tasks[$running->task_name];
+
+            return [
+                'active' => true,
+                'message' => $running->status === ServerManageAction::STATUS_QUEUED
+                    ? $meta['queued']
+                    : $meta['running'],
+                'mode' => $meta['mode'],
+            ];
+        }
+
+        return ['active' => false, 'message' => '', 'mode' => null];
+    }
+
+    /** Poll hook — empty body; Livewire re-render refreshes {@see caddyModulesBuildState()}. */
+    public function refreshCaddyModulesBuildUi(): void {}
 
     public function loadOlsVhostsConfig(): void
     {
@@ -2449,7 +5977,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\OpenLiteSpeedVhostsConfig::class)->read($this->server);
+            $result = app(OpenLiteSpeedVhostsConfig::class)->read($this->server);
             $form = [];
             $identity = [];
             foreach ($result['vhosts'] as $vh) {
@@ -2469,7 +5997,7 @@ class WorkspaceWebserver extends WorkspaceManage
             if (! empty($result['unreadable_httpd'])) {
                 $this->ols_vhosts_error = __('Could not read /usr/local/lsws/conf/httpd_config.conf — check sudo permissions for the deploy user.');
             } elseif (empty($result['vhosts'])) {
-                $this->ols_vhosts_flash = __('No vhTemplate blocks found in httpd_config.conf — add a site to populate this list.');
+                $this->ols_vhosts_flash = __('No virtual hosts found in httpd_config.conf — add a site to populate this list.');
             }
         } catch (\Throwable $e) {
             $this->ols_vhosts_error = __('Failed to read vhost config: :msg', ['msg' => $e->getMessage()]);
@@ -2511,18 +6039,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save OpenLiteSpeed vhost config'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\OpenLiteSpeedVhostsConfig::class)
+            app(OpenLiteSpeedVhostsConfig::class)
                 ->save($this->server, $updates, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -2530,8 +6058,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->ols_vhosts_flash = __('Vhost config saved and OpenLiteSpeed reloaded.');
             $this->loadOlsVhostsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -2551,7 +6079,7 @@ class WorkspaceWebserver extends WorkspaceManage
         }
 
         try {
-            $result = app(\App\Services\Servers\OpenLiteSpeedListenersConfig::class)->read($this->server);
+            $result = app(OpenLiteSpeedListenersConfig::class)->read($this->server);
             $form = [];
             $identity = [];
             $maps = [];
@@ -2600,18 +6128,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Save OpenLiteSpeed listener config'),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\OpenLiteSpeedListenersConfig::class)
+            app(OpenLiteSpeedListenersConfig::class)
                 ->save($this->server, $this->ols_listeners_form, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -2619,8 +6147,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->ols_listeners_flash = __('Listener config saved and OpenLiteSpeed reloaded.');
             $this->loadOlsListenersConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -2666,18 +6194,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Add OpenLiteSpeed listener: :name', ['name' => trim($this->ols_listeners_new['name'] ?? '')]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\OpenLiteSpeedListenersConfig::class)
+            app(OpenLiteSpeedListenersConfig::class)
                 ->addListener($this->server, $this->ols_listeners_new, [], $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -2687,8 +6215,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->ols_listeners_new = ['name' => '', 'address' => '', 'secure' => '0', 'keyFile' => '', 'certFile' => ''];
             $this->loadOlsListenersConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -2720,18 +6248,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Remove OpenLiteSpeed listener: :name', ['name' => $name]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\OpenLiteSpeedListenersConfig::class)
+            app(OpenLiteSpeedListenersConfig::class)
                 ->removeListener($this->server, $name, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -2739,8 +6267,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->ols_listeners_flash = __('Listener :name removed and OpenLiteSpeed reloaded.', ['name' => $name]);
             $this->loadOlsListenersConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
@@ -2777,18 +6305,18 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Remove OpenLiteSpeed ExtApp: :name', ['name' => $name]),
         );
-        \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-            'status' => \App\Models\ConsoleAction::STATUS_RUNNING,
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
             'updated_at' => now(),
         ]);
-        $emitter = new \App\Services\ConsoleActions\ConsoleEmitter($consoleId);
+        $emitter = new ConsoleEmitter($consoleId);
 
         try {
-            app(\App\Services\Servers\OpenLiteSpeedExtAppsConfig::class)
+            app(OpenLiteSpeedExtAppsConfig::class)
                 ->removeApp($this->server, $name, $emitter);
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_COMPLETED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
                 'finished_at' => now(),
                 'error' => null,
                 'updated_at' => now(),
@@ -2796,13 +6324,106 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->ols_extapps_flash = __('ExtApp :name removed and OpenLiteSpeed reloaded.', ['name' => $name]);
             $this->loadOlsExtAppsConfig();
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\DB::table('console_actions')->where('id', $consoleId)->update([
-                'status' => \App\Models\ConsoleAction::STATUS_FAILED,
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
                 'error' => mb_substr($e->getMessage(), 0, 2000),
                 'updated_at' => now(),
             ]);
             $this->ols_extapps_error = $e->getMessage();
+        }
+    }
+
+    /**
+     * Repair a down Caddy unix upstream to PHP-FPM (start FPM, socket access, reload Caddy).
+     * Invoked from the Upstreams live-state table after modal confirmation.
+     */
+    public function repairCaddyPhpFpmUpstream(string $upstreamAddress): void
+    {
+        $phpManager = app(ServerPhpManager::class);
+        $installed = $phpManager->probeInstalledVersionIds($this->server);
+        $versions = CaddyPhpFpmUpstreamAddress::repairPhpVersions(
+            $upstreamAddress,
+            $installed,
+            $phpManager->probeLatestInstalledVersion($this->server),
+        );
+
+        if ($versions['upstream'] === null && ! CaddyPhpFpmUpstreamAddress::isPhpFpmSocket($upstreamAddress)) {
+            $this->remote_error = __('Could not determine PHP version from this upstream.');
+
+            return;
+        }
+
+        $this->allowlistedActionPhpVersion = $versions['primary'];
+        $this->allowlistedActionUpstreamPhpVersion = $versions['needs_config_update'] ? $versions['upstream'] : null;
+
+        try {
+            $this->runAllowlistedAction('repair_caddy_php_fpm_upstream');
+            if ($this->remote_error === null && ($this->manageRemoteTaskId === null || $this->manageRemoteTaskId === '')) {
+                $this->reapplyCaddySiteConfigsAfterPhpRepair();
+            }
+        } finally {
+            $this->allowlistedActionPhpVersion = null;
+            $this->allowlistedActionUpstreamPhpVersion = null;
+            $this->allowlistedActionPhpVersionFallback = null;
+        }
+    }
+
+    protected function reapplyCaddySiteConfigsAfterPhpRepair(): void
+    {
+        if (strtolower((string) data_get($this->server->meta, 'webserver', 'nginx')) !== 'caddy') {
+            return;
+        }
+
+        $provisioner = app(SiteCaddyProvisioner::class);
+
+        foreach ($this->server->sites()->get() as $site) {
+            if ($site->type === SiteType::Custom) {
+                continue;
+            }
+
+            try {
+                $provisioner->provision($site->fresh());
+            } catch (\Throwable $e) {
+                $this->toastError(__('Could not re-apply Caddy config for :site: :error', [
+                    'site' => $site->name,
+                    'error' => mb_substr($e->getMessage(), 0, 120),
+                ]));
+            }
+        }
+    }
+
+    public function syncManageRemoteTaskFromCache(): void
+    {
+        if ($this->manageRemoteTaskId === null || $this->manageRemoteTaskId === '') {
+            return;
+        }
+
+        $payload = Cache::get(ServerManageRemoteSshJob::cacheKey($this->manageRemoteTaskId));
+        if (! is_array($payload)) {
+            return;
+        }
+
+        $status = (string) ($payload['status'] ?? '');
+        $taskName = $this->manageRemoteTaskName;
+        $refreshLiveState = $status === 'finished'
+            && $this->shouldRefreshWebserverLiveStateAfterRemoteTask($taskName);
+
+        parent::syncManageRemoteTaskFromCache();
+
+        if ($status === 'finished' && $taskName === 'manage-action:repair_caddy_php_fpm_upstream') {
+            $this->reapplyCaddySiteConfigsAfterPhpRepair();
+        }
+
+        if ($status === 'finished' && in_array($taskName, ['manage-config:caddy-modules-rebuild', 'manage-config:caddy-modules-restore'], true)) {
+            $this->server->refresh();
+            if ($this->workspace_tab === 'caddy' && $this->engine_subtab === 'modules') {
+                $this->loadCaddyModulesInventory();
+            }
+        }
+
+        if ($refreshLiveState && $this->isEngineLiveStateSubtab($this->engine_subtab, $this->workspace_tab)) {
+            $this->ensureEngineLiveState(forceFresh: true);
         }
     }
 
@@ -2815,20 +6436,809 @@ class WorkspaceWebserver extends WorkspaceManage
     public function refreshEngineLiveState(): void
     {
         $this->authorize('view', $this->server);
+        $this->ensureEngineLiveState(forceFresh: true);
+        $this->toastSuccess(__('Refreshed.'));
+    }
+
+    /**
+     * Load cached live-state when fresh (default 60s TTL), otherwise probe
+     * over SSH and persist to Server.meta. Called when opening a live-state
+     * sub-tab (Hosts, Upstreams, etc.).
+     */
+    public function ensureEngineLiveState(bool $forceFresh = false): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            return;
+        }
+
         $engine = $this->workspace_tab;
+        if (! $this->isEngineLiveStateSubtab($this->engine_subtab, $engine)) {
+            return;
+        }
+
         $probe = $this->resolveLiveStateProbe($engine);
         if ($probe === null) {
-            $this->toastError(__('No live-state probe registered for :engine.', ['engine' => $engine]));
+            return;
+        }
+
+        $this->engine_live_state_loading = true;
+
+        try {
+            $probe->probe($this->server->fresh(), $forceFresh);
+            $this->server->refresh();
+            if ($engine === 'traefik') {
+                $this->mergeTraefikStaticEntrypointsIntoMeta();
+                $this->server->refresh();
+            }
+        } catch (\Throwable $e) {
+            if ($forceFresh) {
+                $this->toastError(__('Refresh failed: :msg', ['msg' => $e->getMessage()]));
+            }
+        } finally {
+            $this->engine_live_state_loading = false;
+        }
+    }
+
+    private function isEngineLiveStateSubtab(string $subtab, string $engine): bool
+    {
+        $map = [
+            'openlitespeed' => ['vhosts', 'listeners', 'extapps', 'modules', 'cache'],
+            'caddy' => ['routes', 'upstreams', 'certs', 'admin'],
+            'nginx' => ['hosts', 'upstreams', 'certs', 'modules', 'workers'],
+            'apache' => ['vhosts', 'modules', 'certs', 'workers'],
+            'traefik' => [
+                'routers', 'services', 'middlewares', 'entrypoints',
+                'tcprouters', 'tcpservices', 'udprouters', 'udpservices', 'tls', 'providers',
+            ],
+            'haproxy' => ['frontends', 'backends', 'ssl', 'runtime'],
+            'envoy' => ['listeners', 'clusters', 'runtime', 'virtualhosts', 'stats'],
+            'openresty' => ['servers', 'upstreams', 'runtime'],
+        ];
+
+        return in_array($subtab, $map[$engine] ?? [], true);
+    }
+
+    public function loadCaddyCustomRoutesConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->caddy_custom_routes_error = __('Provisioning and SSH must be ready before reading custom routes.');
 
             return;
         }
+
         try {
-            $probe->probe($this->server->fresh(), forceFresh: true);
-            $this->server->refresh();
-            $this->toastSuccess(__('Refreshed.'));
+            $result = app(CaddyCustomRoutesConfig::class)->read($this->server);
+            $form = [];
+            foreach ($result['routes'] as $route) {
+                $slug = (string) ($route['slug'] ?? '');
+                if ($slug === '') {
+                    continue;
+                }
+                $form[$slug] = [
+                    'hosts' => implode("\n", $route['hosts'] ?? []),
+                    'root' => (string) ($route['root'] ?? ''),
+                    'upstream' => (string) ($route['upstream'] ?? ''),
+                ];
+            }
+            $this->caddy_custom_routes_form = $form;
+            $this->caddy_custom_routes_loaded = true;
+            $this->caddy_custom_routes_flash = null;
+            $this->caddy_custom_routes_error = null;
+            if (! empty($result['unreadable'])) {
+                $this->caddy_custom_routes_error = __('Could not read custom route files — check sudo permissions for the deploy user.');
+            }
         } catch (\Throwable $e) {
-            $this->toastError(__('Refresh failed: :msg', ['msg' => $e->getMessage()]));
+            $this->caddy_custom_routes_error = __('Failed to read custom routes: :msg', ['msg' => $e->getMessage()]);
+            $this->caddy_custom_routes_loaded = false;
         }
+    }
+
+    public function openAddCaddyCustomRouteForm(): void
+    {
+        $this->caddy_custom_routes_show_add = true;
+        $this->caddy_custom_routes_new = [
+            'slug' => '',
+            'hosts' => '',
+            'root' => '',
+            'upstream' => '',
+        ];
+        $this->caddy_custom_routes_error = null;
+        $this->caddy_custom_routes_flash = null;
+    }
+
+    public function cancelAddCaddyCustomRouteForm(): void
+    {
+        $this->caddy_custom_routes_show_add = false;
+        $this->caddy_custom_routes_new = [
+            'slug' => '',
+            'hosts' => '',
+            'root' => '',
+            'upstream' => '',
+        ];
+    }
+
+    public function submitAddCaddyCustomRoute(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->caddy_custom_routes_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->caddy_custom_routes_error = __('Provisioning and SSH must be ready before adding a custom route.');
+
+            return;
+        }
+
+        $this->caddy_custom_routes_flash = null;
+        $this->caddy_custom_routes_error = null;
+
+        $fields = $this->caddyCustomRouteFieldsFromForm($this->caddy_custom_routes_new);
+        $slug = (string) ($this->caddy_custom_routes_new['slug'] ?? '');
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Add Caddy custom route: :slug', ['slug' => $slug]),
+        );
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new ConsoleEmitter($consoleId);
+
+        try {
+            app(CaddyCustomRoutesConfig::class)->add($this->server, $slug, $fields, $emitter);
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->caddy_custom_routes_flash = __('Custom route :slug added and Caddy reloaded.', ['slug' => $slug]);
+            $this->caddy_custom_routes_show_add = false;
+            $this->caddy_custom_routes_new = [
+                'slug' => '',
+                'hosts' => '',
+                'root' => '',
+                'upstream' => '',
+            ];
+            $this->loadCaddyCustomRoutesConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->caddy_custom_routes_error = $e->getMessage();
+        }
+    }
+
+    public function saveCaddyCustomRoute(string $slug): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->caddy_custom_routes_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->caddy_custom_routes_error = __('Provisioning and SSH must be ready before saving custom routes.');
+
+            return;
+        }
+
+        if (! isset($this->caddy_custom_routes_form[$slug])) {
+            return;
+        }
+
+        $this->caddy_custom_routes_flash = null;
+        $this->caddy_custom_routes_error = null;
+
+        $fields = $this->caddyCustomRouteFieldsFromForm($this->caddy_custom_routes_form[$slug]);
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Save Caddy custom route: :slug', ['slug' => $slug]),
+        );
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new ConsoleEmitter($consoleId);
+
+        try {
+            app(CaddyCustomRoutesConfig::class)->save($this->server, $slug, $fields, $emitter);
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->caddy_custom_routes_flash = __('Custom route :slug saved and Caddy reloaded.', ['slug' => $slug]);
+            $this->loadCaddyCustomRoutesConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->caddy_custom_routes_error = $e->getMessage();
+        }
+    }
+
+    public function removeCaddyCustomRoute(string $slug): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->caddy_custom_routes_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->caddy_custom_routes_error = __('Provisioning and SSH must be ready before removing custom routes.');
+
+            return;
+        }
+
+        $this->caddy_custom_routes_flash = null;
+        $this->caddy_custom_routes_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Remove Caddy custom route: :slug', ['slug' => $slug]),
+        );
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new ConsoleEmitter($consoleId);
+
+        try {
+            app(CaddyCustomRoutesConfig::class)->remove($this->server, $slug, $emitter);
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->caddy_custom_routes_flash = __('Custom route :slug removed.', ['slug' => $slug]);
+            $this->loadCaddyCustomRoutesConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->caddy_custom_routes_error = $e->getMessage();
+        }
+    }
+
+    /**
+     * @param  array{hosts?: string, root?: string, upstream?: string}  $form
+     * @return array{hosts: list<string>, root: string, upstream: string}
+     */
+    private function caddyCustomRouteFieldsFromForm(array $form): array
+    {
+        $hosts = preg_split('/[\s,]+/', trim((string) ($form['hosts'] ?? ''))) ?: [];
+
+        return [
+            'hosts' => array_values(array_filter(array_map('trim', $hosts), fn (string $s): bool => $s !== '')),
+            'root' => trim((string) ($form['root'] ?? '')),
+            'upstream' => trim((string) ($form['upstream'] ?? '')),
+        ];
+    }
+
+    public function loadNginxCustomHostsConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->nginx_custom_hosts_error = __('Provisioning and SSH must be ready before reading custom hosts.');
+
+            return;
+        }
+
+        try {
+            $result = app(NginxCustomHostsConfig::class)->read($this->server);
+            $form = [];
+            foreach ($result['hosts'] as $host) {
+                $slug = (string) ($host['slug'] ?? '');
+                if ($slug === '') {
+                    continue;
+                }
+                $form[$slug] = [
+                    'server_names' => implode("\n", $host['server_names'] ?? []),
+                    'listen' => implode("\n", $host['listen'] ?? ['80', '[::]:80']),
+                    'root' => (string) ($host['root'] ?? ''),
+                    'upstream' => (string) ($host['upstream'] ?? ''),
+                ];
+            }
+            $this->nginx_custom_hosts_form = $form;
+            $this->nginx_custom_hosts_loaded = true;
+            $this->nginx_custom_hosts_flash = null;
+            $this->nginx_custom_hosts_error = null;
+            if (! empty($result['unreadable'])) {
+                $this->nginx_custom_hosts_error = __('Could not read custom host files — check sudo permissions for the deploy user.');
+            }
+        } catch (\Throwable $e) {
+            $this->nginx_custom_hosts_error = __('Failed to read custom hosts: :msg', ['msg' => $e->getMessage()]);
+            $this->nginx_custom_hosts_loaded = false;
+        }
+    }
+
+    public function openAddNginxCustomHostForm(): void
+    {
+        $this->nginx_custom_hosts_show_add = true;
+        $this->nginx_custom_hosts_new = [
+            'slug' => '',
+            'server_names' => '',
+            'listen' => "80\n[::]:80",
+            'root' => '',
+            'upstream' => '',
+        ];
+        $this->nginx_custom_hosts_error = null;
+        $this->nginx_custom_hosts_flash = null;
+    }
+
+    public function cancelAddNginxCustomHostForm(): void
+    {
+        $this->nginx_custom_hosts_show_add = false;
+        $this->nginx_custom_hosts_new = [
+            'slug' => '',
+            'server_names' => '',
+            'listen' => "80\n[::]:80",
+            'root' => '',
+            'upstream' => '',
+        ];
+    }
+
+    public function submitAddNginxCustomHost(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->nginx_custom_hosts_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->nginx_custom_hosts_error = __('Provisioning and SSH must be ready before adding a custom host.');
+
+            return;
+        }
+
+        $this->nginx_custom_hosts_flash = null;
+        $this->nginx_custom_hosts_error = null;
+
+        $fields = $this->nginxCustomHostFieldsFromForm($this->nginx_custom_hosts_new);
+        $slug = (string) ($this->nginx_custom_hosts_new['slug'] ?? '');
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Add nginx custom host: :slug', ['slug' => $slug]),
+        );
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new ConsoleEmitter($consoleId);
+
+        try {
+            app(NginxCustomHostsConfig::class)->add($this->server, $slug, $fields, $emitter);
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->nginx_custom_hosts_flash = __('Custom host :slug added and nginx reloaded.', ['slug' => $slug]);
+            $this->nginx_custom_hosts_show_add = false;
+            $this->nginx_custom_hosts_new = [
+                'slug' => '',
+                'server_names' => '',
+                'listen' => "80\n[::]:80",
+                'root' => '',
+                'upstream' => '',
+            ];
+            $this->loadNginxCustomHostsConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->nginx_custom_hosts_error = $e->getMessage();
+        }
+    }
+
+    public function saveNginxCustomHost(string $slug): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->nginx_custom_hosts_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->nginx_custom_hosts_error = __('Provisioning and SSH must be ready before saving custom hosts.');
+
+            return;
+        }
+
+        if (! isset($this->nginx_custom_hosts_form[$slug])) {
+            return;
+        }
+
+        $this->nginx_custom_hosts_flash = null;
+        $this->nginx_custom_hosts_error = null;
+
+        $fields = $this->nginxCustomHostFieldsFromForm($this->nginx_custom_hosts_form[$slug]);
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Save nginx custom host: :slug', ['slug' => $slug]),
+        );
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new ConsoleEmitter($consoleId);
+
+        try {
+            app(NginxCustomHostsConfig::class)->save($this->server, $slug, $fields, $emitter);
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->nginx_custom_hosts_flash = __('Custom host :slug saved and nginx reloaded.', ['slug' => $slug]);
+            $this->loadNginxCustomHostsConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->nginx_custom_hosts_error = $e->getMessage();
+        }
+    }
+
+    public function removeNginxCustomHost(string $slug): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->nginx_custom_hosts_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->nginx_custom_hosts_error = __('Provisioning and SSH must be ready before removing custom hosts.');
+
+            return;
+        }
+
+        $this->nginx_custom_hosts_flash = null;
+        $this->nginx_custom_hosts_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Remove nginx custom host: :slug', ['slug' => $slug]),
+        );
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new ConsoleEmitter($consoleId);
+
+        try {
+            app(NginxCustomHostsConfig::class)->remove($this->server, $slug, $emitter);
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->nginx_custom_hosts_flash = __('Custom host :slug removed.', ['slug' => $slug]);
+            $this->loadNginxCustomHostsConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->nginx_custom_hosts_error = $e->getMessage();
+        }
+    }
+
+    public function loadApacheCustomVhostsConfig(): void
+    {
+        $this->authorize('view', $this->server);
+
+        if (! $this->serverOpsReady()) {
+            $this->apache_custom_vhosts_error = __('Provisioning and SSH must be ready before reading custom vhosts.');
+
+            return;
+        }
+
+        try {
+            $result = app(ApacheCustomVhostsConfig::class)->read($this->server);
+            $form = [];
+            foreach ($result['vhosts'] as $vhost) {
+                $slug = (string) ($vhost['slug'] ?? '');
+                if ($slug === '') {
+                    continue;
+                }
+                $form[$slug] = [
+                    'server_name' => (string) ($vhost['server_name'] ?? ''),
+                    'server_aliases' => implode("\n", $vhost['server_aliases'] ?? []),
+                    'document_root' => (string) ($vhost['document_root'] ?? ''),
+                    'php_socket' => (string) ($vhost['php_socket'] ?? ''),
+                ];
+            }
+            $this->apache_custom_vhosts_form = $form;
+            $this->apache_custom_vhosts_loaded = true;
+            $this->apache_custom_vhosts_flash = null;
+            $this->apache_custom_vhosts_error = null;
+            if (! empty($result['unreadable'])) {
+                $this->apache_custom_vhosts_error = __('Could not read custom vhost files — check sudo permissions for the deploy user.');
+            }
+        } catch (\Throwable $e) {
+            $this->apache_custom_vhosts_error = __('Failed to read custom vhosts: :msg', ['msg' => $e->getMessage()]);
+            $this->apache_custom_vhosts_loaded = false;
+        }
+    }
+
+    public function openAddApacheCustomVhostForm(): void
+    {
+        $this->apache_custom_vhosts_show_add = true;
+        $this->apache_custom_vhosts_new = [
+            'slug' => '',
+            'server_name' => '',
+            'server_aliases' => '',
+            'document_root' => '',
+            'php_socket' => '',
+        ];
+        $this->apache_custom_vhosts_error = null;
+        $this->apache_custom_vhosts_flash = null;
+    }
+
+    public function cancelAddApacheCustomVhostForm(): void
+    {
+        $this->apache_custom_vhosts_show_add = false;
+        $this->apache_custom_vhosts_new = [
+            'slug' => '',
+            'server_name' => '',
+            'server_aliases' => '',
+            'document_root' => '',
+            'php_socket' => '',
+        ];
+    }
+
+    public function submitAddApacheCustomVhost(): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->apache_custom_vhosts_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->apache_custom_vhosts_error = __('Provisioning and SSH must be ready before adding a custom vhost.');
+
+            return;
+        }
+
+        $this->apache_custom_vhosts_flash = null;
+        $this->apache_custom_vhosts_error = null;
+
+        $fields = $this->apacheCustomVhostFieldsFromForm($this->apache_custom_vhosts_new);
+        $slug = (string) ($this->apache_custom_vhosts_new['slug'] ?? '');
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Add Apache custom vhost: :slug', ['slug' => $slug]),
+        );
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new ConsoleEmitter($consoleId);
+
+        try {
+            app(ApacheCustomVhostsConfig::class)->add($this->server, $slug, $fields, $emitter);
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->apache_custom_vhosts_flash = __('Custom vhost :slug added and Apache reloaded.', ['slug' => $slug]);
+            $this->apache_custom_vhosts_show_add = false;
+            $this->apache_custom_vhosts_new = [
+                'slug' => '',
+                'server_name' => '',
+                'server_aliases' => '',
+                'document_root' => '',
+                'php_socket' => '',
+            ];
+            $this->loadApacheCustomVhostsConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->apache_custom_vhosts_error = $e->getMessage();
+        }
+    }
+
+    public function saveApacheCustomVhost(string $slug): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->apache_custom_vhosts_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->apache_custom_vhosts_error = __('Provisioning and SSH must be ready before saving custom vhosts.');
+
+            return;
+        }
+
+        if (! isset($this->apache_custom_vhosts_form[$slug])) {
+            return;
+        }
+
+        $this->apache_custom_vhosts_flash = null;
+        $this->apache_custom_vhosts_error = null;
+
+        $fields = $this->apacheCustomVhostFieldsFromForm($this->apache_custom_vhosts_form[$slug]);
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Save Apache custom vhost: :slug', ['slug' => $slug]),
+        );
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new ConsoleEmitter($consoleId);
+
+        try {
+            app(ApacheCustomVhostsConfig::class)->save($this->server, $slug, $fields, $emitter);
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->apache_custom_vhosts_flash = __('Custom vhost :slug saved and Apache reloaded.', ['slug' => $slug]);
+            $this->loadApacheCustomVhostsConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->apache_custom_vhosts_error = $e->getMessage();
+        }
+    }
+
+    public function removeApacheCustomVhost(string $slug): void
+    {
+        $this->authorize('update', $this->server);
+
+        if ($this->currentUserIsDeployer()) {
+            $this->apache_custom_vhosts_error = __('Deployers cannot edit server config.');
+
+            return;
+        }
+
+        if (! $this->serverOpsReady()) {
+            $this->apache_custom_vhosts_error = __('Provisioning and SSH must be ready before removing custom vhosts.');
+
+            return;
+        }
+
+        $this->apache_custom_vhosts_flash = null;
+        $this->apache_custom_vhosts_error = null;
+
+        $consoleId = $this->seedManageConsoleAction(
+            $this->server->fresh(),
+            (string) __('Remove Apache custom vhost: :slug', ['slug' => $slug]),
+        );
+        DB::table('console_actions')->where('id', $consoleId)->update([
+            'status' => ConsoleAction::STATUS_RUNNING,
+            'started_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $emitter = new ConsoleEmitter($consoleId);
+
+        try {
+            app(ApacheCustomVhostsConfig::class)->remove($this->server, $slug, $emitter);
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_COMPLETED,
+                'finished_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $this->apache_custom_vhosts_flash = __('Custom vhost :slug removed.', ['slug' => $slug]);
+            $this->loadApacheCustomVhostsConfig();
+            $this->ensureEngineLiveState(forceFresh: true);
+        } catch (\Throwable $e) {
+            DB::table('console_actions')->where('id', $consoleId)->update([
+                'status' => ConsoleAction::STATUS_FAILED,
+                'finished_at' => now(),
+                'error' => mb_substr($e->getMessage(), 0, 2000),
+                'updated_at' => now(),
+            ]);
+            $this->apache_custom_vhosts_error = $e->getMessage();
+        }
+    }
+
+    /**
+     * @param  array{server_name?: string, server_aliases?: string, document_root?: string, php_socket?: string}  $form
+     * @return array{server_name: string, server_aliases: list<string>, document_root: string, php_socket: string}
+     */
+    private function apacheCustomVhostFieldsFromForm(array $form): array
+    {
+        return [
+            'server_name' => trim((string) ($form['server_name'] ?? '')),
+            'server_aliases' => array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', (string) ($form['server_aliases'] ?? '')) ?: []))),
+            'document_root' => trim((string) ($form['document_root'] ?? '')),
+            'php_socket' => trim((string) ($form['php_socket'] ?? '')),
+        ];
+    }
+
+    /**
+     * @param  array{server_names?: string, listen?: string, root?: string, upstream?: string}  $form
+     * @return array{server_names: list<string>, listen: list<string>, root: string, upstream: string}
+     */
+    private function nginxCustomHostFieldsFromForm(array $form): array
+    {
+        return [
+            'server_names' => array_values(array_filter(array_map('trim', preg_split('/[\s,]+/', (string) ($form['server_names'] ?? '')) ?: []))),
+            'listen' => array_values(array_filter(array_map('trim', preg_split('/\R/', (string) ($form['listen'] ?? '')) ?: []))),
+            'root' => trim((string) ($form['root'] ?? '')),
+            'upstream' => trim((string) ($form['upstream'] ?? '')),
+        ];
     }
 
     /**
@@ -2836,15 +7246,17 @@ class WorkspaceWebserver extends WorkspaceManage
      * probe isn't built yet (anything other than OLS in v1). Each
      * subsequent engine wires in here as its probe lands.
      */
-    private function resolveLiveStateProbe(string $engine): ?\App\Services\Servers\LiveState\EngineLiveStateProbe
+    private function resolveLiveStateProbe(string $engine): ?EngineLiveStateProbe
     {
         return match ($engine) {
-            'openlitespeed' => app(\App\Services\Servers\LiveState\OlsLiveStateProbe::class),
-            'caddy' => app(\App\Services\Servers\LiveState\CaddyLiveStateProbe::class),
-            'nginx' => app(\App\Services\Servers\LiveState\NginxLiveStateProbe::class),
-            'apache' => app(\App\Services\Servers\LiveState\ApacheLiveStateProbe::class),
-            'traefik' => app(\App\Services\Servers\LiveState\TraefikLiveStateProbe::class),
-            'haproxy' => app(\App\Services\Servers\LiveState\HaproxyLiveStateProbe::class),
+            'openlitespeed' => app(OlsLiveStateProbe::class),
+            'caddy' => app(CaddyLiveStateProbe::class),
+            'nginx' => app(NginxLiveStateProbe::class),
+            'apache' => app(ApacheLiveStateProbe::class),
+            'traefik' => app(TraefikLiveStateProbe::class),
+            'haproxy' => app(HaproxyLiveStateProbe::class),
+            'envoy' => app(EnvoyLiveStateProbe::class),
+            'openresty' => app(OpenRestyLiveStateProbe::class),
             default => null,
         };
     }
@@ -2865,34 +7277,31 @@ class WorkspaceWebserver extends WorkspaceManage
             return;
         }
 
-        // Queue the load so the banner shows queued→running→completed
-        // exactly like the mutating ops. The worker stashes the file
-        // contents in a cache key; pickupQueuedConfigLoad() (called from
-        // render()) drops them into the editor buffer on the next poll
-        // cycle once the row goes to completed.
-        $consoleId = $this->seedManageConsoleAction(
-            $this->server->fresh(),
-            (string) __('Load webserver config: :path', ['path' => basename($path)]),
-        );
-        $this->pending_load_console_id = $consoleId;
-        $this->pending_load_path = $path;
-        // Clear stale buffer state so the textarea doesn't keep showing the
-        // previous file while the new one loads on the worker.
-        $this->config_selected_path = null;
-        $this->config_contents = '';
-        $this->config_truncated_on_load = false;
+        // Straight, synchronous SSH pull — no queue, no console banner, no poll.
+        // RemoteWebserverConfigService::read() now reads over a single phpseclib
+        // connection (capped well under the request limit), so the file lands in
+        // the editor on this very request. This deliberately bypasses the queued
+        // worker flow for file editing (the queue + poll round-trip was the
+        // source of the "doesn't load" / status:null behaviour).
+        try {
+            $result = app(RemoteWebserverConfigService::class)->read($this->server, $this->workspace_tab, $path);
+        } catch (\Throwable $e) {
+            $this->toastError(__('Could not read :path: :msg', ['path' => basename($path), 'msg' => $e->getMessage()]));
+
+            return;
+        }
+
+        $this->config_selected_path = $path;
+        $this->config_contents = (string) ($result['contents'] ?? '');
+        $this->config_original_contents = $this->config_contents;
+        $this->config_truncated_on_load = (bool) ($result['truncated'] ?? false);
         $this->config_validate_output = null;
         $this->config_validate_ok = null;
         $this->config_last_backup = null;
-        $this->config_backups = [];
-
-        \App\Jobs\RunWebserverConfigOpJob::dispatch(
-            $this->server->id,
-            $consoleId,
-            'read',
-            $this->workspace_tab,
-            $path,
-        );
+        $this->webserverConfigSaveDiffOpen = false;
+        $this->closeWebserverConfigRevisionDiff();
+        $this->refreshConfigBackups();
+        $this->refreshWebserverConfigRevisionState();
     }
 
     /**
@@ -2905,29 +7314,31 @@ class WorkspaceWebserver extends WorkspaceManage
         if ($this->pending_load_console_id === null) {
             return;
         }
-        $row = \App\Models\ConsoleAction::query()->find($this->pending_load_console_id);
+        $row = ConsoleAction::query()->find($this->pending_load_console_id);
         if ($row === null) {
             $this->pending_load_console_id = null;
             $this->pending_load_path = null;
 
             return;
         }
-        if (! in_array($row->status, [\App\Models\ConsoleAction::STATUS_COMPLETED, \App\Models\ConsoleAction::STATUS_FAILED], true)) {
+        if (! in_array($row->status, [ConsoleAction::STATUS_COMPLETED, ConsoleAction::STATUS_FAILED], true)) {
             return; // still queued / running
         }
 
-        if ($row->status === \App\Models\ConsoleAction::STATUS_COMPLETED) {
-            $cached = \Illuminate\Support\Facades\Cache::pull(
-                \App\Jobs\RunWebserverConfigOpJob::readResultCacheKey($this->pending_load_console_id),
+        if ($row->status === ConsoleAction::STATUS_COMPLETED) {
+            $cached = Cache::pull(
+                RunWebserverConfigOpJob::readResultCacheKey($this->pending_load_console_id),
             );
             if (is_array($cached)) {
                 $this->config_selected_path = $this->pending_load_path;
                 $this->config_contents = (string) ($cached['contents'] ?? '');
+                $this->config_original_contents = $this->config_contents;
                 $this->config_truncated_on_load = (bool) ($cached['truncated'] ?? false);
                 // Bust the cached picker listing so the next render reflects
                 // the freshly-read file size + mtime accurately.
-                \Illuminate\Support\Facades\Cache::forget('dply.webserver-config-files:'.$this->server->id.':'.$this->workspace_tab);
+                Cache::forget('dply.webserver-config-files:'.$this->server->id.':'.$this->workspace_tab);
                 $this->refreshConfigBackups();
+                $this->refreshWebserverConfigRevisionState();
             }
         }
         $this->pending_load_console_id = null;
@@ -2992,18 +7403,33 @@ class WorkspaceWebserver extends WorkspaceManage
             return;
         }
 
+        if ($this->webserverConfigRevisionsEnabled()) {
+            app(ServerWebserverConfigEditor::class)->ensureBaseline(
+                $this->server,
+                $this->workspace_tab,
+                (string) $this->config_selected_path,
+                $this->config_original_contents,
+                auth()->user(),
+            );
+        }
+
         $consoleId = $this->seedManageConsoleAction(
             $this->server->fresh(),
             (string) __('Save webserver config: :path', ['path' => basename((string) $this->config_selected_path)]),
         );
-        \App\Jobs\RunWebserverConfigOpJob::dispatch(
+        $this->pending_write_console_id = $consoleId;
+        RunWebserverConfigOpJob::dispatch(
             $this->server->id,
             $consoleId,
             'write',
             $this->workspace_tab,
             $this->config_selected_path,
             $this->config_contents,
+            '',
+            auth()->id(),
+            $this->webserverConfigRevisionsEnabled(),
         );
+        $this->webserverConfigSaveDiffOpen = false;
         $this->toastSuccess(__('Save queued — progress shows in the banner above.'));
     }
 
@@ -3033,7 +7459,8 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Validate webserver config buffer: :path', ['path' => basename((string) $this->config_selected_path)]),
         );
-        \App\Jobs\RunWebserverConfigOpJob::dispatch(
+        $this->pending_validate_console_id = $consoleId;
+        RunWebserverConfigOpJob::dispatch(
             $this->server->id,
             $consoleId,
             'validate',
@@ -3099,7 +7526,7 @@ class WorkspaceWebserver extends WorkspaceManage
             $this->server->fresh(),
             (string) __('Restore revision: :path', ['path' => basename($backup_path)]),
         );
-        \App\Jobs\RunWebserverConfigOpJob::dispatch(
+        RunWebserverConfigOpJob::dispatch(
             $this->server->id,
             $consoleId,
             'restore',
@@ -3173,44 +7600,84 @@ class WorkspaceWebserver extends WorkspaceManage
         }
     }
 
-    public function render(): View
+    public function toggleWebserverLogRaw(): void
     {
-        $this->server->refresh();
-        $this->pickupQueuedConfigLoad();
+        $this->log_raw = ! $this->log_raw;
+    }
 
-        // listFiles does an SSH call. render() runs on every Livewire commit,
-        // including every banner wire:poll tick — so without caching it,
-        // every 4s poll fires a fresh SSH connection. Cache for 10s per
-        // (server, engine) keeps the picker fresh enough but lets the polls
-        // re-use the result. Also gate on the Config sub-tab so other sub-
-        // tabs (Overview / Live-state) skip the SSH entirely.
-        $configFiles = [];
-        if ($this->engine_subtab === 'config'
-            && in_array($this->workspace_tab, ['nginx', 'caddy', 'apache', 'openlitespeed', 'traefik', 'haproxy'], true)
-            && $this->serverOpsReady()) {
-            $cacheKey = 'dply.webserver-config-files:'.$this->server->id.':'.$this->workspace_tab;
-            try {
-                $configFiles = \Illuminate\Support\Facades\Cache::remember(
-                    $cacheKey,
-                    10,
-                    fn () => app(RemoteWebserverConfigService::class)->listFiles($this->server, $this->workspace_tab),
-                );
-            } catch (\Throwable) {
-                $configFiles = [];
-            }
+    /**
+     * Structured view of the current access-log buffer for the Logs tab.
+     *
+     * Only engages for the nginx-family "combined" format and only on the
+     * access log; everything else (error log, journal, non-combined engines,
+     * or operator-forced raw mode) returns ['structured' => false] so the
+     * blade falls back to the existing <pre> dump. The SSH fetch itself is
+     * unchanged — this purely parses the already-fetched text.
+     *
+     * @return array<string, mixed>
+     */
+    public function getParsedAccessLogProperty(): array
+    {
+        $off = ['structured' => false, 'rows' => [], 'summary' => null];
+
+        if ($this->log_raw || $this->log_kind !== 'access' || $this->log_output === '') {
+            return $off;
         }
 
-        return view('livewire.servers.workspace-webserver', [
-            'configPreviews' => config('server_manage.config_previews', []),
-            'serviceActions' => config('server_manage.service_actions', []),
-            'dangerousActions' => config('server_manage.dangerous_actions', []),
-            'autoUpdateIntervals' => config('server_manage.auto_update_intervals', []),
-            'webserverConfigLayout' => config('server_manage.webserver_config_layout', []),
-            'webserverConfigFiles' => $configFiles,
-            'deletionSummary' => $this->showRemoveServerModal
-                ? \App\Services\Servers\ServerRemovalAdvisor::summary($this->server)
-                : null,
-        ]);
+        // Combined format is the nginx default. Other engines (caddy JSON,
+        // apache, haproxy, …) won't match looksLikeCombined() and fall back.
+        $parser = app(NginxAccessLogParser::class);
+        if (! $parser->looksLikeCombined($this->log_output)) {
+            return $off;
+        }
+
+        $rows = $parser->parse($this->log_output);
+
+        return [
+            'structured' => true,
+            'rows' => $rows,
+            'summary' => $parser->summarize($rows),
+        ];
+    }
+
+    public function render(ServerManageToolsReport $toolsReport): View
+    {
+        $consoleLookup = app(ServerConsoleActionLookup::class);
+        if ($consoleLookup->shouldRefreshServerMeta($this->server, 'webserver')) {
+            $this->server->refresh();
+        }
+
+        if (auth()->check() && auth()->user()?->currentOrganization()) {
+            Feature::loadMissing(['workspace.webserver_config_diff']);
+        }
+
+        $this->pickupQueuedConfigLoad();
+        $this->pickupQueuedConfigWrite();
+        $this->pickupQueuedConfigValidate();
+
+        // Picker listing is loaded off the render path (loadWebserverConfigFiles
+        // via wire:init) and held in $webserverConfigFilesRaw — render() does NO
+        // SSH, so the pickup poll can tick safely without blocking the request.
+        $configFiles = $this->engine_subtab === 'config' ? $this->webserverConfigFilesRaw : [];
+
+        return view('livewire.servers.workspace-webserver', array_merge(
+            WebserverWorkspaceViewData::for($this->server, $this),
+            $this->webserverConfigRevisionViewData(),
+            [
+                'configPreviews' => config('server_manage.config_previews', []),
+                'serviceActions' => config('server_manage.service_actions', []),
+                'dangerousActions' => config('server_manage.dangerous_actions', []),
+                'autoUpdateIntervals' => config('server_manage.auto_update_intervals', []),
+                'webserverConfigLayout' => config('server_manage.webserver_config_layout', []),
+                'webserverConfigFiles' => $configFiles,
+                'deletionSummary' => $this->showRemoveServerModal
+                    ? ServerRemovalAdvisor::summary($this->server)
+                    : null,
+                'notifChannels' => $this->workspace_tab === 'notifications' ? $this->assignableWebserverNotificationChannels() : collect(),
+                'notifSubscriptions' => $this->workspace_tab === 'notifications' ? $this->webserverNotificationSubscriptions() : collect(),
+                'notifEventLabels' => $this->workspace_tab === 'notifications' ? $this->webserverEventLabels() : [],
+            ],
+        ));
     }
 
     /**
@@ -3220,7 +7687,7 @@ class WorkspaceWebserver extends WorkspaceManage
      */
     protected function engineSupportsConfig(string $engine): bool
     {
-        return in_array($engine, ['nginx', 'caddy', 'apache', 'openlitespeed', 'traefik', 'haproxy'], true);
+        return in_array($engine, ['nginx', 'caddy', 'apache', 'openlitespeed', 'traefik', 'haproxy', 'envoy', 'openresty'], true);
     }
 
     /**
@@ -3271,6 +7738,8 @@ class WorkspaceWebserver extends WorkspaceManage
         $this->config_truncated_on_load = false;
         $this->config_last_backup = null;
         $this->config_backups = [];
+        $this->webserverConfigFilesRaw = [];
+        $this->webserverConfigFilesLoaded = false;
     }
 
     protected function resetLogViewerState(): void
@@ -3279,5 +7748,6 @@ class WorkspaceWebserver extends WorkspaceManage
         $this->log_output = '';
         $this->log_lines = 300;
         $this->log_live = false;
+        $this->log_raw = false;
     }
 }

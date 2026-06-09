@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Snapshots;
 
-use App\Models\Site;
 use App\Models\Snapshot;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 
@@ -27,8 +26,15 @@ class LocalDiskDestination implements SnapshotDestination
         private readonly ExecuteRemoteTaskOnServer $executor,
     ) {}
 
-    public function persist(Site $site, string $reason, string $dumpRemotePath, int $bytes, string $engine, ?string $userId): Snapshot
+    public function kind(): string
     {
+        return Snapshot::DESTINATION_LOCAL_DISK;
+    }
+
+    public function persist(Snapshot $snapshot, string $dumpRemotePath, int $bytes): Snapshot
+    {
+        $site = $snapshot->site;
+
         // Move the dump from /tmp into the per-site snapshot dir so a
         // crash in the orchestrator doesn't leave it where /tmp sweeps
         // would chew it.
@@ -45,16 +51,15 @@ class LocalDiskDestination implements SnapshotDestination
             timeoutSeconds: 30,
         );
 
-        return Snapshot::query()->create([
-            'site_id' => $site->getKey(),
+        $snapshot->update([
             'destination' => Snapshot::DESTINATION_LOCAL_DISK,
             'local_path' => $finalPath,
             'bytes' => $bytes,
-            'engine' => $engine,
-            'reason' => $reason,
-            'taken_by_user_id' => $userId,
             'expires_at' => now()->addDays(self::TTL_DAYS),
+            'status' => Snapshot::STATUS_COMPLETED,
         ]);
+
+        return $snapshot;
     }
 
     public function restore(Snapshot $snapshot): void

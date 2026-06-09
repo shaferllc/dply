@@ -88,7 +88,7 @@ class ServerObserver
             return;
         }
 
-        SyncOrganizationBillingJob::dispatch($organizationId);
+        SyncOrganizationBillingJob::dispatch($organizationId, 'server_lifecycle');
     }
 
     /**

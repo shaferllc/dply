@@ -9,13 +9,15 @@ use App\Models\Site;
 /**
  * Picks the uptime probe region that best matches where a site is hosted,
  * so an auto-created monitor's region label reflects the host instead of
- * defaulting to EU. Maps a DigitalOcean region slug (nyc1, sfo3, ams3, …)
- * onto one of the configured `site_uptime.probe_regions` keys.
+ * defaulting to EU. Maps a provider region slug — DigitalOcean (nyc1, sfo3,
+ * ams3, …) or Hetzner (fsn1, nbg1, ash, …) — onto one of the configured
+ * `site_uptime.probe_regions` keys.
  */
 final class UptimeProbeRegionResolver
 {
-    /** DigitalOcean region slug prefix → preferred probe-region key. */
+    /** Provider region slug prefix → preferred probe-region key. */
     private const MAP = [
+        // DigitalOcean
         'nyc' => 'us-east',
         'tor' => 'us-east',
         'sfo' => 'us-west',
@@ -25,6 +27,14 @@ final class UptimeProbeRegionResolver
         'sgp' => 'ap-sydney',
         'blr' => 'ap-sydney',
         'syd' => 'ap-sydney',
+        // Hetzner — Falkenstein/Nuremberg/Helsinki are the eu-central zone,
+        // nearest the worker-1 box in Falkenstein.
+        'fsn' => 'eu-falkenstein',
+        'nbg' => 'eu-falkenstein',
+        'hel' => 'eu-falkenstein',
+        'ash' => 'us-east',
+        'hil' => 'us-west',
+        'sin' => 'ap-sydney',
     ];
 
     public function forSite(Site $site): string

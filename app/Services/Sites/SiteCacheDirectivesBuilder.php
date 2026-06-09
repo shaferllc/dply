@@ -112,14 +112,14 @@ NGINX;
         // "cache everything safe" defaults. Per-rule excludes (admin paths,
         // logged-in users) are a v2 follow-up — operators who need them today
         // can drop them via the layered webserver-config editor.
+        // vhTemplate files use `<virtualHostConfig>` — LSCache tunables are
+        // top-level directives there, not a nested `cache { }` block.
         return <<<CONF
-cache  {
-  enableCache             1
-  qsCache                 1
-  reqCookieCache          1
-  respCookieCache         1
-  expireInSeconds         {$expire}
-}
+enableCache             1
+qsCache                 1
+reqCookieCache          1
+respCookieCache         1
+expireInSeconds         {$expire}
 
 CONF;
     }

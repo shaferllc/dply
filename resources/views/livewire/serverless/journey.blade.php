@@ -121,7 +121,7 @@
                             @if ($stage['state'] === 'done')
                                 <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.5 7.5a1 1 0 0 1-1.4 0L3.3 9.7a1 1 0 1 1 1.4-1.4l3.8 3.8 6.8-6.8a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>
                             @elseif ($stage['state'] === 'active')
-                                <svg class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                                <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                                     <path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.4 0 0 5.4 0 12h4z"/>
                                 </svg>
@@ -231,14 +231,21 @@
         </div>
 
         {{-- Function facts --}}
-        <div class="dply-card mt-6 p-6 sm:p-8">
-            <div class="flex items-center justify-between">
-                <h2 class="text-sm font-bold text-brand-ink">{{ __('Function details') }}</h2>
+        <div class="dply-card overflow-hidden mt-6">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <x-icon-badge>
+                    <x-heroicon-o-document-text class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Details') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Function details') }}</h2>
+                </div>
                 @if ($deployDuration !== '')
-                    <span class="text-xs text-brand-moss">{{ __('Deploy took') }} <span class="font-mono">{{ $deployDuration }}</span></span>
+                    <span class="ml-auto shrink-0 text-xs text-brand-moss">{{ __('Deploy took') }} <span class="font-mono">{{ $deployDuration }}</span></span>
                 @endif
             </div>
-            <dl class="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
+            <div class="px-6 py-6 sm:px-7">
+            <dl class="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
                 @foreach ($facts as $fact)
                     <div class="min-w-0">
                         <dt class="text-xs font-medium text-brand-moss/70">{{ $fact['label'] }}</dt>
@@ -261,6 +268,7 @@
                     </dd>
                 </div>
             @endif
+            </div>
         </div>
 
         {{-- Deploy log --}}

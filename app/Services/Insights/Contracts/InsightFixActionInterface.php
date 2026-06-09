@@ -6,6 +6,7 @@ use App\Models\InsightFinding;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Insights\FixResult;
+use App\Services\Servers\ExecuteRemoteTaskOnServer;
 
 interface InsightFixActionInterface
 {
@@ -25,10 +26,10 @@ interface InsightFixActionInterface
      *
      * @param  array<string, mixed>  $params  Per-fix parameters from config.
      * @param  (callable(string $type, string $chunk): void)|null  $onOutput
-     *     Optional streaming hook. When supplied, long-running handlers should plumb it
-     *     through to the SSH layer (e.g. {@see \App\Services\Servers\ExecuteRemoteTaskOnServer::runInlineBashWithOutputCallback})
-     *     so the workspace banner can show progress in real time. Handlers that complete
-     *     in milliseconds may safely ignore it.
+     *                                                                        Optional streaming hook. When supplied, long-running handlers should plumb it
+     *                                                                        through to the SSH layer (e.g. {@see ExecuteRemoteTaskOnServer::runInlineBashWithOutputCallback})
+     *                                                                        so the workspace banner can show progress in real time. Handlers that complete
+     *                                                                        in milliseconds may safely ignore it.
      */
     public function apply(Server $server, ?Site $site, InsightFinding $finding, array $params, ?callable $onOutput = null): FixResult;
 }

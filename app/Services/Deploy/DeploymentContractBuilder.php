@@ -17,10 +17,10 @@ final class DeploymentContractBuilder
 
     public function build(Site $site): DeploymentContract
     {
-        $site->loadMissing(['server', 'domains', 'workspace.variables']);
+        $site->loadMissing(['server', 'domains', 'workspace.variables', 'previewDomains']);
 
         $environment = $this->runtimeEnvironment($site);
-        $defaultPath = '/var/www/'.trim((string) ($site->slug ?: $site->name ?: 'site'), '/');
+        $defaultPath = rtrim($site->conventionalRepositoryPath(), '/');
         $documentRoot = (string) ($site->document_root ?: $defaultPath);
         $repositoryPath = (string) ($site->repository_path ?: $documentRoot);
         $effectiveEnvDirectory = $site->isAtomicDeploys()

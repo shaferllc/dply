@@ -41,6 +41,26 @@ final class DeploymentSecretInventory
             }
         }
 
+        // Managed resource bindings contribute their connection variables here,
+        // between workspace inheritance and the site .env blob. They are a
+        // separate layer kept out of the editable Variables list — but an
+        // explicit site .env key still overrides a binding-provided value
+        // (parsed below), so operators retain a manual escape hatch.
+        $site->loadMissing('bindings');
+        foreach ($site->bindings as $binding) {
+            foreach ($binding->connectionEnv() as $key => $value) {
+                $inventory[] = new DeploymentSecret(
+                    key: (string) $key,
+                    value: (string) $value,
+                    scope: 'binding',
+                    source: 'site_binding:'.$binding->type,
+                    environment: $environment,
+                    classification: $this->classify((string) $key),
+                    isSecret: $this->looksSensitiveKey((string) $key),
+                );
+            }
+        }
+
         $parsed = $this->parser->parse((string) ($site->env_file_content ?? ''));
         foreach ($parsed['variables'] as $key => $value) {
             $inventory[] = new DeploymentSecret(

@@ -1,0 +1,22 @@
+name = "dply-edge"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+# Placeholder — replace with your Cloudflare account values before deploy.
+[vars]
+ENVIRONMENT = "production"
+
+[[r2_buckets]]
+binding = "ARTIFACTS"
+bucket_name = "dply-edge-artifacts"
+
+[[kv_namespaces]]
+binding = "HOST_MAP"
+id = "00000000000000000000000000000000"
+
+# Optional. When bound, the Worker uses this namespace to cache origin
+# GET responses with TTL from Cache-Control: s-maxage (see B1 in
+# docs/edge-roadmap.md). If unset, hybrid sites simply skip the cache.
+[[kv_namespaces]]
+binding = "EDGE_CACHE"
+id = "00000000000000000000000000000000"

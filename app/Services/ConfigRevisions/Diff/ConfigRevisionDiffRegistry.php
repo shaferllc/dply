@@ -18,6 +18,8 @@ class ConfigRevisionDiffRegistry
         'php_fpm_ini' => PhpFileDiffRenderer::class,
         'php_pool' => PhpFileDiffRenderer::class,
         'webserver_config' => WebserverConfigDiffRenderer::class,
+        'server_webserver_file' => PhpFileDiffRenderer::class,
+        'server_config_file' => PhpFileDiffRenderer::class,
     ];
 
     public function __construct(protected Container $container) {}

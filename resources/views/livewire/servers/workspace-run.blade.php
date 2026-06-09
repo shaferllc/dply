@@ -12,11 +12,32 @@
     @include('livewire.servers.partials.workspace-flashes', ['command_output' => $command_output ?? null])
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-explainer class="mb-4" tone="warn">
+    <x-explainer tone="warn">
         <p>{{ __('Run server-level shell commands over SSH from the workspace: ad-hoc one-offs, saved presets, and library snippets (Laravel artisan, php-fpm restart, etc.). Output streams back into the page.') }}</p>
         <p>{{ __('This is full root-equivalent shell access via the dply SSH key. Treat it like a terminal: command goes in, output comes back, no row-level safety net. Saved commands persist on this server only.') }}</p>
         <p>{{ __('Site deploys are NOT run from here — each site\'s page has its own deploy button so deploys can run with site-scoped context. The banner below points at the right surfaces.') }}</p>
     </x-explainer>
+
+    @if ($container_scope_id !== '')
+        <div class="rounded-2xl border border-brand-gold/40 bg-brand-cream/50 p-4">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <p class="text-sm font-semibold text-brand-ink">{{ __('Container scope') }}</p>
+                    <p class="mt-1 font-mono text-sm text-brand-forest">{{ $container_scope_name }}</p>
+                    <p class="mt-2 text-sm leading-relaxed text-brand-moss">
+                        {{ __('Ad-hoc commands and saved recipes run inside this container via docker exec. Host-level marketplace presets (docker ps, prune, etc.) still target the VM unless you save a container-inner recipe.') }}
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    wire:click="clearContainerScope"
+                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                >
+                    {{ __('Clear container scope') }}
+                </button>
+            </div>
+        </div>
+    @endif
 
     {{-- Top-of-page banner clarifying scope. The page used to be
          called "Deploy" and operators kept landing here looking for
@@ -35,9 +56,11 @@
                     {{ __('Open Sites') }}
                 </a>
                 @if ($server->workspace)
-                    <a href="{{ route('projects.delivery', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/30">
-                        {{ __('Open Project delivery') }}
-                    </a>
+                    @feature('surface.projects')
+                        <a href="{{ route('projects.delivery', $server->workspace) }}" wire:navigate class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/30">
+                            {{ __('Open Project delivery') }}
+                        </a>
+                    @endfeature
                 @endif
             </div>
         </div>
@@ -45,13 +68,19 @@
 
     @if ($opsReady)
         <div class="space-y-6">
-            <div class="{{ $card }} p-6 sm:p-8">
-                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div class="min-w-0">
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Library on this server') }}</h2>
-                        <p class="mt-1 text-sm text-brand-moss">
-                            {{ __(':count saved · pulled from marketplace presets, organization scripts, or written here.', ['count' => $server->recipes->count()]) }}
-                        </p>
+            <div class="{{ $card }}">
+                <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-7">
+                    <div class="flex min-w-0 items-start gap-3">
+                        <x-icon-badge>
+                            <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
+                        </x-icon-badge>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Library') }}</p>
+                            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Library on this server') }}</h2>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                {{ __(':count saved · pulled from marketplace presets, organization scripts, or written here.', ['count' => $server->recipes->count()]) }}
+                            </p>
+                        </div>
                     </div>
                     {{-- flex-nowrap + shrink-0 keeps Browse + Write your own
                          on a single row even when the heading column is wide.
@@ -64,7 +93,7 @@
                             wire:click="openLibrary"
                             class="inline-flex items-center gap-1.5 rounded-lg bg-brand-ink px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-ink/90 focus:outline-none focus:ring-2 focus:ring-brand-sage/40"
                         >
-                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <rect x="3" y="3" width="14" height="14" rx="2"/>
                                 <path d="M3 8h14"/>
                                 <path d="M8 3v14"/>
@@ -79,7 +108,7 @@
                             wire:click="startNewRecipe"
                             class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
                         >
-                            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                 <path d="M10 4v12"/>
                                 <path d="M4 10h12"/>
                             </svg>
@@ -88,15 +117,16 @@
                     </div>
                 </div>
 
+                <div class="px-6 py-6 sm:px-7">
                 @if ($server->recipes->isEmpty())
-                    <div class="mt-6 rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-5 py-8 text-center text-sm text-brand-moss">
+                    <div class="rounded-xl border border-dashed border-brand-ink/15 bg-brand-sand/15 px-5 py-8 text-center text-sm text-brand-moss">
                         <p class="font-medium text-brand-ink">{{ __('No saved commands yet.') }}</p>
                         <p class="mt-1">
                             {{ __('Open the library to import a marketplace preset or an organization script — or write your own from scratch.') }}
                         </p>
                     </div>
                 @else
-                    <ul class="mt-6 divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10">
+                    <ul class="divide-y divide-brand-ink/10 rounded-xl border border-brand-ink/10">
                         @foreach ($server->recipes as $rec)
                             <li class="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
                                 <div class="min-w-0">
@@ -120,7 +150,7 @@
                                         class="inline-flex items-center gap-1.5 rounded-lg border border-brand-sage/40 bg-brand-sage/10 px-2.5 py-1 text-brand-sage hover:bg-brand-sage/20 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
                                         <span wire:loading.remove wire:target="runRecipe('{{ $rec->id }}')" class="inline-flex items-center gap-1">
-                                            <x-heroicon-o-bolt class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            <x-heroicon-o-bolt class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Run') }}
                                         </span>
                                         <span wire:loading wire:target="runRecipe('{{ $rec->id }}')" class="inline-flex items-center gap-1.5">
@@ -137,7 +167,7 @@
                                         class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-brand-ink hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
                                         <span wire:loading.remove wire:target="editRecipe('{{ $rec->id }}')" class="inline-flex items-center gap-1">
-                                            <x-heroicon-o-pencil-square class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            <x-heroicon-o-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Edit') }}
                                         </span>
                                         <span wire:loading wire:target="editRecipe('{{ $rec->id }}')" class="inline-flex items-center gap-1.5">
@@ -154,7 +184,7 @@
                                         class="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2.5 py-1 text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
                                     >
                                         <span wire:loading.remove wire:target="{{ $deleteCall }}" class="inline-flex items-center gap-1">
-                                            <x-heroicon-o-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                            <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Delete') }}
                                         </span>
                                         <span wire:loading wire:target="{{ $deleteCall }}" class="inline-flex items-center gap-1.5">
@@ -167,24 +197,32 @@
                         @endforeach
                     </ul>
                 @endif
+                </div>
             </div>
 
             @if ($showEditor)
-                <div class="{{ $card }} p-6 sm:p-8">
-                    <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                            <h2 class="text-lg font-semibold text-brand-ink">
-                                {{ $editing_recipe_id ? __('Edit saved command') : __('New saved command') }}
-                            </h2>
-                            <p class="mt-1 text-sm text-brand-moss">
-                                {{ __('Store the command exactly as it should run on this server. Recipes are listed above and can be run, edited, or deleted any time.') }}
-                            </p>
+                <div class="{{ $card }}">
+                    <div class="flex flex-col gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:px-7">
+                        <div class="flex min-w-0 items-start gap-3">
+                            <x-icon-badge>
+                                <x-heroicon-o-pencil-square class="h-5 w-5" aria-hidden="true" />
+                            </x-icon-badge>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Saved command') }}</p>
+                                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">
+                                    {{ $editing_recipe_id ? __('Edit saved command') : __('New saved command') }}
+                                </h2>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                                    {{ __('Store the command exactly as it should run on this server. Recipes are listed above and can be run, edited, or deleted any time.') }}
+                                </p>
+                            </div>
                         </div>
-                        <button type="button" wire:click="cancelEditingRecipe" class="text-sm font-medium text-brand-moss hover:text-brand-ink">
+                        <button type="button" wire:click="cancelEditingRecipe" class="shrink-0 text-sm font-medium text-brand-moss hover:text-brand-ink">
                             {{ __('Close') }}
                         </button>
                     </div>
 
+                    <div class="px-6 py-6 sm:px-7">
                     @if (! $editing_recipe_id && ! empty($starterTemplates))
                         {{-- Starter templates: pre-fill the form from the
                              small set of presets that the deleted /deploy
@@ -221,6 +259,7 @@
                             </button>
                         </div>
                     </form>
+                    </div>
                 </div>
             @endif
 
@@ -228,17 +267,26 @@
                  /deploy page so /run owns all command execution. Output
                  streams to the live SSH panel via the StreamsRemoteSshLivewire
                  trait — same plumbing the recipe runner uses. --}}
-            <div class="{{ $card }} p-6 sm:p-8">
-                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                        <h2 class="text-lg font-semibold text-brand-ink">{{ __('Run a one-off command') }}</h2>
-                        <p class="mt-1 text-sm text-brand-moss">
-                            {{ __('Type a shell command and run it now. Output streams below; nothing is saved. Save it as a recipe above when you want to keep it around.') }}
+            <div class="{{ $card }}">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <x-icon-badge>
+                        <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('One-off') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Run a one-off command') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            @if ($container_scope_id !== '')
+                                {{ __('Type a command to run inside the scoped container. Output streams below; nothing is saved unless you add it as a saved command.') }}
+                            @else
+                                {{ __('Type a shell command and run it now. Output streams below; nothing is saved. Save it as a recipe above when you want to keep it around.') }}
+                            @endif
                         </p>
                     </div>
                 </div>
-                <form wire:submit="runAdhocCommand" class="mt-5 space-y-3">
-                    <textarea wire:model="adhoc_command" rows="4" class="w-full rounded-lg border border-brand-ink/15 font-mono text-xs shadow-sm" placeholder="uname -a"></textarea>
+                <div class="px-6 py-6 sm:px-7">
+                <form wire:submit="runAdhocCommand" class="space-y-3">
+                    <textarea wire:model="adhoc_command" rows="4" class="w-full rounded-lg border border-brand-ink/15 font-mono text-xs shadow-sm" placeholder="{{ $container_scope_id !== '' ? 'php artisan migrate --force' : 'uname -a' }}"></textarea>
                     <div class="flex flex-wrap items-center gap-3">
                         <x-primary-button type="submit" class="!py-2">
                             {{ __('Run command') }}
@@ -248,6 +296,7 @@
                         @endif
                     </div>
                 </form>
+                </div>
             </div>
 
             <div class="rounded-2xl border border-brand-ink/10 bg-brand-sand/15 px-5 py-4 text-sm text-brand-moss">
@@ -261,9 +310,18 @@
             </div>
         </div>
     @else
-        <div class="rounded-2xl border border-brand-gold/40 bg-brand-sand/40 px-5 py-4 text-sm text-brand-olive">
-            {{ __('Provisioning and SSH must be ready before you can use this section.') }}
-        </div>
+        <section class="dply-card overflow-hidden border-amber-200">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                <x-icon-badge tone="amber">
+                    <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Waiting on provisioning') }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Provisioning and SSH must be ready before you can use this section.') }}</p>
+                </div>
+            </div>
+        </section>
     @endif
 
     <x-slot name="modals">

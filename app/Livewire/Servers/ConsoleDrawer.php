@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Servers;
 
+use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\RunsServerConsoleCommands;
 use App\Models\Server;
 use Illuminate\Contracts\View\View;
@@ -28,7 +29,10 @@ use Livewire\Component;
  */
 class ConsoleDrawer extends Component
 {
+    use RequiresFeature;
     use RunsServerConsoleCommands;
+
+    protected string $requiredFeature = 'workspace.console';
 
     /** Active server, or null when no pick has been made yet. */
     public ?Server $server = null;
@@ -71,6 +75,7 @@ class ConsoleDrawer extends Component
                 $this->verifyActiveServer(refresh: false);
             }
         }
+
     }
 
     public function selectServer(string $id): void
@@ -156,6 +161,16 @@ class ConsoleDrawer extends Component
     protected function setActiveServer(Server $server): void
     {
         $this->authorize('view', $server);
+
+        // Switching servers (incl. landing on a different /servers/{id}/* page)
+        // must start with a clean console — otherwise command output from the
+        // previously-active server bleeds into the new one's drawer.
+        if ((string) ($this->server?->id ?? '') !== (string) $server->id) {
+            $this->history = [];
+            $this->error = null;
+            $this->command = '';
+        }
+
         $this->server = $server;
         session([self::SESSION_KEY => (string) $server->id]);
     }
@@ -196,11 +211,6 @@ class ConsoleDrawer extends Component
 
     public function render(): View
     {
-        // Verify server on each render if set but not verified
-        if ($this->server !== null && ! $this->serverVerified && ! $this->serverLoading) {
-            $this->verifyActiveServer();
-        }
-
         return view('livewire.servers.console-drawer', [
             // Only fetch the picker list when we need it — avoids a DB query
             // on every server-page render where the active server is set.

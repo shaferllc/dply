@@ -6,6 +6,7 @@
 @php
     $regionOptions = collect($catalog['regions'] ?? [])->values();
     $selectedRegionOption = $regionOptions->firstWhere('value', $form->region);
+    $existingServersByRegion = $existingServersByRegion ?? [];
     $digitalOceanRegionMarkers = collect([
         ['value' => 'nyc1', 'label' => 'New York', 'top' => '34%', 'left' => '29%'],
         ['value' => 'nyc2', 'label' => 'New York', 'top' => '34%', 'left' => '29%'],
@@ -24,98 +25,148 @@
     ])->filter(fn (array $marker) => $regionOptions->contains(fn (array $region) => ($region['value'] ?? null) === $marker['value']))->values();
 @endphp
 
-<div>
-    <x-input-label for="form_region" :value="$catalog['region_label'] ?? __('Region')" />
+<div class="flex min-w-0 flex-col">
+    <x-input-label for="form_region" :value="$catalog['region_label'] ?? __('Region')" class="min-h-5" />
     <div
-        x-data="{ open: false, search: '', mapOpen: false }"
+        x-data="{
+            open: false,
+            search: '',
+            mapOpen: false,
+            position: { top: 0, left: 0, width: 0 },
+            compute() {
+                const trigger = this.$refs.trigger;
+                const menu = this.$refs.menu;
+                if (! trigger || ! menu) {
+                    return;
+                }
+                const r = trigger.getBoundingClientRect();
+                const gap = 8;
+                const margin = 8;
+                const mw = menu.offsetWidth || r.width;
+                const mh = menu.offsetHeight || 1;
+                let top = r.bottom + gap;
+                let left = r.left;
+                const width = r.width;
+                if (top + mh > window.innerHeight - margin) {
+                    top = r.top - mh - gap;
+                }
+                left = Math.max(margin, Math.min(left, window.innerWidth - mw - margin));
+                top = Math.max(margin, Math.min(top, window.innerHeight - mh - margin));
+                this.position = { top, left, width };
+            },
+            toggle() {
+                this.open = ! this.open;
+                if (this.open) {
+                    this.$nextTick(() => this.compute());
+                }
+            },
+            close() {
+                this.open = false;
+            },
+        }"
         x-on:dply-region-selected.window="$wire.set('form.region', $event.detail.value); mapOpen = false"
+        x-on:click.outside="close()"
         class="relative mt-1"
     >
         @if ($regionOptions->isEmpty())
-            <div class="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-5 text-sm text-slate-500">
+            <div class="flex min-h-[5.25rem] items-center rounded-xl border border-dashed border-slate-300 bg-white px-4 py-5 text-sm text-slate-500">
                 {{ __('Select an account first to load regions.') }}
             </div>
         @else
             <button
                 id="form_region"
                 type="button"
-                x-on:click="open = !open"
-                x-on:keydown.escape.window="open = false"
+                x-ref="trigger"
+                x-on:click.stop="toggle()"
+                x-on:keydown.escape.window="close()"
                 x-bind:aria-expanded="open.toString()"
                 aria-haspopup="listbox"
-                class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-left shadow-sm transition focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                class="flex min-h-[5.25rem] w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-left shadow-sm transition focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
             >
-                <div class="flex items-start justify-between gap-4">
-                    <div class="min-w-0">
+                <div class="flex w-full items-center justify-between gap-4">
+                    <div class="min-w-0 flex-1">
                         <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Selected region') }}</div>
                         @if ($selectedRegionOption)
                             <div class="mt-1 truncate text-sm font-semibold text-slate-900">{{ $selectedRegionOption['label'] }}</div>
+                            <div class="mt-1 truncate text-xs text-slate-600">{{ strtoupper((string) ($selectedRegionOption['value'] ?? '')) }}</div>
                         @else
                             <div class="mt-1 text-sm text-slate-500">{{ __('Select region') }}</div>
+                            <div class="mt-1 text-xs text-transparent" aria-hidden="true">&nbsp;</div>
                         @endif
                     </div>
-                    <div class="shrink-0 pt-1 text-slate-400" x-bind:class="{ 'rotate-180': open }">
+                    <div class="shrink-0 text-slate-400" x-bind:class="{ 'rotate-180': open }">
                         <x-heroicon-m-chevron-down class="h-5 w-5 transition-transform" aria-hidden="true" />
                     </div>
                 </div>
             </button>
 
-            <div
-                x-cloak
-                x-show="open"
-                x-transition.origin.top
-                x-on:click.outside="open = false"
-                role="listbox"
-                class="absolute z-20 mt-2 w-full rounded-2xl border border-slate-200 bg-white p-3 shadow-xl shadow-slate-200/80"
-            >
-                @if ($digitalOceanRegionMarkers->isNotEmpty())
-                    <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
-                        <div class="flex items-center justify-between gap-3">
-                            <div>
-                                <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Map') }}</div>
-                                <div class="mt-1 text-sm text-slate-600">{{ __('Open the full map for easier geographic selection.') }}</div>
+            <template x-teleport="body">
+                <div
+                    x-ref="menu"
+                    x-cloak
+                    x-show="open"
+                    x-transition.origin.top
+                    x-on:scroll.window.passive="open && compute()"
+                    x-on:resize.window.passive="open && compute()"
+                    x-bind:style="`top: ${position.top}px; left: ${position.left}px; width: ${position.width}px;`"
+                    role="listbox"
+                    class="fixed z-[80] rounded-2xl border border-slate-200 bg-white p-3 shadow-xl shadow-slate-200/80"
+                >
+                    @if ($digitalOceanRegionMarkers->isNotEmpty())
+                        <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+                            <div class="flex items-center justify-between gap-3">
+                                <div>
+                                    <div class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{{ __('Map') }}</div>
+                                    <div class="mt-1 text-sm text-slate-600">{{ __('Open the full map for easier geographic selection.') }}</div>
+                                </div>
+                                <button
+                                    type="button"
+                                    x-on:click="close(); mapOpen = true; $nextTick(() => window.dispatchEvent(new Event('dply:region-map-open')))"
+                                    class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+                                >
+                                    {{ __('View map') }}
+                                </button>
                             </div>
+                        </div>
+                    @endif
+
+                    <div class="mt-3">
+                        <input
+                            x-model="search"
+                            type="text"
+                            class="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
+                            placeholder="{{ __('Search regions…') }}"
+                        />
+                    </div>
+
+                    <div class="mt-3 max-h-56 space-y-2 overflow-y-auto overscroll-contain pr-1">
+                        @foreach ($regionOptions as $regionOption)
                             <button
                                 type="button"
-                                x-on:click="open = false; mapOpen = true; $nextTick(() => window.dispatchEvent(new Event('dply:region-map-open')))"
-                                class="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+                                role="option"
+                                wire:click="$set('form.region', '{{ $regionOption['value'] }}')"
+                                x-on:click="close()"
+                                x-show="'{{ Str::lower((string) ($regionOption['label'] ?? '')) }}'.includes(search.toLowerCase()) || '{{ Str::lower((string) ($regionOption['value'] ?? '')) }}'.includes(search.toLowerCase())"
+                                aria-selected="{{ $form->region === $regionOption['value'] ? 'true' : 'false' }}"
+                                class="w-full rounded-xl border px-4 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-sky-500/30 {{ $form->region === $regionOption['value'] ? 'border-sky-600 bg-sky-50 ring-1 ring-sky-600/20' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50' }}"
                             >
-                                {{ __('View map') }}
-                            </button>
-                        </div>
-                    </div>
-                @endif
-
-                <div class="mt-3">
-                    <input
-                        x-model="search"
-                        type="text"
-                        class="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
-                        placeholder="{{ __('Search regions…') }}"
-                    />
-                </div>
-
-                <div class="mt-3 max-h-56 space-y-2 overflow-y-auto overscroll-contain pr-1">
-                    @foreach ($regionOptions as $regionOption)
-                        <button
-                            type="button"
-                            role="option"
-                            wire:click="$set('form.region', '{{ $regionOption['value'] }}')"
-                            x-on:click="open = false"
-                            x-show="'{{ Str::lower((string) ($regionOption['label'] ?? '')) }}'.includes(search.toLowerCase()) || '{{ Str::lower((string) ($regionOption['value'] ?? '')) }}'.includes(search.toLowerCase())"
-                            aria-selected="{{ $form->region === $regionOption['value'] ? 'true' : 'false' }}"
-                            class="w-full rounded-xl border px-4 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-sky-500/30 {{ $form->region === $regionOption['value'] ? 'border-sky-600 bg-sky-50 ring-1 ring-sky-600/20' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50' }}"
-                        >
-                            <div class="flex items-start justify-between gap-4">
-                                <div class="min-w-0">
-                                    <div class="truncate text-sm font-semibold text-slate-900">{{ $regionOption['label'] }}</div>
-                                    <div class="mt-1 text-[11px] uppercase tracking-[0.16em] text-slate-500">{{ $regionOption['value'] }}</div>
+                                <div class="flex items-start justify-between gap-4">
+                                    <div class="min-w-0">
+                                        <div class="truncate text-sm font-semibold text-slate-900">{{ $regionOption['label'] }}</div>
+                                        <div class="mt-1 text-[11px] uppercase tracking-[0.16em] text-slate-500">{{ $regionOption['value'] }}</div>
+                                        @if (($existingServersByRegion[$regionOption['value']] ?? 0) > 0)
+                                            <div class="mt-1.5 inline-flex items-center gap-1 rounded-md bg-brand-sage/10 px-1.5 py-0.5 text-[10px] font-medium text-brand-forest ring-1 ring-brand-sage/20">
+                                                <x-heroicon-o-server-stack class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                                {{ trans_choice(':count server here|:count servers here', $existingServersByRegion[$regionOption['value']], ['count' => $existingServersByRegion[$regionOption['value']]]) }}
+                                            </div>
+                                        @endif
+                                    </div>
                                 </div>
-                            </div>
-                        </button>
-                    @endforeach
+                            </button>
+                        @endforeach
+                    </div>
                 </div>
-            </div>
+            </template>
 
             @if ($digitalOceanRegionMarkers->isNotEmpty())
                 <div
@@ -167,6 +218,12 @@
                                                     <div class="min-w-0">
                                                         <div class="truncate text-sm font-semibold text-slate-900">{{ $regionOption['label'] }}</div>
                                                         <div class="mt-1 text-[11px] uppercase tracking-[0.16em] text-slate-500">{{ $regionOption['value'] }}</div>
+                                                        @if (($existingServersByRegion[$regionOption['value']] ?? 0) > 0)
+                                                            <div class="mt-1.5 inline-flex items-center gap-1 rounded-md bg-brand-sage/10 px-1.5 py-0.5 text-[10px] font-medium text-brand-forest ring-1 ring-brand-sage/20">
+                                                                <x-heroicon-o-server-stack class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                                                {{ trans_choice(':count server here|:count servers here', $existingServersByRegion[$regionOption['value']], ['count' => $existingServersByRegion[$regionOption['value']]]) }}
+                                                            </div>
+                                                        @endif
                                                     </div>
                                                 </div>
                                             </button>

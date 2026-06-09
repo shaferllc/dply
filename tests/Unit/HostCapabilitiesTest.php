@@ -1,77 +1,69 @@
 <?php
 
-namespace Tests\Unit;
+namespace Tests\Unit\HostCapabilitiesTest;
 
 use App\Models\Server;
-use Tests\TestCase;
 
-class HostCapabilitiesTest extends TestCase
-{
-    public function test_vm_hosts_keep_ssh_capabilities_by_default(): void
-    {
-        $server = new Server([
-            'meta' => [],
-        ]);
+test('vm hosts keep ssh capabilities by default', function () {
+    $server = new Server([
+        'meta' => [],
+    ]);
 
-        $capabilities = $server->hostCapabilities();
+    $capabilities = $server->hostCapabilities();
 
-        $this->assertTrue($server->isVmHost());
-        $this->assertTrue($capabilities->supportsSsh());
-        $this->assertTrue($capabilities->supportsWebserverProvisioning());
-        $this->assertFalse($capabilities->supportsFunctionDeploy());
-    }
+    expect($server->isVmHost())->toBeTrue();
+    expect($capabilities->supportsSsh())->toBeTrue();
+    expect($capabilities->supportsWebserverProvisioning())->toBeTrue();
+    expect($capabilities->supportsFunctionDeploy())->toBeFalse();
+});
 
-    public function test_digitalocean_functions_hosts_disable_machine_features(): void
-    {
-        $server = new Server([
-            'meta' => [
-                'host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
-            ],
-        ]);
+test('digitalocean functions hosts disable machine features', function () {
+    $server = new Server([
+        'meta' => [
+            'host_kind' => Server::HOST_KIND_DIGITALOCEAN_FUNCTIONS,
+        ],
+    ]);
 
-        $capabilities = $server->hostCapabilities();
+    $capabilities = $server->hostCapabilities();
 
-        $this->assertTrue($server->isDigitalOceanFunctionsHost());
-        $this->assertFalse($capabilities->supportsSsh());
-        $this->assertFalse($capabilities->supportsWebserverProvisioning());
-        $this->assertFalse($capabilities->supportsEnvPushToHost());
-        $this->assertTrue($capabilities->supportsFunctionDeploy());
-        $this->assertSame('DigitalOcean Functions', $server->providerDisplayLabel());
-    }
+    expect($server->isDigitalOceanFunctionsHost())->toBeTrue();
+    expect($capabilities->supportsSsh())->toBeFalse();
+    expect($capabilities->supportsWebserverProvisioning())->toBeFalse();
+    expect($capabilities->supportsEnvPushToHost())->toBeFalse();
+    expect($capabilities->supportsFunctionDeploy())->toBeTrue();
+    expect($server->providerDisplayLabel())->toBe('DigitalOcean Functions');
+});
 
-    public function test_docker_hosts_expose_container_capabilities_without_vm_features(): void
-    {
-        $server = new Server([
-            'meta' => [
-                'host_kind' => Server::HOST_KIND_DOCKER,
-            ],
-        ]);
+test('docker hosts expose container capabilities without vm features', function () {
+    $server = new Server([
+        'meta' => [
+            'host_kind' => Server::HOST_KIND_DOCKER,
+        ],
+    ]);
 
-        $capabilities = $server->hostCapabilities();
+    $capabilities = $server->hostCapabilities();
 
-        $this->assertTrue($server->isDockerHost());
-        $this->assertFalse($capabilities->supportsSsh());
-        $this->assertTrue($capabilities->supportsContainerDeploy());
-        $this->assertFalse($capabilities->supportsClusterDeploy());
-        $this->assertFalse($capabilities->supportsWebserverProvisioning());
-        $this->assertSame('Docker', $server->providerDisplayLabel());
-    }
+    expect($server->isDockerHost())->toBeTrue();
+    expect($capabilities->supportsSsh())->toBeFalse();
+    expect($capabilities->supportsContainerDeploy())->toBeTrue();
+    expect($capabilities->supportsClusterDeploy())->toBeFalse();
+    expect($capabilities->supportsWebserverProvisioning())->toBeFalse();
+    expect($server->providerDisplayLabel())->toBe('Docker');
+});
 
-    public function test_kubernetes_clusters_expose_cluster_capabilities_without_vm_features(): void
-    {
-        $server = new Server([
-            'meta' => [
-                'host_kind' => Server::HOST_KIND_KUBERNETES,
-            ],
-        ]);
+test('kubernetes clusters expose cluster capabilities without vm features', function () {
+    $server = new Server([
+        'meta' => [
+            'host_kind' => Server::HOST_KIND_KUBERNETES,
+        ],
+    ]);
 
-        $capabilities = $server->hostCapabilities();
+    $capabilities = $server->hostCapabilities();
 
-        $this->assertTrue($server->isKubernetesCluster());
-        $this->assertFalse($capabilities->supportsSsh());
-        $this->assertFalse($capabilities->supportsContainerDeploy());
-        $this->assertTrue($capabilities->supportsClusterDeploy());
-        $this->assertTrue($capabilities->supportsIngressManagement());
-        $this->assertSame('Kubernetes', $server->providerDisplayLabel());
-    }
-}
+    expect($server->isKubernetesCluster())->toBeTrue();
+    expect($capabilities->supportsSsh())->toBeFalse();
+    expect($capabilities->supportsContainerDeploy())->toBeFalse();
+    expect($capabilities->supportsClusterDeploy())->toBeTrue();
+    expect($capabilities->supportsIngressManagement())->toBeTrue();
+    expect($server->providerDisplayLabel())->toBe('Kubernetes');
+});

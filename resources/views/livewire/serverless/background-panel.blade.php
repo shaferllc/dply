@@ -1,14 +1,17 @@
-<div class="dply-card p-6 sm:p-8 space-y-4">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-        <div>
-            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-moss">{{ __('Background') }}</p>
-            <h2 class="mt-1 text-lg font-bold text-brand-ink">{{ __('Scheduler & queue worker') }}</h2>
-            <p class="mt-1 text-sm text-brand-moss">
+<div class="dply-card overflow-hidden">
+    <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+        <x-icon-badge>
+            <x-heroicon-o-clock class="h-5 w-5" aria-hidden="true" />
+        </x-icon-badge>
+        <div class="min-w-0">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Background') }}</p>
+            <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Scheduler & queue worker') }}</h2>
+            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                 {{ __('DigitalOcean Functions has no long-running process, so dply invokes this function every minute to run the Laravel scheduler (schedule:run) and drain queued jobs (queue:work).') }}
             </p>
         </div>
         <span @class([
-            'inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold',
+            'ml-auto shrink-0 inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold',
             'bg-brand-forest/15 text-brand-forest' => $enabled,
             'bg-brand-ink/5 text-brand-moss' => ! $enabled,
         ])>
@@ -16,6 +19,7 @@
         </span>
     </div>
 
+    <div class="px-6 py-6 sm:px-7 space-y-4">
     @if ($enabled)
         <div class="rounded-xl border border-brand-forest/20 bg-brand-forest/10 px-4 py-3 text-sm text-brand-forest">
             {{ __('Running every minute. For queued jobs, set QUEUE_CONNECTION=database (or redis) in the Environment panel and migrate the jobs table.') }}
@@ -23,9 +27,20 @@
     @endif
 
     @unless ($deployed)
-        <div class="rounded-xl border border-brand-gold/30 bg-brand-gold/10 px-4 py-3 text-sm text-brand-ink">
-            {{ __('Deploy the function first — ticks are skipped until it has an invocation URL.') }}
-        </div>
+        <section class="dply-card overflow-hidden border-amber-200">
+            <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                <div class="flex items-start gap-3">
+                    <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ring-1 bg-amber-50 text-amber-900 ring-amber-200">
+                        <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deploy the function first') }}</h3>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Ticks are skipped until the function has an invocation URL.') }}</p>
+                    </div>
+                </div>
+            </div>
+        </section>
     @endunless
 
     <button type="button" wire:click="toggle" wire:loading.attr="disabled"
@@ -46,5 +61,6 @@
                 {{ $keepWarm ? __('Disable keep-warm') : __('Enable keep-warm') }}
             </button>
         </div>
+    </div>
     </div>
 </div>

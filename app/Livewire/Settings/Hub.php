@@ -2,14 +2,19 @@
 
 namespace App\Livewire\Settings;
 
+use App\Http\Controllers\SessionController;
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\InteractsWithUnsavedChangesBar;
+use App\Livewire\Forms\ProfileGeneralForm;
 use App\Models\Organization;
 use App\Models\Team;
 use App\Models\User;
 use DateTimeZone;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -17,11 +22,21 @@ use Livewire\Component;
 #[Layout('layouts.settings')]
 class Hub extends Component
 {
+    use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
     use InteractsWithUnsavedChangesBar;
 
     /** @var 'profile'|'servers' */
     public string $section = 'profile';
+
+    /**
+     * Identity form (name / email / country / locale / timezone). Merged in
+     * from the former /profile/edit page so /settings/profile is the single
+     * personal-settings surface.
+     */
+    public ProfileGeneralForm $profileForm;
+
+    public bool $verificationLinkSent = false;
 
     /** @var array<string, mixed> */
     public array $ui = [];
@@ -48,6 +63,16 @@ class Hub extends Component
         $this->ui = $user->mergedUiPreferences();
         $this->profileTimezone = $user->timezone ?? config('app.timezone');
 
+        // Identity fields previously on /profile/edit. Merged here so
+        // /settings/profile is the canonical personal-settings page.
+        $this->profileForm->fill([
+            'name' => $user->name,
+            'email' => $user->email,
+            'country_code' => $user->country_code ?? '',
+            'locale' => $user->locale ?? config('app.locale'),
+            'timezone' => $user->timezone ?? config('app.timezone'),
+        ]);
+
         $legacyTab = request()->query('tab');
         if (in_array($legacyTab, ['servers', 'servers-sites'], true)) {
             $this->redirect(route('settings.servers'), navigate: true);
@@ -63,6 +88,151 @@ class Hub extends Component
         $org = $user->currentOrganization();
         $this->hydrateServerSiteState($org);
     }
+
+    // -----------------------------------------------------------------
+    // Identity (formerly Profile\Edit). These methods + computed props
+    // were lifted from app/Livewire/Profile/Edit.php as part of the
+    // /profile → /settings/profile merge; the old component is gone.
+    // -----------------------------------------------------------------
+
+    protected function authUser(): ?User
+    {
+        return Auth::user();
+    }
+
+    /**
+     * @return list<array{id: string, device_label: string, ip_address: ?string, last_activity: int, is_current: bool}>
+     */
+    public function getSessionsProperty(): array
+    {
+        $user = $this->authUser();
+        if (! $user) {
+            return [];
+        }
+
+        return SessionController::listSessionsForUser($user->id, session()->getId());
+    }
+
+    public function getGravatarUrlProperty(): string
+    {
+        $email = strtolower(trim($this->profileForm->email ?? ''));
+        if ($email === '') {
+            $email = strtolower(trim((string) ($this->authUser()->email ?? '')));
+        }
+
+        return 'https://www.gravatar.com/avatar/'.md5($email).'?s=160&d=mp';
+    }
+
+    public function updateProfile(): void
+    {
+        $user = $this->authUser();
+        if (! $user) {
+            return;
+        }
+
+        $this->profileForm->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'country_code' => ['nullable', 'string', 'max:2'],
+            'locale' => ['required', 'string', 'max:10'],
+            'timezone' => ['required', 'string', Rule::in(DateTimeZone::listIdentifiers(DateTimeZone::ALL))],
+        ]);
+
+        $before = [
+            'name' => $user->name,
+            'email' => $user->email,
+            'country_code' => $user->country_code,
+            'locale' => $user->locale,
+            'timezone' => $user->timezone,
+        ];
+        $after = [];
+        $emailChanged = false;
+
+        DB::transaction(function () use ($user, $before, &$after, &$emailChanged): void {
+            $user->name = $this->profileForm->name;
+            if ($this->profileForm->email !== $user->email) {
+                $emailChanged = true;
+                $user->email = $this->profileForm->email;
+                $user->email_verified_at = null;
+            }
+            $user->country_code = $this->profileForm->country_code !== '' ? $this->profileForm->country_code : null;
+            $user->locale = $this->profileForm->locale;
+            $user->timezone = $this->profileForm->timezone;
+            $user->save();
+
+            foreach (['name', 'email', 'country_code', 'locale', 'timezone'] as $key) {
+                if (($before[$key] ?? null) !== ($user->{$key} ?? null)) {
+                    $after[$key] = $user->{$key};
+                }
+            }
+        });
+
+        if ($after !== [] && ($org = $user->currentOrganization())) {
+            $action = $emailChanged && count($after) === 1 ? 'user.email_changed' : 'user.profile_updated';
+            audit_log($org, $user, $action, $user, $before, $after);
+        }
+
+        // The Servers & Sites tab reads the user's timezone as a label —
+        // keep its local string in sync after a profile save.
+        $this->profileTimezone = $user->fresh()?->timezone ?? config('app.timezone');
+
+        $this->toastSuccess(__('Profile details saved.'));
+        $this->dispatch('profile-updated');
+    }
+
+    public function discardProfileFormUnsaved(): void
+    {
+        $user = $this->authUser();
+        if (! $user) {
+            return;
+        }
+        $this->profileForm->fill([
+            'name' => $user->name,
+            'email' => $user->email,
+            'country_code' => $user->country_code ?? '',
+            'locale' => $user->locale ?? config('app.locale'),
+            'timezone' => $user->timezone ?? config('app.timezone'),
+        ]);
+    }
+
+    public function sendVerificationEmail(): void
+    {
+        $user = $this->authUser();
+        if (! $user || ! ($user instanceof MustVerifyEmail) || $user->hasVerifiedEmail()) {
+            return;
+        }
+        $user->sendEmailVerificationNotification();
+        $this->verificationLinkSent = true;
+    }
+
+    public function revokeSession(int|string $sessionId): void
+    {
+        $userId = $this->authUser()?->id;
+        if (! $userId) {
+            return;
+        }
+        if ((string) $sessionId === session()->getId()) {
+            $this->addError('session', __('You cannot revoke your current session.'));
+
+            return;
+        }
+        SessionController::deleteSessionForUser($userId, (string) $sessionId);
+        $this->dispatch('session-revoked');
+    }
+
+    public function revokeOtherSessions(): void
+    {
+        $userId = $this->authUser()?->id;
+        if (! $userId) {
+            return;
+        }
+        SessionController::deleteOtherSessionsForUser($userId, session()->getId());
+        $this->dispatch('sessions-revoked');
+    }
+
+    // -----------------------------------------------------------------
+    // End identity helpers.
+    // -----------------------------------------------------------------
 
     public function updatedSelectedTeamId(mixed $value): void
     {
@@ -464,6 +634,7 @@ class Hub extends Component
             'organizationServerSiteUnsavedTargets' => 'organizationServerSite.email_server_passwords,organizationServerSite.set_timezone_on_new_servers',
             'organizationInsightsUnsavedTargets' => 'organizationInsights.digest_non_critical,organizationInsights.digest_frequency,organizationInsights.quiet_hours_enabled,organizationInsights.quiet_hours_start,organizationInsights.quiet_hours_end',
             'teamServersSitesUnsavedTargets' => 'teamServerSite.show_server_updates_in_list,teamServerSite.isolate_new_sites,teamServerSite.default_server_sort,teamServerSite.default_site_sort',
+            'profileFormUnsavedTargets' => 'profileForm.name,profileForm.email,profileForm.country_code,profileForm.locale,profileForm.timezone',
         ]);
     }
 }

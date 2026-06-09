@@ -20,7 +20,7 @@ final class ProcessGitCloner implements GitCloner
     /**
      * Default timeout for the clone process, in seconds. Overridable so
      * tests can drop it; the production value gives a reasonable budget
-     * for a Render/Railway-shape large monorepo on a slow connection.
+     * for a large monorepo on a slow connection.
      */
     public function __construct(
         private readonly int $timeoutSeconds = 120,
@@ -35,32 +35,63 @@ final class ProcessGitCloner implements GitCloner
             throw new GitCloneException('Branch is required.');
         }
 
-        $process = new Process([
-            'git',
-            'clone',
-            '--depth=1',
-            '--single-branch',
-            '--branch', $branch,
-            $url,
-            $destination,
-        ]);
+        $process = $this->runClone([
+            'git', 'clone', '--depth=1', '--single-branch',
+            '--branch', $branch, $url, $destination,
+        ], $url);
+
+        if ($process->isSuccessful()) {
+            return;
+        }
+
+        $stderr = $this->sanitize($process->getErrorOutput(), $url);
+
+        // Stale/wrong branch hint (form pre-filled `main` for a repo whose
+        // default is actually `master`/`12.x`/etc.) — re-try cloning the
+        // remote HEAD so runtime detection still has something to work on.
+        // Form correction is the resolver's job; here we just refuse to
+        // hard-fail when a one-line fallback succeeds.
+        if ($this->looksLikeMissingBranch($stderr)) {
+            $fallback = $this->runClone([
+                'git', 'clone', '--depth=1', $url, $destination,
+            ], $url);
+            if ($fallback->isSuccessful()) {
+                return;
+            }
+            $stderr = $this->sanitize($fallback->getErrorOutput(), $url);
+        }
+
+        throw new GitCloneException(
+            "Clone failed for {$this->displayUrl($url)} (branch {$branch}): {$stderr}",
+        );
+    }
+
+    /**
+     * @param  list<string>  $command
+     */
+    private function runClone(array $command, string $url): Process
+    {
+        $process = new Process($command);
         $process->setTimeout($this->timeoutSeconds);
 
         try {
             $process->run();
         } catch (ProcessTimedOutException $e) {
             throw new GitCloneException(
-                "Clone timed out after {$this->timeoutSeconds}s: {$url}",
+                "Clone timed out after {$this->timeoutSeconds}s: {$this->displayUrl($url)}",
                 previous: $e,
             );
         }
 
-        if (! $process->isSuccessful()) {
-            $stderr = $this->sanitize($process->getErrorOutput(), $url);
-            throw new GitCloneException(
-                "Clone failed for {$this->displayUrl($url)} (branch {$branch}): {$stderr}",
-            );
-        }
+        return $process;
+    }
+
+    private function looksLikeMissingBranch(string $stderr): bool
+    {
+        // git's exact phrasing across versions:
+        //   "fatal: Remote branch <name> not found in upstream origin"
+        //   "fatal: Could not find remote branch <name>"
+        return preg_match('/(Remote branch.*not found|Could not find remote branch)/i', $stderr) === 1;
     }
 
     /**

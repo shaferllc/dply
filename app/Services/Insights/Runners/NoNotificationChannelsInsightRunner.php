@@ -61,14 +61,14 @@ class NoNotificationChannelsInsightRunner implements InsightRunnerInterface
                     $q->where('owner_type', $org->getMorphClass())
                         ->where('owner_id', $org->id);
                 })
-                  ->orWhere(function ($q) use ($teamIds): void {
-                      $q->where('owner_type', Team::class)
-                          ->whereIn('owner_id', $teamIds);
-                  })
-                  ->orWhere(function ($q) use ($userMemberIds): void {
-                      $q->where('owner_type', User::class)
-                          ->whereIn('owner_id', $userMemberIds);
-                  });
+                    ->orWhere(function ($q) use ($teamIds): void {
+                        $q->where('owner_type', Team::class)
+                            ->whereIn('owner_id', $teamIds);
+                    })
+                    ->orWhere(function ($q) use ($userMemberIds): void {
+                        $q->where('owner_type', User::class)
+                            ->whereIn('owner_id', $userMemberIds);
+                    });
             })
             ->count();
 
@@ -79,7 +79,7 @@ class NoNotificationChannelsInsightRunner implements InsightRunnerInterface
                     dedupeHash: 'org-no-channels',
                     severity: InsightFinding::SEVERITY_WARNING,
                     title: __('No notification channels configured'),
-                    body: __('Insights, deploy failures, and SSH login alerts have nowhere to go. Add a channel under Settings → Notifications (Slack, email, webhook).'),
+                    body: __('Insights, deploy failures, and SSH login alerts have nowhere to go. Add a channel on the Insights → Notifications tab (Slack, email, webhook).'),
                     meta: [
                         'signal' => [
                             'org_wide_channel_count' => 0,
@@ -99,7 +99,7 @@ class NoNotificationChannelsInsightRunner implements InsightRunnerInterface
                 dedupeHash: 'server-no-subscriptions',
                 severity: InsightFinding::SEVERITY_INFO,
                 title: __('No alert routing for this server'),
-                body: __('Your organization has notification channels but none are subscribed to this server\'s events. Wire one up under Settings → Alerts.'),
+                body: __('Your organization has notification channels but none are subscribed to this server\'s events. Wire one up on the Insights → Notifications tab.'),
                 meta: [
                     'signal' => [
                         'org_wide_channel_count' => $orgWideChannels,

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers;
 
+use App\Jobs\PollDoksClusterStatusJob;
+use App\Jobs\PollEksClusterStatusJob;
 use App\Jobs\RunSetupScriptJob;
 use App\Jobs\WaitForServerSshReadyJob;
 use App\Livewire\Servers\Concerns\BuildsContainerLaunchSummary;
@@ -11,15 +13,31 @@ use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Models\InsightFinding;
 use App\Models\Server;
-use App\Models\ServerMetricSnapshot;
+use App\Models\ServerBackupSchedule;
+use App\Models\ServerCacheService;
+use App\Models\ServerDatabaseBackup;
+use App\Models\ServerDatabaseEngine;
 use App\Models\Site;
 use App\Models\SiteDeployment;
+use App\Models\SiteFileBackup;
+use App\Models\SupervisorProgram;
+use App\Services\Servers\ServerCostCard;
+use App\Services\Servers\ServerHealthCockpit;
+use App\Services\Servers\ServerPatchAdvisor;
+use App\Services\Servers\ServerReleaseHygiene;
 use App\Services\Servers\ServerRemovalAdvisor;
+use App\Support\Servers\CacheServiceStats;
+use App\Support\Servers\DatabaseEngineInfo;
 use App\Support\Servers\InstalledStack;
+use App\Support\Servers\SharedHostReport;
+use App\Support\Servers\SupervisorQueueProgramTypes;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
+use Livewire\Attributes\Lazy;
 
 /**
  * Server workspace landing page — at-a-glance dashboard.
@@ -33,8 +51,10 @@ use Livewire\Component;
  * it probably belongs on the matching workspace nav entry instead.
  */
 #[Layout('layouts.app')]
+#[Lazy]
 class WorkspaceOverview extends Component
 {
+    use RendersWorkspacePlaceholder;
     use BuildsContainerLaunchSummary;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
@@ -56,6 +76,24 @@ class WorkspaceOverview extends Component
             }
         }
 
+        // Same story for dply Edge + dply Cloud synthetic hosts — neither
+        // has a VM, SSH, metrics, or anything else a "server overview"
+        // would surface. Redirect to the first site's workspace (single
+        // app per synthetic server in the common case) or fall back to
+        // the product index when this server has no sites yet.
+        if ($server->isDplyEdgeHost() || $server->isDplyCloudHost()) {
+            $site = $server->sites()->orderBy('created_at')->first();
+            if ($site !== null) {
+                return $this->redirect(
+                    route('sites.show', ['server' => $server, 'site' => $site]),
+                );
+            }
+
+            return $this->redirect(
+                $server->isDplyEdgeHost() ? route('edge.index') : route('cloud.index'),
+            );
+        }
+
         $this->kickClusterPollIfStale();
 
         return null;
@@ -73,9 +111,9 @@ class WorkspaceOverview extends Component
 
         $provider = (string) ($this->server->meta['kubernetes']['provider'] ?? 'digitalocean');
         if ($provider === 'aws') {
-            \App\Jobs\PollEksClusterStatusJob::dispatch($this->server);
+            PollEksClusterStatusJob::dispatch($this->server);
         } else {
-            \App\Jobs\PollDoksClusterStatusJob::dispatch($this->server);
+            PollDoksClusterStatusJob::dispatch($this->server);
         }
         $this->toastSuccess(__('Re-checking cluster status…'));
     }
@@ -108,8 +146,12 @@ class WorkspaceOverview extends Component
 
     public function render(): View
     {
-        $this->server->refresh();
-
+        // No $this->server->refresh() here: Livewire re-resolves the bound
+        // model from the database on every request (route binding on first
+        // load, the Eloquent synthesizer on later updates), so the row is
+        // already current at render time. mount() already re-pulls via
+        // kickClusterPollIfStale() when a sync cluster poll mutates it, so
+        // refreshing again here only doubled the `select * from servers`.
         $sites = $this->server->sites()->get(['id', 'status']);
         $siteIds = $sites->pluck('id');
 
@@ -166,25 +208,25 @@ class WorkspaceOverview extends Component
         // without having to drill into the Background subpages individually.
         $weekAgo = now()->subDays(7);
         $backgroundSummary = [
-            'active_workers' => \App\Models\SupervisorProgram::query()
+            'active_workers' => SupervisorProgram::query()
                 ->where('server_id', $this->server->id)
-                ->whereIn('program_type', \App\Livewire\Servers\WorkspaceQueueWorkers::QUEUE_TYPES)
+                ->whereIn('program_type', SupervisorQueueProgramTypes::TYPES)
                 ->where('is_active', true)
                 ->count(),
-            'active_schedules' => \App\Models\ServerBackupSchedule::query()
+            'active_schedules' => ServerBackupSchedule::query()
                 ->where('server_id', $this->server->id)
                 ->where('is_active', true)
                 ->count(),
-            'paused_schedules' => \App\Models\ServerBackupSchedule::query()
+            'paused_schedules' => ServerBackupSchedule::query()
                 ->where('server_id', $this->server->id)
                 ->where('is_active', false)
                 ->count(),
-            'failed_backups_7d' => (int) \App\Models\ServerDatabaseBackup::query()
+            'failed_backups_7d' => (int) ServerDatabaseBackup::query()
                 ->whereIn('server_database_id', $this->server->serverDatabases()->pluck('id'))
                 ->where('status', 'failed')
                 ->where('created_at', '>=', $weekAgo)
                 ->count()
-                + (int) \App\Models\SiteFileBackup::query()
+                + (int) SiteFileBackup::query()
                     ->whereIn('site_id', $this->server->sites()->pluck('id'))
                     ->where('status', 'failed')
                     ->where('created_at', '>=', $weekAgo)
@@ -195,10 +237,9 @@ class WorkspaceOverview extends Component
         // One row, cheap. Same source the Monitor page uses — duplicating it
         // here means the overview reflects current load without a full
         // Monitor-tab fetch and the operator can decide whether to drill in.
-        $latestMetricSnapshot = ServerMetricSnapshot::query()
-            ->where('server_id', $this->server->id)
-            ->orderByDesc('captured_at')
-            ->first();
+        // Read through the memoized relation so the cost card, health cockpit,
+        // and billing tier below all reuse this single lookup.
+        $latestMetricSnapshot = $this->server->latestMetricSnapshot;
 
         // Sites preview for the overview. We already have $sites with id+status;
         // pull the small bit extra we need to render five rows (name + updated_at)
@@ -234,11 +275,94 @@ class WorkspaceOverview extends Component
             [Server::HOST_KIND_DOCKER, Server::HOST_KIND_KUBERNETES],
             true,
         );
+        $serverRole = (string) ($this->server->meta['server_role'] ?? '');
+        $isCacheRoleHost = in_array($serverRole, ['redis', 'valkey'], true);
+        $isDatabaseRoleHost = $serverRole === 'database';
+        $isWorkerRoleHost = $serverRole === 'worker';
+        // Dedicated cache/db boxes never host site code, so their site/stack/deploy
+        // cards are hidden. A worker IS an app host (it runs queue workers from the
+        // deployed code), so it keeps sites/deploys — it just doesn't serve web traffic.
+        $isDedicatedServiceRoleHost = $isCacheRoleHost || $isDatabaseRoleHost;
         $monitorInstalled = $latestMetricSnapshot !== null
             && is_array($latestMetricSnapshot->payload ?? null)
             && isset($latestMetricSnapshot->payload['cpu_pct']);
         $hasBackupSchedule = ($backgroundSummary['active_schedules'] ?? 0)
             + ($backgroundSummary['paused_schedules'] ?? 0) > 0;
+        // An "installed" cache engine is one that's past the install pipeline
+        // (running or stopped). Pending/installing/uninstalling/failed rows
+        // are mid-flight and don't satisfy the onboarding step yet.
+        $cacheRows = ServerCacheService::query()
+            ->where('server_id', $this->server->id)
+            ->whereIn('status', [
+                ServerCacheService::STATUS_RUNNING,
+                ServerCacheService::STATUS_STOPPED,
+            ])
+            ->get();
+        $cacheEngineInstalled = $cacheRows->isNotEmpty();
+
+        // Tile pack for the cache-role Overview (server_role redis/valkey). Pulls
+        // a short-TTL INFO snapshot from the highest-priority running redis-family
+        // engine — most boxes have exactly one. Returns null when this isn't a
+        // cache-role host so the view falls through to the generic tiles.
+        $cacheTileData = null;
+        $cacheTileEngine = null;
+        if ($isCacheRoleHost) {
+            $cacheTileRow = $cacheRows
+                ->filter(fn ($row) => in_array($row->engine, ['redis', 'valkey', 'keydb', 'dragonfly'], true))
+                ->sortByDesc(fn ($row) => $row->status === ServerCacheService::STATUS_RUNNING ? 1 : 0)
+                ->first();
+            if ($cacheTileRow !== null) {
+                $cacheTileData = app(CacheServiceStats::class)
+                    ->overviewSnapshot($this->server, $cacheTileRow);
+                $cacheTileEngine = $cacheTileRow->engine;
+            }
+        }
+
+        // Tile pack for database-role Overview (server_role database). Uses
+        // control-plane rows only — no SSH probe — so the page stays fast
+        // and works before the engine finishes installing.
+        $databaseTileData = null;
+        if ($isDatabaseRoleHost) {
+            $installedStack = InstalledStack::fromMeta($this->server);
+            $engineRows = ServerDatabaseEngine::query()
+                ->where('server_id', $this->server->id)
+                ->whereIn('status', [
+                    ServerDatabaseEngine::STATUS_RUNNING,
+                    ServerDatabaseEngine::STATUS_STOPPED,
+                    ServerDatabaseEngine::STATUS_INSTALLING,
+                    ServerDatabaseEngine::STATUS_PENDING,
+                ])
+                ->get();
+            $engineRow = $engineRows
+                ->sortByDesc(fn (ServerDatabaseEngine $row) => $row->status === ServerDatabaseEngine::STATUS_RUNNING ? 1 : 0)
+                ->first();
+            $engineKey = $engineRow?->engine
+                ?? (is_string($installedStack->database) && $installedStack->database !== 'none'
+                    ? strtolower((string) preg_replace('/\d+$/', '', $installedStack->database))
+                    : null);
+            $engineLabel = $engineKey !== null
+                ? (DatabaseEngineInfo::for($engineKey)['label'] ?? ucfirst($engineKey))
+                : __('Database engine');
+            $databaseTileData = [
+                'engine' => $engineKey,
+                'engine_label' => $engineLabel,
+                'version' => $engineRow?->version ?? $installedStack->databaseVersion,
+                'status' => $engineRow?->status,
+                'database_count' => $databaseSummary['count'],
+                'active_schedules' => $backgroundSummary['active_schedules'],
+                'paused_schedules' => $backgroundSummary['paused_schedules'],
+                'failed_backups_7d' => $backgroundSummary['failed_backups_7d'],
+            ];
+        }
+        $databaseEngineInstalled = $isDatabaseRoleHost
+            ? ServerDatabaseEngine::query()
+                ->where('server_id', $this->server->id)
+                ->whereIn('status', [
+                    ServerDatabaseEngine::STATUS_RUNNING,
+                    ServerDatabaseEngine::STATUS_STOPPED,
+                ])
+                ->exists()
+            : false;
 
         $onboardingSteps = [];
         if (! $isContainerHostForChecklist) {
@@ -251,18 +375,55 @@ class WorkspaceOverview extends Component
                 'cta_route' => route('servers.ssh-keys', $this->server),
             ];
         }
-        $onboardingSteps[] = [
-            'key' => 'first_site',
-            'label' => $isContainerHostForChecklist
-                ? __('Add your first container app')
-                : __('Add your first site'),
-            'help' => $isContainerHostForChecklist
-                ? __('Point dply at a Git repo and deploy a container.')
-                : __('Connect a Git repo, configure the web root, and deploy.'),
-            'done' => $sites->count() > 0,
-            'cta_label' => __('Add'),
-            'cta_route' => route('sites.create', $this->server),
-        ];
+        if ($isCacheRoleHost) {
+            // Cache-role servers (server_role redis/valkey) don't host sites —
+            // the "first useful thing" is installing the cache engine via the
+            // Caches workspace, not connecting a Git repo.
+            $engineLabel = $serverRole === 'valkey' ? __('Valkey') : __('Redis');
+            $onboardingSteps[] = [
+                'key' => 'first_cache_engine',
+                'label' => __('Install :engine', ['engine' => $engineLabel]),
+                'help' => __('Provision the cache engine apt + systemd on this host.'),
+                'done' => $cacheEngineInstalled,
+                'cta_label' => __('Open Caches'),
+                'cta_route' => route('servers.caches', $this->server),
+            ];
+        } elseif ($isDatabaseRoleHost) {
+            $engineLabel = $databaseTileData['engine_label'] ?? __('Database engine');
+            $onboardingSteps[] = [
+                'key' => 'first_database_engine',
+                'label' => __('Install :engine', ['engine' => $engineLabel]),
+                'help' => __('Provision the database engine apt + systemd on this host.'),
+                'done' => $databaseEngineInstalled,
+                'cta_label' => __('Open Database'),
+                'cta_route' => route('servers.databases', $this->server),
+            ];
+        } else {
+            $onboardingSteps[] = [
+                'key' => 'first_site',
+                'label' => $isContainerHostForChecklist
+                    ? __('Add your first container app')
+                    : __('Add your first site'),
+                'help' => $isContainerHostForChecklist
+                    ? __('Point dply at a Git repo and deploy a container.')
+                    : __('Connect a Git repo, configure the web root, and deploy.'),
+                'done' => $sites->count() > 0,
+                'cta_label' => __('Add'),
+                'cta_route' => route('sites.create', $this->server),
+            ];
+        }
+        if ($isWorkerRoleHost) {
+            // A worker runs queue workers from the deployed code — once the site
+            // is on the box, the next step is starting a worker on the Workers tab.
+            $onboardingSteps[] = [
+                'key' => 'first_worker',
+                'label' => __('Start a queue worker'),
+                'help' => __('Run your queue workers and scheduled jobs from the Workers tab.'),
+                'done' => ($backgroundSummary['active_workers'] ?? 0) > 0,
+                'cta_label' => __('Open Workers'),
+                'cta_route' => route('servers.workers', $this->server),
+            ];
+        }
         if (! $isContainerHostForChecklist) {
             $onboardingSteps[] = [
                 'key' => 'monitor',
@@ -272,14 +433,20 @@ class WorkspaceOverview extends Component
                 'cta_label' => __('Install'),
                 'cta_route' => route('servers.monitor', $this->server),
             ];
-            $onboardingSteps[] = [
-                'key' => 'backups',
-                'label' => __('Schedule backups'),
-                'help' => __('Automatic database + site-files backups on a cron you choose.'),
-                'done' => $hasBackupSchedule,
-                'cta_label' => __('Open Backups'),
-                'cta_route' => route('servers.backups', $this->server),
-            ];
+            // Backups workspace is gated by mysql/postgres install tags AND
+            // hidden from the Redis sidebar via role_nav_keys — skip the step
+            // entirely on cache-role hosts so the checklist doesn't dangle on
+            // a CTA route that 404s.
+            if (! $isCacheRoleHost && ! $isWorkerRoleHost) {
+                $onboardingSteps[] = [
+                    'key' => 'backups',
+                    'label' => __('Schedule backups'),
+                    'help' => __('Automatic database + site-files backups on a cron you choose.'),
+                    'done' => $hasBackupSchedule,
+                    'cta_label' => __('Open Backups'),
+                    'cta_route' => route('servers.backups', $this->server),
+                ];
+            }
         }
         if ($notificationSummary['manage_url']) {
             $onboardingSteps[] = [
@@ -326,6 +493,23 @@ class WorkspaceOverview extends Component
             'latestDeployment' => $latestDeployment,
             'databaseSummary' => $databaseSummary,
             'healthSummary' => $healthSummary,
+            'healthCockpitSummary' => Feature::active('workspace.health')
+                ? $this->healthCockpitSummary(app(ServerHealthCockpit::class))
+                : null,
+            'patchAdvisorSummary' => Feature::active('workspace.patch_advisor')
+                ? $this->patchAdvisorSummary(app(ServerPatchAdvisor::class))
+                : null,
+            'releaseHygieneSummary' => Feature::active('workspace.release_hygiene')
+                ? $this->releaseHygieneSummary(app(ServerReleaseHygiene::class))
+                : null,
+            'costCardSummary' => Feature::active('workspace.server_cost')
+                ? app(ServerCostCard::class)->overviewSummary($this->server)
+                : null,
+            'sharedHostSummary' => workspace_shared_host_active()
+                ? app(SharedHostReport::class)->overviewSummary($this->server)
+                : (workspace_shared_host_preview_active()
+                    ? app(SharedHostReport::class)->overviewSummary($this->server, preview: true)
+                    : null),
             'containerLaunch' => $this->containerLaunchSummary(),
             'hasProfileSshKeys' => $hasProfileSshKeys,
             'serverHasPersonalProfileKey' => $serverHasPersonalProfileKey,
@@ -346,7 +530,65 @@ class WorkspaceOverview extends Component
             'deletionSummary' => $this->showRemoveServerModal
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
+            'cacheTileData' => $cacheTileData,
+            'cacheTileEngine' => $cacheTileEngine,
+            'databaseTileData' => $databaseTileData,
+            'isDedicatedServiceRoleHost' => $isDedicatedServiceRoleHost,
+            'isDatabaseRoleHost' => $isDatabaseRoleHost,
         ]);
     }
 
+    /**
+     * @return array{overall: string, alert_count: int}|null
+     */
+    private function healthCockpitSummary(ServerHealthCockpit $cockpit): ?array
+    {
+        if (! $this->server->isVmHost()) {
+            return null;
+        }
+
+        $report = $cockpit->forServer($this->server);
+
+        return [
+            'overall' => $report['overall'],
+            'alert_count' => $report['alert_count'],
+        ];
+    }
+
+    /**
+     * @return array{overall: string, alert_count: int, security: int, reboot_required: ?bool}|null
+     */
+    private function patchAdvisorSummary(ServerPatchAdvisor $advisor): ?array
+    {
+        if (! $this->server->isVmHost()) {
+            return null;
+        }
+
+        $report = $advisor->forServer($this->server);
+
+        return [
+            'overall' => $report['overall'],
+            'alert_count' => $report['alert_count'],
+            'security' => $report['packages']['security'],
+            'reboot_required' => $report['reboot']['required'],
+        ];
+    }
+
+    /**
+     * @return array{overall: string, alert_count: int, sites_over_keep: int}|null
+     */
+    private function releaseHygieneSummary(ServerReleaseHygiene $hygiene): ?array
+    {
+        if (! $this->server->isVmHost()) {
+            return null;
+        }
+
+        $report = $hygiene->forServer($this->server);
+
+        return [
+            'overall' => $report['overall'],
+            'alert_count' => $report['alert_count'],
+            'sites_over_keep' => $report['releases']['sites_over_keep'],
+        ];
+    }
 }

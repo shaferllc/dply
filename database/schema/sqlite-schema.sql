@@ -1014,7 +1014,7 @@ CREATE TABLE sites (
 	ssl_installed_at TIMESTAMP, 
 	last_deploy_at TIMESTAMP, 
 	git_repository_url VARCHAR(255), 
-	git_branch VARCHAR(255) DEFAULT 'main' NOT NULL, 
+	git_branch VARCHAR(255) DEFAULT 'main', 
 	git_deploy_key_private TEXT, 
 	git_deploy_key_public TEXT, 
 	webhook_secret TEXT, 

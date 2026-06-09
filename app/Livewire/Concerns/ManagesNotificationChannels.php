@@ -8,6 +8,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
@@ -160,7 +161,23 @@ trait ManagesNotificationChannels
 
         $this->resetNewChannelFields();
         unset($this->channels);
+        $this->dispatch('close-modal', 'settings-create-channel-modal');
         $this->toastSuccess(__('Channel created.'));
+    }
+
+    public function openCreateChannelModal(): void
+    {
+        Gate::authorize('manageNotificationChannels', $this->owner());
+        $this->resetErrorBag();
+        $this->resetNewChannelFields();
+        $this->dispatch('open-modal', 'settings-create-channel-modal');
+    }
+
+    public function closeCreateChannelModal(): void
+    {
+        $this->resetErrorBag();
+        $this->resetNewChannelFields();
+        $this->dispatch('close-modal', 'settings-create-channel-modal');
     }
 
     protected function resetNewChannelFields(): void
@@ -322,7 +339,7 @@ trait ManagesNotificationChannels
      * route to that org; user-owned (personal) channels route to the user's
      * current org so the action surfaces alongside their other audit events.
      */
-    protected function recordChannelAudit(string $action, ?\Illuminate\Database\Eloquent\Model $subject, ?array $oldValues, ?array $newValues): void
+    protected function recordChannelAudit(string $action, ?Model $subject, ?array $oldValues, ?array $newValues): void
     {
         $owner = $this->owner();
         $org = match (true) {

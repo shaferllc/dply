@@ -2,15 +2,18 @@
 
 namespace App\Livewire\Servers\Concerns;
 
+use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\ConsoleAction;
 use App\Services\ConsoleActions\ConsoleEmitter;
+use App\Services\Servers\ServerRemoteAccessContext;
+use App\Services\Servers\ServerRemoteAccessLogger;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Livewire-side machinery for the console-actions banner.
  *
- * Differs from {@see \App\Jobs\Concerns\WritesConsoleAction} (the job-side
+ * Differs from {@see WritesConsoleAction} (the job-side
  * trait) in two ways:
  *
  *   - Subjects vary per call. A workspace Livewire component handles many
@@ -75,6 +78,13 @@ trait RunsServerConsoleActions
     {
         $id = $this->seedConsoleActionRun($subject, $kind, $label);
 
+        if ((bool) config('server_ssh_access.log_remote_access', true)) {
+            app()->instance(
+                ServerRemoteAccessContext::class,
+                ServerRemoteAccessContext::forLivewireConsole($label, $id, auth()->id()),
+            );
+        }
+
         DB::table('console_actions')->where('id', $id)->update([
             'status' => ConsoleAction::STATUS_RUNNING,
             'started_at' => now(),
@@ -95,6 +105,10 @@ trait RunsServerConsoleActions
 
             return $result;
         } catch (\Throwable $e) {
+            if (app()->bound(ServerRemoteAccessContext::class)) {
+                app(ServerRemoteAccessContext::class)->failed = true;
+            }
+
             DB::table('console_actions')->where('id', $id)->update([
                 'status' => ConsoleAction::STATUS_FAILED,
                 'finished_at' => now(),
@@ -103,6 +117,8 @@ trait RunsServerConsoleActions
             ]);
 
             throw $e;
+        } finally {
+            app(ServerRemoteAccessLogger::class)->finishContext();
         }
     }
 

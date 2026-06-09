@@ -28,6 +28,7 @@ final readonly class RuntimeDetection
      * @param  list<string>  $reasons  human-readable explanations of each inference
      * @param  list<DetectedProcess>  $processes  suggested non-web processes (workers, schedulers)
      * @param  string  $confidence  one of "low", "medium", "high"
+     * @param  ?string  $outputDirectory  repo-relative folder containing built static assets
      */
     public function __construct(
         public string $runtime,
@@ -40,5 +41,6 @@ final readonly class RuntimeDetection
         public array $reasons,
         public array $processes,
         public string $confidence,
+        public ?string $outputDirectory = null,
     ) {}
 }

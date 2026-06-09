@@ -67,23 +67,26 @@ class CleanupRemoteSiteArtifactsJob implements ShouldQueue
             $log .= $ssh->exec($supervisorProvisioner->supervisorRereadUpdateExecLine($server, 'DPLY_SV_CLEAN_EXIT'), 180);
         }
 
-        if ($basename !== '') {
+        // Worker / headless hosts provision with webserver=none and have no
+        // nginx/apache binary — skip vhost teardown entirely so we don't run
+        // `nginx -t` on a box where it doesn't exist (exit 127).
+        if ($basename !== '' && $webserver !== '' && $webserver !== 'none') {
             $log .= match ($webserver) {
                 'apache' => $ssh->exec(sprintf(
-                    '(a2dissite %1$s >/dev/null 2>&1 || true; rm -f %2$s; apachectl configtest && (systemctl reload apache2 2>/dev/null || service apache2 reload 2>/dev/null)) 2>&1; printf "\nDPLY_WEBSERVER_CLEAN_EXIT:%%s" "$?"',
+                    '(sudo a2dissite %1$s >/dev/null 2>&1 || true; sudo rm -f %2$s; sudo apachectl configtest && (sudo systemctl reload apache2 2>/dev/null || sudo service apache2 reload 2>/dev/null)) 2>&1; printf "\nDPLY_WEBSERVER_CLEAN_EXIT:%%s" "$?"',
                     escapeshellarg($basename.'.conf'),
                     escapeshellarg(rtrim(config('sites.apache_sites_available'), '/').'/'.$basename.'.conf')
                 ), 120),
                 'caddy' => $ssh->exec(sprintf(
-                    '(rm -f %1$s && caddy validate --config /etc/caddy/Caddyfile && (systemctl reload caddy 2>/dev/null || service caddy reload 2>/dev/null || systemctl restart caddy)) 2>&1; printf "\nDPLY_WEBSERVER_CLEAN_EXIT:%%s" "$?"',
+                    '(sudo rm -f %1$s && sudo caddy validate --config /etc/caddy/Caddyfile && (sudo systemctl reload caddy 2>/dev/null || sudo service caddy reload 2>/dev/null || sudo systemctl restart caddy)) 2>&1; printf "\nDPLY_WEBSERVER_CLEAN_EXIT:%%s" "$?"',
                     escapeshellarg(rtrim(config('sites.caddy_sites_enabled'), '/').'/'.$basename.'.caddy')
                 ), 120),
                 'openlitespeed' => $ssh->exec(sprintf(
-                    '(rm -rf %1$s && /usr/local/lsws/bin/lswsctrl restart) 2>&1; printf "\nDPLY_WEBSERVER_CLEAN_EXIT:%%s" "$?"',
+                    '(sudo rm -rf %1$s && sudo /usr/local/lsws/bin/lswsctrl restart) 2>&1; printf "\nDPLY_WEBSERVER_CLEAN_EXIT:%%s" "$?"',
                     escapeshellarg(rtrim(config('sites.openlitespeed_vhosts_path'), '/').'/'.$basename)
                 ), 180),
                 'traefik' => $ssh->exec(sprintf(
-                    '(rm -f %1$s %2$s && caddy validate --config /etc/caddy/Caddyfile && (systemctl reload caddy 2>/dev/null || service caddy reload 2>/dev/null || systemctl restart caddy) && (systemctl reload traefik 2>/dev/null || systemctl restart traefik 2>/dev/null || true)) 2>&1; printf "\nDPLY_WEBSERVER_CLEAN_EXIT:%%s" "$?"',
+                    '(sudo rm -f %1$s %2$s && sudo caddy validate --config /etc/caddy/Caddyfile && (sudo systemctl reload caddy 2>/dev/null || sudo service caddy reload 2>/dev/null || sudo systemctl restart caddy) && (sudo systemctl reload traefik 2>/dev/null || sudo systemctl restart traefik 2>/dev/null || true)) 2>&1; printf "\nDPLY_WEBSERVER_CLEAN_EXIT:%%s" "$?"',
                     escapeshellarg(rtrim(config('sites.traefik_dynamic_config_path'), '/').'/'.$basename.'.yml'),
                     escapeshellarg(rtrim(config('sites.caddy_sites_enabled'), '/').'/'.$basename.'-backend.caddy')
                 ), 180),
@@ -93,8 +96,12 @@ class CleanupRemoteSiteArtifactsJob implements ShouldQueue
                     $confFile = $available.'/'.$basename.'.conf';
                     $linkFile = $enabled.'/'.$basename.'.conf';
 
+                    // The vhost files live under /etc/nginx (root-owned), and
+                    // nginx -t / reload need root — run privileged or the rm
+                    // fails with "Permission denied" and leaves orphaned vhosts
+                    // (→ "conflicting server name" on the next site).
                     return $ssh->exec(sprintf(
-                        '(rm -f %1$s %2$s && nginx -t && (systemctl reload nginx 2>/dev/null || service nginx reload 2>/dev/null || nginx -s reload)) 2>&1; printf "\nDPLY_WEBSERVER_CLEAN_EXIT:%%s" "$?"',
+                        '(sudo rm -f %1$s %2$s && sudo nginx -t && (sudo systemctl reload nginx 2>/dev/null || sudo service nginx reload 2>/dev/null || sudo nginx -s reload)) 2>&1; printf "\nDPLY_WEBSERVER_CLEAN_EXIT:%%s" "$?"',
                         escapeshellarg($confFile),
                         escapeshellarg($linkFile)
                     ), 120);
@@ -102,20 +109,39 @@ class CleanupRemoteSiteArtifactsJob implements ShouldQueue
             };
         }
 
+        // Remove this site's dedicated PHP-FPM pool from every version's pool.d
+        // (a version switch can leave the conf in more than one) and reload each
+        // affected master. Runs after the vhost teardown above, so nothing still
+        // points at the pool's socket when it goes away.
+        $poolName = trim((string) ($this->payload['php_fpm_pool_name'] ?? ''));
+        if ($poolName !== '') {
+            $log .= $ssh->exec(sprintf(
+                '(NAME=%1$s; RELOAD=""; for d in /etc/php/*/fpm/pool.d; do [ -d "$d" ] || continue; f="${d}/${NAME}.conf"; if [ -f "$f" ]; then sudo rm -f "$f"; v="$(basename "$(dirname "$(dirname "$d")")")"; RELOAD="${RELOAD} ${v}"; fi; done; for v in $(echo "$RELOAD" | tr " " "\n" | sort -u); do [ -z "$v" ] && continue; sudo systemctl reload "php${v}-fpm" 2>/dev/null || sudo systemctl restart "php${v}-fpm" 2>/dev/null || true; done) 2>&1; printf "\nDPLY_FPM_POOL_CLEAN_EXIT:%%s" "$?"',
+                escapeshellarg($poolName)
+            ), 120);
+        }
+
+        // Release artifacts are written by privileged provision/deploy steps, so
+        // the deploy user can't always rm them — use sudo or the tree survives
+        // and a re-created same-slug site inherits stale code (wrong PHP socket,
+        // old index.php) and 502s.
         $baseEsc = escapeshellarg($base);
         if ($base !== '' && config('dply.delete_remote_repository_on_site_delete', false)) {
-            $log .= $ssh->exec(sprintf('rm -rf %s 2>&1; printf "\nDPLY_RM_BASE_EXIT:%%s" "$?"', $baseEsc), 600);
+            $log .= $ssh->exec(sprintf('sudo rm -rf %s 2>&1; printf "\nDPLY_RM_BASE_EXIT:%%s" "$?"', $baseEsc), 600);
         } elseif ($base !== '' && $strategy === 'atomic') {
             $log .= $ssh->exec(sprintf(
-                'rm -rf %1$s/releases 2>/dev/null; rm -f %1$s/current 2>/dev/null; printf "\nDPLY_ATOMIC_RM_EXIT:%%s" "$?"',
+                'sudo rm -rf %1$s/releases 2>/dev/null; sudo rm -f %1$s/current 2>/dev/null; printf "\nDPLY_ATOMIC_RM_EXIT:%%s" "$?"',
                 $baseEsc
             ), 300);
         }
 
         $siteId = (int) ($this->payload['site_id'] ?? 0);
         if ($siteId > 0) {
+            // The deploy key lives under root's home; the SSH connection runs
+            // as the (non-root) deploy user, so remove it via sudo — mirroring
+            // the systemd teardown below.
             $keyPath = '/root/.ssh/dply_site_'.$siteId.'_deploy';
-            $log .= $ssh->exec('rm -f '.escapeshellarg($keyPath).' 2>&1', 30);
+            $log .= $ssh->exec('sudo rm -f '.escapeshellarg($keyPath).' 2>&1', 30);
         }
 
         $host = trim((string) ($this->payload['primary_hostname'] ?? ''));

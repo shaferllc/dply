@@ -4,11 +4,14 @@ namespace App\Services\Sites;
 
 use App\Enums\SiteType;
 use App\Models\ConsoleAction;
+use App\Models\ServerWebserverCacheFeature;
 use App\Models\Site;
 use App\Models\SiteWebserverConfigProfile;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Sites\Contracts\SiteWebserverProvisioner;
 use App\Services\SshConnection;
+use App\Support\Servers\CaddyEdgeBackendLayout;
+use App\Support\Servers\NginxServiceScript;
 use Illuminate\Support\Str;
 
 class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements SiteWebserverProvisioner
@@ -37,7 +40,11 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
             [
                 'webserver' => 'nginx',
                 'mode' => SiteWebserverConfigProfile::MODE_LAYERED,
-                'main_snippet_body' => $site->nginx_extra_raw,
+                'main_snippet_body' => trim((string) $site->nginx_extra_raw) !== ''
+                    ? $site->nginx_extra_raw
+                    : SiteWebserverConfigProfile::DEFAULT_MAIN_SNIPPET_BODY,
+                'before_body' => SiteWebserverConfigProfile::DEFAULT_BEFORE_BODY,
+                'after_body' => SiteWebserverConfigProfile::DEFAULT_AFTER_BODY,
             ]
         );
         $site->setRelation('webserverConfigProfile', $profile);
@@ -50,16 +57,28 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
 
         $ssh = $this->systemSsh($site);
 
-        // First-apply only — nginx_installed_at flips on the first successful
-        // provision, so subsequent applies (rotations, SSL, etc.) never even
-        // probe the doc root for a placeholder.
-        if ($site->nginx_installed_at === null) {
+        // Ensure the "being set up" splash whenever the site has no deployed
+        // release yet — first apply (nginx_installed_at null) OR any apply for a
+        // site that has never deployed (last_deploy_at null). A services-first
+        // bare site lives in that state until its first deploy, and a botched
+        // first provision can flip nginx_installed_at without ever landing the
+        // placeholder, leaving an empty doc root that nginx 403s on. Once the
+        // site has deployed, steady-state applies (rotations, SSL) skip the
+        // probe. installPlaceholderPage() is idempotent — it leaves a real
+        // release's index untouched — so this never clobbers deployed content.
+        if ($site->nginx_installed_at === null || $site->last_deploy_at === null) {
             $this->installPlaceholderPage($site, $ssh, $emit);
         }
         $this->ensureSuspendedPage($site, $ssh, $emit);
+        $this->ensureManagedErrorPages($site, $ssh, $emit);
         $this->ensureNginxEngineHttpCacheInfrastructure($site, $ssh, $emit);
         $this->syncBasicAuthHtpasswdFiles($site, $ssh, $emit);
+        $this->syncAccessGateFiles($site, $ssh, $emit);
         $this->writeNginxLayerSnippetFiles($site, $profile, $ssh, $emit);
+
+        // Pool first: the vhost below points fastcgi_pass at this pool's socket,
+        // so it must exist (and php-fpm reloaded) before nginx reloads onto it.
+        $this->ensurePhpFpmPool($site, $ssh, $emit);
 
         // Vhost write only emits when content actually changed; an apply that
         // didn't touch anything the vhost references (e.g. a sync that found
@@ -68,17 +87,19 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
             $emit->step('nginx', 'writing site config file: '.$confFile);
         }
 
-        $emit->step('nginx', 'running nginx -t and reloading');
+        $emit->step('nginx', 'running nginx -t and applying config');
+        $nginxApply = sprintf(
+            'ln -sf %1$s %2$s && %3$s',
+            escapeshellarg($confFile),
+            escapeshellarg($linkFile),
+            NginxServiceScript::testAndReloadOrStartScript(),
+        );
+        if (! $server->hasEdgeProxy()) {
+            $nginxApply = CaddyEdgeBackendLayout::releasePort80Shell()."\n".$nginxApply;
+        }
         $out = $ssh->exec(sprintf(
             '(%s) 2>&1; printf "\nDPLY_NGINX_EXIT:%%s" "$?"',
-            $this->privilegedCommand(
-                $server,
-                sprintf(
-                    'ln -sf %1$s %2$s && nginx -t && (systemctl reload nginx 2>/dev/null || service nginx reload 2>/dev/null || nginx -s reload)',
-                    escapeshellarg($confFile),
-                    escapeshellarg($linkFile)
-                )
-            ),
+            $this->privilegedCommand($server, $nginxApply),
         ), 120);
 
         // The nginx -t output is multi-line; emit each non-blank line so the
@@ -120,18 +141,70 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
     }
 
     /**
-     * Reads a layered snippet file from the host (before or after include target).
+     * Reads everything the editor needs (main vhost + before/after snippet files)
+     * in a SINGLE SSH round trip instead of one connection + cat per file.
+     *
+     * The webserver-config page previously opened four separate connections on
+     * load (read main, ensure layer files, read before, read after) — each a full
+     * TCP+auth handshake. This collapses them into one `cat`-everything script
+     * (base64-framed so arbitrary file content can't collide with the markers) on
+     * one connection. It is a pure read: missing files come back as null and are
+     * materialized on the next apply (the include globs tolerate their absence).
+     *
+     * @return array{main: ?string, before: ?string, after: ?string}
      */
-    public function readLayerSnippetFile(Site $site, string $which): ?string
+    public function readEditorStateFromServer(Site $site): array
     {
         $server = $this->ensureServerReady($site);
         $ssh = $this->systemSsh($site);
-        $basename = $this->configBasename($site);
-        $base = rtrim(config('sites.nginx_dply_site_path'), '/').'/'.$basename;
-        $sub = $which === 'before' ? 'before/10-dply-layer.conf' : 'after/10-dply-layer.conf';
-        $path = $base.'/'.$sub;
 
-        return $this->readRemoteFile($server, $ssh, $path);
+        $basename = $this->configBasename($site);
+        $confFile = rtrim(config('sites.nginx_sites_available'), '/').'/'.$basename.'.conf';
+        $base = rtrim(config('sites.nginx_dply_site_path'), '/').'/'.$basename;
+        $beforeFile = $base.'/before/10-dply-layer.conf';
+        $afterFile = $base.'/after/10-dply-layer.conf';
+
+        // One script, one channel: emit each file base64-encoded on a single
+        // marker line. `cat ... 2>/dev/null` swallows the shell's not-found error
+        // so a missing file yields an empty (→ null) section without noise.
+        $emit = fn (string $marker, string $path): string => sprintf(
+            'printf %%s %s; cat %s 2>/dev/null | base64 | tr -d "\n"; printf "\n"',
+            escapeshellarg($marker.':'),
+            escapeshellarg($path),
+        );
+        $script = implode("\n", [
+            $emit('DPLYMAIN', $confFile),
+            $emit('DPLYBEFORE', $beforeFile),
+            $emit('DPLYAFTER', $afterFile),
+        ]);
+
+        $out = $ssh->exec($this->privilegedCommand($server, $script), 60);
+
+        return [
+            'main' => $this->decodeEditorStateSection($out, 'DPLYMAIN'),
+            'before' => $this->decodeEditorStateSection($out, 'DPLYBEFORE'),
+            'after' => $this->decodeEditorStateSection($out, 'DPLYAFTER'),
+        ];
+    }
+
+    /**
+     * Pulls one base64 marker line out of {@see readEditorStateFromServer} output.
+     * Mirrors {@see readRemoteFile} semantics: trimmed, empty becomes null.
+     */
+    private function decodeEditorStateSection(string $output, string $marker): ?string
+    {
+        if (! preg_match('/^'.preg_quote($marker, '/').':(.*)$/m', $output, $m)) {
+            return null;
+        }
+
+        $decoded = base64_decode(trim($m[1]), true);
+        if ($decoded === false) {
+            return null;
+        }
+
+        $decoded = trim($decoded);
+
+        return $decoded === '' ? null : $decoded;
     }
 
     /**
@@ -265,43 +338,6 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
     }
 
     /**
-     * Creates missing before/after snippet files on the host (e.g. legacy sites) so includes resolve.
-     */
-    public function ensureNginxLayerSnippetFilesIfMissing(Site $site, SiteWebserverConfigProfile $profile): void
-    {
-        if ($profile->mode !== SiteWebserverConfigProfile::MODE_LAYERED) {
-            return;
-        }
-
-        $server = $this->ensureServerReady($site);
-        $ssh = $this->systemSsh($site);
-        $basename = $this->configBasename($site);
-        $base = rtrim(config('sites.nginx_dply_site_path'), '/').'/'.$basename;
-        $beforeFile = $base.'/before/10-dply-layer.conf';
-        $afterFile = $base.'/after/10-dply-layer.conf';
-
-        $this->ensureNginxLayerDirectories($site, $ssh);
-
-        if ($this->readRemoteFile($server, $ssh, $beforeFile) === null) {
-            $beforeBody = trim((string) $profile->before_body);
-            $this->writeSystemFile(
-                $ssh,
-                $beforeFile,
-                $beforeBody !== '' ? $beforeBody : "# Dply placeholder (empty before layer)\n"
-            );
-        }
-
-        if ($this->readRemoteFile($server, $ssh, $afterFile) === null) {
-            $afterBody = trim((string) $profile->after_body);
-            $this->writeSystemFile(
-                $ssh,
-                $afterFile,
-                $afterBody !== '' ? $afterBody : "# Dply placeholder (empty after layer)\n"
-            );
-        }
-    }
-
-    /**
      * Writes before/after snippet files for layered nginx profiles so include globs always match at least one file.
      * Emits a `step` only when at least one snippet actually changed.
      */
@@ -324,8 +360,8 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         $afterDir = $base.'/after';
         $beforeBody = trim((string) $profile->before_body);
         $afterBody = trim((string) $profile->after_body);
-        $beforeContent = $beforeBody !== '' ? $beforeBody : "# Dply placeholder (empty before layer)\n";
-        $afterContent = $afterBody !== '' ? $afterBody : "# Dply placeholder (empty after layer)\n";
+        $beforeContent = ($beforeBody !== '' ? $beforeBody : SiteWebserverConfigProfile::DEFAULT_BEFORE_BODY)."\n";
+        $afterContent = ($afterBody !== '' ? $afterBody : SiteWebserverConfigProfile::DEFAULT_AFTER_BODY)."\n";
 
         $changed = $this->writeSystemFileIfChanged($server, $ssh, $beforeDir.'/10-dply-layer.conf', $beforeContent);
         $changed = $this->writeSystemFileIfChanged($server, $ssh, $afterDir.'/10-dply-layer.conf', $afterContent) || $changed;
@@ -357,9 +393,9 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         // can tune them per-server from the workspace. The row is created
         // lazily here with the legacy defaults (100m/100m/2g/60m) so existing
         // servers get the same on-disk output until someone touches it.
-        $feature = \App\Models\ServerWebserverCacheFeature::findOrCreateFor(
+        $feature = ServerWebserverCacheFeature::findOrCreateFor(
             $server->id,
-            \App\Models\ServerWebserverCacheFeature::WEBSERVER_NGINX,
+            ServerWebserverCacheFeature::WEBSERVER_NGINX,
         );
         $fcgiSize = (int) $feature->nginx_fcgi_zone_size_mb;
         $proxySize = (int) $feature->nginx_proxy_zone_size_mb;
@@ -410,9 +446,10 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
             $this->privilegedCommand(
                 $server,
                 sprintf(
-                    'rm -f %1$s %2$s && nginx -t && (systemctl reload nginx 2>/dev/null || service nginx reload 2>/dev/null || nginx -s reload)',
+                    'rm -f %1$s %2$s && %3$s',
                     escapeshellarg($linkFile),
-                    escapeshellarg($confFile)
+                    escapeshellarg($confFile),
+                    NginxServiceScript::testAndReloadOrStartScript(),
                 )
             ),
         ), 120);

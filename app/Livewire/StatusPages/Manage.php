@@ -3,6 +3,7 @@
 namespace App\Livewire\StatusPages;
 
 use App\Livewire\Concerns\ConfirmsActionWithModal;
+use App\Livewire\Concerns\RequiresFeature;
 use App\Models\Incident;
 use App\Models\Server;
 use App\Models\Site;
@@ -12,7 +13,6 @@ use App\Models\StatusPageMonitor;
 use Illuminate\Contracts\View\View;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
-use App\Livewire\Concerns\RequiresFeature;
 use Livewire\Component;
 
 #[Layout('layouts.app')]
@@ -21,6 +21,7 @@ class Manage extends Component
     use RequiresFeature;
 
     protected string $requiredFeature = 'surface.status_pages';
+
     use ConfirmsActionWithModal;
 
     public StatusPage $statusPage;

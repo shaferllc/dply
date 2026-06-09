@@ -57,7 +57,15 @@ class SiteWebserverConfigEditorService
             [
                 'webserver' => $ws,
                 'mode' => SiteWebserverConfigProfile::MODE_LAYERED,
-                'main_snippet_body' => $ws === 'nginx' ? $site->nginx_extra_raw : null,
+                // Seed each layer with self-documenting comments so the editor is
+                // never an intimidating blank box and the files on disk always
+                // carry an explanation of what each layer is for. Keep any
+                // pre-existing nginx_extra_raw as the main snippet if present.
+                'main_snippet_body' => $ws === 'nginx'
+                    ? (trim((string) $site->nginx_extra_raw) !== '' ? $site->nginx_extra_raw : SiteWebserverConfigProfile::DEFAULT_MAIN_SNIPPET_BODY)
+                    : null,
+                'before_body' => $ws === 'nginx' ? SiteWebserverConfigProfile::DEFAULT_BEFORE_BODY : null,
+                'after_body' => $ws === 'nginx' ? SiteWebserverConfigProfile::DEFAULT_AFTER_BODY : null,
             ]
         );
     }
@@ -233,7 +241,12 @@ class SiteWebserverConfigEditorService
      */
     protected function hydrateNginxEditorFromServer(Site $site, SiteWebserverConfigProfile $profile): array
     {
-        $main = $this->nginxProvisioner->readCurrentMainConfig($site);
+        // One SSH round trip pulls the main vhost and both layer snippets together
+        // (was four separate connections — read main, ensure layers, read before,
+        // read after — each a full handshake) so the page loads with a single
+        // remote call.
+        $state = $this->nginxProvisioner->readEditorStateFromServer($site);
+        $main = $state['main'];
         if ($main === null || trim($main) === '') {
             return [
                 'ok' => false,
@@ -242,7 +255,7 @@ class SiteWebserverConfigEditorService
             ];
         }
 
-        $basename = $site->nginxConfigBasename();
+        $basename = $site->webserverConfigBasename();
         $base = rtrim(config('sites.nginx_dply_site_path'), '/').'/'.$basename;
         $isLayeredRemote = str_contains($main, $base.'/before/') && str_contains($main, $base.'/after/');
 
@@ -250,17 +263,15 @@ class SiteWebserverConfigEditorService
         $wantsLayered = $profileWantsLayered || $isLayeredRemote;
 
         if ($wantsLayered) {
-            // ensureNginxLayerSnippetFilesIfMissing only runs when the profile is layered; if the host
-            // already has Dply includes but the app still thought "full file", flip mode first.
+            // If the host already has Dply includes but the app still thought
+            // "full file", flip mode first.
             if ($isLayeredRemote && $profile->mode !== SiteWebserverConfigProfile::MODE_LAYERED) {
                 $profile->update(['mode' => SiteWebserverConfigProfile::MODE_LAYERED]);
                 $profile->refresh();
             }
 
-            $this->nginxProvisioner->ensureNginxLayerSnippetFilesIfMissing($site, $profile);
-
-            $beforeRaw = $this->nginxProvisioner->readLayerSnippetFile($site, 'before');
-            $afterRaw = $this->nginxProvisioner->readLayerSnippetFile($site, 'after');
+            $beforeRaw = $state['before'];
+            $afterRaw = $state['after'];
 
             if ($isLayeredRemote) {
                 $parsedMain = $this->nginxProvisioner->parseLayeredMainSnippetFromVhost($site, $main);
@@ -342,7 +353,11 @@ class SiteWebserverConfigEditorService
             return false;
         }
 
-        if ($site->usesFunctionsRuntime() || $site->usesDockerRuntime() || $site->usesKubernetesRuntime()) {
+        if ($site->usesFunctionsRuntime() || $site->usesKubernetesRuntime()) {
+            return false;
+        }
+
+        if ($site->usesDockerRuntime() && ! $site->usesVmDockerRuntime()) {
             return false;
         }
 
@@ -357,15 +372,23 @@ class SiteWebserverConfigEditorService
 
     protected function normalizeNginxLayerPlaceholder(?string $raw, string $kind): string
     {
-        if ($raw === null || trim($raw) === '') {
-            return '';
+        $default = $kind === 'before'
+            ? SiteWebserverConfigProfile::DEFAULT_BEFORE_BODY
+            : SiteWebserverConfigProfile::DEFAULT_AFTER_BODY;
+
+        $legacy = $kind === 'before'
+            ? SiteWebserverConfigProfile::LEGACY_BEFORE_PLACEHOLDER
+            : SiteWebserverConfigProfile::LEGACY_AFTER_PLACEHOLDER;
+
+        $trimmed = trim((string) $raw);
+
+        // Empty/missing on disk or the old terse placeholder → surface the
+        // informative default so the editor always shows a documented layer.
+        if ($trimmed === '' || $trimmed === $legacy) {
+            return $default;
         }
 
-        $placeholder = $kind === 'before'
-            ? '# Dply placeholder (empty before layer)'
-            : '# Dply placeholder (empty after layer)';
-
-        return trim($raw) === $placeholder ? '' : $raw;
+        return $raw;
     }
 
     /**

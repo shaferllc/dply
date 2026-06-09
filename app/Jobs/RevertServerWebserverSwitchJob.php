@@ -8,9 +8,12 @@ use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerWebserverAuditEvent;
+use App\Models\Site;
 use App\Services\RemoteCli\RiskLevel;
 use App\Services\SshConnection;
+use App\Support\Servers\CaddyRuntimeOwnership;
 use Illuminate\Bus\Queueable;
+use Illuminate\Bus\UniqueLock;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
@@ -85,19 +88,23 @@ class RevertServerWebserverSwitchJob implements ShouldBeUnique, ShouldQueue
         return $this->userId;
     }
 
-    public function handle(): void
+    public function handle(\App\Services\Notifications\ServerWebserverNotificationDispatcher $notifications): void
     {
         $server = Server::query()->find($this->serverId);
         if ($server === null) {
             return;
         }
 
+        $actor = $this->userId !== null ? \App\Models\User::query()->find($this->userId) : null;
         $emitter = $this->beginConsoleAction();
         $startedAt = microtime(true);
         $ssh = new SshConnection($server);
 
         $emitter->info(sprintf('[stop]      stopping %s if running', $this->target));
         $this->bestEffortStopUnit($server, $ssh, $this->target);
+
+        $emitter->info(sprintf('[cleanup]   removing dply %s site configs', $this->target));
+        $this->bestEffortRemoveTargetSiteConfigs($server, $ssh, $this->target);
 
         $emitter->info(sprintf('[uninstall] removing %s package + repo files', $this->target));
         $this->bestEffortUninstall($server, $ssh, $this->target);
@@ -119,6 +126,9 @@ class RevertServerWebserverSwitchJob implements ShouldBeUnique, ShouldQueue
             $emitter->info('Reverted.');
             $this->completeConsoleAction();
             $this->recordAudit($server, ServerWebserverAuditEvent::RESULT_SUCCESS, $startedAt);
+            $notifications->notify($server, 'switch_reverted', [
+                __('Reverted :target back to :from', ['target' => $this->target, 'from' => $this->from]),
+            ], $actor, ['from' => $this->from, 'target' => $this->target]);
         } else {
             $msg = sprintf('Could not confirm %s is running on :80 after revert — manual check required.', $this->from);
             $emitter->error($msg);
@@ -133,7 +143,7 @@ class RevertServerWebserverSwitchJob implements ShouldBeUnique, ShouldQueue
         // blocked for the full uniqueFor() window when the worker was
         // SIGKILL'd. See SwitchServerWebserverJob::failed() for the full
         // rationale.
-        app(\Illuminate\Bus\UniqueLock::class)->release($this);
+        app(UniqueLock::class)->release($this);
 
         $server = Server::query()->find($this->serverId);
         if ($server === null) {
@@ -159,6 +169,35 @@ class RevertServerWebserverSwitchJob implements ShouldBeUnique, ShouldQueue
         }
 
         $this->recordAudit($server, ServerWebserverAuditEvent::RESULT_FAILURE, microtime(true), $message);
+    }
+
+    private function bestEffortRemoveTargetSiteConfigs(Server $server, SshConnection $ssh, string $webserver): void
+    {
+        if (strtolower($webserver) !== 'caddy') {
+            return;
+        }
+
+        $paths = Site::query()
+            ->where('server_id', $server->id)
+            ->get()
+            ->map(function (Site $site): string {
+                $basename = method_exists($site, 'webserverConfigBasename')
+                    ? (string) $site->webserverConfigBasename()
+                    : (string) $site->slug;
+
+                return '/etc/caddy/sites-enabled/'.$basename.'.caddy';
+            })
+            ->unique()
+            ->values();
+
+        if ($paths->isEmpty()) {
+            return;
+        }
+
+        $rm = $paths
+            ->map(fn (string $path): string => 'rm -f '.escapeshellarg($path))
+            ->implode('; ');
+        $ssh->exec($this->privilegedCommand($rm.'; '.CaddyRuntimeOwnership::shell()), 30);
     }
 
     private function bestEffortStopUnit(Server $server, SshConnection $ssh, string $webserver): void

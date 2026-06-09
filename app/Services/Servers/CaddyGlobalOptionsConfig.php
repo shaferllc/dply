@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\SshConnection;
@@ -189,6 +190,7 @@ class CaddyGlobalOptionsConfig
 
     /**
      * @param  array<string, string>  $values
+     *
      * @throws \RuntimeException
      */
     public function save(Server $server, array $values, ?ConsoleEmitter $emitter = null): void
@@ -491,7 +493,7 @@ class CaddyGlobalOptionsConfig
         foreach (preg_split('/\R/', trim($stripped)) ?: [] as $line) {
             $line = trim($line);
             if ($line !== '') {
-                $emit($line, $exit !== 0 ? \App\Models\ConsoleAction::LEVEL_WARN : \App\Models\ConsoleAction::LEVEL_INFO);
+                $emit($line, $exit !== 0 ? ConsoleAction::LEVEL_WARN : ConsoleAction::LEVEL_INFO);
             }
         }
         if ($exit !== 0) {

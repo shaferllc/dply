@@ -5,7 +5,7 @@ namespace App\Support;
 final class ServerDatabaseNotificationKeys
 {
     /** @var list<string> */
-    public const KINDS = ['created', 'removed'];
+    public const KINDS = ['created', 'removed', 'engine_installed', 'engine_removed', 'user_created', 'user_removed', 'credential_shared'];
 
     public static function eventKey(string $kind): string
     {
@@ -14,6 +14,14 @@ final class ServerDatabaseNotificationKeys
         }
 
         return 'server.database.'.$kind;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function eventKeys(): array
+    {
+        return array_map(static fn (string $kind) => self::eventKey($kind), self::KINDS);
     }
 
     /**

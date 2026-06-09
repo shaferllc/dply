@@ -2,105 +2,81 @@
 
 declare(strict_types=1);
 
-namespace Tests\Feature;
+namespace Tests\Feature\MarketplaceItemSeederRuntimeTagsTest;
 
 use App\Models\MarketplaceItem;
 use Database\Seeders\MarketplaceItemSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Tests\TestCase;
 
-class MarketplaceItemSeederRuntimeTagsTest extends TestCase
-{
-    use RefreshDatabase;
+uses(RefreshDatabase::class);
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->seed(MarketplaceItemSeeder::class);
+beforeEach(function () {
+    $this->seed(MarketplaceItemSeeder::class);
+});
+test('seeder tags php recipes with runtime php', function () {
+    foreach (['nginx-laravel-php', 'deploy-laravel', 'nginx-php-generic', 'deploy-php-fpm-reload'] as $slug) {
+        $item = MarketplaceItem::query()->where('slug', $slug)->firstOrFail();
+        expect($item->runtimes ?? [])->toContain('php');
     }
-
-    public function test_seeder_tags_php_recipes_with_runtime_php(): void
-    {
-        foreach (['nginx-laravel-php', 'deploy-laravel', 'nginx-php-generic', 'deploy-php-fpm-reload'] as $slug) {
-            $item = MarketplaceItem::query()->where('slug', $slug)->firstOrFail();
-            $this->assertContains('php', $item->runtimes ?? [], "{$slug} should be tagged php");
-        }
+});
+test('seeder tags laravel recipes with framework laravel', function () {
+    foreach (['nginx-laravel-php', 'deploy-laravel-migrate-only', 'deploy-laravel-storage-link'] as $slug) {
+        $item = MarketplaceItem::query()->where('slug', $slug)->firstOrFail();
+        expect($item->frameworks ?? [])->toContain('laravel');
     }
-
-    public function test_seeder_tags_laravel_recipes_with_framework_laravel(): void
-    {
-        foreach (['nginx-laravel-php', 'deploy-laravel-migrate-only', 'deploy-laravel-storage-link'] as $slug) {
-            $item = MarketplaceItem::query()->where('slug', $slug)->firstOrFail();
-            $this->assertContains('laravel', $item->frameworks ?? [], "{$slug} should be tagged laravel");
-        }
+});
+test('seeder tags rails recipes with runtime ruby and framework rails', function () {
+    foreach (['deploy-rails', 'deploy-rails-db-migrate-only'] as $slug) {
+        $item = MarketplaceItem::query()->where('slug', $slug)->firstOrFail();
+        expect($item->runtimes ?? [])->toContain('ruby');
+        expect($item->frameworks ?? [])->toContain('rails');
     }
-
-    public function test_seeder_tags_rails_recipes_with_runtime_ruby_and_framework_rails(): void
-    {
-        foreach (['deploy-rails', 'deploy-rails-db-migrate-only'] as $slug) {
-            $item = MarketplaceItem::query()->where('slug', $slug)->firstOrFail();
-            $this->assertContains('ruby', $item->runtimes ?? []);
-            $this->assertContains('rails', $item->frameworks ?? []);
-        }
+});
+test('seeder tags django recipes with runtime python and framework django', function () {
+    $django = MarketplaceItem::query()->where('slug', 'deploy-django-prod')->firstOrFail();
+    expect($django->runtimes ?? [])->toContain('python');
+    expect($django->frameworks ?? [])->toContain('django');
+});
+test('seeder tags node recipes with runtime node', function () {
+    foreach (['nginx-node-reverse-proxy', 'deploy-npm-build-prod', 'deploy-pnpm-ci-build'] as $slug) {
+        $item = MarketplaceItem::query()->where('slug', $slug)->firstOrFail();
+        expect($item->runtimes ?? [])->toContain('node');
     }
-
-    public function test_seeder_tags_django_recipes_with_runtime_python_and_framework_django(): void
-    {
-        $django = MarketplaceItem::query()->where('slug', 'deploy-django-prod')->firstOrFail();
-        $this->assertContains('python', $django->runtimes ?? []);
-        $this->assertContains('django', $django->frameworks ?? []);
+});
+test('seeder includes curated non php process recipes', function () {
+    foreach ([
+        'process-node-bullmq-worker' => 'node',
+        'process-python-celery-worker' => 'python',
+        'process-python-celery-beat' => 'python',
+        'process-ruby-sidekiq' => 'ruby',
+        'process-laravel-horizon' => 'php',
+        'process-laravel-scheduler' => 'php',
+    ] as $slug => $expectedRuntime) {
+        $item = MarketplaceItem::query()->where('slug', $slug)->firstOrFail();
+        expect($item->runtimes ?? [])->toContain($expectedRuntime);
+        expect($item->payload['command'] ?? null)->not->toBeEmpty();
     }
-
-    public function test_seeder_tags_node_recipes_with_runtime_node(): void
-    {
-        foreach (['nginx-node-reverse-proxy', 'deploy-npm-build-prod', 'deploy-pnpm-ci-build'] as $slug) {
-            $item = MarketplaceItem::query()->where('slug', $slug)->firstOrFail();
-            $this->assertContains('node', $item->runtimes ?? []);
-        }
+});
+test('universal items remain untagged', function () {
+    // Guides / notification integrations / generic snippets should
+    // surface for every runtime, so they stay tag-free.
+    foreach (['guide-first-server', 'integration-slack-webhook', 'guide-api-keys'] as $slug) {
+        $item = MarketplaceItem::query()->where('slug', $slug)->firstOrFail();
+        expect($item->runtimes)->toBeNull("{$slug} should remain runtime-agnostic");
     }
+});
+test('for runtime scope returns only php recipes plus universal', function () {
+    $phpItems = MarketplaceItem::query()->forRuntime('php')->whereNotNull('runtimes')->pluck('slug');
 
-    public function test_seeder_includes_curated_non_php_process_recipes(): void
-    {
-        foreach ([
-            'process-node-bullmq-worker' => 'node',
-            'process-python-celery-worker' => 'python',
-            'process-python-celery-beat' => 'python',
-            'process-ruby-sidekiq' => 'ruby',
-            'process-laravel-horizon' => 'php',
-            'process-laravel-scheduler' => 'php',
-        ] as $slug => $expectedRuntime) {
-            $item = MarketplaceItem::query()->where('slug', $slug)->firstOrFail();
-            $this->assertContains($expectedRuntime, $item->runtimes ?? []);
-            $this->assertNotEmpty($item->payload['command'] ?? null);
-        }
-    }
+    expect($phpItems->contains('process-laravel-horizon'))->toBeTrue();
+    expect($phpItems->contains('process-ruby-sidekiq'))->toBeFalse();
+    expect($phpItems->contains('process-node-bullmq-worker'))->toBeFalse();
+});
+test('for runtime scope for ruby excludes node python php', function () {
+    $rubyItems = MarketplaceItem::query()->forRuntime('ruby')->whereNotNull('runtimes')->pluck('slug');
 
-    public function test_universal_items_remain_untagged(): void
-    {
-        // Guides / notification integrations / generic snippets should
-        // surface for every runtime, so they stay tag-free.
-        foreach (['guide-first-server', 'integration-slack-webhook', 'guide-api-keys'] as $slug) {
-            $item = MarketplaceItem::query()->where('slug', $slug)->firstOrFail();
-            $this->assertNull($item->runtimes, "{$slug} should remain runtime-agnostic");
-        }
-    }
-
-    public function test_for_runtime_scope_returns_only_php_recipes_plus_universal(): void
-    {
-        $phpItems = MarketplaceItem::query()->forRuntime('php')->whereNotNull('runtimes')->pluck('slug');
-
-        $this->assertTrue($phpItems->contains('process-laravel-horizon'));
-        $this->assertFalse($phpItems->contains('process-ruby-sidekiq'));
-        $this->assertFalse($phpItems->contains('process-node-bullmq-worker'));
-    }
-
-    public function test_for_runtime_scope_for_ruby_excludes_node_python_php(): void
-    {
-        $rubyItems = MarketplaceItem::query()->forRuntime('ruby')->whereNotNull('runtimes')->pluck('slug');
-
-        $this->assertTrue($rubyItems->contains('process-ruby-sidekiq'));
-        $this->assertTrue($rubyItems->contains('deploy-rails'));
-        $this->assertFalse($rubyItems->contains('process-laravel-horizon'));
-        $this->assertFalse($rubyItems->contains('process-node-bullmq-worker'));
-    }
-}
+    expect($rubyItems->contains('process-ruby-sidekiq'))->toBeTrue();
+    expect($rubyItems->contains('deploy-rails'))->toBeTrue();
+    expect($rubyItems->contains('process-laravel-horizon'))->toBeFalse();
+    expect($rubyItems->contains('process-node-bullmq-worker'))->toBeFalse();
+});

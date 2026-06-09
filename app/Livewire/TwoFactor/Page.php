@@ -97,6 +97,10 @@ class Page extends Component
             'two_factor_recovery_codes' => encrypt(json_encode($hashedCodes)),
         ])->save();
 
+        if ($org = $user->currentOrganization()) {
+            audit_log($org, $user, 'user.two_factor_enabled', $user);
+        }
+
         Session::flash('recovery_codes', $recoveryCodes);
         Session::flash('status', 'two-factor-enabled');
 
@@ -129,6 +133,10 @@ class Page extends Component
             'two_factor_recovery_codes' => null,
             'two_factor_confirmed_at' => null,
         ])->save();
+
+        if ($org = $user->currentOrganization()) {
+            audit_log($org, $user, 'user.two_factor_disabled', $user);
+        }
 
         Session::flash('status', 'two-factor-disabled');
 

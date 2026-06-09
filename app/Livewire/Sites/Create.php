@@ -10,22 +10,25 @@ use App\Jobs\ProvisionSiteJob;
 use App\Jobs\RunLaravelScaffoldJob;
 use App\Jobs\RunWordPressScaffoldJob;
 use App\Livewire\Concerns\DetectsRepositoryRuntime;
+use App\Livewire\Concerns\EnforcesSiteQuota;
+use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
 use App\Livewire\Forms\SiteCreateForm;
 use App\Models\Server;
 use App\Models\Site;
-use App\Models\SiteDeployStep;
 use App\Models\SiteDomain;
 use App\Models\SiteProcess;
 use App\Services\Deploy\LocalRepositoryInspector;
-use App\Services\Deploy\RuntimeAwareDeployStepDefaults;
 use App\Services\Deploy\ServerlessRepositoryCheckout;
 use App\Services\Deploy\ServerlessRuntimeDetector;
 use App\Services\Deploy\ServerlessTargetCapabilityResolver;
+use App\Services\Deploy\SiteDeployPipelineManager;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Sites\InternalPortAllocator;
 use App\Services\Sites\SiteProvisioner;
+use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use App\Support\HostnameValidator;
+use App\Support\Sites\SiteCreateAccess;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
@@ -35,6 +38,8 @@ use Livewire\Component;
 class Create extends Component
 {
     use DetectsRepositoryRuntime;
+    use EnforcesSiteQuota;
+    use RefreshesLinkedSourceControlAccounts;
 
     public Server $server;
 
@@ -143,23 +148,22 @@ class Create extends Component
      */
     public array $containerAvailableRepositories = [];
 
+    /** Non-empty when mount determined the user cannot create a site on this server. */
+    public string $siteCreateBlockedReason = '';
+
     public function mount(
         Server $server,
         ServerPhpManager $phpManager,
         SourceControlRepositoryBrowser $repositoryBrowser,
     ): void {
         $this->authorize('view', $server);
-        $this->authorize('update', $server);
 
-        $org = auth()->user()->currentOrganization();
-        abort_if($org === null, 403);
-        abort_if($server->organization_id === null, 403);
-        if ($server->organization_id !== $org->id) {
-            abort(404);
-        }
-
-        $this->authorize('create', Site::class);
         $this->server = $server;
+        $this->siteCreateBlockedReason = SiteCreateAccess::blockedReason($server);
+
+        if ($this->siteCreateBlockedReason !== '') {
+            return;
+        }
         $this->form->applyDefaultsForType($this->form->type);
         if ($server->hostCapabilities()->supportsMachinePhpManagement()) {
             $phpData = $phpManager->siteCreationPhpData($server);
@@ -185,6 +189,17 @@ class Create extends Component
         }
 
         $this->form->applyPathDefaults();
+
+        $deployStack = request()->query('deploy_stack');
+        if (
+            is_string($deployStack)
+            && $deployStack === 'docker'
+            && $server->dockerEnginePresent()
+            && ! $server->isDockerHost()
+            && ! $server->isKubernetesCluster()
+        ) {
+            $this->form->deploy_stack = 'docker';
+        }
 
         // Build the list of database engines the user can pick from. The
         // default ServerDatabaseEngine row pre-selects in the picker; the
@@ -222,6 +237,56 @@ class Create extends Component
         );
     }
 
+    /**
+     * Docker container deploy on a regular VM (compose + host port + webserver proxy).
+     */
+    public function usesVmDockerDeployStack(): bool
+    {
+        return $this->form->deploy_stack === 'docker'
+            && ! $this->isContainerMode()
+            && $this->server->dockerEnginePresent();
+    }
+
+    /**
+     * True when the URL requests VM Docker deploy (`?deploy_stack=docker`) on a
+     * regular VM host, even if Docker has not been probed yet.
+     */
+    public function requestsVmDockerDeployStack(): bool
+    {
+        if ($this->isContainerMode()
+            || $this->server->isDockerHost()
+            || $this->server->isKubernetesCluster()) {
+            return false;
+        }
+
+        $deployStack = request()->query('deploy_stack');
+
+        return is_string($deployStack) && $deployStack === 'docker';
+    }
+
+    /**
+     * Choose-app bare create (name + domain only) — skipped for VM Docker
+     * deep links so the full deploy-target wizard stays reachable.
+     */
+    public function usesChooseAppBareCreate(): bool
+    {
+        if ($this->siteCreateBlockedReason !== '') {
+            return false;
+        }
+
+        return config('dply.choose_app_enabled')
+            && $this->server->isVmHost()
+            && ! $this->isContainerMode()
+            && ! $this->usesVmDockerDeployStack()
+            && ! $this->requestsVmDockerDeployStack();
+    }
+
+    public function dockerDeployRequestedButMissing(): bool
+    {
+        return $this->requestsVmDockerDeployStack()
+            && ! $this->server->dockerEnginePresent();
+    }
+
     private function initializeContainerMode(SourceControlRepositoryBrowser $repositoryBrowser): void
     {
         $this->containerLinkedSourceControlAccounts = $repositoryBrowser->accountsForUser(auth()->user());
@@ -252,7 +317,9 @@ class Create extends Component
 
             return;
         }
-        $account = auth()->user()?->socialAccounts()->find($this->container_source_control_account_id);
+        $account = auth()->user() !== null
+            ? app(GitIdentityResolver::class)->forId(auth()->user(), $this->container_source_control_account_id)
+            : null;
         $this->containerAvailableRepositories = $account
             ? $repositoryBrowser->repositoriesForAccount($account)
             : [];
@@ -348,7 +415,6 @@ class Create extends Component
     public function storeContainer(LocalRepositoryInspector $repositoryInspector): mixed
     {
         $this->authorize('update', $this->server);
-        $this->authorize('create', Site::class);
 
         $rules = [
             'container_repo_source' => ['required', 'string', 'in:manual,provider'],
@@ -382,6 +448,12 @@ class Create extends Component
         if ($user === null || $org === null) {
             abort(403);
         }
+
+        if ($this->siteQuotaReached($org)) {
+            return null;
+        }
+
+        $this->authorize('create', Site::class);
 
         // K8s containers may target a different namespace than the server's
         // default. Stash the per-container namespace into the inspection
@@ -482,7 +554,6 @@ class Create extends Component
     public function storeScaffold(): mixed
     {
         $this->authorize('update', $this->server);
-        $this->authorize('create', Site::class);
 
         if (! config('dply.scaffold_v1_enabled')) {
             $this->addError('form.mode', __('Scaffolding is not enabled on this dply install yet.'));
@@ -493,6 +564,12 @@ class Create extends Component
         $org = auth()->user()?->currentOrganization();
         abort_if($org === null, 403);
         abort_if($this->server->organization_id !== $org->id, 403);
+
+        if ($this->siteQuotaReached($org)) {
+            return null;
+        }
+
+        $this->authorize('create', Site::class);
 
         // Database-engine compat per Q5: WordPress requires MySQL/MariaDB.
         // We don't auto-block here because the server's engine list may
@@ -567,7 +644,9 @@ class Create extends Component
             );
         }
 
-        return $this->redirect(route('sites.scaffold-journey', [
+        // Land on the site workspace — the scaffold-install flow renders inside
+        // the shell (Show) while STATUS_SCAFFOLDING keeps it pre-workspace.
+        return $this->redirect(route('sites.show', [
             'server' => $this->server,
             'site' => $site,
         ]), navigate: true);
@@ -601,8 +680,8 @@ class Create extends Component
             return;
         }
 
-        $account = auth()->user()->socialAccounts()->find($value);
-        if (! $account) {
+        $account = app(GitIdentityResolver::class)->forId(auth()->user(), $value);
+        if ($account === null) {
             return;
         }
 
@@ -860,23 +939,35 @@ class Create extends Component
     public function store(SiteProvisioner $siteProvisioner): mixed
     {
         $this->authorize('update', $this->server);
-        $this->authorize('create', Site::class);
 
         $org = auth()->user()->currentOrganization();
         abort_if($org === null, 403);
         abort_if($this->server->organization_id === null, 403);
         abort_if($this->server->organization_id !== $org->id, 403);
 
+        // Friendly site-quota check first so the user gets an upgrade toast
+        // rather than a raw 403 from the create policy (which also gates on
+        // the plan site ceiling as the authoritative hard block).
+        if ($this->siteQuotaReached($org)) {
+            return null;
+        }
+
+        $this->authorize('create', Site::class);
+
         $phpVersionIds = array_column($this->phpVersions, 'id');
         $functionsHost = $this->server->hostCapabilities()->supportsFunctionDeploy();
         $dockerHost = $this->server->isDockerHost();
         $kubernetesHost = $this->server->isKubernetesCluster();
         $containerHost = $dockerHost || $kubernetesHost;
+        // Headless host (webserver=none): no domain, no web root — the site
+        // just runs deployed code via the standard pipeline + processes.
+        $headlessHost = (($this->server->meta['webserver'] ?? 'nginx') === 'none')
+            && ! $functionsHost && ! $containerHost;
 
         $rules = [
             'name' => 'required|string|max:120',
             'type' => 'required|in:php,static,node',
-            'document_root' => 'required|string|max:500',
+            'document_root' => $headlessHost ? 'nullable|string|max:500' : 'required|string|max:500',
             'repository_path' => 'nullable|string|max:500',
             'php_version' => 'nullable|string|max:10',
             'app_port' => 'nullable|integer|min:1|max:65535',
@@ -891,19 +982,22 @@ class Create extends Component
             'functions_build_command' => 'nullable|string|max:4000',
             'functions_artifact_output_path' => 'nullable|string|max:255',
             'primary_hostname' => [
-                'required',
+                'nullable',
                 'string',
                 'max:255',
                 'unique:site_domains,hostname',
                 function (string $attribute, mixed $value, \Closure $fail): void {
-                    if (! is_string($value) || ! HostnameValidator::isValid($value)) {
+                    if (! is_string($value) || trim($value) === '') {
+                        return;
+                    }
+                    if (! HostnameValidator::isValid($value)) {
                         $fail('Enter a valid domain name like app.example.com.');
                     }
                 },
             ],
         ];
 
-        if ($this->form->type === 'php' && ! $functionsHost && ! $containerHost) {
+        if ($this->form->type === 'php' && ! $functionsHost && ! $containerHost && ! $this->usesVmDockerDeployStack()) {
             $rules['php_version'] = ['required', 'string', 'max:10'];
 
             if ($phpVersionIds !== []) {
@@ -984,6 +1078,20 @@ class Create extends Component
             $meta['docker_runtime'] = [
                 'app_type' => $this->form->type,
             ];
+        } elseif ($this->usesVmDockerDeployStack()) {
+            $meta['runtime_profile'] = 'docker_web';
+            $meta['runtime_target'] = [
+                'family' => 'byo_vm_docker',
+                'platform' => 'byo',
+                'provider' => $this->server->provider?->value ?? 'byo',
+                'mode' => 'docker',
+                'status' => 'pending',
+                'logs' => [],
+                'vm_docker' => true,
+            ];
+            $meta['docker_runtime'] = [
+                'app_type' => $this->form->type,
+            ];
         } elseif ($kubernetesHost) {
             $meta['runtime_profile'] = 'kubernetes_web';
             $meta['runtime_target'] = [
@@ -1022,6 +1130,7 @@ class Create extends Component
             : $this->form->type;
         $allocatesInternalPort = ! $functionsHost
             && ! $containerHost
+            && ! $this->usesVmDockerDeployStack()
             && ! in_array($effectiveRuntime, ['php', 'static'], true);
         $internalPort = null;
         if ($allocatesInternalPort) {
@@ -1121,25 +1230,23 @@ class Create extends Component
         // pipeline editor. Skips when no defaults apply (custom / null
         // runtime / unknown runtime).
         $effectiveFramework = (string) ($this->detectedPlan['framework'] ?? '');
-        $defaults = app(RuntimeAwareDeployStepDefaults::class)
-            ->defaultsFor($site->runtime, $effectiveFramework !== '' ? $effectiveFramework : null);
-        foreach ($defaults as $step) {
-            SiteDeployStep::create([
+        app(SiteDeployPipelineManager::class)->seedRuntimeDefaults(
+            $site,
+            $site->runtime,
+            $effectiveFramework !== '' ? $effectiveFramework : null,
+        );
+
+        // Primary domain is optional at create time — Dply provisions a testing
+        // hostname automatically. Only create the SiteDomain row when the user
+        // supplied a real customer-facing hostname.
+        if (trim((string) $this->form->primary_hostname) !== '') {
+            SiteDomain::query()->create([
                 'site_id' => $site->id,
-                'sort_order' => $step['sort_order'],
-                'step_type' => $step['step_type'],
-                'phase' => $step['phase'],
-                'custom_command' => $step['custom_command'] ?? null,
-                'timeout_seconds' => $step['timeout_seconds'],
+                'hostname' => strtolower(trim($this->form->primary_hostname)),
+                'is_primary' => true,
+                'www_redirect' => false,
             ]);
         }
-
-        SiteDomain::query()->create([
-            'site_id' => $site->id,
-            'hostname' => strtolower(trim($this->form->primary_hostname)),
-            'is_primary' => true,
-            'www_redirect' => false,
-        ]);
 
         $site->loadMissing(['server', 'domains']);
         $siteProvisioner->markQueued($site);
@@ -1167,6 +1274,138 @@ class Create extends Component
         }
 
         return $this->redirect(route('sites.show', [$this->server, $site]), navigate: true);
+    }
+
+    /**
+     * Bare-create submit for the choose-app flow (config/dply.php
+     * `choose_app_enabled`). Collects only name + primary hostname, creates
+     * the Site in STATUS_AWAITING_APP, then redirects to sites.choose-app
+     * where the user picks what application runs on it.
+     *
+     * VM hosts only — the blade only renders the bare form when the flag is
+     * on and the host is a VM, but we re-assert both here so the action is
+     * never reachable on a non-VM host or with the flag off.
+     */
+    public function storeBare(): mixed
+    {
+        $this->authorize('update', $this->server);
+
+        if (! config('dply.choose_app_enabled') || ! $this->server->isVmHost()) {
+            abort(404);
+        }
+
+        $org = auth()->user()?->currentOrganization();
+        abort_if($org === null, 403);
+        abort_if($this->server->organization_id === null, 403);
+        abort_if($this->server->organization_id !== $org->id, 403);
+
+        if ($this->siteQuotaReached($org)) {
+            return null;
+        }
+
+        $this->authorize('create', Site::class);
+
+        $this->form->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'primary_hostname' => [
+                'nullable',
+                'string',
+                'max:255',
+                'unique:site_domains,hostname',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (! is_string($value) || trim($value) === '') {
+                        return;
+                    }
+                    if (! HostnameValidator::isValid($value)) {
+                        $fail(__('Enter a valid domain name like app.example.com.'));
+                    }
+                },
+            ],
+        ]);
+
+        // Resolve slug uniqueness BEFORE the insert. ensureUniqueSlug() only
+        // dedupes pre-save; passing a colliding slug straight to create()
+        // trips the (server_id, slug) unique constraint. Mirror the loop
+        // used by WorkspaceSites::addSite().
+        $baseSlug = Str::slug($this->form->name) ?: 'site';
+        $slug = $baseSlug;
+        $i = 1;
+        while (Site::query()->where('server_id', $this->server->id)->where('slug', $slug)->exists()) {
+            $slug = $baseSlug.'-'.$i;
+            $i++;
+        }
+        $hostname = strtolower(trim($this->form->primary_hostname));
+
+        // Bare site: type defaults to PHP as a harmless placeholder; the
+        // chosen application on sites.choose-app overwrites type / runtime /
+        // document_root before anything is provisioned. No webserver / FPM
+        // is provisioned at this point.
+        $site = Site::query()->create([
+            'server_id' => $this->server->id,
+            'user_id' => auth()->id(),
+            'organization_id' => $this->server->organization_id,
+            'deploy_script_id' => $this->server->organization?->default_site_script_id,
+            'name' => $this->form->name,
+            'slug' => $slug,
+            'type' => SiteType::Php,
+            'runtime' => 'php',
+            'document_root' => '/home/dply/'.$slug.'/public',
+            'repository_path' => '/home/dply/'.$slug,
+            'status' => Site::STATUS_PENDING,
+            'ssl_status' => Site::SSL_NONE,
+            'webhook_secret' => Str::random(48),
+            'deploy_strategy' => 'simple',
+            'releases_to_keep' => 5,
+            'laravel_scheduler' => false,
+            'deployment_environment' => 'production',
+            'restart_supervisor_programs_after_deploy' => false,
+            'meta' => [
+                'choose_app' => [
+                    'created_at' => now()->toISOString(),
+                    'created_by_user_id' => auth()->id(),
+                    // Services-first: foundation provisions now; the repo is
+                    // connected later. `skipped` keeps it out of the forced
+                    // picker while leaving "Connect repository" re-choosable.
+                    'skipped' => true,
+                ],
+            ],
+        ]);
+
+        if ($hostname !== '') {
+            SiteDomain::query()->create([
+                'site_id' => $site->id,
+                'hostname' => $hostname,
+                'is_primary' => true,
+                'www_redirect' => false,
+            ]);
+        }
+
+        if ($this->server->organization) {
+            audit_log(
+                $this->server->organization,
+                auth()->user(),
+                'site.created',
+                $site,
+                null,
+                [
+                    'name' => $site->name,
+                    'slug' => $site->slug,
+                    'server_id' => (string) $this->server->id,
+                    'mode' => 'choose_app',
+                    'primary_hostname' => $hostname,
+                ],
+            );
+        }
+
+        // Provision the foundation now (live PHP default-page site) so services
+        // can be configured against a real site before any repo is connected,
+        // then land in the workspace — not the forced app picker.
+        app(\App\Services\Sites\SiteFoundationProvisioner::class)->provision($site, 'php');
+
+        return $this->redirect(route('sites.show', [
+            'server' => $this->server,
+            'site' => $site,
+        ]), navigate: true);
     }
 
     private function refreshFunctionsDetection(): void
@@ -1237,6 +1476,8 @@ class Create extends Component
             'phpVersions' => $this->phpVersions,
             'isContainerMode' => $this->isContainerMode(),
             'containerOssPresets' => $this->isContainerMode() ? $this->containerOssPresets() : [],
+            'usesChooseAppBareCreate' => $this->usesChooseAppBareCreate(),
+            'dockerDeployRequestedButMissing' => $this->dockerDeployRequestedButMissing(),
         ]);
     }
 
@@ -1258,9 +1499,18 @@ class Create extends Component
             $this->form->functions_source_control_account_id = $this->linkedSourceControlAccounts[0]['id'];
         }
 
-        $account = auth()->user()->socialAccounts()->find($this->form->functions_source_control_account_id);
+        $account = app(GitIdentityResolver::class)->forId(auth()->user(), $this->form->functions_source_control_account_id);
         $this->availableFunctionsRepositories = $account
             ? $repositoryBrowser->repositoriesForAccount($account)
             : [];
+    }
+
+    protected function afterLinkedSourceControlAccountsRefreshed(): void
+    {
+        $this->loadFunctionsSourceControlState(app(SourceControlRepositoryBrowser::class));
+
+        if ($this->isContainerMode()) {
+            $this->refreshContainerRepositories(app(SourceControlRepositoryBrowser::class));
+        }
     }
 }

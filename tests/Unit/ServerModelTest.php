@@ -1,53 +1,44 @@
 <?php
 
-namespace Tests\Unit;
+namespace Tests\Unit\ServerModelTest;
 
 use App\Models\Server;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
-use Tests\TestCase;
 
-class ServerModelTest extends TestCase
-{
-    use RefreshDatabase;
+uses(RefreshDatabase::class);
 
-    public function test_is_ready_returns_true_when_status_ready(): void
-    {
-        $server = Server::factory()->ready()->create();
+test('is ready returns true when status ready', function () {
+    $server = Server::factory()->ready()->create();
 
-        $this->assertTrue($server->isReady());
-    }
+    expect($server->isReady())->toBeTrue();
+});
 
-    public function test_is_ready_returns_false_when_status_pending(): void
-    {
-        $server = Server::factory()->pending()->create();
+test('is ready returns false when status pending', function () {
+    $server = Server::factory()->pending()->create();
 
-        $this->assertFalse($server->isReady());
-    }
+    expect($server->isReady())->toBeFalse();
+});
 
-    public function test_get_ssh_connection_string_formats_correctly(): void
-    {
-        $server = Server::factory()->create([
-            'ssh_user' => 'deploy',
-            'ip_address' => '10.0.0.1',
-        ]);
+test('get ssh connection string formats correctly', function () {
+    $server = Server::factory()->create([
+        'ssh_user' => 'deploy',
+        'ip_address' => '10.0.0.1',
+    ]);
 
-        $this->assertSame('deploy@10.0.0.1', $server->getSshConnectionString());
-    }
+    expect($server->getSshConnectionString())->toBe('deploy@10.0.0.1');
+});
 
-    public function test_get_ssh_connection_string_uses_placeholder_when_no_ip(): void
-    {
-        $server = Server::factory()->create([
-            'ssh_user' => 'root',
-            'ip_address' => null,
-        ]);
+test('get ssh connection string uses placeholder when no ip', function () {
+    $server = Server::factory()->create([
+        'ssh_user' => 'root',
+        'ip_address' => null,
+    ]);
 
-        $this->assertSame('root@0.0.0.0', $server->getSshConnectionString());
-    }
+    expect($server->getSshConnectionString())->toBe('root@0.0.0.0');
+});
 
-    public function test_servers_table_has_dual_key_columns(): void
-    {
-        $this->assertTrue(Schema::hasColumn('servers', 'ssh_operational_private_key'));
-        $this->assertTrue(Schema::hasColumn('servers', 'ssh_recovery_private_key'));
-    }
-}
+test('servers table has dual key columns', function () {
+    expect(Schema::hasColumn('servers', 'ssh_operational_private_key'))->toBeTrue();
+    expect(Schema::hasColumn('servers', 'ssh_recovery_private_key'))->toBeTrue();
+});

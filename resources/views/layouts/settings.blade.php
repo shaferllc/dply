@@ -38,7 +38,7 @@
                         </div>
                     @else
                         <div class="lg:grid lg:grid-cols-12 lg:gap-10">
-                            <aside class="lg:col-span-3 mb-8 lg:mb-0 shrink-0">
+                            <aside class="sm:col-span-3 mb-8 lg:mb-0 shrink-0">
                                 <x-settings-nav variant="sidebar" />
                             </aside>
                             <div class="lg:col-span-9 min-w-0">
@@ -51,6 +51,10 @@
         </div>
 
         <x-marketing-footer />
+
+        @auth
+            <livewire:settings.connect-provider-modal :key="'global-connect-provider-modal'" />
+        @endauth
 
         {{ $modals ?? '' }}
 

@@ -1,0 +1,14 @@
+<svg width="152" height="96" viewBox="0 0 152 96" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="#171a0e" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
+  <!-- FONT-INDEPENDENT "dply", heavier monoline weight -->
+  <!-- d -->
+  <circle cx="23" cy="46" r="13"/>
+  <path d="M41 8 V64"/>
+  <!-- p -->
+  <path d="M59 28 V86"/>
+  <circle cx="73" cy="46" r="13"/>
+  <!-- l -->
+  <path d="M101 8 V64"/>
+  <!-- y -->
+  <path d="M111 28 L125 52"/>
+  <path d="M139 28 L113 86"/>
+</svg>

@@ -6,6 +6,7 @@ namespace App\Services\Deploy;
 
 use App\Models\Site;
 use App\Models\SiteDeployHook;
+use App\Services\Sites\DeployHookRunner;
 use App\Services\Sites\DeployHookScriptExpander;
 use RuntimeException;
 use Symfony\Component\Process\Process;
@@ -13,7 +14,7 @@ use Symfony\Component\Process\Process;
 /**
  * Runs a serverless function's deploy hooks.
  *
- * The VM {@see \App\Services\Sites\DeployHookRunner} executes hooks over SSH
+ * The VM {@see DeployHookRunner} executes hooks over SSH
  * on the server. A function has no server — its artifact is built on dply's
  * own build host (the same place `composer install` already runs) — so this
  * runner executes each hook as a local shell process in the build's working

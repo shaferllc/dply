@@ -93,4 +93,61 @@ final class EngineLiveState
     {
         return is_array($this->units[$key] ?? null) ? count($this->units[$key]) : 0;
     }
+
+    /**
+     * Normalize engineSpecific['errors'] for UI display. Probes store a
+     * list of strings, but cached payloads may contain nested arrays
+     * (e.g. API-style {"message": "…"} objects).
+     *
+     * @return list<string>
+     */
+    public static function probeErrorLines(mixed $errors): array
+    {
+        if ($errors === null || $errors === '' || $errors === []) {
+            return [];
+        }
+
+        if (! is_array($errors)) {
+            $line = self::formatProbeErrorLine($errors);
+
+            return $line !== '' ? [$line] : [];
+        }
+
+        $lines = [];
+        foreach ($errors as $error) {
+            $line = self::formatProbeErrorLine($error);
+            if ($line !== '') {
+                $lines[] = $line;
+            }
+        }
+
+        return $lines;
+    }
+
+    private static function formatProbeErrorLine(mixed $error): string
+    {
+        if ($error === null || $error === '' || $error === []) {
+            return '';
+        }
+
+        if (is_scalar($error)) {
+            return trim((string) $error);
+        }
+
+        if (is_array($error)) {
+            if (isset($error['message']) && is_scalar($error['message'])) {
+                return trim((string) $error['message']);
+            }
+
+            $encoded = json_encode($error, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+            return is_string($encoded) ? $encoded : '';
+        }
+
+        if ($error instanceof \Throwable) {
+            return trim($error->getMessage());
+        }
+
+        return trim((string) $error);
+    }
 }

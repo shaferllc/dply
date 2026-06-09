@@ -18,15 +18,20 @@
 @endphp
 
 <section id="settings-group-webhook" class="space-y-6" aria-labelledby="settings-group-webhook-title">
-    @include('livewire.servers.partials.settings._intro', [
-        'headingId' => 'settings-group-webhook-title',
-        'kicker' => __('Integrations'),
-        'title' => __('Outbound webhook'),
-        'description' => __('Register a URL to receive server-scoped events (created, provisioned, health changed, deleted, authorized keys synced, sites created/deleted). Every emitted event is recorded below — even when no URL is set, so you can audit what would be sent before wiring up.'),
-    ])
+    <div id="settings-webhooks" class="{{ $card }} scroll-mt-24">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <x-icon-badge>
+                <x-heroicon-o-bolt class="h-5 w-5" aria-hidden="true" />
+            </x-icon-badge>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Webhook') }}</p>
+                <h2 id="settings-group-webhook-title" class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Outbound webhook') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Register a URL to receive server-scoped events (created, provisioned, health changed, deleted, authorized keys synced, sites created/deleted). Every emitted event is recorded below — even when no URL is set, so you can audit what would be sent before wiring up.') }}</p>
+            </div>
+        </div>
 
-    <div id="settings-webhooks" class="{{ $card }} scroll-mt-24 p-6 sm:p-8">
-        <form wire:submit="saveServerWebhooks" class="space-y-5">
+        <div class="px-6 py-6 sm:px-7">
+            <form wire:submit="saveServerWebhooks" class="space-y-5">
             <div>
                 <x-input-label for="settings-webhook-url" value="{{ __('Webhook URL') }}" />
                 <input
@@ -74,17 +79,22 @@
                 @endif
             </div>
         </form>
+        </div>
     </div>
 
     <div class="{{ $card }} scroll-mt-24">
-        <div class="flex flex-col gap-1 border-b border-brand-ink/10 px-6 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-            <div>
-                <h2 class="text-sm font-semibold text-brand-ink">{{ __('Recent deliveries') }}</h2>
-                <p class="mt-1 text-xs text-brand-moss leading-relaxed">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <x-icon-badge>
+                <x-heroicon-o-paper-airplane class="h-5 w-5" aria-hidden="true" />
+            </x-icon-badge>
+            <div class="min-w-0 flex-1">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Deliveries') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent deliveries') }}</h2>
+                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
                     {{ __('Last 30 outbound webhook attempts for this server. “Would send” rows show the payload that would have fired with no URL configured.') }}
                 </p>
             </div>
-            <span class="text-xs text-brand-moss">{{ __(':count rows', ['count' => $webhookDeliveries->count()]) }}</span>
+            <span class="shrink-0 text-xs text-brand-moss">{{ __(':count rows', ['count' => $webhookDeliveries->count()]) }}</span>
         </div>
 
         @if ($webhookDeliveries->isEmpty())
@@ -178,7 +188,7 @@
                                         wire:target="resendWebhookDelivery(@js($delivery->id))"
                                         class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-50"
                                     >
-                                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" />
+                                        <x-heroicon-o-arrow-path class="h-4 w-4" />
                                         {{ __('Resend') }}
                                     </button>
                                 </div>

@@ -45,7 +45,7 @@ class WebserverSmokeTestRunner
      *     results: list<array{site_id: string, site_name: string, hostname: string, http_status: ?int, http_time_ms: ?int, http_error: ?string, https_status: ?int, https_time_ms: ?int, https_tls_ok: bool, https_error: ?string, urgency: string}>,
      *     total_sites: int,
      *     probed: int,
-     *     scanned_at: \Carbon\CarbonImmutable,
+     *     scanned_at: CarbonImmutable,
      *     truncated: bool,
      * }
      */

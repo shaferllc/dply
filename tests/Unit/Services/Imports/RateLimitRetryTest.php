@@ -2,139 +2,117 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Services\Imports;
+namespace Tests\Unit\Services\Imports\RateLimitRetryTest;
 
 use App\Models\ProviderCredential;
 use App\Services\Imports\Forge\ForgeClient;
 use App\Services\Imports\Ploi\PloiClient;
+use Carbon\CarbonInterval;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
-use Tests\TestCase;
 
-/**
- * Both clients now retry on 429 / 5xx with exponential backoff + Retry-After
- * support. Tests use Sleep::fake() so the test suite doesn't actually wait
- * the backoff window between attempts.
- */
-class RateLimitRetryTest extends TestCase
-{
-    use RefreshDatabase;
+uses(RefreshDatabase::class);
 
-    protected function setUp(): void
-    {
-        parent::setUp();
-        Sleep::fake();
-    }
+beforeEach(function () {
+    Sleep::fake();
+});
+test('ploi client retries on 429 and succeeds', function () {
+    Http::fake([
+        'https://ploi.io/api/servers' => Http::sequence()
+            ->push(['message' => 'Too Many Requests'], 429)
+            ->push(['data' => [['id' => 1, 'name' => 'a']]], 200),
+    ]);
 
-    public function test_ploi_client_retries_on_429_and_succeeds(): void
-    {
-        Http::fake([
-            'https://ploi.io/api/servers' => Http::sequence()
-                ->push(['message' => 'Too Many Requests'], 429)
-                ->push(['data' => [['id' => 1, 'name' => 'a']]], 200),
-        ]);
+    $credential = ProviderCredential::factory()->create([
+        'provider' => 'ploi',
+        'credentials' => ['api_token' => 'ploi_test'],
+    ]);
+    $client = new PloiClient($credential);
 
-        $credential = ProviderCredential::factory()->create([
-            'provider' => 'ploi',
-            'credentials' => ['api_token' => 'ploi_test'],
-        ]);
-        $client = new PloiClient($credential);
+    $response = $client->get('/servers');
+    expect($response->successful())->toBeTrue();
+    expect($response->json('data'))->toBe([['id' => 1, 'name' => 'a']]);
+    Http::assertSentCount(2);
+});
+test('ploi client retries on 503', function () {
+    Http::fake([
+        'https://ploi.io/api/servers' => Http::sequence()
+            ->push('upstream busy', 503)
+            ->push(['data' => []], 200),
+    ]);
 
-        $response = $client->get('/servers');
-        $this->assertTrue($response->successful());
-        $this->assertSame([['id' => 1, 'name' => 'a']], $response->json('data'));
-        Http::assertSentCount(2);
-    }
+    $credential = ProviderCredential::factory()->create([
+        'provider' => 'ploi',
+        'credentials' => ['api_token' => 'ploi_test'],
+    ]);
 
-    public function test_ploi_client_retries_on_503(): void
-    {
-        Http::fake([
-            'https://ploi.io/api/servers' => Http::sequence()
-                ->push('upstream busy', 503)
-                ->push(['data' => []], 200),
-        ]);
+    $response = (new PloiClient($credential))->get('/servers');
+    expect($response->successful())->toBeTrue();
+});
+test('ploi client does not retry 401', function () {
+    Http::fake([
+        'https://ploi.io/api/servers' => Http::response('Unauthorized', 401),
+    ]);
 
-        $credential = ProviderCredential::factory()->create([
-            'provider' => 'ploi',
-            'credentials' => ['api_token' => 'ploi_test'],
-        ]);
+    $credential = ProviderCredential::factory()->create([
+        'provider' => 'ploi',
+        'credentials' => ['api_token' => 'ploi_test'],
+    ]);
 
-        $response = (new PloiClient($credential))->get('/servers');
-        $this->assertTrue($response->successful());
-    }
+    $response = (new PloiClient($credential))->get('/servers');
+    expect($response->status())->toBe(401);
+    Http::assertSentCount(1);
+});
+test('ploi client returns 429 after max attempts', function () {
+    Http::fake([
+        'https://ploi.io/api/servers' => Http::response(['message' => 'Too Many Requests'], 429),
+    ]);
 
-    public function test_ploi_client_does_not_retry_401(): void
-    {
-        Http::fake([
-            'https://ploi.io/api/servers' => Http::response('Unauthorized', 401),
-        ]);
+    $credential = ProviderCredential::factory()->create([
+        'provider' => 'ploi',
+        'credentials' => ['api_token' => 'ploi_test'],
+    ]);
 
-        $credential = ProviderCredential::factory()->create([
-            'provider' => 'ploi',
-            'credentials' => ['api_token' => 'ploi_test'],
-        ]);
+    $response = (new PloiClient($credential))->get('/servers');
+    expect($response->status())->toBe(429);
+    Http::assertSentCount(3);
+});
+test('forge client retries on 429', function () {
+    Http::fake([
+        'https://forge.laravel.com/api/v1/servers' => Http::sequence()
+            ->push('Rate limit', 429)
+            ->push(['servers' => []], 200),
+    ]);
 
-        $response = (new PloiClient($credential))->get('/servers');
-        $this->assertSame(401, $response->status());
-        Http::assertSentCount(1);
-    }
+    $credential = ProviderCredential::factory()->create([
+        'provider' => 'forge',
+        'credentials' => ['api_token' => 'forge_test'],
+    ]);
 
-    public function test_ploi_client_returns_429_after_max_attempts(): void
-    {
-        Http::fake([
-            'https://ploi.io/api/servers' => Http::response(['message' => 'Too Many Requests'], 429),
-        ]);
+    $response = (new ForgeClient($credential))->get('/servers');
+    expect($response->successful())->toBeTrue();
+    Http::assertSentCount(2);
+});
+test('ploi client honors retry after header when present', function () {
+    Http::fake([
+        'https://ploi.io/api/servers' => Http::sequence()
+            ->push(['message' => 'Too Many Requests'], 429, ['Retry-After' => '3'])
+            ->push(['data' => []], 200),
+    ]);
 
-        $credential = ProviderCredential::factory()->create([
-            'provider' => 'ploi',
-            'credentials' => ['api_token' => 'ploi_test'],
-        ]);
+    $credential = ProviderCredential::factory()->create([
+        'provider' => 'ploi',
+        'credentials' => ['api_token' => 'ploi_test'],
+    ]);
 
-        $response = (new PloiClient($credential))->get('/servers');
-        $this->assertSame(429, $response->status());
-        Http::assertSentCount(3);
-    }
+    $response = (new PloiClient($credential))->get('/servers');
+    expect($response->successful())->toBeTrue();
 
-    public function test_forge_client_retries_on_429(): void
-    {
-        Http::fake([
-            'https://forge.laravel.com/api/v1/servers' => Http::sequence()
-                ->push('Rate limit', 429)
-                ->push(['servers' => []], 200),
-        ]);
-
-        $credential = ProviderCredential::factory()->create([
-            'provider' => 'forge',
-            'credentials' => ['api_token' => 'forge_test'],
-        ]);
-
-        $response = (new ForgeClient($credential))->get('/servers');
-        $this->assertTrue($response->successful());
-        Http::assertSentCount(2);
-    }
-
-    public function test_ploi_client_honors_retry_after_header_when_present(): void
-    {
-        Http::fake([
-            'https://ploi.io/api/servers' => Http::sequence()
-                ->push(['message' => 'Too Many Requests'], 429, ['Retry-After' => '3'])
-                ->push(['data' => []], 200),
-        ]);
-
-        $credential = ProviderCredential::factory()->create([
-            'provider' => 'ploi',
-            'credentials' => ['api_token' => 'ploi_test'],
-        ]);
-
-        $response = (new PloiClient($credential))->get('/servers');
-        $this->assertTrue($response->successful());
-
-        // Retry-After was 3s; the request layer should have slept at least that long.
-        // Sleep::fake() lets us assert on the slept duration without actually waiting.
-        Sleep::assertSleptTimes(1);
-        Sleep::assertSlept(function (\Carbon\CarbonInterval $interval): bool {
-            return $interval->totalMilliseconds >= 3000;
-        });
-    }
-}
+    // Retry-After was 3s; the request layer should have slept at least that long.
+    // Sleep::fake() lets us assert on the slept duration without actually waiting.
+    Sleep::assertSleptTimes(1);
+    Sleep::assertSlept(function (CarbonInterval $interval): bool {
+        return $interval->totalMilliseconds >= 3000;
+    });
+});

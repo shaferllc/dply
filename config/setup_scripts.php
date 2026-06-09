@@ -17,7 +17,12 @@ return [
                 // Laravel server requirements + typical stack: DB drivers, Redis, images, intl, sodium.
                 'apt-get install -y ca-certificates curl git unzip '
                     .'php-bcmath php-cli php-curl php-fpm php-gd php-intl php-mbstring php-mysql '
-                    .'php-pgsql php-redis php-sodium php-sqlite3 php-xml php-zip',
+                    .'php-pgsql php-redis php-sqlite3 php-xml php-zip',
+                // sodium ships built into PHP on Ubuntu 24.04 (no separate
+                // php-sodium package on the stock repo), so install it
+                // best-effort — its absence must not abort the whole stack
+                // install with "E: Unable to locate package".
+                'apt-get install -y php-sodium || true',
                 'curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer',
             ],
         ],
@@ -35,7 +40,12 @@ return [
                 'apt-get update -y',
                 'apt-get install -y ca-certificates curl git unzip '
                     .'php-bcmath php-cli php-curl php-fpm php-gd php-intl php-mbstring php-mysql '
-                    .'php-pgsql php-redis php-sodium php-sqlite3 php-xml php-zip',
+                    .'php-pgsql php-redis php-sqlite3 php-xml php-zip',
+                // sodium ships built into PHP on Ubuntu 24.04 (no separate
+                // php-sodium package on the stock repo), so install it
+                // best-effort — its absence must not abort the whole stack
+                // install with "E: Unable to locate package".
+                'apt-get install -y php-sodium || true',
                 'curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer',
                 'curl -fsSL https://deb.nodesource.com/setup_20.x | bash -',
                 'apt-get install -y nodejs',

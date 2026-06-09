@@ -1,0 +1,43 @@
+<?php
+
+namespace App\Livewire\Billing;
+
+use App\Models\Organization;
+use App\Services\Billing\BillingAnalytics;
+use Illuminate\Contracts\View\View;
+use Livewire\Attributes\Layout;
+use Livewire\Component;
+
+#[Layout('layouts.app')]
+class Analytics extends Component
+{
+    public Organization $organization;
+
+    public function mount(Organization $organization): void
+    {
+        $this->authorize('update', $organization);
+        $this->organization = $organization;
+    }
+
+    public function render(BillingAnalytics $billingAnalytics): View
+    {
+        $analytics = $billingAnalytics->forOrganization($this->organization);
+
+        return view('livewire.billing.analytics', [
+            'costObservatory' => $analytics['cost_observatory'] ?? [],
+            'summary' => $analytics['summary'] ?? [],
+            'forecast' => $analytics['forecast'] ?? [],
+            'spendTrend' => $analytics['spend_trend'] ?? [],
+            'categoryBreakdown' => $analytics['category_breakdown'] ?? [],
+            'lineItems' => $analytics['line_items'] ?? [],
+            'edgeUsageDaily' => $analytics['edge_usage_daily'] ?? [],
+            'edgeSites' => $analytics['edge_sites'] ?? [],
+            'syncEvents' => $analytics['sync_events'] ?? [],
+            'invoiceHistory' => $analytics['invoice_history'] ?? [],
+            'managedProducts' => $analytics['managed_products'] ?? [],
+            'billableServers' => $analytics['billable_servers'] ?? [],
+            'excludedServers' => $analytics['excluded_servers'] ?? [],
+            'subscription' => $analytics['subscription'] ?? [],
+        ]);
+    }
+}

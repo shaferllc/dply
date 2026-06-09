@@ -18,9 +18,9 @@ class ScriptRemoteRunner
     public function run(Script $script, Server $server, int $timeoutSeconds = 600): array
     {
         $tmp = '/tmp/dply-script-'.Str::lower(Str::random(20)).'.sh';
+        $ssh = new SshConnection($server);
 
         try {
-            $ssh = new SshConnection($server);
             $ssh->putFile($tmp, $script->content);
 
             $runner = new SshConnection($server);
@@ -43,11 +43,19 @@ class ScriptRemoteRunner
 
             $output = $runner->exec($cmd, $timeoutSeconds);
 
-            $runner->exec('rm -f '.escapeshellarg($tmp), 30);
-
             return ['ok' => true, 'output' => $output, 'error' => null];
         } catch (Throwable $e) {
             return ['ok' => false, 'output' => '', 'error' => $e->getMessage()];
+        } finally {
+            // Always remove the uploaded script, including on the connect
+            // failure and catch paths above — otherwise a failed run leaves
+            // the script body (which may carry secrets) in /tmp. Reuse the
+            // upload connection that owns the file; best-effort.
+            try {
+                $ssh->exec('rm -f '.escapeshellarg($tmp), 30);
+            } catch (Throwable) {
+                // ignore — cleanup is best-effort
+            }
         }
     }
 }

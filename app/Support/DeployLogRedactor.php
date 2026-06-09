@@ -13,6 +13,8 @@ class DeployLogRedactor
             '/(password|passwd|secret|token|api_key|apikey|authorization)\s*[=:]\s*\S+/iu' => '$1=[redacted]',
             '/(AWS_SECRET_ACCESS_KEY|AWS_ACCESS_KEY_ID|GITHUB_TOKEN|GITLAB_TOKEN)\s*=\s*\S+/u' => '$1=[redacted]',
             '/-----BEGIN [A-Z ]+PRIVATE KEY-----[\s\S]*?-----END [A-Z ]+PRIVATE KEY-----/u' => '[redacted private key]',
+            // Strip tokens embedded in HTTPS clone URLs: https://x-access-token:TOKEN@github.com/…
+            '#(https?://)[^/@\s]+:[^/@\s]+@#' => '$1[redacted]@',
         ];
 
         foreach ($patterns as $pattern => $replacement) {

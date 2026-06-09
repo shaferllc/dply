@@ -60,7 +60,7 @@
     <div class="{{ $card }} p-6 sm:p-8">
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="max-w-2xl">
-                <h2 id="manage-services-title" class="text-lg font-semibold text-brand-ink">{{ __('Services') }}</h2>
+                <h2 id="manage-services-title" class="text-base font-semibold text-brand-ink">{{ __('Services') }}</h2>
                 <p class="mt-2 text-sm text-brand-moss leading-relaxed">
                     {{ __('Live status of watched systemd units. Each row’s actions are queued over SSH; output streams into the panel above.') }}
                 </p>
@@ -74,7 +74,7 @@
                     class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50"
                 >
                     <span wire:loading.remove wire:target="refreshServerInventoryDetails" class="inline-flex items-center gap-1.5">
-                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" aria-hidden="true" />
+                        <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
                         {{ __('Refresh state') }}
                     </span>
                     <span wire:loading wire:target="refreshServerInventoryDetails" class="inline-flex items-center gap-1.5">
@@ -110,6 +110,10 @@
                                     ? ['restart_php_fpm']
                                     : ($unitActions[$unitName] ?? []);
                             @endphp
+                            @php
+                                $standbyReason = app(\App\Support\Servers\SystemdServiceStandbyReasonResolver::class)
+                                    ->reasonForUnit($server, $unitName, $u['active_state'] ?? null);
+                            @endphp
                             <tr>
                                 <td class="px-4 py-2">
                                     <span class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium {{ $pill['classes'] }}">
@@ -117,7 +121,12 @@
                                         {{ $pill['label'] }}
                                     </span>
                                 </td>
-                                <td class="px-4 py-2 font-mono text-xs text-brand-ink">{{ $unitName }}</td>
+                                <td class="px-4 py-2">
+                                    <p class="font-mono text-xs text-brand-ink">{{ $unitName }}</p>
+                                    @if ($standbyReason)
+                                        <p class="mt-1 text-[11px] leading-snug text-amber-900/90">{{ $standbyReason }}</p>
+                                    @endif
+                                </td>
                                 <td class="px-4 py-2 text-xs text-brand-moss">{{ $formatSince($u['active_enter_at'] ?? null) }}</td>
                                 <td class="px-4 py-2 text-xs text-brand-moss">{{ $formatBytes($u['memory_current_bytes'] ?? null) }}</td>
                                 <td class="px-4 py-2 text-right">

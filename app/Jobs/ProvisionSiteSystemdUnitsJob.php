@@ -6,6 +6,7 @@ namespace App\Jobs;
 
 use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\Site;
+use App\Models\SiteProcess;
 use App\Services\Sites\SiteSystemdProvisioner;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -68,12 +69,23 @@ class ProvisionSiteSystemdUnitsJob implements ShouldQueue
             return;
         }
 
+        // A php/static site's WEB tier needs no systemd unit (FPM / static is
+        // served by the webserver). BUT its WORKER processes (Horizon,
+        // queue:work, scheduler) still need units — previously we returned here
+        // and they never got provisioned, so Horizon never started on deploy.
+        // Provision whenever the site has an active non-web worker process, OR a
+        // non-php/static runtime with a web start command.
+        $site->loadMissing('processes');
+        $hasWorkerProcess = $site->processes->contains(
+            fn (SiteProcess $p): bool => $p->type !== SiteProcess::TYPE_WEB
+                && (bool) $p->is_active
+                && trim((string) $p->command) !== ''
+        );
         $runtime = $site->runtimeKey();
-        if ($runtime === 'php' || $runtime === 'static' || $runtime === null) {
-            return;
-        }
+        $webNeedsUnit = ! in_array($runtime, ['php', 'static', null], true)
+            && trim((string) $site->start_command) !== '';
 
-        if (trim((string) $site->start_command) === '') {
+        if (! $hasWorkerProcess && ! $webNeedsUnit) {
             return;
         }
 

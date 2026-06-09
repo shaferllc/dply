@@ -10,11 +10,20 @@
     'docRoute' => null,
     /** When docRoute is docs.markdown, pass the slug (e.g. source-control). */
     'docSlug' => null,
+    /** Open the in-app docs panel for the current page (ContextualDocResolver). */
+    'docContextual' => false,
+    /** Pre-resolved markdown slug for docContextual (avoids stale route context after wire:navigate). */
+    'contextualDocSlug' => null,
     'docLabel' => null,
+    /** When false, hide the documentation affordance (e.g. when rendered on the breadcrumb row). */
+    'showDocumentation' => true,
 ])
 
 @php
     $docLinkLabel = $docLabel ?? __('Documentation');
+    $resolvedContextualDocSlug = $docContextual
+        ? ($contextualDocSlug ?? app(\App\Support\Docs\ContextualDocResolver::class)->resolve())
+        : null;
 @endphp
 
 <header {{ $attributes->class([
@@ -55,23 +64,32 @@
             @endisset
         </div>
 
-        @if ($docRoute || isset($actions))
+        @if ($showDocumentation && ($docRoute || $docContextual || isset($actions)))
             <div @class([
                 'mt-4 flex flex-wrap items-center gap-2' => ! $toolbar,
                 'flex flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end' => $toolbar,
             ])>
-                @if ($docRoute)
-                    <x-outline-link
-                        href="{{ $docSlug !== null ? route($docRoute, ['slug' => $docSlug]) : route($docRoute) }}"
-                        wire:navigate
-                    >
+                @if ($showDocumentation && $docContextual)
+                    <x-docs-link :slug="$resolvedContextualDocSlug">
                         <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                         {{ $docLinkLabel }}
-                    </x-outline-link>
+                    </x-docs-link>
+                @elseif ($showDocumentation && $docRoute)
+                    <x-docs-link :doc-route="$docRoute" :doc-slug="$docSlug">
+                        <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                        {{ $docLinkLabel }}
+                    </x-docs-link>
                 @endif
                 @isset($actions)
                     {{ $actions }}
                 @endisset
+            </div>
+        @elseif (isset($actions))
+            <div @class([
+                'mt-4 flex flex-wrap items-center gap-2' => ! $toolbar,
+                'flex flex-wrap items-center gap-2 lg:shrink-0 lg:justify-end' => $toolbar,
+            ])>
+                {{ $actions }}
             </div>
         @endif
     </div>

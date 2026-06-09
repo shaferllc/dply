@@ -27,6 +27,7 @@ class WaitForServerSshReadyJob implements ShouldQueue
         public Server $server
     ) {
         $this->tries = max(5, (int) config('server_provision.ssh_ready_max_attempts', 45));
+        $this->onQueue(config('server_provision.queue', 'dply'));
     }
 
     public function handle(): void

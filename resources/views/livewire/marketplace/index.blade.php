@@ -8,15 +8,24 @@
 
         <x-page-header
             :title="__('Marketplace')"
-            :description="__('Import curated starters into the right scope: webserver templates go to your organization, deploy starters go to Deploy on a server, and server runbooks go to Saved commands. Guides and integrations stay linked here for discovery.')"
+            :description="__('Import curated starters into the right scope: webserver templates go to your organization, deploy starters and saved commands go to a server, and runbooks go to a project operations page. Guides and integrations stay linked here for discovery.')"
             doc-route="docs.index"
             flush
         />
 
         @if (! $hasOrganization)
-            <div class="mb-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                {{ __('Create or join an organization to import webserver templates and deploy commands.') }}
-            </div>
+            <section class="dply-card overflow-hidden border-amber-200 mb-6">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
+                        <x-icon-badge tone="amber">
+                            <x-heroicon-o-shield-exclamation class="h-5 w-5" aria-hidden="true" />
+                        </x-icon-badge>
+                        <div class="min-w-0">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-800">{{ __('Setup') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Organization required') }}</h3>
+                            <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Create or join an organization to import webserver templates and deploy commands.') }}</p>
+                        </div>
+                </div>
+            </section>
         @endif
 
         <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-6">
@@ -115,6 +124,18 @@
                                 @else
                                     <span class="text-xs text-brand-moss">{{ __('Requires a server in this organization') }}</span>
                                 @endif
+                            @elseif ($item->recipe_type === \App\Models\MarketplaceItem::RECIPE_WORKSPACE_RUNBOOK)
+                                @if ($hasOrganization && $workspaces->isNotEmpty())
+                                    <button
+                                        type="button"
+                                        wire:click="openRunbookImport('{{ $item->id }}')"
+                                        class="inline-flex items-center rounded-lg bg-brand-forest px-3 py-2 text-sm font-semibold text-white hover:bg-brand-forest/90"
+                                    >
+                                        {{ __('Import to project') }}
+                                    </button>
+                                @else
+                                    <span class="text-xs text-brand-moss">{{ __('Requires a project in this organization') }}</span>
+                                @endif
                             @elseif ($item->recipe_type === \App\Models\MarketplaceItem::RECIPE_EXTERNAL_LINK)
                                 @php
                                     $url = $item->payload['url'] ?? '/';
@@ -139,29 +160,52 @@
         @endif
     </div>
 
-    @if ($deployModalItemId || $serverRecipeModalItemId)
+    @if ($deployModalItemId || $serverRecipeModalItemId || $runbookModalItemId)
         <div class="fixed inset-0 z-40 flex items-end justify-center sm:items-center p-4" role="dialog" aria-modal="true">
             <button type="button" class="absolute inset-0 bg-brand-ink/40" wire:click="closeServerImportModal" aria-label="{{ __('Close') }}"></button>
             <div class="relative z-10 w-full max-w-md rounded-2xl border border-brand-mist bg-brand-cream p-6 shadow-xl">
                 <h3 class="text-lg font-semibold text-brand-ink">
-                    {{ $deployModalItemId ? __('Import deploy command') : __('Import saved command') }}
+                    @if ($runbookModalItemId)
+                        {{ __('Import runbook') }}
+                    @elseif ($deployModalItemId)
+                        {{ __('Import deploy command') }}
+                    @else
+                        {{ __('Import saved command') }}
+                    @endif
                 </h3>
                 <p class="mt-2 text-sm text-brand-moss">
-                    {{ $deployModalItemId
-                        ? __('Choose which server should receive this deploy script. You can edit it later on the Deploy page.')
-                        : __('Choose which server should receive this saved command. You can run or edit it later on the Saved commands page.') }}
+                    @if ($runbookModalItemId)
+                        {{ __('Choose which project should receive this runbook. Edit it later on the project Operations tab.') }}
+                    @elseif ($deployModalItemId)
+                        {{ __('Choose which server should receive this deploy script. You can edit it later on the Deploy page.') }}
+                    @else
+                        {{ __('Choose which server should receive this saved command. You can run or edit it later on the Saved commands page.') }}
+                    @endif
                 </p>
                 <div class="mt-4">
-                    <label for="deploy-server" class="block text-sm font-medium text-brand-ink">{{ __('Server') }}</label>
-                    <select
-                        id="deploy-server"
-                        wire:model="deployServerId"
-                        class="mt-2 block w-full rounded-lg border border-brand-mist bg-white px-3 py-2 text-sm text-brand-ink"
-                    >
-                        @foreach ($servers as $server)
-                            <option value="{{ $server->id }}">{{ $server->name }}</option>
-                        @endforeach
-                    </select>
+                    @if ($runbookModalItemId)
+                        <label for="runbook-workspace" class="block text-sm font-medium text-brand-ink">{{ __('Project') }}</label>
+                        <select
+                            id="runbook-workspace"
+                            wire:model="runbookWorkspaceId"
+                            class="mt-2 block w-full rounded-lg border border-brand-mist bg-white px-3 py-2 text-sm text-brand-ink"
+                        >
+                            @foreach ($workspaces as $workspace)
+                                <option value="{{ $workspace->id }}">{{ $workspace->name }}</option>
+                            @endforeach
+                        </select>
+                    @else
+                        <label for="deploy-server" class="block text-sm font-medium text-brand-ink">{{ __('Server') }}</label>
+                        <select
+                            id="deploy-server"
+                            wire:model="deployServerId"
+                            class="mt-2 block w-full rounded-lg border border-brand-mist bg-white px-3 py-2 text-sm text-brand-ink"
+                        >
+                            @foreach ($servers as $server)
+                                <option value="{{ $server->id }}">{{ $server->name }}</option>
+                            @endforeach
+                        </select>
+                    @endif
                 </div>
                 <div class="mt-6 flex justify-end gap-2">
                     <button type="button" wire:click="closeServerImportModal" class="rounded-lg px-4 py-2 text-sm font-medium text-brand-moss hover:text-brand-ink">
@@ -169,7 +213,7 @@
                     </button>
                     <button
                         type="button"
-                        wire:click="{{ $deployModalItemId ? 'confirmDeployImport' : 'confirmServerRecipeImport' }}"
+                        wire:click="{{ $runbookModalItemId ? 'confirmRunbookImport' : ($deployModalItemId ? 'confirmDeployImport' : 'confirmServerRecipeImport') }}"
                         class="rounded-lg bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream hover:bg-brand-ink/90"
                     >
                         {{ __('Import') }}

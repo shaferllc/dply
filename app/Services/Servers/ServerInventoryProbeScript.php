@@ -150,6 +150,15 @@ if command -v docker >/dev/null 2>&1; then
 fi
 printf "DOCKER_PRESENT=%s\n" "\$docker_p"
 [ -n "\$docker_v" ] && printf "DOCKER_VERSION=%s\n" "\$docker_v"
+docker_running=0; docker_stopped=0; docker_images=0
+if command -v docker >/dev/null 2>&1; then
+  docker_running=\$(docker ps -q 2>/dev/null | wc -l | tr -d ' ')
+  docker_stopped=\$(docker ps -aq --filter status=exited 2>/dev/null | wc -l | tr -d ' ')
+  docker_images=\$(docker images -q 2>/dev/null | wc -l | tr -d ' ')
+fi
+printf "DOCKER_RUNNING=%s\n" "\$docker_running"
+printf "DOCKER_STOPPED=%s\n" "\$docker_stopped"
+printf "DOCKER_IMAGES=%s\n" "\$docker_images"
 wp_p=0; wp_v=
 if command -v wp >/dev/null 2>&1; then
   wp_p=1
@@ -158,6 +167,30 @@ if command -v wp >/dev/null 2>&1; then
 fi
 printf "WP_CLI_PRESENT=%s\n" "\$wp_p"
 [ -n "\$wp_v" ] && printf "WP_CLI_VERSION=%s\n" "\$wp_v"
+composer_p=0; composer_v=
+if command -v composer >/dev/null 2>&1; then
+  composer_p=1
+  composer_v=\$(composer --version 2>/dev/null | head -n 1)
+fi
+printf "COMPOSER_PRESENT=%s\n" "\$composer_p"
+[ -n "\$composer_v" ] && printf "COMPOSER_VERSION=%s\n" "\$composer_v"
+git_p=0; git_v=
+if command -v git >/dev/null 2>&1; then
+  git_p=1
+  git_v=\$(git --version 2>/dev/null | head -n 1)
+fi
+printf "GIT_PRESENT=%s\n" "\$git_p"
+[ -n "\$git_v" ] && printf "GIT_VERSION=%s\n" "\$git_v"
+redis_cli_p=0; redis_cli_v=
+if command -v redis-cli >/dev/null 2>&1; then
+  redis_cli_p=1
+  redis_cli_v=\$(redis-cli --version 2>/dev/null | head -n 1)
+elif command -v valkey-cli >/dev/null 2>&1; then
+  redis_cli_p=1
+  redis_cli_v=\$(valkey-cli --version 2>/dev/null | head -n 1)
+fi
+printf "REDIS_CLI_PRESENT=%s\n" "\$redis_cli_p"
+[ -n "\$redis_cli_v" ] && printf "REDIS_CLI_VERSION=%s\n" "\$redis_cli_v"
 printf "TOOLS_END\n"
 printf "SYSTEM_RUNTIMES_BEGIN\n"
 # System-level runtime detection — anything on the default PATH that the operator
@@ -201,6 +234,10 @@ printf "SYSTEM_RUNTIMES_END\n"
 SH;
 
         if ($hasDeployUser) {
+            $miseRuntimeLoop = implode(' ', array_map(
+                static fn (string $rt): string => preg_match('/^[a-z0-9_-]+$/', $rt) ? $rt : '',
+                MiseInstallScriptBuilder::supportedRuntimes(),
+            ));
             // Per-user mise state — mise stores installed runtimes under
             // ~deploy/.local/share/mise/installs and reads global pins from
             // ~deploy/.config/mise/config.toml. The root SSH login can't see
@@ -215,13 +252,21 @@ if command -v mise >/dev/null 2>&1; then
   printf "LS_BEGIN\n"
   (sudo -n -u {$deployUserArg} -i mise ls --json 2>/dev/null) || (sudo -u {$deployUserArg} -i mise ls --json 2>/dev/null) || printf "{}"
   printf "\nLS_END\n"
-  for rt in node python ruby go; do
+  for rt in {$miseRuntimeLoop}; do
     cur=\$( (sudo -n -u {$deployUserArg} -i mise current "\$rt" 2>/dev/null) || (sudo -u {$deployUserArg} -i mise current "\$rt" 2>/dev/null) || true)
     cur=\$(printf '%s' "\$cur" | head -n 1 | tr -d '[:space:]')
     [ -n "\$cur" ] && printf "CURRENT %s=%s\n" "\$rt" "\$cur"
   done
 fi
 printf "MISE_RUNTIMES_END\n"
+printf "GIT_IDENTITY_BEGIN\n"
+if command -v git >/dev/null 2>&1; then
+  gn=\$( (sudo -n -u {$deployUserArg} -H git config --global user.name 2>/dev/null) || (sudo -u {$deployUserArg} -H git config --global user.name 2>/dev/null) || true)
+  ge=\$( (sudo -n -u {$deployUserArg} -H git config --global user.email 2>/dev/null) || (sudo -u {$deployUserArg} -H git config --global user.email 2>/dev/null) || true)
+  printf "USER_NAME=%s\n" "\$gn"
+  printf "USER_EMAIL=%s\n" "\$ge"
+fi
+printf "GIT_IDENTITY_END\n"
 SH;
         }
 
@@ -412,6 +457,20 @@ SH;
         $miseRuntimes = $this->parseMiseRuntimesBlock($out);
         if ($miseRuntimes !== null) {
             $meta['manage_mise_runtimes'] = $miseRuntimes;
+
+            $defaults = is_array($meta['runtime_defaults'] ?? null) ? $meta['runtime_defaults'] : [];
+            foreach ($miseRuntimes as $runtime => $data) {
+                if (! is_array($data)) {
+                    continue;
+                }
+                $active = trim((string) ($data['active'] ?? ''));
+                if ($active !== '') {
+                    $defaults[$runtime] = $active;
+                }
+            }
+            if ($defaults !== []) {
+                $meta['runtime_defaults'] = $defaults;
+            }
         }
 
         // System-level runtimes — what's on PATH in the non-interactive root
@@ -439,6 +498,9 @@ SH;
             'mise' => 'mise',
             'docker' => 'docker',
             'wp_cli' => 'wp_cli',
+            'composer' => 'composer',
+            'git' => 'git',
+            'redis_cli' => 'redis_cli',
         ] as $slug => $prefix) {
             $present = (string) ($toolsKv[$prefix.'_present'] ?? '0') === '1';
             $version = $present ? (string) ($toolsKv[$prefix.'_version'] ?? '') : '';
@@ -447,7 +509,30 @@ SH;
                 'version' => $version !== '' ? $version : null,
             ];
         }
+        $gitIdentity = $this->extractKvBlock($out, 'GIT_IDENTITY');
+        if ($gitIdentity !== [] && isset($tools['git'])) {
+            $name = trim((string) ($gitIdentity['user_name'] ?? ''));
+            $email = trim((string) ($gitIdentity['user_email'] ?? ''));
+            if ($name !== '') {
+                $tools['git']['user_name'] = $name;
+            }
+            if ($email !== '') {
+                $tools['git']['user_email'] = $email;
+            }
+        }
         $meta['manage_tools'] = $tools;
+
+        $dockerPresent = (string) ($toolsKv['docker_present'] ?? '0') === '1';
+        $meta['manage_docker'] = [
+            'present' => $dockerPresent,
+            'version' => $dockerPresent ? (string) ($toolsKv['docker_version'] ?? '') : null,
+            'containers_running' => max(0, (int) ($toolsKv['docker_running'] ?? 0)),
+            'containers_stopped' => max(0, (int) ($toolsKv['docker_stopped'] ?? 0)),
+            'images_count' => max(0, (int) ($toolsKv['docker_images'] ?? 0)),
+        ];
+        if ($meta['manage_docker']['version'] === '') {
+            $meta['manage_docker']['version'] = null;
+        }
 
         // MySQL/MariaDB
         $meta['manage_mysql'] = $this->extractKvBlock($out, 'MYSQL');
@@ -549,12 +634,10 @@ SH;
         }
         $body = $m[1];
 
-        $shape = [
-            'node' => ['versions' => [], 'active' => null],
-            'python' => ['versions' => [], 'active' => null],
-            'ruby' => ['versions' => [], 'active' => null],
-            'go' => ['versions' => [], 'active' => null],
-        ];
+        $shape = [];
+        foreach (MiseInstallScriptBuilder::supportedRuntimes() as $rt) {
+            $shape[$rt] = ['versions' => [], 'active' => null];
+        }
 
         // CURRENT <rt>=<version> lines drive the active-default pill.
         foreach (explode("\n", $body) as $line) {
