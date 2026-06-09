@@ -563,6 +563,7 @@ class AppServiceProvider extends ServiceProvider
                     'server_id' => $site->server_id,
                     'webserver' => $site->webserver(),
                     'nginx_basename' => $site->webserverConfigBasename(),
+                    'php_fpm_pool_name' => $site->usesDedicatedPhpFpmPool() ? $site->phpFpmPoolName() : null,
                     'repository_base' => rtrim($site->effectiveRepositoryPath(), '/'),
                     'deploy_strategy' => $site->deploy_strategy ?? 'simple',
                     'primary_hostname' => $primary?->hostname,

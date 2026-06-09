@@ -64,11 +64,15 @@ class CaddySiteConfigBuilder
         $phpVersion = $site->server !== null
             ? app(ServerPhpManager::class)->resolveCaddyPhpVersion($site->server, $site->phpVersion())
             : ($site->phpVersion() ?? '8.3');
-        $phpSock = str_replace(
-            '{version}',
-            $phpVersion,
-            config('sites.php_fpm_socket')
-        );
+        // Dedicated-pool PHP sites get their own version-free socket; anything
+        // else (legacy/edge) keeps the shared per-version socket.
+        $phpSock = $site->usesDedicatedPhpFpmPool()
+            ? $site->phpFpmListenSocketPath()
+            : str_replace(
+                '{version}',
+                $phpVersion,
+                config('sites.php_fpm_socket')
+            );
         $redirectLines = $this->redirectLines($site);
         $basicAuth = $this->caddyBasicAuthBlocks($site);
         $formGate = SiteAccessGateConfigSupport::caddyBlocks($site);

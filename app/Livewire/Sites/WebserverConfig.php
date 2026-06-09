@@ -126,6 +126,18 @@ class WebserverConfig extends Component
     {
         $this->active_layer = $value === SiteWebserverConfigProfile::MODE_FULL_OVERRIDE ? 'full' : 'main';
         $this->content_tab = 'edit';
+
+        // Switching to "Full file" means the user wants to edit the entire vhost.
+        // Seed the editor with the current file so they edit the real config
+        // instead of a blank box — prefer what's live on the server, fall back to
+        // the effective (pending) build that dply would write.
+        if ($value === SiteWebserverConfigProfile::MODE_FULL_OVERRIDE && trim($this->full_override_body) === '') {
+            $editor = app(SiteWebserverConfigEditorService::class);
+            $live = trim((string) ($this->remote_live_config ?? ''));
+            $this->full_override_body = $live !== ''
+                ? $live
+                : trim($editor->effectivePreview($this->site, $this->draftProfile()));
+        }
     }
 
     protected function hydrateFromProfile(SiteWebserverConfigProfile $profile): void

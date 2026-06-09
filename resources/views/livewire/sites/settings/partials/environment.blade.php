@@ -290,6 +290,21 @@
 
     @include('livewire.sites.settings.partials.environment.advanced-path')
 
+    {{-- Worker-pool env comparison: a site replicated across a worker pool needs
+         the same .env on every member or background jobs misbehave. Only render
+         when this server actually has pool peers to compare against. --}}
+    @php
+        $envPoolId = $server->worker_pool_id;
+        $hasPoolPeers = $envPoolId
+            && \App\Models\Server::query()
+                ->where('worker_pool_id', $envPoolId)
+                ->whereKeyNot($server->id)
+                ->exists();
+    @endphp
+    @if ($hasPoolPeers)
+        <livewire:sites.worker-env-comparison :site="$site" :key="'worker-env-'.$site->id" />
+    @endif
+
     {{-- Resource management moved to the Resources tab. Keep the binding modal
          in the DOM (modal-only) so the inline binding-group actions in the
          variables list still function; the visible binding card is suppressed. --}}

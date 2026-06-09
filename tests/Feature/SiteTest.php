@@ -285,6 +285,71 @@ test('site php settings can be saved from site settings for installed versions o
         ->assertHasErrors(['php_version']);
 });
 
+test('php fpm pool settings persist and queue a webserver re-apply', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'meta' => [
+            'php_inventory' => [
+                'supported' => true,
+                'installed_versions' => ['8.4'],
+                'detected_default_version' => '8.4',
+            ],
+        ],
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'php_version' => '8.4',
+    ]);
+
+    Bus::fake();
+
+    Livewire::actingAs($user)
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'runtime'])
+        ->set('fpm_pm', 'static')
+        ->set('fpm_max_children', '24')
+        ->set('fpm_max_requests', '0')
+        ->set('fpm_request_terminate_timeout', '90')
+        ->call('savePhpFpmPool')
+        ->assertHasNoErrors()
+        ->assertDispatched('notify', message: 'PHP-FPM pool saved. Webserver config queued.', type: 'success');
+
+    Bus::assertDispatched(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
+
+    $pool = $site->fresh()->phpFpmPoolSettings();
+    expect($pool['pm'])->toBe('static');
+    expect($pool['max_children'])->toBe(24);
+    expect($pool['max_requests'])->toBe(0);
+    expect($pool['request_terminate_timeout'])->toBe(90);
+});
+
+test('php fpm pool rejects an invalid process manager and out-of-range children', function () {
+    $user = userWithOrganization();
+    $org = $user->currentOrganization();
+    $server = Server::factory()->ready()->create([
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'meta' => ['php_inventory' => ['supported' => true, 'installed_versions' => ['8.4'], 'detected_default_version' => '8.4']],
+    ]);
+    $site = Site::factory()->create([
+        'server_id' => $server->id,
+        'user_id' => $user->id,
+        'organization_id' => $org->id,
+        'php_version' => '8.4',
+    ]);
+
+    Livewire::actingAs($user)
+        ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'runtime'])
+        ->set('fpm_pm', 'bogus')
+        ->set('fpm_max_children', '0')
+        ->call('savePhpFpmPool')
+        ->assertHasErrors(['fpm_pm', 'fpm_max_children']);
+});
+
 test('php site creation prefills the valid server new site default', function () {
     $user = userWithOrganization();
     $org = $user->currentOrganization();

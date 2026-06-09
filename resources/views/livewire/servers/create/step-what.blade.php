@@ -56,12 +56,13 @@
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ $sizeRoleMismatch['detail'] }}</p>
                     </div>
                 </div>
-                <div class="flex flex-col gap-3 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-7">
+                <div class="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:gap-6 sm:p-7">
                     @if ($sizeRoleMismatch['suggested_size'] !== '')
-                        <p class="text-sm text-brand-moss">
-                            {{ __('Suggested plan: :plan', ['plan' => $sizeRoleMismatch['suggested_label']]) }}
-                        </p>
-                        <div class="flex flex-wrap gap-2">
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-moss/70">{{ __('Suggested plan') }}</p>
+                            <p class="mt-0.5 text-sm font-medium text-brand-ink">{{ $sizeRoleMismatch['suggested_label'] }}</p>
+                        </div>
+                        <div class="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
                             <button
                                 type="button"
                                 wire:click="applySuggestedPlanSize('{{ $sizeRoleMismatch['suggested_size'] }}')"

@@ -109,6 +109,18 @@ class CleanupRemoteSiteArtifactsJob implements ShouldQueue
             };
         }
 
+        // Remove this site's dedicated PHP-FPM pool from every version's pool.d
+        // (a version switch can leave the conf in more than one) and reload each
+        // affected master. Runs after the vhost teardown above, so nothing still
+        // points at the pool's socket when it goes away.
+        $poolName = trim((string) ($this->payload['php_fpm_pool_name'] ?? ''));
+        if ($poolName !== '') {
+            $log .= $ssh->exec(sprintf(
+                '(NAME=%1$s; RELOAD=""; for d in /etc/php/*/fpm/pool.d; do [ -d "$d" ] || continue; f="${d}/${NAME}.conf"; if [ -f "$f" ]; then sudo rm -f "$f"; v="$(basename "$(dirname "$(dirname "$d")")")"; RELOAD="${RELOAD} ${v}"; fi; done; for v in $(echo "$RELOAD" | tr " " "\n" | sort -u); do [ -z "$v" ] && continue; sudo systemctl reload "php${v}-fpm" 2>/dev/null || sudo systemctl restart "php${v}-fpm" 2>/dev/null || true; done) 2>&1; printf "\nDPLY_FPM_POOL_CLEAN_EXIT:%%s" "$?"',
+                escapeshellarg($poolName)
+            ), 120);
+        }
+
         // Release artifacts are written by privileged provision/deploy steps, so
         // the deploy user can't always rm them — use sudo or the tree survives
         // and a re-created same-slug site inherits stale code (wrong PHP socket,

@@ -241,7 +241,12 @@ class SiteWebserverConfigEditorService
      */
     protected function hydrateNginxEditorFromServer(Site $site, SiteWebserverConfigProfile $profile): array
     {
-        $main = $this->nginxProvisioner->readCurrentMainConfig($site);
+        // One SSH round trip pulls the main vhost and both layer snippets together
+        // (was four separate connections — read main, ensure layers, read before,
+        // read after — each a full handshake) so the page loads with a single
+        // remote call.
+        $state = $this->nginxProvisioner->readEditorStateFromServer($site);
+        $main = $state['main'];
         if ($main === null || trim($main) === '') {
             return [
                 'ok' => false,
@@ -258,17 +263,15 @@ class SiteWebserverConfigEditorService
         $wantsLayered = $profileWantsLayered || $isLayeredRemote;
 
         if ($wantsLayered) {
-            // ensureNginxLayerSnippetFilesIfMissing only runs when the profile is layered; if the host
-            // already has Dply includes but the app still thought "full file", flip mode first.
+            // If the host already has Dply includes but the app still thought
+            // "full file", flip mode first.
             if ($isLayeredRemote && $profile->mode !== SiteWebserverConfigProfile::MODE_LAYERED) {
                 $profile->update(['mode' => SiteWebserverConfigProfile::MODE_LAYERED]);
                 $profile->refresh();
             }
 
-            $this->nginxProvisioner->ensureNginxLayerSnippetFilesIfMissing($site, $profile);
-
-            $beforeRaw = $this->nginxProvisioner->readLayerSnippetFile($site, 'before');
-            $afterRaw = $this->nginxProvisioner->readLayerSnippetFile($site, 'after');
+            $beforeRaw = $state['before'];
+            $afterRaw = $state['after'];
 
             if ($isLayeredRemote) {
                 $parsedMain = $this->nginxProvisioner->parseLayeredMainSnippetFromVhost($site, $main);

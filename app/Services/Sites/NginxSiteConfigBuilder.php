@@ -111,11 +111,15 @@ class NginxSiteConfigBuilder
         }
 
         $root = $site->effectiveDocumentRootForNginx();
-        $phpSock = str_replace(
-            '{version}',
-            $this->phpFpmVersion($site),
-            config('sites.php_fpm_socket')
-        );
+        // Dedicated-pool PHP sites get their own version-free socket; anything
+        // else (legacy/edge) keeps the shared per-version socket.
+        $phpSock = $site->usesDedicatedPhpFpmPool()
+            ? $site->phpFpmListenSocketPath()
+            : str_replace(
+                '{version}',
+                $this->phpFpmVersion($site),
+                config('sites.php_fpm_socket')
+            );
 
         $redirects = $site->redirects->sortBy('sort_order')->values();
         $redirectBlock = '';

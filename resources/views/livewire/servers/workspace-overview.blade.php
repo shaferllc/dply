@@ -1034,7 +1034,20 @@
                             </span>
                         @endif
                     </div>
-                    @if ($installedStackDiverges)
+                    @if ($installedStack->lowMemoryMode)
+                        <p class="mt-3 rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs leading-relaxed text-amber-900">
+                            @if ($installedStackDiverges)
+                                {{ __('Low-memory mode: :memMb MB RAM is under the 1 GB threshold, so SQLite was installed instead of :requested. Re-provision on a 2 GB+ droplet for a full database server — see journey for details.', [
+                                    'memMb' => $installedStack->totalMemoryMb ?: '<1024',
+                                    'requested' => str($server->meta['database'] ?? 'a database server')->headline(),
+                                ]) }}
+                            @else
+                                {{ __('Low-memory mode: :memMb MB RAM is under the 1 GB threshold, so lighter services were substituted. Re-provision on a 2 GB+ droplet for the full stack — see journey for details.', [
+                                    'memMb' => $installedStack->totalMemoryMb ?: '<1024',
+                                ]) }}
+                            @endif
+                        </p>
+                    @elseif ($installedStackDiverges)
                         <p class="mt-3 rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs leading-relaxed text-amber-900">
                             {{ __('Wizard requested :requested but :installed was installed instead. See journey for context.', [
                                 'requested' => $server->meta['database'] ?? '—',

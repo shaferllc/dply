@@ -239,6 +239,125 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
     }
 
     /**
+     * Ensure this site's dedicated PHP-FPM pool exists on the box, is valid, and
+     * is the only pool for the site (cleaning up stale copies left in another
+     * PHP version's pool.d after a version switch). MUST run BEFORE the vhost is
+     * (re)written, because the vhost points at the pool's socket — creating the
+     * socket first means there's no window where nginx/Caddy proxies to a socket
+     * that doesn't exist yet.
+     *
+     * Idempotent: the on-box script compares content and only reloads php-fpm
+     * when something actually changed, so steady-state applies (deploys, SSL
+     * renewals) are no-ops here. Throws on a failed `php-fpm -t` so the caller
+     * aborts before pointing the vhost at a pool that won't load.
+     */
+    protected function ensurePhpFpmPool(Site $site, SshConnection $ssh, ?ConsoleEmitter $emit = null): void
+    {
+        if (! $site->usesDedicatedPhpFpmPool()) {
+            return;
+        }
+
+        $server = $site->server;
+        if ($server === null || ! $server->hostCapabilities()->supportsMachinePhpManagement()) {
+            return;
+        }
+
+        $version = $site->resolvedPhpFpmVersion();
+        $name = $site->phpFpmPoolName();
+        $content = app(SitePhpFpmPoolConfigBuilder::class)->build($site, $server);
+
+        $script = $this->phpFpmPoolScript($name, $version, base64_encode($content));
+
+        $out = $ssh->exec(sprintf(
+            '(%s) 2>&1; printf "\nDPLY_FPM_POOL_EXIT:%%s" "$?"',
+            $this->privilegedCommand($server, $script),
+        ), 120);
+
+        if (! preg_match('/DPLY_FPM_POOL_EXIT:0\s*$/', $out)) {
+            throw new \RuntimeException('PHP-FPM pool validation/reload failed for '.$name.'. Output: '.Str::limit($out, 2000));
+        }
+
+        if (str_contains($out, 'DPLY_FPM_POOL_CHANGED:1')) {
+            $emit?->step($this->emitterSource(), 'updating PHP-FPM pool ('.$name.' → php'.$version.'-fpm)');
+        }
+    }
+
+    /**
+     * The on-box bash that writes + validates + reloads a single pool conf and
+     * sweeps stale-version copies. Kept as a string builder (not a heredoc in
+     * the caller) so the escaping stays in one place and is unit-testable.
+     */
+    protected function phpFpmPoolScript(string $name, string $version, string $base64Content): string
+    {
+        $name = escapeshellarg($name);
+        $version = escapeshellarg($version);
+        $b64 = escapeshellarg($base64Content);
+
+        return <<<BASH
+set +e
+NAME={$name}
+VER={$version}
+TARGET="/etc/php/\${VER}/fpm/pool.d/\${NAME}.conf"
+
+# Boxes that never installed this fpm can't host the pool — skip rather than
+# block the whole webserver apply (the vhost still points at the socket, but a
+# later apply once the version is installed will create it).
+if ! command -v "php-fpm\${VER}" >/dev/null 2>&1; then
+  echo "DPLY_FPM_POOL_SKIP:1"
+  echo "DPLY_FPM_POOL_EXIT:0"
+  exit 0
+fi
+
+NEW="\$(mktemp)"
+echo {$b64} | base64 -d > "\$NEW"
+
+RELOAD=""
+
+# Remove this site's pool from any OTHER version's pool.d (left behind by a PHP
+# version switch) and mark those masters for reload.
+for d in /etc/php/*/fpm/pool.d; do
+  [ -d "\$d" ] || continue
+  v="\$(basename "\$(dirname "\$(dirname "\$d")")")"
+  f="\${d}/\${NAME}.conf"
+  if [ -f "\$f" ] && [ "\$v" != "\$VER" ]; then
+    rm -f "\$f"
+    RELOAD="\${RELOAD} \${v}"
+  fi
+done
+
+CHANGED=0
+if [ ! -f "\$TARGET" ] || ! cmp -s "\$NEW" "\$TARGET"; then
+  cp -f "\$TARGET" "\${TARGET}.dply-bak" 2>/dev/null
+  install -m 0644 -o root -g root "\$NEW" "\$TARGET"
+  CHANGED=1
+fi
+
+if [ "\$CHANGED" = "1" ]; then
+  if ! "php-fpm\${VER}" -t >/tmp/dply-fpm-test.\$\$ 2>&1; then
+    cat /tmp/dply-fpm-test.\$\$
+    rm -f /tmp/dply-fpm-test.\$\$
+    # Roll the pool back so an unrelated reload later doesn't trip on it.
+    if [ -f "\${TARGET}.dply-bak" ]; then mv -f "\${TARGET}.dply-bak" "\$TARGET"; else rm -f "\$TARGET"; fi
+    rm -f "\$NEW"
+    echo "DPLY_FPM_POOL_EXIT:1"
+    exit 1
+  fi
+  rm -f /tmp/dply-fpm-test.\$\$
+  RELOAD="\${RELOAD} \${VER}"
+  echo "DPLY_FPM_POOL_CHANGED:1"
+fi
+
+for v in \$(echo "\$RELOAD" | tr ' ' '\\n' | sort -u); do
+  [ -z "\$v" ] && continue
+  systemctl reload "php\${v}-fpm" 2>/dev/null || systemctl restart "php\${v}-fpm" 2>/dev/null || true
+done
+
+rm -f "\$NEW" "\${TARGET}.dply-bak" 2>/dev/null
+echo "DPLY_FPM_POOL_EXIT:0"
+BASH;
+    }
+
+    /**
      * Source label for emit lines from helpers shared across all webservers.
      * Falls back to 'webserver' when a subclass doesn't expose webserver()
      * (only AbstractSiteWebserverProvisioner without the contract — shouldn't

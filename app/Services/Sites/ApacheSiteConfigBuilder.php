@@ -39,11 +39,13 @@ class ApacheSiteConfigBuilder
         $primary = $hostnames->first();
         $aliases = $hostnames->skip(1)->values();
         $root = $site->effectiveDocumentRoot();
-        $phpSock = str_replace(
-            '{version}',
-            $site->phpVersion() ?? '8.3',
-            config('sites.php_fpm_socket')
-        );
+        $phpSock = $site->usesDedicatedPhpFpmPool()
+            ? $site->phpFpmListenSocketPath()
+            : str_replace(
+                '{version}',
+                $site->phpVersion() ?? '8.3',
+                config('sites.php_fpm_socket')
+            );
         $basename = $site->webserverConfigBasename();
         $aliasLines = $aliases->isNotEmpty()
             ? '    ServerAlias '.$aliases->implode(' ')."\n"

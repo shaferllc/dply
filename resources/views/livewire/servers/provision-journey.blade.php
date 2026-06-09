@@ -1406,14 +1406,19 @@
                     </section>
                 @endif
 
-                {{-- Divergence banner: fires when the reconciled snapshot
-                     reports a different database engine than the wizard
-                     requested (e.g., low-memory mode swapped MySQL → SQLite).
-                     The wizard request lives in $requestedDatabase; the
-                     installed reality lives in $installedStack. We use the
-                     `installedStackDiverges` precomputed bool from the
-                     component to keep view logic minimal. --}}
-                @if ($installedStackDiverges)
+                {{-- Low-memory / divergence banner.
+
+                     Fires in two cases:
+                       1. Low-memory mode engaged ($installedStack->lowMemoryMode) —
+                          the droplet was under the 1 GB threshold, so the script
+                          substituted lighter services. This is the important one:
+                          we explain *what* changed and *why*, plus the fix, even
+                          when the database itself didn't diverge (e.g. the user
+                          already picked SQLite).
+                       2. The stack diverged for some other reason
+                          ($installedStackDiverges without low-memory mode) — rare,
+                          falls through to the generic substitution message. --}}
+                @if ($installedStack->lowMemoryMode || $installedStackDiverges)
                     <section class="{{ $card }} overflow-hidden border-amber-200 p-0">
                         <div class="border-b border-amber-200 bg-amber-50/70 px-5 py-4 sm:px-6">
                             <div class="flex items-start gap-3">
@@ -1421,18 +1426,44 @@
                                     <x-heroicon-o-exclamation-triangle class="h-5 w-5" aria-hidden="true" />
                                 </span>
                                 <div class="min-w-0 flex-1">
-                                    <p class="text-sm font-semibold text-amber-900">{{ __('Server stack differs from your request') }}</p>
-                                    <p class="mt-1 text-sm text-amber-800">
-                                        {{ __('You picked :requested, but the droplet was too small to run it safely. The provisioning script substituted :installed to keep the server functional.', [
-                                            'requested' => $requestedDatabase ?? '—',
-                                            'installed' => $installedStack->database ?? '—',
-                                        ]) }}
-                                    </p>
-                                    @if ($installedStack->lowMemoryMode && $installedStack->totalMemoryMb)
-                                        <p class="mt-1 text-xs text-amber-700">
-                                            {{ __('Detected :memMb MB total RAM (low-memory mode threshold: 1024 MB). Re-provision on a 2 GB+ droplet to install :requested.', [
-                                                'memMb' => $installedStack->totalMemoryMb,
+                                    @if ($installedStack->lowMemoryMode)
+                                        <p class="text-sm font-semibold text-amber-900">{{ __('Provisioned in low-memory mode') }}</p>
+                                        <p class="mt-1 text-sm text-amber-800">
+                                            @if ($installedStack->totalMemoryMb)
+                                                {{ __('This server has :memMb MB of RAM — below the 1 GB (1024 MB) threshold dply needs to run MySQL 8.0 or PostgreSQL safely. To keep it stable, lighter services were substituted during provisioning:', ['memMb' => $installedStack->totalMemoryMb]) }}
+                                            @else
+                                                {{ __('This server is below the 1 GB (1024 MB) threshold dply needs to run MySQL 8.0 or PostgreSQL safely. To keep it stable, lighter services were substituted during provisioning:', []) }}
+                                            @endif
+                                        </p>
+                                        <ul class="mt-2 space-y-1 text-sm text-amber-800">
+                                            @if ($installedStackDiverges)
+                                                <li class="flex gap-2">
+                                                    <span aria-hidden="true">•</span>
+                                                    <span>{{ __('SQLite was installed in place of :requested. Your app works, but on a single-file database instead of a dedicated server.', ['requested' => str($requestedDatabase ?? 'a database server')->headline()]) }}</span>
+                                                </li>
+                                            @endif
+                                            @if ($installedStack->cacheService && $installedStack->cacheService !== 'none')
+                                                <li class="flex gap-2">
+                                                    <span aria-hidden="true">•</span>
+                                                    <span>{{ __(':cache was kept as the cache — it is lightweight enough for this tier.', ['cache' => str($installedStack->cacheService)->headline()]) }}</span>
+                                                </li>
+                                            @endif
+                                            @if ($installedStack->swapMb)
+                                                <li class="flex gap-2">
+                                                    <span aria-hidden="true">•</span>
+                                                    <span>{{ __(':swapMb MB of swap was added as a safety margin against out-of-memory crashes.', ['swapMb' => $installedStack->swapMb]) }}</span>
+                                                </li>
+                                            @endif
+                                        </ul>
+                                        <p class="mt-2 text-xs text-amber-700">
+                                            {{ __('To run a full Laravel or WordPress stack with a real database server, re-provision on a 2 GB+ droplet (the s-1vcpu-2gb tier on DigitalOcean, or equivalent).') }}
+                                        </p>
+                                    @else
+                                        <p class="text-sm font-semibold text-amber-900">{{ __('Server stack differs from your request') }}</p>
+                                        <p class="mt-1 text-sm text-amber-800">
+                                            {{ __('You picked :requested, but the droplet was too small to run it safely. The provisioning script substituted :installed to keep the server functional.', [
                                                 'requested' => $requestedDatabase ?? '—',
+                                                'installed' => $installedStack->database ?? '—',
                                             ]) }}
                                         </p>
                                     @endif

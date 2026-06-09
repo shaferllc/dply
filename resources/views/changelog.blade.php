@@ -58,6 +58,13 @@
                 [
                     'date'    => 'June 9, 2026',
                     'tags'    => ['new'],
+                    'title'   => 'PHP-FPM Pool Tuning',
+                    'summary' => 'Sites now expose configurable PHP-FPM pool settings and a panel to compare environment variables against worker pool members.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 9, 2026',
+                    'tags'    => ['new'],
                     'title'   => 'More PHP Runtime Settings',
                     'summary' => 'Site PHP settings now expose post max size, input time, input vars, file uploads, and timezone, which are applied to the live server\'s FastCGI config automatically.',
                     'items'   => [],

@@ -11,7 +11,6 @@ use App\Models\User;
 use App\Services\Sites\SiteNginxProvisioner;
 use App\Services\Sites\WebserverConfig\SiteWebserverConfigEditorService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Mockery;
 
 uses(RefreshDatabase::class);
 
@@ -53,10 +52,12 @@ test('layered profile pulls before and after even when main vhost has no include
     $flatMain = "server {\n    listen 80;\n    server_name app.example.test;\n}\n";
 
     $this->mock(SiteNginxProvisioner::class, function ($mock) use ($flatMain): void {
-        $mock->shouldReceive('readCurrentMainConfig')->once()->andReturn($flatMain);
-        $mock->shouldReceive('ensureNginxLayerSnippetFilesIfMissing')->once();
-        $mock->shouldReceive('readLayerSnippetFile')->with(Mockery::type(Site::class), 'before')->once()->andReturn('# pulled-before');
-        $mock->shouldReceive('readLayerSnippetFile')->with(Mockery::type(Site::class), 'after')->once()->andReturn('# pulled-after');
+        // Single consolidated read replaces the old read-main / ensure / read-before / read-after calls.
+        $mock->shouldReceive('readEditorStateFromServer')->once()->andReturn([
+            'main' => $flatMain,
+            'before' => '# pulled-before',
+            'after' => '# pulled-after',
+        ]);
     });
 
     $editor = app(SiteWebserverConfigEditorService::class);
@@ -116,9 +117,11 @@ server {
 NGX;
 
     $this->mock(SiteNginxProvisioner::class, function ($mock) use ($layeredMain): void {
-        $mock->shouldReceive('readCurrentMainConfig')->once()->andReturn($layeredMain);
-        $mock->shouldReceive('ensureNginxLayerSnippetFilesIfMissing')->once();
-        $mock->shouldReceive('readLayerSnippetFile')->twice()->andReturn('# x', '# y');
+        $mock->shouldReceive('readEditorStateFromServer')->once()->andReturn([
+            'main' => $layeredMain,
+            'before' => '# x',
+            'after' => '# y',
+        ]);
         $mock->shouldReceive('parseLayeredMainSnippetFromVhost')->once()->andReturn('location / { }');
     });
 

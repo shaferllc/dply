@@ -239,6 +239,14 @@ class Show extends Component
 
     public string $php_timezone = '';
 
+    public string $fpm_pm = 'dynamic';
+
+    public string $fpm_max_children = '';
+
+    public string $fpm_max_requests = '';
+
+    public string $fpm_request_terminate_timeout = '';
+
     /** Localhost port for reverse-proxy runtimes (Node, Rails, Puma, containers, etc.). */
     public string $runtime_app_port = '';
 
@@ -445,6 +453,11 @@ class Show extends Component
         $this->php_max_input_vars = (string) ($phpRuntime['max_input_vars'] ?? '');
         $this->php_max_file_uploads = (string) ($phpRuntime['max_file_uploads'] ?? '');
         $this->php_timezone = (string) ($phpRuntime['timezone'] ?? '');
+        $fpmPool = $this->site->phpFpmPoolSettings();
+        $this->fpm_pm = $fpmPool['pm'];
+        $this->fpm_max_children = (string) $fpmPool['max_children'];
+        $this->fpm_max_requests = (string) $fpmPool['max_requests'];
+        $this->fpm_request_terminate_timeout = (string) $fpmPool['request_terminate_timeout'];
         $this->runtime_app_port = $this->site->app_port !== null ? (string) $this->site->app_port : '';
         $ips = $this->site->webhook_allowed_ips;
         $this->webhook_allowed_ips_text = is_array($ips) && $ips !== []
@@ -580,6 +593,56 @@ class Show extends Component
             $this->toastSuccess(__('PHP settings saved. Webserver config queued.'));
         } else {
             $this->toastSuccess(__('PHP settings saved.'));
+        }
+
+        $this->syncFormFromSite();
+    }
+
+    public function savePhpFpmPool(): void
+    {
+        $this->authorize('update', $this->site);
+        if (! $this->server->hostCapabilities()->supportsMachinePhpManagement()) {
+            $this->toastError(__('This host runtime does not expose PHP-FPM pool settings.'));
+
+            return;
+        }
+
+        $validated = $this->validate([
+            'fpm_pm' => ['required', 'string', 'in:dynamic,static,ondemand'],
+            'fpm_max_children' => ['required', 'integer', 'min:1', 'max:1000'],
+            'fpm_max_requests' => ['required', 'integer', 'min:0', 'max:100000'],
+            'fpm_request_terminate_timeout' => ['required', 'integer', 'min:1', 'max:3600'],
+        ], [], [
+            'fpm_pm' => 'process manager',
+            'fpm_max_children' => 'max children',
+            'fpm_max_requests' => 'max requests',
+            'fpm_request_terminate_timeout' => 'request terminate timeout',
+        ]);
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $old = $this->site->phpFpmPoolSettings();
+        $meta['php_fpm_pool'] = [
+            'pm' => $validated['fpm_pm'],
+            'max_children' => (int) $validated['fpm_max_children'],
+            'max_requests' => (int) $validated['fpm_max_requests'],
+            'request_terminate_timeout' => (int) $validated['fpm_request_terminate_timeout'],
+        ];
+        $this->site->meta = $meta;
+        $this->site->save();
+
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.php_fpm_pool_updated', $this->site, $old, $meta['php_fpm_pool']);
+        }
+
+        // The pool conf is rewritten + php-fpm reloaded as the first step of the
+        // webserver apply (before the vhost), so the running pool picks up the
+        // new sizing/timeout without a socket gap.
+        if ($this->shouldAutoReapplyManagedWebserverConfig()) {
+            ApplySiteWebserverConfigJob::dispatch($this->site->id);
+            $this->toastSuccess(__('PHP-FPM pool saved. Webserver config queued.'));
+        } else {
+            $this->toastSuccess(__('PHP-FPM pool saved.'));
         }
 
         $this->syncFormFromSite();

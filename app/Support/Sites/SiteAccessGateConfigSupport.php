@@ -23,6 +23,11 @@ final class SiteAccessGateConfigSupport
     {
         $site->loadMissing('server');
 
+        // Form-gate PHP runs through the same dedicated pool socket as the app.
+        if ($site->usesDedicatedPhpFpmPool()) {
+            return $site->phpFpmListenSocketPath();
+        }
+
         if ($site->server !== null) {
             return str_replace(
                 '{version}',

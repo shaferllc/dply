@@ -46,6 +46,9 @@ class SiteCaddyProvisioner extends AbstractSiteWebserverProvisioner implements S
         $this->ensureManagedErrorPages($site, $ssh, $emit);
         $this->syncBasicAuthHtpasswdFiles($site, $ssh, $emit);
         $this->syncAccessGateFiles($site, $ssh, $emit);
+        // Pool first: the php_fastcgi below points at this pool's socket, so it
+        // must exist (and php-fpm reloaded) before Caddy reloads onto it.
+        $this->ensurePhpFpmPool($site, $ssh, $emit);
         if ($this->writeSystemFileIfChanged($server, $ssh, $configFile, $config)) {
             $emit->step('caddy', 'writing site config: '.$configFile);
         }

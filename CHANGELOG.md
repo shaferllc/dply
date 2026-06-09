@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 ### Added
+- Sites now expose configurable PHP-FPM pool settings and a panel to compare environment variables against worker pool members.
+### Added
 - Site PHP settings now expose post max size, input time, input vars, file uploads, and timezone, which are applied to the live server's FastCGI config automatically.
 ### Added
 - Adds a "Validate reachability" action that probes every networked site resource binding from the site's server and badges each one on the Resources map.

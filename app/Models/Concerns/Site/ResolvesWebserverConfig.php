@@ -104,6 +104,108 @@ trait ResolvesWebserverConfig
     }
 
     /**
+     * Every PHP site runs in its own PHP-FPM pool (Forge-style isolation), so
+     * request_terminate_timeout, pm.* and the run user can be tuned per site
+     * without affecting neighbours. Non-PHP sites (static/node/octane) never
+     * touch a pool. Octane sites proxy to a port, not a FastCGI socket, so they
+     * opt out too.
+     *
+     * Scoped to nginx + Caddy — the two engines whose provisioners create the
+     * pool. Apache/OpenLiteSpeed keep the shared socket (OLS uses lsphp, not
+     * php-fpm), so we must NOT point their vhosts at a pool that nothing writes.
+     */
+    public function usesDedicatedPhpFpmPool(): bool
+    {
+        return $this->type === SiteType::Php
+            && empty($this->octane_port)
+            && in_array($this->webserver(), ['nginx', 'caddy'], true);
+    }
+
+    /**
+     * The pool name == the on-disk pool conf basename == the vhost basename, so
+     * the three always agree and an operator can grep one to find the others.
+     */
+    public function phpFpmPoolName(): string
+    {
+        return $this->webserverConfigBasename();
+    }
+
+    /**
+     * The unix socket this site's dedicated pool listens on. Deliberately
+     * version-FREE: the socket name never changes when the PHP version does, so
+     * a version switch is a pool-conf move (handled by the provisioner) and the
+     * vhost never has to be rewritten for it. Directory tracks the configured
+     * shared-socket location so DPLY_PHP_FPM_SOCKET overrides are honoured.
+     */
+    public function phpFpmListenSocketPath(): string
+    {
+        $dir = rtrim(dirname((string) config('sites.php_fpm_socket', '/run/php/php{version}-fpm.sock')), '/');
+
+        return ($dir !== '' ? $dir : '/run/php').'/'.$this->phpFpmPoolName().'.sock';
+    }
+
+    /**
+     * The PHP-FPM version whose `pool.d` dir this site's pool conf lives in (and
+     * whose fpm master serves it). Mirrors the socket-version guard in the nginx
+     * builder: trust the site's configured version only when it's actually
+     * installed, else the server's provisioned primary, else a safe default.
+     */
+    public function resolvedPhpFpmVersion(): string
+    {
+        $server = $this->server;
+        $installedPrimary = $server !== null
+            ? \App\Support\Servers\InstalledStack::fromMeta($server)->phpVersion
+            : null;
+        $configured = $this->phpVersion();
+
+        if ($configured !== null && $configured !== '') {
+            $installed = [];
+            if ($server !== null) {
+                foreach ((array) data_get($server->meta, 'php_inventory.installed_versions', []) as $v) {
+                    $id = (string) (is_array($v) ? ($v['version'] ?? $v['id'] ?? '') : $v);
+                    if ($id !== '') {
+                        $installed[] = $id;
+                    }
+                }
+            }
+            if ($installedPrimary !== null && $installedPrimary !== '' && ! in_array($installedPrimary, $installed, true)) {
+                $installed[] = $installedPrimary;
+            }
+            if ($installed === [] || in_array($configured, $installed, true)) {
+                return $configured;
+            }
+        }
+
+        return ($installedPrimary !== null && $installedPrimary !== '') ? $installedPrimary : '8.3';
+    }
+
+    /**
+     * Per-site PHP-FPM pool process settings, merged over sane defaults. Stored
+     * in meta['php_fpm_pool']; the start/spare-server counts are DERIVED from
+     * max_children by {@see \App\Services\Sites\SitePhpFpmPoolConfigBuilder}.
+     *
+     * @return array{pm: string, max_children: int, max_requests: int, request_terminate_timeout: int}
+     */
+    public function phpFpmPoolSettings(): array
+    {
+        $meta = is_array($this->meta['php_fpm_pool'] ?? null) ? $this->meta['php_fpm_pool'] : [];
+
+        $pm = is_string($meta['pm'] ?? null) ? $meta['pm'] : 'dynamic';
+        if (! in_array($pm, ['dynamic', 'static', 'ondemand'], true)) {
+            $pm = 'dynamic';
+        }
+
+        $int = static fn (mixed $v, int $default, int $min): int => is_numeric($v) && (int) $v >= $min ? (int) $v : $default;
+
+        return [
+            'pm' => $pm,
+            'max_children' => $int($meta['max_children'] ?? null, 10, 1),
+            'max_requests' => $int($meta['max_requests'] ?? null, 500, 0),
+            'request_terminate_timeout' => $int($meta['request_terminate_timeout'] ?? null, 120, 1),
+        ];
+    }
+
+    /**
      * Web root for Nginx (atomic → …/current/public).
      */
     public function effectiveDocumentRootForNginx(): string

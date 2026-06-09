@@ -168,6 +168,126 @@
     </section>
 @endif
 
+@if ($supportsMachinePhp && $site->usesDedicatedPhpFpmPool())
+    @php
+        // Seed the client-side sizing helper. Server RAM comes from the probed
+        // installed stack; per-worker default is the site's own memory_limit
+        // (the worst-case footprint of one busy worker), falling back to PHP's
+        // 128M default when the site hasn't pinned one.
+        $poolServerRamMb = \App\Support\Servers\InstalledStack::fromMeta($server)->totalMemoryMb;
+        $poolMemLimitBytes = \App\Services\Sites\SitePhpRuntimeDirectivesBuilder::shorthandBytes(
+            (string) (is_array($site->meta['php_runtime'] ?? null) ? ($site->meta['php_runtime']['memory_limit'] ?? '') : '')
+        );
+        $poolWorkerMb = $poolMemLimitBytes > 0 ? (int) round($poolMemLimitBytes / 1048576) : 128;
+        $poolReserveMb = $poolServerRamMb !== null ? max(256, (int) round($poolServerRamMb * 0.25)) : 512;
+    @endphp
+    <section class="dply-card overflow-hidden mt-6">
+        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <x-icon-badge>
+                <x-heroicon-o-rectangle-stack class="h-5 w-5" aria-hidden="true" />
+            </x-icon-badge>
+            <div class="min-w-0">
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('PHP-FPM pool') }}</p>
+                <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Dedicated process pool') }}</h2>
+                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('This site runs in its own PHP-FPM pool, isolated from neighbours. Tune its process manager and the hard request ceiling here.') }}</p>
+                <p class="mt-2 font-mono text-xs text-brand-moss">{{ $site->phpFpmListenSocketPath() }}</p>
+            </div>
+        </div>
+
+        <form wire:submit="savePhpFpmPool">
+            <div class="space-y-6 px-6 py-6 sm:px-7">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <div>
+                        <x-input-label for="fpm_pm" value="Process manager" />
+                        <select id="fpm_pm" wire:model="fpm_pm" class="mt-1 block w-full rounded-md border-brand-ink/15 shadow-sm text-sm">
+                            <option value="dynamic">{{ __('dynamic') }}</option>
+                            <option value="static">{{ __('static') }}</option>
+                            <option value="ondemand">{{ __('ondemand') }}</option>
+                        </select>
+                        <x-input-error :messages="$errors->get('fpm_pm')" class="mt-1" />
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('start/spare servers are derived from max children.') }}</p>
+                    </div>
+                    <div>
+                        <x-input-label for="fpm_max_children" value="Max children" />
+                        <x-text-input id="fpm_max_children" wire:model="fpm_max_children" class="mt-1 block w-full font-mono text-sm" placeholder="10" />
+                        <x-input-error :messages="$errors->get('fpm_max_children')" class="mt-1" />
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('Worker ceiling for this site.') }}</p>
+                    </div>
+                    <div>
+                        <x-input-label for="fpm_max_requests" value="Max requests" />
+                        <x-text-input id="fpm_max_requests" wire:model="fpm_max_requests" class="mt-1 block w-full font-mono text-sm" placeholder="500" />
+                        <x-input-error :messages="$errors->get('fpm_max_requests')" class="mt-1" />
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('Recycle a worker after N requests (0 = never).') }}</p>
+                    </div>
+                    <div>
+                        <x-input-label for="fpm_request_terminate_timeout" value="Request terminate timeout" />
+                        <x-text-input id="fpm_request_terminate_timeout" wire:model="fpm_request_terminate_timeout" class="mt-1 block w-full font-mono text-sm" placeholder="120" />
+                        <x-input-error :messages="$errors->get('fpm_request_terminate_timeout')" class="mt-1" />
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('Seconds. Hard wall-clock kill of a stuck worker.') }}</p>
+                    </div>
+                </div>
+
+                {{-- Max-children sizing helper. Pure client-side: max_children ≈
+                     (RAM − reserve) ÷ per-worker memory. Seeded from the server's
+                     probed RAM and the site's memory_limit. --}}
+                <div
+                    x-data="{
+                        ram: @js($poolServerRamMb),
+                        reserve: @js($poolReserveMb),
+                        worker: @js($poolWorkerMb),
+                        get usable() { return Math.max(0, (Number(this.ram) || 0) - (Number(this.reserve) || 0)); },
+                        get suggested() {
+                            const w = Number(this.worker) || 0;
+                            if (w <= 0 || this.usable <= 0) return null;
+                            return Math.max(1, Math.floor(this.usable / w));
+                        },
+                    }"
+                    class="rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4"
+                >
+                    <div class="flex items-center gap-2">
+                        <x-heroicon-o-calculator class="h-4 w-4 text-brand-sage" aria-hidden="true" />
+                        <p class="text-sm font-semibold text-brand-ink">{{ __('Max children sizing helper') }}</p>
+                    </div>
+                    <p class="mt-1 text-xs text-brand-moss">{{ __('Estimates a safe worker ceiling: (RAM − reserve) ÷ per-worker memory.') }}</p>
+
+                    <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div>
+                            <label class="text-xs font-medium text-brand-moss">{{ __('Server RAM (MB)') }}</label>
+                            <input type="number" min="0" x-model.number="ram" class="mt-1 block w-full rounded-md border-brand-ink/15 font-mono text-sm shadow-sm" placeholder="2048" />
+                        </div>
+                        <div>
+                            <label class="text-xs font-medium text-brand-moss">{{ __('Reserve for OS/DB (MB)') }}</label>
+                            <input type="number" min="0" x-model.number="reserve" class="mt-1 block w-full rounded-md border-brand-ink/15 font-mono text-sm shadow-sm" />
+                        </div>
+                        <div>
+                            <label class="text-xs font-medium text-brand-moss">{{ __('Per-worker memory (MB)') }}</label>
+                            <input type="number" min="1" x-model.number="worker" class="mt-1 block w-full rounded-md border-brand-ink/15 font-mono text-sm shadow-sm" />
+                        </div>
+                    </div>
+
+                    <div class="mt-3 flex flex-wrap items-center gap-3">
+                        <p class="text-sm text-brand-ink">
+                            {{ __('Suggested max children:') }}
+                            <span class="font-mono font-semibold" x-text="suggested ?? '—'"></span>
+                        </p>
+                        <button
+                            type="button"
+                            x-show="suggested !== null"
+                            x-on:click="$wire.set('fpm_max_children', String(suggested))"
+                            class="rounded-md border border-brand-forest/30 bg-white px-3 py-1 text-xs font-semibold text-brand-forest hover:bg-brand-forest/5"
+                        >
+                            {{ __('Use this') }}
+                        </button>
+                        <span x-show="ram === null" class="text-xs text-brand-moss">{{ __('Enter the server RAM to estimate.') }}</span>
+                    </div>
+                </div>
+
+                <x-primary-button type="submit">{{ __('Save PHP-FPM pool') }}</x-primary-button>
+            </div>
+        </form>
+    </section>
+@endif
+
 @if ($showPhpStackDetails)
     <section class="dply-card overflow-hidden mt-6">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">

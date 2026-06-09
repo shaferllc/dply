@@ -76,6 +76,10 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         $this->syncAccessGateFiles($site, $ssh, $emit);
         $this->writeNginxLayerSnippetFiles($site, $profile, $ssh, $emit);
 
+        // Pool first: the vhost below points fastcgi_pass at this pool's socket,
+        // so it must exist (and php-fpm reloaded) before nginx reloads onto it.
+        $this->ensurePhpFpmPool($site, $ssh, $emit);
+
         // Vhost write only emits when content actually changed; an apply that
         // didn't touch anything the vhost references (e.g. a sync that found
         // nothing) produces no banner line here either.
@@ -137,18 +141,70 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
     }
 
     /**
-     * Reads a layered snippet file from the host (before or after include target).
+     * Reads everything the editor needs (main vhost + before/after snippet files)
+     * in a SINGLE SSH round trip instead of one connection + cat per file.
+     *
+     * The webserver-config page previously opened four separate connections on
+     * load (read main, ensure layer files, read before, read after) — each a full
+     * TCP+auth handshake. This collapses them into one `cat`-everything script
+     * (base64-framed so arbitrary file content can't collide with the markers) on
+     * one connection. It is a pure read: missing files come back as null and are
+     * materialized on the next apply (the include globs tolerate their absence).
+     *
+     * @return array{main: ?string, before: ?string, after: ?string}
      */
-    public function readLayerSnippetFile(Site $site, string $which): ?string
+    public function readEditorStateFromServer(Site $site): array
     {
         $server = $this->ensureServerReady($site);
         $ssh = $this->systemSsh($site);
-        $basename = $this->configBasename($site);
-        $base = rtrim(config('sites.nginx_dply_site_path'), '/').'/'.$basename;
-        $sub = $which === 'before' ? 'before/10-dply-layer.conf' : 'after/10-dply-layer.conf';
-        $path = $base.'/'.$sub;
 
-        return $this->readRemoteFile($server, $ssh, $path);
+        $basename = $this->configBasename($site);
+        $confFile = rtrim(config('sites.nginx_sites_available'), '/').'/'.$basename.'.conf';
+        $base = rtrim(config('sites.nginx_dply_site_path'), '/').'/'.$basename;
+        $beforeFile = $base.'/before/10-dply-layer.conf';
+        $afterFile = $base.'/after/10-dply-layer.conf';
+
+        // One script, one channel: emit each file base64-encoded on a single
+        // marker line. `cat ... 2>/dev/null` swallows the shell's not-found error
+        // so a missing file yields an empty (→ null) section without noise.
+        $emit = fn (string $marker, string $path): string => sprintf(
+            'printf %%s %s; cat %s 2>/dev/null | base64 | tr -d "\n"; printf "\n"',
+            escapeshellarg($marker.':'),
+            escapeshellarg($path),
+        );
+        $script = implode("\n", [
+            $emit('DPLYMAIN', $confFile),
+            $emit('DPLYBEFORE', $beforeFile),
+            $emit('DPLYAFTER', $afterFile),
+        ]);
+
+        $out = $ssh->exec($this->privilegedCommand($server, $script), 60);
+
+        return [
+            'main' => $this->decodeEditorStateSection($out, 'DPLYMAIN'),
+            'before' => $this->decodeEditorStateSection($out, 'DPLYBEFORE'),
+            'after' => $this->decodeEditorStateSection($out, 'DPLYAFTER'),
+        ];
+    }
+
+    /**
+     * Pulls one base64 marker line out of {@see readEditorStateFromServer} output.
+     * Mirrors {@see readRemoteFile} semantics: trimmed, empty becomes null.
+     */
+    private function decodeEditorStateSection(string $output, string $marker): ?string
+    {
+        if (! preg_match('/^'.preg_quote($marker, '/').':(.*)$/m', $output, $m)) {
+            return null;
+        }
+
+        $decoded = base64_decode(trim($m[1]), true);
+        if ($decoded === false) {
+            return null;
+        }
+
+        $decoded = trim($decoded);
+
+        return $decoded === '' ? null : $decoded;
     }
 
     /**
@@ -279,43 +335,6 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
             escapeshellarg($base.'/after')
         );
         $ssh->exec($this->privilegedCommand($server, $cmd), 30);
-    }
-
-    /**
-     * Creates missing before/after snippet files on the host (e.g. legacy sites) so includes resolve.
-     */
-    public function ensureNginxLayerSnippetFilesIfMissing(Site $site, SiteWebserverConfigProfile $profile): void
-    {
-        if ($profile->mode !== SiteWebserverConfigProfile::MODE_LAYERED) {
-            return;
-        }
-
-        $server = $this->ensureServerReady($site);
-        $ssh = $this->systemSsh($site);
-        $basename = $this->configBasename($site);
-        $base = rtrim(config('sites.nginx_dply_site_path'), '/').'/'.$basename;
-        $beforeFile = $base.'/before/10-dply-layer.conf';
-        $afterFile = $base.'/after/10-dply-layer.conf';
-
-        $this->ensureNginxLayerDirectories($site, $ssh);
-
-        if ($this->readRemoteFile($server, $ssh, $beforeFile) === null) {
-            $beforeBody = trim((string) $profile->before_body);
-            $this->writeSystemFile(
-                $ssh,
-                $beforeFile,
-                ($beforeBody !== '' ? $beforeBody : SiteWebserverConfigProfile::DEFAULT_BEFORE_BODY)."\n"
-            );
-        }
-
-        if ($this->readRemoteFile($server, $ssh, $afterFile) === null) {
-            $afterBody = trim((string) $profile->after_body);
-            $this->writeSystemFile(
-                $ssh,
-                $afterFile,
-                ($afterBody !== '' ? $afterBody : SiteWebserverConfigProfile::DEFAULT_AFTER_BODY)."\n"
-            );
-        }
     }
 
     /**
