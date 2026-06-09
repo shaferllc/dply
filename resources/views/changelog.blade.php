@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 8, 2026',
+                    'tags'    => ['fixed'],
+                    'title'   => 'Resource Map Connector Alignment',
+                    'summary' => 'Resource map connector lines now align correctly with nodes when the topology graph is zoomed on narrow screens.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 8, 2026',
                     'tags'    => ['new'],
                     'title'   => 'Site System User Management',
                     'summary' => 'VM-backed PHP sites can now assign the Linux account that owns their files and runs their PHP-FPM pool, with permissions resettable over SSH.',

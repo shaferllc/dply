@@ -59,10 +59,10 @@
 
     {{-- The graph. Horizontally scrollable on narrow screens so the topology
          keeps its shape instead of collapsing. --}}
-    <div class="dply-card overflow-x-auto bg-gradient-to-br from-white to-brand-cream/30 p-6 sm:p-8">
+    <div class="dply-card overflow-x-auto bg-gradient-to-br from-white to-brand-cream/30 p-6 sm:p-8" style="zoom: 0.95;">
         <div
             x-data="{
-                w: 0, h: 0, _ro: null,
+                w: 0, h: 0, _ro: null, _zoom: 1,
                 boot() {
                     this.$nextTick(() => this.compute());
                     this._ro = new ResizeObserver(() => this.compute());
@@ -71,9 +71,12 @@
                     setTimeout(() => this.compute(), 600);
                 },
                 point(rect, wrap, side) {
+                    const z = this._zoom || 1;
                     const x = side === 'left' ? rect.left : side === 'right' ? rect.right : rect.left + rect.width / 2;
                     const y = side === 'top' ? rect.top : side === 'bottom' ? rect.bottom : rect.top + rect.height / 2;
-                    return { x: x - wrap.left, y: y - wrap.top };
+                    // getBoundingClientRect is scaled by the ancestor css `zoom`;
+                    // divide back to the svg's intrinsic (unzoomed) user space.
+                    return { x: (x - wrap.left) / z, y: (y - wrap.top) / z };
                 },
                 curve(a, da, b, db) {
                     const c = Math.max(34, Math.hypot(b.x - a.x, b.y - a.y) * 0.45);
@@ -86,6 +89,8 @@
                     if (!el || !site || !layer) return;
                     const wrap = el.getBoundingClientRect();
                     this.w = el.offsetWidth; this.h = el.offsetHeight;
+                    // Detect cumulative ancestor `zoom` (rendered width / layout width).
+                    this._zoom = el.offsetWidth ? (wrap.width / el.offsetWidth) : 1;
 
                     // Build the connectors imperatively in the SVG namespace — an
                     // Alpine x-for inside <svg> would create HTML-namespaced nodes

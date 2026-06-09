@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Fixed
+- Resource map connector lines now align correctly with nodes when the topology graph is zoomed on narrow screens.
 ### Added
 - VM-backed PHP sites can now assign the Linux account that owns their files and runs their PHP-FPM pool, with permissions resettable over SSH.
 ### Changed
