@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Changed
+- The project page is now organized into dedicated Overview, Resources, Access, Operations, and Delivery sections within a unified workspace layout.
 ### Added
 - AI features can now route completions through the local `claude` CLI by setting the provider to "claude", requiring no API key.
 ### Added

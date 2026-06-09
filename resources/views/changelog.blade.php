@@ -57,6 +57,13 @@
             $entries = [
                 [
                     'date'    => 'June 9, 2026',
+                    'tags'    => ['improved'],
+                    'title'   => 'Redesigned Project Workspace Page',
+                    'summary' => 'The project page is now organized into dedicated Overview, Resources, Access, Operations, and Delivery sections within a unified workspace layout.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 9, 2026',
                     'tags'    => ['new'],
                     'title'   => 'Local Claude CLI Provider Support',
                     'summary' => 'AI features can now route completions through the local `claude` CLI by setting the provider to "claude", requiring no API key.',
