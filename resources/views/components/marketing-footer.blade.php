@@ -52,7 +52,9 @@
             ? request()->query('v')
             : (request()->cookie('home_version') === '2' ? '2' : '1'))
         <div class="mt-12 pt-8 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-brand-mist">
-            <span>&copy; {{ date('Y') }} {{ config('app.name') }}. All rights reserved.</span>
+            <span>&copy; {{ date('Y') }} {{ config('app.name') }}. All rights reserved.
+                <span class="ml-2 font-mono text-brand-sand/40" title="{{ \App\Support\AppVersion::sha() }}">v{{ \App\Support\AppVersion::date() }}</span>
+            </span>
             <div class="flex items-center gap-3">
                 <div class="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1">
                     <span class="px-2 text-[10px] font-medium uppercase tracking-wider text-brand-mist">Homepage</span>
