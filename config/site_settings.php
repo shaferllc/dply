@@ -17,6 +17,7 @@ return [
         'repository' => ['label' => 'Repository'],
         'runtime' => ['label' => 'Runtime'],
         'system-user' => ['label' => 'System user'],
+        'worker-fleet' => ['label' => 'Worker servers'],
         'laravel-stack' => ['label' => 'Laravel'],
         'rails-stack' => ['label' => 'Rails'],
         'wordpress' => ['label' => 'WordPress'],

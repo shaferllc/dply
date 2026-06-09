@@ -35,6 +35,7 @@ use App\Models\SiteDomainAlias;
 use App\Models\SitePreviewDomain;
 use App\Models\SiteTenantDomain;
 use App\Models\Snapshot;
+use App\Models\WorkerPool;
 use App\Models\Workspace;
 use App\Services\AzureDnsService;
 use App\Services\Certificates\CertificateRepairService;
@@ -68,6 +69,7 @@ use App\Services\Sites\SiteScopedCommandWrapper;
 use App\Services\Snapshots\LocalDiskDestination;
 use App\Services\Snapshots\SnapshotService;
 use App\Services\SshConnection;
+use App\Services\WorkerPools\WorkerPoolManager;
 use App\Support\HostnameValidator;
 use App\Support\NotificationSubscriptionMatrix;
 use App\Support\SiteErrorsNotificationKeys;
@@ -1690,6 +1692,79 @@ class Settings extends Show
             __('OPcache flush failed.'),
         );
         $this->toastConsoleActionQueued();
+    }
+
+    /**
+     * Resolve a worker pool that's actually attached to this site (workspace-
+     * scoped), so the site Workers panel can only act on its own fleet.
+     */
+    private function resolveAttachedPool(string $poolId): ?WorkerPool
+    {
+        return $this->site->attachedWorkerPools()->firstWhere('id', $poolId);
+    }
+
+    /** Scale an attached worker pool to N members (declarative — reconciler converges). */
+    public function scaleWorkerPool(string $poolId, int $count, WorkerPoolManager $manager): void
+    {
+        $this->authorize('update', $this->site);
+        $pool = $this->resolveAttachedPool($poolId);
+        if ($pool === null) {
+            $this->toastError(__('Worker pool not found for this site.'));
+
+            return;
+        }
+        $cap = (int) ($pool->max_size ?: 50);
+        $count = max(1, min($count, $cap));
+        $manager->setDesiredCount($pool, $count);
+        $this->toastSuccess(__('Scaling workers to :n — provisioning/draining in the background.', ['n' => $count]));
+    }
+
+    /** Add one worker to an attached pool. */
+    public function addPoolWorker(string $poolId, WorkerPoolManager $manager): void
+    {
+        $this->authorize('update', $this->site);
+        $pool = $this->resolveAttachedPool($poolId);
+        if ($pool === null) {
+            $this->toastError(__('Worker pool not found for this site.'));
+
+            return;
+        }
+        $next = (int) $pool->servers()->count() + 1;
+        $cap = (int) ($pool->max_size ?: 50);
+        if ($next > $cap) {
+            $this->toastError(__('Pool is at its max size (:n).', ['n' => $cap]));
+
+            return;
+        }
+        $manager->setDesiredCount($pool, $next);
+        $this->toastSuccess(__('Adding a worker — provisioning in the background.'));
+    }
+
+    /** Drain + remove a specific (non-primary) worker from an attached pool. */
+    public function removePoolWorker(string $poolId, string $serverId, WorkerPoolManager $manager): void
+    {
+        $this->authorize('update', $this->site);
+        $pool = $this->resolveAttachedPool($poolId);
+        if ($pool === null) {
+            $this->toastError(__('Worker pool not found for this site.'));
+
+            return;
+        }
+        $server = $pool->servers()->whereKey($serverId)->first();
+        if ($server === null) {
+            $this->toastError(__('That worker is not part of this pool.'));
+
+            return;
+        }
+        if ($server->isPoolPrimary()) {
+            $this->toastError(__('Can’t remove the primary worker — promote another from the pool page first.'));
+
+            return;
+        }
+        $manager->removeMember($pool, $server);
+        // Lower the target so the reconciler doesn't immediately re-provision it.
+        $pool->forceFill(['desired_count' => max(1, (int) $pool->desired_count - 1)])->save();
+        $this->toastSuccess(__('Draining and removing the worker.'));
     }
 
     public function saveRuntimePreferences(): void

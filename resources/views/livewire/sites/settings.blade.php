@@ -145,6 +145,8 @@
                         @include('livewire.sites.settings.partials.rails.workspace')
                     @elseif ($section === 'wordpress')
                         @livewire('sites.wordpress.wordpress-section', ['site' => $site], key('wordpress-section-'.$site->id))
+                    @elseif ($section === 'worker-fleet')
+                        @include('livewire.sites.settings.partials.worker-fleet')
                     @elseif ($section === 'environment')
                         @include('livewire.sites.settings.partials.environment')
                     @elseif ($section === 'resources')

@@ -22,6 +22,11 @@
             >
                 {{ __('Remove or schedule removal…') }}
             </button>
+        @elseif ($server->isDeletionProtected())
+            <div class="mt-4 flex items-start gap-2.5 rounded-lg border border-brand-ink/10 bg-brand-sand/40 px-4 py-3 text-sm text-brand-moss">
+                <x-heroicon-o-lock-closed class="mt-0.5 h-4 w-4 shrink-0 text-brand-moss" aria-hidden="true" />
+                <p>{{ __('This is dply infrastructure and is protected from deletion. It cannot be removed from the host or the database.') }}</p>
+            </div>
         @endcan
     </div>
 </div>

@@ -22,6 +22,16 @@ class ProcessScheduledServerDeletionsCommand extends Command
 
         $count = 0;
         $query->each(function (Server $server) use ($deleteServer, &$count): void {
+            // A server can become dply-protected (tagged `dply` / self-adopted)
+            // after a removal was scheduled. Self-heal: drop the stale schedule
+            // and skip, rather than throwing here every minute forever.
+            if ($server->isDeletionProtected()) {
+                $server->forceFill(['scheduled_deletion_at' => null])->save();
+                $this->warn("Skipped protected server {$server->name}; cleared its scheduled removal.");
+
+                return;
+            }
+
             $meta = $server->meta ?? [];
             $reason = $meta['scheduled_deletion_reason'] ?? null;
             $auditExtras = ['scheduled_completion' => true];

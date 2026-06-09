@@ -765,10 +765,22 @@
                     <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform" x-bind:class="open ? 'rotate-90' : ''" />
                 </button>
                 <form wire:submit="saveHorizonConfig" x-show="open" x-cloak class="space-y-5 px-6 py-6 sm:px-7">
-                    <div>
+                    <div x-data="{
+                        q: @js((string) $hz_queues),
+                        get tokens() { return this.q.split(',').map(s => s.trim()).filter(Boolean); },
+                        get first() { return this.tokens[0] || '—'; },
+                    }">
                         <x-input-label for="hz_queues" :value="__('Queues watched')" />
-                        <x-text-input id="hz_queues" wire:model="hz_queues" class="mt-2 block w-full font-mono text-sm" placeholder="default, emails, notifications" />
+                        <x-text-input id="hz_queues" wire:model="hz_queues" x-on:input="q = $event.target.value" class="mt-2 block w-full font-mono text-sm" placeholder="default, emails, notifications" />
                         <p class="mt-1 text-xs text-brand-moss">{{ __('Comma-separated. Workers process these queues in priority order.') }}</p>
+                        {{-- Live preview: the FIRST queue is the dispatch target (REDIS_QUEUE) —
+                             so a typo here silently misroutes jobs. Make it visible before save. --}}
+                        <p class="mt-1 text-[11px] text-brand-moss">
+                            {{ __('Dispatch queue (REDIS_QUEUE):') }}
+                            <span class="font-mono font-semibold text-brand-ink" x-text="first"></span>
+                            <span class="text-brand-mist"> · </span>{{ __('watching') }}
+                            <span class="font-mono text-brand-ink" x-text="tokens.join(', ') || '—'"></span>
+                        </p>
                     </div>
                     <div class="grid grid-cols-2 gap-4 sm:grid-cols-3">
                         <div>

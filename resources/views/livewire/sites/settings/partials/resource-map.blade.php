@@ -311,8 +311,35 @@
                                     <div x-show="open" x-cloak class="rounded-lg bg-brand-cream/40 p-2">
                                         <p class="mb-1 text-[9px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Injected variables') }} ({{ count($envKeys) }})</p>
                                         <div class="flex flex-wrap gap-1">
-                                            @foreach ($envKeys as $k)
-                                                <span class="rounded bg-white px-1.5 py-0.5 font-mono text-[10px] text-brand-moss shadow-sm">{{ $k }}</span>
+                                            @foreach ($binding->injected_env as $k => $v)
+                                                {{-- Hover/click a chip to reveal its injected value (masked by
+                                                     default), copy it, or jump to Environment to override it. --}}
+                                                <div
+                                                    x-data="{ pop: false, show: false, copied: false,
+                                                        async copyVal() { try { await navigator.clipboard.writeText(@js((string) $v)); this.copied = true; setTimeout(() => this.copied = false, 1200); } catch (e) {} } }"
+                                                    @mouseenter="pop = true" @mouseleave="pop = false"
+                                                    class="relative"
+                                                >
+                                                    <button type="button" @click="pop = ! pop"
+                                                        class="rounded bg-white px-1.5 py-0.5 font-mono text-[10px] text-brand-moss shadow-sm hover:bg-brand-sand/40">{{ $k }}</button>
+                                                    <div x-show="pop" x-cloak x-transition.opacity
+                                                        class="absolute left-0 top-full z-30 mt-1 w-64 rounded-lg border border-brand-ink/10 bg-white p-2 text-left shadow-xl">
+                                                        <div class="flex items-center justify-between gap-2">
+                                                            <span class="truncate font-mono text-[10px] font-semibold text-brand-ink">{{ $k }}</span>
+                                                            <div class="flex shrink-0 items-center gap-2 text-[10px] font-semibold">
+                                                                <button type="button" @click="show = ! show" class="text-brand-sage hover:underline"><span x-show="! show">{{ __('Show') }}</span><span x-show="show" x-cloak>{{ __('Hide') }}</span></button>
+                                                                <button type="button" @click="copyVal()" class="text-brand-sage hover:underline"><span x-show="! copied">{{ __('Copy') }}</span><span x-show="copied" x-cloak class="text-emerald-600">{{ __('Copied') }}</span></button>
+                                                            </div>
+                                                        </div>
+                                                        <p class="mt-1 break-all rounded bg-brand-cream/50 px-2 py-1 font-mono text-[10px] text-brand-ink">
+                                                            <span x-show="show" x-cloak>{{ ((string) $v) === '' ? '(empty)' : $v }}</span>
+                                                            <span x-show="! show">••••••••••</span>
+                                                        </p>
+                                                        <a href="{{ $sectionUrl('environment') }}" wire:navigate class="mt-1.5 inline-flex items-center gap-1 text-[10px] font-semibold text-brand-forest hover:underline">
+                                                            <x-heroicon-o-pencil-square class="h-3 w-3" /> {{ __('Override in Environment') }}
+                                                        </a>
+                                                    </div>
+                                                </div>
                                             @endforeach
                                         </div>
                                     </div>

@@ -23,6 +23,15 @@
         {{ trans_choice(':count site|:count sites', $server->sites_count, ['count' => $server->sites_count]) }}
     </span>
 
+    {{-- Detect worker servers (the app's background/queue fleet) so they're
+         scannable in the list; manage/scale them on the server's Worker Pool tab. --}}
+    @if ($server->isWorkerServer())
+        <span class="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-800" title="{{ __('Worker server — background / queue capacity') }}">
+            <x-heroicon-o-square-3-stack-3d class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            {{ $server->isPoolPrimary() ? __('Worker · primary') : ($server->pool_role === \App\Models\WorkerPool::ROLE_REPLICA ? __('Worker · replica') : __('Worker')) }}
+        </span>
+    @endif
+
     @if ($isFullyReady($server))
         <span class="inline-flex items-center gap-1 text-xs text-brand-moss" title="{{ __('Uptime since creation') }}">
             <x-heroicon-o-clock class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />

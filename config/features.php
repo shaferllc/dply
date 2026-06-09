@@ -286,7 +286,7 @@ return [
         // exit: ship after a curated v1 marketplace catalog is approved
         'marketplace' => env('FEATURE_SURFACE_MARKETPLACE', false),
         // exit: ship as the org-substitute UX for solo users with 3+ servers
-        'projects' => env('FEATURE_SURFACE_PROJECTS', false),
+        'projects' => env('FEATURE_SURFACE_PROJECTS', true),
         // exit: ship once one-off script execution has audit + rollback story
         'scripts' => env('FEATURE_SURFACE_SCRIPTS', false),
         // exit: ship as a standalone product launch with its own positioning

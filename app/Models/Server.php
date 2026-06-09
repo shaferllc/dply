@@ -57,6 +57,13 @@ class Server extends Model
     /** dply runs this VM on its own provider account and bills it all-in cost-plus. */
     public const HOSTING_BACKEND_DPLY = 'dply_managed';
 
+    /**
+     * Tag that locks a server as dply's own infrastructure. A server carrying
+     * this tag (or self-adopted into the control plane) can never be deleted
+     * from the panel. {@see isDeletionProtected()}.
+     */
+    public const PROTECTED_TAG = 'dply';
+
     public const HEALTH_REACHABLE = 'reachable';
 
     public const HEALTH_UNREACHABLE = 'unreachable';
@@ -166,6 +173,30 @@ class Server extends Model
     }
 
     /**
+     * dply's own control-plane infrastructure (the dogfood boxes — app, worker,
+     * database, redis) must never be deletable from the panel: not the cloud
+     * host, not the database row. A server is locked when it carries the `dply`
+     * tag (set on the server's meta tags) or was self-adopted into the control
+     * plane ({@see App\Console\Commands\SelfAdoptCommand} stamps
+     * meta['self_managed']).
+     *
+     * Enforced in three layers: {@see App\Policies\ServerPolicy::delete()} hides
+     * every UI affordance; {@see App\Actions\Servers\DeleteServerAction::execute()}
+     * is the hard backstop that throws {@see App\Exceptions\ProtectedServerDeletionException}
+     * for any direct caller (HTTP, scheduled-deletion command, worker teardown).
+     */
+    public function isDeletionProtected(): bool
+    {
+        if (\App\Support\Servers\ServerTags::hasTag($this, self::PROTECTED_TAG)) {
+            return true;
+        }
+
+        $meta = is_array($this->meta) ? $this->meta : [];
+
+        return ($meta['self_managed'] ?? false) === true;
+    }
+
+    /**
      * The worker pool this server belongs to (clones + their source), if any.
      * See {@see WorkerPool}.
      */
@@ -178,6 +209,18 @@ class Server extends Model
     public function isPoolPrimary(): bool
     {
         return $this->pool_role === WorkerPool::ROLE_PRIMARY;
+    }
+
+    /**
+     * True when this server is a worker — by role (server_role=worker), or by
+     * pool membership (it's a primary/replica in a worker pool). Used to detect
+     * + label worker servers in the resources list and the site Workers panel.
+     */
+    public function isWorkerServer(): bool
+    {
+        return $this->isWorkerHost()
+            || $this->pool_role !== null
+            || $this->worker_pool_id !== null;
     }
 
     /** Per-member reconciler sub-state (servers.meta['pool']['state']). */
@@ -318,7 +361,7 @@ class Server extends Model
 
     /**
      * The dply Logs add-on agent for this server (at most one — the add-on is a
-     * per-server resource). See {@see \App\Models\ServerLogAgent}.
+     * per-server resource). See {@see ServerLogAgent}.
      */
     public function logAgent(): HasOne
     {

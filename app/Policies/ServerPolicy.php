@@ -50,6 +50,14 @@ class ServerPolicy
 
     public function delete(User $user, Server $server): bool
     {
+        // dply's own control-plane infrastructure is never deletable from the
+        // panel — see Server::isDeletionProtected(). Returning false here hides
+        // every @can('delete')-gated affordance; DeleteServerAction is the hard
+        // backstop for any non-UI caller.
+        if ($server->isDeletionProtected()) {
+            return false;
+        }
+
         if (! $this->view($user, $server)) {
             return false;
         }
