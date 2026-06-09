@@ -12,6 +12,14 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
+# Skip when opted out, or when the push was initiated from inside Claude Code:
+# a nested `claude -p` contends with the parent session and stalls. Human
+# terminal pushes (no CLAUDECODE) still generate the changelog normally.
+if [ -n "${DPLY_SKIP_AI_HOOKS:-}" ] || [ -n "${CLAUDECODE:-}" ]; then
+  echo "[changelog] skipped (Claude Code session or DPLY_SKIP_AI_HOOKS)."
+  exit 0
+fi
+
 RANGE="${DPLY_PUSH_RANGE:-}"
 [ -z "$RANGE" ] && exit 0
 command -v claude >/dev/null 2>&1 || { echo "[changelog] claude CLI not found — skipping."; exit 0; }
@@ -28,7 +36,19 @@ CHANGELOG: <one concise sentence describing the user-visible change>
 
 ${diff}"
 
-output="$(claude -p "$prompt" 2>/dev/null)" || { echo "[changelog] claude failed — skipping."; exit 0; }
+# Run claude headless. CRITICAL: stdin MUST be /dev/null — a pre-push hook
+# inherits git's ref-list pipe on stdin, which git holds open with no EOF;
+# `claude -p` reads stdin to append to the prompt and would block forever,
+# hanging the push. A `timeout` (when available) is a second backstop so a slow
+# or wedged model can never stall a push.
+TIMEOUT_BIN="$(command -v timeout || command -v gtimeout || true)"
+if [ -n "$TIMEOUT_BIN" ]; then
+  output="$("$TIMEOUT_BIN" 120 claude -p "$prompt" </dev/null 2>/dev/null)" \
+    || { echo "[changelog] claude timed out/failed — skipping."; exit 0; }
+else
+  output="$(claude -p "$prompt" </dev/null 2>/dev/null)" \
+    || { echo "[changelog] claude failed — skipping."; exit 0; }
+fi
 TYPE="$(printf '%s' "$output"  | grep '^TYPE:'      | sed 's/^TYPE: *//')"
 TITLE="$(printf '%s' "$output" | grep '^TITLE:'     | sed 's/^TITLE: *//')"
 ENTRY="$(printf '%s' "$output" | grep '^CHANGELOG:' | sed 's/^CHANGELOG: *//')"

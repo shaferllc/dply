@@ -10,6 +10,13 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
+# Skip when opted out, or when the push was initiated from inside Claude Code
+# (a nested LLM call contends with the parent session and stalls).
+if [ -n "${DPLY_SKIP_AI_HOOKS:-}" ] || [ -n "${CLAUDECODE:-}" ]; then
+  echo "[roadmap] skipped (Claude Code session or DPLY_SKIP_AI_HOOKS)."
+  exit 0
+fi
+
 RANGE="${DPLY_PUSH_RANGE:-}"
 # Tip being pushed: right side of "a..b", else the lone sha.
 tip="${RANGE##*..}"
@@ -17,8 +24,10 @@ tip="${RANGE##*..}"
 
 command -v php >/dev/null 2>&1 || { echo "[roadmap] php not found — skipping."; exit 0; }
 
+# A timeout (when available) backstops a slow/wedged model so it can't stall the push.
+TIMEOUT_BIN="$(command -v timeout || command -v gtimeout || true)"
 echo "[roadmap] updating from $tip ..."
-php artisan dply:roadmap:ai-update --sync --commit="$tip" 2>/dev/null \
-  || echo "[roadmap] skipped/failed (non-fatal)."
+${TIMEOUT_BIN:+$TIMEOUT_BIN 150} php artisan dply:roadmap:ai-update --sync --commit="$tip" </dev/null 2>/dev/null \
+  || echo "[roadmap] skipped/failed/timed out (non-fatal)."
 
 exit 0
