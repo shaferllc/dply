@@ -53,6 +53,7 @@ use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
 use App\Services\Sites\PrimaryHostnameRenamePlanner;
 use App\Services\Sites\RepositoryWebhookProvisioner;
+use App\Services\Sites\SitePhpRuntimeDirectivesBuilder;
 use App\Services\Sites\SiteProvisioner;
 use App\Services\Sites\SiteProvisioningCanceller;
 use App\Services\SourceControl\GitIdentityResolver;
@@ -227,6 +228,16 @@ class Show extends Component
     public string $php_upload_max_filesize = '';
 
     public string $php_max_execution_time = '';
+
+    public string $php_post_max_size = '';
+
+    public string $php_max_input_time = '';
+
+    public string $php_max_input_vars = '';
+
+    public string $php_max_file_uploads = '';
+
+    public string $php_timezone = '';
 
     /** Localhost port for reverse-proxy runtimes (Node, Rails, Puma, containers, etc.). */
     public string $runtime_app_port = '';
@@ -429,6 +440,11 @@ class Show extends Component
         $this->php_memory_limit = (string) ($phpRuntime['memory_limit'] ?? '');
         $this->php_upload_max_filesize = (string) ($phpRuntime['upload_max_filesize'] ?? '');
         $this->php_max_execution_time = (string) ($phpRuntime['max_execution_time'] ?? '');
+        $this->php_post_max_size = (string) ($phpRuntime['post_max_size'] ?? '');
+        $this->php_max_input_time = (string) ($phpRuntime['max_input_time'] ?? '');
+        $this->php_max_input_vars = (string) ($phpRuntime['max_input_vars'] ?? '');
+        $this->php_max_file_uploads = (string) ($phpRuntime['max_file_uploads'] ?? '');
+        $this->php_timezone = (string) ($phpRuntime['timezone'] ?? '');
         $this->runtime_app_port = $this->site->app_port !== null ? (string) $this->site->app_port : '';
         $ips = $this->site->webhook_allowed_ips;
         $this->webhook_allowed_ips_text = is_array($ips) && $ips !== []
@@ -485,7 +501,25 @@ class Show extends Component
             'php_version' => ['required', 'string'],
             'php_memory_limit' => ['nullable', 'string', 'max:32', 'regex:/^\d+[KMG]?$/i'],
             'php_upload_max_filesize' => ['nullable', 'string', 'max:32', 'regex:/^\d+[KMG]?$/i'],
+            'php_post_max_size' => ['nullable', 'string', 'max:32', 'regex:/^\d+[KMG]?$/i', function (string $attribute, mixed $value, callable $fail): void {
+                // PHP requires post_max_size >= upload_max_filesize, else uploads
+                // silently fail. `0` means unlimited, so it always satisfies.
+                if (! is_string($value) || $value === '' || $this->php_upload_max_filesize === '') {
+                    return;
+                }
+                $post = SitePhpRuntimeDirectivesBuilder::shorthandBytes($value);
+                if ($post === 0) {
+                    return;
+                }
+                if ($post < SitePhpRuntimeDirectivesBuilder::shorthandBytes($this->php_upload_max_filesize)) {
+                    $fail(__('Post max size must be at least as large as the upload max filesize.'));
+                }
+            }],
             'php_max_execution_time' => ['nullable', 'integer', 'min:1', 'max:3600'],
+            'php_max_input_time' => ['nullable', 'integer', 'min:-1', 'max:3600'],
+            'php_max_input_vars' => ['nullable', 'integer', 'min:1', 'max:100000'],
+            'php_max_file_uploads' => ['nullable', 'integer', 'min:1', 'max:1000'],
+            'php_timezone' => ['nullable', 'string', 'timezone'],
         ];
 
         if ($installedVersions !== []) {
@@ -496,13 +530,20 @@ class Show extends Component
             'php_version.in' => __('Choose a PHP version that is currently installed on this server.'),
             'php_memory_limit.regex' => __('Use a PHP size like 256M or 1G.'),
             'php_upload_max_filesize.regex' => __('Use a PHP size like 64M or 1G.'),
+            'php_post_max_size.regex' => __('Use a PHP size like 64M or 1G.'),
+            'php_timezone.timezone' => __('Choose a valid PHP timezone like UTC or America/New_York.'),
         ]);
 
         $meta = is_array($this->site->meta) ? $this->site->meta : [];
         $meta['php_runtime'] = [
             'memory_limit' => $validated['php_memory_limit'] !== '' ? $validated['php_memory_limit'] : null,
             'upload_max_filesize' => $validated['php_upload_max_filesize'] !== '' ? $validated['php_upload_max_filesize'] : null,
+            'post_max_size' => $validated['php_post_max_size'] !== '' ? $validated['php_post_max_size'] : null,
             'max_execution_time' => $validated['php_max_execution_time'] !== '' ? (string) $validated['php_max_execution_time'] : null,
+            'max_input_time' => $validated['php_max_input_time'] !== '' ? (string) $validated['php_max_input_time'] : null,
+            'max_input_vars' => $validated['php_max_input_vars'] !== '' ? (string) $validated['php_max_input_vars'] : null,
+            'max_file_uploads' => $validated['php_max_file_uploads'] !== '' ? (string) $validated['php_max_file_uploads'] : null,
+            'timezone' => $validated['php_timezone'] !== '' ? $validated['php_timezone'] : null,
         ];
 
         // PHP-version writes now flow through runtime_version (the
@@ -522,11 +563,25 @@ class Show extends Component
                 'runtime_version' => $validated['php_version'],
                 'memory_limit' => $meta['php_runtime']['memory_limit'] ?? null,
                 'upload_max_filesize' => $meta['php_runtime']['upload_max_filesize'] ?? null,
+                'post_max_size' => $meta['php_runtime']['post_max_size'] ?? null,
                 'max_execution_time' => $meta['php_runtime']['max_execution_time'] ?? null,
+                'max_input_time' => $meta['php_runtime']['max_input_time'] ?? null,
+                'max_input_vars' => $meta['php_runtime']['max_input_vars'] ?? null,
+                'max_file_uploads' => $meta['php_runtime']['max_file_uploads'] ?? null,
+                'timezone' => $meta['php_runtime']['timezone'] ?? null,
             ]);
         }
 
-        $this->toastSuccess('PHP settings saved.');
+        // Push the new limits (and any version switch) to the box. The
+        // FastCGI PHP_VALUE directives are rebuilt and the webserver reloaded;
+        // without this the form would only persist meta and change nothing.
+        if ($this->shouldAutoReapplyManagedWebserverConfig()) {
+            ApplySiteWebserverConfigJob::dispatch($this->site->id);
+            $this->toastSuccess(__('PHP settings saved. Webserver config queued.'));
+        } else {
+            $this->toastSuccess(__('PHP settings saved.'));
+        }
+
         $this->syncFormFromSite();
     }
 

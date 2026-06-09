@@ -232,6 +232,7 @@
                             $hasAction = $isLogging || $canProvision || $canConfig;
                             $conn = $attached && is_array($binding->config) ? ($binding->config['connectivity'] ?? null) : null;
                             $reachTarget = $attached ? BindingReachability::target($binding) : null;
+                            $isUnreachable = $conn !== null && ! ($conn['ok'] ?? false);
                         @endphp
                         <div
                             wire:key="res-{{ $type }}"
@@ -320,6 +321,29 @@
 
                             {{-- Actions --}}
                             <div class="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-brand-ink/10 pt-2.5">
+                                @if ($isUnreachable && method_exists($this, 'fixBindingConnectivity'))
+                                    {{-- Highlighted remediation when the server can't reach the resource.
+                                         database/redis get the server-side auto-fix modal; logging links to
+                                         the Logs editor; everything else opens the reconfigure modal. --}}
+                                    @if (in_array($type, ['database', 'redis'], true))
+                                        <button type="button" wire:click="startFixBinding(@js((string) $binding->id))" x-on:click="$dispatch('open-modal', 'fix-binding-modal')"
+                                            title="{{ __('Fix the private-network connectivity for this resource.') }}"
+                                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2 py-1 text-[11px] font-semibold text-rose-700 shadow-sm hover:bg-rose-50">
+                                            <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" /> {{ __('Fix') }}
+                                        </button>
+                                    @elseif ($isLogging)
+                                        <a href="{{ $sectionUrl('logs') }}" wire:navigate
+                                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2 py-1 text-[11px] font-semibold text-rose-700 shadow-sm hover:bg-rose-50">
+                                            <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" /> {{ __('Fix') }}
+                                        </a>
+                                    @else
+                                        <button type="button" wire:click="openBindingModal('{{ $type }}', 'attach')"
+                                            title="{{ __('Re-enter the endpoint / credentials for this resource.') }}"
+                                            class="inline-flex items-center gap-1 rounded-md border border-rose-200 bg-white px-2 py-1 text-[11px] font-semibold text-rose-700 shadow-sm hover:bg-rose-50">
+                                            <x-heroicon-o-wrench-screwdriver class="h-3.5 w-3.5" /> {{ __('Fix') }}
+                                        </button>
+                                    @endif
+                                @endif
                                 @if ($isLogging)
                                     <a href="{{ $sectionUrl('logs') }}" wire:navigate class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                         <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" /> {{ $attached ? __('Edit') : __('Configure') }}
@@ -356,10 +380,27 @@
                                         <a href="{{ $runtimeUrl }}" wire:navigate class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                             <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" /> {{ __('Configure') }}
                                         </a>
+                                    @elseif ($type === 'publication')
+                                        {{-- Runtime-owned: the deploy runtime fills in the publication
+                                             target (url/service/port); there's nothing to configure. --}}
+                                        @php
+                                            $pub = is_array(data_get($site->runtimeTarget(), 'publication')) ? data_get($site->runtimeTarget(), 'publication') : [];
+                                            $pubUrl = $pub['url'] ?? $pub['hostname'] ?? null;
+                                            $pubHref = $pubUrl ? (\Illuminate\Support\Str::startsWith($pubUrl, ['http://', 'https://']) ? $pubUrl : 'https://'.$pubUrl) : null;
+                                        @endphp
+                                        @if ($pubHref)
+                                            <span class="inline-flex min-w-0 items-center gap-1.5 text-[11px] font-medium">
+                                                <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"></span>
+                                                <span class="shrink-0 text-brand-mist">{{ __('Published') }}</span>
+                                                <a href="{{ $pubHref }}" target="_blank" rel="noopener" class="truncate font-mono text-brand-forest hover:underline">{{ $pubUrl }}</a>
+                                            </span>
+                                        @else
+                                            <span title="{{ __('Set automatically on deploy') }}" class="inline-flex items-center gap-1 rounded-full bg-brand-sand/50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                                                <x-heroicon-o-cpu-chip class="h-3 w-3" /> {{ __('Managed by the runtime') }}
+                                            </span>
+                                        @endif
                                     @else
-                                        <span class="inline-flex items-center gap-1 rounded-full bg-brand-sand/50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
-                                            <x-heroicon-o-clock class="h-3 w-3" /> {{ __('Coming soon') }}
-                                        </span>
+                                        <span class="text-[11px] italic text-brand-mist">{{ $attached ? __('Active') : __('Not configured') }}</span>
                                     @endif
                                 @endif
                             </div>
@@ -372,6 +413,9 @@
 
     {{-- Shared site-binding-modal (modal-only — we render our own graph above). --}}
     @include('livewire.sites.settings.partials.environment.resources', ['bindingModalOnly' => true])
+
+    {{-- Fix-unreachable modal (auto-fix in place / re-point for database & redis). --}}
+    @include('livewire.sites.settings.partials.environment.fix-binding-modal')
 
     @verbatim
         <style>

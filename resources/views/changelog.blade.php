@@ -56,6 +56,13 @@
         @php
             $entries = [
                 [
+                    'date'    => 'June 9, 2026',
+                    'tags'    => ['new'],
+                    'title'   => 'More PHP Runtime Settings',
+                    'summary' => 'Site PHP settings now expose post max size, input time, input vars, file uploads, and timezone, which are applied to the live server\'s FastCGI config automatically.',
+                    'items'   => [],
+                ],
+                [
                     'date'    => 'June 8, 2026',
                     'tags'    => ['new'],
                     'title'   => 'Validate Resource Reachability',
@@ -694,18 +701,36 @@ Unified Button And Binding UI',
                 'security' => 'Security',
             ];
 
-            // Paginate the flat (newest-first) list, then group the current
-            // page's entries by date for display.
-            $perPage  = 12;
-            $total    = count($entries);
-            $lastPage = max(1, (int) ceil($total / $perPage));
-            $page     = max(1, min((int) request()->query('page', 1), $lastPage));
-            $offset   = ($page - 1) * $perPage;
+            // Group the full (newest-first) list by date, then pack whole date
+            // groups into pages targeting ~12 entries each — a date is never
+            // split across a page boundary (a single oversized date gets its
+            // own page).
+            $perPage = 12;
 
-            $grouped = [];
-            foreach (array_slice($entries, $offset, $perPage) as $entry) {
-                $grouped[$entry['date']][] = $entry;
+            $byDate = [];
+            foreach ($entries as $entry) {
+                $byDate[$entry['date']][] = $entry;
             }
+
+            $pages   = [];
+            $current = [];
+            $count   = 0;
+            foreach ($byDate as $date => $dateEntries) {
+                if ($count > 0 && $count + count($dateEntries) > $perPage) {
+                    $pages[] = $current;
+                    $current = [];
+                    $count   = 0;
+                }
+                $current[$date] = $dateEntries;
+                $count += count($dateEntries);
+            }
+            if ($current !== []) {
+                $pages[] = $current;
+            }
+
+            $lastPage = max(1, count($pages));
+            $page     = max(1, min((int) request()->query('page', 1), $lastPage));
+            $grouped  = $pages[$page - 1] ?? [];
 
             $pageLink = fn ($p) => $p <= 1 ? route('changelog') : route('changelog') . '?page=' . $p;
         @endphp

@@ -138,6 +138,21 @@ class WebserverConfig extends Component
         }
         $this->after_body = (string) ($profile->after_body ?? '');
         $this->full_override_body = (string) ($profile->full_override_body ?? '');
+
+        // Never present nginx's before/main/after layers as a blank box — seed
+        // the self-documenting defaults when the profile carries no body (e.g. a
+        // legacy profile, or a server we couldn't read live).
+        if ($this->site->webserver() === 'nginx') {
+            if (trim($this->before_body) === '') {
+                $this->before_body = SiteWebserverConfigProfile::DEFAULT_BEFORE_BODY;
+            }
+            if (trim($this->main_snippet_body) === '') {
+                $this->main_snippet_body = SiteWebserverConfigProfile::DEFAULT_MAIN_SNIPPET_BODY;
+            }
+            if (trim($this->after_body) === '') {
+                $this->after_body = SiteWebserverConfigProfile::DEFAULT_AFTER_BODY;
+            }
+        }
     }
 
     protected function draftProfile(): SiteWebserverConfigProfile

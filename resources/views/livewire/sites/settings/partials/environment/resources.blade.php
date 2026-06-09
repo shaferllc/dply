@@ -478,6 +478,8 @@
                     $osCloudCreds = $osApiManaged ? $this->cloudCredentialsForStorage($osProvider) : [];
                     $osApiMode = $osApiManaged && $osCloudCreds !== [] && ($bindingForm['key_source'] ?? 'manual') === 'api';
                     $osProviderLabel = (string) ($osProviders[$osProvider]['label'] ?? $osProvider);
+                    $osPricingNote = (string) ($osProviders[$osProvider]['pricing_note'] ?? '');
+                    $osPricingUrl = (string) ($osProviders[$osProvider]['pricing_url'] ?? '');
                 @endphp
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div class="sm:col-span-2">
@@ -488,6 +490,29 @@
                             @endforeach
                         </select>
                     </div>
+
+                    {{-- Pricing: shown up front, and explicit that dply takes no cut —
+                         the provider bills the customer directly on their own account. --}}
+                    @if ($osPricingNote !== '' || $osPricingUrl !== '')
+                        <div class="sm:col-span-2 rounded-lg border border-brand-ink/10 bg-brand-cream/40 p-3">
+                            <div class="flex items-start gap-2">
+                                <x-heroicon-o-banknotes class="mt-0.5 h-4 w-4 shrink-0 text-brand-forest" />
+                                <div class="min-w-0 text-xs leading-relaxed text-brand-moss">
+                                    <p class="font-semibold uppercase tracking-wide text-brand-ink">{{ __('Storage pricing') }}</p>
+                                    @if ($osPricingNote !== '')
+                                        <p class="mt-0.5">{{ $osPricingNote }}</p>
+                                    @endif
+                                    <p class="mt-1 font-semibold text-brand-forest">{{ __('dply adds no markup — :provider bills you directly on your own account.', ['provider' => $osProviderLabel]) }}</p>
+                                    @if ($osPricingUrl !== '')
+                                        <a href="{{ $osPricingUrl }}" target="_blank" rel="noopener" class="mt-1 inline-flex items-center gap-1 font-semibold text-brand-forest hover:underline">
+                                            {{ __('View :provider pricing', ['provider' => $osProviderLabel]) }}
+                                            <x-heroicon-o-arrow-top-right-on-square class="h-3 w-3" />
+                                        </a>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    @endif
                     @if ($osApiManaged && $osCloudCreds !== [])
                         {{-- DO can mint the Spaces keys from the cloud API token, so
                              offer fully-automatic vs bring-your-own keys. --}}

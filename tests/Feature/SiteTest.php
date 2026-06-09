@@ -253,15 +253,21 @@ test('site php settings can be saved from site settings for installed versions o
         ],
     ]);
 
+    Bus::fake();
+
     Livewire::actingAs($user)
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'runtime'])
         ->set('php_version', '8.4')
         ->set('php_memory_limit', '512M')
         ->set('php_upload_max_filesize', '128M')
         ->set('php_max_execution_time', '120')
+        ->set('php_post_max_size', '128M')
+        ->set('php_max_input_vars', '5000')
         ->call('savePhpSettings')
         ->assertHasNoErrors()
-        ->assertDispatched('notify', message: 'PHP settings saved.', type: 'success');
+        ->assertDispatched('notify', message: 'PHP settings saved. Webserver config queued.', type: 'success');
+
+    Bus::assertDispatched(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
 
     $site->refresh();
 
@@ -269,6 +275,8 @@ test('site php settings can be saved from site settings for installed versions o
     expect(data_get($site->meta, 'php_runtime.memory_limit'))->toBe('512M');
     expect(data_get($site->meta, 'php_runtime.upload_max_filesize'))->toBe('128M');
     expect((string) data_get($site->meta, 'php_runtime.max_execution_time'))->toBe('120');
+    expect(data_get($site->meta, 'php_runtime.post_max_size'))->toBe('128M');
+    expect((string) data_get($site->meta, 'php_runtime.max_input_vars'))->toBe('5000');
 
     Livewire::actingAs($user)
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site->fresh(), 'section' => 'runtime'])
@@ -2873,12 +2881,16 @@ test('site settings runtime section can save php version', function () {
         'status' => Site::STATUS_NGINX_ACTIVE,
     ]);
 
+    Bus::fake();
+
     Livewire::actingAs($user)
         ->test(SiteSettings::class, ['server' => $server, 'site' => $site, 'section' => 'runtime'])
         ->set('php_version', '8.4')
         ->call('savePhpSettings')
         ->assertHasNoErrors()
-        ->assertDispatched('notify', message: 'PHP settings saved.', type: 'success');
+        ->assertDispatched('notify', message: 'PHP settings saved. Webserver config queued.', type: 'success');
+
+    Bus::assertDispatched(ApplySiteWebserverConfigJob::class, fn (ApplySiteWebserverConfigJob $job): bool => $job->siteId === $site->id);
 
     $site->refresh();
 

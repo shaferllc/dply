@@ -40,7 +40,11 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
             [
                 'webserver' => 'nginx',
                 'mode' => SiteWebserverConfigProfile::MODE_LAYERED,
-                'main_snippet_body' => $site->nginx_extra_raw,
+                'main_snippet_body' => trim((string) $site->nginx_extra_raw) !== ''
+                    ? $site->nginx_extra_raw
+                    : SiteWebserverConfigProfile::DEFAULT_MAIN_SNIPPET_BODY,
+                'before_body' => SiteWebserverConfigProfile::DEFAULT_BEFORE_BODY,
+                'after_body' => SiteWebserverConfigProfile::DEFAULT_AFTER_BODY,
             ]
         );
         $site->setRelation('webserverConfigProfile', $profile);
@@ -300,7 +304,7 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
             $this->writeSystemFile(
                 $ssh,
                 $beforeFile,
-                $beforeBody !== '' ? $beforeBody : "# Dply placeholder (empty before layer)\n"
+                ($beforeBody !== '' ? $beforeBody : SiteWebserverConfigProfile::DEFAULT_BEFORE_BODY)."\n"
             );
         }
 
@@ -309,7 +313,7 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
             $this->writeSystemFile(
                 $ssh,
                 $afterFile,
-                $afterBody !== '' ? $afterBody : "# Dply placeholder (empty after layer)\n"
+                ($afterBody !== '' ? $afterBody : SiteWebserverConfigProfile::DEFAULT_AFTER_BODY)."\n"
             );
         }
     }
@@ -337,8 +341,8 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         $afterDir = $base.'/after';
         $beforeBody = trim((string) $profile->before_body);
         $afterBody = trim((string) $profile->after_body);
-        $beforeContent = $beforeBody !== '' ? $beforeBody : "# Dply placeholder (empty before layer)\n";
-        $afterContent = $afterBody !== '' ? $afterBody : "# Dply placeholder (empty after layer)\n";
+        $beforeContent = ($beforeBody !== '' ? $beforeBody : SiteWebserverConfigProfile::DEFAULT_BEFORE_BODY)."\n";
+        $afterContent = ($afterBody !== '' ? $afterBody : SiteWebserverConfigProfile::DEFAULT_AFTER_BODY)."\n";
 
         $changed = $this->writeSystemFileIfChanged($server, $ssh, $beforeDir.'/10-dply-layer.conf', $beforeContent);
         $changed = $this->writeSystemFileIfChanged($server, $ssh, $afterDir.'/10-dply-layer.conf', $afterContent) || $changed;

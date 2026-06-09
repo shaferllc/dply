@@ -125,9 +125,39 @@
                         <x-input-error :messages="$errors->get('php_upload_max_filesize')" class="mt-1" />
                     </div>
                     <div>
+                        <x-input-label for="php_post_max_size" value="Post max size" />
+                        <x-text-input id="php_post_max_size" wire:model="php_post_max_size" class="mt-1 block w-full font-mono text-sm" placeholder="64M" />
+                        <x-input-error :messages="$errors->get('php_post_max_size')" class="mt-1" />
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('Must be ≥ upload max filesize.') }}</p>
+                    </div>
+                    <div>
                         <x-input-label for="php_max_execution_time" value="Max execution time" />
                         <x-text-input id="php_max_execution_time" wire:model="php_max_execution_time" class="mt-1 block w-full font-mono text-sm" placeholder="120" />
                         <x-input-error :messages="$errors->get('php_max_execution_time')" class="mt-1" />
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('Seconds. Soft (CPU-time) limit under FPM.') }}</p>
+                    </div>
+                    <div>
+                        <x-input-label for="php_max_input_time" value="Max input time" />
+                        <x-text-input id="php_max_input_time" wire:model="php_max_input_time" class="mt-1 block w-full font-mono text-sm" placeholder="60" />
+                        <x-input-error :messages="$errors->get('php_max_input_time')" class="mt-1" />
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('Seconds. Use -1 to derive from execution time.') }}</p>
+                    </div>
+                    <div>
+                        <x-input-label for="php_max_input_vars" value="Max input vars" />
+                        <x-text-input id="php_max_input_vars" wire:model="php_max_input_vars" class="mt-1 block w-full font-mono text-sm" placeholder="1000" />
+                        <x-input-error :messages="$errors->get('php_max_input_vars')" class="mt-1" />
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('Raise for large forms (e.g. WordPress).') }}</p>
+                    </div>
+                    <div>
+                        <x-input-label for="php_max_file_uploads" value="Max file uploads" />
+                        <x-text-input id="php_max_file_uploads" wire:model="php_max_file_uploads" class="mt-1 block w-full font-mono text-sm" placeholder="20" />
+                        <x-input-error :messages="$errors->get('php_max_file_uploads')" class="mt-1" />
+                    </div>
+                    <div>
+                        <x-input-label for="php_timezone" value="Default timezone" />
+                        <x-text-input id="php_timezone" wire:model="php_timezone" class="mt-1 block w-full font-mono text-sm" placeholder="UTC" />
+                        <x-input-error :messages="$errors->get('php_timezone')" class="mt-1" />
+                        <p class="mt-1 text-xs text-brand-moss">{{ __('date.timezone — e.g. UTC or America/New_York.') }}</p>
                     </div>
                 </div>
 

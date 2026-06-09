@@ -57,7 +57,15 @@ class SiteWebserverConfigEditorService
             [
                 'webserver' => $ws,
                 'mode' => SiteWebserverConfigProfile::MODE_LAYERED,
-                'main_snippet_body' => $ws === 'nginx' ? $site->nginx_extra_raw : null,
+                // Seed each layer with self-documenting comments so the editor is
+                // never an intimidating blank box and the files on disk always
+                // carry an explanation of what each layer is for. Keep any
+                // pre-existing nginx_extra_raw as the main snippet if present.
+                'main_snippet_body' => $ws === 'nginx'
+                    ? (trim((string) $site->nginx_extra_raw) !== '' ? $site->nginx_extra_raw : SiteWebserverConfigProfile::DEFAULT_MAIN_SNIPPET_BODY)
+                    : null,
+                'before_body' => $ws === 'nginx' ? SiteWebserverConfigProfile::DEFAULT_BEFORE_BODY : null,
+                'after_body' => $ws === 'nginx' ? SiteWebserverConfigProfile::DEFAULT_AFTER_BODY : null,
             ]
         );
     }
@@ -361,15 +369,23 @@ class SiteWebserverConfigEditorService
 
     protected function normalizeNginxLayerPlaceholder(?string $raw, string $kind): string
     {
-        if ($raw === null || trim($raw) === '') {
-            return '';
+        $default = $kind === 'before'
+            ? SiteWebserverConfigProfile::DEFAULT_BEFORE_BODY
+            : SiteWebserverConfigProfile::DEFAULT_AFTER_BODY;
+
+        $legacy = $kind === 'before'
+            ? SiteWebserverConfigProfile::LEGACY_BEFORE_PLACEHOLDER
+            : SiteWebserverConfigProfile::LEGACY_AFTER_PLACEHOLDER;
+
+        $trimmed = trim((string) $raw);
+
+        // Empty/missing on disk or the old terse placeholder → surface the
+        // informative default so the editor always shows a documented layer.
+        if ($trimmed === '' || $trimmed === $legacy) {
+            return $default;
         }
 
-        $placeholder = $kind === 'before'
-            ? '# Dply placeholder (empty before layer)'
-            : '# Dply placeholder (empty after layer)';
-
-        return trim($raw) === $placeholder ? '' : $raw;
+        return $raw;
     }
 
     /**

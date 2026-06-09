@@ -92,6 +92,16 @@ CADDY;
 
         $reverbPhp = $site->type === SiteType::Php ? $this->reverbHandleDirective($site) : '';
 
+        // Per-site PHP ini overrides are passed as a PHP_VALUE env var. When
+        // present, php_fastcgi grows a block to carry them; otherwise it stays
+        // the bare one-liner.
+        $phpEnv = $site->type === SiteType::Php
+            ? app(SitePhpRuntimeDirectivesBuilder::class)->caddyEnvDirective($site)
+            : '';
+        $phpFastcgi = $phpEnv !== ''
+            ? "php_fastcgi unix//{$phpSock} {\n{$phpEnv}    }"
+            : "php_fastcgi unix//{$phpSock}";
+
         return match ($site->type) {
             SiteType::Php => <<<CADDY
 {$hosts} {
@@ -100,7 +110,7 @@ CADDY;
     log {
         output file /var/log/caddy/{$basename}-access.log
     }
-    php_fastcgi unix//{$phpSock}
+    {$phpFastcgi}
     file_server
 }
 CADDY,

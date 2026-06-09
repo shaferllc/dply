@@ -373,6 +373,12 @@ NGINX;
         $fcgiEngine = $site->type === SiteType::Php
             ? app(SiteCacheDirectivesBuilder::class)->nginxFastcgiDirectives($site)
             : '';
+        // Per-site PHP ini overrides ride the same FastCGI seam as the cache
+        // directives, so they land in the main php location AND every
+        // basic-auth php fragment below.
+        if ($site->type === SiteType::Php) {
+            $fcgiEngine = app(SitePhpRuntimeDirectivesBuilder::class)->nginxDirectives($site).$fcgiEngine;
+        }
         $phpBa = $this->nginxBasicAuthPhpFragments($site, $root, $phpSock, $fcgiEngine);
         $formGate = SiteAccessGateConfigSupport::nginxFragments($site, $root);
         $managedErrors = SiteManagedErrorPageSupport::nginxServerBlock($site);
