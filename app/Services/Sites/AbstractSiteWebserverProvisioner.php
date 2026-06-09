@@ -235,7 +235,18 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
 
         $emit?->step($this->emitterSource(), 'ensuring managed error pages');
         $builder = new SiteServerErrorPageBuilder;
-        $this->writeSystemFile($ssh, $dir.'/'.SiteManagedErrorPageSupport::ERROR_FILENAME, $builder->render($site));
+        $this->writeSystemFile($ssh, $dir.'/'.SiteManagedErrorPageSupport::ERROR_FILENAME, $builder->render($site, $this->errorPageReferenceInjected()));
+    }
+
+    /**
+     * Whether this engine injects the per-request reference id into the served
+     * error page (so the visible "Reference" row is rendered). Engines that only
+     * set the `X-Dply-Ref` header — Apache/OLS for now — leave this false; the id
+     * still flows to logs for reference lookup.
+     */
+    protected function errorPageReferenceInjected(): bool
+    {
+        return false;
     }
 
     /**

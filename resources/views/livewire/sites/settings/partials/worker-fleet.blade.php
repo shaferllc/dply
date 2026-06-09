@@ -2,7 +2,15 @@
      scale them up/down. Distinct from the Workers/daemons tab (Supervisor
      processes on this box). Actions delegate to WorkerPoolManager; deep controls
      (autoscale, cross-region, queue/Horizon config) live on the pool page. --}}
-@php $pools = $site->attachedWorkerPools(); @endphp
+@php
+    $pools = $site->attachedWorkerPools();
+    // Running worker processes on a member (from the last stats probe) — the best
+    // available proxy for how much of the shared pull-queue this box is draining.
+    $workerProcs = function ($m) {
+        $s = is_array(data_get($m->meta, 'pool.stats')) ? data_get($m->meta, 'pool.stats') : [];
+        return max((int) ($s['horizon_procs'] ?? 0), (int) ($s['queue_procs'] ?? 0), (int) ($s['sv_running'] ?? 0));
+    };
+@endphp
 
 <section class="dply-card overflow-hidden">
     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
@@ -32,6 +40,11 @@
                         $desired = (int) $pool->desired_count;
                         $cap = (int) ($pool->max_size ?: 50);
                         $primary = $pool->primaryServer;
+                        // Pool-wide workload (Horizon snapshot on pool meta) + total worker
+                        // processes across members (the denominator for each worker's share).
+                        $hz = is_array($pool->meta['horizon'] ?? null) ? $pool->meta['horizon'] : [];
+                        $poolProcs = (int) $members->sum(fn ($m) => $workerProcs($m));
+                        $collectedAt = $members->map(fn ($m) => data_get($m->meta, 'pool.stats.collected_at'))->filter()->sort()->last();
                     @endphp
                     <div class="rounded-2xl border border-brand-ink/10 bg-white p-4" x-data="{ n: {{ $desired ?: $active }} }">
                         <div class="flex flex-wrap items-start justify-between gap-3">
@@ -57,12 +70,33 @@
                             </div>
                         @endcan
 
+                        {{-- Live workload. The pool is a PULL queue — every worker drains the
+                             SAME Redis queues, so there's no per-worker job assignment: the
+                             backlog/throughput are pool-wide, and each worker's "share" below is
+                             its running worker processes ÷ the pool's (its drain capacity). --}}
+                        <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-brand-ink/10 pt-3 text-xs text-brand-moss">
+                            <span><span class="font-semibold text-brand-ink">{{ $hz['pending'] ?? '—' }}</span> {{ __('in queue') }}</span>
+                            <span><span class="font-semibold text-brand-ink">{{ $hz['jobs_per_minute'] ?? '—' }}</span> {{ __('jobs/min') }}</span>
+                            <span>{{ __('processed') }} <span class="font-medium text-brand-ink">{{ $hz['processed'] ?? '—' }}</span></span>
+                            <span>{{ __('failed') }} <span class="font-medium text-brand-ink">{{ $hz['failed'] ?? '—' }}</span></span>
+                            <span>{{ trans_choice(':n worker process|:n worker processes', $poolProcs, ['n' => $poolProcs]) }}</span>
+                            @can('update', $site)
+                                <button type="button" wire:click="refreshWorkerStats(@js((string) $pool->id))" wire:loading.attr="disabled" wire:target="refreshWorkerStats"
+                                    class="ml-auto inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink hover:bg-brand-sand/40 disabled:opacity-50">
+                                    <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" wire:target="refreshWorkerStats" /> {{ __('Refresh') }}
+                                </button>
+                            @endcan
+                        </div>
+                        @if ($collectedAt)
+                            <p class="mt-1 text-[10px] text-brand-mist">{{ __('Stats as of :t', ['t' => \Illuminate\Support\Carbon::parse($collectedAt)->diffForHumans()]) }}</p>
+                        @endif
+
                         <ul class="mt-3 divide-y divide-brand-ink/10 overflow-hidden rounded-xl border border-brand-ink/10">
                             @foreach ($members as $member)
                                 <li class="flex items-center justify-between gap-3 px-3 py-2 text-sm">
                                     <div class="min-w-0">
                                         <div class="flex items-center gap-2">
-                                            <span class="truncate font-medium text-brand-ink">{{ $member->name }}</span>
+                                            <a href="{{ route('servers.overview', ['server' => $member]) }}" wire:navigate class="truncate font-medium text-brand-ink hover:text-brand-sage hover:underline">{{ $member->name }}</a>
                                             @if ($member->isPoolPrimary())
                                                 <span class="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-800">{{ __('primary') }}</span>
                                             @else
@@ -73,6 +107,17 @@
                                             @endif
                                         </div>
                                         <p class="mt-0.5 truncate font-mono text-[11px] text-brand-mist">{{ $member->ip_address ?? '—' }} · {{ $member->region ?? '—' }} · {{ $member->size ?? '—' }}</p>
+                                        @php
+                                            $mProcs = $workerProcs($member);
+                                            $share = $poolProcs > 0 ? (int) round($mProcs / $poolProcs * 100) : 0;
+                                        @endphp
+                                        <div class="mt-1.5 flex items-center gap-2" title="{{ __('Worker processes on this box — its share of the pool\'s drain capacity (pull queue, so no fixed per-worker assignment).') }}">
+                                            <span class="text-[10px] text-brand-moss">{{ trans_choice(':n process|:n processes', $mProcs, ['n' => $mProcs]) }}</span>
+                                            <div class="h-1.5 w-24 overflow-hidden rounded-full bg-brand-sand/60">
+                                                <div class="h-full rounded-full bg-violet-500" style="width: {{ $share }}%"></div>
+                                            </div>
+                                            <span class="text-[10px] font-medium text-brand-mist">{{ $share }}%</span>
+                                        </div>
                                     </div>
                                     @can('update', $site)
                                         @unless ($member->isPoolPrimary())

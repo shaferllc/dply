@@ -5,6 +5,8 @@ namespace App\Livewire\Sites;
 use App\Enums\SiteType;
 use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Jobs\AssignSystemUserToSiteJob;
+use App\Jobs\CollectWorkerPoolHorizonSnapshotJob;
+use App\Jobs\CollectWorkerPoolStatsJob;
 use App\Jobs\ExecuteSiteCertificateJob;
 use App\Jobs\ProvisionTenantTestingHostnameJob;
 use App\Jobs\ResetSiteOpcacheJob;
@@ -1717,6 +1719,27 @@ class Settings extends Show
         $count = max(1, min($count, $cap));
         $manager->setDesiredCount($pool, $count);
         $this->toastSuccess(__('Scaling workers to :n — provisioning/draining in the background.', ['n' => $count]));
+    }
+
+    /**
+     * Refresh the pool's live workload: per-member worker-process counts (the
+     * "distribution" — it's a pull queue, so each worker's share = its running
+     * processes ÷ the pool's) plus the pool-wide Horizon backlog / throughput.
+     * Both probes are QUEUED SSH jobs (never inline — see the no-render-path-SSH
+     * rule) that stash results on member/pool meta, which the panel then reads.
+     */
+    public function refreshWorkerStats(string $poolId): void
+    {
+        $this->authorize('update', $this->site);
+        $pool = $this->resolveAttachedPool($poolId);
+        if ($pool === null) {
+            $this->toastError(__('Worker pool not found for this site.'));
+
+            return;
+        }
+        CollectWorkerPoolStatsJob::dispatch((string) $pool->id);
+        CollectWorkerPoolHorizonSnapshotJob::dispatch((string) $pool->id);
+        $this->toastSuccess(__('Refreshing worker stats over SSH — numbers update in a few seconds.'));
     }
 
     /** Add one worker to an attached pool. */

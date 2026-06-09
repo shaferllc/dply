@@ -8,6 +8,8 @@ use App\Enums\SiteType;
 use App\Jobs\RelocateSiteFilesJob;
 use App\Jobs\ScanSiteEnvRequirementsJob;
 use App\Models\Server;
+use App\Services\Sites\SitePhpFpmPoolConfigBuilder;
+use App\Support\Servers\InstalledStack;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -27,6 +29,16 @@ trait ResolvesWebserverConfig
 
         if ($this->usesKubernetesRuntime()) {
             return 'kubernetes';
+        }
+
+        // Worker-fleet hosts (dedicated worker-role boxes and worker-pool members)
+        // run the deployed code + queue daemons but never serve web traffic, so no
+        // webserver is installed on them. Resolve them headless ('none') — otherwise
+        // a replica's deploy tries to write/reload a Caddy vhost on a box with no
+        // caddy binary ("sudo: caddy: command not found"), the ProvisionSiteJob fails,
+        // and the pool stays stuck in "deploying" forever.
+        if ($this->server?->isWorkerServer()) {
+            return 'none';
         }
 
         $serverMeta = is_array($this->server?->meta) ? $this->server->meta : [];
@@ -154,7 +166,7 @@ trait ResolvesWebserverConfig
     {
         $server = $this->server;
         $installedPrimary = $server !== null
-            ? \App\Support\Servers\InstalledStack::fromMeta($server)->phpVersion
+            ? InstalledStack::fromMeta($server)->phpVersion
             : null;
         $configured = $this->phpVersion();
 
@@ -182,7 +194,7 @@ trait ResolvesWebserverConfig
     /**
      * Per-site PHP-FPM pool process settings, merged over sane defaults. Stored
      * in meta['php_fpm_pool']; the start/spare-server counts are DERIVED from
-     * max_children by {@see \App\Services\Sites\SitePhpFpmPoolConfigBuilder}.
+     * max_children by {@see SitePhpFpmPoolConfigBuilder}.
      *
      * @return array{pm: string, max_children: int, max_requests: int, request_terminate_timeout: int}
      */

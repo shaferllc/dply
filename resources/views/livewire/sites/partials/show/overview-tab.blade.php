@@ -199,6 +199,37 @@
                                 @endforeach
                             </div>
                         @endif
+
+                        {{-- Attached worker SERVER pools (the scalable background fleet on this
+                             site's private network). Shows only when one is attached; manage on
+                             Resources, scale on the pool page. See Site::attachedWorkerPools(). --}}
+                        @php $workerPools = $site->attachedWorkerPools(); @endphp
+                        @if ($workerPools->isNotEmpty())
+                            <div class="mt-5 border-t border-brand-ink/10 pt-5">
+                                <div class="flex items-center justify-between gap-3">
+                                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Worker servers') }}</p>
+                                    <a href="{{ route('sites.resources', [$site->server, $site]) }}" wire:navigate class="text-[11px] font-semibold text-brand-forest hover:underline">{{ __('Manage') }} →</a>
+                                </div>
+                                <ul class="mt-2 space-y-2">
+                                    @foreach ($workerPools as $pool)
+                                        @php $primary = $pool->primaryServer; @endphp
+                                        <li class="rounded-lg border border-brand-ink/10 bg-white px-3 py-2">
+                                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                                <div class="flex flex-wrap items-center gap-2">
+                                                    <x-heroicon-o-square-3-stack-3d class="h-4 w-4 shrink-0 text-violet-700" aria-hidden="true" />
+                                                    <span class="text-sm font-semibold text-brand-ink">{{ $pool->name ?: __('Worker pool') }}</span>
+                                                    <span class="rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-800">{{ trans_choice(':n server|:n servers', $pool->servers->count(), ['n' => $pool->servers->count()]) }}</span>
+                                                    <span class="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-700">{{ $pool->status }}</span>
+                                                </div>
+                                                @if ($primary)
+                                                    <a href="{{ route('servers.worker-pool', ['server' => $primary]) }}" wire:navigate class="text-[11px] font-semibold text-brand-forest hover:underline">{{ __('Scale') }} →</a>
+                                                @endif
+                                            </div>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
                         </div>
                     </section>
                 </div>

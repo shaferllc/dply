@@ -97,16 +97,51 @@ class ServerAuthorizedKeysDiffPreview
             }
 
             $remote = $this->reader->normalizedKeyLines($server, $targetUser);
+
+            // Mirror the synchronizer's non-destructive reconcile: a remote key is only "removed"
+            // when dply itself previously placed it (its fingerprint is in the managed set) AND it's
+            // no longer desired. Foreign / operator-added keys are preserved, not removed — so the
+            // preview must show them under "kept", never under "removed".
+            $desiredFps = $this->fingerprintSet($desired);
+            $remoteFps = $this->fingerprintSet($remote);
+            $managedMap = is_array(data_get($server->meta, ServerAuthorizedKeysSynchronizer::META_MANAGED_FINGERPRINTS_KEY))
+                ? data_get($server->meta, ServerAuthorizedKeysSynchronizer::META_MANAGED_FINGERPRINTS_KEY)
+                : [];
+            $previouslyManaged = array_flip(array_map('strval', (array) ($managedMap[$targetUser] ?? [])));
+
+            $added = [];
+            $kept = [];
+            foreach ($desired as $line) {
+                $fp = SshPublicKeyFingerprint::shortSha256($line);
+                if ($fp !== null && isset($remoteFps[$fp])) {
+                    $kept[] = $line; // already on the box
+                } else {
+                    $added[] = $line;
+                }
+            }
+
+            $removed = [];
+            foreach ($remote as $line) {
+                $fp = SshPublicKeyFingerprint::shortSha256($line);
+                if ($fp !== null && isset($desiredFps[$fp])) {
+                    continue; // counted as kept above
+                }
+                if ($fp !== null && isset($previouslyManaged[$fp])) {
+                    $removed[] = $line; // dply-managed, dropped from the panel → will be removed
+                } else {
+                    $kept[] = $line; // foreign / unmanaged → preserved on the next sync
+                }
+            }
+
             $out[$targetUser] = [
                 'remote' => $remote,
                 'desired' => $desired,
-                'added' => array_values(array_diff($desired, $remote)),
-                'removed' => array_values(array_diff($remote, $desired)),
-                // Lines present in both — they stay on the server unchanged on the next sync.
-                // The workspace shows these alongside the diff so operators can see what's
-                // already in place (especially Dply's auto-injected operational/recovery keys)
-                // and not mistake "+1 to add" for "this is the only key".
-                'kept' => array_values(array_intersect($desired, $remote)),
+                'added' => array_values($added),
+                'removed' => array_values($removed),
+                // Stays on the server after the next sync: desired keys already present PLUS every
+                // foreign key dply preserves. The workspace shows these so operators see what's in
+                // place (incl. Dply's auto-injected operational/recovery keys and their own keys).
+                'kept' => array_values(array_unique($kept)),
             ];
 
             if ($callback !== null) {
@@ -147,5 +182,23 @@ class ServerAuthorizedKeysDiffPreview
         sort($lines);
 
         return $lines;
+    }
+
+    /**
+     * Map of SHA256 fingerprint => true for every parseable key line (comment-independent).
+     *
+     * @param  list<string>  $lines
+     * @return array<string, true>
+     */
+    protected function fingerprintSet(array $lines): array
+    {
+        $set = [];
+        foreach ($lines as $line) {
+            if ($fp = SshPublicKeyFingerprint::shortSha256($line)) {
+                $set[$fp] = true;
+            }
+        }
+
+        return $set;
     }
 }

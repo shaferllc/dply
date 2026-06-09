@@ -17,6 +17,21 @@ class ServerAuthorizedKeysSynchronizer
     public const META_SYNCED_LINUX_USERS_KEY = 'authorized_keys_synced_linux_users';
 
     /**
+     * Per-target-user list of SHA256 fingerprints that dply itself last wrote into the remote
+     * authorized_keys. This is what makes the sync a non-destructive RECONCILE rather than a
+     * wholesale overwrite: on each run we only ever remove a key we previously placed (its fp is
+     * here but it's no longer desired), and we preserve every key we never managed (operator-added
+     * keys, break-glass keys, other tooling's keys). See {@see reconciledKeyLines()}.
+     */
+    public const META_MANAGED_FINGERPRINTS_KEY = 'authorized_keys_managed_fingerprints';
+
+    /**
+     * Collected during a sync run (keyed by target user) and flushed to server meta at the end so
+     * the next run knows which keys are dply-managed. @var array<string, list<string>>
+     */
+    protected array $managedFingerprintsByTarget = [];
+
+    /**
      * Optional output callback set by callers that want to stream the SSH process output as it's
      * produced (e.g. {@see SyncAuthorizedKeysJob} writing chunks into the application
      * cache so the workspace banner can render a live tail). When null, the synchronizer falls
@@ -30,6 +45,7 @@ class ServerAuthorizedKeysSynchronizer
         protected ExecuteRemoteTaskOnServer $remote,
         protected ServerAuthorizedKeysAuditLogger $auditLogger,
         protected ServerAuthorizedKeysHealthCheck $healthCheck,
+        protected ServerAuthorizedKeysRemoteReader $remoteReader,
     ) {}
 
     /**
@@ -176,6 +192,14 @@ class ServerAuthorizedKeysSynchronizer
         $server->refresh();
         $meta = $server->meta ?? [];
         $meta[self::META_SYNCED_LINUX_USERS_KEY] = $targets;
+
+        // Record which fingerprints dply manages per target, so the next reconcile knows what it's
+        // allowed to remove. Merge over the existing map (don't clobber targets we didn't touch).
+        $existingManaged = is_array($meta[self::META_MANAGED_FINGERPRINTS_KEY] ?? null)
+            ? $meta[self::META_MANAGED_FINGERPRINTS_KEY]
+            : [];
+        $meta[self::META_MANAGED_FINGERPRINTS_KEY] = array_merge($existingManaged, $this->managedFingerprintsByTarget);
+
         $server->update(['meta' => $meta]);
     }
 
@@ -187,13 +211,14 @@ class ServerAuthorizedKeysSynchronizer
     }
 
     /**
-     * Replace remote authorized_keys with exactly the public keys from the panel for this user.
+     * Reconcile remote authorized_keys for this user: add the panel/operational keys, remove only
+     * keys dply previously placed that are now gone, and PRESERVE every key dply never managed.
      *
      * @param  Collection<int, ServerAuthorizedKey>  $rows
      */
     protected function writeAuthorizedKeysForTarget(Server $server, string $connectionUser, string $targetUser, Collection $rows): string
     {
-        $lines = $this->desiredAuthorizedKeyLines($server, $connectionUser, $targetUser, $rows);
+        $lines = $this->reconciledKeyLines($server, $connectionUser, $targetUser, $rows);
 
         $body = implode("\n", $lines);
         if ($body !== '') {
@@ -262,6 +287,78 @@ class ServerAuthorizedKeysSynchronizer
         sort($lines);
 
         return $lines;
+    }
+
+    /**
+     * The lines we will actually write: the dply-managed (desired) keys merged with every existing
+     * remote key that dply does NOT manage. We only drop a key when its fingerprint was recorded as
+     * dply-managed on a previous run AND it's no longer desired — so operator-added keys, break-glass
+     * keys and any line we can't parse (options, comments) are always preserved.
+     *
+     * Records the desired fingerprints for this target so the next run knows what it may remove.
+     *
+     * @param  Collection<int, ServerAuthorizedKey>  $rows
+     * @return list<string>
+     */
+    protected function reconciledKeyLines(Server $server, string $connectionUser, string $targetUser, Collection $rows): array
+    {
+        $desired = $this->desiredAuthorizedKeyLines($server, $connectionUser, $targetUser, $rows);
+
+        $desiredFps = [];
+        foreach ($desired as $line) {
+            if ($fp = SshPublicKeyFingerprint::shortSha256($line)) {
+                $desiredFps[$fp] = true;
+            }
+        }
+
+        // Record what dply manages for this target (flushed to meta after the write succeeds).
+        $this->managedFingerprintsByTarget[$targetUser] = array_values(array_keys($desiredFps));
+
+        // Read what's currently on the box. If we genuinely can't read it (e.g. sudo -n denied for a
+        // non-login user), fall back to the desired set rather than crash — same situation in which
+        // the write itself would also be unable to touch that user's file.
+        try {
+            $existing = $this->remoteReader->normalizedKeyLines($server, $targetUser);
+        } catch (\Throwable) {
+            return $desired;
+        }
+
+        $managedMap = is_array(data_get($server->meta, self::META_MANAGED_FINGERPRINTS_KEY))
+            ? data_get($server->meta, self::META_MANAGED_FINGERPRINTS_KEY)
+            : [];
+        $previouslyManaged = array_flip(array_map('strval', (array) ($managedMap[$targetUser] ?? [])));
+
+        $final = [];
+        $seenFps = [];
+        $emit = function (string $line) use (&$final, &$seenFps): void {
+            $fp = SshPublicKeyFingerprint::shortSha256($line);
+            if ($fp === null) {
+                $final[] = $line; // not a parseable key (options/comment) — preserve verbatim
+            } elseif (! isset($seenFps[$fp])) {
+                $seenFps[$fp] = true;
+                $final[] = $line;
+            }
+        };
+
+        // Preserve every existing key dply doesn't own; drop only ones it placed and no longer wants.
+        foreach ($existing as $line) {
+            $fp = SshPublicKeyFingerprint::shortSha256($line);
+            if ($fp !== null && isset($desiredFps[$fp])) {
+                continue; // re-added below from the canonical desired list
+            }
+            if ($fp !== null && isset($previouslyManaged[$fp])) {
+                continue; // dply-managed previously, now removed from the panel → drop
+            }
+            $emit($line); // foreign / unmanaged key → keep
+        }
+
+        foreach ($desired as $line) {
+            $emit($line);
+        }
+
+        sort($final);
+
+        return $final;
     }
 
     /**

@@ -5,13 +5,29 @@ declare(strict_types=1);
 namespace App\Services\Sites;
 
 use App\Models\Site;
+use App\Support\Sites\SiteManagedErrorPageSupport;
 
 class SiteServerErrorPageBuilder
 {
-    public function render(Site $site): string
+    /**
+     * Placeholder the edge webserver swaps for the per-request reference id
+     * (nginx `sub_filter`). Kept in sync with
+     * {@see SiteManagedErrorPageSupport::REFERENCE_TOKEN}.
+     */
+    public const REFERENCE_TOKEN = '{{DPLY_REF}}';
+
+    /**
+     * @param  bool  $injectsReference  whether the target webserver replaces the
+     *                                  reference token at serve time. Only then
+     *                                  do we render the visible "Reference" row,
+     *                                  so engines without body injection never
+     *                                  leak a literal `{{DPLY_REF}}`.
+     */
+    public function render(Site $site, bool $injectsReference = false): string
     {
         $siteName = $this->escape($site->name !== '' ? $site->name : 'Site');
         $hostname = $this->escape($this->primaryHostname($site));
+        $referenceRow = $injectsReference ? $this->referenceRow() : '';
 
         return <<<HTML
 <!doctype html>
@@ -111,10 +127,27 @@ class SiteServerErrorPageBuilder
         <section class="detail">
             <span class="detail-label">Hostname</span>
             <div class="detail-value">{$hostname}</div>
-        </section>
+{$referenceRow}        </section>
     </main>
 </body>
 </html>
+HTML;
+    }
+
+    /**
+     * The "Reference" row. The {@see self::REFERENCE_TOKEN} placeholder is
+     * replaced with the live per-request id by the webserver at serve time
+     * (nginx `sub_filter`). Only rendered for engines that perform that
+     * substitution, so the raw token is never shown to a visitor.
+     */
+    private function referenceRow(): string
+    {
+        $token = self::REFERENCE_TOKEN;
+
+        return <<<HTML
+            <span class="detail-label" style="margin-top:20px">Reference</span>
+            <div class="detail-value">{$token}</div>
+
 HTML;
     }
 

@@ -23,6 +23,11 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         parent::__construct($placeholderPageBuilder);
     }
 
+    protected function errorPageReferenceInjected(): bool
+    {
+        return true;
+    }
+
     public function webserver(): string
     {
         return 'nginx';

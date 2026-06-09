@@ -31,6 +31,20 @@ test('render escapes site name and includes 500 copy', function () {
         ->toContain('noindex');
 });
 
+test('reference row is rendered only when the engine injects the token', function () {
+    $site = Site::factory()->create();
+
+    $withInjection = (new SiteServerErrorPageBuilder)->render($site->fresh(['domains']), true);
+    $withoutInjection = (new SiteServerErrorPageBuilder)->render($site->fresh(['domains']), false);
+
+    expect($withInjection)
+        ->toContain('Reference')
+        ->toContain(SiteServerErrorPageBuilder::REFERENCE_TOKEN);
+
+    // Engines that only set the header must never leak the raw placeholder.
+    expect($withoutInjection)->not->toContain(SiteServerErrorPageBuilder::REFERENCE_TOKEN);
+});
+
 test('managed error pages root lives under site env directory', function () {
     $site = Site::factory()->create();
 

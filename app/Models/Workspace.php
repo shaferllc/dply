@@ -141,6 +141,14 @@ class Workspace extends Model
 
     public function hasMember(User $user): bool
     {
+        // Reuse the already-loaded members collection when present so per-row
+        // permission checks (userCanManageMembers/userCanDeploy/… in the project
+        // tabs) don't fire a membership query for every row. Falls back to a
+        // direct query when the relation isn't loaded.
+        if ($this->relationLoaded('members')) {
+            return $this->members->contains('user_id', $user->id);
+        }
+
         return $this->members()->where('user_id', $user->id)->exists();
     }
 
@@ -148,6 +156,10 @@ class Workspace extends Model
     {
         if (! $user) {
             return null;
+        }
+
+        if ($this->relationLoaded('members')) {
+            return $this->members->firstWhere('user_id', $user->id)?->role;
         }
 
         return $this->members()

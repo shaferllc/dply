@@ -13,6 +13,7 @@ use App\Models\CloudDatabase;
 use App\Models\CloudWorker;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\WorkerPool;
 use App\Support\Sites\SiteWorkerCoverage;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
@@ -101,6 +102,21 @@ class Resources extends Component
     public function vmWorkers(): \Illuminate\Support\Collection
     {
         return SiteWorkerCoverage::workers($this->site);
+    }
+
+    /**
+     * Worker SERVER pools attached to this site's workspace — the scalable
+     * background fleet (distinct from {@see vmWorkers()}, which lists the
+     * individual Supervisor processes). Surfaced here so operators see the
+     * pool as a resource; scaling lives on the site's Worker-servers settings
+     * section and the pool page. See {@see Site::attachedWorkerPools()}.
+     *
+     * @return \Illuminate\Support\Collection<int, WorkerPool>
+     */
+    #[Computed]
+    public function attachedWorkerPools(): \Illuminate\Support\Collection
+    {
+        return $this->site->attachedWorkerPools();
     }
 
     public function openAttach(string $pane = 'attach'): void

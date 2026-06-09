@@ -5,7 +5,7 @@
         <x-page-header
             :title="__('Projects')"
             :description="__('Group servers, sites, and member access for each initiative.')"
-            doc-route="docs.index"
+            :show-documentation="false"
             flush
             compact
             toolbar
@@ -15,20 +15,32 @@
                     <x-heroicon-o-rectangle-group class="h-7 w-7 text-brand-ink" aria-hidden="true" />
                 </span>
             </x-slot>
-            @if ($hasOrganization)
-                @can('create', App\Models\Workspace::class)
-                    <x-slot name="actions">
+            {{-- Render both actions ourselves so Documentation and New project
+                 share identical sizing (px-5 py-2.5 text-sm, both bordered so
+                 they're pixel-identical in height). The Documentation button
+                 fires the same docs-drawer event as <x-docs-link>. --}}
+            <x-slot name="actions">
+                <button
+                    type="button"
+                    x-on:click="window.dispatchEvent(new CustomEvent('dply-docs-open', { detail: { docRoute: 'docs.index' } }))"
+                    class="inline-flex items-center justify-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-5 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
+                >
+                    <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                    {{ __('Documentation') }}
+                </button>
+                @if ($hasOrganization)
+                    @can('create', App\Models\Workspace::class)
                         <button
                             type="button"
                             wire:click="openCreateProjectModal"
-                            class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest"
+                            class="inline-flex items-center justify-center gap-2 rounded-xl border border-transparent bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest"
                         >
                             <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
                             {{ __('New project') }}
                         </button>
-                    </x-slot>
-                @endcan
-            @endif
+                    @endcan
+                @endif
+            </x-slot>
         </x-page-header>
 
         @if (! $hasOrganization)
