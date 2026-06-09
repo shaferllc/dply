@@ -245,3 +245,58 @@ test('parse file reads real file', function () {
         @unlink($path);
     }
 });
+test('parseRaw reads JSON by extension', function () {
+    $json = json_encode([
+        'runtime' => 'node',
+        'version' => '22',
+        'build' => 'npm ci',
+        'processes' => ['web' => ['command' => 'node server.js', 'scale' => 2]],
+    ]);
+
+    $manifest = parser()->parseRaw($json, 'dply.json');
+
+    expect($manifest->runtime)->toBe('node');
+    expect($manifest->version)->toBe('22');
+    expect($manifest->build)->toBe(['npm ci']);
+    expect($manifest->processes['web']->scale)->toBe(2);
+});
+test('parseRaw reads TOML by extension', function () {
+    $toml = "runtime = \"go\"\nversion = \"1.22\"\nbuild = [\"go build\"]\n";
+
+    $manifest = parser()->parseRaw($toml, 'dply.toml');
+
+    expect($manifest->runtime)->toBe('go');
+    expect($manifest->version)->toBe('1.22');
+    expect($manifest->build)->toBe(['go build']);
+});
+test('healthcheck parses from a path string', function () {
+    expect(parser()->parseYaml("runtime: php\nhealthcheck: /up\n")->healthcheck)->toBe('/up');
+});
+test('healthcheck parses from a map with path', function () {
+    expect(parser()->parseYaml("healthcheck:\n  path: /health\n")->healthcheck)->toBe('/health');
+});
+test('unified-file routing keys do not produce warnings', function () {
+    $yaml = <<<'YAML'
+runtime: php
+crons:
+  - {schedule: "* * * * *", command: php artisan schedule:run}
+redirects:
+  - {from: /a, to: /b}
+edge:
+  bindings: {kv: []}
+YAML;
+
+    $manifest = parser()->parseYaml($yaml);
+
+    expect($manifest->runtime)->toBe('php');
+    expect($manifest->warnings)->toBe([]);
+});
+test('hasCodeShape reflects whether the manifest has an opinion', function () {
+    expect(parser()->parseYaml('')->hasCodeShape())->toBeFalse();
+    expect(parser()->parseYaml("crons:\n  - {schedule: '* * * * *', command: x}\n")->hasCodeShape())->toBeFalse();
+    expect(parser()->parseYaml("build: composer install\n")->hasCodeShape())->toBeTrue();
+});
+test('invalid JSON throws typed exception', function () {
+    expect(fn () => parser()->parseRaw('{not json', 'dply.json'))
+        ->toThrow(DplyManifestException::class);
+});
