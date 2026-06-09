@@ -92,6 +92,7 @@
                 \App\Models\WorkerPool::MEMBER_DEPLOYING => ['label' => __('Deploying'), 'cls' => 'bg-indigo-50 text-indigo-700 ring-indigo-200'],
                 \App\Models\WorkerPool::MEMBER_ACTIVE => ['label' => __('Active'), 'cls' => 'bg-emerald-50 text-emerald-700 ring-emerald-200'],
                 \App\Models\WorkerPool::MEMBER_DRAINING => ['label' => __('Draining'), 'cls' => 'bg-rose-50 text-rose-700 ring-rose-200'],
+                \App\Models\WorkerPool::MEMBER_ERRORED => ['label' => __('Errored'), 'cls' => 'bg-rose-100 text-rose-800 ring-rose-300'],
                 default => ['label' => __('Ready'), 'cls' => 'bg-brand-sand/60 text-brand-moss ring-brand-ink/15'],
             };
         @endphp
