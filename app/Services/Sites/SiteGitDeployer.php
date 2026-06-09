@@ -174,6 +174,14 @@ class SiteGitDeployer
             }
         }
 
+        // ── MANIFEST ── reconcile code-shape (build/release/processes) from a
+        // repo dply.* BEFORE the build phase reads its steps (gated).
+        $manifestLog = app(\App\Services\Deploy\Manifest\SiteManifestCodeShapeSync::class)
+            ->applyFromRemote($site, $ssh, $path);
+        if ($manifestLog !== '') {
+            $log .= "\n".$manifestLog;
+        }
+
         // ── BUILD ── install deps / compile assets from the build steps.
         $build = $this->pipelineRunner->runBuild($ssh, $site, $path);
         $log .= $build['log'];

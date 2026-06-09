@@ -31,6 +31,7 @@ class SiteProcess extends Model
         'working_directory',
         'user',
         'is_active',
+        'managed_by_manifest',
     ];
 
     protected function casts(): array
@@ -39,6 +40,7 @@ class SiteProcess extends Model
             'env_vars' => 'encrypted:array',
             'is_active' => 'boolean',
             'scale' => 'integer',
+            'managed_by_manifest' => 'boolean',
         ];
     }
 

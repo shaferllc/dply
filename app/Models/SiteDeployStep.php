@@ -55,6 +55,8 @@ class SiteDeployStep extends Model
 
     public const TYPE_ARTISAN_CACHE_CLEAR = 'artisan_cache_clear';
 
+    public const TYPE_ARTISAN_PENNANT_CLEAR = 'artisan_pennant_clear';
+
     public const TYPE_CUSTOM = 'custom';
 
     /** @return list<string> */
@@ -67,6 +69,7 @@ class SiteDeployStep extends Model
         self::TYPE_ARTISAN_HORIZON_TERMINATE,
         self::TYPE_ARTISAN_DB_SEED,
         self::TYPE_ARTISAN_CACHE_CLEAR,
+        self::TYPE_ARTISAN_PENNANT_CLEAR,
     ];
 
     /**
@@ -113,7 +116,15 @@ class SiteDeployStep extends Model
         'phase',
         'custom_command',
         'timeout_seconds',
+        'managed_by_manifest',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'managed_by_manifest' => 'boolean',
+        ];
+    }
 
     public function site(): BelongsTo
     {
@@ -220,6 +231,7 @@ class SiteDeployStep extends Model
                 .'else echo "[dply] Horizon was not running before terminate; skipping restart check."; fi',
             self::TYPE_ARTISAN_DB_SEED => 'php artisan db:seed --force',
             self::TYPE_ARTISAN_CACHE_CLEAR => 'php artisan cache:clear',
+            self::TYPE_ARTISAN_PENNANT_CLEAR => 'php artisan pennant:clear',
             self::TYPE_CUSTOM => trim((string) $this->custom_command) !== ''
                 ? trim((string) $this->custom_command)
                 : null,
@@ -254,6 +266,7 @@ class SiteDeployStep extends Model
             self::TYPE_ARTISAN_HORIZON_TERMINATE => __('Horizon terminate'),
             self::TYPE_ARTISAN_DB_SEED => __('DB seed'),
             self::TYPE_ARTISAN_CACHE_CLEAR => __('Cache clear'),
+            self::TYPE_ARTISAN_PENNANT_CLEAR => __('Pennant clear'),
             self::TYPE_CUSTOM => trim((string) $this->custom_command) !== ''
                 ? Str::limit(trim((string) $this->custom_command), 36)
                 : __('Custom command'),
@@ -290,6 +303,7 @@ class SiteDeployStep extends Model
             self::TYPE_ARTISAN_HORIZON_TERMINATE => 'php artisan horizon:terminate',
             self::TYPE_ARTISAN_DB_SEED => 'php artisan db:seed --force',
             self::TYPE_ARTISAN_CACHE_CLEAR => 'php artisan cache:clear',
+            self::TYPE_ARTISAN_PENNANT_CLEAR => 'php artisan pennant:clear',
             self::TYPE_CUSTOM => 'Custom shell command',
         ];
     }
