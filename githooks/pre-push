@@ -40,7 +40,10 @@ done
 echo "[pre-push] pre-deploy generators for $range (branch: $branch)"
 for h in "$HOOK_DIR"/pre-push.d/*.sh; do
   [ -f "$h" ] || continue
-  if ! DPLY_PUSH_RANGE="$range" DPLY_PUSH_BRANCH="$branch" bash "$h"; then
+  # stdin </dev/null: git feeds the ref list on this hook's stdin and holds the
+  # pipe open with no EOF. Without this, any child that reads stdin (e.g.
+  # `claude -p`) blocks forever and wedges the push.
+  if ! DPLY_PUSH_RANGE="$range" DPLY_PUSH_BRANCH="$branch" bash "$h" </dev/null; then
     echo "[pre-push] $(basename "$h") failed — aborting push." >&2
     exit 1
   fi

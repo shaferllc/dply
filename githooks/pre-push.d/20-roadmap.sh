@@ -28,6 +28,8 @@ tip="${RANGE##*..}"
 
 command -v php >/dev/null 2>&1 || { echo "[roadmap] php not found — skipping."; exit 0; }
 
+# A timeout (when available) backstops a slow/wedged model so it can't stall the push.
+TIMEOUT_BIN="$(command -v timeout || command -v gtimeout || true)"
 echo "[roadmap] updating from $tip ..."
 _to "${DPLY_ROADMAP_TIMEOUT:-120}" php artisan dply:roadmap:ai-update --sync --commit="$tip" </dev/null 2>/dev/null \
   || echo "[roadmap] skipped/failed/timed out (non-fatal)."
