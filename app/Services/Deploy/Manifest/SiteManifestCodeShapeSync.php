@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Deploy\Manifest;
 
+use App\Jobs\ProvisionSiteJob;
 use App\Models\Site;
 use App\Models\SiteDeployStep;
 use App\Models\SiteProcess;
@@ -101,13 +102,16 @@ final class SiteManifestCodeShapeSync
 
         if ($result['runtime_change'] !== null) {
             $rc = $result['runtime_change'];
+            $this->storePendingRuntimeChange($site, $rc + ['source' => $found['name']]);
             $log .= sprintf(
-                "[dply] NOTE: %s change %s → %s declared in %s is NOT auto-applied (re-provisions the runtime). Apply it in Settings → Runtime.\n",
+                "[dply] NOTE: %s change %s → %s declared in %s is NOT auto-applied (re-provisions the runtime). Apply it from the site's Runtime settings.\n",
                 $rc['field'],
                 $rc['from'] ?? '(unset)',
                 $rc['to'] ?? '(unset)',
                 $found['name'],
             );
+        } else {
+            $this->clearPendingRuntimeChange($site);
         }
 
         return $log;
@@ -273,6 +277,68 @@ final class SiteManifestCodeShapeSync
             return;
         }
         unset($meta['manifest']['removed_pending_confirm']);
+        $site->forceFill(['meta' => $meta])->save();
+    }
+
+    /**
+     * A manifest-declared runtime/version change awaiting an explicit apply
+     * (re-provisions the FPM pool). Null when the site already matches.
+     *
+     * @return array{field: string, from: ?string, to: ?string, source: string}|null
+     */
+    public function pendingRuntimeChange(Site $site): ?array
+    {
+        $change = data_get($site->meta, 'manifest.pending_runtime_change');
+
+        return is_array($change) && isset($change['to']) ? $change : null;
+    }
+
+    /**
+     * Operator-confirmed runtime/version apply: write the declared value and
+     * re-provision the site (ensures the pool for the new version), then clear
+     * the pending flag. No-op when nothing is pending.
+     *
+     * @return array{field: string, from: ?string, to: ?string}|null
+     */
+    public function applyPendingRuntimeChange(Site $site): ?array
+    {
+        $change = $this->pendingRuntimeChange($site);
+        if ($change === null) {
+            return null;
+        }
+
+        if ($change['field'] === 'version') {
+            $site->runtime_version = $change['to'];
+        } elseif ($change['field'] === 'runtime') {
+            $site->runtime = $change['to'];
+        }
+        $site->save();
+
+        $this->clearPendingRuntimeChange($site);
+
+        // Re-provision (idempotent) so the new runtime/version pool is ensured.
+        ProvisionSiteJob::dispatch($site->id);
+
+        return ['field' => $change['field'], 'from' => $change['from'] ?? null, 'to' => $change['to'] ?? null];
+    }
+
+    /**
+     * @param  array{field: string, from: ?string, to: ?string, source: string}  $change
+     */
+    private function storePendingRuntimeChange(Site $site, array $change): void
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+        $meta['manifest']['pending_runtime_change'] = $change;
+        $site->forceFill(['meta' => $meta])->save();
+    }
+
+    private function clearPendingRuntimeChange(Site $site): void
+    {
+        $meta = is_array($site->meta) ? $site->meta : [];
+        if (! isset($meta['manifest']['pending_runtime_change'])) {
+            return;
+        }
+        unset($meta['manifest']['pending_runtime_change']);
         $site->forceFill(['meta' => $meta])->save();
     }
 }
