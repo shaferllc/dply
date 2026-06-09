@@ -43,6 +43,7 @@ use App\Console\Commands\PruneTestingHostnameRecordsCommand;
 use App\Console\Commands\RevokeExpiredServerSshSessionsCommand;
 use App\Console\Commands\RollupEdgeAnalyticsEngineCommand;
 use App\Console\Commands\RunDueDeploymentSchedulesCommand;
+use App\Console\Commands\SecretsEscrowCommand;
 use App\Console\Commands\ServerlessTickCommand;
 use App\Console\Commands\SnapshotOrganizationBillingCommand;
 use App\Console\Commands\SweepExpiredMaintenanceWindowsCommand;
@@ -231,6 +232,15 @@ final class DplySchedule
         $schedule->command(DispatchGuestMetricsScriptUpgradesCommand::class)
             ->hourly()
             ->name('dispatch-guest-metrics-script-upgrades');
+
+        // Secret-vault safety net. The canonical escrow + DB backup is the
+        // app-independent bash cron (deploy/secrets/*.sh); this is a belt-and-
+        // suspenders daily escrow that also surfaces health in-app and catches
+        // out-of-band .env edits. Restore drills run on the isolated drill host.
+        $schedule->command(SecretsEscrowCommand::class, ['--source' => 'platform-env'])
+            ->dailyAt('04:20')
+            ->withoutOverlapping()
+            ->name('secrets-escrow-safety-net');
 
         if (DplyRuntime::isSplitDeployment()) {
             foreach ($schedule->events() as $event) {
