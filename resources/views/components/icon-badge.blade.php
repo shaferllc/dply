@@ -10,8 +10,10 @@
     // needed. An explicit tone (emerald, rose, …) always wins; `brand` opts back
     // into the muted look.
     if ($tone === 'auto') {
-        $autoPalette = ['amber', 'rose', 'emerald', 'indigo', 'violet', 'gold', 'sky', 'teal'];
-        $tone = $autoPalette[crc32(trim((string) $slot)) % count($autoPalette)];
+        // Palette restricted to tones already present in the compiled CSS so
+        // colors render immediately (no rebuild dependency).
+        $autoPalette = ['amber', 'rose', 'emerald', 'indigo', 'violet', 'gold'];
+        $tone = $autoPalette[hexdec(substr(md5(trim((string) $slot)), 0, 8)) % count($autoPalette)];
     }
 
     $toneClasses = match ($tone) {
@@ -22,8 +24,6 @@
         'emerald' => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
         'indigo'  => 'bg-indigo-50 text-indigo-700 ring-indigo-200',
         'violet'  => 'bg-violet-100 text-violet-700 ring-violet-200',
-        'sky'     => 'bg-sky-100 text-sky-700 ring-sky-200',
-        'teal'    => 'bg-teal-100 text-teal-700 ring-teal-200',
         'gold'    => 'bg-brand-gold/20 text-brand-forest ring-brand-gold/30',
         'brand'   => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
         default   => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25',
