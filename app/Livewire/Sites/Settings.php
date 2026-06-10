@@ -4120,8 +4120,10 @@ class Settings extends Show
         $deploymentContract = $needsDeploymentSurface
             ? app(DeploymentContractBuilder::class)->build($this->site)
             : null;
+        // Reuse the contract just built — validate() rebuilds it otherwise,
+        // doubling the most expensive piece of the render.
         $deploymentPreflight = $needsDeploymentSurface
-            ? app(DeploymentPreflightValidator::class)->validate($this->site)
+            ? app(DeploymentPreflightValidator::class)->validate($this->site, $deploymentContract)
             : [];
 
         $viewData = [

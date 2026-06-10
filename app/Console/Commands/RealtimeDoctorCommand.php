@@ -46,8 +46,10 @@ class RealtimeDoctorCommand extends Command
     private function compileReport(): array
     {
         $featureEnabled = (bool) config('features.surface.realtime');
-        $stripePrice = (string) (config('subscription.standard.stripe.realtime') ?? '');
         $host = (string) config('realtime.host');
+
+        $tiers = (array) config('realtime.tiers', []);
+        $tierPricesMissing = $this->missingTierPrices();
 
         $summary = [
             'feature_enabled' => $featureEnabled ? 'yes' : 'no',
@@ -56,14 +58,15 @@ class RealtimeDoctorCommand extends Command
             'cf_account_id' => $this->present(config('realtime.cloudflare.account_id')),
             'cf_api_token' => $this->present(config('realtime.cloudflare.api_token')),
             'cf_kv_namespace_id' => $this->present(config('realtime.cloudflare.kv_namespace_id')),
-            'stripe_price' => $stripePrice !== '' ? 'set' : '(unset)',
-            'price_per_app' => '$'.number_format(((int) config('realtime.plan.price_cents')) / 100, 2),
+            'stripe_tier_prices' => $tierPricesMissing === []
+                ? 'set ('.implode(', ', array_keys($tiers)).')'
+                : count($tierPricesMissing).' missing',
         ];
 
         // Checks that apply regardless of mode.
         $alwaysChecks = [
             $this->checkFeatureFlag($featureEnabled),
-            $this->checkStripePrice($stripePrice),
+            $this->checkStripePrice($tierPricesMissing, array_keys($tiers)),
             $this->checkWorkerHealth($host),
         ];
 
@@ -142,16 +145,43 @@ class RealtimeDoctorCommand extends Command
     }
 
     /**
+     * Per-tier Stripe price env vars that are not set. Apps are billed by their
+     * connection tier, so every configured tier needs a monthly + yearly price.
+     *
+     * @return list<string>
+     */
+    private function missingTierPrices(): array
+    {
+        $monthly = (array) config('subscription.standard.stripe.realtime_tiers', []);
+        $yearly = (array) config('subscription.standard.stripe.realtime_tiers_yearly', []);
+
+        $missing = [];
+        foreach (array_keys((array) config('realtime.tiers', [])) as $slug) {
+            $slug = (string) $slug;
+            if ((string) ($monthly[$slug] ?? '') === '') {
+                $missing[] = 'STRIPE_PRICE_STANDARD_REALTIME_'.strtoupper($slug);
+            }
+            if ((string) ($yearly[$slug] ?? '') === '') {
+                $missing[] = 'STRIPE_PRICE_STANDARD_REALTIME_'.strtoupper($slug).'_YEARLY';
+            }
+        }
+
+        return $missing;
+    }
+
+    /**
+     * @param  list<string>  $missing
+     * @param  list<int|string>  $tierSlugs
      * @return array<string, mixed>
      */
-    private function checkStripePrice(string $priceId): array
+    private function checkStripePrice(array $missing, array $tierSlugs): array
     {
         return [
-            'name' => 'stripe_price',
-            'ok' => $priceId !== '',
-            'detail' => $priceId !== ''
-                ? 'STRIPE_PRICE_STANDARD_REALTIME is set ('.$priceId.').'
-                : 'No Stripe price — active apps will not bill. Run php artisan dply:billing:provision-stripe and paste STRIPE_PRICE_STANDARD_REALTIME[_YEARLY].',
+            'name' => 'stripe_tier_prices',
+            'ok' => $missing === [],
+            'detail' => $missing === []
+                ? 'All connection-tier prices set ('.implode(', ', array_map('strval', $tierSlugs)).').'
+                : 'Active apps on these tiers will not bill — missing: '.implode(', ', $missing).'. Run php artisan dply:billing:provision-stripe and paste the printed STRIPE_PRICE_STANDARD_REALTIME_* lines.',
         ];
     }
 
