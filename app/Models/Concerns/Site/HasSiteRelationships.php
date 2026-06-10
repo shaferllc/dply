@@ -21,6 +21,7 @@ use App\Models\ServerDatabase;
 use App\Models\Site;
 use App\Models\SiteAccessGate;
 use App\Models\SiteAccessGatePassword;
+use App\Models\SiteBackend;
 use App\Models\SiteBasicAuthUser;
 use App\Models\SiteBinding;
 use App\Models\SiteCertificate;
@@ -61,6 +62,16 @@ trait HasSiteRelationships
     public function server(): BelongsTo
     {
         return $this->belongsTo(Server::class);
+    }
+
+    /**
+     * The serving points of a multi-backend site (this site behind a balancer on
+     * ≥2 app servers). Empty for an ordinary single-server site. See
+     * docs/MULTI_BACKEND_SITES.md.
+     */
+    public function backends(): HasMany
+    {
+        return $this->hasMany(SiteBackend::class);
     }
 
     /**

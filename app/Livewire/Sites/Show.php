@@ -3,6 +3,7 @@
 namespace App\Livewire\Sites;
 
 use App\Actions\Edge\RedeployEdgeSite;
+use App\Enums\DeploymentMethod;
 use App\Enums\SiteRedirectKind;
 use App\Jobs\ApplySiteWebserverConfigJob;
 use App\Jobs\AttachCloudDomainJob;
@@ -152,6 +153,14 @@ class Show extends Component
     public ?string $revealed_webhook_secret = null;
 
     public string $deploy_strategy = 'simple';
+
+    /**
+     * The site's effective {@see DeploymentMethod} value — the richer deploy-recipe
+     * picker that supersedes the bare zero-downtime toggle. Maps back to
+     * `deploy_strategy` (and keeps {@see $zero_downtime_enabled} in sync) so the
+     * pipeline tabs that still read the boolean keep working.
+     */
+    public string $deploy_method = 'flat';
 
     /** Mirrors {@see Site::$deploy_strategy} `atomic` for the zero-downtime card UI. */
     public bool $zero_downtime_enabled = false;
@@ -405,6 +414,7 @@ class Show extends Component
         $this->post_deploy_command = (string) ($this->site->post_deploy_command ?? '');
         $this->env_file_path_override = (string) ($this->site->env_file_path ?? '');
         $this->deploy_strategy = (string) ($this->site->deploy_strategy ?? 'simple');
+        $this->deploy_method = DeploymentMethod::forSite($this->site)->value;
         $this->zero_downtime_enabled = $this->deploy_strategy === 'atomic';
         $dm = is_array($this->site->meta) ? $this->site->meta : [];
         $this->ephemeral_deploy_credentials_enabled = (bool) data_get($dm, 'deploy.ephemeral_credentials', false);
@@ -1641,9 +1651,18 @@ class Show extends Component
         $previousStrategy = (string) ($this->site->deploy_strategy ?? 'simple');
         $newStrategy = $this->zero_downtime_enabled ? 'atomic' : 'simple';
 
-        $this->site->update(['deploy_strategy' => $newStrategy]);
+        $updates = ['deploy_strategy' => $newStrategy];
+        // This crude toggle only knows flat vs atomic. Realign deploy_method to
+        // match ONLY when the strategy actually flips, so it never clobbers a
+        // deliberate maintenance/recreate choice on an unrelated save.
+        if ($previousStrategy !== $newStrategy) {
+            $updates['deploy_method'] = DeploymentMethod::fromStrategy($newStrategy)->value;
+        }
+
+        $this->site->update($updates);
         $this->site->refresh();
         $this->deploy_strategy = $newStrategy;
+        $this->deploy_method = DeploymentMethod::forSite($this->site)->value;
 
         $message = __('Zero downtime deployment settings saved.');
 
@@ -1673,6 +1692,99 @@ class Show extends Component
         }
 
         $this->toastSuccess($message.' '.__('Use “Apply webserver config now” on the Routing tab if the document root should match this strategy.'));
+    }
+
+    /**
+     * The deployment methods offerable for this site, shaped for the picker.
+     * Sourced from {@see DeploymentMethod::availableForSite()} so a not-yet-built
+     * or unsupported method is never listed (and so never shown-then-errored).
+     *
+     * @return list<array{value: string, label: string, description: string}>
+     */
+    public function deploymentMethodOptions(): array
+    {
+        return array_map(
+            static fn (DeploymentMethod $m): array => [
+                'value' => $m->value,
+                'label' => $m->label(),
+                'description' => $m->description(),
+            ],
+            DeploymentMethod::availableForSite($this->site),
+        );
+    }
+
+    /**
+     * Persist the chosen {@see DeploymentMethod}: write `deploy_method`, keep the
+     * legacy `deploy_strategy` / `zero_downtime_enabled` mirrors in sync, and arm
+     * a one-time on-disk layout migration when the placement actually changes
+     * (flat ⇄ atomic). The migration runs at the END of the next successful
+     * deploy via SiteDeployLayoutMigrator — see docs/DEPLOYMENT_METHODS.md.
+     */
+    public function saveDeploymentMethod(): void
+    {
+        $this->authorize('update', $this->site);
+        $this->validate(['deploy_method' => ['required', 'string']]);
+
+        $method = DeploymentMethod::tryFrom($this->deploy_method);
+
+        // Server-truth gate: only accept a method actually offered for this site.
+        // Guards against a hidden/scaffolded value arriving from a tampered form.
+        if ($method === null || ! in_array($method, DeploymentMethod::availableForSite($this->site), true)) {
+            $this->deploy_method = DeploymentMethod::forSite($this->site)->value;
+            $this->toastError(__('That deployment method isn’t available for this site.'));
+
+            return;
+        }
+
+        $previousMethod = DeploymentMethod::forSite($this->site);
+        $newStrategy = $method->deployStrategy();
+
+        // The on-disk layout family the migrator actually transitions: flat
+        // (in-place checkout) vs atomic (releases/ + current). blue-green / image
+        // refine the atomic base but don't change this family, so they never arm a
+        // migration the migrator can't perform.
+        $layoutOf = static fn (DeploymentMethod $m): string => $m->deployStrategy() === 'simple' ? 'flat' : 'atomic';
+        $previousLayout = $layoutOf($previousMethod);
+        $newLayout = $layoutOf($method);
+
+        $this->site->update([
+            'deploy_method' => $method->value,
+            'deploy_strategy' => $newStrategy,
+        ]);
+        $this->site->refresh();
+        $this->deploy_method = $method->value;
+        $this->deploy_strategy = $newStrategy;
+        $this->zero_downtime_enabled = $newStrategy === 'atomic';
+
+        $message = __('Deployment method saved.');
+
+        if ($previousMethod === $method) {
+            $this->toastSuccess($message);
+
+            return;
+        }
+
+        // Arm the layout migration only when the on-disk layout family changes;
+        // e.g. atomic → maintenance (or → blue-green) keeps the atomic tree and
+        // needs no migration.
+        if ($previousLayout !== $newLayout) {
+            $meta = is_array($this->site->meta) ? $this->site->meta : [];
+            $meta['deploy_layout_migration'] = [
+                'from' => $previousLayout,
+                'to' => $newLayout,
+                'armed_at' => now()->toIso8601String(),
+            ];
+            $this->site->forceFill(['meta' => $meta])->save();
+        }
+
+        if ($this->shouldAutoReapplyManagedWebserverConfig()) {
+            ApplySiteWebserverConfigJob::dispatch($this->site->id);
+            $this->toastSuccess($message.' '.__('Webserver config queued.'));
+
+            return;
+        }
+
+        $this->toastSuccess($message.' '.__('Use “Apply webserver config now” on the Routing tab if the document root should match this method.'));
     }
 
     public function saveEphemeralDeployCredentials(): void

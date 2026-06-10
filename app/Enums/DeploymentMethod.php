@@ -90,8 +90,8 @@ enum DeploymentMethod: string
     public function isImplemented(): bool
     {
         return match ($this) {
-            self::Flat, self::Atomic, self::Maintenance, self::Recreate => true,
-            self::BlueGreen, self::Rolling, self::Canary, self::Image => false,
+            self::Flat, self::Atomic, self::Maintenance, self::Recreate, self::BlueGreen => true,
+            self::Rolling, self::Canary, self::Image => false,
         };
     }
 

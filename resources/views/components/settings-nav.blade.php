@@ -75,6 +75,36 @@
                             </button>
                         </x-slot>
                         <x-slot name="content">
+                            <x-dropdown-link :href="route('profile.api-keys')" wire:navigate>
+                                <x-slot name="icon">
+                                    <x-heroicon-o-bolt class="h-[1.15rem] w-[1.15rem]" />
+                                </x-slot>
+                                {{ __('API keys') }}
+                            </x-dropdown-link>
+                            <x-dropdown-link :href="route('profile.backup-configurations')" wire:navigate>
+                                <x-slot name="icon">
+                                    <x-heroicon-o-archive-box class="h-[1.15rem] w-[1.15rem]" />
+                                </x-slot>
+                                {{ __('Backup configurations') }}
+                            </x-dropdown-link>
+                            <x-dropdown-link :href="route('profile.cli')" wire:navigate>
+                                <x-slot name="icon">
+                                    <x-heroicon-o-command-line class="h-[1.15rem] w-[1.15rem]" />
+                                </x-slot>
+                                {{ __('CLI') }}
+                            </x-dropdown-link>
+                            <x-dropdown-link :href="route('profile.notification-channels')" wire:navigate>
+                                <x-slot name="icon">
+                                    <x-heroicon-o-bell-alert class="h-[1.15rem] w-[1.15rem]" />
+                                </x-slot>
+                                {{ __('Notification channels') }}
+                            </x-dropdown-link>
+                            <x-dropdown-link :href="route('organizations.index')" wire:navigate>
+                                <x-slot name="icon">
+                                    <x-heroicon-o-building-office-2 class="h-[1.15rem] w-[1.15rem]" />
+                                </x-slot>
+                                {{ __('Organizations') }}
+                            </x-dropdown-link>
                             <x-dropdown-link :href="route('settings.profile')" wire:navigate>
                                 <x-slot name="icon">
                                     <x-heroicon-o-user-circle class="h-[1.15rem] w-[1.15rem]" />
@@ -105,36 +135,6 @@
                                 </x-slot>
                                 {{ __('SSH keys') }}
                             </x-dropdown-link>
-                            <x-dropdown-link :href="route('profile.api-keys')" wire:navigate>
-                                <x-slot name="icon">
-                                    <x-heroicon-o-bolt class="h-[1.15rem] w-[1.15rem]" />
-                                </x-slot>
-                                {{ __('API keys') }}
-                            </x-dropdown-link>
-                            <x-dropdown-link :href="route('profile.cli')" wire:navigate>
-                                <x-slot name="icon">
-                                    <x-heroicon-o-command-line class="h-[1.15rem] w-[1.15rem]" />
-                                </x-slot>
-                                {{ __('CLI') }}
-                            </x-dropdown-link>
-                            <x-dropdown-link :href="route('profile.backup-configurations')" wire:navigate>
-                                <x-slot name="icon">
-                                    <x-heroicon-o-archive-box class="h-[1.15rem] w-[1.15rem]" />
-                                </x-slot>
-                                {{ __('Backup configurations') }}
-                            </x-dropdown-link>
-                            <x-dropdown-link :href="route('profile.notification-channels')" wire:navigate>
-                                <x-slot name="icon">
-                                    <x-heroicon-o-bell-alert class="h-[1.15rem] w-[1.15rem]" />
-                                </x-slot>
-                                {{ __('Notification channels') }}
-                            </x-dropdown-link>
-                            <x-dropdown-link :href="route('organizations.index')" wire:navigate>
-                                <x-slot name="icon">
-                                    <x-heroicon-o-building-office-2 class="h-[1.15rem] w-[1.15rem]" />
-                                </x-slot>
-                                {{ __('Organizations') }}
-                            </x-dropdown-link>
                         </x-slot>
                     </x-dropdown>
 
@@ -154,11 +154,11 @@
                             </button>
                         </x-slot>
                         <x-slot name="content">
-                            <x-dropdown-link :href="route('docs.create-first-server')" wire:navigate>
+                            <x-dropdown-link :href="route('docs.index')" wire:navigate>
                                 <x-slot name="icon">
-                                    <x-heroicon-o-server class="h-[1.15rem] w-[1.15rem]" />
+                                    <x-heroicon-o-rectangle-stack class="h-[1.15rem] w-[1.15rem]" />
                                 </x-slot>
-                                {{ __('Create your first server') }}
+                                {{ __('All docs') }}
                             </x-dropdown-link>
                             <x-dropdown-link :href="route('docs.connect-provider')" wire:navigate>
                                 <x-slot name="icon">
@@ -166,11 +166,11 @@
                                 </x-slot>
                                 {{ __('Connect a provider') }}
                             </x-dropdown-link>
-                            <x-dropdown-link :href="route('docs.markdown', ['slug' => 'source-control'])" wire:navigate>
+                            <x-dropdown-link :href="route('docs.create-first-server')" wire:navigate>
                                 <x-slot name="icon">
-                                    <x-heroicon-o-code-bracket-square class="h-[1.15rem] w-[1.15rem]" />
+                                    <x-heroicon-o-server class="h-[1.15rem] w-[1.15rem]" />
                                 </x-slot>
-                                {{ __('Source control & deploys') }}
+                                {{ __('Create your first server') }}
                             </x-dropdown-link>
                             <x-dropdown-link :href="route('docs.markdown', ['slug' => 'org-roles-and-limits'])" wire:navigate>
                                 <x-slot name="icon">
@@ -178,11 +178,11 @@
                                 </x-slot>
                                 {{ __('Roles & plan limits') }}
                             </x-dropdown-link>
-                            <x-dropdown-link :href="route('docs.index')" wire:navigate>
+                            <x-dropdown-link :href="route('docs.markdown', ['slug' => 'source-control'])" wire:navigate>
                                 <x-slot name="icon">
-                                    <x-heroicon-o-rectangle-stack class="h-[1.15rem] w-[1.15rem]" />
+                                    <x-heroicon-o-code-bracket-square class="h-[1.15rem] w-[1.15rem]" />
                                 </x-slot>
-                                {{ __('All docs') }}
+                                {{ __('Source control & deploys') }}
                             </x-dropdown-link>
                         </x-slot>
                     </x-dropdown>
@@ -217,6 +217,46 @@
 
         <p class="mt-4 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Account') }}</p>
         <nav class="{{ $accountNavClass }}" aria-label="{{ __('Account settings') }}">
+            <a
+                href="{{ route('profile.api-keys') }}"
+                wire:navigate
+                @class([$navBase, request()->routeIs('profile.api-keys') ? $navOn : $navOff])
+            >
+                <x-heroicon-o-bolt class="{{ $navIcon }}" aria-hidden="true" />
+                {{ __('API keys') }}
+            </a>
+            <a
+                href="{{ route('profile.backup-configurations') }}"
+                wire:navigate
+                @class([$navBase, request()->routeIs('profile.backup-configurations') ? $navOn : $navOff])
+            >
+                <x-heroicon-o-archive-box class="{{ $navIcon }}" aria-hidden="true" />
+                {{ __('Backup configurations') }}
+            </a>
+            <a
+                href="{{ route('profile.cli') }}"
+                wire:navigate
+                @class([$navBase, request()->routeIs('profile.cli') ? $navOn : $navOff])
+            >
+                <x-heroicon-o-command-line class="{{ $navIcon }}" aria-hidden="true" />
+                {{ __('CLI') }}
+            </a>
+            <a
+                href="{{ route('profile.notification-channels') }}"
+                wire:navigate
+                @class([$navBase, request()->routeIs('profile.notification-channels') ? $navOn : $navOff])
+            >
+                <x-heroicon-o-bell-alert class="{{ $navIcon }}" aria-hidden="true" />
+                {{ __('Notification channels') }}
+            </a>
+            <a
+                href="{{ route('organizations.index') }}"
+                wire:navigate
+                @class([$navBase, request()->routeIs('organizations.index', 'organizations.create') ? $navOn : $navOff])
+            >
+                <x-heroicon-o-building-office-2 class="{{ $navIcon }}" aria-hidden="true" />
+                {{ __('Organizations') }}
+            </a>
             {{-- Profile is the merged page (identity + preferences + sessions
                  + danger zone). The separate "Preferences" link is gone since
                  it pointed to the same URL after the /profile merge. --}}
@@ -260,58 +300,18 @@
                 <x-heroicon-o-key class="{{ $navIcon }}" aria-hidden="true" />
                 {{ __('SSH keys') }}
             </a>
-            <a
-                href="{{ route('profile.api-keys') }}"
-                wire:navigate
-                @class([$navBase, request()->routeIs('profile.api-keys') ? $navOn : $navOff])
-            >
-                <x-heroicon-o-bolt class="{{ $navIcon }}" aria-hidden="true" />
-                {{ __('API keys') }}
-            </a>
-            <a
-                href="{{ route('profile.cli') }}"
-                wire:navigate
-                @class([$navBase, request()->routeIs('profile.cli') ? $navOn : $navOff])
-            >
-                <x-heroicon-o-command-line class="{{ $navIcon }}" aria-hidden="true" />
-                {{ __('CLI') }}
-            </a>
-            <a
-                href="{{ route('profile.backup-configurations') }}"
-                wire:navigate
-                @class([$navBase, request()->routeIs('profile.backup-configurations') ? $navOn : $navOff])
-            >
-                <x-heroicon-o-archive-box class="{{ $navIcon }}" aria-hidden="true" />
-                {{ __('Backup configurations') }}
-            </a>
-            <a
-                href="{{ route('profile.notification-channels') }}"
-                wire:navigate
-                @class([$navBase, request()->routeIs('profile.notification-channels') ? $navOn : $navOff])
-            >
-                <x-heroicon-o-bell-alert class="{{ $navIcon }}" aria-hidden="true" />
-                {{ __('Notification channels') }}
-            </a>
-            <a
-                href="{{ route('organizations.index') }}"
-                wire:navigate
-                @class([$navBase, request()->routeIs('organizations.index', 'organizations.create') ? $navOn : $navOff])
-            >
-                <x-heroicon-o-building-office-2 class="{{ $navIcon }}" aria-hidden="true" />
-                {{ __('Organizations') }}
-            </a>
         </nav>
 
         <div class="mt-5 border-t border-brand-ink/10 pt-4">
             <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Guides') }}</p>
             <nav class="{{ $guidesNavClass }}" aria-label="{{ __('Guides') }}">
                 <a
-                    href="{{ route('docs.create-first-server') }}"
+                    href="{{ route('docs.index') }}"
                     wire:navigate
-                    @class([$navBase, request()->routeIs('docs.create-first-server') ? $navOn : $navOff])
+                    @class([$navBase, request()->routeIs('docs.index') ? $navOn : $navOff])
                 >
-                    <x-heroicon-o-server class="{{ $navIcon }}" aria-hidden="true" />
-                    {{ __('Create your first server') }}
+                    <x-heroicon-o-rectangle-stack class="{{ $navIcon }}" aria-hidden="true" />
+                    {{ __('All docs') }}
                 </a>
                 <a
                     href="{{ route('docs.connect-provider') }}"
@@ -322,12 +322,12 @@
                     {{ __('Connect a provider') }}
                 </a>
                 <a
-                    href="{{ route('docs.markdown', ['slug' => 'source-control']) }}"
+                    href="{{ route('docs.create-first-server') }}"
                     wire:navigate
-                    @class([$navBase, request()->routeIs('docs.markdown') && request()->route('slug') === 'source-control' ? $navOn : $navOff])
+                    @class([$navBase, request()->routeIs('docs.create-first-server') ? $navOn : $navOff])
                 >
-                    <x-heroicon-o-code-bracket-square class="{{ $navIcon }}" aria-hidden="true" />
-                    {{ __('Source control & deploys') }}
+                    <x-heroicon-o-server class="{{ $navIcon }}" aria-hidden="true" />
+                    {{ __('Create your first server') }}
                 </a>
                 <a
                     href="{{ route('docs.markdown', ['slug' => 'org-roles-and-limits']) }}"
@@ -338,12 +338,12 @@
                     {{ __('Roles & plan limits') }}
                 </a>
                 <a
-                    href="{{ route('docs.index') }}"
+                    href="{{ route('docs.markdown', ['slug' => 'source-control']) }}"
                     wire:navigate
-                    @class([$navBase, request()->routeIs('docs.index') ? $navOn : $navOff])
+                    @class([$navBase, request()->routeIs('docs.markdown') && request()->route('slug') === 'source-control' ? $navOn : $navOff])
                 >
-                    <x-heroicon-o-rectangle-stack class="{{ $navIcon }}" aria-hidden="true" />
-                    {{ __('All docs') }}
+                    <x-heroicon-o-code-bracket-square class="{{ $navIcon }}" aria-hidden="true" />
+                    {{ __('Source control & deploys') }}
                 </a>
             </nav>
         </div>

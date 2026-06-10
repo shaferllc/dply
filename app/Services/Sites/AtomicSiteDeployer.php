@@ -2,6 +2,7 @@
 
 namespace App\Services\Sites;
 
+use App\Enums\DeploymentMethod;
 use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Models\SiteDeployment;
@@ -70,7 +71,25 @@ class AtomicSiteDeployer
             }
         }
 
-        $folder = gmdate('YmdHis');
+        // Blue-green is the atomic base layout constrained to two fixed,
+        // alternating slots instead of timestamped releases: build into the IDLE
+        // slot (the opposite of whatever `current` points at), health-check it,
+        // then flip `current` to it. The live slot is never touched, so rollback
+        // is a guaranteed one-flip back to it. Everything else (clone/build/env/
+        // activate/health) is identical to atomic.
+        $blueGreen = DeploymentMethod::forSite($site)->placement() === 'blue_green';
+        if ($blueGreen) {
+            $liveSlot = basename(trim($ssh->exec(
+                sprintf('readlink -f %s/current 2>/dev/null || true', escapeshellarg($base)),
+                30
+            )));
+            $folder = $liveSlot === 'blue' ? 'green' : 'blue';
+            // The idle slot holds an older release; wipe it so the fresh clone
+            // lands in a clean tree.
+            $ssh->exec(sprintf('rm -rf %s/releases/%s', escapeshellarg($base), $folder), 120);
+        } else {
+            $folder = gmdate('YmdHis');
+        }
         $releasesDir = $base.'/releases';
         $newRelease = $releasesDir.'/'.$folder;
         $currentPath = $base.'/current';
@@ -83,7 +102,10 @@ class AtomicSiteDeployer
         // deploys clone+build+release into the timestamped release directory,
         // then flip the `current` symlink to it — so artisan/migrate always run
         // against the real checked-out code, never the `current` symlink.
-        $log .= "\n=== dply deploy plan (atomic / zero-downtime) ===\n";
+        $log .= sprintf("\n=== dply deploy plan (%s) ===\n", $blueGreen ? 'blue-green / zero-downtime' : 'atomic / zero-downtime');
+        if ($blueGreen) {
+            $log .= sprintf("[dply] blue-green slot: %s (idle slot built, then current flips to it)\n", $folder);
+        }
         $log .= sprintf("[dply] site:            #%s %s\n", $site->id, $site->name);
         $log .= sprintf("[dply] server:          #%s %s\n", $server->id, $server->name);
         $log .= sprintf("[dply] repository:      %s\n", $repo);
@@ -253,7 +275,31 @@ class AtomicSiteDeployer
             $log .= app(SiteLoggingConfigPusher::class)->apply($site, $ssh, $newRelease)['log'];
         }
 
-        // ── ACTIVATE ── before-activate hooks + the atomic symlink flip.
+        // ── RELEASE ── run release-phase steps (migrations, optimize, custom
+        // commands) in the freshly-built RELEASE dir — the real checkout, never
+        // the `current` symlink, so they do NOT depend on the flip resolving.
+        // Crucially this runs BEFORE the activate/cutover below: the symlink flip
+        // is the final, all-or-nothing gate. If a migration or any release step
+        // fails we throw here and `current` is never moved — the prior release
+        // keeps serving and the failed deploy changes nothing that's live.
+        // (Running against the real release dir also means `php artisan …` always
+        // finds `artisan`, never "Could not open input file: artisan" off a stale
+        // `current` — the failure mode for first deploys and worker-host sites.)
+        $log .= sprintf("\n[dply] RELEASE → running release-phase steps in %s (before cutover)\n", $newRelease);
+        $release = $this->pipelineRunner->runRelease($ssh, $site, $newRelease);
+        $releaseSteps = $release['steps'];
+        $releaseLog = $release['log'];
+        $releaseLog .= sprintf("[dply] RELEASE steps done → %d step(s), ok=%s\n", count($release['steps']), $release['ok'] ? 'true' : 'false');
+        $log .= $releaseLog;
+        $deployment?->recordPhaseResults('release', $releaseSteps);
+        if (! $release['ok']) {
+            throw new \RuntimeException('Deploy failed during the release phase before cutover — the previous release is still live and nothing changed. See the deployment log for details.');
+        }
+
+        // ── ACTIVATE ── before-activate hooks + the atomic symlink flip. Reached
+        // only after build AND release steps pass, so the cutover is the final
+        // action of a healthy deploy — any failure above left `current` pointing
+        // at the prior release, exactly as if the deploy had never run.
         $activateStart = microtime(true);
         $log .= sprintf("\n[dply] ACTIVATE → before-activate hooks + flip %s -> %s\n", $currentPath, $newRelease);
         $activateLog = $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::ANCHOR_BEFORE_ACTIVATE, $newRelease);
@@ -275,34 +321,25 @@ class AtomicSiteDeployer
             'skipped' => trim($activateOut) === '',
         ]]);
 
-        // ── RELEASE ── run release steps in the freshly-built RELEASE dir, not
-        // the `current` symlink. The flip above already points `current` at
-        // this release, so this is equivalent for a healthy deploy — but it
-        // does NOT depend on the symlink resolving. Running migrations/caches
-        // against the real checked-out code means `php artisan …` always finds
-        // `artisan`, instead of dying with "Could not open input file: artisan"
-        // when `current` is a stale/placeholder directory (the failure mode for
-        // first deploys and worker-host sites).
-        $log .= sprintf("\n[dply] RELEASE → running release-phase steps in %s\n", $newRelease);
-        $release = $this->pipelineRunner->runRelease($ssh, $site, $newRelease);
-        $releaseLog = $release['log'];
-        $releaseSteps = $release['steps'];
-        $releaseOk = $release['ok'];
-        $releaseLog .= sprintf("[dply] RELEASE steps done → %d step(s), ok=%s\n", count($release['steps']), $releaseOk ? 'true' : 'false');
-
+        // ── POST-ACTIVATE ── after-activate hooks + the user post-deploy command
+        // run now that `current` points at the new release (they are post-cutover
+        // by definition — e.g. warming the live site). A failure here still fails
+        // the deploy, but the release is already live; the health-check +
+        // auto-rollback below is the safety net for a bad cutover.
         $afterActivateLog = $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_ACTIVATE, $newRelease);
-        $releaseLog .= $afterActivateLog;
+        $log .= $afterActivateLog;
 
+        $postOk = true;
         $post = trim((string) $site->post_deploy_command);
         if ($post !== '') {
             $postStart = microtime(true);
-            $releaseLog .= sprintf("\n--- post deploy (in %s) ---\n", $newRelease);
             $postOut = $ssh->exec(
                 sprintf('cd %s && (%s) 2>&1; printf "\nDPLY_STEP_EXIT:%%s" "$?"', $newEsc, $post),
                 900
             );
-            $releaseLog .= $postOut;
+            $log .= sprintf("\n--- post deploy (in %s) ---\n", $newRelease).$postOut;
             $postOk = ! (preg_match('/DPLY_STEP_EXIT:(\d+)/', $postOut, $m) && (int) $m[1] !== 0);
+            // Append to the recorded release phase so it still shows on the timeline.
             $releaseSteps[] = [
                 'step_id' => 'post_deploy',
                 'step_type' => 'post_deploy',
@@ -312,14 +349,12 @@ class AtomicSiteDeployer
                 'duration_ms' => (int) round((microtime(true) - $postStart) * 1000),
                 'skipped' => false,
             ];
-            $releaseOk = $releaseOk && $postOk;
+            $deployment?->recordPhaseResults('release', $releaseSteps);
         }
 
-        $log .= $releaseLog;
-        $deployment?->recordPhaseResults('release', $releaseSteps);
         $this->hookRunner->assertHooksSucceeded($afterActivateLog, 'after_activate');
-        if (! $releaseOk) {
-            throw new \RuntimeException('Deploy failed during the release phase. See the deployment log for details.');
+        if (! $postOk) {
+            throw new \RuntimeException('Deploy failed during the post-deploy command (after cutover). See the deployment log for details.');
         }
 
         // ── RESTART ── bring long-running processes onto the new release. dply's
@@ -381,16 +416,31 @@ class AtomicSiteDeployer
 
         $sha = trim($ssh->exec(sprintf('cd %s && git rev-parse HEAD 2>/dev/null', $newEsc), 30));
 
-        $keep = max(1, min(50, (int) ($site->releases_to_keep ?? 5)));
-        $log .= "\n--- prune old releases ---\n";
-        $log .= $ssh->exec(
-            sprintf(
-                'cd %s/releases 2>/dev/null && ls -1t 2>/dev/null | tail -n +%d | while read -r d; do rm -rf "$d"; done; echo done',
-                $baseEsc,
-                $keep + 1
-            ),
-            120
-        );
+        if ($blueGreen) {
+            // Two-slot model: keep exactly blue + green (the live one and the
+            // idle rollback target). Sweep any stray timestamped dirs left from a
+            // prior atomic history so the tree stays the two pinned trees. The
+            // live slot was just flipped to, so nothing here can drop it.
+            $log .= "\n--- blue-green: keep blue + green, sweep strays ---\n";
+            $log .= $ssh->exec(
+                sprintf(
+                    'find %s/releases -mindepth 1 -maxdepth 1 -type d ! -name blue ! -name green -exec rm -rf {} + 2>/dev/null; echo done',
+                    $baseEsc
+                ),
+                120
+            );
+        } else {
+            $keep = max(1, min(50, (int) ($site->releases_to_keep ?? 5)));
+            $log .= "\n--- prune old releases ---\n";
+            $log .= $ssh->exec(
+                sprintf(
+                    'cd %s/releases 2>/dev/null && ls -1t 2>/dev/null | tail -n +%d | while read -r d; do rm -rf "$d"; done; echo done',
+                    $baseEsc,
+                    $keep + 1
+                ),
+                120
+            );
+        }
 
         SiteRelease::query()->where('site_id', $site->id)->update(['is_active' => false]);
         SiteRelease::query()->create([
