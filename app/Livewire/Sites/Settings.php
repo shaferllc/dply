@@ -8,6 +8,7 @@ use App\Jobs\AssignSystemUserToSiteJob;
 use App\Jobs\CollectWorkerPoolHorizonSnapshotJob;
 use App\Jobs\CollectWorkerPoolStatsJob;
 use App\Jobs\ExecuteSiteCertificateJob;
+use App\Jobs\MeasureSiteDiskUsageJob;
 use App\Jobs\ProvisionTenantTestingHostnameJob;
 use App\Jobs\ResetSiteOpcacheJob;
 use App\Jobs\RunSiteDeploymentJob;
@@ -1694,6 +1695,72 @@ class Settings extends Show
             __('OPcache flush failed.'),
         );
         $this->toastConsoleActionQueued();
+    }
+
+    /**
+     * Measure this site's on-disk footprint over SSH and stash it on
+     * meta.disk_usage so the Site details card shows a real size. VM sites only —
+     * container/edge/serverless apps have no SSH box to `du`.
+     */
+    public function measureDiskUsage(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->canMeasureDiskUsage()) {
+            $this->toastError(__('Disk usage can only be measured for sites hosted on a VM.'));
+
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('disk_usage_measure', __('Measuring disk usage'));
+        MeasureSiteDiskUsageJob::dispatch(
+            (string) $this->site->id,
+            (string) (auth()->id() ?? ''),
+            (string) $run->id,
+        );
+
+        // Re-read meta on the next render so the new value lands the moment the job finishes.
+        unset($this->diskUsage);
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            __('Disk usage updated.'),
+            __('Disk usage measurement failed.'),
+        );
+        $this->toastConsoleActionQueued();
+    }
+
+    /**
+     * VM-hosted sites have a real filesystem to measure; container/edge/serverless
+     * apps run off-box and have no deploy path to `du`.
+     */
+    #[Computed]
+    public function canMeasureDiskUsage(): bool
+    {
+        return $this->server->isVmHost()
+            && ! $this->site->usesFunctionsRuntime()
+            && ! $this->site->usesEdgeRuntime()
+            && ! $this->site->usesDockerRuntime()
+            && ! $this->site->usesKubernetesRuntime();
+    }
+
+    /**
+     * Fresh disk-usage snapshot, re-queried (not read off the hydrated model) so
+     * the value appears the moment {@see MeasureSiteDiskUsageJob} writes it,
+     * without a full model refresh. Memoized per render.
+     *
+     * @return array{bytes:int, files?:int, volume_total_bytes?:int, volume_used_bytes?:int, volume_available_bytes?:int, path?:string, measured_at?:string}|null
+     */
+    #[Computed]
+    public function diskUsage(): ?array
+    {
+        $usage = data_get(
+            Site::query()->select(['id', 'meta'])->find($this->site->id)?->meta,
+            'disk_usage'
+        );
+
+        return is_array($usage) && isset($usage['bytes']) ? $usage : null;
     }
 
     /**
