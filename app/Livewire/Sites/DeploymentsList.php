@@ -244,7 +244,11 @@ class DeploymentsList extends Component
                     $w->orWhere('server_id', $this->site->server_id);
                 }
             })
-            ->with('server:id,name')
+            // Full server (not server:id,name) — SitePolicy/ServerPolicy::update
+            // reads user_id/organization_id/workspace_id to authorize the deploy.
+            // A partial column load nulls those and skips every site as "no
+            // permission" (the deployMultiple footgun).
+            ->with('server')
             ->orderBy('name')
             ->get();
     }
