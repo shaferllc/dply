@@ -103,3 +103,35 @@ test('a failed step still reports the phase failed despite a trailing queued ste
 
     expect(phasesByKey($site, $deployment)['build']['status'])->toBe('failed');
 });
+
+test('the Restart phase is appended (after Activate) when the site has restart steps', function () {
+    $site = \App\Models\Site::factory()->create();
+    $site->deploySteps()->create([
+        'step_type' => 'artisan_horizon_terminate',
+        'phase' => 'restart',
+        'sort_order' => 0,
+    ]);
+
+    $keys = collect(SiteDeployTimeline::forDeployment($site->fresh(), null))->pluck('key')->all();
+
+    expect($keys)->toBe(['clone', 'build', 'release', 'activate', 'restart']);
+});
+
+test('the Restart phase is omitted when there are no restart steps or recorded restart', function () {
+    $site = \App\Models\Site::factory()->create();
+
+    $keys = collect(SiteDeployTimeline::forDeployment($site, null))->pluck('key')->all();
+
+    expect($keys)->toBe(['clone', 'build', 'release', 'activate']);
+});
+
+test('a recorded restart phase surfaces even without configured restart steps', function () {
+    $site = \App\Models\Site::factory()->create();
+
+    $deployment = runningDeployment($site, [
+        'restart' => [['step_type' => 'restart', 'ok' => true, 'skipped' => false, 'output' => 'FPM reloaded', 'duration_ms' => 50]],
+    ]);
+
+    $keys = collect(SiteDeployTimeline::forDeployment($site, $deployment))->pluck('key')->all();
+    expect($keys)->toContain('restart');
+});

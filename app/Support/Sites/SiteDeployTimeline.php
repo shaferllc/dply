@@ -43,14 +43,31 @@ final class SiteDeployTimeline
     {
         $running = $latest !== null && $latest->status === SiteDeployment::STATUS_RUNNING;
 
+        // Use the cached relation property (not ->get()) so repeated reads in the
+        // same request — e.g. this timeline plus SitePipelineAdvisor on the same
+        // $site instance — share one query instead of each hitting the DB.
+        $site->loadMissing('deploySteps');
+
+        // Canonical phases, plus a POST-CUTOVER Restart phase when the site has
+        // restart-phase steps (queue:restart / horizon:terminate / custom worker
+        // restarts) or this deploy recorded one (dply's managed reload also lands
+        // under 'restart'). Omitted otherwise so static sites don't show an empty
+        // pending Restart row.
+        $phaseDefs = self::PHASES;
+        $hasRestart = ($latest !== null && $latest->hasPhase('restart'))
+            || $site->deploySteps->contains(static fn ($s): bool => (string) $s->phase === SiteDeployStep::PHASE_RESTART);
+        if ($hasRestart) {
+            $phaseDefs['restart'] = 'Restart';
+        }
+
         // The phase currently executing. With incremental per-step recording a
         // phase is recorded WHILE it runs, so prefer the phase that still has a
         // step flagged `running`; only then fall back to the first canonical
         // phase the deployment hasn't recorded yet (deployer records
-        // clone → build → release → activate in order).
+        // clone → build → release → activate → restart in order).
         $runningPhase = null;
         if ($running) {
-            foreach (array_keys(self::PHASES) as $key) {
+            foreach (array_keys($phaseDefs) as $key) {
                 if (! $latest->hasPhase($key)) {
                     continue;
                 }
@@ -62,7 +79,7 @@ final class SiteDeployTimeline
                 }
             }
             if ($runningPhase === null) {
-                foreach (array_keys(self::PHASES) as $key) {
+                foreach (array_keys($phaseDefs) as $key) {
                     if (! $latest->hasPhase($key)) {
                         $runningPhase = $key;
                         break;
@@ -76,17 +93,13 @@ final class SiteDeployTimeline
         // running and a phase hasn't recorded yet, so the whole pipeline shows.
         $previewing = $latest === null || ! $finished;
 
-        // Use the cached relation property (not ->get()) so repeated reads in the
-        // same request — e.g. this timeline plus SitePipelineAdvisor on the same
-        // $site instance — share one query instead of each hitting the DB.
-        $site->loadMissing('deploySteps');
         $configuredByPhase = $site->deploySteps->groupBy(static fn ($s): string => (string) $s->phase);
         $hooksByPhase = self::hooksByPhase($site);
 
-        // Show EVERY canonical phase with its status — clone → build → activate
-        // → release — so the full pipeline and all statuses are always visible.
+        // Show every phase with its status — clone → build → release → activate
+        // (→ restart) — so the full pipeline and all statuses are always visible.
         $phases = [];
-        foreach (self::PHASES as $key => $label) {
+        foreach ($phaseDefs as $key => $label) {
             $recorded = $latest !== null && $latest->hasPhase($key);
             $steps = $recorded ? $latest->phaseSteps($key) : [];
             $configured = $configuredByPhase->get($key) ?? collect();

@@ -19,6 +19,10 @@
         : $site->deployments()->where('status', 'success')->latest()->first();
     $deployedSha = $deployedDeployment?->git_sha;
     $shortSha = $deployedSha ? \Illuminate\Support\Str::limit($deployedSha, 7, '') : null;
+    // Detail-modal data for the deployed commit badge.
+    $commitWebUrl = $deployedSha ? $site->commitWebUrl($deployedSha) : null;
+    $deployedBranch = trim((string) ($site->git_branch ?? ''));
+    $deployedDurationMs = $deployedDeployment ? $deployedDeployment->phaseTotalDurationMs() : 0;
     $totalDurationMs = $latest ? $latest->phaseTotalDurationMs() : 0;
     // Phase timeline derived from the site's pipeline (Clone → Build →
     // Release → Activate) overlaid with this deployment's recorded steps.
@@ -389,7 +393,15 @@
                 </dt>
                 <dd class="mt-1.5 truncate">
                     @if ($shortSha)
-                        <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 font-mono text-xs font-semibold text-brand-sage" title="{{ $deployedSha }}">{{ $shortSha }}</span>
+                        <button
+                            type="button"
+                            x-on:click="$dispatch('open-modal', 'deployed-commit')"
+                            title="{{ __('View commit details') }}"
+                            class="inline-flex items-center gap-1 rounded bg-brand-sand/60 px-1.5 py-0.5 font-mono text-xs font-semibold text-brand-sage transition-colors hover:bg-brand-sand hover:text-brand-forest focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-sage/40"
+                        >
+                            {{ $shortSha }}
+                            <x-heroicon-m-arrow-top-right-on-square class="h-3 w-3 opacity-60" aria-hidden="true" />
+                        </button>
                     @elseif ($latest)
                         <span class="text-brand-mist">{{ __('No successful deploy yet') }}</span>
                     @else
@@ -493,6 +505,82 @@
             </div>
         </div>
     </section>
+
+    {{-- Deployed-commit detail modal (opened from the summary badge). --}}
+    @if ($deployedDeployment)
+        <x-modal name="deployed-commit" maxWidth="lg" overlayClass="bg-brand-ink/30" focusable>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+                <x-icon-badge>
+                    <x-heroicon-o-code-bracket class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Deployed commit') }}</p>
+                    <h2 class="mt-1 font-mono text-lg font-semibold text-brand-ink">{{ $shortSha }}</h2>
+                    <p class="mt-1 text-sm text-brand-moss">{{ __('The commit currently live for this site (last successful deploy).') }}</p>
+                </div>
+            </div>
+
+            <div class="space-y-4 px-6 py-6">
+                {{-- Full SHA + copy. --}}
+                <div x-data="{ copied: false }">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Full SHA') }}</p>
+                    <div class="mt-1 flex items-center gap-2">
+                        <code class="min-w-0 flex-1 truncate rounded-lg bg-brand-sand/40 px-3 py-2 font-mono text-xs text-brand-ink ring-1 ring-inset ring-brand-ink/10">{{ $deployedSha }}</code>
+                        <button
+                            type="button"
+                            x-on:click="navigator.clipboard.writeText(@js($deployedSha)); copied = true; setTimeout(() => copied = false, 1500)"
+                            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-2 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40"
+                        >
+                            <template x-if="! copied"><span class="inline-flex items-center gap-1.5"><x-heroicon-o-clipboard-document class="h-4 w-4" /> {{ __('Copy') }}</span></template>
+                            <template x-if="copied"><span class="inline-flex items-center gap-1.5 text-emerald-700"><x-heroicon-o-check class="h-4 w-4" /> {{ __('Copied') }}</span></template>
+                        </button>
+                    </div>
+                </div>
+
+                {{-- Facts grid. --}}
+                <dl class="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-brand-ink/[0.06] text-sm ring-1 ring-inset ring-brand-ink/10">
+                    @if ($deployedBranch !== '')
+                        <div class="bg-white px-4 py-3">
+                            <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Branch') }}</dt>
+                            <dd class="mt-1 truncate font-mono text-xs text-brand-ink">{{ $deployedBranch }}</dd>
+                        </div>
+                    @endif
+                    <div class="bg-white px-4 py-3">
+                        <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Status') }}</dt>
+                        <dd class="mt-1 text-xs font-semibold capitalize text-emerald-700">{{ $deployedDeployment->status }}</dd>
+                    </div>
+                    <div class="bg-white px-4 py-3">
+                        <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Deployed') }}</dt>
+                        <dd class="mt-1 text-xs text-brand-ink" title="{{ ($deployedDeployment->finished_at ?? $deployedDeployment->created_at)?->toDayDateTimeString() }}">{{ ($deployedDeployment->finished_at ?? $deployedDeployment->created_at)?->diffForHumans() }}</dd>
+                    </div>
+                    <div class="bg-white px-4 py-3">
+                        <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Trigger') }}</dt>
+                        <dd class="mt-1 text-xs capitalize text-brand-ink">{{ $deployedDeployment->trigger ?? '—' }}</dd>
+                    </div>
+                    @if ($deployedDurationMs > 0)
+                        <div class="bg-white px-4 py-3">
+                            <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Duration') }}</dt>
+                            <dd class="mt-1 font-mono text-xs text-brand-ink">{{ number_format($deployedDurationMs / 1000, 1) }}s</dd>
+                        </div>
+                    @endif
+                </dl>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+                <div class="flex flex-wrap items-center gap-3">
+                    @if ($commitWebUrl)
+                        <a href="{{ $commitWebUrl }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-forest hover:underline">
+                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" /> {{ __('View on provider') }}
+                        </a>
+                    @endif
+                    <a href="{{ route('sites.deployments.show', ['server' => $server ?? $site->server, 'site' => $site, 'deployment' => $deployedDeployment]) }}" wire:navigate class="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-forest hover:underline">
+                        <x-heroicon-o-document-text class="h-4 w-4" /> {{ __('Open deployment') }}
+                    </a>
+                </div>
+                <x-secondary-button type="button" x-on:click="$dispatch('close-modal', 'deployed-commit')">{{ __('Close') }}</x-secondary-button>
+            </div>
+        </x-modal>
+    @endif
 
     @if (method_exists($this, 'applyPipelineOptimization'))
         @include('livewire.sites.partials.pipeline._optimize-preview-modal')

@@ -105,11 +105,9 @@ final class SitePipelineAdvisor
                     __('No storage:link step — files in storage/app/public won\'t be web-accessible.'),
                     SiteDeployStep::TYPE_ARTISAN_STORAGE_LINK, null, 'low');
             }
-            if (! empty($detection['laravel_horizon']) && ! $has(SiteDeployStep::TYPE_ARTISAN_HORIZON_TERMINATE)) {
-                $out[] = self::make('horizon', __('Restart Horizon after deploy'),
-                    __('Horizon is installed but never restarted on deploy — workers keep running the old code.'),
-                    SiteDeployStep::TYPE_ARTISAN_HORIZON_TERMINATE, null, 'medium');
-            }
+            // Horizon restart is handled post-cutover by dply's managed restart
+            // (guarded on the package + command), so we don't suggest adding an
+            // explicit horizon:terminate step anymore.
             if (! empty($detection['laravel_octane']) && ! $customMatches('octane:reload')) {
                 $out[] = self::make('octane', __('Reload Octane workers'),
                     __('Octane is installed but workers aren\'t reloaded on deploy — they serve stale code.'),

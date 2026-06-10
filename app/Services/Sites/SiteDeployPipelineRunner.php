@@ -118,8 +118,11 @@ class SiteDeployPipelineRunner
         }
 
         if ($site->isLaravelFrameworkDetected()) {
-            // Signal any queue:work workers to restart gracefully after the current job.
-            $parts[] = '{ [ -f artisan ] && { echo "[dply] queue:restart"; php artisan queue:restart 2>&1 || true; }; } || true';
+            // Signal any queue:work workers to restart gracefully after the
+            // current job — guarded on the command existing so an app without
+            // the queue component (or that can't boot artisan) skips cleanly.
+            $parts[] = '{ [ -f artisan ] && php artisan list 2>/dev/null | grep -q "queue:restart" '
+                .'&& { echo "[dply] queue:restart"; php artisan queue:restart 2>&1 || true; }; } || true';
             $labels[] = 'queue workers';
         }
 
