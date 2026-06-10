@@ -533,5 +533,26 @@ class RunSiteDeploymentJob implements ShouldQueue
     public function failed(?\Throwable $exception): void
     {
         $this->clearIdempotencyInflight();
+
+        // Hard failures (queue timeout, OOM, fatal) bypass handle()'s catch,
+        // leaving the deployment stuck "running" and the deploy button spinning
+        // until the optimistic lock's 600s TTL. Release the UI lock and mark the
+        // in-flight deployment failed so the failure surfaces on the next poll.
+        Cache::forget('site-deploy-active:'.$this->site->id);
+
+        $deployment = $this->site->deployments()
+            ->where('status', SiteDeployment::STATUS_RUNNING)
+            ->latest()
+            ->first();
+
+        if ($deployment !== null) {
+            $deployment->update([
+                'status' => SiteDeployment::STATUS_FAILED,
+                'exit_code' => $deployment->exit_code ?? 1,
+                'log_output' => trim(($deployment->log_output ? $deployment->log_output."\n\n" : '')
+                    .'Deployment failed: '.($exception?->getMessage() ?? 'job terminated')),
+                'finished_at' => now(),
+            ]);
+        }
     }
 }
