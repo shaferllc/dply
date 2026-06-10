@@ -1,6 +1,7 @@
 <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
     <x-breadcrumb-trail
         :items="$settingsBreadcrumbs"
+        :site="$site"
         doc-contextual
         :contextual-doc-slug="$contextualDocSlug"
         class="mb-6"
