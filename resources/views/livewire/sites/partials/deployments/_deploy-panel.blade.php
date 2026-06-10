@@ -537,32 +537,29 @@
                     </div>
                 </div>
 
-                {{-- Facts grid. --}}
-                <dl class="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-brand-ink/[0.06] text-sm ring-1 ring-inset ring-brand-ink/10">
-                    @if ($deployedBranch !== '')
-                        <div class="bg-white px-4 py-3">
-                            <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Branch') }}</dt>
-                            <dd class="mt-1 truncate font-mono text-xs text-brand-ink">{{ $deployedBranch }}</dd>
+                {{-- Facts grid. Built as a list so an odd cell count makes the
+                     last cell span both columns — no empty grey track cell. --}}
+                @php
+                    $deployedAt = $deployedDeployment->finished_at ?? $deployedDeployment->created_at;
+                    $facts = [];
+                    if ($deployedBranch !== '') {
+                        $facts[] = ['label' => __('Branch'), 'value' => $deployedBranch, 'class' => 'truncate font-mono text-xs text-brand-ink'];
+                    }
+                    $facts[] = ['label' => __('Status'), 'value' => ucfirst($deployedDeployment->status), 'class' => 'text-xs font-semibold text-emerald-700'];
+                    $facts[] = ['label' => __('Deployed'), 'value' => $deployedAt?->diffForHumans(), 'class' => 'text-xs text-brand-ink', 'title' => $deployedAt?->toDayDateTimeString()];
+                    $facts[] = ['label' => __('Trigger'), 'value' => ucfirst((string) ($deployedDeployment->trigger ?? '—')), 'class' => 'text-xs text-brand-ink'];
+                    if ($deployedDurationMs > 0) {
+                        $facts[] = ['label' => __('Duration'), 'value' => number_format($deployedDurationMs / 1000, 1).'s', 'class' => 'font-mono text-xs text-brand-ink'];
+                    }
+                    $oddCount = count($facts) % 2 === 1;
+                @endphp
+                <dl class="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-brand-ink/[0.06] ring-1 ring-inset ring-brand-ink/10">
+                    @foreach ($facts as $fact)
+                        <div @class(['bg-white px-4 py-3', 'col-span-2' => $oddCount && $loop->last])>
+                            <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $fact['label'] }}</dt>
+                            <dd class="mt-1 {{ $fact['class'] }}" @isset($fact['title']) title="{{ $fact['title'] }}" @endisset>{{ $fact['value'] }}</dd>
                         </div>
-                    @endif
-                    <div class="bg-white px-4 py-3">
-                        <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Status') }}</dt>
-                        <dd class="mt-1 text-xs font-semibold capitalize text-emerald-700">{{ $deployedDeployment->status }}</dd>
-                    </div>
-                    <div class="bg-white px-4 py-3">
-                        <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Deployed') }}</dt>
-                        <dd class="mt-1 text-xs text-brand-ink" title="{{ ($deployedDeployment->finished_at ?? $deployedDeployment->created_at)?->toDayDateTimeString() }}">{{ ($deployedDeployment->finished_at ?? $deployedDeployment->created_at)?->diffForHumans() }}</dd>
-                    </div>
-                    <div class="bg-white px-4 py-3">
-                        <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Trigger') }}</dt>
-                        <dd class="mt-1 text-xs capitalize text-brand-ink">{{ $deployedDeployment->trigger ?? '—' }}</dd>
-                    </div>
-                    @if ($deployedDurationMs > 0)
-                        <div class="bg-white px-4 py-3">
-                            <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Duration') }}</dt>
-                            <dd class="mt-1 font-mono text-xs text-brand-ink">{{ number_format($deployedDurationMs / 1000, 1) }}s</dd>
-                        </div>
-                    @endif
+                    @endforeach
                 </dl>
             </div>
 
