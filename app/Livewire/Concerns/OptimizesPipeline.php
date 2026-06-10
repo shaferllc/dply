@@ -8,6 +8,7 @@ use App\Jobs\OptimizeSitePipelineJob;
 use App\Livewire\Sites\Concerns\ManagesSiteDeploySteps;
 use App\Models\SiteDeployStep;
 use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Support\Sites\SitePipelineAdvisor;
 use Livewire\Component;
 
 /**
@@ -119,6 +120,94 @@ trait OptimizesPipeline
                 $added,
                 ['count' => $added],
             ));
+        }
+    }
+
+    /**
+     * Autofix one "Pipeline check" suggestion — drop its ready-made step into the
+     * default pipeline. Lives here (not on the heavy {@see ManagesSiteDeploySteps})
+     * so the Deploy hub — which doesn't carry the full pipeline-editing trait — can
+     * offer per-suggestion fixes too. DB-only, runs inline, idempotent.
+     */
+    public function addSuggestedPipelineStep(string $key): void
+    {
+        $this->authorize('update', $this->site);
+
+        $suggestion = collect(SitePipelineAdvisor::suggestions($this->site, true))
+            ->firstWhere('key', $key);
+        if ($suggestion === null) {
+            return;
+        }
+
+        $pipelines = app(SiteDeployPipelineManager::class);
+        $pipeline = $pipelines->ensureDefaultPipeline($this->site);
+
+        // Don't double-add a step the pipeline already has.
+        $existing = $pipeline->steps()->get();
+        $isCustom = $suggestion['step_type'] === SiteDeployStep::TYPE_CUSTOM;
+        $already = $isCustom
+            ? $existing->where('step_type', SiteDeployStep::TYPE_CUSTOM)
+                ->contains(static fn ($s): bool => strtolower((string) $s->custom_command) === strtolower((string) $suggestion['command']))
+            : $existing->contains(static fn ($s): bool => (string) $s->step_type === $suggestion['step_type']);
+
+        if (! $already) {
+            $pipelines->addStep(
+                $pipeline,
+                $suggestion['step_type'],
+                $suggestion['command'],
+                900,
+                null,
+                $suggestion['phase'],
+            );
+        }
+
+        // Recompute the advisor against the just-added step so the suggestion
+        // clears on re-render (see applyPipelineOptimization for the why).
+        $this->site->unsetRelation('deploySteps');
+        if (method_exists($this, 'syncEditingPipelineBranches')) {
+            $this->site->refresh();
+        }
+
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess($already
+                ? __('That step is already in the pipeline.')
+                : __(':label added to the :phase phase.', ['label' => $suggestion['label'], 'phase' => $suggestion['phase']]));
+        }
+    }
+
+    /**
+     * Hide a suggestion the operator doesn't want — persisted on meta so it stays
+     * gone across renders. Reversible via {@see restorePipelineSuggestions()}.
+     */
+    public function dismissPipelineSuggestion(string $key): void
+    {
+        $this->authorize('update', $this->site);
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        $meta[SitePipelineAdvisor::DISMISSED_META_KEY] = array_values(array_unique(array_merge(
+            (array) ($meta[SitePipelineAdvisor::DISMISSED_META_KEY] ?? []),
+            [$key],
+        )));
+        $this->site->forceFill(['meta' => $meta])->save();
+
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess(__('Suggestion dismissed.'));
+        }
+    }
+
+    /**
+     * Bring back every dismissed pipeline suggestion.
+     */
+    public function restorePipelineSuggestions(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $meta = is_array($this->site->meta) ? $this->site->meta : [];
+        unset($meta[SitePipelineAdvisor::DISMISSED_META_KEY]);
+        $this->site->forceFill(['meta' => $meta])->save();
+
+        if (method_exists($this, 'toastSuccess')) {
+            $this->toastSuccess(__('Dismissed suggestions restored.'));
         }
     }
 

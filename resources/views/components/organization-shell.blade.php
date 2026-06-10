@@ -21,6 +21,7 @@
             <p class="text-xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('Organization') }}</p>
             <p class="mt-1 font-semibold text-brand-ink truncate" title="{{ $org->name }}">{{ $org->name }}</p>
             <nav class="mt-4 space-y-0.5" aria-label="{{ __('Organization navigation') }}">
+                {{-- Overview is the workspace root — pinned first; everything below is alphabetical. --}}
                 <a
                     href="{{ route('organizations.show', $org) }}"
                     wire:navigate
@@ -28,22 +29,6 @@
                 >
                     <x-heroicon-o-squares-2x2 class="{{ $ni }}" aria-hidden="true" />
                     {{ __('Overview') }}
-                </a>
-                <a
-                    href="{{ route('organizations.members', $org) }}"
-                    wire:navigate
-                    @class([$navBase, $link('members')])
-                >
-                    <x-heroicon-o-users class="{{ $ni }}" aria-hidden="true" />
-                    {{ __('Members') }}
-                </a>
-                <a
-                    href="{{ route('organizations.teams', $org) }}"
-                    wire:navigate
-                    @class([$navBase, $link('teams')])
-                >
-                    <x-heroicon-o-rectangle-group class="{{ $ni }}" aria-hidden="true" />
-                    {{ __('Teams') }}
                 </a>
                 @if ($org->hasAdminAccess(auth()->user()))
                     <a
@@ -89,6 +74,14 @@
                         {{ __('Invoices') }}
                     </a>
                 @endcan
+                <a
+                    href="{{ route('organizations.members', $org) }}"
+                    wire:navigate
+                    @class([$navBase, $link('members')])
+                >
+                    <x-heroicon-o-users class="{{ $ni }}" aria-hidden="true" />
+                    {{ __('Members') }}
+                </a>
                 @can('viewNotificationChannels', $org)
                     <a
                         href="{{ route('organizations.notification-channels', $org) }}"
@@ -109,6 +102,14 @@
                         {{ __('Server providers') }}
                     </a>
                 @endcan
+                <a
+                    href="{{ route('organizations.teams', $org) }}"
+                    wire:navigate
+                    @class([$navBase, $link('teams')])
+                >
+                    <x-heroicon-o-rectangle-group class="{{ $ni }}" aria-hidden="true" />
+                    {{ __('Teams') }}
+                </a>
                 @can('view', $org)
                     <a
                         href="{{ route('organizations.webserver-templates', $org) }}"

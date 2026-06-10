@@ -22,12 +22,18 @@ use Illuminate\Support\Str;
  */
 final class SiteDeployTimeline
 {
-    /** Canonical pipeline phases shown on the Deploy tab, in display order. */
+    /**
+     * Canonical pipeline phases shown on the Deploy tab, in execution/display
+     * order. Release-phase steps now run BEFORE the activate/cutover (the
+     * deployer flips `current` last, so a failed deploy never goes live), so
+     * Release precedes Activate here — keeping this list in step with the real
+     * order also keeps the "currently running" indicator accurate.
+     */
     private const PHASES = [
         'clone' => 'Clone & fetch',
         'build' => 'Build',
-        'activate' => 'Activate',
         'release' => 'Release',
+        'activate' => 'Activate',
     ];
 
     /**

@@ -241,6 +241,16 @@ class Server extends Model
         return $this->hasMany(Site::class);
     }
 
+    /**
+     * Multi-backend serving points hosted on this server (this server acting as a
+     * backend for one or more sites' backend groups). See
+     * docs/MULTI_BACKEND_SITES.md.
+     */
+    public function siteBackends(): HasMany
+    {
+        return $this->hasMany(SiteBackend::class);
+    }
+
     /** Memoized request-lifetime cache for {@see cachedSitesCount()}. */
     private ?int $cachedSitesCount = null;
 

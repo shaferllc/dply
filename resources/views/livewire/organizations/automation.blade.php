@@ -147,7 +147,9 @@
                     </div>
                 </section>
 
-                {{-- Cloud alerts: Slack webhook + extra emails for deploy/restart/CPU/memory. --}}
+                {{-- Cloud alerts: Slack webhook + extra emails for deploy/restart/CPU/memory.
+                     Only meaningful once the Cloud surface is enabled for the org. --}}
+                @feature('surface.cloud')
                 <section class="dply-card overflow-hidden" id="alerts">
                     @php $h = $sectionHeader(__('Cloud alerts'), __('Alert destinations'), __('Where dply sends deploy-failed, restart, CPU, and memory alerts for Cloud apps. Org owners are always notified on their login emails — these fields add extra recipients.'), 'heroicon-o-exclamation-triangle', 'amber'); @endphp
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">
@@ -184,8 +186,11 @@
                         </div>
                     </form>
                 </section>
+                @endfeature
 
-                {{-- Edge data region: regional preference for R2 buckets. --}}
+                {{-- Edge data region: regional preference for R2 buckets.
+                     Only meaningful once the Edge surface is enabled for the org. --}}
+                @feature('surface.edge')
                 <section class="dply-card overflow-hidden" id="data-region">
                     @php $h = $sectionHeader(__('Data residency'), __('Edge data region'), __('Preferred Cloudflare R2 region for buckets created on behalf of this organization. Existing buckets stay where they are — the setting only applies to future Edge bootstraps.'), 'heroicon-o-globe-europe-africa', 'sky'); @endphp
                     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
@@ -212,6 +217,7 @@
                         <p class="text-xs text-brand-mist">{{ __('Selecting "EU" creates buckets in Cloudflare\'s EU jurisdiction — data is stored in the EU and the EU jurisdiction header is set on every request.') }}</p>
                     </div>
                 </section>
+                @endfeature
 
                 {{-- API tokens: create form + sandy "Existing tokens" header + clean rows. --}}
                 <section class="dply-card overflow-hidden" id="api-tokens">
