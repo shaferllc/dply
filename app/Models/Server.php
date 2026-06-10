@@ -497,6 +497,19 @@ class Server extends Model
         return $this->status === self::STATUS_READY;
     }
 
+    /**
+     * Fully provisioned: the provider instance is up (status ready) AND the
+     * OS-level setup script finished (setup_status done). `status` flips to ready
+     * the moment the IP is known — long before setup completes — so callers that
+     * must not touch a half-built box (e.g. worker-pool replay/deploy) gate on
+     * this instead of {@see isReady()}.
+     */
+    public function isProvisioningComplete(): bool
+    {
+        return $this->status === self::STATUS_READY
+            && $this->setup_status === self::SETUP_STATUS_DONE;
+    }
+
     public function privateNetwork(): BelongsTo
     {
         return $this->belongsTo(PrivateNetwork::class, 'private_network_id');

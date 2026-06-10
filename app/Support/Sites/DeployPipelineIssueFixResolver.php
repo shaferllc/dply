@@ -65,6 +65,22 @@ final class DeployPipelineIssueFixResolver
             ];
         }
 
+        // The Laravel safety bundle adds — in one click — exactly what these
+        // three warn about: the maintenance down/up hooks, the Migrate (pretend)
+        // dry-run step, and the pre-migrate DB snapshot. So fixing any of them
+        // applies the bundle (idempotent: clicking one clears all three). Falls
+        // through to the per-issue links below for non-Laravel sites.
+        if (in_array($key, [
+            'migrate_without_pretend',
+            'migrate_without_backup',
+            'migrate_without_maintenance_down',
+        ], true) && $site->isLaravelFrameworkDetected()) {
+            return [
+                'label' => __('Apply safety bundle'),
+                'action' => 'applyLaravelSafetyPresetBundle',
+            ];
+        }
+
         if ($key === 'migrate_without_backup') {
             return self::link(
                 __('Open database backups'),

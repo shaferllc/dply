@@ -7,9 +7,11 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\WorkerPool;
+use App\Services\WorkerPools\WorkerMemberProviderProbe;
 use App\Services\WorkerPools\WorkerPoolManager;
 use App\Services\WorkerPools\WorkerPoolNotifier;
 use App\Services\WorkerPools\WorkerWorkloadReplayer;
+use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
@@ -43,6 +45,14 @@ class ReconcileWorkerPoolJob implements ShouldQueue
 
     /** Stop re-dispatching after this many ticks (~20 min at 30s) as a backstop. */
     private const MAX_ATTEMPTS = 40;
+
+    /**
+     * A non-active member that hasn't advanced for this long is "wedged". We then
+     * ask the provider whether its instance still exists; a confirmed-gone box
+     * (destroyed out-of-band, IP recycled) is marked errored instead of looped on
+     * forever. Generous so a slow-but-healthy provision is never killed.
+     */
+    private const STUCK_MINUTES = 15;
 
     private ?Server $resolvedSubject = null;
 
@@ -161,8 +171,17 @@ class ReconcileWorkerPoolJob implements ShouldQueue
                 continue;
             }
 
+            if ($state === WorkerPool::MEMBER_ERRORED) {
+                continue; // wedged/gone — left for operator inspection or removal
+            }
+
             if ($state === WorkerPool::MEMBER_PROVISIONING) {
-                if ($member->isReady()) {
+                // Gate on full provisioning (status ready AND setup done), NOT just
+                // isReady(): `status` flips to ready the moment the IP is known,
+                // long before the OS setup script finishes. Replaying onto a
+                // half-built box was how a member advanced to deploying while its
+                // box was still being created (and sometimes vanished mid-setup).
+                if ($member->isProvisioningComplete()) {
                     $this->markState($member, WorkerPool::MEMBER_REPLAYING);
                     $emit->step('replay', sprintf('%s is ready — replaying workload', $member->name));
                     try {
@@ -183,11 +202,16 @@ class ReconcileWorkerPoolJob implements ShouldQueue
                         $this->markState($member, WorkerPool::MEMBER_PROVISIONING);
                         $inFlight = true;
                     }
+                } elseif ($this->guardWedgedMember($member, $pool, $emit)) {
+                    continue; // confirmed gone — marked errored, skip
                 } else {
                     $emit->info(sprintf('%s still provisioning at the provider…', $member->name), 'provision');
                     $inFlight = true; // still provisioning at the provider
                 }
             } elseif ($state === WorkerPool::MEMBER_DEPLOYING) {
+                if ($this->guardWedgedMember($member, $pool, $emit)) {
+                    continue; // box vanished mid-deploy — marked errored, skip
+                }
                 if ($this->dispatchReadyDeploys($member, $emit)) {
                     $this->markState($member, WorkerPool::MEMBER_ACTIVE);
                     $activated = true;
@@ -301,8 +325,67 @@ class ReconcileWorkerPoolJob implements ShouldQueue
     private function markState(Server $member, string $state): void
     {
         $meta = is_array($member->meta) ? $member->meta : [];
+        $prev = $meta['pool']['state'] ?? null;
         $meta['pool'] = array_merge($meta['pool'] ?? [], ['state' => $state]);
+        // Stamp when we ENTERED this state so guardWedgedMember can measure how
+        // long a member has been stuck without advancing.
+        if ($prev !== $state) {
+            $meta['pool']['state_since'] = now()->toIso8601String();
+        }
         $member->forceFill(['meta' => $meta])->save();
+    }
+
+    /**
+     * A member that has been provisioning/deploying past {@see STUCK_MINUTES}
+     * without advancing is "wedged". Ask the provider whether its instance still
+     * exists; on a CONFIRMED "not found" (destroyed out-of-band, IP recycled) mark
+     * it errored and degrade the pool so it stops being a silent zombie. Anything
+     * ambiguous (transient API error, unsupported provider) is left alone.
+     *
+     * @return bool true when the member was marked errored (caller should skip it)
+     */
+    private function guardWedgedMember(Server $member, WorkerPool $pool, \App\Services\ConsoleActions\ConsoleEmitter $emit): bool
+    {
+        $sinceRaw = $member->meta['pool']['state_since'] ?? $member->created_at?->toIso8601String();
+        $since = is_string($sinceRaw) ? CarbonImmutable::parse($sinceRaw) : null;
+        if ($since === null || $since->gt(now()->subMinutes(self::STUCK_MINUTES))) {
+            return false; // not stuck long enough yet
+        }
+
+        $exists = app(WorkerMemberProviderProbe::class)->instanceExists($member);
+        if ($exists !== false) {
+            // true (healthy, just slow) or null (couldn't tell) — never tear down.
+            if ($exists === null) {
+                $emit->warn(sprintf(
+                    '%s has been wedged for >%dm; could not confirm with the provider whether it still exists.',
+                    $member->name,
+                    self::STUCK_MINUTES,
+                ), 'provision');
+            }
+
+            return false;
+        }
+
+        Log::warning('worker-pool: member instance not found at provider — marking errored', [
+            'pool_id' => $pool->id,
+            'member_id' => $member->id,
+            'provider' => $member->provider->value,
+            'provider_id' => $member->provider_id,
+        ]);
+        $this->markState($member, WorkerPool::MEMBER_ERRORED);
+        $emit->error(sprintf(
+            '%s no longer exists at %s (instance %s) — its box was destroyed out-of-band. Marked errored; remove it to let the pool re-scale.',
+            $member->name,
+            $member->provider->value,
+            $member->provider_id ?: 'unknown',
+        ), 'provision');
+        $pool->forceFill(['status' => WorkerPool::STATUS_DEGRADED])->save();
+        app(WorkerPoolNotifier::class)->scaleFailed(
+            $pool->fresh() ?? $pool,
+            sprintf('Worker %s vanished at the provider and was marked errored.', $member->name),
+        );
+
+        return true;
     }
 
     protected function consoleSubject(): Model

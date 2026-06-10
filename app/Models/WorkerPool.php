@@ -47,6 +47,14 @@ class WorkerPool extends Model
 
     public const MEMBER_DRAINING = 'draining';
 
+    /**
+     * Terminal failure: the member could not converge (e.g. its provider
+     * instance vanished, or provisioning wedged past the stuck threshold). It is
+     * left in place for the operator to inspect/remove — the reconciler stops
+     * trying to advance it and surfaces the pool as degraded.
+     */
+    public const MEMBER_ERRORED = 'errored';
+
     protected $fillable = [
         'organization_id',
         'name',

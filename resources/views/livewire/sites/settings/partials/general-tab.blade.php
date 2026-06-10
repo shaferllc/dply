@@ -135,11 +135,23 @@
                     </div>
                 </div>
 
-                <dl class="grid grid-cols-1 gap-4 rounded-xl border border-brand-ink/10 bg-brand-sand/15 p-4 text-sm sm:grid-cols-2">
+                <dl class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     @foreach ($summaryCards as $card)
-                        <div>
-                            <dt class="text-brand-mist">{{ $card['label'] }}</dt>
-                            <dd class="mt-1 break-all font-medium text-brand-ink">{{ $card['value'] }}</dd>
+                        @php
+                            $cardValue = trim((string) $card['value']);
+                            $cardValueLower = strtolower($cardValue);
+                            $cardIsPositive = \Illuminate\Support\Str::contains($cardValueLower, ['active', 'enabled', 'running', 'ready', 'healthy', 'published']);
+                            $cardIsNegative = \Illuminate\Support\Str::contains($cardValueLower, ['disabled', 'failed', 'inactive', 'error', 'down', 'not ', 'never', 'unhealthy']);
+                            $cardIsPath = \Illuminate\Support\Str::startsWith($cardValue, '/');
+                        @endphp
+                        <div class="rounded-xl border border-brand-ink/10 bg-white px-4 py-3.5 shadow-sm">
+                            <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ $card['label'] }}</dt>
+                            <dd class="mt-1.5 flex items-center gap-2">
+                                @if ($cardIsPositive || $cardIsNegative)
+                                    <span class="inline-flex h-2 w-2 shrink-0 rounded-full {{ $cardIsNegative ? 'bg-rose-500' : 'bg-emerald-500' }} ring-4 {{ $cardIsNegative ? 'ring-rose-500/15' : 'ring-emerald-500/15' }}" aria-hidden="true"></span>
+                                @endif
+                                <span class="break-all {{ $cardIsPath ? 'font-mono text-xs' : 'text-sm' }} font-semibold text-brand-ink">{{ $cardValue !== '' ? $cardValue : '—' }}</span>
+                            </dd>
                         </div>
                     @endforeach
                 </dl>
@@ -294,29 +306,121 @@
 
     <div class="px-6 py-6 sm:px-7">
         @php
-            $diskUsageBytes = data_get($site->meta, 'disk_usage.bytes');
+            $disk = $this->diskUsage;
+            $diskBytes = data_get($disk, 'bytes');
+            $diskFiles = data_get($disk, 'files');
+            $diskMeasuredAt = data_get($disk, 'measured_at');
+            $diskVolumeTotal = data_get($disk, 'volume_total_bytes');
+            $diskVolumeUsed = data_get($disk, 'volume_used_bytes');
+            $diskVolumePct = is_numeric($diskVolumeTotal) && is_numeric($diskVolumeUsed) && $diskVolumeTotal > 0
+                ? min(100, round($diskVolumeUsed / $diskVolumeTotal * 100, 1))
+                : null;
         @endphp
-            <dl class="grid grid-cols-1 gap-5 text-sm sm:grid-cols-2">
-                <div>
-                    <dt class="text-brand-mist">{{ __('Created at') }}</dt>
-                    <dd class="mt-1 font-medium text-brand-ink">{{ $site->created_at?->format('Y-m-d H:i:s') ?? '—' }}</dd>
+        <dl class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {{-- Created at --}}
+            <div class="flex items-start gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-3.5 shadow-sm">
+                <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-sand/50 text-brand-moss">
+                    <x-heroicon-o-calendar-days class="h-4 w-4" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Created at') }}</dt>
+                    <dd class="mt-0.5 text-sm font-semibold text-brand-ink">{{ $site->created_at?->format('M j, Y') ?? '—' }}</dd>
+                    @if ($site->created_at)
+                        <dd class="text-xs text-brand-moss">{{ $site->created_at->format('H:i') }} · {{ $site->created_at->diffForHumans() }}</dd>
+                    @endif
                 </div>
-                <div>
-                    <dt class="text-brand-mist">{{ __('Site ID') }}</dt>
-                    <dd class="mt-1 font-mono text-xs font-medium text-brand-ink">{{ $site->id }}</dd>
+            </div>
+
+            {{-- Stack --}}
+            <div class="flex items-start gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-3.5 shadow-sm">
+                <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-sand/50 text-brand-moss">
+                    <x-heroicon-o-cpu-chip class="h-4 w-4" aria-hidden="true" />
+                </span>
+                <div class="min-w-0">
+                    <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Stack') }}</dt>
+                    <dd class="mt-0.5 text-sm font-semibold text-brand-ink">{{ $site->type->label() }}</dd>
                 </div>
-                <div>
-                    <dt class="text-brand-mist">{{ __('Stack') }}</dt>
-                    <dd class="mt-1 font-medium text-brand-ink">{{ $site->type->label() }}</dd>
-                </div>
-                <div>
-                    <dt class="text-brand-mist">{{ __('Disk usage') }}</dt>
-                    <dd class="mt-1 font-medium text-brand-ink">
-                        {{ is_numeric($diskUsageBytes) ? \Illuminate\Support\Number::fileSize((int) $diskUsageBytes) : __('Not recorded yet') }}
+            </div>
+
+            {{-- Site ID (copyable) --}}
+            <div class="flex items-start gap-3 rounded-xl border border-brand-ink/10 bg-white px-4 py-3.5 shadow-sm sm:col-span-2">
+                <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-sand/50 text-brand-moss">
+                    <x-heroicon-o-hashtag class="h-4 w-4" aria-hidden="true" />
+                </span>
+                <div class="min-w-0 flex-1">
+                    <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Site ID') }}</dt>
+                    <dd class="mt-0.5 flex items-center gap-2">
+                        <span class="break-all font-mono text-xs font-semibold text-brand-ink">{{ $site->id }}</span>
+                        <button type="button"
+                            x-data="{ copied: false }"
+                            x-on:click="navigator.clipboard.writeText(@js((string) $site->id)); copied = true; setTimeout(() => copied = false, 1500)"
+                            class="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-brand-sage hover:bg-brand-sand/50"
+                            :title="copied ? @js(__('Copied')) : @js(__('Copy site ID'))">
+                            <span x-show="!copied" class="inline-flex items-center gap-1">
+                                <x-heroicon-o-clipboard-document class="h-3.5 w-3.5" aria-hidden="true" />
+                                {{ __('Copy') }}
+                            </span>
+                            <span x-show="copied" x-cloak class="inline-flex items-center gap-1 text-emerald-600">
+                                <x-heroicon-o-check class="h-3.5 w-3.5" aria-hidden="true" />
+                                {{ __('Copied') }}
+                            </span>
+                        </button>
                     </dd>
                 </div>
-            </dl>
-        </div>
+            </div>
+
+            {{-- Disk usage (measurable on VM hosts) --}}
+            <div class="rounded-xl border border-brand-ink/10 bg-white px-4 py-3.5 shadow-sm sm:col-span-2">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="flex min-w-0 items-start gap-3">
+                        <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-sand/50 text-brand-moss">
+                            <x-heroicon-o-circle-stack class="h-4 w-4" aria-hidden="true" />
+                        </span>
+                        <div class="min-w-0">
+                            <dt class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Disk usage') }}</dt>
+                            @if (is_numeric($diskBytes))
+                                <dd class="mt-0.5 text-sm font-semibold text-brand-ink">{{ \Illuminate\Support\Number::fileSize((int) $diskBytes) }}</dd>
+                                <dd class="text-xs text-brand-moss">
+                                    @if (is_numeric($diskFiles)){{ number_format((int) $diskFiles) }} {{ trans_choice('file|files', (int) $diskFiles) }} · @endif
+                                    @if ($diskMeasuredAt){{ __('measured :ago', ['ago' => \Illuminate\Support\Carbon::parse($diskMeasuredAt)->diffForHumans()]) }}@endif
+                                </dd>
+                            @else
+                                <dd class="mt-0.5 text-sm font-medium text-brand-mist">{{ __('Not recorded yet') }}</dd>
+                                <dd class="text-xs text-brand-moss">
+                                    {{ $this->canMeasureDiskUsage ? __('Run a measurement to see this site’s footprint.') : __('Only available for VM-hosted sites.') }}
+                                </dd>
+                            @endif
+                        </div>
+                    </div>
+                    @if ($this->canMeasureDiskUsage)
+                        <button type="button"
+                            wire:click="measureDiskUsage"
+                            wire:target="measureDiskUsage"
+                            wire:loading.attr="disabled"
+                            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
+                            <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.class="animate-spin" wire:target="measureDiskUsage" aria-hidden="true" />
+                            <span wire:loading.remove wire:target="measureDiskUsage">{{ is_numeric($diskBytes) ? __('Refresh') : __('Measure') }}</span>
+                            <span wire:loading wire:target="measureDiskUsage">{{ __('Measuring…') }}</span>
+                        </button>
+                    @endif
+                </div>
+
+                @if ($diskVolumePct !== null)
+                    <div class="mt-3">
+                        <div class="h-1.5 w-full overflow-hidden rounded-full bg-brand-sand/60">
+                            <div class="h-full rounded-full {{ $diskVolumePct >= 90 ? 'bg-rose-500' : ($diskVolumePct >= 75 ? 'bg-amber-500' : 'bg-brand-sage') }}" style="width: {{ $diskVolumePct }}%"></div>
+                        </div>
+                        <p class="mt-1 text-[11px] text-brand-mist">
+                            {{ __(':pct% of volume used', ['pct' => rtrim(rtrim(number_format($diskVolumePct, 1), '0'), '.')]) }}
+                            @if (is_numeric($diskVolumeTotal))
+                                · {{ __(':used of :total', ['used' => \Illuminate\Support\Number::fileSize((int) $diskVolumeUsed), 'total' => \Illuminate\Support\Number::fileSize((int) $diskVolumeTotal)]) }}
+                            @endif
+                        </p>
+                    </div>
+                @endif
+            </div>
+        </dl>
+    </div>
 </section>
 
 @if (data_get($site->meta, 'notes'))

@@ -327,22 +327,8 @@ foreach ((array) config('services.digitalocean.testing_domains', []) as $functio
 }
 
 Route::get('/', function () {
-    // The animated homepage (v2) is the default; visitors can switch to the
-    // classic one and we remember it. `?v=1` (classic) or `?v=2` (animated);
-    // persisted via cookie. With no preference, show the animated default.
-    $requested = request()->query('v');
-    $valid = in_array($requested, ['1', '2'], true);
-    $version = $valid
-        ? $requested
-        : (request()->cookie('home_version') === '1' ? '1' : '2');
-
-    $response = response()->view($version === '2' ? 'welcome-v2' : 'welcome');
-
-    if ($valid) {
-        $response->cookie('home_version', $version, 60 * 24 * 365);
-    }
-
-    return $response;
+    // The animated homepage is THE homepage — no classic/animated switching.
+    return view('welcome-v2');
 });
 
 Route::get('/pricing', function () {
