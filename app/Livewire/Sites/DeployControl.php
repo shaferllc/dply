@@ -12,6 +12,7 @@ use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
+use App\Support\Sites\SiteDeployTimeline;
 use App\Support\Sites\SiteFixers;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -43,6 +44,12 @@ class DeployControl extends Component
 
     public ?string $fixerRunKey = null;
 
+    /** Peer site ids selected in the Sync drawer to deploy together. */
+    public array $syncSelected = [];
+
+    /** Peer site ids launched in the active sync batch — drives the live console. */
+    public array $syncedSiteIds = [];
+
     public function mount(): void
     {
         $site = request()->route('site');
@@ -52,6 +59,194 @@ class DeployControl extends Component
         $this->server = $server instanceof Server ? $server : $this->site?->server;
 
         $this->restoreInFlightFixer();
+
+        // Default the Sync selection to every peer (this site + its workers).
+        $this->syncSelected = $this->syncPeers->pluck('id')->map(fn ($id): string => (string) $id)->all();
+
+        // Re-attach to an in-flight sync batch so the combined console (and its
+        // live polling) survives a page reload — same idea as restoreInFlightFixer.
+        $batch = $this->site ? Cache::get('site-sync-batch:'.$this->site->id) : null;
+        if (is_array($batch) && is_array($batch['ids'] ?? null)) {
+            $this->syncedSiteIds = array_values(array_map('strval', $batch['ids']));
+        }
+    }
+
+    /** Clear the active sync batch and return the drawer to peer selection. */
+    public function newSync(): void
+    {
+        $this->syncedSiteIds = [];
+        if ($this->site) {
+            Cache::forget('site-sync-batch:'.$this->site->id);
+        }
+        $this->syncSelected = $this->syncPeers->pluck('id')->map(fn ($id): string => (string) $id)->all();
+        unset($this->syncRows);
+    }
+
+    /**
+     * Live per-peer rows for the combined sync console: each launched peer with
+     * its latest deployment, phase timeline, and in-flight state. Server is a
+     * display-only partial load (no auth happens here).
+     *
+     * @return list<array<string, mixed>>
+     */
+    #[Computed]
+    public function syncRows(): array
+    {
+        if ($this->syncedSiteIds === []) {
+            return [];
+        }
+
+        $sites = Site::query()
+            ->whereIn('id', $this->syncedSiteIds)
+            ->with('server:id,name')
+            ->get()
+            ->keyBy(fn (Site $s): string => (string) $s->id);
+
+        $rows = [];
+        foreach ($this->syncedSiteIds as $id) {
+            $peer = $sites->get($id);
+            if ($peer === null) {
+                continue;
+            }
+
+            $latest = $peer->deployments()->latest()->first();
+            $lock = Cache::get('site-deploy-active:'.$peer->id);
+            $lockStarted = ($lock && ! empty($lock['started_at'])) ? Carbon::parse($lock['started_at']) : null;
+
+            // Just-queued but the worker hasn't recorded a running deployment yet.
+            $startingFresh = $lock !== null && (
+                $latest === null
+                || ($latest->status !== SiteDeployment::STATUS_RUNNING
+                    && ($latest->finished_at === null || $lockStarted === null || $lockStarted->greaterThanOrEqualTo($latest->finished_at)))
+            );
+            $running = $latest?->status === SiteDeployment::STATUS_RUNNING;
+            $inProgress = $running || ($startingFresh && $lockStarted !== null && $lockStarted->greaterThan(now()->subSeconds(90)));
+
+            $phases = $latest ? SiteDeployTimeline::forDeployment($peer, $latest) : [];
+            $done = 0;
+            $current = null;
+            foreach ($phases as $p) {
+                if (in_array($p['status'], ['success', 'skipped'], true)) {
+                    $done++;
+                } elseif ($p['status'] === 'running' && $current === null) {
+                    $current = $p['label'];
+                }
+            }
+
+            $rows[] = [
+                'id' => (string) $peer->id,
+                'name' => $peer->name,
+                'server' => $peer->server?->name,
+                'is_self' => (string) $peer->id === (string) $this->site?->id,
+                'is_worker' => $peer->isWorkerSite(),
+                'latest' => $latest,
+                'status' => $startingFresh ? 'starting' : ($latest?->status ?? 'queued'),
+                'phases' => $phases,
+                'phase_done' => $done,
+                'phase_total' => count($phases),
+                'current_phase' => $current,
+                'in_progress' => $inProgress,
+                'starting_fresh' => $startingFresh,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /** Whether any peer in the active sync batch is still deploying. */
+    #[Computed]
+    public function syncInProgress(): bool
+    {
+        foreach ($this->syncRows as $row) {
+            if ($row['in_progress']) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Related sites that can be deployed together — this site plus any sharing
+     * its Git repository (or the same server when no repo is set). Mirrors the
+     * Sync tab's candidate query; the FULL server is loaded so the update policy
+     * authorises each peer (a partial server:id,name load nulls the policy
+     * columns and silently skips every site).
+     *
+     * @return \Illuminate\Support\Collection<int, Site>
+     */
+    #[Computed]
+    public function syncPeers(): \Illuminate\Support\Collection
+    {
+        if ($this->site === null) {
+            return collect();
+        }
+
+        $repo = trim((string) $this->site->git_repository_url);
+
+        return Site::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->where(function ($w) use ($repo): void {
+                $w->where('id', $this->site->id);
+                if ($repo !== '') {
+                    $w->orWhere('git_repository_url', $repo);
+                } else {
+                    $w->orWhere('server_id', $this->site->server_id);
+                }
+            })
+            ->with('server')
+            ->orderBy('name')
+            ->get();
+    }
+
+    /**
+     * Queue a deploy for every selected peer that the user can update. Mirrors
+     * DeploymentsList::deployMultiple — the persistent, deploy-from-anywhere
+     * twin of the Sync tab.
+     */
+    public function deploySelected(): void
+    {
+        $ids = array_values(array_unique(array_map('strval', $this->syncSelected)));
+        if ($ids === []) {
+            $this->toastError(__('Pick at least one site to deploy.'));
+
+            return;
+        }
+
+        $peers = $this->syncPeers->keyBy(fn (Site $s): string => (string) $s->id);
+        $queuedIds = [];
+        $skipped = 0;
+        foreach ($ids as $id) {
+            $peer = $peers->get($id);
+            if ($peer === null || ! Gate::allows('update', $peer)) {
+                $skipped++;
+
+                continue;
+            }
+            Cache::put('site-deploy-active:'.$peer->id, [
+                'started_at' => now()->toIso8601String(),
+                'deployment_id' => null,
+            ], 600);
+            RunSiteDeploymentJob::dispatch($peer->fresh(), SiteDeployment::TRIGGER_MANUAL);
+            $queuedIds[] = (string) $peer->id;
+        }
+
+        // Drive the combined live console for exactly the peers that launched,
+        // and persist the batch so the console survives a page reload.
+        $this->syncedSiteIds = $queuedIds;
+        if ($queuedIds !== [] && $this->site) {
+            Cache::put('site-sync-batch:'.$this->site->id, [
+                'ids' => $queuedIds,
+                'started_at' => now()->toIso8601String(),
+            ], 1800);
+        }
+        unset($this->deployLockInfo, $this->latestDeployment, $this->syncRows);
+
+        $msg = trans_choice('{1}:count deployment queued.|[2,*]:count deployments queued.', count($queuedIds), ['count' => count($queuedIds)]);
+        if ($skipped > 0) {
+            $msg .= ' '.__(':n skipped (no permission).', ['n' => $skipped]);
+        }
+        $this->toastSuccess($msg);
     }
 
     /**

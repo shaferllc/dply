@@ -43,15 +43,30 @@ final class SiteDeployTimeline
     {
         $running = $latest !== null && $latest->status === SiteDeployment::STATUS_RUNNING;
 
-        // The phase currently executing is the first canonical phase the
-        // running deployment hasn't recorded yet — the deployer records
-        // clone → build → activate → release in order as it goes.
+        // The phase currently executing. With incremental per-step recording a
+        // phase is recorded WHILE it runs, so prefer the phase that still has a
+        // step flagged `running`; only then fall back to the first canonical
+        // phase the deployment hasn't recorded yet (deployer records
+        // clone → build → release → activate in order).
         $runningPhase = null;
         if ($running) {
             foreach (array_keys(self::PHASES) as $key) {
                 if (! $latest->hasPhase($key)) {
-                    $runningPhase = $key;
-                    break;
+                    continue;
+                }
+                foreach ($latest->phaseSteps($key) as $recordedStep) {
+                    if (($recordedStep['running'] ?? false) === true) {
+                        $runningPhase = $key;
+                        break 2;
+                    }
+                }
+            }
+            if ($runningPhase === null) {
+                foreach (array_keys(self::PHASES) as $key) {
+                    if (! $latest->hasPhase($key)) {
+                        $runningPhase = $key;
+                        break;
+                    }
                 }
             }
         }
@@ -134,9 +149,11 @@ final class SiteDeployTimeline
             'skipped' => false,
             'ok' => false,
             'pending' => true,
+            'running' => false,
             'output' => '',
             'glyph' => '·',
             'glyph_classes' => 'bg-brand-sand/60 text-brand-ink',
+            'id' => (string) $step->id,
         ];
     }
 
@@ -192,9 +209,11 @@ final class SiteDeployTimeline
             'skipped' => ! $ran && ! $pending,
             'ok' => $ran,
             'pending' => $pending,
+            'running' => false,
             'output' => '',
             'glyph' => $ran ? '✓' : '·',
             'glyph_classes' => $ran ? 'bg-emerald-100 text-emerald-800' : 'bg-brand-sand/60 text-brand-ink',
+            'id' => (string) $hook->id,
         ];
     }
 
@@ -204,19 +223,35 @@ final class SiteDeployTimeline
     private static function statusFor(bool $recorded, array $steps, bool $running, bool $isRunningPhase): string
     {
         if ($recorded) {
+            // Incremental recording: an in-flight or still-queued step means the
+            // phase is mid-run, not finished — judge that before failure/success.
+            foreach ($steps as $step) {
+                if (($step['running'] ?? false) === true) {
+                    return 'running';
+                }
+            }
+
             if ($steps === []) {
                 // Recorded with no steps — the phase ran but had nothing to
                 // do (e.g. a build phase with no configured steps, or the
                 // activate no-op on simple deploys).
                 return 'skipped';
             }
+
+            $hasPending = false;
             foreach ($steps as $step) {
+                if (($step['pending'] ?? false) === true) {
+                    $hasPending = true;
+
+                    continue;
+                }
                 if (($step['skipped'] ?? false) !== true && ($step['ok'] ?? false) !== true) {
                     return 'failed';
                 }
             }
 
-            return 'success';
+            // No failures yet, but steps are still queued → the phase is running.
+            return $hasPending ? 'running' : 'success';
         }
 
         if ($running && $isRunningPhase) {
@@ -232,16 +267,22 @@ final class SiteDeployTimeline
      */
     private static function stepView(?SiteDeployment $latest, array $step): array
     {
+        $running = ($step['running'] ?? false) === true;
+        $pending = ($step['pending'] ?? false) === true;
+
         return [
             'label' => self::stepLabel($step),
             'step_type' => (string) ($step['step_type'] ?? 'step'),
             'duration_ms' => (int) ($step['duration_ms'] ?? 0),
             'skipped' => ($step['skipped'] ?? false) === true,
             'ok' => ($step['ok'] ?? false) === true,
-            'pending' => false,
+            'pending' => $pending,
+            'running' => $running,
             'output' => trim((string) ($step['output'] ?? '')),
-            'glyph' => $latest?->stepGlyph($step) ?? '·',
-            'glyph_classes' => $latest?->stepClasses($step) ?? 'bg-brand-sand/60 text-brand-ink',
+            // Running steps get the spinner glyph; others use the model's glyph.
+            'glyph' => $running ? '⟳' : ($latest?->stepGlyph($step) ?? '·'),
+            'glyph_classes' => $running ? 'bg-amber-100 text-amber-800' : ($latest?->stepClasses($step) ?? 'bg-brand-sand/60 text-brand-ink'),
+            'id' => (string) ($step['step_id'] ?? ''),
         ];
     }
 

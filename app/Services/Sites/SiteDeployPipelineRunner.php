@@ -42,19 +42,24 @@ class SiteDeployPipelineRunner
     }
 
     /**
+     * @param  ?callable(list<array<string, mixed>>): void  $onProgress  Fired
+     *   before each step with the full ordered step list (completed steps carry
+     *   their output; the current one is flagged `running`; the rest `pending`),
+     *   so the caller can persist live progress for the phase timeline.
      * @return array{log: string, steps: list<array<string, mixed>>, ok: bool}
      */
-    public function runBuild(RemoteShell $ssh, Site $site, string $workingDirectory): array
+    public function runBuild(RemoteShell $ssh, Site $site, string $workingDirectory, ?callable $onProgress = null): array
     {
-        return $this->runPhase($ssh, $site, $workingDirectory, SiteDeployStep::PHASE_BUILD);
+        return $this->runPhase($ssh, $site, $workingDirectory, SiteDeployStep::PHASE_BUILD, $onProgress);
     }
 
     /**
+     * @param  ?callable(list<array<string, mixed>>): void  $onProgress
      * @return array{log: string, steps: list<array<string, mixed>>, ok: bool}
      */
-    public function runRelease(RemoteShell $ssh, Site $site, string $workingDirectory): array
+    public function runRelease(RemoteShell $ssh, Site $site, string $workingDirectory, ?callable $onProgress = null): array
     {
-        return $this->runPhase($ssh, $site, $workingDirectory, SiteDeployStep::PHASE_RELEASE);
+        return $this->runPhase($ssh, $site, $workingDirectory, SiteDeployStep::PHASE_RELEASE, $onProgress);
     }
 
     /**
@@ -142,7 +147,10 @@ class SiteDeployPipelineRunner
     /**
      * @return array{log: string, steps: list<array<string, mixed>>, ok: bool}
      */
-    protected function runPhase(RemoteShell $ssh, Site $site, string $workingDirectory, string $phase): array
+    /**
+     * @param  ?callable(list<array<string, mixed>>): void  $onProgress
+     */
+    protected function runPhase(RemoteShell $ssh, Site $site, string $workingDirectory, string $phase, ?callable $onProgress = null): array
     {
         $site->loadMissing('deploySteps');
         $cwd = escapeshellarg($workingDirectory);
@@ -154,6 +162,37 @@ class SiteDeployPipelineRunner
             ->where('phase', $phase)
             ->sortBy('sort_order')
             ->values();
+
+        // Live progress: before each step runs, emit the whole phase as
+        // completed (with output) + the current step `running` + the rest
+        // `pending`, so the polled timeline lights steps up one-by-one. SSH exec
+        // is blocking, so a step's own output only lands once it finishes —
+        // which is exactly the incremental "step done → next running" cadence.
+        $emitProgress = static function (int $runningIndex) use ($onProgress, $ordered, &$steps): void {
+            if ($onProgress === null) {
+                return;
+            }
+            $full = [];
+            foreach ($ordered as $i => $cfg) {
+                /** @var SiteDeployStep $cfg */
+                if ($i < count($steps)) {
+                    $full[] = $steps[$i];
+                } else {
+                    $full[] = [
+                        'step_id' => (string) $cfg->id,
+                        'step_type' => (string) $cfg->step_type,
+                        'command' => $cfg->custom_command,
+                        'ok' => false,
+                        'skipped' => false,
+                        'running' => $i === $runningIndex,
+                        'pending' => $i !== $runningIndex,
+                        'output' => '',
+                        'duration_ms' => 0,
+                    ];
+                }
+            }
+            $onProgress($full);
+        };
 
         // Verbose preamble: show the working directory this phase runs in and
         // exactly what's on disk there (does `artisan` exist? is it a symlink?)
@@ -185,8 +224,11 @@ class SiteDeployPipelineRunner
         ), 30);
         $log .= $probe."\n";
 
-        foreach ($ordered as $step) {
+        foreach ($ordered as $idx => $step) {
             /** @var SiteDeployStep $step */
+            // Mark this step running (rest pending) before it executes.
+            $emitProgress($idx);
+
             $cmd = $this->resolveShellCommand($step);
             if ($cmd === null || $cmd === '') {
                 // A step with no resolvable command (e.g. an empty custom

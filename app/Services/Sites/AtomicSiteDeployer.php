@@ -257,8 +257,13 @@ class AtomicSiteDeployer
 
         // ── BUILD ── install deps / compile assets in the new release.
         $log .= sprintf("\n[dply] BUILD → running build-phase steps in %s\n", $newRelease);
-        $build = $this->pipelineRunner->runBuild($ssh, $site, $newRelease);
+        $buildProgress = $deployment
+            ? static fn (array $full) => $deployment->recordPhaseResults('build', $full)
+            : null;
+        $build = $this->pipelineRunner->runBuild($ssh, $site, $newRelease, $buildProgress);
         $log .= $build['log'];
+        // Final clean record (no running/pending placeholders) — overwrites the
+        // last live snapshot with the settled step results.
         $deployment?->recordPhaseResults('build', $build['steps']);
         if (! $build['ok']) {
             throw new \RuntimeException('Deploy failed during the build phase. See the deployment log for details.');
@@ -286,7 +291,10 @@ class AtomicSiteDeployer
         // finds `artisan`, never "Could not open input file: artisan" off a stale
         // `current` — the failure mode for first deploys and worker-host sites.)
         $log .= sprintf("\n[dply] RELEASE → running release-phase steps in %s (before cutover)\n", $newRelease);
-        $release = $this->pipelineRunner->runRelease($ssh, $site, $newRelease);
+        $releaseProgress = $deployment
+            ? static fn (array $full) => $deployment->recordPhaseResults('release', $full)
+            : null;
+        $release = $this->pipelineRunner->runRelease($ssh, $site, $newRelease, $releaseProgress);
         $releaseSteps = $release['steps'];
         $releaseLog = $release['log'];
         $releaseLog .= sprintf("[dply] RELEASE steps done → %d step(s), ok=%s\n", count($release['steps']), $release['ok'] ? 'true' : 'false');
