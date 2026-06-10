@@ -166,7 +166,14 @@
                         $serverlessSteps = $deployment->phaseSteps('serverless');
                         $rawOutput = trim((string) ($deployment->log_output ?? ''));
                     @endphp
-                    <li class="rounded-xl border border-brand-ink/10 bg-white p-3">
+                    <li class="relative rounded-xl border border-brand-ink/10 bg-white p-3">
+                        {{-- Detail link as a sibling overlay, not nested in the summary
+                             (a summary element is itself a button; nesting an anchor
+                             trips the "interactive element within a summary" a11y warning). --}}
+                        <a href="{{ route('sites.deployments.show', ['server' => $site->server, 'site' => $site, 'deployment' => $deployment]) }}"
+                           wire:navigate
+                           class="absolute right-3 top-3 z-10 rounded bg-brand-sand/60 px-1.5 py-0.5 font-mono text-[10px] text-brand-moss hover:bg-brand-sand"
+                           title="{{ __('Open deployment detail') }}">{{ $deployment->id }}</a>
                         <details>
                             <summary class="cursor-pointer list-none">
                                 <div class="flex flex-wrap items-center gap-2 text-xs">
@@ -183,10 +190,6 @@
                                     @if ($deployment->git_sha)
                                         <span class="font-mono text-[11px] text-brand-moss/60">· {{ \Illuminate\Support\Str::limit($deployment->git_sha, 8, '') }}</span>
                                     @endif
-                                    <a href="{{ route('sites.deployments.show', ['server' => $site->server, 'site' => $site, 'deployment' => $deployment]) }}"
-                                       wire:navigate
-                                       class="ml-auto rounded bg-brand-sand/60 px-1.5 py-0.5 font-mono text-[10px] text-brand-moss hover:bg-brand-sand"
-                                       title="{{ __('Open deployment detail') }}">{{ $deployment->id }}</a>
                                 </div>
                             </summary>
                             <div class="mt-3 space-y-3">

@@ -17,7 +17,17 @@ class LoadBalancerTarget extends Model
         'server_id',
         'provider_server_id',
         'status',
+        'weight',
+        'drained_at',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'weight' => 'integer',
+            'drained_at' => 'datetime',
+        ];
+    }
 
     public function loadBalancer(): BelongsTo
     {

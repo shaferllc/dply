@@ -90,8 +90,9 @@ enum DeploymentMethod: string
     public function isImplemented(): bool
     {
         return match ($this) {
-            self::Flat, self::Atomic, self::Maintenance, self::Recreate, self::BlueGreen => true,
-            self::Rolling, self::Canary, self::Image => false,
+            self::Flat, self::Atomic, self::Maintenance, self::Recreate,
+            self::BlueGreen, self::Rolling, self::Canary => true,
+            self::Image => false,
         };
     }
 
@@ -133,11 +134,24 @@ enum DeploymentMethod: string
         }
 
         return match ($this) {
-            // Rolling / canary need ≥2 backends (a load balancer or worker pool);
-            // gated here once those engines land.
-            self::Rolling, self::Canary => false,
+            // Rolling needs a real multi-backend group fronted by a balancer
+            // (≥2 active backends + a linked load balancer) — otherwise there's
+            // nothing to drain traffic across. Stays hidden until then.
+            self::Rolling => $site->isMultiBackend() && $this->hasLinkedBalancer($site),
+            // Canary additionally needs a weight-capable substrate (HAProxy) for
+            // the traffic ramp — Hetzner cloud LBs can't do per-target weights.
+            self::Canary => $site->isMultiBackend()
+                && $this->hasLinkedBalancer($site)
+                && $site->backendSubstrateSupportsWeights(),
             default => true,
         };
+    }
+
+    /** Whether the site's backend group has a load balancer provisioned + linked. */
+    private function hasLinkedBalancer(Site $site): bool
+    {
+        return is_string($site->backendGroup()['load_balancer_id'] ?? null)
+            && ($site->backendGroup()['load_balancer_id'] ?? '') !== '';
     }
 
     /** Methods a site can currently choose, in display order. */

@@ -239,7 +239,12 @@
             ])>
                 <dt class="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-mist">{{ __('Preflight') }}</dt>
                 <dd class="mt-2 text-sm font-medium">
-                    @if ($preflightErrors->isEmpty() && $preflightWarnings->isEmpty())
+                    @if (! ($preflightActive ?? false))
+                        <span class="inline-flex items-center gap-1.5 text-brand-mist">
+                            <span class="inline-block h-1.5 w-1.5 rounded-full bg-brand-mist/60"></span>
+                            {{ __('Runs at first deploy') }}
+                        </span>
+                    @elseif ($preflightErrors->isEmpty() && $preflightWarnings->isEmpty())
                         <span class="inline-flex items-center gap-1.5 text-emerald-700">
                             <span class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-600"></span>
                             {{ __('Ready') }}

@@ -12,6 +12,105 @@
                     @endfeature
                 @endif
 
+                {{-- Section order is by operational importance: Health (is the site
+                     up?) and Preflight (anything blocking a deploy?) lead, then the
+                     reference cards — Endpoints (where it lives) and Resources (what
+                     it depends on). --}}
+                <div class="grid gap-6 lg:grid-cols-2">
+                    {{-- Health --}}
+                    <section class="dply-card overflow-hidden">
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <x-icon-badge>
+                                <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
+                            </x-icon-badge>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Health') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Health & checks') }}</h3>
+                            </div>
+                            <a href="{{ route('sites.monitor', [$server, $site]) }}" wire:navigate class="ml-auto shrink-0 self-center text-xs font-medium text-brand-sage hover:underline">{{ __('Open monitor') }}</a>
+                        </div>
+                        <ul class="divide-y divide-brand-ink/8 px-6 sm:px-8">
+                            <li class="flex items-start justify-between gap-3 py-3">
+                                <div class="min-w-0">
+                                    <p class="text-sm font-medium text-brand-ink">{{ __('URL responds') }}</p>
+                                    <p class="text-xs text-brand-moss">{{ __('Last checked') }} {{ $healthLastCheck ? \Illuminate\Support\Carbon::parse($healthLastCheck)->diffForHumans() : __('never') }}</p>
+                                </div>
+                                <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide
+                                    {{ $healthLastOk === true ? 'bg-emerald-100 text-emerald-800' : ($healthLastOk === false ? 'bg-red-100 text-red-800' : 'bg-brand-sand/40 text-brand-mist') }}">
+                                    {{ $healthLastOk === true ? __('OK') : ($healthLastOk === false ? __('Failed') : __('—')) }}
+                                </span>
+                            </li>
+                            <li class="flex items-start justify-between gap-3 py-3">
+                                <div class="min-w-0">
+                                    <p class="text-sm font-medium text-brand-ink">{{ __('Runtime contract') }}</p>
+                                    <p class="break-all font-mono text-[11px] text-brand-mist">{{ \Illuminate\Support\Str::limit((string) ($foundationStatus['current_runtime_revision'] ?? '—'), 24) }}</p>
+                                </div>
+                                <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide
+                                    {{ $runtimeDrifted ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800' }}">
+                                    {{ $runtimeDrifted ? __('Drift') : __('In sync') }}
+                                </span>
+                            </li>
+                            <li class="flex items-start justify-between gap-3 py-3">
+                                <div class="min-w-0">
+                                    <p class="text-sm font-medium text-brand-ink">{{ __('SSL') }}</p>
+                                    <p class="text-xs capitalize text-brand-moss">{{ $site->ssl_status ?: __('Not configured') }}</p>
+                                </div>
+                                <span class="shrink-0 rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
+                                    {{ $site->currentSslSummary() ?: '—' }}
+                                </span>
+                            </li>
+                            @if ($site->isSuspended())
+                                <li class="flex items-start justify-between gap-3 py-3">
+                                    <div class="min-w-0">
+                                        <p class="text-sm font-medium text-brand-ink">{{ __('Public traffic') }}</p>
+                                        <p class="text-xs text-amber-800">{{ __('Suspended — visitors see the suspended page.') }}</p>
+                                    </div>
+                                    <span class="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">{{ __('Suspended') }}</span>
+                                </li>
+                            @endif
+                            @if ($hostChecks->isNotEmpty())
+                                <li class="py-3">
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Reachability checks') }}</p>
+                                    <ul class="mt-2 space-y-1.5">
+                                        @foreach ($hostChecks as $check)
+                                            <li class="flex items-center justify-between gap-3 rounded-lg border {{ ($check['ok'] ?? false) ? 'border-emerald-200 bg-emerald-50/60' : 'border-amber-200 bg-amber-50/60' }} px-3 py-2">
+                                                <p class="break-all font-mono text-[11px] text-brand-ink">{{ $check['hostname'] }}</p>
+                                                <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ ($check['ok'] ?? false) ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' }}">
+                                                    {{ ($check['ok'] ?? false) ? __('Ready') : __('Waiting') }}
+                                                </span>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </li>
+                            @endif
+                        </ul>
+                    </section>
+
+                    {{-- Preflight (only once a deploy has been attempted) --}}
+                    @if ($preflightActive ?? false)
+                    <section class="dply-card overflow-hidden">
+                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                            <x-icon-badge>
+                                <x-heroicon-o-rocket-launch class="h-5 w-5" aria-hidden="true" />
+                            </x-icon-badge>
+                            <div class="min-w-0">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Preflight') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Launch preflight') }}</h3>
+                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Shared deployment checks for config, publication, and attached resources.') }}</p>
+                            </div>
+                        </div>
+                        <div class="px-6 py-6 sm:px-7">
+                        @if ($preflightErrors->isEmpty() && $preflightWarnings->isEmpty())
+                            <p class="text-sm font-medium text-emerald-700">{{ __('No blocking preflight issues.') }}</p>
+                        @else
+                            <x-site-preflight-issues-panel :checks="$preflightActionableChecks" compact />
+                        @endif
+                        </div>
+                    </section>
+                    @endif
+                </div>
+
+                {{-- Reference: where it lives + what it depends on --}}
                 <div class="grid gap-6 lg:grid-cols-2">
                     {{-- Endpoints --}}
                     <section class="dply-card overflow-hidden">
@@ -83,98 +182,7 @@
                         </div>
                     </section>
 
-                    {{-- Health --}}
-                    <section class="dply-card overflow-hidden">
-                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                            <x-icon-badge>
-                                <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
-                            </x-icon-badge>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Health') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Health & checks') }}</h3>
-                            </div>
-                            <a href="{{ route('sites.monitor', [$server, $site]) }}" wire:navigate class="ml-auto shrink-0 self-center text-xs font-medium text-brand-sage hover:underline">{{ __('Open monitor') }}</a>
-                        </div>
-                        <ul class="divide-y divide-brand-ink/8 px-6 sm:px-8">
-                            <li class="flex items-start justify-between gap-3 py-3">
-                                <div class="min-w-0">
-                                    <p class="text-sm font-medium text-brand-ink">{{ __('URL responds') }}</p>
-                                    <p class="text-xs text-brand-moss">{{ __('Last checked') }} {{ $healthLastCheck ? \Illuminate\Support\Carbon::parse($healthLastCheck)->diffForHumans() : __('never') }}</p>
-                                </div>
-                                <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide
-                                    {{ $healthLastOk === true ? 'bg-emerald-100 text-emerald-800' : ($healthLastOk === false ? 'bg-red-100 text-red-800' : 'bg-brand-sand/40 text-brand-mist') }}">
-                                    {{ $healthLastOk === true ? __('OK') : ($healthLastOk === false ? __('Failed') : __('—')) }}
-                                </span>
-                            </li>
-                            <li class="flex items-start justify-between gap-3 py-3">
-                                <div class="min-w-0">
-                                    <p class="text-sm font-medium text-brand-ink">{{ __('Runtime contract') }}</p>
-                                    <p class="break-all font-mono text-[11px] text-brand-mist">{{ \Illuminate\Support\Str::limit((string) ($foundationStatus['current_runtime_revision'] ?? '—'), 24) }}</p>
-                                </div>
-                                <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide
-                                    {{ $runtimeDrifted ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800' }}">
-                                    {{ $runtimeDrifted ? __('Drift') : __('In sync') }}
-                                </span>
-                            </li>
-                            <li class="flex items-start justify-between gap-3 py-3">
-                                <div class="min-w-0">
-                                    <p class="text-sm font-medium text-brand-ink">{{ __('SSL') }}</p>
-                                    <p class="text-xs capitalize text-brand-moss">{{ $site->ssl_status ?: __('Not configured') }}</p>
-                                </div>
-                                <span class="shrink-0 rounded-full bg-brand-sand/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-moss">
-                                    {{ $site->currentSslSummary() ?: '—' }}
-                                </span>
-                            </li>
-                            @if ($site->isSuspended())
-                                <li class="flex items-start justify-between gap-3 py-3">
-                                    <div class="min-w-0">
-                                        <p class="text-sm font-medium text-brand-ink">{{ __('Public traffic') }}</p>
-                                        <p class="text-xs text-amber-800">{{ __('Suspended — visitors see the suspended page.') }}</p>
-                                    </div>
-                                    <span class="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">{{ __('Suspended') }}</span>
-                                </li>
-                            @endif
-                            @if ($hostChecks->isNotEmpty())
-                                <li class="py-3">
-                                    <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Reachability checks') }}</p>
-                                    <ul class="mt-2 space-y-1.5">
-                                        @foreach ($hostChecks as $check)
-                                            <li class="flex items-center justify-between gap-3 rounded-lg border {{ ($check['ok'] ?? false) ? 'border-emerald-200 bg-emerald-50/60' : 'border-amber-200 bg-amber-50/60' }} px-3 py-2">
-                                                <p class="break-all font-mono text-[11px] text-brand-ink">{{ $check['hostname'] }}</p>
-                                                <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ ($check['ok'] ?? false) ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' }}">
-                                                    {{ ($check['ok'] ?? false) ? __('Ready') : __('Waiting') }}
-                                                </span>
-                                            </li>
-                                        @endforeach
-                                    </ul>
-                                </li>
-                            @endif
-                        </ul>
-                    </section>
-                </div>
-
-                {{-- Preflight + resources --}}
-                <div class="grid gap-6 lg:grid-cols-2">
-                    <section class="dply-card overflow-hidden">
-                        <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                            <x-icon-badge>
-                                <x-heroicon-o-rocket-launch class="h-5 w-5" aria-hidden="true" />
-                            </x-icon-badge>
-                            <div class="min-w-0">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Preflight') }}</p>
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Launch preflight') }}</h3>
-                                <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Shared deployment checks for config, publication, and attached resources.') }}</p>
-                            </div>
-                        </div>
-                        <div class="px-6 py-6 sm:px-7">
-                        @if ($preflightErrors->isEmpty() && $preflightWarnings->isEmpty())
-                            <p class="text-sm font-medium text-emerald-700">{{ __('No blocking preflight issues.') }}</p>
-                        @else
-                            <x-site-preflight-issues-panel :checks="$preflightActionableChecks" compact />
-                        @endif
-                        </div>
-                    </section>
-
+                    {{-- Resources --}}
                     <section class="dply-card overflow-hidden">
                         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                             <x-icon-badge>

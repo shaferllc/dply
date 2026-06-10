@@ -43,7 +43,15 @@
                 $durationMs = $deployment->phaseTotalDurationMs();
                 $shortSha = $deployment->git_sha ? substr((string) $deployment->git_sha, 0, 7) : null;
             @endphp
-            <li>
+            <li class="relative">
+                {{-- The deployment-detail link is a sibling overlay, NOT nested in
+                     the summary: a summary element is itself a button, so an anchor
+                     or button inside it nests interactive controls (the "interactive
+                     element within a summary" a11y warning) and is inconsistently
+                     reachable by keyboard/AT. Positioned over the row's right edge. --}}
+                <a href="{{ route('sites.deployments.show', ['server' => $site->server, 'site' => $site, 'deployment' => $deployment]) }}" wire:navigate
+                    class="absolute right-12 top-3.5 z-10 hidden shrink-0 rounded-md bg-brand-sand/40 px-2 py-1 font-mono text-[10px] text-brand-mist hover:bg-brand-sand/70 hover:text-brand-moss sm:right-14 sm:inline-block"
+                    title="{{ __('Open deployment detail') }}">{{ \Illuminate\Support\Str::limit((string) $deployment->id, 12, '…') }}</a>
                 <details class="group">
                     <summary class="flex cursor-pointer list-none items-center gap-3 px-6 py-3.5 transition-colors hover:bg-brand-sand/15 sm:px-7 [&::-webkit-details-marker]:hidden">
                         <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold {{ $dotClasses }} {{ $status === 'running' ? 'animate-pulse' : '' }}" aria-hidden="true">{{ $glyph }}</span>
@@ -79,10 +87,8 @@
                             </div>
                         </div>
 
-                        <a href="{{ route('sites.deployments.show', ['server' => $site->server, 'site' => $site, 'deployment' => $deployment]) }}" wire:navigate
-                            class="hidden shrink-0 rounded-md bg-brand-sand/40 px-2 py-1 font-mono text-[10px] text-brand-mist hover:bg-brand-sand/70 hover:text-brand-moss sm:inline-block"
-                            title="{{ __('Open deployment detail') }}"
-                            x-on:click.stop>{{ \Illuminate\Support\Str::limit((string) $deployment->id, 12, '…') }}</a>
+                        {{-- spacer so the overlaid id-chip link (above) doesn't collide with the chevron --}}
+                        <span class="hidden shrink-0 sm:block sm:w-20" aria-hidden="true"></span>
 
                         <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform group-open:rotate-90" aria-hidden="true" />
                     </summary>
