@@ -84,6 +84,12 @@ return [
             'failed' => 'The test email could not be sent — see the transport error.',
             'stale' => 'Test email did not finish.',
         ],
+        'disk_usage_measure' => [
+            'running' => 'Measuring :host disk usage …',
+            'completed' => 'Disk usage updated.',
+            'failed' => 'Disk usage measurement failed.',
+            'stale' => 'Disk usage measurement did not finish.',
+        ],
         'remediation_apply' => [
             'running' => 'Applying fix …',
             'completed' => 'Fix applied — re-run the operation to continue.',
@@ -309,6 +315,10 @@ return [
     | `uptime_check` directly and does not consult this table.
     */
     'section_kinds' => [
+        // The general tab's Site-details card has a Measure button that runs a
+        // disk-usage `du` over SSH; surface its progress banner here so the
+        // "tracking in the console" toast isn't a dead end.
+        'general' => ['disk_usage_measure'],
         'settings' => ['webserver_config'],
         'routing' => ['webserver_config'],
         'certificates' => ['ssl', 'webserver_config'],
