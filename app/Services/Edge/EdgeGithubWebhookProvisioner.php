@@ -7,6 +7,7 @@ namespace App\Services\Edge;
 use App\Contracts\SourceControl\GitIdentity;
 use App\Models\Site;
 use App\Services\SourceControl\GitIdentityResolver;
+use App\Support\SourceControl\GitHubWebhookFailure;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -76,16 +77,13 @@ class EdgeGithubWebhookProvisioner
             Log::warning('Edge GitHub webhook create failed', [
                 'site_id' => $site->id,
                 'status' => $response->status(),
+                'scopes' => $response->header('X-OAuth-Scopes'),
                 'body' => $response->body(),
             ]);
 
-            $hint = $account->kind() === 'pat'
-                ? __('GitHub rejected the webhook (:status). The personal access token needs admin:repo_hook scope (classic) or Read/Write Webhooks repo permission (fine-grained).', ['status' => $response->status()])
-                : __('GitHub rejected the webhook (:status). Re-link GitHub with repo and hook permissions.', ['status' => $response->status()]);
-
             return [
                 'ok' => false,
-                'message' => $hint,
+                'message' => GitHubWebhookFailure::message($response, $account->kind() === 'pat'),
             ];
         }
 

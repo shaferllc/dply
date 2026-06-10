@@ -6,6 +6,7 @@ use App\Contracts\SourceControl\GitIdentity;
 use App\Models\Site;
 use App\Services\SourceControl\GitIdentityResolver;
 use App\Support\GitRemoteRepositoryRef;
+use App\Support\SourceControl\GitHubWebhookFailure;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -120,13 +121,9 @@ class RepositoryWebhookProvisioner
             ]);
 
         if (! $response->successful()) {
-            Log::warning('GitHub webhook create failed', ['site_id' => $site->id, 'status' => $response->status(), 'body' => $response->body()]);
+            Log::warning('GitHub webhook create failed', ['site_id' => $site->id, 'status' => $response->status(), 'scopes' => $response->header('X-OAuth-Scopes'), 'body' => $response->body()]);
 
-            $hint = $account->kind() === 'pat'
-                ? __('GitHub rejected the webhook (:status). The personal access token needs admin:repo_hook scope (classic) or Read/Write Webhooks repo permission (fine-grained).', ['status' => $response->status()])
-                : __('GitHub rejected the webhook (:status). Re-link GitHub with repo and hook permissions, or check repository access.', ['status' => $response->status()]);
-
-            return ['ok' => false, 'message' => $hint];
+            return ['ok' => false, 'message' => GitHubWebhookFailure::message($response, $account->kind() === 'pat')];
         }
 
         $id = $response->json('id');
