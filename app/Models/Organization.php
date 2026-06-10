@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Cashier\Billable;
 
@@ -28,6 +29,9 @@ class Organization extends Model
         'name',
         'slug',
         'email',
+        'icon_path',
+        'description',
+        'timezone',
         'deploy_email_notifications_enabled',
         'email_server_credentials_enabled',
         'email_database_credentials_enabled',
@@ -66,6 +70,45 @@ class Organization extends Model
             'services_preferences' => 'array',
             'alert_extra_emails' => 'array',
         ];
+    }
+
+    /**
+     * Public URL of the org's uploaded icon/logo, or null when none is set —
+     * callers fall back to the generated initials avatar. Stored on the
+     * `public` disk (mirrors {@see Site::logoUrl()}).
+     */
+    public function iconUrl(): ?string
+    {
+        $path = $this->icon_path;
+        if (! is_string($path) || $path === '') {
+            return null;
+        }
+
+        return Storage::disk('public')->url($path);
+    }
+
+    public function hasIcon(): bool
+    {
+        return is_string($this->icon_path) && $this->icon_path !== '';
+    }
+
+    /**
+     * 1–2 letter initials from the org name for the placeholder avatar shown
+     * when no icon is uploaded.
+     */
+    public function initials(): string
+    {
+        $words = preg_split('/\s+/', trim((string) $this->name)) ?: [];
+        $words = array_values(array_filter($words, fn (string $w): bool => $w !== ''));
+
+        if ($words === []) {
+            return '?';
+        }
+
+        $first = Str::substr($words[0], 0, 1);
+        $second = count($words) > 1 ? Str::substr($words[count($words) - 1], 0, 1) : '';
+
+        return Str::upper($first.$second);
     }
 
     protected static function booted(): void

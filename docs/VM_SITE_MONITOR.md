@@ -1,3 +1,12 @@
+---
+title: "Site uptime monitor"
+slug: vm-site-monitor
+category: "Sites & deploys"
+order: 190
+description: "Describes configuring HTTP uptime checks against a site's public URL, including interval, expected status, timeout, status history, and alerting."
+group: sites
+---
+
 # Site uptime monitor
 
 The **Monitor** section configures **HTTP uptime checks** against this site's public URL.

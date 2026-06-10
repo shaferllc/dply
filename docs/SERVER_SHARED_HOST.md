@@ -1,3 +1,12 @@
+---
+title: "Shared Host Radar"
+slug: server-shared-host
+category: "Servers"
+order: 380
+description: "Maps per-site resource use and shared stack dependencies on multi-site VMs, surfacing noisy-neighbor contention with budgets, alerts, and a timeline."
+group: servers
+---
+
 # Shared Host Radar
 
 The **Shared Host Radar** section maps per-site resource use and shared stack dependencies on multi-site VMs — surfacing noisy-neighbor contention before deploys fail.

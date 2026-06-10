@@ -1,12 +1,10 @@
 <div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <x-organization-shell :organization="$organization" section="billing-analytics">
-            <x-breadcrumb-trail :items="[
-                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-                ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
-                ['label' => __('Billing analytics'), 'icon' => 'chart-bar'],
-            ]" />
-
+        <x-organization-shell :organization="$organization" section="billing-analytics" :breadcrumb="[
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
+            ['label' => __('Billing analytics'), 'icon' => 'chart-bar'],
+        ]">
             @php
                 $interval = $summary['interval'] ?? 'month';
                 $monthlyCents = (int) ($summary['monthly_total_cents'] ?? 0);

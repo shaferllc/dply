@@ -1,3 +1,12 @@
+---
+title: "Remote files"
+slug: server-files
+category: "Servers"
+order: 210
+description: "Browse, edit, upload, and download files on a server outside the Configuration allowlist, with ownership resets and confirmation-guarded deletes."
+group: servers
+---
+
 # Remote files
 
 The **Files** section browses and edits files on the server outside the strict **Configuration** allowlist.

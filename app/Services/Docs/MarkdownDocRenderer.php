@@ -20,7 +20,7 @@ final class MarkdownDocRenderer
             throw new NotFoundHttpException;
         }
 
-        $html = Str::markdown(File::get($path));
+        $html = Str::markdown($this->stripFrontMatter(File::get($path)));
         $html = $this->transformTablesToCards($html);
         $html = $this->injectHeadingIds($html);
         $headings = $this->headingsFromHtml($html);
@@ -37,31 +37,27 @@ final class MarkdownDocRenderer
      */
     private function resolvePage(string $slug): array
     {
-        $pages = config('docs.markdown', []);
-        $page = $pages[$slug] ?? null;
-
-        if (is_array($page)) {
-            $filename = $page['file'] ?? null;
-            $title = $page['title'] ?? null;
-
-            if (is_string($filename) && $filename !== '' && is_string($title) && $title !== '') {
-                return [$filename, $title];
-            }
-        }
-
-        $virtual = config('docs.virtual', []);
-        $virtualPage = $virtual[$slug] ?? null;
-
-        if (is_array($virtualPage) && isset($virtualPage['file'], $virtualPage['title'])) {
-            $filename = $virtualPage['file'];
-            $title = $virtualPage['title'];
-
-            if (is_string($filename) && $filename !== '' && is_string($title) && $title !== '') {
-                return [$filename, $title];
-            }
+        // The front-matter manifest is the single source of truth.
+        $doc = app(DocsManifest::class)->find($slug);
+        if (is_array($doc) && ! empty($doc['file']) && ! empty($doc['title'])) {
+            return [(string) $doc['file'], (string) $doc['title']];
         }
 
         throw new NotFoundHttpException;
+    }
+
+    /**
+     * Strip the leading YAML front-matter block so it isn't rendered as prose.
+     */
+    private function stripFrontMatter(string $raw): string
+    {
+        $raw = ltrim($raw, "\xEF\xBB\xBF");
+        if (! str_starts_with($raw, "---\n") && ! str_starts_with($raw, "---\r\n")) {
+            return $raw;
+        }
+        $body = preg_replace('/^---\r?\n.*?\r?\n---\r?\n/s', '', $raw, 1);
+
+        return is_string($body) ? ltrim($body) : $raw;
     }
 
     /**

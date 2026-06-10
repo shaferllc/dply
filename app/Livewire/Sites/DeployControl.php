@@ -13,6 +13,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Support\Sites\SiteFixers;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
@@ -104,6 +105,43 @@ class DeployControl extends Component
     public function latestDeployment(): ?SiteDeployment
     {
         return $this->site?->deployments()->latest()->first();
+    }
+
+    /**
+     * Whether the deploy button should show the spinning "Deploying…" state.
+     *
+     * A running/queued deployment always counts. The optimistic deploy lock (set
+     * on click, 600s TTL) only bridges the brief gap before the queued job
+     * creates a deployment row — so it must NOT keep the button spinning after a
+     * failure or when the job never starts. We therefore stop as soon as THIS
+     * run lands a terminal status, and otherwise honour the lock only within the
+     * queue-pickup window. Without this a failed/stuck deploy spins for the full
+     * 600s lock TTL (or forever if the job is killed without recording failure).
+     */
+    #[Computed]
+    public function inProgress(): bool
+    {
+        $latest = $this->latestDeployment;
+
+        if ($latest?->status === SiteDeployment::STATUS_RUNNING) {
+            return true;
+        }
+
+        $lock = $this->deployLockInfo;
+        $startedAt = isset($lock['started_at']) ? Carbon::parse($lock['started_at']) : null;
+        if ($startedAt === null) {
+            return false;
+        }
+
+        $terminalSinceLock = $latest !== null
+            && in_array($latest->status, [
+                SiteDeployment::STATUS_FAILED,
+                SiteDeployment::STATUS_SUCCESS,
+                SiteDeployment::STATUS_SKIPPED,
+            ], true)
+            && $latest->created_at?->greaterThanOrEqualTo($startedAt->subSeconds(2));
+
+        return ! $terminalSinceLock && $startedAt->greaterThan(now()->subSeconds(90));
     }
 
     public function deploy(): void

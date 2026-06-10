@@ -127,17 +127,3 @@ test('job provisions units for each non web process', function () {
     expect($contents->contains(fn ($c) => str_contains($c, 'gunicorn app:app')))->toBeTrue();
     expect($contents->contains(fn ($c) => str_contains($c, 'celery -A app worker')))->toBeTrue();
 });
-class ProvisionRecordingShell implements RemoteShell
-{
-    public function exec(string $command, int $timeoutSeconds = 120): string
-    {
-        $this->execCalls[] = $command;
-
-        return '';
-    }
-
-    public function putFile(string $remotePath, string $contents, int $timeoutSeconds = 60): void
-    {
-        $this->putFiles[] = ['path' => $remotePath, 'contents' => $contents];
-    }
-}

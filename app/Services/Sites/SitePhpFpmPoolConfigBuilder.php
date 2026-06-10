@@ -70,6 +70,17 @@ final class SitePhpFpmPoolConfigBuilder
         $lines[] = "request_terminate_timeout = {$settings['request_terminate_timeout']}s";
         // Surface fatals/timeouts in the pool log instead of swallowing them.
         $lines[] = 'catch_workers_output = yes';
+        $lines[] = '';
+
+        // Per-request reference correlation. nginx passes the request uuid as the
+        // REQUEST_ID fastcgi param; logging it here (with an epoch + the request
+        // line) lets a 5xx reference code resolve to the exact request, which is
+        // then time-correlated to the app's error log. The FPM master (root) opens
+        // these files, so the pool user needs no write access to the directory.
+        $lines[] = "access.log = {$site->phpFpmAccessLogPath()}";
+        $lines[] = 'access.format = "ref=%{REQUEST_ID}e t=%{%s}t at=%{%Y-%m-%dT%H:%M:%S}t %m %r%Q%q dur=%{milli}dms status=%s"';
+        $lines[] = "php_admin_value[error_log] = {$site->phpFpmPoolErrorLogPath()}";
+        $lines[] = 'php_admin_flag[log_errors] = on';
 
         return implode("\n", $lines)."\n";
     }

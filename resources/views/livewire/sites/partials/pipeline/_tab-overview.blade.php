@@ -45,7 +45,7 @@
                 compact
                 section-id="pipeline-advisor-overview"
                 :title="__('Pipeline review')"
-                :description="__('Open the Pipeline tab to adjust steps and hooks flagged below.')"
+                :description="__('Apply the recommended fix for each flagged step or hook below.')"
             />
         </div>
     @endif

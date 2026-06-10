@@ -22,6 +22,83 @@ class SiteGitDeployer
 
     public function run(Site $site, ?SiteDeployment $deployment = null): array
     {
+        // Cutover wrapper: maintenance/recreate methods bracket the whole deploy
+        // with a pre/post action (raise the maintenance page / stop the runtime
+        // before, lower / start after — even on failure). Instant cutovers (flat,
+        // atomic, …) skip this entirely, so existing deploys are untouched.
+        $cutover = \App\Enums\DeploymentMethod::forSite($site)->cutover();
+        if (! in_array($cutover, ['maintenance', 'recreate'], true)) {
+            return $this->runInner($site, $deployment);
+        }
+
+        $server = $site->server;
+        $ssh = ($server !== null && $server->isReady() && ! empty($server->ssh_private_key))
+            ? $this->sshFactory->forServer($server)
+            : null;
+
+        $log = $ssh !== null ? $this->cutoverPre($cutover, $site, $ssh) : '';
+        try {
+            $result = $this->runInner($site, $deployment);
+            if ($ssh !== null) {
+                $log .= $this->cutoverPost($cutover, $site, $ssh);
+            }
+            $result['output'] = $log.((string) ($result['output'] ?? ''));
+
+            return $result;
+        } catch (\Throwable $e) {
+            if ($ssh !== null) {
+                try {
+                    $this->cutoverPost($cutover, $site, $ssh);
+                } catch (\Throwable) {
+                    // best-effort restore; surface the original failure
+                }
+            }
+            throw $e;
+        }
+    }
+
+    /** The path the live app serves from (current symlink for atomic, root otherwise). */
+    private function activeAppPath(Site $site): string
+    {
+        $base = rtrim($site->effectiveRepositoryPath(), '/');
+
+        return $site->isAtomicDeploys() ? $base.'/current' : $base;
+    }
+
+    /** Pre-deploy half of a maintenance/recreate cutover. */
+    private function cutoverPre(string $cutover, Site $site, \App\Services\SshConnection $ssh): string
+    {
+        $active = escapeshellarg($this->activeAppPath($site));
+        if ($cutover === 'maintenance') {
+            // Only if the app is already deployed (artisan present) — skips the
+            // very first deploy. storage/ is shared across atomic releases, so the
+            // down state persists until `up` below.
+            return "\n[dply] CUTOVER maintenance → raising maintenance page\n"
+                .$ssh->exec(sprintf('cd %s 2>/dev/null && [ -f artisan ] && php artisan down 2>&1 || echo "[dply]   (no app yet — skipped)"', $active), 60);
+        }
+
+        // recreate: stop the long-running runtime so the new code starts clean.
+        $unit = escapeshellarg('dply-site-'.$site->id.'.service');
+        return "\n[dply] CUTOVER recreate → stopping runtime\n"
+            .$ssh->exec(sprintf('sudo -n systemctl stop %1$s 2>&1 || systemctl stop %1$s 2>&1 || echo "[dply]   (no managed unit — skipped)"', $unit), 60);
+    }
+
+    /** Post-deploy half — runs on success AND failure so the site never stays down. */
+    private function cutoverPost(string $cutover, Site $site, \App\Services\SshConnection $ssh): string
+    {
+        $active = escapeshellarg($this->activeAppPath($site));
+        if ($cutover === 'maintenance') {
+            return "\n[dply] CUTOVER maintenance → lowering maintenance page\n"
+                .$ssh->exec(sprintf('cd %s 2>/dev/null && [ -f artisan ] && php artisan up 2>&1 || echo "[dply]   (no app — skipped)"', $active), 60);
+        }
+
+        $unit = escapeshellarg('dply-site-'.$site->id.'.service');
+        return "\n[dply] CUTOVER recreate → starting runtime\n"
+            .$ssh->exec(sprintf('sudo -n systemctl start %1$s 2>&1 || systemctl start %1$s 2>&1 || echo "[dply]   (no managed unit — skipped)"', $unit), 60);
+    }
+
+    private function runInner(Site $site, ?SiteDeployment $deployment = null): array
+    {
         if (($site->deploy_strategy ?? 'simple') === 'atomic') {
             return app(AtomicSiteDeployer::class)->deploy($site, $deployment);
         }
@@ -290,6 +367,15 @@ class SiteGitDeployer
             if ($syncResult['warnings'] !== []) {
                 $log .= "Warnings:\n- ".implode("\n- ", $syncResult['warnings'])."\n";
             }
+        }
+
+        // ── LAYOUT MIGRATE ── a deploy-method switch (e.g. atomic→flat) may have
+        // armed an on-disk layout change; perform it now that the flat checkout is
+        // live. Best-effort — never fail a healthy deploy over cleanup.
+        try {
+            $log .= app(SiteDeployLayoutMigrator::class)->migrateIfArmed($site, $ssh, gmdate('YmdHis'));
+        } catch (\Throwable $e) {
+            $log .= "\n[dply] layout migration skipped (non-fatal): ".$e->getMessage()."\n";
         }
 
         return ['output' => $log, 'sha' => $sha !== '' ? $sha : null];

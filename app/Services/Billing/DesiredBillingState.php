@@ -51,6 +51,8 @@ class DesiredBillingState
         public readonly array $edgeUsageEstimate,
         public readonly int $realtimeCount,
         public readonly int $realtimeSubtotalCents,
+        /** @var array<string, int> Active managed-realtime app counts keyed by tier slug. */
+        public readonly array $realtimeTierQuantities,
         public readonly int $monthlyTotalCents,
         // --- Back-compat shims for consumers not yet migrated off the old
         // size-tier shape (billing dashboard, analytics, forecast, snapshot).
@@ -83,8 +85,11 @@ class DesiredBillingState
         int $edgeUnitCents = 0,
         int $edgeUsageSubtotalCents = 0,
         array $edgeUsageEstimate = [],
+        // Legacy flat realtime inputs — kept for back-compat. Prefer
+        // $realtimeTierQuantities, which prices each app by its tier.
         int $realtimeCount = 0,
         int $realtimeUnitCents = 0,
+        array $realtimeTierQuantities = [],
     ): self {
         $normalized = [];
         foreach (ServerTier::ordered() as $tier) {
@@ -109,8 +114,29 @@ class DesiredBillingState
 
         $edgeUsageSubtotalCents = max(0, $edgeUsageSubtotalCents);
 
-        $realtimeCount = max(0, $realtimeCount);
-        $realtimeSubtotal = $realtimeCount * max(0, $realtimeUnitCents);
+        // Realtime: prefer per-tier quantities priced from config('realtime.tiers');
+        // fall back to the legacy flat count×unit for any caller not yet migrated
+        // (a flat count is attributed to the default tier for display).
+        $realtimeTiers = (array) config('realtime.tiers', []);
+        $realtimeTierNormalized = [];
+        if ($realtimeTierQuantities !== []) {
+            $realtimeSubtotal = 0;
+            foreach ($realtimeTierQuantities as $slug => $qty) {
+                $qty = max(0, (int) $qty);
+                if ($qty === 0) {
+                    continue;
+                }
+                $realtimeTierNormalized[(string) $slug] = $qty;
+                $realtimeSubtotal += $qty * (int) ($realtimeTiers[(string) $slug]['price_cents'] ?? 0);
+            }
+            $realtimeCount = array_sum($realtimeTierNormalized);
+        } else {
+            $realtimeCount = max(0, $realtimeCount);
+            $realtimeSubtotal = $realtimeCount * max(0, $realtimeUnitCents);
+            if ($realtimeCount > 0) {
+                $realtimeTierNormalized[(string) config('realtime.default_tier', 'starter')] = $realtimeCount;
+            }
+        }
 
         $monthly = $planPriceCents
             + $serverlessSubtotal
@@ -141,6 +167,7 @@ class DesiredBillingState
             edgeUsageEstimate: $edgeUsageEstimate,
             realtimeCount: $realtimeCount,
             realtimeSubtotalCents: $realtimeSubtotal,
+            realtimeTierQuantities: $realtimeTierNormalized,
             monthlyTotalCents: $monthly,
             baseCents: 0,
             serverSubtotalCents: $planPriceCents,
@@ -210,6 +237,7 @@ class DesiredBillingState
             'edge_usage_estimate' => $this->edgeUsageEstimate,
             'realtime_count' => $this->realtimeCount,
             'realtime_subtotal_cents' => $this->realtimeSubtotalCents,
+            'realtime_tier_quantities' => $this->realtimeTierQuantities,
             'monthly_total_cents' => $this->monthlyTotalCents,
             // Back-compat keys (snapshots/forecast read these today).
             'base_cents' => $this->baseCents,

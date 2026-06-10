@@ -137,6 +137,10 @@ class Index extends Component
         $workspaces = collect();
         $labels = collect();
         $views = collect();
+        $projectsTotal = 0;
+        $serversTotal = 0;
+        $sitesTotal = 0;
+        $membersTotal = 0;
 
         if ($org) {
             $query = $org->workspaces()
@@ -146,6 +150,14 @@ class Index extends Component
             if (! $org->hasAdminAccess($user)) {
                 $query->whereHas('members', fn ($members) => $members->where('user_id', $user->id));
             }
+
+            // Roll up the full set the member can access, before search/label/role
+            // filters narrow the visible list, so the hero stats stay stable.
+            $accessible = (clone $query)->get();
+            $projectsTotal = $accessible->count();
+            $serversTotal = $accessible->sum('servers_count');
+            $sitesTotal = $accessible->sum('sites_count');
+            $membersTotal = $accessible->sum(fn ($w) => $w->members->count());
 
             if ($this->search !== '') {
                 $query->where(function ($q): void {
@@ -185,6 +197,10 @@ class Index extends Component
             'labels' => $labels,
             'views' => $views,
             'workspaceRoles' => WorkspaceMember::roles(),
+            'projectsTotal' => $projectsTotal,
+            'serversTotal' => $serversTotal,
+            'sitesTotal' => $sitesTotal,
+            'membersTotal' => $membersTotal,
         ]);
     }
 }

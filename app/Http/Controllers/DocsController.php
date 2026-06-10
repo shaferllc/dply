@@ -2,19 +2,33 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Docs\DocsManifest;
+use App\Services\Docs\DocsSearchIndex;
 use App\Services\Docs\MarkdownDocRenderer;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class DocsController extends Controller
 {
     public function __construct(
         private readonly MarkdownDocRenderer $markdownDocRenderer,
+        private readonly DocsManifest $manifest,
     ) {}
 
     public function index(): View
     {
-        return view('docs.index');
+        return view('docs.index', [
+            'categories' => $this->manifest->byCategory(),
+        ]);
+    }
+
+    /**
+     * Client-side search index for the Cmd+K palette.
+     */
+    public function searchIndex(DocsSearchIndex $index): JsonResponse
+    {
+        return response()->json($index->cached());
     }
 
     public function connectProvider(): View
@@ -36,7 +50,7 @@ class DocsController extends Controller
     }
 
     /**
-     * Markdown pages registered in config/docs.php (`markdown` key).
+     * Markdown pages resolved via the front-matter manifest (config fallback).
      */
     public function markdown(string $slug): View
     {
@@ -51,9 +65,17 @@ class DocsController extends Controller
             throw new NotFoundHttpException;
         }
 
+        $prevNext = $this->manifest->prevNext($slug);
+
         return view('docs.markdown-doc', [
+            'slug' => $slug,
             'title' => $rendered['title'],
             'html' => $rendered['html'],
+            'headings' => $rendered['headings'],
+            'categories' => $this->manifest->byCategory(),
+            'current' => $this->manifest->find($slug),
+            'prev' => $prevNext['prev'],
+            'next' => $prevNext['next'],
         ]);
     }
 }

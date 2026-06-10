@@ -57,9 +57,22 @@ class ManagedProductCostEstimator
         return ((int) config('subscription.standard.edge_cents', 0)) / 100;
     }
 
+    /**
+     * Monthly fee (dollars) for a managed Realtime app on the default tier.
+     */
     public function realtimeFee(): float
     {
-        return ((int) config('subscription.standard.realtime_cents', 0)) / 100;
+        return $this->realtimeTierFee((string) config('realtime.default_tier', 'starter'));
+    }
+
+    /**
+     * Monthly fee (dollars) for a managed Realtime app on a specific tier.
+     */
+    public function realtimeTierFee(string $tier): float
+    {
+        $tiers = (array) config('realtime.tiers', []);
+
+        return ((int) ($tiers[$tier]['price_cents'] ?? config('subscription.standard.realtime_cents', 0))) / 100;
     }
 
     /**

@@ -24,6 +24,12 @@ return [
             'failed' => 'Webserver config apply failed.',
             'stale' => 'Webserver config apply did not finish.',
         ],
+        'error_reference_lookup' => [
+            'running' => 'Searching :host logs for the reference …',
+            'completed' => 'Reference resolved.',
+            'failed' => 'Reference lookup failed.',
+            'stale' => 'Reference lookup did not finish.',
+        ],
         'site_db_create' => [
             'running' => 'Creating the database on :host …',
             'completed' => 'Database created.',
@@ -77,6 +83,12 @@ return [
             'completed' => 'Test email sent — check the inbox.',
             'failed' => 'The test email could not be sent — see the transport error.',
             'stale' => 'Test email did not finish.',
+        ],
+        'disk_usage_measure' => [
+            'running' => 'Measuring :host disk usage …',
+            'completed' => 'Disk usage updated.',
+            'failed' => 'Disk usage measurement failed.',
+            'stale' => 'Disk usage measurement did not finish.',
         ],
         'remediation_apply' => [
             'running' => 'Applying fix …',
@@ -303,6 +315,10 @@ return [
     | `uptime_check` directly and does not consult this table.
     */
     'section_kinds' => [
+        // The general tab's Site-details card has a Measure button that runs a
+        // disk-usage `du` over SSH; surface its progress banner here so the
+        // "tracking in the console" toast isn't a dead end.
+        'general' => ['disk_usage_measure'],
         'settings' => ['webserver_config'],
         'routing' => ['webserver_config'],
         'certificates' => ['ssl', 'webserver_config'],

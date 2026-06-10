@@ -1,3 +1,12 @@
+---
+title: "Edge billing & usage"
+slug: edge-billing
+category: "Edge"
+order: 140
+description: "Summarizes per-site Edge charges including the platform fee and month-to-date CDN request and bandwidth usage, with a link to org-wide billing."
+group: edge
+---
+
 # Edge billing & usage
 
 **Billing & usage** summarizes Edge-specific charges for this site. Org-wide invoices live under **Settings → Billing**.

@@ -1,3 +1,12 @@
+---
+title: "Edge traffic & analytics"
+slug: edge-traffic
+category: "Edge"
+order: 130
+description: "CDN-level visibility for managed Edge sites covering requests, bandwidth, cache hit ratio, Worker performance, Core Web Vitals, and access log samples."
+group: edge
+---
+
 # Edge traffic & analytics
 
 **Traffic & analytics** shows CDN-level visibility for Edge sites on **managed dply Edge** delivery.

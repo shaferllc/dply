@@ -135,7 +135,10 @@
                     <x-heroicon-o-magnifying-glass class="h-5 w-5 shrink-0 text-brand-moss" />
                     <input
                         x-ref="input"
+                        id="command-palette-search"
+                        name="command_palette_search"
                         type="text"
+                        aria-label="{{ __('Search dply') }}"
                         wire:model.live.debounce.200ms="query"
                         @input="active = 0; confirming = -1"
                         @keydown.arrow-down.prevent="move(1)"

@@ -1,3 +1,12 @@
+---
+title: "Server settings"
+slug: server-settings
+category: "Servers"
+order: 370
+description: "Server-level metadata and connection preferences, including general details, provider info, SSH connection config, and danger actions like delete."
+group: servers
+---
+
 # Server settings
 
 The **Settings** section holds server-level metadata and connection preferences.

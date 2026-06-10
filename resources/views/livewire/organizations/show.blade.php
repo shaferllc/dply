@@ -85,11 +85,10 @@
 
 <div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <x-organization-shell :organization="$organization" section="overview">
-            <x-breadcrumb-trail :items="[
-                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-                ['label' => $organization->name, 'icon' => 'building-office-2'],
-            ]" />
+        <x-organization-shell :organization="$organization" section="overview" :breadcrumb="[
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => $organization->name, 'icon' => 'building-office-2'],
+        ]">
 
             {{-- Hero card. Stat strip on the right summarizes the four
                  numbers an admin scans for first — plan, fleet, people,
@@ -110,13 +109,13 @@
                             </div>
                         </div>
                         <div class="mt-4 flex flex-wrap items-center gap-2">
-                            <x-docs-link doc-route="docs.markdown" doc-slug="org-roles-and-limits">
+                            <x-docs-link slug="org-overview">
+                                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                {{ __('Organization guide') }}
+                            </x-docs-link>
+                            <x-docs-link slug="org-roles-and-limits">
                                 <x-heroicon-o-queue-list class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                                 {{ __('Roles & limits') }}
-                            </x-docs-link>
-                            <x-docs-link doc-route="docs.index">
-                                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                {{ __('Documentation') }}
                             </x-docs-link>
                             @if ($isAdmin)
                                 <a href="{{ route('billing.show', $organization) }}" wire:navigate class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest">

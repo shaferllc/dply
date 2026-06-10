@@ -63,6 +63,33 @@ class ProvisionSiteJob implements ShouldQueue
                 }
             }
 
+            // The vhost is held back until the per-server wildcard TLS cert for
+            // the testing zone is installed, so the site's :443 block is present
+            // from the first response and it is never published HTTP-only. Keep
+            // retrying within the probe window until issuance completes.
+            if ($site->provisioningState() === 'waiting_for_wildcard_tls') {
+                if (! $siteProvisioner->ensureWebserverConfigForReachability($site)) {
+                    if ($this->probeAttempt >= self::MAX_PROBE_ATTEMPTS) {
+                        $siteProvisioner->markTimedOut($site, 'The testing hostname was assigned, but the wildcard TLS certificate for its zone could not be issued before the retry limit was reached. dply requires SSL before publishing the site — check the wildcard certificate output and retry.');
+
+                        return;
+                    }
+
+                    $delaySeconds = $this->reachabilityDelaySeconds($this->probeAttempt);
+                    $siteProvisioner->appendLog($site, 'info', 'waiting_for_wildcard_tls', 'Waiting for the wildcard TLS certificate before writing the web server config.', [
+                        'next_probe_attempt' => $this->probeAttempt + 1,
+                        'delay_seconds' => $delaySeconds,
+                    ]);
+
+                    static::dispatch($site->id, $this->probeAttempt + 1)
+                        ->delay(now()->addSeconds($delaySeconds));
+
+                    return;
+                }
+
+                $site->refresh();
+            }
+
             $result = $siteProvisioner->checkReadiness($site);
             if ($result['ok']) {
                 return;

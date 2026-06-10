@@ -1,3 +1,12 @@
+---
+title: "Databases workspace"
+slug: server-databases
+category: "Servers"
+order: 170
+description: "Manage database engines on a server including MySQL, MariaDB, PostgreSQL, SQLite, MongoDB, and ClickHouse with install, connections, and backups."
+group: servers
+---
+
 # Databases workspace
 
 The **Databases** section manages database engines on the server — MySQL, MariaDB, PostgreSQL, SQLite, MongoDB, and ClickHouse.

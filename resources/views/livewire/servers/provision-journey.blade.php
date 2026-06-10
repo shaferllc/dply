@@ -721,7 +721,7 @@
                                             x-data="{ open: false, copied: false, copy() { navigator.clipboard?.writeText(this.$refs.pre.textContent); this.copied = true; clearTimeout(this._t); this._t = setTimeout(() => this.copied = false, 1500); } }"
                                             x-bind:open="open"
                                             @toggle.stop="open = $event.target.open; open && $nextTick(() => $refs.pre.scrollTop = $refs.pre.scrollHeight)"
-                                            class="group mt-4 overflow-hidden rounded-xl border border-brand-ink/10 bg-slate-950 shadow-inner"
+                                            class="group relative mt-4 overflow-hidden rounded-xl border border-brand-ink/10 bg-slate-950 shadow-inner"
                                         >
                                             <summary class="flex cursor-pointer items-center justify-between gap-3 border-b border-white/5 bg-slate-900/80 px-4 py-2.5">
                                                 <span class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
@@ -732,12 +732,15 @@
                                                     @if ($taskUpdatedAt)
                                                         <p class="text-[11px] text-slate-500">{{ __('updated :ago', ['ago' => $taskUpdatedAt->diffForHumans()]) }}</p>
                                                     @endif
-                                                    <button type="button" x-on:click.stop.prevent="copy()" class="inline-flex items-center gap-1 rounded-md border border-white/10 bg-slate-800/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 shadow-sm transition hover:bg-slate-700/80">
-                                                        <template x-if="!copied"><span class="inline-flex items-center gap-1"><x-heroicon-o-clipboard class="h-3 w-3" />{{ __('Copy') }}</span></template>
-                                                        <template x-if="copied"><span class="inline-flex items-center gap-1 text-emerald-300"><x-heroicon-m-check class="h-3 w-3" />{{ __('Copied') }}</span></template>
-                                                    </button>
                                                 </div>
                                             </summary>
+                                            {{-- Copy lives just below the summary (not inside it): a summary
+                                                 element is itself a button, so a nested control trips the a11y
+                                                 warning. It stays within this details' Alpine scope, overlaying the bar. --}}
+                                            <button type="button" x-on:click.stop.prevent="copy()" class="absolute right-3 top-2 z-10 inline-flex items-center gap-1 rounded-md border border-white/10 bg-slate-800/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 shadow-sm transition hover:bg-slate-700/80">
+                                                <template x-if="!copied"><span class="inline-flex items-center gap-1"><x-heroicon-o-clipboard class="h-3 w-3" />{{ __('Copy') }}</span></template>
+                                                <template x-if="copied"><span class="inline-flex items-center gap-1 text-emerald-300"><x-heroicon-m-check class="h-3 w-3" />{{ __('Copied') }}</span></template>
+                                            </button>
                                             <pre
                                                 x-ref="pre"
                                                 x-data="provisionConsoleScroll()"
@@ -755,7 +758,7 @@
                                             x-data="{ open: false, copied: false, copy() { navigator.clipboard?.writeText(this.$refs.pre.textContent); this.copied = true; clearTimeout(this._t); this._t = setTimeout(() => this.copied = false, 1500); } }"
                                             x-bind:open="open"
                                             @toggle.stop="open = $event.target.open; open && $nextTick(() => $refs.pre.scrollTop = $refs.pre.scrollHeight)"
-                                            class="group mt-4 overflow-hidden rounded-xl border border-brand-ink/10 bg-slate-950 shadow-inner"
+                                            class="group relative mt-4 overflow-hidden rounded-xl border border-brand-ink/10 bg-slate-950 shadow-inner"
                                         >
                                             <summary class="flex cursor-pointer flex-wrap items-center justify-between gap-3 border-b border-white/5 bg-slate-900/80 px-4 py-2.5">
                                                 <span class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
@@ -769,12 +772,13 @@
                                                             · {{ __('updated :ago', ['ago' => $taskUpdatedAt->diffForHumans()]) }}
                                                         @endif
                                                     </span>
-                                                    <button type="button" x-on:click.stop.prevent="copy()" class="inline-flex items-center gap-1 rounded-md border border-white/10 bg-slate-800/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 shadow-sm transition hover:bg-slate-700/80">
-                                                        <template x-if="!copied"><span class="inline-flex items-center gap-1"><x-heroicon-o-clipboard class="h-3 w-3" />{{ __('Copy') }}</span></template>
-                                                        <template x-if="copied"><span class="inline-flex items-center gap-1 text-emerald-300"><x-heroicon-m-check class="h-3 w-3" />{{ __('Copied') }}</span></template>
-                                                    </button>
                                                 </span>
                                             </summary>
+                                            {{-- Copy moved below the summary (out of the toggle button) — see note above. --}}
+                                            <button type="button" x-on:click.stop.prevent="copy()" class="absolute right-3 top-2 z-10 inline-flex items-center gap-1 rounded-md border border-white/10 bg-slate-800/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 shadow-sm transition hover:bg-slate-700/80">
+                                                <template x-if="!copied"><span class="inline-flex items-center gap-1"><x-heroicon-o-clipboard class="h-3 w-3" />{{ __('Copy') }}</span></template>
+                                                <template x-if="copied"><span class="inline-flex items-center gap-1 text-emerald-300"><x-heroicon-m-check class="h-3 w-3" />{{ __('Copied') }}</span></template>
+                                            </button>
                                             <pre
                                                 x-ref="pre"
                                                 x-data="provisionConsoleScroll()"
@@ -793,7 +797,7 @@
                                             x-data="{ open: false, copied: false, copy() { navigator.clipboard?.writeText(this.$refs.pre.textContent); this.copied = true; clearTimeout(this._t); this._t = setTimeout(() => this.copied = false, 1500); } }"
                                             x-bind:open="open"
                                             @toggle.stop="open = $event.target.open; open && $nextTick(() => $refs.pre.scrollTop = $refs.pre.scrollHeight)"
-                                            class="group mt-4 overflow-hidden rounded-xl border border-brand-ink/10 bg-slate-950 shadow-inner"
+                                            class="group relative mt-4 overflow-hidden rounded-xl border border-brand-ink/10 bg-slate-950 shadow-inner"
                                         >
                                             <summary class="flex cursor-pointer flex-wrap items-center justify-between gap-3 border-b border-white/5 bg-slate-900/80 px-4 py-2.5">
                                                 <span class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
@@ -807,12 +811,13 @@
                                                             · {{ __('updated :ago', ['ago' => $taskUpdatedAt->diffForHumans()]) }}
                                                         @endif
                                                     </p>
-                                                    <button type="button" x-on:click.stop.prevent="copy()" class="inline-flex items-center gap-1 rounded-md border border-white/10 bg-slate-800/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 shadow-sm transition hover:bg-slate-700/80">
-                                                        <template x-if="!copied"><span class="inline-flex items-center gap-1"><x-heroicon-o-clipboard class="h-3 w-3" />{{ __('Copy') }}</span></template>
-                                                        <template x-if="copied"><span class="inline-flex items-center gap-1 text-emerald-300"><x-heroicon-m-check class="h-3 w-3" />{{ __('Copied') }}</span></template>
-                                                    </button>
                                                 </div>
                                             </summary>
+                                            {{-- Copy moved below the summary (out of the toggle button) — see note above. --}}
+                                            <button type="button" x-on:click.stop.prevent="copy()" class="absolute right-3 top-2 z-10 inline-flex items-center gap-1 rounded-md border border-white/10 bg-slate-800/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-200 shadow-sm transition hover:bg-slate-700/80">
+                                                <template x-if="!copied"><span class="inline-flex items-center gap-1"><x-heroicon-o-clipboard class="h-3 w-3" />{{ __('Copy') }}</span></template>
+                                                <template x-if="copied"><span class="inline-flex items-center gap-1 text-emerald-300"><x-heroicon-m-check class="h-3 w-3" />{{ __('Copied') }}</span></template>
+                                            </button>
                                             <pre
                                                 x-ref="pre"
                                                 x-data="provisionConsoleScroll()"

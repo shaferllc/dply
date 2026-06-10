@@ -16,7 +16,7 @@
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Scaling') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Create a worker pool') }}</h2>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        {{ __('Turn this worker into the primary of a pool. You can then scale to N workers — each clone replays this server's sites and joins the same queue.') }}
+                        {{ __('Turn this worker into the primary of a pool. You can then scale to N workers — each clone replays this server\'s sites and joins the same queue.') }}
                     </p>
                 </div>
             </div>
@@ -92,6 +92,7 @@
                 \App\Models\WorkerPool::MEMBER_DEPLOYING => ['label' => __('Deploying'), 'cls' => 'bg-indigo-50 text-indigo-700 ring-indigo-200'],
                 \App\Models\WorkerPool::MEMBER_ACTIVE => ['label' => __('Active'), 'cls' => 'bg-emerald-50 text-emerald-700 ring-emerald-200'],
                 \App\Models\WorkerPool::MEMBER_DRAINING => ['label' => __('Draining'), 'cls' => 'bg-rose-50 text-rose-700 ring-rose-200'],
+                \App\Models\WorkerPool::MEMBER_ERRORED => ['label' => __('Errored'), 'cls' => 'bg-rose-100 text-rose-800 ring-rose-300'],
                 default => ['label' => __('Ready'), 'cls' => 'bg-brand-sand/60 text-brand-moss ring-brand-ink/15'],
             };
         @endphp
@@ -378,7 +379,7 @@
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Cross-region') }}</p>
                     <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Add a worker in another region') }}</h2>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        {{ __('Provision one replica in a different region (same provider). Its env is rewritten to reach your backends over their public address — you'll then need to expose + allowlist those backends (shown above once it's ready).') }}
+                        {{ __('Provision one replica in a different region (same provider). Its env is rewritten to reach your backends over their public address — you\'ll then need to expose + allowlist those backends (shown above once it\'s ready).') }}
                     </p>
                 </div>
             </div>
@@ -433,7 +434,7 @@
                 </div>
                 <label class="flex items-start gap-3">
                     <input type="checkbox" wire:model="cr_ack_secrets" class="mt-0.5 h-4 w-4 rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage/30" />
-                    <span class="text-xs text-brand-moss">{{ __('I understand this server's secrets (.env, including credentials) will be replicated to the new region/provider.') }}</span>
+                    <span class="text-xs text-brand-moss">{{ __('I understand this server\'s secrets (.env, including credentials) will be replicated to the new region/provider.') }}</span>
                 </label>
                 <div class="flex justify-end">
                     <x-primary-button type="submit">{{ __('Provision cross-region worker') }}</x-primary-button>
@@ -485,7 +486,7 @@
                             </p>
                         </div>
                         <div class="flex items-center gap-2">
-                            <div class="inline-flex overflow-hidden rounded-lg border border-brand-ink/15" title="{{ __('Start / restart / stop this member's worker daemon (Horizon or queue:work) via the active process manager.') }}">
+                            <div class="inline-flex overflow-hidden rounded-lg border border-brand-ink/15" title="{{ __('Start / restart / stop this member\'s worker daemon (Horizon or queue:work) via the active process manager.') }}">
                                 <button type="button" wire:click="controlMemberWorkers('{{ $member->id }}', 'start')" class="px-2.5 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Start') }}</button>
                                 <button type="button" wire:click="controlMemberWorkers('{{ $member->id }}', 'restart')" class="border-l border-brand-ink/15 px-2.5 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40">{{ __('Restart') }}</button>
                                 <button type="button" wire:click="controlMemberWorkers('{{ $member->id }}', 'stop')" class="border-l border-brand-ink/15 px-2.5 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50">{{ __('Stop') }}</button>
@@ -504,7 +505,7 @@
         </section>
 
         <p class="mt-4 text-xs text-brand-moss">
-            {{ __('Same-region workers join this server's private network (env copied verbatim). Cross-region workers reach backends over the public network (env rewritten) and require you to expose + allowlist those backends. Backend exposure is not automated yet.') }}
+            {{ __('Same-region workers join this server\'s private network (env copied verbatim). Cross-region workers reach backends over the public network (env rewritten) and require you to expose + allowlist those backends. Backend exposure is not automated yet.') }}
         </p>
         @endif {{-- /members --}}
 
@@ -553,7 +554,7 @@
             @unless ($hzInstalled)
                 <div class="flex items-start gap-2 rounded-xl border border-brand-ink/15 bg-brand-sand/30 px-4 py-3 text-sm text-brand-moss">
                     <x-heroicon-o-information-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-mist" />
-                    <span>{{ __('Horizon isn't installed on this app, so aggregate metrics are unavailable — the Live jobs feed below still streams every job in real time. Install laravel/horizon for the full dashboard.') }}</span>
+                    <span>{{ __('Horizon isn\'t installed on this app, so aggregate metrics are unavailable — the Live jobs feed below still streams every job in real time. Install laravel/horizon for the full dashboard.') }}</span>
                 </div>
             @endunless
             @if ($hzInstalled && ! empty($hzDrift))
@@ -562,7 +563,7 @@
                         <x-heroicon-o-exclamation-triangle class="h-4 w-4 shrink-0" />
                         {{ __('Running config differs from saved') }}
                     </div>
-                    <p class="mt-1 text-xs text-amber-700">{{ __('The workers are running settings that don't match this pool's saved config. Click “Save & apply” to push the saved values, or update the saved config to match.') }}</p>
+                    <p class="mt-1 text-xs text-amber-700">{{ __('The workers are running settings that don\'t match this pool\'s saved config. Click “Save & apply” to push the saved values, or update the saved config to match.') }}</p>
                     <ul class="mt-2 space-y-0.5 font-mono text-[11px] text-amber-800">
                         @foreach ($hzDrift as $field => $d)
                             <li>{{ $field }}: <span class="text-amber-600">saved={{ is_array($d['saved'] ?? null) ? implode(',', $d['saved']) : ($d['saved'] ?? '—') }}</span> → <span class="font-semibold">running={{ is_array($d['running'] ?? null) ? implode(',', $d['running']) : ($d['running'] ?? '—') }}</span></li>
@@ -585,14 +586,14 @@
                                 ])>{{ $hzStatus }}</span>
                             @endif
                         </div>
-                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Live job metrics pulled from the app's Horizon over SSH — processed, failed, pending, throughput and recent failures across the pool.') }}</p>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">{{ __('Live job metrics pulled from the app\'s Horizon over SSH — processed, failed, pending, throughput and recent failures across the pool.') }}</p>
                         @php $watchedQueues = \App\Support\WorkerPools\WorkerPoolHorizonConfig::for($pool)['queues'] ?? ['default']; @endphp
                         <p class="mt-1.5 text-xs text-brand-moss">
                             <span class="font-medium text-brand-ink">{{ __('Queues watched:') }}</span>
                             @foreach ($watchedQueues as $q)
                                 <code class="ml-1 rounded bg-brand-sand/60 px-1.5 py-0.5 font-mono text-[11px]">{{ $q }}</code>
                             @endforeach
-                            <span class="ml-1 text-brand-mist">{{ __('· isolated from dply's own queues (dply / dply-control)') }}</span>
+                            <span class="ml-1 text-brand-mist">{{ __('· isolated from dply\'s own queues (dply / dply-control)') }}</span>
                         </p>
                     </div>
                     <div class="flex flex-col items-end gap-2 text-right text-xs text-brand-moss">
@@ -765,10 +766,22 @@
                     <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform" x-bind:class="open ? 'rotate-90' : ''" />
                 </button>
                 <form wire:submit="saveHorizonConfig" x-show="open" x-cloak class="space-y-5 px-6 py-6 sm:px-7">
-                    <div>
+                    <div x-data="{
+                        q: @js((string) $hz_queues),
+                        get tokens() { return this.q.split(',').map(s => s.trim()).filter(Boolean); },
+                        get first() { return this.tokens[0] || '—'; },
+                    }">
                         <x-input-label for="hz_queues" :value="__('Queues watched')" />
-                        <x-text-input id="hz_queues" wire:model="hz_queues" class="mt-2 block w-full font-mono text-sm" placeholder="default, emails, notifications" />
+                        <x-text-input id="hz_queues" wire:model="hz_queues" x-on:input="q = $event.target.value" class="mt-2 block w-full font-mono text-sm" placeholder="default, emails, notifications" />
                         <p class="mt-1 text-xs text-brand-moss">{{ __('Comma-separated. Workers process these queues in priority order.') }}</p>
+                        {{-- Live preview: the FIRST queue is the dispatch target (REDIS_QUEUE) —
+                             so a typo here silently misroutes jobs. Make it visible before save. --}}
+                        <p class="mt-1 text-[11px] text-brand-moss">
+                            {{ __('Dispatch queue (REDIS_QUEUE):') }}
+                            <span class="font-mono font-semibold text-brand-ink" x-text="first"></span>
+                            <span class="text-brand-mist"> · </span>{{ __('watching') }}
+                            <span class="font-mono text-brand-ink" x-text="tokens.join(', ') || '—'"></span>
+                        </p>
                     </div>
                     <div class="grid grid-cols-2 gap-4 sm:grid-cols-3">
                         <div>
@@ -801,7 +814,7 @@
                         </div>
                     </div>
                     <div class="flex items-center justify-between gap-3">
-                        <p class="text-xs text-brand-moss">{{ __('Saving restarts each worker's Horizon to pick up the new settings.') }}</p>
+                        <p class="text-xs text-brand-moss">{{ __('Saving restarts each worker\'s Horizon to pick up the new settings.') }}</p>
                         <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="saveHorizonConfig">
                             <span wire:loading.remove wire:target="saveHorizonConfig">{{ __('Save & apply') }}</span>
                             <span wire:loading wire:target="saveHorizonConfig">{{ __('Applying…') }}</span>

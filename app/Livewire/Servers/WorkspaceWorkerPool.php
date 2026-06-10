@@ -4,26 +4,29 @@ namespace App\Livewire\Servers;
 
 use App\Actions\Servers\ResolveServerCreateCatalog;
 use App\Jobs\ApplyWorkerPoolExposureJob;
+use App\Jobs\CollectWorkerPoolHorizonSnapshotJob;
+use App\Jobs\CollectWorkerPoolStatsJob;
+use App\Jobs\PushWorkerPoolHorizonConfigJob;
+use App\Jobs\ReconcileWorkerPoolJob;
+use App\Jobs\RunWorkerPoolTestJobsJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\ConsoleAction;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\WorkerPool;
 use App\Services\WorkerPools\WorkerCloneProvisioner;
 use App\Services\WorkerPools\WorkerPoolManager;
+use App\Support\WorkerPools\WorkerPoolHorizonConfig;
 use Illuminate\Contracts\View\View;
-use App\Jobs\CollectWorkerPoolHorizonSnapshotJob;
-use App\Jobs\CollectWorkerPoolStatsJob;
-use App\Jobs\RunWorkerPoolTestJobsJob;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 
 /**
  * Server workspace page for cloning + scaling a worker server as a Worker Pool.
@@ -36,10 +39,10 @@ use Livewire\Attributes\Lazy;
 #[Lazy]
 class WorkspaceWorkerPool extends Component
 {
-    use RendersWorkspacePlaceholder;
     use ConfirmsActionWithModal;
     use DismissesServerConsoleActionRun;
     use InteractsWithServerWorkspace;
+    use RendersWorkspacePlaceholder;
 
     #[Url(as: 'tab')]
     public string $tab = 'overview';
@@ -113,7 +116,7 @@ class WorkspaceWorkerPool extends Component
             $this->as_max = (int) ($as['max'] ?? min(5, $pool->max_size));
             $this->as_backlog = (int) ($as['per_worker_backlog'] ?? 100);
 
-            $hz = \App\Support\WorkerPools\WorkerPoolHorizonConfig::for($pool);
+            $hz = WorkerPoolHorizonConfig::for($pool);
             $this->hz_queues = implode(', ', $hz['queues']);
             $this->hz_min_processes = $hz['min_processes'];
             $this->hz_max_processes = $hz['max_processes'];
@@ -223,6 +226,26 @@ class WorkspaceWorkerPool extends Component
             return;
         }
 
+        // Validate queue tokens before saving. The FIRST queue becomes the
+        // dispatch target (REDIS_QUEUE), so a malformed/empty value silently
+        // breaks routing (this is how a typo'd queue once stuck the control plane).
+        $queueTokens = array_values(array_filter(
+            array_map('trim', explode(',', (string) $this->hz_queues)),
+            fn (string $q): bool => $q !== '',
+        ));
+        if ($queueTokens === []) {
+            $this->toastError(__('Add at least one queue — the first is the dispatch target (REDIS_QUEUE).'));
+
+            return;
+        }
+        foreach ($queueTokens as $q) {
+            if (! preg_match('/^[A-Za-z0-9_:.\-]+$/', $q)) {
+                $this->toastError(__('Invalid queue name “:q” — use letters, digits, and _ : . - only.', ['q' => $q]));
+
+                return;
+            }
+        }
+
         $previousManager = $pool->processManager();
         $newManager = in_array($this->hz_process_manager, [WorkerPool::PM_SYSTEMD, WorkerPool::PM_SUPERVISOR], true)
             ? $this->hz_process_manager
@@ -244,7 +267,7 @@ class WorkspaceWorkerPool extends Component
 
         // Re-read through the normaliser so the form reflects the clamped/cleaned
         // values that were actually stored (and will be pushed to the boxes).
-        $normalised = \App\Support\WorkerPools\WorkerPoolHorizonConfig::for($pool->refresh());
+        $normalised = WorkerPoolHorizonConfig::for($pool->refresh());
         $this->hz_queues = implode(', ', $normalised['queues']);
         $this->hz_min_processes = $normalised['min_processes'];
         $this->hz_max_processes = $normalised['max_processes'];
@@ -253,7 +276,7 @@ class WorkspaceWorkerPool extends Component
         $this->hz_timeout = $normalised['timeout'];
         $this->hz_tries = $normalised['tries'];
 
-        \App\Jobs\PushWorkerPoolHorizonConfigJob::dispatch((string) $pool->id);
+        PushWorkerPoolHorizonConfigJob::dispatch((string) $pool->id);
 
         // Switching process manager re-provisions every member's worker daemons
         // under the new backend and tears down the old one (systemd⇄supervisor).
@@ -667,7 +690,7 @@ class WorkspaceWorkerPool extends Component
         }
 
         $pool->forceFill(['status' => WorkerPool::STATUS_SCALING])->save();
-        \App\Jobs\ReconcileWorkerPoolJob::dispatch((string) $pool->id);
+        ReconcileWorkerPoolJob::dispatch((string) $pool->id);
         $this->toastSuccess(__('Re-checking the pool — watch the console below for what each member is waiting on.'));
     }
 
@@ -751,7 +774,7 @@ class WorkspaceWorkerPool extends Component
         $newDesired = max(1, $pool->desired_count - 1);
         $pool->forceFill(['desired_count' => $newDesired, 'status' => WorkerPool::STATUS_SCALING])->save();
         $this->desired_count = $newDesired;
-        \App\Jobs\ReconcileWorkerPoolJob::dispatch((string) $pool->id);
+        ReconcileWorkerPoolJob::dispatch((string) $pool->id);
 
         $this->toastSuccess(__('Draining :name, then it will be destroyed. Desired count is now :n.', ['name' => $member->name, 'n' => $newDesired]));
     }

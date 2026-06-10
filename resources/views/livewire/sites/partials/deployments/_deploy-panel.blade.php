@@ -1,11 +1,16 @@
 @php
     $latest = $latestDeployment ?? null;
     $isRunning = $latest && $latest->status === 'running';
-    // A deploy is "in progress" whenever the latest run is running or the
-    // deploy lock is held (e.g. a queued run on a worker). Drive the deploy
-    // button off this so it reads "Deploying…" for the whole run, not just
-    // the brief request that dispatches it.
-    $deployInProgress = $isRunning || (bool) ($this->deployLockInfo ?? null);
+    // A deploy is "in progress" while the latest run is running, or the deploy
+    // lock is held AND no terminal run has landed since it was taken. Driving
+    // the button off raw lock presence kept it spinning "Deploying…" for the
+    // full 600s lock TTL after a deploy finished — a self-deploy can kill the
+    // worker that runs the lock-cleanup `finally` before it clears the marker.
+    // The trait helper stops as soon as this run lands terminal. (Guarded so a
+    // partial rendered by a component without the trait still falls back.)
+    $deployInProgress = method_exists($this, 'deployIsInProgress')
+        ? $this->deployIsInProgress($latest)
+        : ($isRunning || (bool) ($this->deployLockInfo ?? null));
     // "Deployed commit" must reflect the code actually live — the last SUCCESSFUL
     // deploy — not the latest attempt (which may be skipped/failed with no SHA,
     // the source of the confusing "No deploys yet" when deploys clearly exist).
@@ -16,7 +21,7 @@
     $shortSha = $deployedSha ? \Illuminate\Support\Str::limit($deployedSha, 7, '') : null;
     $totalDurationMs = $latest ? $latest->phaseTotalDurationMs() : 0;
     // Phase timeline derived from the site's pipeline (Clone → Build →
-    // Activate → Release) overlaid with this deployment's recorded steps.
+    // Release → Activate) overlaid with this deployment's recorded steps.
     $timelinePhases = \App\Support\Sites\SiteDeployTimeline::forDeployment($site, $latest);
 
     // Env vars the last deploy was blocked on (recorded by the deploy job's
@@ -210,8 +215,12 @@
     {{-- Pipeline suggestions — proactively flag missing-but-needed deploy
          steps (e.g. installs JS deps but never builds them → the live site
          500s on a missing Vite manifest) with one-click "Add to pipeline". --}}
-    @php $pipelineSuggestions = method_exists($this, 'optimizePipeline') ? \App\Support\Sites\SitePipelineAdvisor::suggestions($site) : []; @endphp
-    @if ($pipelineSuggestions !== [])
+    @php
+        $pipelineSuggestions = method_exists($this, 'optimizePipeline') ? \App\Support\Sites\SitePipelineAdvisor::suggestions($site) : [];
+        $pipelineDismissedCount = method_exists($this, 'optimizePipeline') ? \App\Support\Sites\SitePipelineAdvisor::dismissedCount($site) : 0;
+        $canAutofixPipeline = method_exists($this, 'addSuggestedPipelineStep');
+    @endphp
+    @if ($pipelineSuggestions !== [] || $pipelineDismissedCount > 0)
         {{-- While the optimizePipeline Livewire request is in flight, swap the
              card for a starting placeholder so old suggestions don't flash. --}}
         <div wire:loading.flex wire:target="optimizePipeline" class="hidden items-center justify-center gap-3 rounded-2xl border border-dashed border-indigo-200 bg-indigo-50/40 px-4 py-8 text-sm text-indigo-700">
@@ -238,10 +247,14 @@
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-indigo-700">{{ __('Pipeline check') }}</p>
                             <h3 class="mt-0.5 text-base font-semibold text-indigo-950">
-                                {{ trans_choice('{1} :count suggested deploy step|[2,*] :count suggested deploy steps', count($pipelineSuggestions), ['count' => count($pipelineSuggestions)]) }}
+                                @if ($pipelineSuggestions !== [])
+                                    {{ trans_choice('{1} :count suggested deploy step|[2,*] :count suggested deploy steps', count($pipelineSuggestions), ['count' => count($pipelineSuggestions)]) }}
+                                @else
+                                    {{ __('No open suggestions') }}
+                                @endif
                             </h3>
                         </div>
-                        @if (method_exists($this, 'optimizePipeline'))
+                        @if ($pipelineSuggestions !== [] && method_exists($this, 'optimizePipeline'))
                             <button type="button" wire:click="optimizePipeline" wire:loading.attr="disabled" wire:target="optimizePipeline" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-700 shadow-sm hover:bg-indigo-50 disabled:opacity-60" title="{{ __('Read package.json / composer.json on the server and add every step the repo needs.') }}">
                                 <x-heroicon-o-sparkles class="h-4 w-4" wire:loading.remove wire:target="optimizePipeline" />
                                 <span wire:loading wire:target="optimizePipeline" class="inline-flex h-4 w-4 items-center justify-center"><x-spinner variant="forest" size="sm" /></span>
@@ -250,38 +263,69 @@
                             </button>
                         @endif
                     </div>
-                    <p class="mt-1 text-sm text-indigo-900/80">{{ __('Add these individually, or Optimize pipeline to scan the repo and add everything at once — so a deploy doesn\'t succeed while the site breaks.') }}</p>
-                    <ul class="mt-3 space-y-2">
-                        @foreach ($pipelineSuggestions as $sug)
-                            <li class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-indigo-200/70 bg-white/70 px-3 py-2">
-                                <div class="min-w-0 flex-1">
-                                    <p class="flex items-center gap-1.5 text-sm font-semibold text-brand-ink">
-                                        {{ $sug['label'] }}
-                                        @if ($sug['priority'] === 'high')
-                                            <span class="rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-rose-700">{{ __('recommended') }}</span>
-                                        @endif
-                                        <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 font-mono text-[10px] text-brand-moss">{{ $sug['phase'] }}</span>
-                                    </p>
-                                    <p class="mt-0.5 text-xs text-brand-moss">{{ $sug['reason'] }}@if ($sug['command']) <span class="font-mono text-brand-ink/70">· {{ $sug['command'] }}</span>@endif</p>
-                                </div>
-                                @if (method_exists($this, 'addDeployPipelineStepFromPalette'))
-                                    <button
-                                        type="button"
-                                        wire:click="addDeployPipelineStepFromPalette(@js($sug['step_type']), null, @js($sug['phase']), @js($sug['command']))"
-                                        wire:loading.attr="disabled"
-                                        class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:opacity-60"
-                                    >
-                                        <x-heroicon-o-plus class="h-4 w-4" />
-                                        {{ __('Add to pipeline') }}
-                                    </button>
-                                @endif
-                            </li>
-                        @endforeach
-                    </ul>
-                    <button type="button" wire:click="setTab('pipeline')" class="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 hover:underline">
-                        <x-heroicon-o-pencil-square class="h-3 w-3" />
-                        {{ __('Edit the full pipeline') }}
-                    </button>
+
+                    @if ($pipelineSuggestions !== [])
+                        <p class="mt-1 text-sm text-indigo-900/80">{{ __('Add a fix to drop the step into your pipeline, or Optimize to scan the repo and add everything at once — so a deploy doesn\'t succeed while the site breaks. Dismiss anything you don\'t want.') }}</p>
+                        <ul class="mt-3 space-y-2">
+                            @foreach ($pipelineSuggestions as $sug)
+                                <li class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-indigo-200/70 bg-white/70 px-3 py-2">
+                                    <div class="min-w-0 flex-1">
+                                        <p class="flex flex-wrap items-center gap-1.5 text-sm font-semibold text-brand-ink">
+                                            {{ $sug['label'] }}
+                                            @if ($sug['priority'] === 'high')
+                                                <span class="rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-rose-700">{{ __('recommended') }}</span>
+                                            @endif
+                                            <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 font-mono text-[10px] text-brand-moss">{{ $sug['phase'] }}</span>
+                                        </p>
+                                        <p class="mt-0.5 text-xs text-brand-moss">{{ $sug['reason'] }}@if ($sug['command']) <span class="font-mono text-brand-ink/70">· {{ $sug['command'] }}</span>@endif</p>
+                                    </div>
+                                    @if ($canAutofixPipeline)
+                                        <div class="flex shrink-0 items-center gap-1.5">
+                                            <button
+                                                type="button"
+                                                wire:click="addSuggestedPipelineStep(@js($sug['key']))"
+                                                wire:loading.attr="disabled"
+                                                wire:target="addSuggestedPipelineStep, dismissPipelineSuggestion"
+                                                class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:opacity-60"
+                                                title="{{ __('Add this step to the deploy pipeline.') }}"
+                                            >
+                                                <x-heroicon-o-wrench-screwdriver class="h-4 w-4" />
+                                                {{ __('Add fix') }}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                wire:click="dismissPipelineSuggestion(@js($sug['key']))"
+                                                wire:loading.attr="disabled"
+                                                wire:target="addSuggestedPipelineStep, dismissPipelineSuggestion"
+                                                class="inline-flex items-center justify-center rounded-lg border border-transparent p-1.5 text-brand-mist transition-colors hover:border-indigo-200 hover:bg-white hover:text-brand-moss disabled:opacity-60"
+                                                title="{{ __('Dismiss this suggestion') }}"
+                                                aria-label="{{ __('Dismiss :label', ['label' => $sug['label']]) }}"
+                                            >
+                                                <x-heroicon-o-x-mark class="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ul>
+                    @else
+                        <p class="mt-1 text-sm text-indigo-900/80">{{ __('Every detected suggestion has been dismissed. Your pipeline still deploys — restore them if you want another look.') }}</p>
+                    @endif
+
+                    <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+                        @if ($pipelineSuggestions !== [])
+                            <button type="button" wire:click="setTab('pipeline')" class="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 hover:underline">
+                                <x-heroicon-o-pencil-square class="h-3 w-3" />
+                                {{ __('Edit the full pipeline') }}
+                            </button>
+                        @endif
+                        @if ($pipelineDismissedCount > 0 && method_exists($this, 'restorePipelineSuggestions'))
+                            <button type="button" wire:click="restorePipelineSuggestions" class="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-moss hover:text-brand-ink hover:underline">
+                                <x-heroicon-o-arrow-uturn-left class="h-3 w-3" />
+                                {{ trans_choice('{1} Restore 1 dismissed|[2,*] Restore :count dismissed', $pipelineDismissedCount, ['count' => $pipelineDismissedCount]) }}
+                            </button>
+                        @endif
+                    </div>
                 </div>
             </div>
         </div>
@@ -338,10 +382,16 @@
             </div>
         </div>
 
-        <dl class="grid grid-cols-2 gap-x-6 gap-y-4 border-b border-brand-ink/10 bg-white px-6 py-5 text-sm sm:grid-cols-4 sm:px-8">
-            <div class="min-w-0">
-                <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Deployed commit') }}</dt>
-                <dd class="mt-1 truncate">
+        {{-- Summary stats — hairline-divided cells (gap-px over a tinted track)
+             so the four read as one continuous strip rather than four boxes,
+             echoing the connected feel of the phase rail below. --}}
+        <dl class="grid grid-cols-2 gap-px border-b border-brand-ink/10 bg-brand-ink/[0.06] text-sm sm:grid-cols-4">
+            <div class="min-w-0 bg-white px-6 py-4 sm:px-8">
+                <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
+                    <x-heroicon-m-code-bracket class="h-3.5 w-3.5" aria-hidden="true" />
+                    {{ __('Deployed commit') }}
+                </dt>
+                <dd class="mt-1.5 truncate">
                     @if ($shortSha)
                         <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 font-mono text-xs font-semibold text-brand-sage" title="{{ $deployedSha }}">{{ $shortSha }}</span>
                     @elseif ($latest)
@@ -351,25 +401,40 @@
                     @endif
                 </dd>
             </div>
-            <div class="min-w-0">
-                <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Status') }}</dt>
-                <dd class="mt-1">
+            <div class="min-w-0 bg-white px-6 py-4 sm:px-8">
+                <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
+                    <x-heroicon-m-signal class="h-3.5 w-3.5" aria-hidden="true" />
+                    {{ __('Status') }}
+                </dt>
+                <dd class="mt-1.5">
                     @if ($latest)
                         <span @class([
-                            'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset',
+                            'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ring-1 ring-inset',
                             'bg-emerald-50 text-emerald-800 ring-emerald-200' => $latest->status === 'success',
                             'bg-rose-50 text-rose-800 ring-rose-200' => $latest->status === 'failed',
                             'bg-amber-50 text-amber-900 ring-amber-200' => $latest->status === 'running',
                             'bg-brand-sand/60 text-brand-ink ring-brand-ink/10' => ! in_array($latest->status, ['success', 'failed', 'running']),
-                        ])>{{ $latest->status }}</span>
+                        ])>
+                            <span @class([
+                                'h-1.5 w-1.5 rounded-full',
+                                'bg-emerald-500' => $latest->status === 'success',
+                                'bg-rose-500' => $latest->status === 'failed',
+                                'bg-amber-500 animate-pulse' => $latest->status === 'running',
+                                'bg-brand-mist' => ! in_array($latest->status, ['success', 'failed', 'running']),
+                            ])></span>
+                            {{ $latest->status }}
+                        </span>
                     @else
                         <span class="text-brand-mist">—</span>
                     @endif
                 </dd>
             </div>
-            <div class="min-w-0">
-                <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Duration') }}</dt>
-                <dd class="mt-1 font-mono text-xs text-brand-ink">
+            <div class="min-w-0 bg-white px-6 py-4 sm:px-8">
+                <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
+                    <x-heroicon-m-clock class="h-3.5 w-3.5" aria-hidden="true" />
+                    {{ __('Duration') }}
+                </dt>
+                <dd class="mt-1.5 font-mono text-xs tabular-nums text-brand-ink">
                     @if ($totalDurationMs > 0)
                         {{ number_format($totalDurationMs / 1000, 1) }}s
                     @elseif ($latest?->started_at && $latest?->finished_at)
@@ -379,9 +444,12 @@
                     @endif
                 </dd>
             </div>
-            <div class="min-w-0">
-                <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Trigger') }}</dt>
-                <dd class="mt-1 text-brand-ink">{{ $latest?->trigger ?: '—' }}</dd>
+            <div class="min-w-0 bg-white px-6 py-4 sm:px-8">
+                <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">
+                    <x-heroicon-m-bolt class="h-3.5 w-3.5" aria-hidden="true" />
+                    {{ __('Trigger') }}
+                </dt>
+                <dd class="mt-1.5 truncate text-brand-ink">{{ $latest?->trigger ?: '—' }}</dd>
             </div>
         </dl>
 

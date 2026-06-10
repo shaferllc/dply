@@ -12,45 +12,82 @@
 
 <div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <x-organization-shell :organization="$organization" section="activity">
-            <x-breadcrumb-trail :items="[
-                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-                ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
-                ['label' => __('Activity'), 'icon' => 'archive-box'],
-            ]" />
+        <x-organization-shell :organization="$organization" section="activity" :breadcrumb="[
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
+            ['label' => __('Activity'), 'icon' => 'archive-box'],
+        ]">
 
-            <x-page-header
-                :title="__('Activity')"
-                :description="__('Audit trail for this organization. Every meaningful change is logged here — filter by family or search by action / subject.')"
-                doc-route="docs.index"
-                toolbar
-                flush
-            >
-                <x-slot name="leading">
-                    <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
-                        <x-heroicon-o-archive-box class="h-7 w-7 text-brand-ink" aria-hidden="true" />
-                    </span>
-                </x-slot>
-                <x-slot name="actions">
-                    <a
-                        href="{{ route('organizations.compliance-export', $organization) }}"
-                        class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                    >
-                        <x-heroicon-o-archive-box-arrow-down class="h-4 w-4 shrink-0 text-brand-sage" aria-hidden="true" />
-                        {{ __('Compliance export') }}
-                    </a>
-                    @if ($family !== '' || $search !== '')
-                        <button
-                            type="button"
-                            wire:click="clearFilters"
-                            class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
-                        >
-                            <x-heroicon-o-x-mark class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Clear filters') }}
-                        </button>
-                    @endif
-                </x-slot>
-            </x-page-header>
+            {{-- Hero card: positioning + at-a-glance counts. Matches the other
+                 org-shell pages (icon badge + eyebrow + title + stat strip). --}}
+            @php
+                $eventsTotal = $this->familyTotals[''] ?? 0;
+                $activeFamilies = collect($this->familyTotals)->except('')->filter(fn ($n) => $n > 0)->count();
+            @endphp
+            <section class="dply-card overflow-hidden">
+                <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
+                    <div class="lg:col-span-7">
+                        <div class="flex items-start gap-3">
+                            <x-icon-badge size="md">
+                                <x-heroicon-o-clock class="h-6 w-6" aria-hidden="true" />
+                            </x-icon-badge>
+                            <div class="min-w-0">
+                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Organization') }}</p>
+                                <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Activity') }}</h2>
+                                <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
+                                    {{ __('Audit trail for this organization. Every meaningful change is logged here — filter by family or search by action / subject.') }}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="mt-4 flex flex-wrap items-center gap-2">
+                            <x-docs-link slug="org-activity">
+                                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                {{ __('Activity guide') }}
+                            </x-docs-link>
+                            <x-outline-link href="{{ route('organizations.compliance-export', $organization) }}">
+                                <x-heroicon-o-archive-box-arrow-down class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                {{ __('Compliance export') }}
+                            </x-outline-link>
+                            @if ($family !== '' || $search !== '')
+                                <button
+                                    type="button"
+                                    wire:click="clearFilters"
+                                    class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40"
+                                >
+                                    <x-heroicon-o-x-mark class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                    {{ __('Clear filters') }}
+                                </button>
+                            @endif
+                        </div>
+                    </div>
+                    <dl class="grid grid-cols-3 gap-2 lg:col-span-5">
+                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Events') }}</dt>
+                            <dd class="mt-1 flex items-baseline gap-1.5">
+                                <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ number_format($eventsTotal) }}</span>
+                                <span class="text-[11px] text-brand-moss">{{ trans_choice('event|events', $eventsTotal) }}</span>
+                            </dd>
+                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Logged all-time') }}</p>
+                        </div>
+                        <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Families') }}</dt>
+                            <dd class="mt-1 flex items-baseline gap-1.5">
+                                <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $activeFamilies }}</span>
+                                <span class="text-[11px] text-brand-moss">{{ __('active') }}</span>
+                            </dd>
+                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('With activity') }}</p>
+                        </div>
+                        <div class="rounded-2xl border border-brand-sage/30 bg-brand-sage/8 px-4 py-3 shadow-sm">
+                            <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-forest/80">{{ __('Audit log') }}</dt>
+                            <dd class="mt-1 flex items-center gap-1.5">
+                                <x-heroicon-m-lock-closed class="h-4 w-4 shrink-0 text-brand-forest" aria-hidden="true" />
+                                <span class="text-[11px] font-medium text-brand-forest">{{ __('Append-only') }}</span>
+                            </dd>
+                            <p class="mt-1 text-[11px] text-brand-mist">{{ __('Immutable trail') }}</p>
+                        </div>
+                    </dl>
+                </div>
+            </section>
 
             {{-- Filter bar: family pills with per-family counts + search box. --}}
             <div class="mt-6 space-y-4">

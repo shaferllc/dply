@@ -42,6 +42,49 @@
     </div>
 
 @if (! $isContainer)
+    {{-- Worker SERVER pools attached to this site's workspace — the scalable
+         background fleet. Distinct from the process roll-up below; scale on the
+         pool page. Only shows when a worker pool shares this site's network. --}}
+    @if ($this->attachedWorkerPools->isNotEmpty())
+        <div class="{{ $card }} mb-6">
+            <div class="flex items-baseline justify-between gap-3">
+                <div>
+                    <h2 class="text-sm font-semibold uppercase tracking-wide text-brand-moss">{{ __('Worker servers') }}</h2>
+                    <p class="mt-1 text-xs text-brand-moss">{{ __('Dedicated worker server pool(s) on this site\'s private network that drain its queues. Scale up when the backlog grows, down when it\'s quiet.') }}</p>
+                </div>
+            </div>
+            <ul class="mt-4 space-y-3">
+                @foreach ($this->attachedWorkerPools as $pool)
+                    @php $primary = $pool->primaryServer; @endphp
+                    <li class="rounded-lg border border-brand-ink/10 p-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="text-sm font-semibold text-brand-ink">{{ $pool->name ?: __('Worker pool') }}</span>
+                                <span class="rounded-full bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-violet-800">{{ trans_choice(':n server|:n servers', $pool->servers->count(), ['n' => $pool->servers->count()]) }}</span>
+                                <span class="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-700">{{ $pool->status }}</span>
+                            </div>
+                            @if ($primary)
+                                <a href="{{ route('servers.worker-pool', ['server' => $primary]) }}" wire:navigate class="text-[11px] font-semibold text-brand-forest hover:underline">{{ __('Scale / manage') }} →</a>
+                            @endif
+                        </div>
+                        <ul class="mt-2 divide-y divide-brand-ink/8">
+                            @foreach ($pool->servers as $member)
+                                <li class="flex items-center justify-between gap-2 py-1.5 text-xs">
+                                    <span class="flex items-center gap-2 min-w-0">
+                                        <x-heroicon-o-server class="h-3.5 w-3.5 shrink-0 text-brand-mist" aria-hidden="true" />
+                                        <span class="truncate font-medium text-brand-ink">{{ $member->name }}</span>
+                                        <span class="rounded px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide {{ $member->isPoolPrimary() ? 'bg-violet-100 text-violet-800' : 'bg-brand-sand/60 text-brand-moss' }}">{{ $member->isPoolPrimary() ? __('primary') : __('replica') }}</span>
+                                    </span>
+                                    <span class="shrink-0 font-mono text-[10px] text-brand-mist">{{ $member->region ?? '—' }} · {{ $member->size ?? '—' }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
     {{-- VM workers roll-up — read-only; management lives on the Workers page. --}}
     <div class="{{ $card }}">
         <div class="flex items-baseline justify-between gap-3">

@@ -1,3 +1,12 @@
+---
+title: "Site errors"
+slug: vm-site-errors
+category: "Sites & deploys"
+order: 10
+description: "A site-scoped stream of every failure (deploys, SSL, connectivity, cron) grouped by cause, with dismiss and retry triage actions."
+group: sites
+---
+
 # Site errors
 
 A dedicated stream of everything that failed for this site — deploys, SSL, connectivity, cron, and more — newest first and grouped by cause.

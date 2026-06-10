@@ -1,3 +1,12 @@
+---
+title: "Web server config editor"
+slug: vm-site-webserver-config
+category: "Sites & deploys"
+order: 280
+description: "Edit a site's live vhost configuration with basics and advanced editors, diff and drift detection, apply locking, and engine-specific templates."
+group: sites
+---
+
 # Web server config editor
 
 The **Web server config** section edits this site's **vhost configuration** on the live server with validation, diff, and drift detection.

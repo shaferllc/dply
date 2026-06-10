@@ -23,14 +23,15 @@
 @endphp
 
 <div>
-    <x-breadcrumb-trail
-        :items="[
-            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-            ['label' => __('Settings'), 'href' => route('settings.profile'), 'icon' => 'cog-6-tooth'],
-            ['label' => $isProfile ? __('Profile') : __('Servers & Sites'), 'icon' => $isProfile ? 'user-circle' : 'server'],
-        ]"
-        wrapper-class="mb-2"
-    />
+    @push('breadcrumbs')
+        <x-breadcrumb-trail
+            :items="[
+                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+                ['label' => __('Settings'), 'href' => route('settings.profile'), 'icon' => 'cog-6-tooth'],
+                ['label' => $isProfile ? __('Profile') : __('Servers & Sites'), 'icon' => $isProfile ? 'user-circle' : 'server'],
+            ]"
+        />
+    @endpush
 
     {{-- Hero card. Stat tiles show the user's current theme / nav layout /
          timezone so a glance reveals what's set without opening each form. --}}

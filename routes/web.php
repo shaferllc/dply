@@ -87,6 +87,7 @@ use App\Livewire\Notifications\Index as NotificationsIndex;
 use App\Livewire\Organizations\Activity as OrganizationsActivity;
 use App\Livewire\Organizations\Automation as OrganizationsAutomation;
 use App\Livewire\Organizations\Create as OrganizationsCreate;
+use App\Livewire\Organizations\Settings as OrganizationsSettings;
 use App\Livewire\Organizations\Index as OrganizationsIndex;
 use App\Livewire\Organizations\Members as OrganizationsMembers;
 use App\Livewire\Organizations\NotificationChannels as OrganizationsNotificationChannels;
@@ -97,9 +98,6 @@ use App\Livewire\Profile\DeleteAccount as ProfileDeleteAccount;
 use App\Livewire\Profile\Referrals as ProfileReferrals;
 use App\Livewire\Projects\Index as ProjectsIndex;
 use App\Livewire\Projects\Show as ProjectsShow;
-use App\Livewire\Realtime\Create as RealtimeCreate;
-use App\Livewire\Realtime\Index as RealtimeIndex;
-use App\Livewire\Realtime\Show as RealtimeShow;
 use App\Livewire\Roadmap\Index as RoadmapIndex;
 use App\Livewire\Scripts\Create as ScriptsCreate;
 use App\Livewire\Scripts\Edit as ScriptsEdit;
@@ -327,22 +325,8 @@ foreach ((array) config('services.digitalocean.testing_domains', []) as $functio
 }
 
 Route::get('/', function () {
-    // The animated homepage (v2) is the default; visitors can switch to the
-    // classic one and we remember it. `?v=1` (classic) or `?v=2` (animated);
-    // persisted via cookie. With no preference, show the animated default.
-    $requested = request()->query('v');
-    $valid = in_array($requested, ['1', '2'], true);
-    $version = $valid
-        ? $requested
-        : (request()->cookie('home_version') === '1' ? '1' : '2');
-
-    $response = response()->view($version === '2' ? 'welcome-v2' : 'welcome');
-
-    if ($valid) {
-        $response->cookie('home_version', $version, 60 * 24 * 365);
-    }
-
-    return $response;
+    // The animated homepage is THE homepage — no classic/animated switching.
+    return view('welcome-v2');
 });
 
 Route::get('/pricing', function () {
@@ -476,11 +460,14 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     });
 
     Route::get('/docs', [DocsController::class, 'index'])->name('docs.index');
+    Route::get('/docs/search-index.json', [DocsController::class, 'searchIndex'])->name('docs.search-index');
     Route::get('/docs/connect-provider', [DocsController::class, 'connectProvider'])->name('docs.connect-provider');
     Route::get('/docs/create-first-server', [DocsController::class, 'createFirstServer'])->name('docs.create-first-server');
     Route::get('/docs/api', [DocsController::class, 'apiDocumentation'])->name('docs.api');
+    // Slug is validated by the renderer (manifest + config fallback) — a kebab
+    // pattern keeps the route from swallowing unrelated paths; unknown slugs 404.
     Route::get('/docs/{slug}', [DocsController::class, 'markdown'])
-        ->whereIn('slug', array_keys(config('docs.markdown', [])))
+        ->where('slug', '[a-z0-9-]+')
         ->name('docs.markdown');
 
     Route::redirect('/settings', '/settings/profile')->name('settings.index');
@@ -505,6 +492,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('organizations', OrganizationsIndex::class)->name('organizations.index');
     Route::livewire('organizations/create', OrganizationsCreate::class)->name('organizations.create');
     Route::livewire('organizations/{organization}', OrganizationsShow::class)->name('organizations.show');
+    Route::livewire('organizations/{organization}/settings', OrganizationsSettings::class)->name('organizations.settings');
     Route::livewire('organizations/{organization}/members', OrganizationsMembers::class)->name('organizations.members');
     Route::livewire('organizations/{organization}/teams', OrganizationsTeams::class)->name('organizations.teams');
     Route::livewire('organizations/{organization}/activity', OrganizationsActivity::class)->name('organizations.activity');
@@ -543,11 +531,6 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         Route::livewire('edge/import', Import::class)->name('edge.import');
         Route::livewire('edge/templates', Templates::class)->name('edge.templates');
         Route::livewire('edge/usage', Usage::class)->name('edge.usage');
-    });
-    Route::livewire('realtime', RealtimeIndex::class)->name('realtime.index');
-    Route::middleware('feature:surface.realtime')->group(function (): void {
-        Route::livewire('realtime/create', RealtimeCreate::class)->name('realtime.create');
-        Route::livewire('realtime/{realtimeApp}', RealtimeShow::class)->name('realtime.show');
     });
     Route::middleware('feature:surface.serverless')->group(function (): void {
         Route::livewire('serverless', ServerlessIndex::class)->name('serverless.index');

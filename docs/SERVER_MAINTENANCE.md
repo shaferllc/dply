@@ -1,3 +1,12 @@
+---
+title: "Maintenance mode"
+slug: server-maintenance
+category: "Servers"
+order: 270
+description: "Suspend visitor HTTP traffic for all managed sites on a server while keeping SSH and deploy access, serving a static maintenance page per site."
+group: servers
+---
+
 # Maintenance mode
 
 The **Maintenance** section suspends **visitor HTTP traffic** for all managed sites on the server while keeping SSH and deploy access.

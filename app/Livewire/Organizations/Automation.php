@@ -9,6 +9,7 @@ use App\Models\Organization;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Validation\ValidationException;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -79,18 +80,26 @@ class Automation extends Component
     {
         $this->authorize('view', $organization);
         abort_unless($organization->hasAdminAccess(auth()->user()), 403);
+        // The route-bound model is already fresh — hydrate directly off it
+        // rather than re-querying via refreshOrganization()'s fresh().
         $this->organization = $organization;
-        $this->refreshOrganization();
+        $this->hydrateOrganization();
     }
 
     protected function refreshOrganization(): void
     {
-        $this->organization = $this->organization->fresh()
-            ->load([
-                'apiTokens',
-                'notificationWebhookDestinations',
-                'sites' => fn ($q) => $q->orderBy('name'),
-            ]);
+        // Post-mutation reload: re-fetch from the DB to pick up the change.
+        $this->organization = $this->organization->fresh();
+        $this->hydrateOrganization();
+    }
+
+    protected function hydrateOrganization(): void
+    {
+        $this->organization->load([
+            'apiTokens',
+            'notificationWebhookDestinations',
+            'sites' => fn ($q) => $q->orderBy('name'),
+        ]);
         $this->deploy_email_notifications_enabled = (bool) $this->organization->deploy_email_notifications_enabled;
         $this->email_server_credentials_enabled = (bool) $this->organization->email_server_credentials_enabled;
         $this->email_database_credentials_enabled = (bool) $this->organization->email_database_credentials_enabled;
@@ -103,6 +112,9 @@ class Automation extends Component
     public function saveAlertDestinations(): void
     {
         $this->authorize('update', $this->organization);
+        // Cloud alerts only exist when the Cloud surface is on (the UI is gated
+        // the same way) — block a stale/forged client from writing them anyway.
+        abort_unless(Feature::active('surface.cloud'), 404);
 
         $this->validate([
             'alert_slack_webhook_url' => ['nullable', 'url', 'max:500', 'starts_with:https://'],
@@ -157,6 +169,9 @@ class Automation extends Component
     public function updatedEdgeDataRegion(): void
     {
         $this->authorize('update', $this->organization);
+        // Data residency only applies when the Edge surface is on (the UI is
+        // gated the same way) — block a stale/forged client from writing it.
+        abort_unless(Feature::active('surface.edge'), 404);
 
         $allowed = ['default', 'eu', 'weur', 'eeur', 'wnam', 'enam', 'apac', 'oc'];
         if (! in_array($this->edge_data_region, $allowed, true)) {

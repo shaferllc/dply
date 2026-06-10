@@ -1,3 +1,12 @@
+---
+title: "WordPress stack"
+slug: vm-site-wordpress
+category: "Sites & deploys"
+order: 290
+description: "Manage WordPress sites with WP-CLI shortcuts, file permissions, cron handling, and database setup when dply detects WordPress."
+group: sites
+---
+
 # WordPress stack
 
 The **WordPress** section appears when dply detects **WordPress** in the repository or path.

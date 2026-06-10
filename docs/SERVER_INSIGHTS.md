@@ -1,3 +1,12 @@
+---
+title: "Server insights"
+slug: server-insights
+category: "Servers"
+order: 250
+description: "Surface advisory recommendations and anomalies for a server, including version drift, disk growth, unused daemons, and right-size hints linked to fixes."
+group: servers
+---
+
 # Server insights
 
 The **Insights** section surfaces recommendations and anomalies — misconfigurations, version drift, and cost nudges — scoped to this server.

@@ -1,3 +1,12 @@
+---
+title: "Laravel stack"
+slug: vm-site-laravel
+category: "Sites & deploys"
+order: 160
+description: "Framework-specific shortcuts shown when dply detects a Laravel app, covering migrations, cache commands, APP_KEY handling, and zero-downtime atomic deploys."
+group: sites
+---
+
 # Laravel stack
 
 The **Laravel** section appears when dply detects a **Laravel** app in the repository. It shortcuts framework-specific operations.

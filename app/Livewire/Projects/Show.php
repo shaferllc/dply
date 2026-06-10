@@ -90,7 +90,9 @@ class Show extends Component
         abort_unless(in_array($section, ['overview', 'resources', 'access', 'operations', 'delivery'], true), 404);
 
         $this->section = $section;
-        $this->workspace = $workspace->load(['servers', 'sites']);
+        // Relations are eager-loaded once in render(); don't double-load
+        // servers/sites here only for render() to discard and reload them.
+        $this->workspace = $workspace;
         $this->editName = $workspace->name;
         $this->editDescription = (string) ($workspace->description ?? '');
         $this->editNotes = (string) ($workspace->notes ?? '');
@@ -517,14 +519,22 @@ class Show extends Component
 
         if (str_starts_with($event->action, 'project.server_')) {
             $serverId = $event->new_values['server_id'] ?? null;
-            $server = $serverId ? Server::query()->find($serverId) : null;
+            // Reuse the already-loaded project servers; only hit the DB for a
+            // server that's since been detached (project.server_removed).
+            $server = $serverId
+                ? ($this->workspace->servers->firstWhere('id', $serverId) ?? Server::query()->find($serverId))
+                : null;
 
             return $server ? route('servers.show', $server) : route('projects.resources', $this->workspace);
         }
 
         if (str_starts_with($event->action, 'project.site_')) {
             $siteId = $event->new_values['site_id'] ?? null;
-            $site = $siteId ? Site::query()->with('server')->find($siteId) : null;
+            // Reuse the already-loaded project sites (with their server); only
+            // query for a site that's since been detached.
+            $site = $siteId
+                ? ($this->workspace->sites->firstWhere('id', $siteId) ?? Site::query()->with('server')->find($siteId))
+                : null;
 
             return $site?->server ? route('sites.show', [$site->server, $site]) : route('projects.resources', $this->workspace);
         }
@@ -552,8 +562,11 @@ class Show extends Component
         }
 
         if ($event->subject_type === Site::class) {
+            // Prefer the already-loaded project site (its server is loaded too);
+            // only fall back to the bare subject + a server query for a site
+            // that's no longer attached to this project.
             /** @var Site|null $site */
-            $site = $event->subject;
+            $site = $this->workspace->sites->firstWhere('id', $event->subject_id) ?? $event->subject;
             $site?->loadMissing('server');
 
             return $site?->server ? route('sites.show', [$site->server, $site]) : route('projects.resources', $this->workspace);
@@ -614,7 +627,12 @@ class Show extends Component
             ->orderBy('name')
             ->get();
 
-        $workspace = $this->workspace->fresh([
+        // Load relations onto the existing instance instead of fresh(), which
+        // re-SELECTs the workspace row on every render. Editing actions already
+        // mutate $this->workspace in memory, so its base attributes are current
+        // — only the relations need refreshing.
+        $this->workspace->load([
+            'organization',
             'members.user',
             'servers',
             'sites.server',
@@ -625,7 +643,20 @@ class Show extends Component
             'variables',
             'deployRuns.user',
         ]);
-        $this->workspace = $workspace;
+        $workspace = $this->workspace;
+
+        // Every server/site in this project belongs to THIS workspace and its
+        // organization, both already loaded above. Prime those inverse relations
+        // so per-row @can('update'|'view', $server|$site) checks (Server/Site
+        // policies read $resource->workspace->organization and
+        // $resource->organization) don't lazy-load workspace + org once per row.
+        $org = $workspace->organization;
+        $workspace->servers->each(function (Server $server) use ($workspace, $org): void {
+            $server->setRelation('workspace', $workspace)->setRelation('organization', $org);
+        });
+        $workspace->sites->each(function (Site $site) use ($workspace, $org): void {
+            $site->setRelation('workspace', $workspace)->setRelation('organization', $org);
+        });
 
         $orgUsers = $workspace->organization->users()->orderBy('name')->get();
         $labels = WorkspaceLabel::query()
@@ -647,6 +678,12 @@ class Show extends Component
                         ->where('subject_type', Site::class)
                         ->whereIn('subject_id', $workspace->sites->pluck('id')->all()));
             })
+            // Eager-load the actor (the feed prints $event->user->name per row)
+            // and the polymorphic audit subject so the subject_summary accessor +
+            // activityUrl() batch into one query per type instead of one per row.
+            // A Site subject's server is resolved from the already-loaded project
+            // sites in activityUrl(), so there's no need to nest ['server'] here.
+            ->with(['user', 'subject'])
             ->latest()
             ->limit(20)
             ->get();

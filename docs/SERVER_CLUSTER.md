@@ -1,3 +1,12 @@
+---
+title: "Kubernetes cluster"
+slug: server-cluster
+category: "Servers"
+order: 120
+description: "The workspace home for Kubernetes host kinds, showing cluster name, API endpoint status, node readiness, and managed namespaces."
+group: servers
+---
+
 # Kubernetes cluster
 
 The **Cluster** section is the workspace home for **Kubernetes** host kinds — not traditional SSH VM tools.

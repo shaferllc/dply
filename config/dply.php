@@ -315,4 +315,14 @@ return [
         'task_runner_max_age_hours' => max(1, (int) env('DPLY_LOCAL_TASK_RUNNER_MAX_AGE_HOURS', 24)),
     ],
 
+    // Remote counterpart to local_workspace_prune: every task dply runs uploads a
+    // <id>.sh/.log (+ .pid) into ~/.dply-task-runner on the box and never removes
+    // it, so the dir grows without bound. A scheduled per-server SSH prune
+    // age-deletes them; the age guard means a script for an in-flight or recently
+    // backgrounded task is never touched, so this can't race a running deploy.
+    'remote_task_runner_prune' => [
+        'enabled' => filter_var(env('DPLY_REMOTE_TASK_RUNNER_PRUNE_ENABLED', true), FILTER_VALIDATE_BOOL),
+        'max_age_hours' => max(1, (int) env('DPLY_REMOTE_TASK_RUNNER_MAX_AGE_HOURS', 48)),
+    ],
+
 ];

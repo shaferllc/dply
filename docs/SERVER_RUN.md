@@ -1,3 +1,12 @@
+---
+title: "Run commands"
+slug: server-run
+category: "Servers"
+order: 330
+description: "Executes saved recipes and ad-hoc shell commands on a server over SSH with live streaming, audit logging, and longer timeouts than Console."
+group: servers
+---
+
 # Run commands
 
 The **Run** section executes saved recipes and ad-hoc shell commands on the server over SSH. Use it for scripts, maintenance, and marketplace imports — not quick one-liners (see **Console**).

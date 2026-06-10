@@ -795,7 +795,10 @@
                 </div>
             @elseif ($bindingModalType === 'broadcasting')
                 @php
-                    $bcKind = (string) ($bindingForm['kind'] ?? 'managed');
+                    // The managed (dply-hosted, billed) relay path is gated behind
+                    // surface.realtime. When off, only bring-your-own is offered.
+                    $bcManagedEnabled = \Laravel\Pennant\Feature::active('surface.realtime');
+                    $bcKind = $bcManagedEnabled ? (string) ($bindingForm['kind'] ?? 'managed') : 'byo';
                     $bcProvision = (bool) ($bindingForm['provision'] ?? false);
                     $bcDriver = (string) ($bindingForm['driver'] ?? 'pusher');
                     $bcTiers = $this->broadcastingTiers();
@@ -803,16 +806,20 @@
                     $bcTierPrice = number_format((($bcTiers[$bcTier]['price_cents'] ?? 0) / 100), 2);
                 @endphp
                 <div class="space-y-4">
-                    {{-- Managed (dply relay) vs bring-your-own. Self-hosted Reverb
-                         on the VM is orchestrated separately (coming next). --}}
-                    <div class="inline-flex rounded-lg border border-brand-ink/15 bg-brand-sand/30 p-0.5 text-xs font-semibold">
-                        <button type="button" wire:click="$set('bindingForm.kind', 'managed')" class="rounded-md px-3 py-1.5 transition-colors {{ $bcKind === 'managed' ? 'bg-white text-brand-ink shadow-sm' : 'text-brand-moss hover:text-brand-ink' }}">
-                            {{ __('dply realtime') }}
-                        </button>
-                        <button type="button" wire:click="$set('bindingForm.kind', 'byo')" class="rounded-md px-3 py-1.5 transition-colors {{ $bcKind === 'byo' ? 'bg-white text-brand-ink shadow-sm' : 'text-brand-moss hover:text-brand-ink' }}">
-                            {{ __('Bring your own') }}
-                        </button>
-                    </div>
+                    {{-- Managed (dply relay) vs bring-your-own. The managed relay
+                         toggle only shows when surface.realtime is enabled; BYO is
+                         always available. Self-hosted Reverb on the VM is
+                         orchestrated separately (coming next). --}}
+                    @if ($bcManagedEnabled)
+                        <div class="inline-flex rounded-lg border border-brand-ink/15 bg-brand-sand/30 p-0.5 text-xs font-semibold">
+                            <button type="button" wire:click="$set('bindingForm.kind', 'managed')" class="rounded-md px-3 py-1.5 transition-colors {{ $bcKind === 'managed' ? 'bg-white text-brand-ink shadow-sm' : 'text-brand-moss hover:text-brand-ink' }}">
+                                {{ __('dply realtime') }}
+                            </button>
+                            <button type="button" wire:click="$set('bindingForm.kind', 'byo')" class="rounded-md px-3 py-1.5 transition-colors {{ $bcKind === 'byo' ? 'bg-white text-brand-ink shadow-sm' : 'text-brand-moss hover:text-brand-ink' }}">
+                                {{ __('Bring your own') }}
+                            </button>
+                        </div>
+                    @endif
 
                     @if ($bcKind === 'managed')
                         {{-- Attach an existing app (share across sites) vs provision

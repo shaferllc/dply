@@ -15,7 +15,6 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Imports\Handlers\CutoverSmokeTestHandler;
 use App\Services\Imports\MigrationPlanner;
-use App\Services\Imports\StepHandler;
 use App\Services\Imports\StepOrchestrator;
 use App\Services\Imports\StepRegistry;
 use App\Services\Notifications\NotificationEventRegistry;
@@ -181,12 +180,3 @@ test('notification event supports email for import keys', function () {
     $definition = $registry->definition('server.ssh_login');
     expect($definition['supports_email'])->toBeFalse('Non-import events stay email-off');
 });
-final class NoOpHandler implements StepHandler
-{
-    public static function key(): string
-    {
-        return 'freeze_snapshot';
-    }
-
-    public function execute(ImportMigrationStep $step): void {}
-}

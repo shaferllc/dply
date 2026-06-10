@@ -1,3 +1,12 @@
+---
+title: "Site schedule"
+slug: vm-site-schedule
+category: "Sites & deploys"
+order: 260
+description: "View the server Schedule calendar filtered to this site's cron and related jobs to plan upcoming runs and deploy windows."
+group: sites
+---
+
 # Site schedule
 
 The **Schedule** section opens the **server Schedule calendar** filtered to this site's cron and related jobs.

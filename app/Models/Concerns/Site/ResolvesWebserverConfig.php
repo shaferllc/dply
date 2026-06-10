@@ -8,6 +8,8 @@ use App\Enums\SiteType;
 use App\Jobs\RelocateSiteFilesJob;
 use App\Jobs\ScanSiteEnvRequirementsJob;
 use App\Models\Server;
+use App\Services\Sites\SitePhpFpmPoolConfigBuilder;
+use App\Support\Servers\InstalledStack;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -27,6 +29,16 @@ trait ResolvesWebserverConfig
 
         if ($this->usesKubernetesRuntime()) {
             return 'kubernetes';
+        }
+
+        // Worker-fleet hosts (dedicated worker-role boxes and worker-pool members)
+        // run the deployed code + queue daemons but never serve web traffic, so no
+        // webserver is installed on them. Resolve them headless ('none') — otherwise
+        // a replica's deploy tries to write/reload a Caddy vhost on a box with no
+        // caddy binary ("sudo: caddy: command not found"), the ProvisionSiteJob fails,
+        // and the pool stays stuck in "deploying" forever.
+        if ($this->server?->isWorkerServer()) {
+            return 'none';
         }
 
         $serverMeta = is_array($this->server?->meta) ? $this->server->meta : [];
@@ -154,7 +166,7 @@ trait ResolvesWebserverConfig
     {
         $server = $this->server;
         $installedPrimary = $server !== null
-            ? \App\Support\Servers\InstalledStack::fromMeta($server)->phpVersion
+            ? InstalledStack::fromMeta($server)->phpVersion
             : null;
         $configured = $this->phpVersion();
 
@@ -182,7 +194,7 @@ trait ResolvesWebserverConfig
     /**
      * Per-site PHP-FPM pool process settings, merged over sane defaults. Stored
      * in meta['php_fpm_pool']; the start/spare-server counts are DERIVED from
-     * max_children by {@see \App\Services\Sites\SitePhpFpmPoolConfigBuilder}.
+     * max_children by {@see SitePhpFpmPoolConfigBuilder}.
      *
      * @return array{pm: string, max_children: int, max_requests: int, request_terminate_timeout: int}
      */
@@ -513,6 +525,45 @@ trait ResolvesWebserverConfig
     public function managedErrorPagesRoot(): string
     {
         return rtrim($this->effectiveEnvDirectory(), '/').'/.dply/errors';
+    }
+
+    /**
+     * Directory holding dply-managed PHP-FPM pool logs. Lives under /var/log so
+     * the FPM master (root) opens the files before dropping to the pool user —
+     * the pool user never needs write access to the directory.
+     */
+    public function phpFpmLogDirectory(): string
+    {
+        return '/var/log/php-fpm';
+    }
+
+    /**
+     * Per-pool FPM access log. Its format carries the per-request reference id
+     * ({@see \App\Support\Sites\SiteManagedErrorPageSupport::REFERENCE_HEADER}),
+     * so a 5xx reference resolves to the request's timestamp + URI here, which is
+     * then time-correlated against {@see self::laravelLogPath()} for the trace.
+     */
+    public function phpFpmAccessLogPath(): string
+    {
+        return $this->phpFpmLogDirectory().'/'.$this->phpFpmPoolName().'-access.log';
+    }
+
+    /** Per-pool PHP error log (uncaught fatals + worker output). */
+    public function phpFpmPoolErrorLogPath(): string
+    {
+        return $this->phpFpmLogDirectory().'/'.$this->phpFpmPoolName().'-error.log';
+    }
+
+    /** The app's own Laravel log, where handled-exception traces land. */
+    public function laravelLogPath(): string
+    {
+        return rtrim($this->effectiveEnvDirectory(), '/').'/storage/logs/laravel.log';
+    }
+
+    /** This site's webserver error log on the host. */
+    public function webserverErrorLogPath(): string
+    {
+        return rtrim($this->webserverLogDirectory(), '/').'/'.$this->webserverConfigBasename().'-error.log';
     }
 
     /**

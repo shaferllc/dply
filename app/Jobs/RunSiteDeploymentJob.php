@@ -183,14 +183,25 @@ class RunSiteDeploymentJob implements ShouldQueue
                 // prompt.
                 $this->assertRequiredEnvPresent($this->site);
 
-                $engine = $deployEngineResolver->forProject($this->site->project);
-                $result = $engine->run(new DeployContext(
-                    project: $this->site->project,
-                    trigger: $this->trigger,
-                    apiIdempotencyHash: $this->apiIdempotencyHash,
-                    auditUserId: $this->auditUserId,
-                    deployment: $deployment,
-                ));
+                // Rolling/canary cutover on a multi-backend site fans the deploy
+                // out across backends (rolling = drain→deploy→re-add per box;
+                // canary = ramp a weighted slice then promote) instead of the
+                // single-server engine run. Every other method/site is unaffected.
+                $cutover = \App\Enums\DeploymentMethod::forSite($this->site)->cutover();
+                if ($this->site->isMultiBackend() && in_array($cutover, ['rolling', 'canary'], true)) {
+                    $result = $cutover === 'canary'
+                        ? app(\App\Services\Sites\Backends\CanarySiteDeployer::class)->deploy($this->site, $deployment)
+                        : app(\App\Services\Sites\Backends\RollingSiteDeployer::class)->deploy($this->site, $deployment);
+                } else {
+                    $engine = $deployEngineResolver->forProject($this->site->project);
+                    $result = $engine->run(new DeployContext(
+                        project: $this->site->project,
+                        trigger: $this->trigger,
+                        apiIdempotencyHash: $this->apiIdempotencyHash,
+                        auditUserId: $this->auditUserId,
+                        deployment: $deployment,
+                    ));
+                }
                 $redacted = DeployLogRedactor::redact($result['output']);
                 $deployment->update([
                     'status' => SiteDeployment::STATUS_SUCCESS,
@@ -533,5 +544,26 @@ class RunSiteDeploymentJob implements ShouldQueue
     public function failed(?\Throwable $exception): void
     {
         $this->clearIdempotencyInflight();
+
+        // Hard failures (queue timeout, OOM, fatal) bypass handle()'s catch,
+        // leaving the deployment stuck "running" and the deploy button spinning
+        // until the optimistic lock's 600s TTL. Release the UI lock and mark the
+        // in-flight deployment failed so the failure surfaces on the next poll.
+        Cache::forget('site-deploy-active:'.$this->site->id);
+
+        $deployment = $this->site->deployments()
+            ->where('status', SiteDeployment::STATUS_RUNNING)
+            ->latest()
+            ->first();
+
+        if ($deployment !== null) {
+            $deployment->update([
+                'status' => SiteDeployment::STATUS_FAILED,
+                'exit_code' => $deployment->exit_code ?? 1,
+                'log_output' => trim(($deployment->log_output ? $deployment->log_output."\n\n" : '')
+                    .'Deployment failed: '.($exception?->getMessage() ?? 'job terminated')),
+                'finished_at' => now(),
+            ]);
+        }
     }
 }

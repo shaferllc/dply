@@ -1,3 +1,12 @@
+---
+title: "Edge deploys"
+slug: edge-deploys
+category: "Edge"
+order: 50
+description: "How to ship new Edge versions, view deploy history, deploy a specific ref, roll back, rebuild, and handle hybrid and preview deploys."
+group: edge
+---
+
 # Edge deploys
 
 The **Deploys** section is where you ship new versions, inspect history, and recover from bad releases.

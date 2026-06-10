@@ -21,6 +21,7 @@ use App\Models\ServerDatabase;
 use App\Models\Site;
 use App\Models\SiteAccessGate;
 use App\Models\SiteAccessGatePassword;
+use App\Models\SiteBackend;
 use App\Models\SiteBasicAuthUser;
 use App\Models\SiteBinding;
 use App\Models\SiteCertificate;
@@ -42,6 +43,7 @@ use App\Models\SiteUptimeMonitor;
 use App\Models\SiteWebserverConfigProfile;
 use App\Models\User;
 use App\Models\WebhookDeliveryLog;
+use App\Models\WorkerPool;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -60,6 +62,44 @@ trait HasSiteRelationships
     public function server(): BelongsTo
     {
         return $this->belongsTo(Server::class);
+    }
+
+    /**
+     * The serving points of a multi-backend site (this site behind a balancer on
+     * ≥2 app servers). Empty for an ordinary single-server site. See
+     * docs/MULTI_BACKEND_SITES.md.
+     */
+    public function backends(): HasMany
+    {
+        return $this->hasMany(SiteBackend::class);
+    }
+
+    /**
+     * Worker pools "attached" to this site — workspace-scoped: pools that own a
+     * server in this site's workspace (falling back to its organization). Not a
+     * true relation (the link is via the pool's member servers, not a FK), so
+     * this returns a resolved collection. Drives the site's Workers panel.
+     *
+     * @return Collection<int, WorkerPool>
+     */
+    public function attachedWorkerPools(): Collection
+    {
+        $workspaceId = $this->workspace_id;
+        $organizationId = $this->organization_id;
+
+        if ($workspaceId === null && $organizationId === null) {
+            return new Collection;
+        }
+
+        return WorkerPool::query()
+            ->whereHas('servers', function ($q) use ($workspaceId, $organizationId): void {
+                $workspaceId !== null
+                    ? $q->where('workspace_id', $workspaceId)
+                    : $q->where('organization_id', $organizationId);
+            })
+            ->with(['servers', 'primaryServer'])
+            ->orderBy('created_at')
+            ->get();
     }
 
     public function webserverConfigProfile(): HasOne

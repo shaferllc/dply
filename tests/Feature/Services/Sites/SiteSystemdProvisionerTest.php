@@ -188,23 +188,3 @@ test('teardown disables and removes each unit', function () {
  * In-memory RemoteShell that records putFile + exec calls so tests can
  * assert on the shell sequence without booting an SSH client.
  */
-class RecordingShell implements RemoteShell
-{
-    /** @var list<array{path: string, contents: string}> */
-    public array $putFiles = [];
-
-    /** @var list<array{command: string, timeout: int}> */
-    public array $execCalls = [];
-
-    public function exec(string $command, int $timeoutSeconds = 120): string
-    {
-        $this->execCalls[] = ['command' => $command, 'timeout' => $timeoutSeconds];
-
-        return '';
-    }
-
-    public function putFile(string $remotePath, string $contents, int $timeoutSeconds = 60): void
-    {
-        $this->putFiles[] = ['path' => $remotePath, 'contents' => $contents];
-    }
-}

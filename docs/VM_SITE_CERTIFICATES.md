@@ -1,3 +1,12 @@
+---
+title: "Site certificates"
+slug: vm-site-certificates
+category: "Sites & deploys"
+order: 80
+description: "Issue and renew HTTPS certificates for a site's hostnames via ACME (Let's Encrypt), covering HTTP-01, DNS-01, and wildcard certificate flows."
+group: sites
+---
+
 # Site certificates
 
 The **Certificates** section issues and renews **HTTPS certificates** for this site's hostnames via ACME (Let's Encrypt).

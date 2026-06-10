@@ -235,7 +235,18 @@ abstract class AbstractSiteWebserverProvisioner implements SiteWebserverProvisio
 
         $emit?->step($this->emitterSource(), 'ensuring managed error pages');
         $builder = new SiteServerErrorPageBuilder;
-        $this->writeSystemFile($ssh, $dir.'/'.SiteManagedErrorPageSupport::ERROR_FILENAME, $builder->render($site));
+        $this->writeSystemFile($ssh, $dir.'/'.SiteManagedErrorPageSupport::ERROR_FILENAME, $builder->render($site, $this->errorPageReferenceInjected()));
+    }
+
+    /**
+     * Whether this engine injects the per-request reference id into the served
+     * error page (so the visible "Reference" row is rendered). Engines that only
+     * set the `X-Dply-Ref` header — Apache/OLS for now — leave this false; the id
+     * still flows to logs for reference lookup.
+     */
+    protected function errorPageReferenceInjected(): bool
+    {
+        return false;
     }
 
     /**
@@ -307,6 +318,10 @@ if ! command -v "php-fpm\${VER}" >/dev/null 2>&1; then
   echo "DPLY_FPM_POOL_EXIT:0"
   exit 0
 fi
+
+# The pool's access/error logs live here; the FPM master (root) opens them on
+# reload but does not create the parent dir, so ensure it exists first.
+mkdir -p /var/log/php-fpm 2>/dev/null || true
 
 NEW="\$(mktemp)"
 echo {$b64} | base64 -d > "\$NEW"

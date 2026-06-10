@@ -1,6 +1,7 @@
 <div class="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
     <x-breadcrumb-trail
         :items="$settingsBreadcrumbs"
+        :site="$site"
         doc-contextual
         :contextual-doc-slug="$contextualDocSlug"
         class="mb-6"
@@ -91,6 +92,8 @@
                         @include('livewire.sites.settings.partials.settings-tab')
                     @elseif ($section === 'routing')
                         @include('livewire.sites.settings.partials.routing')
+                    @elseif ($section === 'backends')
+                        @livewire(\App\Livewire\Sites\Backends::class, ['server' => $server, 'site' => $site], key('backends-'.$site->id))
                     @elseif ($section === 'certificates')
                         @include('livewire.sites.settings.partials.certificates')
                     @elseif ($section === 'repository')
@@ -145,6 +148,8 @@
                         @include('livewire.sites.settings.partials.rails.workspace')
                     @elseif ($section === 'wordpress')
                         @livewire('sites.wordpress.wordpress-section', ['site' => $site], key('wordpress-section-'.$site->id))
+                    @elseif ($section === 'worker-fleet')
+                        @include('livewire.sites.settings.partials.worker-fleet')
                     @elseif ($section === 'environment')
                         @include('livewire.sites.settings.partials.environment')
                     @elseif ($section === 'resources')

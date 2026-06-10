@@ -46,7 +46,10 @@ class SiteEnvPusher
             throw new \RuntimeException('Server must be ready with an SSH key.');
         }
 
-        $content = (string) ($site->env_file_content ?? '');
+        // Derived workers have no env of their own — they deploy the parent
+        // app's env with a small override set applied. effectiveEnvFileContent()
+        // returns own content verbatim for standalone sites.
+        $content = $site->effectiveEnvFileContent();
         $parsed = $this->parser->parse($content);
         if ($parsed['errors'] !== []) {
             throw new \RuntimeException('.env has parse errors — fix and retry: '.implode('; ', $parsed['errors']));
@@ -170,9 +173,14 @@ class SiteEnvPusher
      */
     private function bindingEnv(Site $site): array
     {
+        // A derived worker inherits its parent app's resources, so the
+        // connection vars come from the parent's bindings, not the worker's own
+        // (which are empty). Standalone sites resolve to themselves.
+        $source = $site->resourceSourceSite();
+
         $env = [];
-        $site->loadMissing('bindings');
-        foreach ($site->bindings as $binding) {
+        $source->loadMissing('bindings');
+        foreach ($source->bindings as $binding) {
             foreach ($binding->connectionEnv() as $key => $value) {
                 $env[(string) $key] = (string) $value;
             }

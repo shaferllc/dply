@@ -1,3 +1,12 @@
+---
+title: "Site files"
+slug: vm-site-files
+category: "Sites & deploys"
+order: 20
+description: "Browse, edit, and download a site's files in the dashboard over SSH as the site user, scoped to the site's paths with no terminal or SFTP needed."
+group: sites
+---
+
 # Site files
 
 Browse and edit your site's files right in the dashboard over SSH — no terminal or SFTP client required.

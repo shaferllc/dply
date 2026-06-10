@@ -48,21 +48,11 @@
                 </div>
             </div>
         </div>
-        @php($homeVersion = in_array(request()->query('v'), ['1', '2'], true)
-            ? request()->query('v')
-            : (request()->cookie('home_version') === '2' ? '2' : '1'))
         <div class="mt-12 pt-8 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-brand-mist">
-            <span>&copy; {{ date('Y') }} {{ config('app.name') }}. All rights reserved.</span>
-            <div class="flex items-center gap-3">
-                <div class="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1">
-                    <span class="px-2 text-[10px] font-medium uppercase tracking-wider text-brand-mist">Homepage</span>
-                    <a href="{{ url('/?v=1') }}"
-                       class="rounded-full px-3 py-1 font-medium transition-colors {{ $homeVersion === '1' ? 'bg-brand-gold text-brand-ink' : 'text-brand-sand/80 hover:text-brand-cream' }}">Classic</a>
-                    <a href="{{ url('/?v=2') }}"
-                       class="rounded-full px-3 py-1 font-medium transition-colors {{ $homeVersion === '2' ? 'bg-brand-gold text-brand-ink' : 'text-brand-sand/80 hover:text-brand-cream' }}">Animated</a>
-                </div>
-                <span class="hidden sm:inline text-brand-sand/50">Built for regulated teams and growing engineering orgs.</span>
-            </div>
+            <span>&copy; {{ date('Y') }} {{ config('app.name') }}. All rights reserved.
+                <span class="ml-2 font-mono text-brand-sand/40" title="{{ \App\Support\AppVersion::sha() }}">v{{ \App\Support\AppVersion::date() }}</span>
+            </span>
+            <span class="hidden sm:inline text-brand-sand/50">Built for regulated teams and growing engineering orgs.</span>
         </div>
     </div>
 </footer>

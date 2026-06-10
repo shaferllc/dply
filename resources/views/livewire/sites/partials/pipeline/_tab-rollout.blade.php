@@ -31,7 +31,7 @@
             <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
                 <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7 lg:border-b-0 lg:border-r">
                     <div class="flex items-start gap-3">
-                        <x-icon-badge>
+                        <x-icon-badge tone="indigo">
                             <x-heroicon-o-arrows-right-left class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">
@@ -58,7 +58,7 @@
                 <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
                     <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7 lg:border-b-0 lg:border-r">
                         <div class="flex items-start gap-3">
-                            <x-icon-badge>
+                            <x-icon-badge tone="amber">
                                 <x-heroicon-o-key class="h-5 w-5" aria-hidden="true" />
                             </x-icon-badge>
                             <div class="min-w-0">
@@ -164,7 +164,7 @@
             <section class="{{ $card }}">
                 <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
                     <div class="flex min-w-0 items-start gap-3">
-                        <x-icon-badge>
+                        <x-icon-badge tone="violet">
                             <x-heroicon-o-server-stack class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                         <div class="min-w-0">

@@ -1,3 +1,12 @@
+---
+title: "Docker workspace"
+slug: server-docker
+category: "Servers"
+order: 190
+description: "Inspect and maintain Docker on a VM over SSH including containers, images, volumes, networks, and compose stacks, plus install and prune actions."
+group: servers
+---
+
 # Docker workspace
 
 The **Docker** section inspects and maintains Docker on the VM — containers, images, volumes, networks, and compose stacks over SSH.

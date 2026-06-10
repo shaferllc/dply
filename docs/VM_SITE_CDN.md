@@ -1,3 +1,12 @@
+---
+title: "Site CDN"
+slug: vm-site-cdn
+category: "Sites & deploys"
+order: 70
+description: "Connect an optional third-party CDN or edge delivery layer in front of a VM site, configuring origin, cache behavior, SSL mode, and post-deploy purge."
+group: sites
+---
+
 # Site CDN
 
 The **CDN / Edge** section connects optional **CDN or edge delivery** in front of this VM site.

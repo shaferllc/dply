@@ -1,3 +1,12 @@
+---
+title: "Site runtime"
+slug: vm-site-runtime
+category: "Sites & deploys"
+order: 250
+description: "Select the language runtime and version for a site (PHP, Ruby, Static, or Docker) and configure runtime-specific child tabs."
+group: sites
+---
+
 # Site runtime
 
 The **Runtime** section selects the **language runtime** and version dply uses for this site.

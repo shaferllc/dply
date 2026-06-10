@@ -1,3 +1,12 @@
+---
+title: "Edge overview"
+slug: edge-overview
+category: "Edge"
+order: 10
+description: "What dply Edge is, static vs hybrid modes, managed vs your-Cloudflare delivery, pricing, the workspace section map, and when to choose Edge over Cloud."
+group: edge
+---
+
 # Edge overview
 
 dply **Edge** hosts JavaScript frameworks, static sites, and static-site generators (SSG) from Git. Each deploy builds your project, publishes assets to global edge delivery, and serves them over HTTPS.

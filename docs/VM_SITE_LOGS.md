@@ -1,3 +1,12 @@
+---
+title: "Site logs"
+slug: vm-site-logs
+category: "Sites & deploys"
+order: 170
+description: "The per-site logs experience with Viewer, Overview, and Sources tabs for tailing vhost/Laravel/Horizon logs over SSH, plus the optional pushed app-log stream."
+group: sites
+---
+
 # Site logs
 
 The **Logs** page is the server logs experience scoped to one site. It has three

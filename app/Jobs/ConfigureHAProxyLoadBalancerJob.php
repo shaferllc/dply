@@ -45,12 +45,15 @@ class ConfigureHAProxyLoadBalancerJob implements ShouldQueue
             $script = HAProxyConfigBuilder::removeScript($lb);
         } else {
             $backends = $lb->targets
-                ->map(fn ($t) => $t->server)
-                ->filter()
-                ->map(fn ($s) => [
-                    'name' => $s->name,
-                    'ip' => $s->private_ip_address ?? $s->ip_address ?? '127.0.0.1',
+                ->filter(fn ($t) => $t->server !== null)
+                ->map(fn ($t) => [
+                    'name' => $t->server->name,
+                    'ip' => $t->server->private_ip_address ?? $t->server->ip_address ?? '127.0.0.1',
                     'port' => 80,
+                    // Weighted routing (canary) + drain (rolling). Defaults keep
+                    // the generic LB feature's behaviour unchanged.
+                    'weight' => (int) ($t->weight ?? 100),
+                    'disabled' => $t->drained_at !== null,
                 ])
                 ->values()
                 ->all();

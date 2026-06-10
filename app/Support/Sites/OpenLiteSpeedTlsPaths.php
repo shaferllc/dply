@@ -15,10 +15,16 @@ use App\Models\SiteCertificate;
 final class OpenLiteSpeedTlsPaths
 {
     /**
-     * True when a Caddy :443 TLS front can reference on-disk Let's Encrypt material.
+     * True when a :443 TLS block can reference on-disk Let's Encrypt material —
+     * either a per-site certificate (custom domains) or an installed per-server
+     * wildcard covering this site's managed testing hostname (e.g. *.on-dply.com).
      */
     public static function siteEdgeTlsFrontReady(Site $site): bool
     {
+        if ($site->coveringServerWildcard() !== null) {
+            return true;
+        }
+
         return SiteCertificate::query()
             ->where('site_id', $site->id)
             ->where('status', SiteCertificate::STATUS_ACTIVE)
@@ -87,6 +93,18 @@ CONF;
 
     private static function letsEncryptDirectoryName(Site $site): ?string
     {
+        $wildcard = $site->coveringServerWildcard();
+
+        // A wildcard-covered, testing-only site (no custom primary domain)
+        // resolves to /etc/letsencrypt/live/<zone>/ — the shared wildcard — so a
+        // stale per-site preview cert never shadows it.
+        if ($wildcard !== null && self::primaryHostnameIsTestingPreview($site)) {
+            $dir = strtolower(trim((string) ($wildcard->live_directory ?: $site->testingZone())));
+            if ($dir !== '') {
+                return $dir;
+            }
+        }
+
         $cert = SiteCertificate::query()
             ->where('site_id', $site->id)
             ->where('provider_type', SiteCertificate::PROVIDER_LETSENCRYPT)
@@ -120,6 +138,26 @@ CONF;
             return strtolower(trim($primary));
         }
 
+        // Last resort: a covering wildcard (e.g. preview is the only hostname
+        // and the heuristic above didn't classify it as testing-preview).
+        if ($wildcard !== null) {
+            $dir = strtolower(trim((string) ($wildcard->live_directory ?: $site->testingZone())));
+            if ($dir !== '') {
+                return $dir;
+            }
+        }
+
         return null;
+    }
+
+    /**
+     * A testing-only site — served on the managed testing hostname with no
+     * customer/custom primary domain — so its TLS should come from the shared
+     * per-server wildcard rather than a per-host certificate.
+     */
+    private static function primaryHostnameIsTestingPreview(Site $site): bool
+    {
+        return $site->primaryPreviewDomain() !== null
+            && $site->customerDomainHostnames() === [];
     }
 }

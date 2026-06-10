@@ -71,6 +71,10 @@ class StripeBillingProvisioner
 
     public const ROLE_REALTIME_YEARLY = 'standard_realtime_yearly';
 
+    // Per connection-tier realtime price roles, e.g. standard_realtime_tier_starter
+    // and standard_realtime_tier_starter_yearly.
+    public const ROLE_REALTIME_TIER_PREFIX = 'standard_realtime_tier_';
+
     public const ROLE_ENTERPRISE_PRODUCT = 'enterprise_product';
 
     public function __construct(private StripeClient $stripe) {}
@@ -288,30 +292,43 @@ class StripeBillingProvisioner
             )->id;
         }
 
-        $realtimeCents = (int) ($standardConfig['realtime_cents'] ?? 900);
-        if ($realtimeCents > 0) {
+        // Managed Realtime — one product, one monthly + yearly price per
+        // connection-tier (Starter / Growth / Scale). Prices come from
+        // config('realtime.tiers'); each tier is billed per active app.
+        $realtimeTiers = (array) config('realtime.tiers', []);
+        if ($realtimeTiers !== []) {
             $realtimeProduct = $this->upsertProduct(
                 name: 'dply Realtime app',
-                description: 'Per-app fee for dply Realtime — a managed Pusher/Reverb-compatible channel app on dply-owned edge infrastructure. Covers WebSocket connections, presence, and publishing. Billed per active app.',
+                description: 'Per-app fee for dply Realtime — a managed Pusher/Reverb-compatible channel app on dply-owned edge infrastructure. Covers WebSocket connections, presence, and publishing. Billed per active app, priced by connection tier.',
                 role: self::ROLE_REALTIME_PRODUCT,
             );
             $result[self::ROLE_REALTIME_PRODUCT] = $realtimeProduct->id;
 
-            $result[self::ROLE_REALTIME_MONTHLY] = $this->upsertRecurringPrice(
-                productId: $realtimeProduct->id,
-                amount: $realtimeCents,
-                interval: 'month',
-                nickname: 'Realtime app — Monthly',
-                role: self::ROLE_REALTIME_MONTHLY,
-            )->id;
+            foreach ($realtimeTiers as $slug => $tier) {
+                $tierCents = (int) ($tier['price_cents'] ?? 0);
+                if ($tierCents <= 0) {
+                    continue;
+                }
+                $label = (string) ($tier['label'] ?? ucfirst((string) $slug));
+                $monthlyRole = self::ROLE_REALTIME_TIER_PREFIX.$slug;
+                $yearlyRole = $monthlyRole.'_yearly';
 
-            $result[self::ROLE_REALTIME_YEARLY] = $this->upsertRecurringPrice(
-                productId: $realtimeProduct->id,
-                amount: $this->annualAmount($realtimeCents, $annualPct),
-                interval: 'year',
-                nickname: 'Realtime app — Yearly',
-                role: self::ROLE_REALTIME_YEARLY,
-            )->id;
+                $result[$monthlyRole] = $this->upsertRecurringPrice(
+                    productId: $realtimeProduct->id,
+                    amount: $tierCents,
+                    interval: 'month',
+                    nickname: 'Realtime '.$label.' — Monthly',
+                    role: $monthlyRole,
+                )->id;
+
+                $result[$yearlyRole] = $this->upsertRecurringPrice(
+                    productId: $realtimeProduct->id,
+                    amount: $this->annualAmount($tierCents, $annualPct),
+                    interval: 'year',
+                    nickname: 'Realtime '.$label.' — Yearly',
+                    role: $yearlyRole,
+                )->id;
+            }
         }
 
         $enterpriseProduct = $this->upsertProduct(
@@ -343,13 +360,25 @@ class StripeBillingProvisioner
             self::ROLE_EDGE_MONTHLY => 'STRIPE_PRICE_STANDARD_EDGE',
             self::ROLE_EDGE_YEARLY => 'STRIPE_PRICE_STANDARD_EDGE_YEARLY',
             self::ROLE_EDGE_USAGE_MONTHLY => 'STRIPE_PRICE_STANDARD_EDGE_USAGE',
-            self::ROLE_REALTIME_MONTHLY => 'STRIPE_PRICE_STANDARD_REALTIME',
-            self::ROLE_REALTIME_YEARLY => 'STRIPE_PRICE_STANDARD_REALTIME_YEARLY',
         ];
 
         $lines = [];
         foreach ($result as $role => $id) {
             $role = (string) $role;
+
+            // Realtime tier price roles → STRIPE_PRICE_STANDARD_REALTIME_{TIER}[_YEARLY].
+            // Checked before the plan/static branches so it owns the tier prefix.
+            if (str_starts_with($role, self::ROLE_REALTIME_TIER_PREFIX)) {
+                $suffix = substr($role, strlen(self::ROLE_REALTIME_TIER_PREFIX));
+                if (str_ends_with($suffix, '_yearly')) {
+                    $slug = substr($suffix, 0, -strlen('_yearly'));
+                    $lines[] = 'STRIPE_PRICE_STANDARD_REALTIME_'.strtoupper($slug).'_YEARLY='.$id;
+                } else {
+                    $lines[] = 'STRIPE_PRICE_STANDARD_REALTIME_'.strtoupper($suffix).'='.$id;
+                }
+
+                continue;
+            }
 
             // Plan price roles → STRIPE_PRICE_STANDARD_{KEY}[_YEARLY]. Skip the
             // plan *product* roles — operators don't need product IDs at runtime.

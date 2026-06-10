@@ -1,3 +1,12 @@
+---
+title: "Database backups"
+slug: server-backups
+category: "Servers"
+order: 80
+description: "Schedule and restore database dumps for a server's engines, with configurable storage, retention, and a confirm-gated restore that overwrites live data."
+group: servers
+---
+
 # Database backups
 
 The **Backups** section schedules and restores **database** dumps for engines on this server.

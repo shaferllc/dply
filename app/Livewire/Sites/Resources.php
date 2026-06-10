@@ -13,6 +13,7 @@ use App\Models\CloudDatabase;
 use App\Models\CloudWorker;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\WorkerPool;
 use App\Support\Sites\SiteWorkerCoverage;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
@@ -77,6 +78,10 @@ class Resources extends Component
         abort_unless($server->organization_id === auth()->user()->currentOrganization()?->id, 404);
         Gate::authorize('view', $site);
 
+        // A derived worker is a role of its parent app — it has no resources of
+        // its own (it inherits the parent's). Don't expose a Resources surface.
+        abort_if($site->isDerivedWorker(), 404);
+
         // Container (Cloud) sites have CloudWorker rows + CloudDatabase pivots
         // and get the full attach/detach surface. VM sites are admitted too —
         // they show a read-only roll-up of their Supervisor + systemd workers
@@ -101,6 +106,21 @@ class Resources extends Component
     public function vmWorkers(): \Illuminate\Support\Collection
     {
         return SiteWorkerCoverage::workers($this->site);
+    }
+
+    /**
+     * Worker SERVER pools attached to this site's workspace — the scalable
+     * background fleet (distinct from {@see vmWorkers()}, which lists the
+     * individual Supervisor processes). Surfaced here so operators see the
+     * pool as a resource; scaling lives on the site's Worker-servers settings
+     * section and the pool page. See {@see Site::attachedWorkerPools()}.
+     *
+     * @return \Illuminate\Support\Collection<int, WorkerPool>
+     */
+    #[Computed]
+    public function attachedWorkerPools(): \Illuminate\Support\Collection
+    {
+        return $this->site->attachedWorkerPools();
     }
 
     public function openAttach(string $pane = 'attach'): void

@@ -1,3 +1,12 @@
+---
+title: "SSH access graph"
+slug: server-ssh-access
+category: "Servers"
+order: 400
+description: "Visualizes who can SSH to a server through users, keys, grants, and time-boxed sessions, with audit alignment and a gated preview."
+group: servers
+---
+
 # SSH access graph
 
 The **Access graph** section visualizes **who can SSH** to this server — users, keys, sessions, and grants.

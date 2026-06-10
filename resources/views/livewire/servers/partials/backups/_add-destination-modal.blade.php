@@ -55,7 +55,8 @@
                                 <x-input-label for="dest_provider" :value="__('Storage provider')" />
                                 <select id="dest_provider" wire:model.live="destinationForm.provider" class="mt-1 block w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2.5 text-sm shadow-sm focus:border-brand-sage focus:ring-brand-sage">
                                     @foreach (\App\Models\BackupConfiguration::providers() as $p)
-                                        <option value="{{ $p }}">{{ \App\Models\BackupConfiguration::labelForProvider($p) }}</option>
+                                        @php $providerAvailable = \App\Models\BackupConfiguration::isProviderAvailable($p); @endphp
+                                        <option value="{{ $p }}" @disabled(! $providerAvailable)>{{ \App\Models\BackupConfiguration::labelForProvider($p) }}@unless ($providerAvailable) — {{ __('coming soon') }}@endunless</option>
                                     @endforeach
                                 </select>
                                 <x-input-error :messages="$errors->get('destinationForm.provider')" class="mt-2" />

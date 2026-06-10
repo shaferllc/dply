@@ -4,31 +4,87 @@
      * hub's Deploy tab and the deployment-detail permalink so the two reflect
      * each other.
      *
+     * Rendered as a connected vertical rail: each phase is a node on the rail,
+     * the segment below a node is tinted by that node's outcome (green = done,
+     * amber = running, gray = upcoming) so the eye follows the pipeline's
+     * progress top-to-bottom. Steps hang off each node as compact sub-rows.
+     *
      * @var array<int, array<string, mixed>> $timelinePhases  from SiteDeployTimeline::forDeployment()
      * @var \App\Models\SiteDeployment $deployment
      */
+
+    $phaseTotal = count($timelinePhases);
+    $phaseDone = 0;
+    $phaseFailed = false;
+    $currentPhaseLabel = null;
+    foreach ($timelinePhases as $p) {
+        if ($p['status'] === 'success' || $p['status'] === 'skipped') {
+            $phaseDone++;
+        } elseif ($p['status'] === 'failed') {
+            $phaseFailed = true;
+        } elseif ($p['status'] === 'running' && $currentPhaseLabel === null) {
+            $currentPhaseLabel = $p['label'];
+        }
+    }
+    $isRunningOverall = $deployment->status === 'running';
+    $pct = $phaseTotal > 0 ? (int) round(($phaseDone / $phaseTotal) * 100) : 0;
 @endphp
-<ol class="space-y-2">
+
+{{-- Progress meter — a single glance at how far the pipeline has gotten and
+     what it's doing right now, above the detailed rail. --}}
+<div class="mb-4 flex items-center gap-3">
+    <div class="relative h-1.5 flex-1 overflow-hidden rounded-full bg-brand-ink/[0.07]">
+        <div @class([
+            'h-full rounded-full transition-[width] duration-500 ease-out',
+            'bg-emerald-500' => ! $phaseFailed && ! $isRunningOverall,
+            'bg-rose-500' => $phaseFailed,
+            'bg-amber-400' => $isRunningOverall && ! $phaseFailed,
+        ]) style="width: {{ $phaseFailed ? max($pct, 8) : $pct }}%"></div>
+    </div>
+    <p class="shrink-0 text-[11px] font-medium text-brand-moss">
+        @if ($phaseFailed)
+            <span class="font-semibold text-rose-700">{{ __('Failed') }}</span>
+        @elseif ($currentPhaseLabel)
+            <span class="font-semibold text-amber-700">{{ $currentPhaseLabel }}</span> · {{ __('running') }}
+        @elseif ($phaseDone === $phaseTotal && $phaseTotal > 0)
+            <span class="font-semibold text-emerald-700">{{ __('Complete') }}</span>
+        @else
+            {{ __('Pending') }}
+        @endif
+        <span class="ml-1 tabular-nums text-brand-mist">{{ $phaseDone }}/{{ $phaseTotal }}</span>
+    </p>
+</div>
+
+<ol class="relative">
     @foreach ($timelinePhases as $phase)
         @php
             $st = $phase['status'];
             $stepCount = count($phase['steps']);
             $durTxt = $phase['duration_ms'] > 0 ? number_format($phase['duration_ms'] / 1000, 1).'s' : null;
         @endphp
-        <li @class([
-            'rounded-2xl border px-4 py-3 transition-colors',
-            'border-emerald-200 bg-emerald-50/50' => $st === 'success',
-            'border-rose-200 bg-rose-50/50' => $st === 'failed',
-            'border-amber-200 bg-amber-50/50' => $st === 'running',
-            'border-brand-ink/10 bg-brand-sand/10' => in_array($st, ['skipped', 'pending'], true),
-        ])>
-            <div class="flex items-center gap-3">
+        <li class="relative pl-12">
+            {{-- Rail segment beneath this node, tinted by this phase's outcome so
+                 the line reads as "done" (green) up to the active node, then fades
+                 to gray for what's still ahead. Hidden on the last phase. --}}
+            @unless ($loop->last)
+                <span aria-hidden="true" @class([
+                    'absolute left-[15px] top-8 bottom-0 w-0.5 -translate-x-1/2 rounded-full',
+                    'bg-emerald-400/70' => $st === 'success',
+                    'bg-rose-400/70' => $st === 'failed',
+                    'bg-gradient-to-b from-amber-400 to-brand-ink/10' => $st === 'running',
+                    'bg-brand-ink/[0.08]' => in_array($st, ['skipped', 'pending'], true),
+                ])></span>
+            @endunless
+
+            <div class="flex min-h-8 flex-col justify-center pb-5">
+                {{-- Phase node --}}
                 <span @class([
-                    'flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-1 ring-inset font-semibold text-xs',
-                    'bg-emerald-100 text-emerald-800 ring-emerald-200' => $st === 'success',
-                    'bg-rose-100 text-rose-800 ring-rose-200' => $st === 'failed',
-                    'bg-amber-100 text-amber-800 ring-amber-200' => $st === 'running',
-                    'bg-white text-brand-mist ring-brand-ink/10' => in_array($st, ['skipped', 'pending'], true),
+                    'absolute left-0 top-0 flex h-[30px] w-[30px] items-center justify-center rounded-full text-[11px] font-bold shadow-sm',
+                    'bg-emerald-500 text-white' => $st === 'success',
+                    'bg-rose-500 text-white' => $st === 'failed',
+                    'bg-amber-400 text-white ring-4 ring-amber-200/60' => $st === 'running',
+                    'bg-brand-sand/70 text-brand-moss ring-1 ring-inset ring-brand-ink/10' => $st === 'skipped',
+                    'bg-white text-brand-mist ring-1 ring-inset ring-brand-ink/15' => $st === 'pending',
                 ])>
                     @switch ($st)
                         @case('success')
@@ -41,75 +97,86 @@
                             <x-heroicon-m-arrow-path class="h-4 w-4 animate-spin" aria-hidden="true" />
                             @break
                         @case('skipped')
-                            <x-heroicon-m-minus class="h-4 w-4" aria-hidden="true" />
+                            <x-heroicon-m-minus class="h-3.5 w-3.5" aria-hidden="true" />
                             @break
                         @default
                             {{ $loop->iteration }}
                     @endswitch
                 </span>
-                <div class="min-w-0 flex-1">
-                    <p class="flex flex-wrap items-baseline gap-x-2 text-sm">
-                        <span class="font-semibold text-brand-ink">{{ $phase['label'] }}</span>
-                        <span class="text-[11px] text-brand-moss">
-                            @switch ($st)
-                                @case('success')
-                                    {{ trans_choice('{1} :count step|[2,*] :count steps', $stepCount, ['count' => $stepCount]) }}@if ($durTxt) · <span class="font-mono">{{ $durTxt }}</span>@endif
-                                    @break
-                                @case('failed')
-                                    <span class="font-semibold text-rose-700">{{ __('Failed') }}</span>@if ($durTxt) · <span class="font-mono">{{ $durTxt }}</span>@endif
-                                    @break
-                                @case('running')
-                                    {{ __('Running…') }}
-                                    @break
-                                @case('skipped')
-                                    {{ __('No steps') }}
-                                    @break
-                                @default
-                                    {{ __('Not started') }}
-                            @endswitch
-                        </span>
-                    </p>
-                </div>
-            </div>
 
-            @if ($phase['steps'] !== [])
-                <ul class="mt-2 space-y-1 pl-11">
-                    @foreach ($phase['steps'] as $step)
-                        @php($stepFailed = ! $step['ok'] && ! $step['skipped'] && ! ($step['pending'] ?? false))
-                        <li>
-                            <div class="flex items-center gap-2 text-xs">
-                                <span class="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold {{ $step['glyph_classes'] }}">{{ $step['glyph'] }}</span>
-                                <span class="min-w-0 truncate {{ $stepFailed ? 'font-medium text-rose-800' : (($step['pending'] ?? false) ? 'text-brand-mist' : 'text-brand-ink') }}">{{ $step['label'] }}</span>
-                                @if ($step['pending'] ?? false)
-                                    <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-brand-moss">{{ __('queued') }}</span>
-                                @elseif ($step['skipped'])
-                                    <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-amber-900">{{ __('skipped') }}</span>
-                                @elseif ($step['duration_ms'] > 0)
-                                    <span class="font-mono text-brand-mist">{{ $step['duration_ms'] >= 1000 ? number_format($step['duration_ms'] / 1000, 1).'s' : $step['duration_ms'].'ms' }}</span>
-                                @endif
-                            </div>
-                            @if (($step['output'] ?? '') !== '')
-                                {{-- Any step with output is expandable (failed steps open by default). --}}
-                                <div x-data="{ open: @js($stepFailed) }" class="mt-1">
-                                    <button type="button" x-on:click="open = ! open"
-                                        class="inline-flex items-center gap-1 text-[10px] font-semibold {{ $stepFailed ? 'text-rose-700' : 'text-brand-moss' }} hover:underline">
-                                        <span class="font-mono" x-text="open ? '▾' : '▸'"></span>
-                                        <span x-text="open ? @js(__('Hide output')) : @js(__('Show output'))"></span>
-                                    </button>
-                                    <pre x-show="open" x-cloak class="mt-1.5 max-h-96 overflow-auto rounded-lg bg-brand-ink p-3 font-mono text-[11px] leading-relaxed {{ $stepFailed ? 'text-rose-100/95' : 'text-brand-cream/90' }}">{{ $step['output'] }}</pre>
+                {{-- Phase header --}}
+                <div class="flex flex-wrap items-baseline gap-x-2">
+                    <span @class([
+                        'text-sm font-semibold',
+                        'text-brand-ink' => $st !== 'pending' && $st !== 'skipped',
+                        'text-brand-mist' => $st === 'pending' || $st === 'skipped',
+                    ])>{{ $phase['label'] }}</span>
+                    <span class="text-[11px] text-brand-moss">
+                        @switch ($st)
+                            @case('success')
+                                {{ trans_choice('{1} :count step|[2,*] :count steps', $stepCount, ['count' => $stepCount]) }}@if ($durTxt) · <span class="font-mono tabular-nums">{{ $durTxt }}</span>@endif
+                                @break
+                            @case('failed')
+                                <span class="font-semibold text-rose-700">{{ __('Failed') }}</span>@if ($durTxt) · <span class="font-mono tabular-nums">{{ $durTxt }}</span>@endif
+                                @break
+                            @case('running')
+                                <span class="font-semibold text-amber-700">{{ __('Running…') }}</span>
+                                @break
+                            @case('skipped')
+                                {{ __('No steps') }}
+                                @break
+                            @default
+                                {{ __('Not started') }}
+                        @endswitch
+                    </span>
+                </div>
+
+                {{-- Steps --}}
+                @if ($phase['steps'] !== [])
+                    <ul class="mt-2 space-y-1.5">
+                        @foreach ($phase['steps'] as $step)
+                            @php($stepFailed = ! $step['ok'] && ! $step['skipped'] && ! ($step['pending'] ?? false))
+                            @php($stepPending = $step['pending'] ?? false)
+                            <li>
+                                <div class="flex items-center gap-2 text-xs">
+                                    <span class="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[9px] font-bold {{ $step['glyph_classes'] }}">{{ $step['glyph'] }}</span>
+                                    <span @class([
+                                        'min-w-0 truncate',
+                                        'font-medium text-rose-800' => $stepFailed,
+                                        'text-brand-mist' => $stepPending,
+                                        'text-brand-ink' => ! $stepFailed && ! $stepPending,
+                                    ])>{{ $step['label'] }}</span>
+                                    @if ($stepPending)
+                                        <span class="rounded bg-brand-sand/40 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-brand-mist">{{ __('queued') }}</span>
+                                    @elseif ($step['skipped'])
+                                        <span class="rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-amber-800 ring-1 ring-inset ring-amber-200/70">{{ __('skipped') }}</span>
+                                    @elseif ($step['duration_ms'] > 0)
+                                        <span class="font-mono tabular-nums text-brand-mist">{{ $step['duration_ms'] >= 1000 ? number_format($step['duration_ms'] / 1000, 1).'s' : $step['duration_ms'].'ms' }}</span>
+                                    @endif
                                 </div>
-                            @endif
-                        </li>
-                    @endforeach
-                </ul>
-            @endif
+                                @if (($step['output'] ?? '') !== '')
+                                    {{-- Any step with output is expandable (failed steps open by default). --}}
+                                    <div x-data="{ open: @js($stepFailed) }" class="mt-1 pl-[26px]">
+                                        <button type="button" x-on:click="open = ! open"
+                                            class="inline-flex items-center gap-1 text-[10px] font-semibold {{ $stepFailed ? 'text-rose-700' : 'text-brand-moss' }} hover:underline">
+                                            <span class="font-mono" x-text="open ? '▾' : '▸'"></span>
+                                            <span x-text="open ? @js(__('Hide output')) : @js(__('Show output'))"></span>
+                                        </button>
+                                        <pre x-show="open" x-cloak class="mt-1.5 max-h-96 overflow-auto rounded-lg bg-brand-ink p-3 font-mono text-[11px] leading-relaxed {{ $stepFailed ? 'text-rose-100/95' : 'text-brand-cream/90' }}">{{ $step['output'] }}</pre>
+                                    </div>
+                                @endif
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+            </div>
         </li>
     @endforeach
 </ol>
 
 @if ($deployment->exit_code !== null && $deployment->exit_code !== 0)
-    <div class="mt-4 space-y-2">
-        <p class="font-mono text-xs text-rose-700">{{ __('exit :code', ['code' => $deployment->exit_code]) }}</p>
+    <div class="mt-4 space-y-2 rounded-xl border border-rose-200 bg-rose-50/50 p-3">
+        <p class="font-mono text-xs font-semibold text-rose-700">{{ __('exit :code', ['code' => $deployment->exit_code]) }}</p>
         {{-- A deploy can fail BETWEEN recorded phases (e.g. a thrown exception that
              never becomes a pipeline step), leaving the timeline with nothing to
              expand. Surface the captured failure reason from the log. --}}

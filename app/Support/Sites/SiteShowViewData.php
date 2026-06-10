@@ -86,6 +86,23 @@ final class SiteShowViewData
         $preflightChecks = collect($deploymentPreflight['checks'] ?? [])->filter(fn ($entry) => is_array($entry))->values();
         $preflightErrors = collect($deploymentPreflight['errors'] ?? [])->filter(fn ($entry) => is_string($entry))->values();
         $preflightWarnings = collect($deploymentPreflight['warnings'] ?? [])->filter(fn ($entry) => is_string($entry))->values();
+
+        // Preflight only makes sense once the operator has actually tried to ship.
+        // A brand-new, never-deployed site hasn't asked for a deploy, so surfacing
+        // "database/workers binding still pending" up front is noise. Gate the whole
+        // preflight surface on a real deploy attempt — a SiteDeployment row exists
+        // from the moment a deploy starts (failures included); last_deploy_at covers
+        // the cloud/serverless/edge paths that don't write a SiteDeployment row.
+        $hasDeployAttempt = ($site->relationLoaded('deployments') && $site->deployments->isNotEmpty())
+            || $site->last_deploy_at !== null;
+        $preflightActive = $readyForWorkspace && $hasDeployAttempt;
+
+        if (! $preflightActive) {
+            $preflightChecks = collect();
+            $preflightErrors = collect();
+            $preflightWarnings = collect();
+        }
+
         $preflightActionableChecks = PreflightIssueFixResolver::actionableChecks($site, $server, $preflightChecks);
 
         $runtimeOperationConsoles = self::runtimeOperationConsoles($runtimeLogs);
@@ -229,6 +246,7 @@ final class SiteShowViewData
                 'runtimeLogs',
                 'foundationStatus',
                 'resourceBindings',
+                'preflightActive',
                 'preflightChecks',
                 'preflightErrors',
                 'preflightWarnings',

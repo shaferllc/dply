@@ -1,3 +1,12 @@
+---
+title: "Networking"
+slug: server-networking
+category: "Servers"
+order: 20
+description: "A workspace-wide view of each server's public and private addresses, listening services, database exposure, and managed load balancers."
+group: servers
+---
+
 # Networking
 
 A workspace-wide view of every server's network surface: private IPs, the services each one runs, and which databases are reachable across the network.

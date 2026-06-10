@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Servers;
 
 use App\Enums\ServerProvider;
+use App\Exceptions\ProtectedServerDeletionException;
 use App\Models\Server;
 use App\Models\User;
 use App\Notifications\ServerRemovalExecutedNotification;
@@ -36,6 +37,15 @@ final class DeleteServerAction
      */
     public function execute(Server $server, ?User $actor, array $auditExtras = [], ?string $emailContext = null): void
     {
+        // Hard backstop: dply's own control-plane boxes (tagged `dply` or
+        // self-adopted) can never be torn down — not the cloud host, not the
+        // DB row. Refuse before touching either. The policy already hides the
+        // UI; this guards every other caller (HTTP delete, scheduled-deletion
+        // command, worker-pool teardown).
+        if ($server->isDeletionProtected()) {
+            throw ProtectedServerDeletionException::for($server);
+        }
+
         $org = $server->organization;
         $serverName = $server->name;
         $organizationName = $org?->name;

@@ -212,6 +212,9 @@ trait ManagesSiteEnvironment
     public function saveEnvFilePath(): void
     {
         $this->authorize('update', $this->site);
+        if ($this->blockedForDerivedWorker()) {
+            return;
+        }
         $value = trim($this->env_file_path_override);
 
         if ($value === '') {
@@ -235,9 +238,29 @@ trait ManagesSiteEnvironment
      * Single-row add: writes one key into the encrypted env cache, then
      * auto-pushes to the server's .env file.
      */
+    /**
+     * A derived worker has no environment of its own — it inherits the parent
+     * app's, overriding only a handful of role-specific keys. Block edits here
+     * and point the operator at the parent. Returns true when blocked so the
+     * caller can early-return.
+     */
+    protected function blockedForDerivedWorker(): bool
+    {
+        if ($this->site->isDerivedWorker()) {
+            $this->toastError(__('This is a worker — its environment is inherited from its parent app. Manage it on the parent app.'));
+
+            return true;
+        }
+
+        return false;
+    }
+
     public function addEnvVar(DotEnvFileParser $parser, DotEnvFileWriter $writer): void
     {
         $this->authorize('update', $this->site);
+        if ($this->blockedForDerivedWorker()) {
+            return;
+        }
         $this->validate([
             'new_env_key' => 'required|string|max:128|regex:/^[A-Za-z_][A-Za-z0-9_]*$/',
             'new_env_value' => 'nullable|string|max:20000',
@@ -279,6 +302,9 @@ trait ManagesSiteEnvironment
     public function bulkImportEnvVars(DotEnvFileParser $parser, DotEnvFileWriter $writer): void
     {
         $this->authorize('update', $this->site);
+        if ($this->blockedForDerivedWorker()) {
+            return;
+        }
         $this->validate(['bulk_env_input' => 'required|string|max:65535']);
 
         $incoming = $parser->parse($this->bulk_env_input);
@@ -326,6 +352,9 @@ trait ManagesSiteEnvironment
     public function importEnvFromSite(string $sourceSiteId, bool $verbatim, DotEnvFileParser $parser, DotEnvFileWriter $writer): void
     {
         $this->authorize('update', $this->site);
+        if ($this->blockedForDerivedWorker()) {
+            return;
+        }
 
         $source = $this->resolveImportSource($sourceSiteId);
         if (! $source instanceof Site) {
@@ -718,6 +747,9 @@ trait ManagesSiteEnvironment
     public function removeEnvVar(string $key, DotEnvFileParser $parser, DotEnvFileWriter $writer): void
     {
         $this->authorize('update', $this->site);
+        if ($this->blockedForDerivedWorker()) {
+            return;
+        }
         $parsed = $parser->parse((string) ($this->site->env_file_content ?? ''));
         if (! array_key_exists($key, $parsed['variables'])) {
             return;

@@ -1,3 +1,12 @@
+---
+title: "PHP workspace"
+slug: server-php
+category: "Servers"
+order: 320
+description: "Manages PHP versions and FPM pools on a server via mise, letting you install, enable, upgrade, and uninstall versions for sites to select."
+group: servers
+---
+
 # PHP workspace
 
 The **PHP** section manages PHP versions and pools on the server via mise — install, enable, upgrade, and uninstall.

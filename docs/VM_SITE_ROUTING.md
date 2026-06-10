@@ -1,3 +1,12 @@
+---
+title: "Site routing and domains"
+slug: vm-site-routing
+category: "Sites & deploys"
+order: 240
+description: "Manage how HTTP requests reach a site through primary domain, aliases, redirects, and preview hostnames, with queued webserver applies."
+group: sites
+---
+
 # Site routing and domains
 
 The **Routing** section manages how HTTP requests reach your app — primary domain, aliases, redirects, and preview hostnames.

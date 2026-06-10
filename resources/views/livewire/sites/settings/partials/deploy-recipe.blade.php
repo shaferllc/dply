@@ -315,7 +315,7 @@
          after Pipeline so the page reads chronologically:
          Source → Build → Pipeline → Activate → Rollout. --}}
     @if (! $functionsHost)
-        <form wire:submit="saveZeroDowntimeDeployment" class="dply-card overflow-hidden">
+        <form wire:submit="saveDeploymentMethod" class="dply-card overflow-hidden">
             <div class="grid gap-0 lg:grid-cols-[17rem_minmax(0,1fr)]">
                 <div class="border-b border-brand-ink/10 bg-brand-cream/40 p-6 lg:border-b-0 lg:border-r">
                     <div class="flex items-start gap-3">
@@ -324,18 +324,39 @@
                         </span>
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Activate') }}</p>
-                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Zero downtime deployment') }}</h3>
-                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('When enabled, each deploy goes to a new release directory, then traffic switches to it in one step so the app stays up during builds. Disable to run simple git-based deploys in the deploy path.') }}</p>
+                            <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Deployment method') }}</h3>
+                            <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('How each deploy lands the new release and moves traffic to it. Changing the method takes effect on the next deploy; the on-disk layout migrates automatically once that deploy succeeds.') }}</p>
                         </div>
                     </div>
                 </div>
 
                 <div class="space-y-3 p-6 sm:p-8">
-                    <label class="flex items-center gap-3">
-                        <input type="checkbox" wire:model="zero_downtime_enabled" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest">
-                        <span class="text-sm font-semibold text-brand-ink">{{ __('Enable zero-downtime rollout') }}</span>
-                    </label>
-                    <x-input-error :messages="$errors->get('zero_downtime_enabled')" />
+                    @php($methodOptions = $this->deploymentMethodOptions())
+                    <fieldset class="space-y-2.5">
+                        <legend class="sr-only">{{ __('Deployment method') }}</legend>
+                        @foreach ($methodOptions as $option)
+                            <label
+                                @class([
+                                    'flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition-colors',
+                                    'border-brand-forest/40 bg-brand-sage/10 ring-1 ring-brand-forest/20' => $deploy_method === $option['value'],
+                                    'border-brand-ink/10 hover:bg-brand-sand/30' => $deploy_method !== $option['value'],
+                                ])
+                            >
+                                <input
+                                    type="radio"
+                                    name="deploy_method"
+                                    value="{{ $option['value'] }}"
+                                    wire:model="deploy_method"
+                                    class="mt-0.5 h-4 w-4 border-brand-ink/30 text-brand-forest focus:ring-brand-forest"
+                                >
+                                <span class="min-w-0">
+                                    <span class="block text-sm font-semibold text-brand-ink">{{ $option['label'] }}</span>
+                                    <span class="mt-0.5 block text-sm leading-relaxed text-brand-moss">{{ $option['description'] }}</span>
+                                </span>
+                            </label>
+                        @endforeach
+                    </fieldset>
+                    <x-input-error :messages="$errors->get('deploy_method')" />
                 </div>
             </div>
 

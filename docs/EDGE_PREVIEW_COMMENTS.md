@@ -1,3 +1,12 @@
+---
+title: "Edge preview comments"
+slug: edge-preview-comments
+category: "Edge"
+order: 170
+description: "How reviewers add, resolve, and delete path-scoped feedback comments on preview deployments, plus enabling the on-page widget and API access."
+group: edge
+---
+
 # Edge preview comments
 
 **Preview comments** let reviewers leave feedback tied to a path on a preview deployment.

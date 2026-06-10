@@ -272,12 +272,20 @@ final class BillingAnalytics
             ];
         }
 
-        if ($state->realtimeCount > 0) {
+        // Managed Realtime — one line per connection-tier in use.
+        $realtimeTiers = (array) config('realtime.tiers', []);
+        foreach ($state->realtimeTierQuantities as $tier => $quantity) {
+            if ($quantity <= 0) {
+                continue;
+            }
+            $tierConfig = $realtimeTiers[(string) $tier] ?? [];
+            $unitCents = (int) ($tierConfig['price_cents'] ?? config('subscription.standard.realtime_cents', 900));
+            $label = (string) ($tierConfig['label'] ?? ucfirst((string) $tier));
             $items[] = [
-                'label' => __('dply Realtime app'),
-                'quantity' => $state->realtimeCount,
-                'unit_cents' => (int) config('subscription.standard.realtime_cents', 900),
-                'line_cents' => $state->realtimeSubtotalCents,
+                'label' => __('dply Realtime app').' — '.$label,
+                'quantity' => $quantity,
+                'unit_cents' => $unitCents,
+                'line_cents' => $unitCents * $quantity,
                 'detail' => null,
             ];
         }
@@ -536,16 +544,27 @@ final class BillingAnalytics
     /**
      * @return Collection<int, Server>
      */
+    /** @var array<string, Collection<int, Server>> */
+    private array $billableServersCache = [];
+
     private function billableServers(Organization $organization): Collection
     {
-        $minAge = max(0, (int) config('subscription.standard.min_billable_age_days', 1));
+        // Memoized per org: billableServersList() and excludedServers() both
+        // call this within one render, and re-fetching re-ran the whole server
+        // query (plus its metric-snapshot eager load) a second time.
+        if (isset($this->billableServersCache[$organization->id])) {
+            return $this->billableServersCache[$organization->id];
+        }
 
-        return $organization->servers()
-            ->where('status', Server::STATUS_READY)
-            ->where('created_at', '<=', now()->subDays($minAge))
-            ->orderBy('name')
-            ->get()
+        // Reuse the billing-state computer's memoised READY-server set (same
+        // status + age filter, with latestMetricSnapshot eager-loaded) so the
+        // expensive snapshot subquery runs once for the whole page instead of
+        // being duplicated here. Sort by name in PHP since the shared set is
+        // unordered.
+        return $this->billableServersCache[$organization->id] = $this->billingStateComputer
+            ->readyBillableServers($organization)
             ->reject(fn (Server $server): bool => $server->isManagedProductHost())
+            ->sortBy(fn (Server $server): string => (string) $server->name, SORT_NATURAL | SORT_FLAG_CASE)
             ->values();
     }
 
@@ -621,6 +640,7 @@ final class BillingAnalytics
 
         $yearlyIds = array_merge(
             array_values((array) config('subscription.standard.stripe.plans_yearly', [])),
+            array_values((array) config('subscription.standard.stripe.realtime_tiers_yearly', [])),
             [
                 (string) (config('subscription.standard.stripe.serverless_yearly') ?? ''),
                 (string) (config('subscription.standard.stripe.cloud_yearly') ?? ''),

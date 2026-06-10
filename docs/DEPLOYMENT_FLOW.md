@@ -1,3 +1,11 @@
+---
+title: "Source control & deploy flow"
+slug: source-control
+category: "Getting started"
+order: 10
+description: "Covers how Git OAuth and server provider credentials differ, linking repositories and branches to sites, webhooks, and what happens during a deploy."
+---
+
 # Source control & deploy flow
 
 How Git connects to dply, how sites pull code, and what happens when you deploy.

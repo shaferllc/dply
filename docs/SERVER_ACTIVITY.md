@@ -1,3 +1,12 @@
+---
+title: "Activity log"
+slug: server-activity
+category: "Servers"
+order: 70
+description: "An audit log of workspace control-plane actions on a server (deploys, firewall edits, SSH syncs, console runs) with actor, action, time, and status."
+group: servers
+---
+
 # Activity log
 
 The **Activity** section records workspace actions on this server — deploys, firewall edits, SSH syncs, and console runs.

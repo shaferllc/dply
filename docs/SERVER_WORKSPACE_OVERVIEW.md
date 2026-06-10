@@ -1,3 +1,12 @@
+---
+title: "Server workspace overview"
+slug: server-workspace
+category: "Servers"
+order: 10
+description: "Introduces the per-server workspace, its sidebar navigation pattern, common sections like Deploy, Sites, Monitor, Databases, Cron, Daemons, Firewall, and Projects."
+group: servers
+---
+
 # Server workspace overview
 
 Each **server** opens a **workspace** with tools grouped like the **site** workspace so operators find parallel capabilities.

@@ -39,6 +39,12 @@
         }
     }
     $groupCount = count($hubGroups);
+
+    // Attached worker SERVER pool(s) get their own graph column on the right, so the
+    // scalable background fleet shows as an attached resource. Workspace-scoped; see
+    // Site::attachedWorkerPools(). Widen the grid by one column when present.
+    $workerPools = $site->attachedWorkerPools();
+    $mapCols = $groupCount + ($workerPools->isNotEmpty() ? 1 : 0);
 @endphp
 
 <div class="space-y-5">
@@ -164,7 +170,7 @@
             }"
             x-init="boot()"
             class="relative mx-auto grid items-start gap-x-2 gap-y-14"
-            style="grid-template-columns: repeat({{ $groupCount }}, minmax(0, 1fr)); min-width: {{ $groupCount * 300 }}px; background-image: radial-gradient(circle, rgba(31,77,51,0.07) 1px, transparent 1.6px); background-size: 22px 22px; background-position: -1px -1px;"
+            style="grid-template-columns: repeat({{ $mapCols }}, minmax(0, 1fr)); min-width: {{ $mapCols * 300 }}px; background-image: radial-gradient(circle, rgba(31,77,51,0.07) 1px, transparent 1.6px); background-size: 22px 22px; background-position: -1px -1px;"
         >
             {{-- Curved connector edges (behind the nodes) --}}
             <svg class="pointer-events-none absolute inset-0 z-0 overflow-visible" :width="w" :height="h" x-ref="svg">
@@ -311,8 +317,35 @@
                                     <div x-show="open" x-cloak class="rounded-lg bg-brand-cream/40 p-2">
                                         <p class="mb-1 text-[9px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Injected variables') }} ({{ count($envKeys) }})</p>
                                         <div class="flex flex-wrap gap-1">
-                                            @foreach ($envKeys as $k)
-                                                <span class="rounded bg-white px-1.5 py-0.5 font-mono text-[10px] text-brand-moss shadow-sm">{{ $k }}</span>
+                                            @foreach ($binding->injected_env as $k => $v)
+                                                {{-- Hover/click a chip to reveal its injected value (masked by
+                                                     default), copy it, or jump to Environment to override it. --}}
+                                                <div
+                                                    x-data="{ pop: false, show: false, copied: false,
+                                                        async copyVal() { try { await navigator.clipboard.writeText(@js((string) $v)); this.copied = true; setTimeout(() => this.copied = false, 1200); } catch (e) {} } }"
+                                                    @mouseenter="pop = true" @mouseleave="pop = false"
+                                                    class="relative"
+                                                >
+                                                    <button type="button" @click="pop = ! pop"
+                                                        class="rounded bg-white px-1.5 py-0.5 font-mono text-[10px] text-brand-moss shadow-sm hover:bg-brand-sand/40">{{ $k }}</button>
+                                                    <div x-show="pop" x-cloak x-transition.opacity
+                                                        class="absolute left-0 top-full z-30 mt-1 w-64 rounded-lg border border-brand-ink/10 bg-white p-2 text-left shadow-xl">
+                                                        <div class="flex items-center justify-between gap-2">
+                                                            <span class="truncate font-mono text-[10px] font-semibold text-brand-ink">{{ $k }}</span>
+                                                            <div class="flex shrink-0 items-center gap-2 text-[10px] font-semibold">
+                                                                <button type="button" @click="show = ! show" class="text-brand-sage hover:underline"><span x-show="! show">{{ __('Show') }}</span><span x-show="show" x-cloak>{{ __('Hide') }}</span></button>
+                                                                <button type="button" @click="copyVal()" class="text-brand-sage hover:underline"><span x-show="! copied">{{ __('Copy') }}</span><span x-show="copied" x-cloak class="text-emerald-600">{{ __('Copied') }}</span></button>
+                                                            </div>
+                                                        </div>
+                                                        <p class="mt-1 break-all rounded bg-brand-cream/50 px-2 py-1 font-mono text-[10px] text-brand-ink">
+                                                            <span x-show="show" x-cloak>{{ ((string) $v) === '' ? '(empty)' : $v }}</span>
+                                                            <span x-show="! show">••••••••••</span>
+                                                        </p>
+                                                        <a href="{{ $sectionUrl('environment') }}" wire:navigate class="mt-1.5 inline-flex items-center gap-1 text-[10px] font-semibold text-brand-forest hover:underline">
+                                                            <x-heroicon-o-pencil-square class="h-3 w-3" /> {{ __('Override in Environment') }}
+                                                        </a>
+                                                    </div>
+                                                </div>
                                             @endforeach
                                         </div>
                                     </div>
@@ -408,6 +441,48 @@
                     @endforeach
                 </div>
             @endforeach
+
+            {{-- Worker SERVER pool(s) as their own attached column. Edges auto-wire via
+                 data-hub="workers" (trunk from the site) and data-group="workers"
+                 (branch into each pool node), the same mechanism the binding groups use. --}}
+            @if ($workerPools->isNotEmpty())
+                @php $wcol = $groupCount + 1; @endphp
+                <div class="relative z-10 flex justify-center" style="grid-column: {{ $wcol }}; grid-row: 2;">
+                    <div data-hub="workers" class="w-44 rounded-xl border border-violet-200 bg-white/90 px-3.5 py-2.5 text-center shadow-sm backdrop-blur">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-800">{{ __('Workers') }}</p>
+                        <p class="mt-0.5 text-[11px] font-medium text-brand-mist">{{ trans_choice(':n pool|:n pools', $workerPools->count(), ['n' => $workerPools->count()]) }} {{ __('attached') }}</p>
+                    </div>
+                </div>
+                <div class="relative z-10 flex flex-col gap-3 pl-9" style="grid-column: {{ $wcol }}; grid-row: 3;">
+                    @foreach ($workerPools as $pool)
+                        @php $primary = $pool->primaryServer; @endphp
+                        <div
+                            data-resource-node="worker-pool-{{ $pool->id }}"
+                            data-group="workers"
+                            data-attached="1"
+                            class="relative w-full rounded-xl border border-violet-200 bg-white p-3 shadow-sm"
+                        >
+                            <span class="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-violet-500 ring-2 ring-white"></span>
+                            <div class="flex items-center gap-2">
+                                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
+                                    <x-heroicon-o-square-3-stack-3d class="h-4 w-4" />
+                                </span>
+                                <div class="min-w-0">
+                                    <p class="truncate text-sm font-semibold text-brand-ink">{{ $pool->name ?: __('Worker pool') }}</p>
+                                    <p class="text-[11px] text-brand-moss">{{ trans_choice(':n server|:n servers', $pool->servers->count(), ['n' => $pool->servers->count()]) }} · {{ $pool->status }}</p>
+                                </div>
+                            </div>
+                            <div class="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-brand-ink/10 pt-2.5">
+                                @if ($primary)
+                                    <a href="{{ route('servers.worker-pool', ['server' => $primary]) }}" wire:navigate class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                        <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" /> {{ __('Scale') }}
+                                    </a>
+                                @endif
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
         </div>
     </div>
 

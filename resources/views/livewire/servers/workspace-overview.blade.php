@@ -955,8 +955,8 @@
                                 <x-heroicon-o-globe-alt class="h-5 w-5" aria-hidden="true" />
                             </x-icon-badge>
                             <div class="min-w-0 flex-1">
-                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Recent activity') }}</h3>
-                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Top sites by last-touched, with each site\'s most recent deploy.') }}</p>
+                                <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Sites') }}</h3>
+                                <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Sites hosted on this server, each with its current status and most recent deploy.') }}</p>
                             </div>
                             <div class="flex shrink-0 items-center gap-2">
                                 @if ($siteCount > 0)

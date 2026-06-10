@@ -54,8 +54,9 @@ class StripeSubscriptionSyncer
         // dply Cloud + Edge — flat per live site.
         $this->reconcileManagedProductLine($subscription, $desired, $changes, 'cloud', $desired->cloudCount);
         $this->reconcileManagedProductLine($subscription, $desired, $changes, 'edge', $desired->edgeCount);
-        // Managed Realtime — flat per active app.
-        $this->reconcileManagedProductLine($subscription, $desired, $changes, 'realtime', $desired->realtimeCount);
+        // Managed Realtime — one line per connection-tier in use, plus removal of
+        // any legacy flat realtime line left over from the pre-tier model.
+        $this->reconcileRealtimeTierLines($subscription, $desired, $changes);
         $this->reconcileCloudResourceLine($subscription, $desired, $changes);
         $this->reconcileServerlessUsageLine($subscription, $desired, $changes);
         $this->reconcileManagedServerLine($subscription, $desired, $changes);
@@ -216,6 +217,64 @@ class StripeSubscriptionSyncer
     }
 
     /**
+     * Reconcile managed-Realtime lines per connection-tier. Each configured tier
+     * price is driven to its desired app count (add/update/remove), so a tier
+     * upgrade or a new app on a different tier settles to the right set of lines.
+     * Also strips the retired flat realtime line off any subscription migrated
+     * from the v1 flat-per-app model.
+     *
+     * @param  array<int, array<string, mixed>>  $changes
+     */
+    private function reconcileRealtimeTierLines(
+        Subscription $subscription,
+        DesiredBillingState $desired,
+        array &$changes,
+    ): void {
+        foreach ($this->allRealtimeTierPriceIds($subscription) as $tier => $priceId) {
+            if ($priceId === '') {
+                continue;
+            }
+
+            $desiredQty = max(0, $desired->realtimeTierQuantities[$tier] ?? 0);
+            $current = $this->currentQuantity($subscription, $priceId);
+            $change = $this->applyDelta($subscription, $priceId, $current, $desiredQty);
+            if ($change !== null) {
+                $changes[] = ['tier' => 'realtime:'.$tier] + $change;
+            }
+        }
+
+        // Retire the legacy flat realtime line if a migrated subscription still
+        // carries it (drive its quantity to 0).
+        $flatPriceId = $this->managedProductPriceIdForSubscription($subscription, 'realtime');
+        if ($flatPriceId !== '') {
+            $current = $this->currentQuantity($subscription, $flatPriceId);
+            if ($current !== null) {
+                $change = $this->applyDelta($subscription, $flatPriceId, $current, 0);
+                if ($change !== null) {
+                    $changes[] = ['tier' => 'realtime:flat'] + $change;
+                }
+            }
+        }
+    }
+
+    /**
+     * Configured Stripe price IDs for every realtime connection-tier at the
+     * subscription's interval, keyed by tier slug.
+     *
+     * @return array<string, string>
+     */
+    private function allRealtimeTierPriceIds(Subscription $subscription): array
+    {
+        $bucket = $this->isYearly($subscription) ? 'realtime_tiers_yearly' : 'realtime_tiers';
+        $ids = [];
+        foreach ((array) config("subscription.standard.stripe.{$bucket}", []) as $tier => $priceId) {
+            $ids[(string) $tier] = (string) ($priceId ?? '');
+        }
+
+        return $ids;
+    }
+
+    /**
      * Metered dply Cloud resource line — the marked-up cost of the DigitalOcean
      * containers, workers, databases, and buckets backing the org's Cloud apps.
      * Uses the per-cent unit price (quantity = cents), same mechanism as the
@@ -342,6 +401,7 @@ class StripeSubscriptionSyncer
         // than keying off a single line that may be absent.
         $yearlyIds = array_merge(
             array_values((array) config('subscription.standard.stripe.plans_yearly', [])),
+            array_values((array) config('subscription.standard.stripe.realtime_tiers_yearly', [])),
             [
                 (string) (config('subscription.standard.stripe.serverless_yearly') ?? ''),
                 (string) (config('subscription.standard.stripe.cloud_yearly') ?? ''),

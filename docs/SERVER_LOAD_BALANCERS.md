@@ -1,3 +1,12 @@
+---
+title: "Load balancers"
+slug: server-load-balancers
+category: "Servers"
+order: 30
+description: "Managed, health-checked load balancers that target this server, covering what the tab shows, health checks, and provider provisioning."
+group: servers
+---
+
 # Load balancers
 
 Spread traffic across this server and its peers with managed, health-checked load balancers — provisioned and wired up from the dashboard.

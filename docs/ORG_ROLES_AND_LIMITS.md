@@ -1,3 +1,12 @@
+---
+title: "Organization roles & plan limits"
+slug: org-roles-and-limits
+category: "Organization"
+order: 70
+description: "Explains per-organization roles (owner, admin, member, deployer), trial server and site caps, Pro unlimited tier, API token scopes, and profile vs org settings."
+group: organization
+---
+
 # Organization roles & plan limits
 
 How membership works in your workspace, what each role can do, and how trial versus Pro affects servers, sites, and API access.

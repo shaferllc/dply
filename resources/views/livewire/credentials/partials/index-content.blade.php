@@ -27,18 +27,22 @@
 
 <x-livewire-validation-errors />
 
-@if ($organization)
-    <x-breadcrumb-trail :items="[
-        ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-        ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
-        ['label' => __('Provider credentials'), 'icon' => 'server'],
-    ]" />
-@else
-    <x-breadcrumb-trail :items="[
-        ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-        ['label' => __('Settings'), 'href' => route('settings.profile'), 'icon' => 'cog-6-tooth'],
-        ['label' => __('Provider credentials'), 'icon' => 'server'],
-    ]" />
+{{-- In the org shell the trail is hoisted above the whole box (see index.blade.php);
+     here it only renders on the standalone (non-shell) surface. --}}
+@if (empty($useOrgShell))
+    @if ($organization)
+        <x-breadcrumb-trail :items="[
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
+            ['label' => __('Provider credentials'), 'icon' => 'server'],
+        ]" />
+    @else
+        <x-breadcrumb-trail :items="[
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => __('Settings'), 'href' => route('settings.profile'), 'icon' => 'cog-6-tooth'],
+            ['label' => __('Provider credentials'), 'icon' => 'server'],
+        ]" />
+    @endif
 @endif
 
 <div class="space-y-6">
@@ -48,11 +52,18 @@
     <section class="dply-card overflow-hidden">
         <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
             <div class="lg:col-span-7">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Credentials') }}</p>
-                <h2 class="mt-2 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Providers') }}</h2>
-                <p class="mt-2 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    {{ __('Store API tokens for the clouds, registrars, and CDNs your organization uses. Tokens are encrypted at rest and validated against the provider when we can.') }}
-                </p>
+                <div class="flex items-start gap-3">
+                    <x-icon-badge size="md">
+                        <x-heroicon-o-key class="h-6 w-6" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Credentials') }}</p>
+                        <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Providers') }}</h2>
+                        <p class="mt-2 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            {{ __('Store API tokens for the clouds, registrars, and CDNs your organization uses. Tokens are encrypted at rest and validated against the provider when we can.') }}
+                        </p>
+                    </div>
+                </div>
                 <div class="mt-4 flex flex-wrap items-center gap-2">
                     <x-docs-link doc-route="docs.connect-provider">
                         <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />

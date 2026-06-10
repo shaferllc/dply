@@ -1,3 +1,12 @@
+---
+title: "Edge build & deploy logs"
+slug: edge-logs
+category: "Edge"
+order: 150
+description: "Shows CI output from clone-and-build jobs with live polling, failure diagnosis, and retention guidance, distinct from visitor HTTP logs."
+group: edge
+---
+
 # Edge build & deploy logs
 
 **Build & deploy logs** shows CI output from clone-and-build jobs — not visitor HTTP logs (see **Traffic & analytics**).

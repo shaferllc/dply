@@ -66,6 +66,14 @@ final class DeploymentPreflightValidator
                 continue;
             }
 
+            // An inferred requirement the operator never opted into (no persisted
+            // SiteBinding row) is a default expectation, not a problem to fix.
+            // Don't raise it as a warning — attaching a database/workers resource
+            // flips source to 'binding', and only then is "still pending" actionable.
+            if (! $binding->isManaged() && $binding->source === 'inferred_requirement') {
+                continue;
+            }
+
             $warnings[] = ucfirst($binding->type).' is not configured yet.';
             $checks[] = $this->check($binding->type, 'warning', ucfirst($binding->type).' binding is still pending.');
         }

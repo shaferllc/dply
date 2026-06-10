@@ -43,6 +43,8 @@ class Index extends Component
             return view('livewire.notifications.index', [
                 'items' => collect(),
                 'unreadCount' => 0,
+                'totalCount' => 0,
+                'attentionCount' => 0,
                 'notificationsReady' => false,
             ]);
         }
@@ -56,11 +58,15 @@ class Index extends Component
             $query->whereNull('read_at');
         }
 
+        $base = fn () => NotificationInboxItem::query()->where('user_id', auth()->id());
+
         return view('livewire.notifications.index', [
             'items' => $query->limit(50)->get(),
-            'unreadCount' => NotificationInboxItem::query()
-                ->where('user_id', auth()->id())
+            'unreadCount' => $base()->whereNull('read_at')->count(),
+            'totalCount' => $base()->count(),
+            'attentionCount' => $base()
                 ->whereNull('read_at')
+                ->whereHas('event', fn ($q) => $q->whereIn('severity', ['warning', 'critical', 'error', 'danger']))
                 ->count(),
             'notificationsReady' => true,
         ]);

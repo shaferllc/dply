@@ -1,3 +1,12 @@
+---
+title: "Patch advisor"
+slug: server-patches
+category: "Servers"
+order: 310
+description: "Surfaces pending OS and package updates on a server, lists security, standard, and kernel upgrades, and applies them over SSH."
+group: servers
+---
+
 # Patch advisor
 
 The **Patches** section (sidebar label **Patches**) surfaces pending OS and package updates on the server so you can plan maintenance windows.

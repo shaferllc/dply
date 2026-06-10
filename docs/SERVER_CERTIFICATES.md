@@ -1,3 +1,12 @@
+---
+title: "Certificate inventory"
+slug: server-certificates
+category: "Servers"
+order: 110
+description: "View the fleet-wide inventory of TLS certificates on a server, including ACME certs, manual uploads, expiry, and bulk renewal."
+group: servers
+---
+
 # Certificate inventory
 
 The **Certificates** section lists TLS certificates installed on the server — site ACME certs, manual uploads, and shared wildcard files.

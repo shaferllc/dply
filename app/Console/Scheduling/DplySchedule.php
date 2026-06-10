@@ -36,10 +36,12 @@ use App\Console\Commands\PruneAuditLogsCommand;
 use App\Console\Commands\PruneErrorEventsCommand;
 use App\Console\Commands\PruneFunctionInvocationsCommand;
 use App\Console\Commands\PruneLocalWorkspaceArtifactsCommand;
+use App\Console\Commands\PruneRemoteTaskRunnerCommand;
 use App\Console\Commands\PruneServerCreateDraftsCommand;
 use App\Console\Commands\PruneServerCronJobRunsCommand;
 use App\Console\Commands\PruneSiteUptimeCheckResultsCommand;
 use App\Console\Commands\PruneTestingHostnameRecordsCommand;
+use App\Console\Commands\RenewServerWildcardCertificatesCommand;
 use App\Console\Commands\RevokeExpiredServerSshSessionsCommand;
 use App\Console\Commands\RollupEdgeAnalyticsEngineCommand;
 use App\Console\Commands\RunDueDeploymentSchedulesCommand;
@@ -54,6 +56,7 @@ use App\Console\Commands\SyncAllOrganizationBillingCommand;
 use App\Console\Commands\SyncErrorEventsCommand;
 use App\Console\Commands\WarmPoolAutoscaleCommand;
 use App\Console\Commands\WorkerPoolAutoscaleCommand;
+use App\Console\Commands\WorkerPoolMemberHealthCommand;
 use App\Console\Commands\WorkerPoolPrimaryHealthCommand;
 use App\Jobs\VerifyEdgeCustomDomainsJob;
 use App\Support\DplyRuntime;
@@ -117,6 +120,13 @@ final class DplySchedule
         $schedule->command(WorkerPoolPrimaryHealthCommand::class)
             ->everyFiveMinutes()
             ->name('worker-pools-primary-health');
+
+        // Catch replicas destroyed out-of-band after the pool settled (the
+        // reconciler only checks instance existence while actively converging).
+        $schedule->command(WorkerPoolMemberHealthCommand::class)
+            ->everyFiveMinutes()
+            ->withoutOverlapping()
+            ->name('worker-pools-member-health');
 
         $schedule->command(ServerlessTickCommand::class)
             ->everyMinute()
@@ -184,6 +194,10 @@ final class DplySchedule
         $schedule->command(CheckEdgeRumAlertsCommand::class)->hourly()->withoutOverlapping();
         $schedule->command(DeployIntelligenceScanCommand::class)->hourly()->withoutOverlapping();
         $schedule->command(PruneTestingHostnameRecordsCommand::class)->dailyAt('03:30');
+        $schedule->command(RenewServerWildcardCertificatesCommand::class)
+            ->dailyAt('03:35')
+            ->withoutOverlapping()
+            ->name('renew-server-wildcard-certs');
         $schedule->command(PruneServerCreateDraftsCommand::class)->dailyAt('03:45');
         $schedule->command(PruneFunctionInvocationsCommand::class)->dailyAt('03:50');
         $schedule->command(PruneSiteUptimeCheckResultsCommand::class)->dailyAt('03:55');
@@ -199,6 +213,16 @@ final class DplySchedule
             ->runInBackground()
             ->when(fn (): bool => (bool) config('dply.local_workspace_prune.enabled', true))
             ->name('prune-local-workspaces');
+
+        // Remote counterpart: SSH each ready box and age-prune ~/.dply-task-runner,
+        // which the task runner fills with per-task <id>.sh/.log and never cleans.
+        // Per-server SSH, so run it in the background off the scheduler tick.
+        $schedule->command(PruneRemoteTaskRunnerCommand::class)
+            ->dailyAt('04:15')
+            ->runInBackground()
+            ->withoutOverlapping()
+            ->when(fn (): bool => (bool) config('dply.remote_task_runner_prune.enabled', true))
+            ->name('prune-remote-task-runner');
 
         $schedule->command(CheckSupervisorHealthCommand::class)
             ->everyFifteenMinutes()

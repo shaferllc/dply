@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature\Actions\Servers\InstallRuntimeOnServerTest;
 
 use App\Actions\Servers\InstallRuntimeOnServer;
-use App\Contracts\RemoteShell;
 use App\Models\Server;
 use App\Services\Servers\MiseInstallScriptBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -92,17 +91,3 @@ test('merges runtime default with existing entries', function () {
     $server->refresh();
     expect($server->meta['runtime_defaults'])->toBe(['node' => '22', 'python' => '3.12']);
 });
-class InstallRuntimeRecordingShell implements RemoteShell
-{
-    /** @var array<int, string> */
-    public array $execCalls = [];
-
-    public function exec(string $command, int $timeoutSeconds = 120): string
-    {
-        $this->execCalls[] = $command;
-
-        return '';
-    }
-
-    public function putFile(string $remotePath, string $contents, int $timeoutSeconds = 60): void {}
-}

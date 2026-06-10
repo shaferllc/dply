@@ -23,10 +23,14 @@ use App\Models\SiteDeployStep;
  */
 final class SitePipelineAdvisor
 {
+    /** Meta key holding the list of suggestion keys the operator has dismissed. */
+    public const DISMISSED_META_KEY = 'pipeline_suggestions_dismissed';
+
     /**
+     * @param  bool  $includeDismissed  Return suggestions the operator has dismissed too (for autofix lookup by key).
      * @return list<array{key: string, label: string, reason: string, step_type: string, phase: string, command: ?string, priority: string}>
      */
-    public static function suggestions(Site $site): array
+    public static function suggestions(Site $site, bool $includeDismissed = false): array
     {
         $server = $site->server;
         if ($server === null || ! $server->isVmHost()) {
@@ -113,7 +117,44 @@ final class SitePipelineAdvisor
             }
         }
 
+        if (! $includeDismissed) {
+            $dismissed = self::dismissedKeys($site);
+            if ($dismissed !== []) {
+                $out = array_values(array_filter(
+                    $out,
+                    static fn (array $s): bool => ! in_array($s['key'], $dismissed, true),
+                ));
+            }
+        }
+
         return $out;
+    }
+
+    /**
+     * How many detected suggestions are currently hidden by a dismissal — so the
+     * UI can offer a "Restore N dismissed" affordance.
+     */
+    public static function dismissedCount(Site $site): int
+    {
+        $dismissed = self::dismissedKeys($site);
+        if ($dismissed === []) {
+            return 0;
+        }
+
+        $activeKeys = array_column(self::suggestions($site, true), 'key');
+
+        return count(array_intersect($dismissed, $activeKeys));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function dismissedKeys(Site $site): array
+    {
+        return array_values(array_filter(
+            (array) data_get($site->meta, self::DISMISSED_META_KEY, []),
+            'is_string',
+        ));
     }
 
     /**

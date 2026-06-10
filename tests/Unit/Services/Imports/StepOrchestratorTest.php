@@ -9,11 +9,9 @@ use App\Models\ImportServerMigration;
 use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\User;
-use App\Services\Imports\StepHandler;
 use App\Services\Imports\StepOrchestrator;
 use App\Services\Imports\StepRegistry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use RuntimeException;
 
 uses(RefreshDatabase::class);
 
@@ -136,25 +134,4 @@ function seedMigration(): ImportServerMigration
         'source_server_id' => 42,
         'status' => ImportServerMigration::STATUS_PENDING,
     ]);
-}
-final class InlineSucceedingHandler implements StepHandler
-{
-    public static function key(): string
-    {
-        return 'freeze_snapshot';
-    }
-
-    public function execute(ImportMigrationStep $step): void {}
-}
-final class InlineThrowingHandler implements StepHandler
-{
-    public static function key(): string
-    {
-        return 'freeze_snapshot';
-    }
-
-    public function execute(ImportMigrationStep $step): void
-    {
-        throw new RuntimeException('boom');
-    }
 }

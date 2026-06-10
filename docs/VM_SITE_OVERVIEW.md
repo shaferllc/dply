@@ -1,3 +1,12 @@
+---
+title: "VM site overview"
+slug: vm-site-overview
+category: "Sites & deploys"
+order: 210
+description: "Orients you to dply BYO VM sites with a map of workspace sections, a site-vs-server comparison, and a quick where-do-I task index."
+group: sites
+---
+
 # VM site overview
 
 dply **BYO VM sites** run on your servers with Git deploys, managed webservers, and SSH-backed tooling. The workspace sidebar is grouped by job — **Networking**, **Deploy**, **Runtime**, etc.

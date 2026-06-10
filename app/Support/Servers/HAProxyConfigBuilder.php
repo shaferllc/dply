@@ -19,7 +19,7 @@ final class HAProxyConfigBuilder
      * Bash script that writes the HAProxy config file for a load balancer
      * and reloads the service. Idempotent — safe to re-run when targets change.
      *
-     * @param  array<array{name:string,ip:string,port:int}>  $backends
+     * @param  array<array{name:string,ip:string,port:int,weight?:int,disabled?:bool}>  $backends
      * @param  array<array{protocol:string,listen_port:int,destination_port:int}>  $services
      */
     public static function applyScript(
@@ -72,7 +72,7 @@ BASH;
     }
 
     /**
-     * @param  array<array{name:string,ip:string,port:int}>  $backends
+     * @param  array<array{name:string,ip:string,port:int,weight?:int,disabled?:bool}>  $backends
      * @param  array<array{protocol:string,listen_port:int,destination_port:int}>  $services
      */
     private static function buildConfig(
@@ -111,7 +111,16 @@ BASH;
             }
             foreach ($backends as $j => $be) {
                 $safeName = preg_replace('/[^a-zA-Z0-9_-]/', '_', $be['name']).'_'.$j;
-                $lines[] = "    server {$safeName} {$be['ip']}:{$svc['destination_port']} check inter 10s fall 3 rise 2";
+                $line = "    server {$safeName} {$be['ip']}:{$svc['destination_port']} check inter 10s fall 3 rise 2";
+                // Per-backend weight drives canary traffic shifting; `disabled`
+                // pulls a backend from rotation for a rolling step (drain).
+                if (isset($be['weight'])) {
+                    $line .= ' weight '.(int) $be['weight'];
+                }
+                if (! empty($be['disabled'])) {
+                    $line .= ' disabled';
+                }
+                $lines[] = $line;
             }
             $lines[] = '';
         }

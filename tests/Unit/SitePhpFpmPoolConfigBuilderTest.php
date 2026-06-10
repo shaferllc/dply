@@ -45,6 +45,18 @@ test('builds a dynamic pool with derived spare servers', function () {
     expect($conf)->toContain('request_terminate_timeout = 90s');
 });
 
+test('pool logs the per-request reference for error correlation', function () {
+    [$site, $server] = poolSite(['pm' => 'dynamic', 'max_children' => 20, 'max_requests' => 1000, 'request_terminate_timeout' => 90]);
+
+    $conf = (new SitePhpFpmPoolConfigBuilder())->build($site, $server);
+
+    // The access log carries the REQUEST_ID (set by nginx fastcgi_param) plus an
+    // epoch, so a 5xx reference code resolves to the exact request.
+    expect($conf)->toContain('access.log = '.$site->phpFpmAccessLogPath());
+    expect($conf)->toContain('%{REQUEST_ID}e');
+    expect($conf)->toContain('php_admin_value[error_log] = '.$site->phpFpmPoolErrorLogPath());
+});
+
 test('static pool omits spare-server tuning', function () {
     [$site, $server] = poolSite(['pm' => 'static', 'max_children' => 8]);
 

@@ -1,3 +1,11 @@
+---
+title: "Sites, DNS & deploy"
+slug: sites-and-deploy
+category: "Getting started"
+order: 20
+description: "Describes how sites relate to servers, attaching domains and DNS zones, ACME HTTPS certificates, atomic vs simple VM deploy strategies, and deploy webhooks."
+---
+
 # Sites, DNS & deploy
 
 How sites relate to servers, how domains and certificates fit together, and how deploys run—including webhooks and zero-downtime options.

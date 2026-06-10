@@ -27,8 +27,13 @@ class Members extends Component
     public function mount(Organization $organization): void
     {
         $this->authorize('view', $organization);
-        $this->organization = $organization;
-        $this->refreshOrganization();
+
+        // The route-bound model is already fresh — just eager-load the relations
+        // the view needs, rather than re-querying it via refreshOrganization().
+        $this->organization = $organization->load([
+            'users',
+            'invitations' => fn ($q) => $q->where('expires_at', '>', now()),
+        ]);
     }
 
     protected function refreshOrganization(): void

@@ -1,3 +1,12 @@
+---
+title: "Server cron jobs"
+slug: server-cron
+category: "Servers"
+order: 150
+description: "Define and run scheduled commands on the server crontab, with a job list, run-now over SSH, and a contrast to site-level crons."
+group: servers
+---
+
 # Server cron jobs
 
 The **Cron jobs** section (sidebar **Cron jobs**) defines scheduled commands that run on the **server** crontab — not Laravel scheduler entries.

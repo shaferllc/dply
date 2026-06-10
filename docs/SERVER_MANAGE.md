@@ -1,3 +1,12 @@
+---
+title: "Manage tools"
+slug: server-manage
+category: "Servers"
+order: 280
+description: "Install and upgrade mise-managed runtimes and bundled tools such as PHP, Node, Composer, Git, Docker, and WP-CLI on a server."
+group: servers
+---
+
 # Manage tools
 
 The **Manage** section installs and upgrades **mise**-managed runtimes and bundled tools on the server.

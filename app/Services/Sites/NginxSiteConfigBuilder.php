@@ -412,6 +412,7 @@ server {
 
     location ~ \.php\$ {
         include snippets/fastcgi-php.conf;
+        fastcgi_param REQUEST_ID \$request_id;
         fastcgi_pass unix:{$phpSock};
 {$fastcgiIntercept}{$fcgiEngine}
     }
@@ -666,6 +667,7 @@ NGINX;
 {$auth}        try_files \$uri \$uri/ /index.php?\$query_string;
         location ~ \.php\$ {
             include snippets/fastcgi-php.conf;
+            fastcgi_param REQUEST_ID \$request_id;
             fastcgi_pass unix:{$phpSock};
 {$fcgiEngine}        }
     }

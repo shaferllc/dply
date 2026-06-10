@@ -3,7 +3,9 @@
         @php
             $lock = $this->deployLockInfo;
             $latest = $this->latestDeployment;
-            $inProgress = (bool) $lock || ($latest?->status === 'running');
+            // Stops on a terminal status and only honours the optimistic lock
+            // briefly, so a failed/stuck deploy doesn't spin for the lock TTL.
+            $inProgress = $this->inProgress;
             // A deploy was just queued (lock held) but the worker hasn't created
             // its running record yet — the "latest" is still the previous run.
             // Show a starting placeholder so the old (often failed) timeline

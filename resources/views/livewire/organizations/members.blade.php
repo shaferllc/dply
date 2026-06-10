@@ -26,14 +26,12 @@
 
 <div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <x-organization-shell :organization="$organization" section="members">
+        <x-organization-shell :organization="$organization" section="members" :breadcrumb="[
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
+            ['label' => __('Members'), 'icon' => 'user-group'],
+        ]">
             <x-livewire-validation-errors />
-
-            <x-breadcrumb-trail :items="[
-                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-                ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
-                ['label' => __('Members'), 'icon' => 'user-group'],
-            ]" />
 
             {{-- Hero: positioning + at-a-glance counts. --}}
             <section class="dply-card overflow-hidden">
@@ -52,14 +50,14 @@
                             </div>
                         </div>
                         <div class="mt-4 flex flex-wrap items-center gap-2">
-                            <x-outline-link href="{{ route('docs.markdown', ['slug' => 'org-roles-and-limits']) }}" wire:navigate>
+                            <x-docs-link slug="org-members">
+                                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                                {{ __('Members guide') }}
+                            </x-docs-link>
+                            <x-docs-link slug="org-roles-and-limits">
                                 <x-heroicon-o-queue-list class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                                 {{ __('Roles & limits') }}
-                            </x-outline-link>
-                            <x-outline-link href="{{ route('docs.index') }}" wire:navigate>
-                                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                {{ __('Documentation') }}
-                            </x-outline-link>
+                            </x-docs-link>
                             <x-outline-link href="{{ route('organizations.teams', $organization) }}" wire:navigate>
                                 <x-heroicon-o-rectangle-group class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                                 {{ __('Teams') }}

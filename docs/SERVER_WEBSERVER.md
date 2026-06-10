@@ -1,3 +1,12 @@
+---
+title: "Webserver workspace"
+slug: server-webserver
+category: "Servers"
+order: 430
+description: "Controls a server's primary reverse proxy (Nginx, Caddy, Apache, or OpenLiteSpeed) with health checks, engine switching, and config editing."
+group: servers
+---
+
 # Webserver workspace
 
 The **Webserver** section controls the primary reverse proxy on the server — Nginx, Caddy, Apache, or OpenLiteSpeed.

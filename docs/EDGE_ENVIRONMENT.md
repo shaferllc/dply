@@ -1,3 +1,12 @@
+---
+title: "Edge environment variables"
+slug: edge-environment
+category: "Edge"
+order: 80
+description: "How to add, update, and remove production-scoped encrypted environment variables for an Edge site and when those changes take effect."
+group: edge
+---
+
 # Edge environment variables
 
 The **Environment** section stores **production-scoped secrets** for your Edge site. Values are encrypted at rest, injected into the build container at deploy time, and exposed as `secret_text` bindings on middleware / SSR workers.

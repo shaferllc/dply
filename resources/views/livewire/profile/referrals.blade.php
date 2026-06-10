@@ -11,11 +11,13 @@
 @endphp
 
 <div>
-    <x-breadcrumb-trail :items="[
-        ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-        ['label' => __('Profile'), 'href' => route('settings.profile'), 'icon' => 'user-circle'],
-        ['label' => __('Referrals'), 'icon' => 'gift'],
-    ]" />
+    @push('breadcrumbs')
+        <x-breadcrumb-trail :items="[
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => __('Profile'), 'href' => route('settings.profile'), 'icon' => 'user-circle'],
+            ['label' => __('Referrals'), 'icon' => 'gift'],
+        ]" />
+    @endpush
 
     {{-- Hero: positioning + at-a-glance referral stats. --}}
     <section class="dply-card overflow-hidden">

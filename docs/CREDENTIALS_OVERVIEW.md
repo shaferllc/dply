@@ -1,3 +1,11 @@
+---
+title: "Server providers vs Git"
+slug: credentials
+category: "Getting started"
+order: 30
+description: "Explains why dply separates infrastructure server provider tokens from Git source control OAuth, where each lives, and a mental model for when to use which."
+---
+
 # Server providers vs Git (source control)
 
 dply separates **infrastructure** credentials from **source code** access. Keeping them apart avoids mixing DigitalOcean tokens with GitHub OAuth and makes permissions easier to reason about.

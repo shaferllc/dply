@@ -1,3 +1,12 @@
+---
+title: "Site deploy"
+slug: vm-site-deploy
+category: "Sites & deploys"
+order: 130
+description: "How the Deploy section controls when and how code reaches a site, covering deploy now, atomic vs simple strategy, webhooks, deploy hooks, and CLI linking."
+group: sites
+---
+
 # Site deploy
 
 The **Deploy** section controls **how** and **when** code reaches the server.

@@ -12,6 +12,7 @@ final class DocChunkExtractor
 {
     public function __construct(
         private readonly MarkdownDocRenderer $renderer,
+        private readonly DocsManifest $manifest,
     ) {}
 
     /**
@@ -38,29 +39,9 @@ final class DocChunkExtractor
 
     private function resolvePath(string $slug): string
     {
-        $pages = config('docs.markdown', []);
-        $page = $pages[$slug] ?? null;
-
-        if (is_array($page) && is_string($page['file'] ?? null) && $page['file'] !== '') {
-            $path = base_path('docs/'.$page['file']);
-            if (File::isFile($path)) {
-                return $path;
-            }
-        }
-
-        $vmGuides = config('docs-vm-guides', []);
-        $vmPage = $vmGuides[$slug] ?? null;
-        if (is_array($vmPage) && is_string($vmPage['file'] ?? null) && $vmPage['file'] !== '') {
-            $path = base_path('docs/'.$vmPage['file']);
-            if (File::isFile($path)) {
-                return $path;
-            }
-        }
-
-        $virtual = config('docs.virtual', []);
-        $virtualPage = $virtual[$slug] ?? null;
-        if (is_array($virtualPage) && is_string($virtualPage['file'] ?? null) && $virtualPage['file'] !== '') {
-            $path = base_path('docs/'.$virtualPage['file']);
+        $doc = $this->manifest->find($slug);
+        if (is_array($doc) && ! empty($doc['file'])) {
+            $path = base_path('docs/'.$doc['file']);
             if (File::isFile($path)) {
                 return $path;
             }
@@ -71,22 +52,9 @@ final class DocChunkExtractor
 
     private function resolveTitle(string $slug): string
     {
-        $pages = config('docs.markdown', []);
-        $page = $pages[$slug] ?? null;
-        if (is_array($page) && is_string($page['title'] ?? null) && $page['title'] !== '') {
-            return $page['title'];
-        }
-
-        $vmGuides = config('docs-vm-guides', []);
-        $vmPage = $vmGuides[$slug] ?? null;
-        if (is_array($vmPage) && is_string($vmPage['title'] ?? null) && $vmPage['title'] !== '') {
-            return $vmPage['title'];
-        }
-
-        $virtual = config('docs.virtual', []);
-        $virtualPage = $virtual[$slug] ?? null;
-        if (is_array($virtualPage) && is_string($virtualPage['title'] ?? null) && $virtualPage['title'] !== '') {
-            return $virtualPage['title'];
+        $doc = $this->manifest->find($slug);
+        if (is_array($doc) && is_string($doc['title'] ?? null) && $doc['title'] !== '') {
+            return $doc['title'];
         }
 
         return Str::headline(str_replace('-', ' ', $slug));

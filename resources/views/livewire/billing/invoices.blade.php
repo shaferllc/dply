@@ -10,14 +10,12 @@
 
 <div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <x-organization-shell :organization="$organization" section="invoices">
+        <x-organization-shell :organization="$organization" section="invoices" :breadcrumb="[
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
+            ['label' => __('Invoices'), 'icon' => 'document-text'],
+        ]">
             <x-livewire-validation-errors />
-
-            <x-breadcrumb-trail :items="[
-                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-                ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
-                ['label' => __('Invoices'), 'icon' => 'document-text'],
-            ]" />
 
             {{-- Hero: positioning + at-a-glance counts. Cross-links into the
                  sibling billing screens so an admin can pivot quickly. --}}

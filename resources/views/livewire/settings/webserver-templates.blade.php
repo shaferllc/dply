@@ -19,14 +19,12 @@
 
 <div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <x-organization-shell :organization="$organization" :section="$orgShellSection ?? 'webserver'">
+        <x-organization-shell :organization="$organization" :section="$orgShellSection ?? 'webserver'" :breadcrumb="[
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
+            ['label' => __('Webserver templates'), 'icon' => 'server'],
+        ]">
             <x-livewire-validation-errors />
-
-            <x-breadcrumb-trail :items="[
-                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-                ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
-                ['label' => __('Webserver templates'), 'icon' => 'server'],
-            ]" />
 
             {{-- Hero card. Stat tiles count templates total + templates by
                  the default nginx engine so an admin sees coverage at a

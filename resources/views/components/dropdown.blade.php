@@ -1,10 +1,15 @@
 @props(['align' => 'right', 'width' => '48', 'contentClasses' => 'py-1.5'])
 
 @php
-$width = match ($width) {
+// A width like "24rem"/"384px" is applied as an inline style so it never
+// depends on whether that arbitrary Tailwind class made it into the build.
+// Anything else is treated as a utility class (e.g. "w-64", "48" => "w-48").
+$isCssWidth = (bool) preg_match('/^\d+(\.\d+)?(rem|px|em|%|vw)$/', (string) $width);
+$widthClass = $isCssWidth ? '' : match ($width) {
     '48' => 'w-48',
     default => $width,
 };
+$widthStyle = $isCssWidth ? "width: {$width};" : '';
 @endphp
 
 {{--
@@ -16,6 +21,7 @@ $width = match ($width) {
     class="relative inline-flex"
     x-data="{
         open: false,
+        uid: 'dd-' + Math.random().toString(36).slice(2),
         align: @js($align),
         position: { top: 0, left: 0 },
         compute() {
@@ -46,6 +52,8 @@ $width = match ($width) {
         toggle() {
             this.open = ! this.open;
             if (this.open) {
+                // Let every other dropdown know to close; they compare against our root element.
+                window.dispatchEvent(new CustomEvent('dropdown-open', { detail: this.uid }));
                 this.$nextTick(() => this.compute());
             }
         },
@@ -55,6 +63,7 @@ $width = match ($width) {
     }"
     @@click.outside="close()"
     @@close.stop="close()"
+    @@dropdown-open.window="$event.detail !== uid && close()"
 >
     <div x-ref="triggerWrap" @@click.stop="toggle()">
         {{ $trigger }}
@@ -75,10 +84,13 @@ $width = match ($width) {
             @@scroll.window.passive="open && compute()"
             @@resize.window.passive="open && compute()"
             x-bind:style="`top: ${position.top}px; left: ${position.left}px;`"
-            class="fixed z-[80] {{ $width }}"
+            class="fixed z-[80] {{ $widthClass }}"
             style="display: none;"
         >
-            <div class="dply-dropdown-panel {{ $contentClasses }}">
+            {{-- Width lives on the panel, not the positioned wrapper above: Alpine's
+                 x-bind:style rewrites the wrapper's style for top/left, which would
+                 strip an inline width. The fixed wrapper shrink-wraps to this panel. --}}
+            <div class="dply-dropdown-panel {{ $contentClasses }}" @style([$widthStyle])>
                 {{ $content }}
             </div>
         </div>

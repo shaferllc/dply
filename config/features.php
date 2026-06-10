@@ -235,6 +235,13 @@ return [
         // viewer + app-log stream). Real flag on, preview off.
         'site_logs' => env('FEATURE_WORKSPACE_SITE_LOGS', true),
         'site_logs_preview' => env('FEATURE_WORKSPACE_SITE_LOGS_PREVIEW', false),
+        // Off by default: multi-backend "Backends" tab (load-balanced web
+        // backends; the substrate under Rolling/Canary deploys). Provisions real
+        // paid servers + an LB, and the path is not yet validated end-to-end, so
+        // it stays gated until enabled per env/org.
+        // exit: ship once add-backend → LB provisioning → rolling/canary verified on real infra
+        'site_backends' => env('FEATURE_WORKSPACE_SITE_BACKENDS', false),
+        'site_backends_preview' => env('FEATURE_WORKSPACE_SITE_BACKENDS_PREVIEW', false),
         // Live: per-site notifications page (channel × event subscriptions, integration
         // webhooks, webhook IP security) plus the Errors → Notifications tab. Real flag
         // on, preview off.
@@ -286,15 +293,16 @@ return [
         // exit: ship after a curated v1 marketplace catalog is approved
         'marketplace' => env('FEATURE_SURFACE_MARKETPLACE', false),
         // exit: ship as the org-substitute UX for solo users with 3+ servers
-        'projects' => env('FEATURE_SURFACE_PROJECTS', false),
+        'projects' => env('FEATURE_SURFACE_PROJECTS', true),
         // exit: ship once one-off script execution has audit + rollback story
         'scripts' => env('FEATURE_SURFACE_SCRIPTS', false),
         // exit: ship as a standalone product launch with its own positioning
         'status_pages' => env('FEATURE_SURFACE_STATUS_PAGES', false),
         // exit: ship when Edge build → R2 → CF Worker loop is green in staging
         'edge' => false,
-        // exit: ship the managed realtime (Reverb/Pusher-compatible) resource
-        // once the realtime Worker + KV provisioning + billing are validated.
+        // Gates the managed (dply-hosted) option of a site's broadcasting
+        // binding — the billed Cloudflare relay path. BYO broadcasting stays
+        // available regardless. There is no standalone /realtime surface.
         'realtime' => env('FEATURE_SURFACE_REALTIME', false),
         // exit: ship once OpenWhisk multi-language adapters + billing are GA
         'serverless' => false,

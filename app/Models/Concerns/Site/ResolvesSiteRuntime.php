@@ -428,6 +428,47 @@ trait ResolvesSiteRuntime
         return ! in_array((string) ($site->runtime ?? ''), ['php', 'static'], true);
     }
 
+    /**
+     * The site's backend-group config (multi-backend behind a balancer):
+     * {enabled, substrate: haproxy|hetzner, load_balancer_id, desired_count}.
+     * Stored on meta; the site_backends rows are the source of truth for
+     * membership. See docs/MULTI_BACKEND_SITES.md.
+     *
+     * @return array<string, mixed>
+     */
+    public function backendGroup(): array
+    {
+        $group = data_get($this->meta, 'backend_group');
+
+        return is_array($group) ? $group : [];
+    }
+
+    /**
+     * Whether this site is served from ≥2 backends behind a balancer — the gate
+     * for rolling/canary. True only when the group is enabled AND it actually has
+     * at least two active backends (never offer a multi-backend method to a site
+     * that has only the primary up).
+     */
+    public function isMultiBackend(): bool
+    {
+        if (! (bool) ($this->backendGroup()['enabled'] ?? false)) {
+            return false;
+        }
+
+        return $this->backends()
+            ->where('state', \App\Models\SiteBackend::STATE_ACTIVE)
+            ->count() >= 2;
+    }
+
+    /**
+     * Whether the site's balancer substrate supports per-backend weights — the
+     * gate for canary (weighted shift). HAProxy yes; Hetzner cloud LB no.
+     */
+    public function backendSubstrateSupportsWeights(): bool
+    {
+        return ($this->backendGroup()['substrate'] ?? null) === 'haproxy';
+    }
+
     public function usesContainerRuntime(): bool
     {
         return $this->type === SiteType::Container

@@ -1,3 +1,12 @@
+---
+title: "Edge domains"
+slug: edge-domains
+category: "Edge"
+order: 60
+description: "How to use an Edge site's default hostname, attach and verify custom domains via CNAME, manage SSL, and handle BYO Cloudflare and previews."
+group: edge
+---
+
 # Edge domains
 
 The **Domains** section controls how visitors reach your Edge site.
