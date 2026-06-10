@@ -1,11 +1,16 @@
 @php
     $latest = $latestDeployment ?? null;
     $isRunning = $latest && $latest->status === 'running';
-    // A deploy is "in progress" whenever the latest run is running or the
-    // deploy lock is held (e.g. a queued run on a worker). Drive the deploy
-    // button off this so it reads "Deploying…" for the whole run, not just
-    // the brief request that dispatches it.
-    $deployInProgress = $isRunning || (bool) ($this->deployLockInfo ?? null);
+    // A deploy is "in progress" while the latest run is running, or the deploy
+    // lock is held AND no terminal run has landed since it was taken. Driving
+    // the button off raw lock presence kept it spinning "Deploying…" for the
+    // full 600s lock TTL after a deploy finished — a self-deploy can kill the
+    // worker that runs the lock-cleanup `finally` before it clears the marker.
+    // The trait helper stops as soon as this run lands terminal. (Guarded so a
+    // partial rendered by a component without the trait still falls back.)
+    $deployInProgress = method_exists($this, 'deployIsInProgress')
+        ? $this->deployIsInProgress($latest)
+        : ($isRunning || (bool) ($this->deployLockInfo ?? null));
     // "Deployed commit" must reflect the code actually live — the last SUCCESSFUL
     // deploy — not the latest attempt (which may be skipped/failed with no SHA,
     // the source of the confusing "No deploys yet" when deploys clearly exist).
@@ -16,7 +21,7 @@
     $shortSha = $deployedSha ? \Illuminate\Support\Str::limit($deployedSha, 7, '') : null;
     $totalDurationMs = $latest ? $latest->phaseTotalDurationMs() : 0;
     // Phase timeline derived from the site's pipeline (Clone → Build →
-    // Activate → Release) overlaid with this deployment's recorded steps.
+    // Release → Activate) overlaid with this deployment's recorded steps.
     $timelinePhases = \App\Support\Sites\SiteDeployTimeline::forDeployment($site, $latest);
 
     // Env vars the last deploy was blocked on (recorded by the deploy job's

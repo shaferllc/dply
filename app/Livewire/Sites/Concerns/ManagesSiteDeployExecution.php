@@ -94,6 +94,43 @@ trait ManagesSiteDeployExecution
         $this->toastSuccess(__('Deploy lock cleared. If a worker is still running, stop it on the queue host; otherwise you can deploy again.'));
     }
 
+    /**
+     * Whether the deploy button should show the spinning "Deploying…" state.
+     *
+     * True only while a run is genuinely live: the latest deployment is RUNNING,
+     * or the optimistic deploy lock is still held AND no terminal run has landed
+     * since it was taken. The lock is a 600s marker set on click (deployNow); a
+     * self-deploy can kill the worker that runs RunSiteDeploymentJob's
+     * lock-cleanup `finally` — it bounces its own Horizon/queue workers
+     * mid-deploy — leaving the lock set for the full TTL. Keying the button off
+     * raw lock presence then spins "Deploying…" for ~10 minutes after the deploy
+     * has already succeeded or failed. So we stop as soon as THIS run lands a
+     * terminal status, and otherwise honour the lock only within the brief
+     * queue-pickup window (before the worker records the running deployment).
+     */
+    public function deployIsInProgress(?SiteDeployment $latest): bool
+    {
+        if ($latest !== null && $latest->status === SiteDeployment::STATUS_RUNNING) {
+            return true;
+        }
+
+        $lock = $this->deployLockInfo;
+        $startedAt = isset($lock['started_at']) ? \Illuminate\Support\Carbon::parse($lock['started_at']) : null;
+        if ($startedAt === null) {
+            return false;
+        }
+
+        $terminalSinceLock = $latest !== null
+            && in_array($latest->status, [
+                SiteDeployment::STATUS_FAILED,
+                SiteDeployment::STATUS_SUCCESS,
+                SiteDeployment::STATUS_SKIPPED,
+            ], true)
+            && $latest->created_at?->greaterThanOrEqualTo($startedAt->subSeconds(2));
+
+        return ! $terminalSinceLock && $startedAt->greaterThan(now()->subSeconds(90));
+    }
+
     public function confirmRollbackRelease(int|string $releaseId): void
     {
         $this->authorize('update', $this->site);
