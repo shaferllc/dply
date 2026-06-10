@@ -29,6 +29,7 @@ use App\Services\Sites\DotEnvFileWriter;
 use App\Services\Storage\ObjectStorageBucketProvisioner;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Laravel\Pennant\Feature;
 use RuntimeException;
 
 /**
@@ -1908,6 +1909,14 @@ class SiteBindingManager
      */
     private function attachManagedBroadcasting(Site $site, array $params): SiteBinding
     {
+        // The managed (dply-hosted, billed) relay is gated behind surface.realtime.
+        // BYO broadcasting stays available regardless. Guard the server side so the
+        // billed path can't be reached via a crafted request when the flag is off.
+        $org = Organization::query()->find($site->organization_id);
+        if (! $org instanceof Organization || ! Feature::for($org)->active('surface.realtime')) {
+            throw new InvalidArgumentException(__('Managed broadcasting is not available. Bring your own broadcasting credentials instead.'));
+        }
+
         if ((bool) ($params['provision'] ?? false)) {
             return $this->provisionManagedBroadcasting($site, $params);
         }

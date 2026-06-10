@@ -1,3 +1,11 @@
+---
+title: "Local development"
+slug: local-development
+category: "Getting started"
+order: 40
+description: "How to run dply locally against a real database, run queue workers, create DigitalOcean servers, and expose inbound webhooks via a tunnel."
+---
+
 # Local development (BYO)
 
 Use this guide to run Dply on your machine against a real database, process provisioning queues, and (optionally) create servers on DigitalOcean or receive inbound webhooks via a tunnel.

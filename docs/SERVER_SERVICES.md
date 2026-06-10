@@ -1,3 +1,12 @@
+---
+title: "Services inventory"
+slug: server-services
+category: "Servers"
+order: 360
+description: "An inventory of systemd units and long-running processes dply tracks on the server, with state, boot-enablement, and start/stop/restart actions."
+group: servers
+---
+
 # Services inventory
 
 The **Services** section lists systemd units and long-running processes dply knows about on the server.

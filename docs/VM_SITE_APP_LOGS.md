@@ -1,3 +1,12 @@
+---
+title: "App logs (dply Logs)"
+slug: vm-site-app-logs
+category: "Sites & deploys"
+order: 180
+description: "Explains dply's built-in App logs destination that streams your application's own log lines off the server via a TLS drain into the site's Logs panel."
+group: sites
+---
+
 # App logs (dply Logs)
 
 **App logs** show your application's own log lines — every `Log::info()`,

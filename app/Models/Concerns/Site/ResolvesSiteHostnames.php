@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models\Concerns\Site;
 
 use App\Livewire\Sites\Settings;
+use App\Models\ServerWildcardCertificate;
 use App\Models\Site;
 use App\Models\SiteDomain;
 use App\Models\SitePreviewDomain;
@@ -86,6 +87,53 @@ trait ResolvesSiteHostnames
 
         return $this->previewDomains->firstWhere('is_primary', true)
             ?? $this->previewDomains->first();
+    }
+
+    /**
+     * The dply-managed testing zone this site's preview hostname lives on
+     * (e.g. on-dply.com), or null when the site has no testing hostname.
+     * Reads the primary preview domain's zone first, falling back to the
+     * provisioner's stored meta['testing_hostname']['zone'].
+     */
+    public function testingZone(): ?string
+    {
+        $previewZone = $this->primaryPreviewDomain()?->zone;
+        if (is_string($previewZone) && trim($previewZone) !== '') {
+            return strtolower(trim($previewZone));
+        }
+
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $zone = $meta['testing_hostname']['zone'] ?? null;
+
+        return is_string($zone) && trim($zone) !== '' ? strtolower(trim($zone)) : null;
+    }
+
+    /**
+     * The installed per-server wildcard certificate that secures this site's
+     * testing hostname (e.g. *.on-dply.com on this site's server), or null.
+     */
+    public function coveringServerWildcard(): ?ServerWildcardCertificate
+    {
+        $zone = $this->testingZone();
+        if ($zone === null || $this->server_id === null) {
+            return null;
+        }
+
+        return ServerWildcardCertificate::query()
+            ->where('server_id', $this->server_id)
+            ->where('zone', $zone)
+            ->where('status', ServerWildcardCertificate::STATUS_ACTIVE)
+            ->whereNotNull('last_installed_at')
+            ->first();
+    }
+
+    /**
+     * True when an installed server wildcard already secures the testing
+     * hostname — meaning the vhost can emit :443 with no per-site cert.
+     */
+    public function isCoveredByServerWildcard(): bool
+    {
+        return $this->coveringServerWildcard() !== null;
     }
 
     public function sslDomainHostnames(): Collection

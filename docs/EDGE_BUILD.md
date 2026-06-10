@@ -1,3 +1,12 @@
+---
+title: "Edge build"
+slug: edge-build
+category: "Edge"
+order: 70
+description: "How to configure how dply compiles an Edge repo, including build command, output directory, SPA fallback, dply.yaml config, and deploy retention."
+group: edge
+---
+
 # Edge build
 
 The **Build** section is where you configure **how dply compiles your repo** and what gets uploaded after each deploy. It does **not** cover webhooks, CDN delivery, env vars, or preview passwords — those live in sibling sidebar sections (see **Edge overview → Workspace sections**).

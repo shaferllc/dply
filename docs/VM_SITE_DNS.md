@@ -1,3 +1,12 @@
+---
+title: "Site DNS automation"
+slug: vm-site-dns
+category: "Sites & deploys"
+order: 140
+description: "How the DNS section picks a provider credential and apex zone so dply can manage preview hostnames, ACME DNS-01 challenges, and primary A/CNAME records."
+group: sites
+---
+
 # Site DNS automation
 
 The **DNS** section picks the **server provider credential** used for DNS automation on this site.

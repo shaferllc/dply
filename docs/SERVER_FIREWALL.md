@@ -1,3 +1,12 @@
+---
+title: "Firewall"
+slug: server-firewall
+category: "Servers"
+order: 220
+description: "Manage UFW firewall rules, templates, and status on a server host, with queued remote apply and guidance to avoid locking out SSH access."
+group: servers
+---
+
 # Firewall
 
 The **Firewall** section manages **UFW** (or equivalent) rules on the server host.

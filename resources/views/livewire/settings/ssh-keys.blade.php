@@ -16,11 +16,13 @@
 <div>
     <x-livewire-validation-errors />
 
-    <x-breadcrumb-trail :items="[
-        ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-        ['label' => __('Profile'), 'href' => route('settings.profile'), 'icon' => 'user-circle'],
-        ['label' => __('SSH keys'), 'icon' => 'key'],
-    ]" />
+    @push('breadcrumbs')
+        <x-breadcrumb-trail :items="[
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => __('Profile'), 'href' => route('settings.profile'), 'icon' => 'user-circle'],
+            ['label' => __('SSH keys'), 'icon' => 'key'],
+        ]" />
+    @endpush
 
     {{-- Hero: positioning + at-a-glance key counts. --}}
     <section class="dply-card overflow-hidden">

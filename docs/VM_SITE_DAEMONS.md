@@ -1,3 +1,12 @@
+---
+title: "Site daemons"
+slug: vm-site-daemons
+category: "Sites & deploys"
+order: 100
+description: "Manage Supervisor programs scoped to a site such as queue workers and websocket servers, with start/stop/restart controls and streaming output."
+group: sites
+---
+
 # Site daemons
 
 The **Daemons** section manages **Supervisor programs** scoped to this site — queue workers, websocket servers, and other long-running processes supervised by `supervisord`.

@@ -1,3 +1,12 @@
+---
+title: "Site settings"
+slug: vm-site-settings
+category: "Sites & deploys"
+order: 270
+description: "Edit core site metadata, choose atomic or simple deploy strategy, suspend the site, and reach notification routing."
+group: sites
+---
+
 # Site settings
 
 The **Settings** section holds core site metadata and high-impact toggles.

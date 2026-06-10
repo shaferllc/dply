@@ -1,3 +1,12 @@
+---
+title: "Site environment variables"
+slug: vm-site-environment
+category: "Sites & deploys"
+order: 150
+description: "How the Environment section stores key/value config injected on deploy, when changes take effect, and how dply.yaml env declarations sync with the dashboard."
+group: sites
+---
+
 # Site environment variables
 
 The **Environment** section stores **key/value config** injected on deploy and available to the app process.

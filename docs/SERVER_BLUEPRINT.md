@@ -1,3 +1,12 @@
+---
+title: "Server blueprint"
+slug: server-blueprint
+category: "Servers"
+order: 90
+description: "Capture a server's configuration (runtimes, webserver, firewall, cron) as a reusable org-level template that pre-fills the create-server wizard."
+group: servers
+---
+
 # Server blueprint
 
 The **Blueprint** section captures and reapplies server configuration templates — packages, webserver choice, and provision options — when creating similar hosts.

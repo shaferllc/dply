@@ -1,3 +1,12 @@
+---
+title: "Site cron jobs"
+slug: vm-site-cron
+category: "Sites & deploys"
+order: 90
+description: "Define site-scoped crontab entries such as schedule:run or custom scripts, sync repo-defined jobs from dply.yaml, and test jobs with run-now output."
+group: sites
+---
+
 # Site cron jobs
 
 The **Cron jobs** section defines **site-scoped** crontab entries — typically `artisan schedule:run`, Rails runners, or custom scripts in the deploy path.

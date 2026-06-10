@@ -1,3 +1,11 @@
+---
+title: "Billing & plans"
+slug: billing-and-plans
+category: "Billing"
+order: 10
+description: "Details the Standard usage-based plan with per-server tiers, managed product fees, Edge delivery metering, annual discount, 14-day trial, Enterprise, and Stripe setup."
+---
+
 # Billing & plans
 
 How **Standard** subscriptions, the 14-day trial, and **Enterprise** deals fit together in dply.

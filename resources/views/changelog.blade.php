@@ -23,26 +23,7 @@
     <x-site-header active="changelog" />
 
     <main>
-        {{-- Hero --}}
-        <section class="relative pt-16 pb-14 sm:pt-24 sm:pb-20 px-4 sm:px-6 lg:px-8">
-            <div class="mx-auto max-w-3xl text-center">
-                <p class="inline-flex items-center gap-2 rounded-full border border-brand-sage/25 bg-white/60 px-4 py-1.5 text-xs font-semibold tracking-wide text-brand-forest uppercase">
-                    <span class="relative flex h-1.5 w-1.5">
-                        <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-gold opacity-60"></span>
-                        <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-brand-gold"></span>
-                    </span>
-                    Shipping continuously
-                </p>
-                <h1 class="mt-8 text-4xl font-bold tracking-tight text-brand-ink sm:text-5xl">
-                    What's new in {{ config('app.name') }}
-                </h1>
-                <p class="mt-6 text-lg text-brand-moss leading-relaxed">
-                    Notable features, improvements, and fixes — in the order they shipped.
-                </p>
-            </div>
-        </section>
-
-        {{-- Entries --}}
+        {{-- Hero + entries are rendered after the data/computation block below. --}}
         {{--
             HOW TO ADD AN ENTRY
             Copy a block below and paste it at the top of the $entries array.
@@ -55,6 +36,13 @@
         --}}
         @php
             $entries = [
+                [
+                    'date'    => 'June 10, 2026',
+                    'tags'    => ['new'],
+                    'title'   => 'Multi-Backend Sites With Rolling And Canary Deploys',
+                    'summary' => 'Sites can now run across multiple load-balanced web backends, unlocking rolling and canary deployment methods with per-target traffic weighting and draining.',
+                    'items'   => [],
+                ],
                 [
                     'date'    => 'June 9, 2026',
                     'tags'    => ['improved'],
@@ -731,94 +719,193 @@ Unified Button And Binding UI',
             ];
 
             $tagStyles = [
-                'new'      => 'bg-brand-forest/10 text-brand-forest',
-                'improved' => 'bg-brand-sage/20 text-brand-sage/90',
+                'new'      => 'bg-brand-forest/10 text-brand-forest ring-1 ring-inset ring-brand-forest/15',
+                'improved' => 'bg-brand-sage/15 text-brand-forest ring-1 ring-inset ring-brand-sage/25',
                 'fixed'    => 'bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200/70',
                 'security' => 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200/70',
             ];
             $tagLabels = [
-                'new'      => 'New',
-                'improved' => 'Improved',
-                'fixed'    => 'Fixed',
-                'security' => 'Security',
+                'new' => 'New', 'improved' => 'Improved', 'fixed' => 'Fixed', 'security' => 'Security',
             ];
+            // Left accent rail colour, chosen by the entry's highest-priority tag.
+            $tagAccent = [
+                'security' => 'bg-red-500',
+                'new'      => 'bg-brand-forest',
+                'improved' => 'bg-brand-sage',
+                'fixed'    => 'bg-amber-400',
+            ];
+            $tagPriority = ['security', 'new', 'improved', 'fixed'];
 
-            // Group the full (newest-first) list by date, then pack whole date
-            // groups into pages targeting ~12 entries each — a date is never
-            // split across a page boundary (a single oversized date gets its
-            // own page).
-            $perPage = 12;
+            // Inline markdown: escape, then render `code` spans.
+            $inline = function (string $s): string {
+                return preg_replace(
+                    '/`([^`]+)`/',
+                    '<code class="rounded bg-brand-ink/[0.06] px-1.5 py-0.5 text-[0.85em] font-medium text-brand-forest">$1</code>',
+                    e($s)
+                );
+            };
 
-            $byDate = [];
+            // Group entries by month (input is already newest-first) and tally
+            // per-tag counts for the live filter, the rail, and month headers.
+            $grandTotal   = count($entries);
+            $globalCounts = ['new' => 0, 'improved' => 0, 'fixed' => 0, 'security' => 0];
+            $months       = [];
             foreach ($entries as $entry) {
-                $byDate[$entry['date']][] = $entry;
-            }
-
-            $pages   = [];
-            $current = [];
-            $count   = 0;
-            foreach ($byDate as $date => $dateEntries) {
-                if ($count > 0 && $count + count($dateEntries) > $perPage) {
-                    $pages[] = $current;
-                    $current = [];
-                    $count   = 0;
+                $c   = \Illuminate\Support\Carbon::parse($entry['date']);
+                $key = $c->format('Y-m');
+                if (! isset($months[$key])) {
+                    $months[$key] = [
+                        'id'      => 'm-' . $key,
+                        'label'   => $c->format('F Y'),
+                        'short'   => $c->format('M Y'),
+                        'entries' => [],
+                        'total'   => 0,
+                        'counts'  => ['new' => 0, 'improved' => 0, 'fixed' => 0, 'security' => 0],
+                        'tags'    => [],
+                    ];
                 }
-                $current[$date] = $dateEntries;
-                $count += count($dateEntries);
-            }
-            if ($current !== []) {
-                $pages[] = $current;
+                $entry['day']     = $c->format('M j');
+                $entry['primary'] = collect($tagPriority)->first(fn ($t) => in_array($t, $entry['tags'], true));
+                $months[$key]['entries'][] = $entry;
+                $months[$key]['total']++;
+                foreach ($entry['tags'] as $t) {
+                    $globalCounts[$t]           = ($globalCounts[$t] ?? 0) + 1;
+                    $months[$key]['counts'][$t] = ($months[$key]['counts'][$t] ?? 0) + 1;
+                    $months[$key]['tags'][$t]   = true;
+                }
             }
 
-            $lastPage = max(1, count($pages));
-            $page     = max(1, min((int) request()->query('page', 1), $lastPage));
-            $grouped  = $pages[$page - 1] ?? [];
-
-            $pageLink = fn ($p) => $p <= 1 ? route('changelog') : route('changelog') . '?page=' . $p;
+            // Filter pills: only tags that actually appear, in canonical order.
+            $filterTags   = array_values(array_filter($tagPriority, fn ($t) => ($globalCounts[$t] ?? 0) > 0));
+            $alpineTotals = json_encode(['all' => $grandTotal] + $globalCounts);
         @endphp
 
-        <section class="px-4 pb-24 sm:px-6 lg:px-8">
-            <div class="mx-auto max-w-3xl">
-                <div class="relative">
-                    {{-- Vertical timeline line --}}
-                    <div class="absolute left-0 top-0 bottom-0 hidden w-px bg-gradient-to-b from-brand-ink/15 via-brand-ink/8 to-transparent sm:block" aria-hidden="true"></div>
+        <div x-data="{
+            filter: 'all',
+            totals: {{ $alpineTotals }},
+            get visible() { return this.totals[this.filter] ?? 0; },
+            has(tags) { return this.filter === 'all' || (tags !== '' && tags.split(',').includes(this.filter)); },
+        }">
+            {{-- Hero --}}
+            <section class="relative px-4 pt-16 pb-10 sm:px-6 sm:pt-24 lg:px-8">
+                <div class="mx-auto max-w-3xl text-center">
+                    <p class="inline-flex items-center gap-2 rounded-full border border-brand-sage/25 bg-white/60 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand-forest">
+                        <span class="relative flex h-1.5 w-1.5">
+                            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-gold opacity-60"></span>
+                            <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-brand-gold"></span>
+                        </span>
+                        Shipping continuously
+                    </p>
+                    <h1 class="mt-8 text-4xl font-bold tracking-tight text-brand-ink sm:text-5xl">
+                        What's new in {{ config('app.name') }}
+                    </h1>
+                    <p class="mt-5 text-lg leading-relaxed text-brand-moss">
+                        Every feature, improvement, and fix — in the order it shipped.
+                    </p>
 
-                    <div class="space-y-12 sm:pl-8">
-                        @foreach ($grouped as $date => $dateEntries)
-                            <section>
-                                {{-- Date header --}}
-                                <div class="relative mb-5">
-                                    <span class="absolute -left-[calc(2rem+0.375rem)] top-1 hidden h-3 w-3 rounded-full bg-brand-sage ring-4 ring-brand-sage/15 sm:block" aria-hidden="true"></span>
-                                    <h2 class="text-sm font-semibold uppercase tracking-wide text-brand-forest">{{ $date }}</h2>
+                    {{-- Stat chips --}}
+                    @php
+                        $stats = [
+                            ['label' => 'Updates',  'value' => $grandTotal,            'tone' => 'text-brand-ink'],
+                            ['label' => 'New',      'value' => $globalCounts['new'],      'tone' => 'text-brand-forest'],
+                            ['label' => 'Improved', 'value' => $globalCounts['improved'], 'tone' => 'text-brand-sage'],
+                            ['label' => 'Fixed',    'value' => $globalCounts['fixed'],    'tone' => 'text-amber-600'],
+                        ];
+                    @endphp
+                    <dl class="mx-auto mt-10 grid max-w-xl grid-cols-2 gap-3 sm:grid-cols-4">
+                        @foreach ($stats as $stat)
+                            <div class="rounded-2xl border border-brand-ink/10 bg-white/70 px-4 py-3 text-center backdrop-blur-sm">
+                                <dd class="text-2xl font-bold tabular-nums {{ $stat['tone'] }}">{{ $stat['value'] }}</dd>
+                                <dt class="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ $stat['label'] }}</dt>
+                            </div>
+                        @endforeach
+                    </dl>
+                </div>
+            </section>
+
+            {{-- Filter pills --}}
+            <div class="px-4 sm:px-6 lg:px-8">
+                <div class="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-2">
+                    <button type="button" @click="filter='all'"
+                        :class="filter==='all' ? 'bg-brand-forest text-white shadow-sm' : 'bg-white/70 text-brand-moss hover:bg-white'"
+                        class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 px-4 py-1.5 text-sm font-semibold transition-colors">
+                        All <span class="text-xs opacity-70">{{ $grandTotal }}</span>
+                    </button>
+                    @foreach ($filterTags as $t)
+                        <button type="button" @click="filter='{{ $t }}'"
+                            :class="filter==='{{ $t }}' ? 'bg-brand-forest text-white shadow-sm' : 'bg-white/70 text-brand-moss hover:bg-white'"
+                            class="inline-flex items-center gap-1.5 rounded-full border border-brand-ink/10 px-4 py-1.5 text-sm font-semibold transition-colors">
+                            {{ $tagLabels[$t] }} <span class="text-xs opacity-70">{{ $globalCounts[$t] }}</span>
+                        </button>
+                    @endforeach
+                </div>
+            </div>
+
+            {{-- Body: month rail + entries --}}
+            <section class="px-4 pb-24 pt-12 sm:px-6 lg:px-8">
+                <div class="mx-auto grid max-w-5xl gap-10 lg:grid-cols-[180px_minmax(0,1fr)]">
+                    {{-- Month rail (desktop) --}}
+                    <aside class="hidden lg:block">
+                        <nav class="sticky top-24 space-y-1" aria-label="Jump to month">
+                            <p class="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wide text-brand-mist">Timeline</p>
+                            @foreach ($months as $month)
+                                <a href="#{{ $month['id'] }}"
+                                   x-show="has('{{ implode(',', array_keys($month['tags'])) }}')"
+                                   class="flex items-center justify-between rounded-lg px-3 py-1.5 text-sm font-medium text-brand-moss transition-colors hover:bg-white/70 hover:text-brand-ink">
+                                    <span>{{ $month['short'] }}</span>
+                                    <span class="text-xs tabular-nums text-brand-mist"
+                                          x-text="filter==='all' ? {{ $month['total'] }} : ({{ json_encode($month['counts']) }}[filter] || 0)"></span>
+                                </a>
+                            @endforeach
+                        </nav>
+                    </aside>
+
+                    {{-- Entries --}}
+                    <div class="space-y-14">
+                        {{-- Empty state --}}
+                        <div x-show="visible === 0" x-cloak class="rounded-2xl border border-dashed border-brand-ink/15 bg-white/60 p-12 text-center">
+                            <p class="text-sm font-medium text-brand-moss">Nothing tagged here yet — try another filter.</p>
+                        </div>
+
+                        @foreach ($months as $month)
+                            <section id="{{ $month['id'] }}" class="scroll-mt-24"
+                                     x-show="has('{{ implode(',', array_keys($month['tags'])) }}')">
+                                {{-- Month header --}}
+                                <div class="mb-6 flex items-baseline gap-3 border-b border-brand-ink/10 pb-3">
+                                    <h2 class="text-xl font-bold tracking-tight text-brand-ink">{{ $month['label'] }}</h2>
+                                    <span class="text-sm font-medium text-brand-moss"
+                                          x-text="(filter==='all' ? {{ $month['total'] }} : ({{ json_encode($month['counts']) }}[filter] || 0)) + ' updates'"></span>
                                 </div>
 
-                                <ol class="space-y-6">
-                                    @foreach ($dateEntries as $entry)
-                                        <li>
-                                            <article class="rounded-2xl border border-brand-ink/10 bg-white/85 p-6 shadow-sm sm:p-8">
-                                                @if (! empty($entry['tags']))
+                                <ol class="space-y-4">
+                                    @foreach ($month['entries'] as $entry)
+                                        <li x-show="has('{{ implode(',', $entry['tags']) }}')">
+                                            <article class="group relative overflow-hidden rounded-2xl border border-brand-ink/10 bg-white/85 shadow-sm transition-shadow hover:shadow-md">
+                                                <span class="absolute inset-y-0 left-0 w-1 {{ $tagAccent[$entry['primary']] ?? 'bg-brand-sand' }}" aria-hidden="true"></span>
+                                                <div class="p-6 pl-7 sm:p-7 sm:pl-8">
                                                     <div class="flex flex-wrap items-center gap-2">
                                                         @foreach ($entry['tags'] as $tag)
                                                             <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide {{ $tagStyles[$tag] ?? '' }}">
                                                                 {{ $tagLabels[$tag] ?? $tag }}
                                                             </span>
                                                         @endforeach
+                                                        <span class="ml-auto text-xs font-medium text-brand-mist">{{ $entry['day'] }}</span>
                                                     </div>
-                                                @endif
 
-                                                <h3 class="mt-3 text-lg font-semibold text-brand-ink">{{ $entry['title'] }}</h3>
-                                                <p class="mt-2 text-sm leading-relaxed text-brand-moss">{{ $entry['summary'] }}</p>
+                                                    <h3 class="mt-3 text-lg font-semibold text-brand-ink">{!! $inline($entry['title']) !!}</h3>
+                                                    <p class="mt-2 text-sm leading-relaxed text-brand-moss">{!! $inline($entry['summary']) !!}</p>
 
-                                                @if (! empty($entry['items']))
-                                                    <ul class="mt-4 space-y-1.5">
-                                                        @foreach ($entry['items'] as $item)
-                                                            <li class="flex items-start gap-2 text-sm text-brand-moss">
-                                                                <x-heroicon-m-chevron-right class="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
-                                                                <span>{!! $item !!}</span>
-                                                            </li>
-                                                        @endforeach
-                                                    </ul>
-                                                @endif
+                                                    @if (! empty($entry['items']))
+                                                        <ul class="mt-4 space-y-1.5">
+                                                            @foreach ($entry['items'] as $item)
+                                                                <li class="flex items-start gap-2 text-sm text-brand-moss">
+                                                                    <x-heroicon-m-chevron-right class="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-sage" aria-hidden="true" />
+                                                                    <span>{!! $item !!}</span>
+                                                                </li>
+                                                            @endforeach
+                                                        </ul>
+                                                    @endif
+                                                </div>
                                             </article>
                                         </li>
                                     @endforeach
@@ -826,49 +913,9 @@ Unified Button And Binding UI',
                             </section>
                         @endforeach
                     </div>
-
-                    {{-- Pagination --}}
-                    @if ($lastPage > 1)
-                        <nav class="mt-14 flex items-center justify-between gap-4 sm:pl-8" aria-label="Changelog pagination">
-                            @if ($page > 1)
-                                <a href="{{ $pageLink($page - 1) }}" rel="prev" class="inline-flex items-center gap-1.5 rounded-xl border-2 border-brand-ink/15 bg-white/70 px-4 py-2.5 text-sm font-semibold text-brand-ink transition-colors hover:border-brand-sage/40 hover:bg-white">
-                                    <x-heroicon-m-chevron-left class="h-4 w-4" aria-hidden="true" />
-                                    Newer
-                                </a>
-                            @else
-                                <span class="inline-flex cursor-not-allowed items-center gap-1.5 rounded-xl border-2 border-brand-ink/10 bg-white/40 px-4 py-2.5 text-sm font-semibold text-brand-mist/50">
-                                    <x-heroicon-m-chevron-left class="h-4 w-4" aria-hidden="true" />
-                                    Newer
-                                </span>
-                            @endif
-
-                            <div class="hidden items-center gap-1 sm:flex">
-                                @foreach (range(1, $lastPage) as $p)
-                                    <a href="{{ $pageLink($p) }}" @if ($p === $page) aria-current="page" @endif
-                                       class="inline-flex h-9 min-w-9 items-center justify-center rounded-lg px-3 text-sm font-semibold transition-colors {{ $p === $page ? 'bg-brand-forest text-white' : 'text-brand-moss hover:bg-white/70' }}">
-                                        {{ $p }}
-                                    </a>
-                                @endforeach
-                            </div>
-
-                            <span class="text-sm font-medium text-brand-moss sm:hidden">Page {{ $page }} of {{ $lastPage }}</span>
-
-                            @if ($page < $lastPage)
-                                <a href="{{ $pageLink($page + 1) }}" rel="next" class="inline-flex items-center gap-1.5 rounded-xl border-2 border-brand-ink/15 bg-white/70 px-4 py-2.5 text-sm font-semibold text-brand-ink transition-colors hover:border-brand-sage/40 hover:bg-white">
-                                    Older
-                                    <x-heroicon-m-chevron-right class="h-4 w-4" aria-hidden="true" />
-                                </a>
-                            @else
-                                <span class="inline-flex cursor-not-allowed items-center gap-1.5 rounded-xl border-2 border-brand-ink/10 bg-white/40 px-4 py-2.5 text-sm font-semibold text-brand-mist/50">
-                                    Older
-                                    <x-heroicon-m-chevron-right class="h-4 w-4" aria-hidden="true" />
-                                </span>
-                            @endif
-                        </nav>
-                    @endif
                 </div>
-            </div>
-        </section>
+            </section>
+        </div>
 
         {{-- CTA --}}
         <section class="border-t border-brand-ink/10 py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-white/40 to-brand-sand/20">

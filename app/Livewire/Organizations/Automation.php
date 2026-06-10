@@ -80,18 +80,26 @@ class Automation extends Component
     {
         $this->authorize('view', $organization);
         abort_unless($organization->hasAdminAccess(auth()->user()), 403);
+        // The route-bound model is already fresh — hydrate directly off it
+        // rather than re-querying via refreshOrganization()'s fresh().
         $this->organization = $organization;
-        $this->refreshOrganization();
+        $this->hydrateOrganization();
     }
 
     protected function refreshOrganization(): void
     {
-        $this->organization = $this->organization->fresh()
-            ->load([
-                'apiTokens',
-                'notificationWebhookDestinations',
-                'sites' => fn ($q) => $q->orderBy('name'),
-            ]);
+        // Post-mutation reload: re-fetch from the DB to pick up the change.
+        $this->organization = $this->organization->fresh();
+        $this->hydrateOrganization();
+    }
+
+    protected function hydrateOrganization(): void
+    {
+        $this->organization->load([
+            'apiTokens',
+            'notificationWebhookDestinations',
+            'sites' => fn ($q) => $q->orderBy('name'),
+        ]);
         $this->deploy_email_notifications_enabled = (bool) $this->organization->deploy_email_notifications_enabled;
         $this->email_server_credentials_enabled = (bool) $this->organization->email_server_credentials_enabled;
         $this->email_database_credentials_enabled = (bool) $this->organization->email_database_credentials_enabled;

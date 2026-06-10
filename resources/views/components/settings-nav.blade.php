@@ -28,9 +28,15 @@
         'profile.cli',
         'profile.backup-configurations',
         'profile.notification-channels',
-        'organizations.index',
-        'organizations.create',
     );
+
+    // Organizations is its own top-level menu item (peer to Account / Guides),
+    // and the menu lists every organization the user belongs to.
+    $organizations = $user
+        ? $user->organizations()->orderBy('organizations.name')->get()
+        : collect();
+    $currentOrgId = session('current_organization_id');
+    $organizationsNavActive = request()->routeIs('organizations.*', 'billing.*', 'subscription.*', 'teams.notification-channels');
     $guidesDropdownActive = request()->routeIs(
         'docs.create-first-server',
         'docs.connect-provider',
@@ -99,12 +105,6 @@
                                 </x-slot>
                                 {{ __('Notification channels') }}
                             </x-dropdown-link>
-                            <x-dropdown-link :href="route('organizations.index')" wire:navigate>
-                                <x-slot name="icon">
-                                    <x-heroicon-o-building-office-2 class="h-[1.15rem] w-[1.15rem]" />
-                                </x-slot>
-                                {{ __('Organizations') }}
-                            </x-dropdown-link>
                             <x-dropdown-link :href="route('settings.profile')" wire:navigate>
                                 <x-slot name="icon">
                                     <x-heroicon-o-user-circle class="h-[1.15rem] w-[1.15rem]" />
@@ -134,6 +134,54 @@
                                     <x-heroicon-o-key class="h-[1.15rem] w-[1.15rem]" />
                                 </x-slot>
                                 {{ __('SSH keys') }}
+                            </x-dropdown-link>
+                        </x-slot>
+                    </x-dropdown>
+
+                    <x-dropdown align="left" width="w-72" contentClasses="py-1.5 max-h-[min(70vh,28rem)] overflow-y-auto">
+                        <x-slot name="trigger">
+                            <button
+                                type="button"
+                                @class([
+                                    $dropdownTriggerBase,
+                                    $organizationsNavActive ? $navOn : $navOff,
+                                ])
+                                aria-haspopup="true"
+                            >
+                                <x-heroicon-o-building-office-2 class="{{ $navIcon }}" aria-hidden="true" />
+                                {{ __('Organizations') }}
+                                <x-heroicon-m-chevron-down class="ms-0.5 h-4 w-4 shrink-0 opacity-70" aria-hidden="true" />
+                            </button>
+                        </x-slot>
+                        <x-slot name="content">
+                            <x-dropdown-link :href="route('organizations.index')" wire:navigate>
+                                <x-slot name="icon">
+                                    <x-heroicon-o-rectangle-stack class="h-[1.15rem] w-[1.15rem]" />
+                                </x-slot>
+                                {{ __('All organizations') }}
+                            </x-dropdown-link>
+                            @if ($organizations->isNotEmpty())
+                                <div class="mx-2 my-1.5 border-t border-brand-ink/8" role="presentation"></div>
+                                @foreach ($organizations as $org)
+                                    <x-dropdown-link :href="route('organizations.show', $org)" wire:navigate>
+                                        <x-slot name="icon">
+                                            <x-heroicon-o-building-office-2 class="h-[1.15rem] w-[1.15rem]" />
+                                        </x-slot>
+                                        <span class="flex items-center justify-between gap-2">
+                                            <span class="truncate">{{ $org->name }}</span>
+                                            @if ($currentOrgId == $org->id)
+                                                <span class="inline-flex shrink-0 items-center rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('Current') }}</span>
+                                            @endif
+                                        </span>
+                                    </x-dropdown-link>
+                                @endforeach
+                            @endif
+                            <div class="mx-2 my-1.5 border-t border-brand-ink/8" role="presentation"></div>
+                            <x-dropdown-link :href="route('organizations.create')" wire:navigate>
+                                <x-slot name="icon">
+                                    <x-heroicon-o-plus class="h-[1.15rem] w-[1.15rem]" />
+                                </x-slot>
+                                {{ __('New organization') }}
                             </x-dropdown-link>
                         </x-slot>
                     </x-dropdown>
@@ -249,14 +297,6 @@
                 <x-heroicon-o-bell-alert class="{{ $navIcon }}" aria-hidden="true" />
                 {{ __('Notification channels') }}
             </a>
-            <a
-                href="{{ route('organizations.index') }}"
-                wire:navigate
-                @class([$navBase, request()->routeIs('organizations.index', 'organizations.create') ? $navOn : $navOff])
-            >
-                <x-heroicon-o-building-office-2 class="{{ $navIcon }}" aria-hidden="true" />
-                {{ __('Organizations') }}
-            </a>
             {{-- Profile is the merged page (identity + preferences + sessions
                  + danger zone). The separate "Preferences" link is gone since
                  it pointed to the same URL after the /profile merge. --}}
@@ -301,6 +341,46 @@
                 {{ __('SSH keys') }}
             </a>
         </nav>
+
+        <div class="mt-5 border-t border-brand-ink/10 pt-4">
+            <div class="flex items-center justify-between gap-2">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Organizations') }}</p>
+                <a
+                    href="{{ route('organizations.create') }}"
+                    wire:navigate
+                    class="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-sage hover:text-brand-ink"
+                    title="{{ __('New organization') }}"
+                >
+                    <x-heroicon-o-plus class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    {{ __('New') }}
+                </a>
+            </div>
+            <nav class="{{ $guidesNavClass }}" aria-label="{{ __('Organizations') }}">
+                <a
+                    href="{{ route('organizations.index') }}"
+                    wire:navigate
+                    @class([$navBase, request()->routeIs('organizations.index') ? $navOn : $navOff])
+                >
+                    <x-heroicon-o-rectangle-stack class="{{ $navIcon }}" aria-hidden="true" />
+                    {{ __('All organizations') }}
+                </a>
+                @foreach ($organizations as $org)
+                    <a
+                        href="{{ route('organizations.show', $org) }}"
+                        wire:navigate
+                        @class([$navBase, request()->routeIs('organizations.show') && (string) request()->route('organization')?->getKey() === (string) $org->getKey() ? $navOn : $navOff])
+                    >
+                        <x-heroicon-o-building-office-2 class="{{ $navIcon }}" aria-hidden="true" />
+                        <span class="flex min-w-0 flex-1 items-center justify-between gap-2">
+                            <span class="truncate">{{ $org->name }}</span>
+                            @if ($currentOrgId == $org->id)
+                                <span class="inline-flex shrink-0 items-center rounded-md border border-brand-sage/30 bg-brand-sage/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-forest">{{ __('Current') }}</span>
+                            @endif
+                        </span>
+                    </a>
+                @endforeach
+            </nav>
+        </div>
 
         <div class="mt-5 border-t border-brand-ink/10 pt-4">
             <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Guides') }}</p>

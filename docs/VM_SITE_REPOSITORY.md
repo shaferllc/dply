@@ -1,3 +1,12 @@
+---
+title: "Site repository"
+slug: vm-site-repository
+category: "Sites & deploys"
+order: 230
+description: "Explains connecting a Git provider, repository, branch, and deploy key, plus monorepo roots, branch switches, and the commits view for deploys."
+group: sites
+---
+
 # Site repository
 
 The **Repository** section connects Git and defines what dply clones on deploy.

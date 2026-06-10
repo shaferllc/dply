@@ -1,3 +1,12 @@
+---
+title: "Server schedule"
+slug: server-schedule
+category: "Servers"
+order: 340
+description: "A calendar view of upcoming server crontab entries and linked site cron executions, gated by the workspace.schedule feature."
+group: servers
+---
+
 # Server schedule
 
 The **Schedule** section shows a calendar view of upcoming **server** and linked **site** cron executions.

@@ -1,3 +1,12 @@
+---
+title: "Server health"
+slug: server-health
+category: "Servers"
+order: 230
+description: "A cockpit of pass/fail service probes and actionable findings for host readiness, covering SSH, webserver, disk, memory, and expected stack services."
+group: servers
+---
+
 # Server health
 
 The **Health** section is a cockpit for host readiness — services, probes, and actionable findings beyond the Overview snapshot.

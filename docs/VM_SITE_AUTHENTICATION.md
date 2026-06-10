@@ -1,3 +1,12 @@
+---
+title: "Site basic authentication"
+slug: vm-site-authentication
+category: "Sites & deploys"
+order: 40
+description: "Locks a VM site behind one staging access method at a time, either HTTP basic auth or a branded password gate, at the webserver vhost layer."
+group: sites
+---
+
 # Site authentication (VM)
 
 The **Authentication** section lets you lock a VM site behind one staging access method at a time.

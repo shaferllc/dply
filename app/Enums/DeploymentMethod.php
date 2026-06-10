@@ -89,11 +89,7 @@ enum DeploymentMethod: string
     /** Whether the method's engine is wired up (vs registered-but-scaffolded). */
     public function isImplemented(): bool
     {
-        return match ($this) {
-            self::Flat, self::Atomic, self::Maintenance, self::Recreate,
-            self::BlueGreen, self::Rolling, self::Canary => true,
-            self::Image => false,
-        };
+        return true;
     }
 
     /** Derive the method from a legacy deploy_strategy value. */
@@ -130,6 +126,18 @@ enum DeploymentMethod: string
         if ($server === null || ! $server->hostCapabilities()->supportsSsh()) {
             // Flat/atomic/maintenance/recreate all need host SSH to drive the
             // deploy. Container/Cloud sites get their own method set later.
+            return false;
+        }
+
+        // A VM running the Docker runtime deploys by building + running a
+        // container image — its on-disk-checkout placement methods (flat/atomic/
+        // blue-green/rolling/canary) don't apply. So `image` is the ONLY method
+        // there, and conversely `image` is offered nowhere else.
+        $isVmDocker = $site->usesVmDockerRuntime();
+        if ($this === self::Image) {
+            return $isVmDocker;
+        }
+        if ($isVmDocker) {
             return false;
         }
 

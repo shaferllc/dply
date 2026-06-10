@@ -1,3 +1,12 @@
+---
+title: "Sites on this server"
+slug: server-sites
+category: "Servers"
+order: 390
+description: "Lists every BYO VM site hosted on this server with name, runtime, and status, plus how to add sites, plan limits, and site versus server scope."
+group: servers
+---
+
 # Sites on this server
 
 The **Sites** section lists every BYO VM site hosted on this server. Open a site to enter its workspace (deploy, routing, runtime, etc.).

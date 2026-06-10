@@ -1,3 +1,12 @@
+---
+title: "Site notifications"
+slug: vm-site-notifications
+category: "Sites & deploys"
+order: 200
+description: "Covers routing deploy and monitor events for a site to org notification channels like Slack, email, and webhooks, with per-site overrides."
+group: sites
+---
+
 # Site notifications
 
 The **Notifications** section routes **deploy and monitor events** for this site to org notification channels.

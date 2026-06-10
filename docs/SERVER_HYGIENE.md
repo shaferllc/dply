@@ -1,3 +1,12 @@
+---
+title: "Release hygiene"
+slug: server-hygiene
+category: "Servers"
+order: 240
+description: "Scan a server for stale deploy artifacts, old releases, log and package bloat, and queue cleanup jobs to reclaim disk space safely."
+group: servers
+---
+
 # Release hygiene
 
 The **Hygiene** section helps reclaim disk space and remove stale deploy artifacts on the server.

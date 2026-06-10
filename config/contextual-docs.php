@@ -165,6 +165,36 @@ return [
             'group' => 'organization',
         ],
         [
+            'route' => 'organizations.show',
+            'slug' => 'org-overview',
+            'group' => 'organization',
+        ],
+        [
+            'route' => 'organizations.settings',
+            'slug' => 'org-general',
+            'group' => 'organization',
+        ],
+        [
+            'route' => 'organizations.activity',
+            'slug' => 'org-activity',
+            'group' => 'organization',
+        ],
+        [
+            'route' => 'organizations.automation',
+            'slug' => 'org-automation',
+            'group' => 'organization',
+        ],
+        [
+            'route' => 'organizations.members',
+            'slug' => 'org-members',
+            'group' => 'organization',
+        ],
+        [
+            'route' => 'organizations.teams',
+            'slug' => 'org-teams',
+            'group' => 'organization',
+        ],
+        [
             'route' => 'billing.show',
             'slug' => 'billing-and-plans',
             'group' => 'organization',
@@ -187,6 +217,16 @@ return [
         [
             'route' => 'profile.api-keys',
             'slug' => 'api',
+            'group' => 'organization',
+        ],
+        [
+            'route' => 'projects.index',
+            'slug' => 'projects-overview',
+            'group' => 'organization',
+        ],
+        [
+            'route' => 'projects.show',
+            'slug' => 'projects-overview',
             'group' => 'organization',
         ],
         [

@@ -1,3 +1,12 @@
+---
+title: "Edge previews"
+slug: edge-previews
+category: "Edge"
+order: 120
+description: "Manage PR and branch previews on a production Edge site, including promote to production, traffic splitting, protection, and the comment widget."
+group: edge
+---
+
 # Edge previews
 
 The **Previews** section on a production Edge site is where you manage PR/branch previews: the list, **promote to production**, **split traffic**, preview protection, and the comment widget.

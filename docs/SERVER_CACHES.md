@@ -1,3 +1,12 @@
+---
+title: "Cache engines"
+slug: server-caches
+category: "Servers"
+order: 100
+description: "Install and manage in-memory cache engines such as Redis, Valkey, Memcached, KeyDB, and Dragonfly on a server."
+group: servers
+---
+
 # Cache engines
 
 The **Caches** section installs and manages in-memory cache engines on the server — Redis, Valkey, Memcached, KeyDB, and Dragonfly.

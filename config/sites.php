@@ -32,6 +32,15 @@ return [
 
     'certbot_email' => env('DPLY_CERTBOT_EMAIL'),
 
+    /*
+    | Secure managed testing hostnames (e.g. *.on-dply.com) with one shared
+    | per-server wildcard certificate (DNS-01) instead of a per-site cert.
+    | When on, a new testing site's vhost is held back until the wildcard is
+    | installed, so it is never published without HTTPS. Disable to fall back
+    | to the legacy per-host preview SSL path.
+    */
+    'wildcard_testing_ssl' => (bool) env('DPLY_WILDCARD_TESTING_SSL', true),
+
     'supervisor_conf_d' => env('DPLY_SUPERVISOR_CONF_D', '/etc/supervisor/conf.d'),
 
     /**

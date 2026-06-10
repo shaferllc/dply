@@ -1,3 +1,12 @@
+---
+title: "Site services (systemd)"
+slug: vm-site-services
+category: "Sites & deploys"
+order: 110
+description: "Manage site-scoped systemd units for web upstreams, workers, and schedulers, including when to use Services versus Supervisor Daemons and unit syncing."
+group: sites
+---
+
 # Site services (systemd)
 
 The **Services** section manages **systemd units** scoped to this site — `dply-site-{siteId}.service` for the web upstream and `dply-site-{siteId}-{name}.service` for workers and schedulers.

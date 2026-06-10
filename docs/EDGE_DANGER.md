@@ -1,3 +1,12 @@
+---
+title: "Delete an Edge site"
+slug: edge-danger
+category: "Edge"
+order: 160
+description: "Explains the Danger zone for permanently deleting an Edge site, what teardown removes, deletion from workspace or fleet, permissions, and billing effects."
+group: edge
+---
+
 # Delete an Edge site
 
 The **Danger zone** permanently removes an Edge site and all associated infrastructure.

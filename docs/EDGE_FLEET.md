@@ -1,3 +1,12 @@
+---
+title: "Edge fleet index"
+slug: edge-fleet
+category: "Edge"
+order: 20
+description: "The Edge sites listing page with summary cards, filter tabs, deploying a new app, scheduled deletion, the coming-soon state, and back navigation."
+group: edge
+---
+
 # Edge fleet index
 
 The **Edge sites** page (`Infrastructure → Edge`) lists every Edge app in your current organization.

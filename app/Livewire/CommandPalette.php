@@ -9,7 +9,6 @@ use App\Jobs\RunServerInsightsJob;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Models\CloudDatabase;
 use App\Models\Organization;
-use App\Models\RealtimeApp;
 use App\Models\RecentResource;
 use App\Models\Server;
 use App\Models\ServerDatabase;
@@ -118,7 +117,6 @@ class CommandPalette extends Component
             'sites' => 'Sites',
             'servers' => 'Servers',
             'projects' => 'Projects',
-            'realtime' => 'Realtime',
             'organizations' => 'Organizations',
             'switch-org' => 'Switch organization',
             'docs' => 'Documentation',
@@ -325,7 +323,6 @@ class CommandPalette extends Component
             'servers' => $this->serversList($org, $query),
             'server' => $this->serverSubPages($org, $context['id'] ?? null, $query),
             'projects' => $this->workspaceList($org, $query),
-            'realtime' => $this->realtimeList($org, $query),
             'organizations' => $this->organizationList($query),
             'switch-org' => $this->switchOrgList($query),
             'docs' => $this->docsList($query),
@@ -371,7 +368,6 @@ class CommandPalette extends Component
             ['Sites', 'sites', 'globe-alt', 'sites apps websites'],
             ['Servers', 'servers', 'server', 'servers vms hosts machines'],
             ['Projects', 'projects', 'rectangle-stack', 'projects workspaces', 'surface.projects'],
-            ['Realtime', 'realtime', 'signal', 'realtime websockets pusher', 'surface.realtime'],
             ['Organizations', 'organizations', 'building-office-2', 'organizations teams orgs'],
         ];
         $resourceItems = [];
@@ -543,22 +539,6 @@ class CommandPalette extends Component
             $groups[] = ['label' => __('Projects'), 'items' => $projects];
         }
 
-        if (Feature::active('surface.realtime')) {
-            $realtime = $org->realtimeApps()
-                ->where('name', 'like', $like)
-                ->orderByDesc('created_at')
-                ->limit(self::SEARCH_LIMIT)
-                ->get()
-                ->map(fn (RealtimeApp $app): array => [
-                    'label' => $app->name,
-                    'sublabel' => null,
-                    'url' => route('realtime.show', $app),
-                    'icon' => 'signal',
-                ])
-                ->all();
-            $groups[] = ['label' => __('Realtime'), 'items' => $realtime];
-        }
-
         if (Feature::active('surface.cloud')) {
             $databases = CloudDatabase::query()
                 ->where('organization_id', $org->id)
@@ -697,35 +677,6 @@ class CommandPalette extends Component
         }
 
         return [['label' => __('Projects'), 'items' => $items]];
-    }
-
-    /**
-     * @return list<array{label: string, items: list<array<string, mixed>>}>
-     */
-    private function realtimeList(?Organization $org, string $query): array
-    {
-        if ($org === null || ! Feature::active('surface.realtime')) {
-            return [];
-        }
-        $items = $this->maybeIndexLink($query, 'all realtime apps index', __('All realtime apps'), __('Open the realtime index'), 'realtime.index', 'signal');
-
-        foreach (
-            RealtimeApp::query()
-                ->where('organization_id', $org->id)
-                ->where('name', 'like', $this->like($query))
-                ->orderByDesc('created_at')
-                ->limit(self::LIST_LIMIT)
-                ->get() as $app
-        ) {
-            $items[] = [
-                'label' => $app->name,
-                'sublabel' => null,
-                'url' => route('realtime.show', $app),
-                'icon' => 'signal',
-            ];
-        }
-
-        return [['label' => __('Realtime'), 'items' => $items]];
     }
 
     /**
@@ -987,7 +938,6 @@ class CommandPalette extends Component
                 ['New cloud database', 'create database postgres mysql redis', 'cloud.databases.create', 'circle-stack', [], 'surface.cloud'],
                 ['New serverless function', 'create function faas', 'serverless.create', 'bolt', [], 'surface.serverless'],
                 ['New edge app', 'create edge worker', 'edge.create', 'globe-alt', [], 'surface.edge'],
-                ['New realtime app', 'create realtime websockets pusher', 'realtime.create', 'signal', [], 'surface.realtime'],
                 ['New project', 'create project workspace', 'projects.index', 'rectangle-stack', [], 'surface.projects'],
                 ['New organization', 'create organization team', 'organizations.create', 'building-office-2'],
                 ['New script', 'create script automation', 'scripts.create', 'code-bracket', [], 'surface.scripts'],

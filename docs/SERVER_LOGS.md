@@ -1,3 +1,12 @@
+---
+title: "System logs"
+slug: server-logs
+category: "Servers"
+order: 260
+description: "Tail allowlisted system log files such as auth.log, syslog, nginx, and php-fpm over SSH with a live, refreshable view that avoids persisting content."
+group: servers
+---
+
 # System logs
 
 The **Logs** section tails allowlisted **system log files** on the server over SSH.

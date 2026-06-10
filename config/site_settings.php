@@ -11,6 +11,7 @@ return [
         'general' => ['label' => 'General'],
         'settings' => ['label' => 'Settings'],
         'routing' => ['label' => 'Routing'],
+        'backends' => ['label' => 'Backends'],
         'dns' => ['label' => 'DNS'],
         'certificates' => ['label' => 'Certificates'],
         'deploy' => ['label' => 'Deploy'],

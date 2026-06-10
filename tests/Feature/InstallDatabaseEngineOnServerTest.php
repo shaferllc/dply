@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature\InstallDatabaseEngineOnServerTest;
 
 use App\Actions\Servers\InstallDatabaseEngineOnServer;
-use App\Contracts\RemoteShell;
 use App\Models\Server;
 use App\Models\ServerDatabaseEngine;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -122,17 +121,3 @@ test('add engine command with install flag falls back when engine unknown', func
     $this->assertStringContainsString('No install steps known', $output);
     expect(ServerDatabaseEngine::query()->where('engine', 'duckdb')->first())->not->toBeNull();
 });
-class InstallDbRecordingShell implements RemoteShell
-{
-    /** @var list<string> */
-    public array $execCalls = [];
-
-    public function exec(string $command, int $timeoutSeconds = 120): string
-    {
-        $this->execCalls[] = $command;
-
-        return '';
-    }
-
-    public function putFile(string $remotePath, string $contents, int $timeoutSeconds = 60): void {}
-}

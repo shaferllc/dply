@@ -1,3 +1,12 @@
+---
+title: "System users"
+slug: server-system-users
+category: "Servers"
+order: 420
+description: "Lists Unix accounts on a server and manages deploy-related users, including per-site system users, creation, and removal guards."
+group: servers
+---
+
 # System users
 
 The **System users** section lists Unix accounts on the server and manages deploy-related users.

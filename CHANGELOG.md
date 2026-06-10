@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Sites can now run across multiple load-balanced web backends, unlocking rolling and canary deployment methods with per-target traffic weighting and draining.
 ### Changed
 - The project page is now organized into dedicated Overview, Resources, Access, Operations, and Delivery sections within a unified workspace layout.
 ### Added

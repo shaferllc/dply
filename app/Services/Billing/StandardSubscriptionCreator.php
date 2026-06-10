@@ -78,10 +78,14 @@ class StandardSubscriptionCreator
             }
         }
 
-        if ($desired->realtimeCount > 0) {
-            $realtimePriceId = $this->managedProductPriceIdForInterval('realtime', $interval);
+        // Managed Realtime — one line per connection-tier in use.
+        foreach ($desired->realtimeTierQuantities as $tier => $quantity) {
+            if ($quantity <= 0) {
+                continue;
+            }
+            $realtimePriceId = $this->realtimeTierPriceIdForInterval((string) $tier, $interval);
             if ($realtimePriceId !== '') {
-                $items[] = ['price' => $realtimePriceId, 'quantity' => $desired->realtimeCount];
+                $items[] = ['price' => $realtimePriceId, 'quantity' => $quantity];
             }
         }
 
@@ -134,6 +138,17 @@ class StandardSubscriptionCreator
     public function realtimePriceIdForInterval(string $interval): string
     {
         return $this->managedProductPriceIdForInterval('realtime', $interval);
+    }
+
+    public function realtimeTierPriceIdForInterval(string $tier, string $interval): string
+    {
+        $bucket = match ($interval) {
+            self::INTERVAL_MONTH => 'realtime_tiers',
+            self::INTERVAL_YEAR => 'realtime_tiers_yearly',
+            default => throw new InvalidArgumentException("Unknown billing interval: {$interval}"),
+        };
+
+        return (string) (config('subscription.standard.stripe.'.$bucket.'.'.$tier) ?? '');
     }
 
     public function edgeUsagePriceId(): string

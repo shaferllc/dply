@@ -54,11 +54,13 @@
 >
     <x-livewire-validation-errors />
 
-    <x-breadcrumb-trail :items="[
-        ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-        ['label' => __('Profile'), 'href' => route('settings.profile'), 'icon' => 'user-circle'],
-        ['label' => __('Security'), 'icon' => 'shield-check'],
-    ]" />
+    @push('breadcrumbs')
+        <x-breadcrumb-trail :items="[
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => __('Profile'), 'href' => route('settings.profile'), 'icon' => 'user-circle'],
+            ['label' => __('Security'), 'icon' => 'shield-check'],
+        ]" />
+    @endpush
 
     {{-- Hero: posture + at-a-glance counts. --}}
     <section class="dply-card overflow-hidden">

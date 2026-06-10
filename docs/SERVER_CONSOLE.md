@@ -1,3 +1,12 @@
+---
+title: "Server console"
+slug: server-console
+category: "Servers"
+order: 140
+description: "A terminal-style SSH interface for quick server inspection with one-click checks, autocomplete, command limits, and a global console drawer."
+group: servers
+---
+
 # Server console
 
 The **Console** section is a terminal-style SSH interface for quick inspection. Prefer **Run** for saved recipes and long scripts.

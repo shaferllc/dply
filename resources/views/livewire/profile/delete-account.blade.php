@@ -1,11 +1,13 @@
 <div>
     <x-livewire-validation-errors />
 
-    <x-breadcrumb-trail :items="[
-        ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-        ['label' => __('Profile'), 'href' => route('settings.profile'), 'icon' => 'user-circle'],
-        ['label' => __('Delete account'), 'icon' => 'trash'],
-    ]" />
+    @push('breadcrumbs')
+        <x-breadcrumb-trail :items="[
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => __('Profile'), 'href' => route('settings.profile'), 'icon' => 'user-circle'],
+            ['label' => __('Delete account'), 'icon' => 'trash'],
+        ]" />
+    @endpush
 
     <div class="max-w-2xl space-y-6">
         <x-page-header

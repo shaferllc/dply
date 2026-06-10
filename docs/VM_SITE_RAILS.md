@@ -1,3 +1,12 @@
+---
+title: "Rails stack"
+slug: vm-site-rails
+category: "Sites & deploys"
+order: 220
+description: "Documents the Rails section that appears for detected Rails apps, covering migrations, asset precompile, restarts, Ruby runtime, and environment vars."
+group: sites
+---
+
 # Rails stack
 
 The **Rails** section appears when dply detects a **Rails** app. It exposes Ruby/Rails-specific deploy helpers.

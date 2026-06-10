@@ -72,7 +72,11 @@
              },
              fmt(n) { return '$' + (Math.round(n * 100) / 100).toFixed(2); }
          }">
-        <x-organization-shell :organization="$organization" section="billing">
+        <x-organization-shell :organization="$organization" section="billing" :breadcrumb="[
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
+            ['label' => __('Billing & plan'), 'icon' => 'rectangle-stack'],
+        ]">
             <x-livewire-validation-errors />
 
             @if ($betaFeeWaived)
@@ -94,12 +98,6 @@
                     </div>
                 </div>
             @endif
-
-            <x-breadcrumb-trail :items="[
-                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-                ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
-                ['label' => __('Billing & plan'), 'icon' => 'rectangle-stack'],
-            ]" />
 
             {{-- Hero card: positioning + status / fleet / bill stat strip. --}}
             <section class="dply-card overflow-hidden">

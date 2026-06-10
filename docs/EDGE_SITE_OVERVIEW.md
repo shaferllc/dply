@@ -1,3 +1,12 @@
+---
+title: "Edge site overview"
+slug: edge-site-overview
+category: "Edge"
+order: 40
+description: "The Overview tab for a production Edge site, covering the hero bar, delivery, source, custom domains, traffic and billing cards, recent deploys, and preview children."
+group: edge
+---
+
 # Edge site overview
 
 The **Overview** tab is the home screen for a production Edge site. Preview child sites show a reduced sidebar but keep Overview.

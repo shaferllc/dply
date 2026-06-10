@@ -139,14 +139,21 @@ class ProvisionStripeBillingCommand extends Command
                 number_format($edgeUsageUnit / 100, 2),
             ));
         }
-        $realtime = (int) ($standard['realtime_cents'] ?? 0);
-        if ($realtime > 0) {
-            $this->line('  Product: dply Realtime app');
-            $this->line(sprintf(
-                '    Per app $%s/mo   $%s/yr',
-                number_format($realtime / 100, 2),
-                number_format($yearlyOf($realtime) / 100, 2),
-            ));
+        $realtimeTiers = (array) config('realtime.tiers', []);
+        if ($realtimeTiers !== []) {
+            $this->line('  Product: dply Realtime app (per connection-tier)');
+            foreach ($realtimeTiers as $slug => $tier) {
+                $tierCents = (int) ($tier['price_cents'] ?? 0);
+                if ($tierCents <= 0) {
+                    continue;
+                }
+                $this->line(sprintf(
+                    '    %s ($%s/mo   $%s/yr)',
+                    (string) ($tier['label'] ?? ucfirst((string) $slug)),
+                    number_format($tierCents / 100, 2),
+                    number_format($yearlyOf($tierCents) / 100, 2),
+                ));
+            }
         }
         $this->line('  Product: dply Enterprise (no prices — sales-led)');
         $this->newLine();

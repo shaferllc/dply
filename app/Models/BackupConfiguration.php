@@ -44,6 +44,27 @@ class BackupConfiguration extends Model
         ];
     }
 
+    /**
+     * Providers that are fully supported today. Only the S3-compatible
+     * destinations are live; the rest are surfaced as "coming soon" so the
+     * picker advertises the roadmap without accepting a non-working choice.
+     *
+     * @return list<string>
+     */
+    public static function availableProviders(): array
+    {
+        return [
+            self::PROVIDER_AWS_S3,
+            self::PROVIDER_CUSTOM_S3,
+            self::PROVIDER_DIGITALOCEAN_SPACES,
+        ];
+    }
+
+    public static function isProviderAvailable(string $provider): bool
+    {
+        return in_array($provider, self::availableProviders(), true);
+    }
+
     public static function labelForProvider(string $provider): string
     {
         return match ($provider) {

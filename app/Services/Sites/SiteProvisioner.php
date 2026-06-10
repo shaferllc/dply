@@ -4,7 +4,9 @@ namespace App\Services\Sites;
 
 use App\Events\Sites\SiteProvisioningUpdatedBroadcast;
 use App\Jobs\ExecuteSiteCertificateJob;
+use App\Jobs\IssueServerWildcardCertificateJob;
 use App\Jobs\ProvisionSiteSystemdUnitsJob;
+use App\Models\ServerWildcardCertificate;
 use App\Models\Site;
 use App\Services\Certificates\CertificateRequestService;
 use App\Services\Deploy\DeploymentContractBuilder;
@@ -201,6 +203,34 @@ class SiteProvisioner
             });
         }
 
+        // Write the vhost and enter reachability — but only once any required
+        // per-server wildcard TLS cert is installed, so the :443 block is present
+        // from the very first response and the site is never published HTTP-only.
+        $this->ensureWebserverConfigForReachability($site);
+    }
+
+    /**
+     * Write the site's webserver config and move into the HTTP-reachability
+     * phase — but gate the write on the per-server wildcard TLS certificate for
+     * the site's managed testing zone (e.g. *.on-dply.com). Returns true once
+     * the vhost is written (proceed to reachability checks), or false while the
+     * wildcard is still being issued (the provisioning loop retries). For sites
+     * that don't need a wildcard (custom-domain-only, Caddy auto-HTTPS boxes,
+     * non-webserver runtimes) the write happens immediately.
+     *
+     * Idempotent: once the vhost is written it is not rewritten here.
+     */
+    public function ensureWebserverConfigForReachability(Site $site): bool
+    {
+        $provisioning = $site->provisioningMeta();
+        if (! empty($provisioning['vhost_written_at'])) {
+            return true;
+        }
+
+        if ($this->requiresServerWildcard($site) && ! $this->ensureServerWildcard($site)) {
+            return false;
+        }
+
         $this->updateProvisioning($site, [
             'state' => 'writing_site_config',
             'webserver' => $site->webserver(),
@@ -224,10 +254,108 @@ class SiteProvisioner
             'state' => 'waiting_for_http',
             'webserver' => $site->webserver(),
             'configured_at' => now()->toIso8601String(),
+            'vhost_written_at' => now()->toIso8601String(),
             'error' => null,
         ]);
 
         $this->appendLog($site, 'info', 'waiting_for_http', 'Beginning hostname reachability checks.');
+
+        return true;
+    }
+
+    /**
+     * Whether this site's testing hostname is secured by a shared per-server
+     * wildcard cert (certbot-managed webservers) rather than a per-host cert or
+     * Caddy's own automatic HTTPS.
+     */
+    private function requiresServerWildcard(Site $site): bool
+    {
+        if (! (bool) config('sites.wildcard_testing_ssl', true)) {
+            return false;
+        }
+
+        if ($site->testingZone() === null || $site->server_id === null) {
+            return false;
+        }
+
+        $webserver = $site->webserver();
+
+        // Caddy with no edge proxy obtains and renews its own certificate on
+        // demand — there is no on-disk wildcard for it to reference.
+        if ($webserver === 'caddy' && ! ($site->server?->hasEdgeProxy() ?? false)) {
+            return false;
+        }
+
+        return in_array($webserver, ['nginx', 'caddy', 'openlitespeed', 'apache'], true);
+    }
+
+    /**
+     * Ensure the per-(server, zone) wildcard cert exists and is being issued.
+     * Returns true once it is installed (vhost may be written), false while
+     * issuance is still pending/in-flight.
+     */
+    private function ensureServerWildcard(Site $site): bool
+    {
+        $zone = $site->testingZone();
+        if ($zone === null) {
+            return true;
+        }
+
+        $routing = $this->testingHostnameProvisioner->testingDnsRoutingForSite($site);
+        $credentialId = $routing['credential']?->id;
+
+        try {
+            $wildcard = ServerWildcardCertificate::query()->firstOrCreate(
+                ['server_id' => $site->server_id, 'zone' => $zone],
+                [
+                    'provider' => $routing['provider'],
+                    'provider_credential_id' => $credentialId,
+                    'status' => ServerWildcardCertificate::STATUS_PENDING,
+                    'live_directory' => $zone,
+                ],
+            );
+        } catch (\Illuminate\Database\QueryException) {
+            // Lost the (server_id, zone) unique-index race to a sibling site
+            // provisioning concurrently — the row now exists, so reuse it.
+            $wildcard = ServerWildcardCertificate::query()
+                ->where('server_id', $site->server_id)
+                ->where('zone', $zone)
+                ->firstOrFail();
+        }
+
+        // Keep the controlling provider/credential current (e.g. the org
+        // connected a DNS credential after the row was first created).
+        if ($wildcard->provider !== $routing['provider'] || $wildcard->provider_credential_id !== $credentialId) {
+            $wildcard->forceFill([
+                'provider' => $routing['provider'],
+                'provider_credential_id' => $credentialId,
+            ])->save();
+        }
+
+        if ($wildcard->isInstalled()) {
+            return true;
+        }
+
+        $this->updateProvisioning($site, [
+            'state' => 'waiting_for_wildcard_tls',
+            'webserver' => $site->webserver(),
+            'error' => null,
+        ]);
+
+        // Dispatch only when idle (pending/failed) — an in-flight 'issuing' run
+        // holds the lock, so re-dispatching every probe would just no-op.
+        if (in_array($wildcard->status, [
+            ServerWildcardCertificate::STATUS_PENDING,
+            ServerWildcardCertificate::STATUS_FAILED,
+        ], true)) {
+            $this->appendLog($site, 'info', 'waiting_for_wildcard_tls', 'Issuing wildcard TLS certificate for the testing zone.', [
+                'zone' => $zone,
+                'provider' => $routing['provider'],
+            ]);
+            IssueServerWildcardCertificateJob::dispatch((string) $site->server_id, $zone);
+        }
+
+        return false;
     }
 
     /**
@@ -335,7 +463,20 @@ class SiteProvisioner
             ]);
 
             $previewHostname = $site->primaryPreviewDomain()?->hostname;
-            if ($this->previewHostnameReachableForAutoSsl($site, $result)) {
+            if ($site->isCoveredByServerWildcard()) {
+                // TLS already comes from the shared per-server wildcard — skip
+                // per-host Let's Encrypt issuance (which would burn the
+                // 50-cert/registered-domain/week limit on the shared zone).
+                if ($site->ssl_status !== Site::SSL_ACTIVE) {
+                    $site->update([
+                        'ssl_status' => Site::SSL_ACTIVE,
+                        'ssl_installed_at' => $site->ssl_installed_at ?? now(),
+                    ]);
+                }
+                $this->appendLog($site, 'info', 'ready', 'Preview hostname secured by the shared wildcard certificate.', [
+                    'preview_hostname' => $previewHostname,
+                ]);
+            } elseif ($this->previewHostnameReachableForAutoSsl($site, $result)) {
                 $this->queueAutomaticPreviewSsl(
                     $site,
                     'ready',
@@ -391,6 +532,9 @@ class SiteProvisioner
             'state' => 'queued',
             'webserver' => $site->webserver(),
             'queued_at' => now()->toIso8601String(),
+            // Clear the deferred-vhost guard so a re-provision re-evaluates the
+            // wildcard TLS gate and rewrites the web server config from scratch.
+            'vhost_written_at' => null,
             'error' => null,
         ]);
     }

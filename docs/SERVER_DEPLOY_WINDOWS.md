@@ -1,3 +1,12 @@
+---
+title: "Deploy windows"
+slug: server-deploy-windows
+category: "Servers"
+order: 180
+description: "Define allow and block schedules controlling when automated and manual deploys may run on a server, with admin overrides and notifications."
+group: servers
+---
+
 # Deploy windows
 
 The **Deploy windows** section defines when automated and manual deploys may run on this server.

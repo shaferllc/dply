@@ -1,3 +1,12 @@
+---
+title: "Edge delivery"
+slug: edge-delivery
+category: "Edge"
+order: 100
+description: "How Edge builds are published and traffic is served, covering CDN backend mode, hybrid SSR origin settings, image optimization, and cache purge."
+group: edge
+---
+
 # Edge delivery
 
 The **Delivery** section covers **where builds are published** and how traffic reaches your app: CDN backend, hybrid SSR origin, image optimization, and cache purge.

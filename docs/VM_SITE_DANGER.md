@@ -1,3 +1,12 @@
+---
+title: "Delete site"
+slug: vm-site-danger
+category: "Sites & deploys"
+order: 120
+description: "How the Danger zone permanently removes a BYO VM site from dply, what cleanup runs, plan-slot impact, and what to back up beforehand."
+group: sites
+---
+
 # Delete site
 
 The **Danger zone** permanently removes a BYO VM site from dply and optionally cleans server paths.

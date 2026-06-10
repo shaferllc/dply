@@ -3,6 +3,7 @@
 namespace App\Support\Docs;
 
 use App\Models\Site;
+use App\Services\Docs\DocsManifest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -11,6 +12,11 @@ final class ContextualDocResolver
     public function __construct(
         private readonly ?Request $request = null,
     ) {}
+
+    private function manifest(): DocsManifest
+    {
+        return app(DocsManifest::class);
+    }
 
     /**
      * Resolve the doc slug for the current or overridden context.
@@ -135,8 +141,7 @@ final class ContextualDocResolver
             return null;
         }
 
-        $groups = config('docs.groups', []);
-        $group = $groups[$groupKey] ?? null;
+        $group = $this->manifest()->groups()[$groupKey] ?? null;
 
         if (! is_array($group)) {
             return null;
@@ -192,21 +197,11 @@ final class ContextualDocResolver
             return __('Documentation');
         }
 
-        $markdown = config('docs.markdown', []);
-        $page = $markdown[$slug] ?? null;
+        $doc = $this->manifest()->find($slug);
 
-        if (is_array($page) && is_string($page['title'] ?? null) && $page['title'] !== '') {
-            return $page['title'];
-        }
-
-        $virtual = config('docs.virtual', []);
-        $virtualPage = $virtual[$slug] ?? null;
-
-        if (is_array($virtualPage) && is_string($virtualPage['title'] ?? null) && $virtualPage['title'] !== '') {
-            return $virtualPage['title'];
-        }
-
-        return null;
+        return is_array($doc) && is_string($doc['title'] ?? null) && $doc['title'] !== ''
+            ? $doc['title']
+            : null;
     }
 
     public function fullPageUrlForSlug(string $slug): ?string
@@ -215,15 +210,17 @@ final class ContextualDocResolver
             return route('docs.index');
         }
 
-        if (isset(config('docs.markdown', [])[$slug])) {
-            return route('docs.markdown', ['slug' => $slug]);
+        $doc = $this->manifest()->find($slug);
+        if (! is_array($doc)) {
+            return null;
         }
 
-        $virtual = config('docs.virtual', []);
-        $virtualPage = $virtual[$slug] ?? null;
+        if (is_string($doc['route'] ?? null) && $doc['route'] !== '') {
+            return route($doc['route']);
+        }
 
-        if (is_array($virtualPage) && is_string($virtualPage['route'] ?? null) && $virtualPage['route'] !== '') {
-            return route($virtualPage['route']);
+        if (! empty($doc['file'])) {
+            return route('docs.markdown', ['slug' => $slug]);
         }
 
         return null;
@@ -235,26 +232,25 @@ final class ContextualDocResolver
             return false;
         }
 
-        if (isset(config('docs.markdown', [])[$slug])) {
-            return true;
-        }
+        $doc = $this->manifest()->find($slug);
 
-        $virtual = config('docs.virtual', []);
-
-        return isset($virtual[$slug]['file']);
+        return is_array($doc) && ! empty($doc['file']);
     }
 
     public function isVirtualOnlySlug(string $slug): bool
     {
-        $virtual = config('docs.virtual', []);
+        $doc = $this->manifest()->find($slug);
 
-        return isset($virtual[$slug]) && ! isset($virtual[$slug]['file']);
+        return is_array($doc) && empty($doc['file']) && ! empty($doc['route']);
     }
 
     public function virtualSummaryForSlug(string $slug): ?string
     {
-        $virtual = config('docs.virtual', []);
-        $summary = $virtual[$slug]['summary'] ?? null;
+        if (! $this->isVirtualOnlySlug($slug)) {
+            return null;
+        }
+
+        $summary = $this->manifest()->find($slug)['description'] ?? null;
 
         return is_string($summary) && $summary !== '' ? $summary : null;
     }
@@ -266,7 +262,7 @@ final class ContextualDocResolver
     {
         $entries = [];
 
-        foreach (config('docs.groups', []) as $group) {
+        foreach ($this->manifest()->groups() as $group) {
             if (! is_array($group)) {
                 continue;
             }
@@ -510,16 +506,6 @@ final class ContextualDocResolver
             return null;
         }
 
-        foreach (config('docs.groups', []) as $key => $group) {
-            if (! is_array($group)) {
-                continue;
-            }
-
-            if (in_array($slug, $group['slugs'] ?? [], true)) {
-                return (string) $key;
-            }
-        }
-
-        return null;
+        return $this->manifest()->groupForSlug($slug);
     }
 }

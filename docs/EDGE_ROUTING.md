@@ -1,3 +1,12 @@
+---
+title: "Edge routing"
+slug: edge-routing
+category: "Edge"
+order: 110
+description: "Read-only view of redirects, rewrites, and header rules parsed from your repo's dply.yaml config on the latest Edge deploy."
+group: edge
+---
+
 # Edge routing
 
 The **Routing** section is a read-only view of **redirects, rewrites, and header rules** from your repo’s `dply.yaml` (or `dply.toml`) on the latest deploy.

@@ -30,11 +30,13 @@
 <div>
     <x-livewire-validation-errors />
 
-    <x-breadcrumb-trail :items="[
-        ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-        ['label' => __('Profile'), 'href' => route('settings.profile'), 'icon' => 'user-circle'],
-        ['label' => __('Backup destinations'), 'icon' => 'archive-box'],
-    ]" />
+    @push('breadcrumbs')
+        <x-breadcrumb-trail :items="[
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => __('Profile'), 'href' => route('settings.profile'), 'icon' => 'user-circle'],
+            ['label' => __('Backup destinations'), 'icon' => 'archive-box'],
+        ]" />
+    @endpush
 
     {{-- Hero: positioning + at-a-glance counts. --}}
     <section class="dply-card overflow-hidden">
@@ -130,7 +132,8 @@
                             <x-input-label for="bc_edit_provider" :value="__('Storage provider')" />
                             <select id="bc_edit_provider" wire:model.live="editForm.provider" class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage">
                                 @foreach (\App\Models\BackupConfiguration::providers() as $p)
-                                    <option value="{{ $p }}">{{ \App\Models\BackupConfiguration::labelForProvider($p) }}</option>
+                                    @php $providerAvailable = \App\Models\BackupConfiguration::isProviderAvailable($p); @endphp
+                                    <option value="{{ $p }}" @disabled(! $providerAvailable)>{{ \App\Models\BackupConfiguration::labelForProvider($p) }}@unless ($providerAvailable) — {{ __('coming soon') }}@endunless</option>
                                 @endforeach
                             </select>
                             <x-input-error :messages="$errors->get('editForm.provider')" class="mt-2" />
@@ -306,7 +309,8 @@
                         <x-input-label for="bc_create_provider_modal" :value="__('Storage provider')" />
                         <select id="bc_create_provider_modal" wire:model.live="createForm.provider" class="mt-1 block w-full rounded-lg border-brand-ink/15 bg-white px-3 py-2.5 text-sm text-brand-ink shadow-sm focus:border-brand-sage focus:ring-brand-sage">
                             @foreach (\App\Models\BackupConfiguration::providers() as $p)
-                                <option value="{{ $p }}">{{ \App\Models\BackupConfiguration::labelForProvider($p) }}</option>
+                                @php $providerAvailable = \App\Models\BackupConfiguration::isProviderAvailable($p); @endphp
+                                <option value="{{ $p }}" @disabled(! $providerAvailable)>{{ \App\Models\BackupConfiguration::labelForProvider($p) }}@unless ($providerAvailable) — {{ __('coming soon') }}@endunless</option>
                             @endforeach
                         </select>
                         <x-input-error :messages="$errors->get('createForm.provider')" class="mt-2" />

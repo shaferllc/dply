@@ -4,6 +4,7 @@ namespace App\Services\Deploy;
 
 use App\Models\Site;
 use App\Models\SiteDeployHook;
+use App\Models\SiteRelease;
 use App\Services\Sites\DeployHookRunner;
 use App\Services\Sites\PipelineAnchorScriptRunner;
 use App\Services\Sites\SiteDeployPipelineRunner;
@@ -37,7 +38,11 @@ final class DockerSiteDeployer
 
         $path = rtrim($site->effectiveRepositoryPath(), '/');
         $branch = $site->git_branch ?: 'main';
-        $compose = $this->composeBuilder->build($site);
+        // Tag this release's image so it's a pinnable artifact — the basis for
+        // image-digest history + one-tag rollback (see imageRepo()).
+        $releaseFolder = gmdate('YmdHis');
+        $imageTag = $this->imageRepo($site).':'.$releaseFolder;
+        $compose = $this->composeBuilder->build($site, $imageTag, withBuild: true);
         $dockerfile = $this->dockerfileBuilder->build($site);
         $ssh = $this->sshFactory->forServer($server);
 
@@ -111,11 +116,53 @@ final class DockerSiteDeployer
         $log .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_ACTIVATE, $path);
         $this->hookRunner->assertHooksSucceeded($log, 'after_activate');
 
+        // Image release history: record this tag as the active release (one
+        // SiteRelease row per image, folder = the tag's timestamp), then prune
+        // old images on the host so disk doesn't grow unbounded. The previous
+        // rows stay as rollback targets — re-runnable by tag (see
+        // DockerImageReleaseRollback).
+        SiteRelease::query()->where('site_id', $site->id)->update(['is_active' => false]);
+        SiteRelease::query()->create([
+            'site_id' => $site->id,
+            'folder' => $releaseFolder,
+            'git_sha' => $sha !== '' ? $sha : null,
+            'is_active' => true,
+        ]);
+        $log .= $this->pruneImages($ssh, $site);
+
         return [
             'output' => $log,
             'sha' => $sha !== '' ? $sha : null,
             'compose_yaml' => $compose,
             'dockerfile' => $dockerfile,
+            'release_folder' => $releaseFolder,
+            'image_tag' => $imageTag,
         ];
+    }
+
+    /** Stable per-site image repository name. */
+    public function imageRepo(Site $site): string
+    {
+        return 'dply-site-'.$site->id;
+    }
+
+    /**
+     * Keep the newest N image tags for this site, remove the rest so the host
+     * doesn't fill with old layers. Best-effort — never fails a healthy deploy.
+     */
+    private function pruneImages($ssh, Site $site): string
+    {
+        $keep = max(1, min(50, (int) ($site->releases_to_keep ?? 5)));
+        $repo = escapeshellarg($this->imageRepo($site));
+
+        return "\n--- prune old images (keep {$keep}) ---\n".$ssh->exec(
+            sprintf(
+                'docker images %1$s --format "{{.Tag}}" 2>/dev/null | sort -r | tail -n +%2$d '
+                .'| while read -r t; do docker rmi %1$s:"$t" 2>/dev/null || true; done; echo done',
+                $repo,
+                $keep + 1
+            ),
+            120
+        );
     }
 }

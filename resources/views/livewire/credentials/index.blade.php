@@ -1,7 +1,11 @@
 <div>
     @if (! empty($useOrgShell) && $organization)
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <x-organization-shell :organization="$organization" section="providers">
+            <x-organization-shell :organization="$organization" section="providers" :breadcrumb="[
+                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+                ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
+                ['label' => __('Provider credentials'), 'icon' => 'server'],
+            ]">
                 @include('livewire.credentials.partials.index-content')
             </x-organization-shell>
         </div>

@@ -10,14 +10,12 @@
 
 <div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <x-organization-shell :organization="$organization" section="automation">
+        <x-organization-shell :organization="$organization" section="automation" :breadcrumb="[
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
+            ['label' => __('Automation & API'), 'icon' => 'bolt'],
+        ]">
             <x-livewire-validation-errors />
-
-            <x-breadcrumb-trail :items="[
-                ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-                ['label' => $organization->name, 'href' => route('organizations.show', $organization), 'icon' => 'building-office-2'],
-                ['label' => __('Automation & API'), 'icon' => 'bolt'],
-            ]" />
 
             {{-- Hero card: positioning + at-a-glance stats. Replaces the
                  previous large "intro" card that only carried a doc link. --}}
@@ -37,10 +35,10 @@
                             </div>
                         </div>
                         <div class="mt-4 flex flex-wrap items-center gap-2">
-                            <x-outline-link href="{{ route('docs.index') }}" wire:navigate>
+                            <x-docs-link slug="org-automation">
                                 <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                {{ __('Documentation') }}
-                            </x-outline-link>
+                                {{ __('Automation guide') }}
+                            </x-docs-link>
                             @can('viewNotificationChannels', $organization)
                                 <x-outline-link href="{{ route('organizations.notification-channels', $organization) }}" wire:navigate>
                                     <x-heroicon-o-bell class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />

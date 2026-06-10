@@ -28,6 +28,10 @@
 
             <main class="flex-1 w-full pb-28 sm:pb-32">
                 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    {{-- Breadcrumb sits above the nav + content grid, full width,
+                         matching the rest of the app. Each settings page pushes
+                         its trail into this stack. --}}
+                    @stack('breadcrumbs')
                     @if ($settingsNavLayout === 'top')
                         {{-- overflow-visible so settings nav dropdown panels are not clipped --}}
                         <div class="space-y-8 overflow-visible">

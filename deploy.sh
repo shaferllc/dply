@@ -308,6 +308,9 @@ $PHP artisan route:cache
 $PHP artisan event:cache
 $PHP artisan view:cache
 $PHP artisan pennant:clear
+# Rebuild the front-matter docs manifest + search index from this release's docs/.
+$PHP artisan docs:flush
+$PHP artisan docs:index
 
 if [ "$ROLE" = "web" ]; then
   # public/storage is per-release; relink it to the (shared) storage each build.

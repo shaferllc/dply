@@ -1,3 +1,12 @@
+---
+title: "Edge deploy triggers"
+slug: edge-deploy-triggers
+category: "Edge"
+order: 90
+description: "How to start Edge deploys without the dashboard using per-site deploy hook URLs and GitHub auto-deploy webhooks for push and pull-request events."
+group: edge
+---
+
 # Edge deploy triggers
 
 The **Deploy triggers** section controls **what starts a deploy** without opening the dashboard: inbound webhooks and GitHub push/PR events.

@@ -83,6 +83,7 @@ final class SiteSettingsSidebar
                 ['id' => 'settings', 'label' => __('Settings'), 'icon' => 'heroicon-o-cog-6-tooth', 'group' => 'general'],
                 ['id' => 'routing', 'label' => __('Routing'), 'icon' => 'heroicon-o-share', 'group' => 'networking'],
                 ['id' => 'certificates', 'label' => __('Certificates'), 'icon' => 'heroicon-o-shield-check', 'group' => 'networking'],
+                ['id' => 'backends', 'label' => __('Backends'), 'icon' => 'heroicon-o-server-stack', 'group' => 'networking', 'feature' => 'workspace.site_backends', 'preview_feature' => 'workspace.site_backends_preview'],
                 ['id' => 'deploy', 'label' => __('Deployments'), 'icon' => 'heroicon-o-code-bracket-square', 'group' => 'deploy', 'route' => 'sites.deployments.index'],
                 ['id' => 'repository', 'label' => __('Repository'), 'icon' => 'heroicon-o-code-bracket', 'group' => 'deploy', 'route' => 'sites.repository'],
                 ['id' => 'runtime', 'label' => __('Runtime'), 'icon' => 'heroicon-o-cube-transparent', 'group' => 'runtime'],

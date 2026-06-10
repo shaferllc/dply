@@ -1,3 +1,12 @@
+---
+title: "Security digest"
+slug: server-security
+category: "Servers"
+order: 350
+description: "A digest summarizing SSH and auth findings from system logs, including failed logins, suspicious IPs, and authorized key changes, with hardening links."
+group: servers
+---
+
 # Security digest
 
 The **Security** section (sidebar **Security**) summarizes SSH and auth findings from system logs — failed logins, suspicious IPs, and recent key changes.

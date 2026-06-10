@@ -1,3 +1,12 @@
+---
+title: "Create an Edge app"
+slug: edge-create
+category: "Edge"
+order: 30
+description: "Step-by-step Edge create wizard covering naming, connecting Git, build detection, static vs hybrid output, delivery backend, submission, and local fake-edge mode."
+group: edge
+---
+
 # Create an Edge app
 
 Open **Infrastructure → Edge → Deploy an edge app** to connect Git and publish your first deploy.

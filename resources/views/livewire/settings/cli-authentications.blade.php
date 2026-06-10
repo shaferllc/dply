@@ -1,11 +1,71 @@
 <div>
     <x-livewire-validation-errors />
 
-    <x-breadcrumb-trail :items="[
-        ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
-        ['label' => __('Profile'), 'href' => route('settings.profile'), 'icon' => 'user-circle'],
-        ['label' => __('CLI'), 'icon' => 'command-line'],
-    ]" />
+    @push('breadcrumbs')
+        <x-breadcrumb-trail :items="[
+            ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
+            ['label' => __('Profile'), 'href' => route('settings.profile'), 'icon' => 'user-circle'],
+            ['label' => __('CLI'), 'icon' => 'command-line'],
+        ]" />
+    @endpush
+
+    @php
+        $sessionCount = $cliTokens->count();
+        $orgCount = $organizations->count();
+        $lastUsed = $cliTokens->pluck('last_used_at')->filter()->sort()->last();
+    @endphp
+
+    {{-- Hero card: positioning + at-a-glance counts (mirrors the
+         notification-channels header). --}}
+    <section class="dply-card overflow-hidden">
+        <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
+            <div class="lg:col-span-7">
+                <div class="flex items-start gap-3">
+                    <x-icon-badge size="md">
+                        <x-heroicon-o-command-line class="h-6 w-6" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Command line') }}</p>
+                        <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('CLI') }}</h2>
+                        <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
+                            {{ __('Install the dply CLI, sign in once with device-flow login, and manage every CLI session tied to your organizations from here.') }}
+                        </p>
+                    </div>
+                </div>
+                <div class="mt-4 flex flex-wrap items-center gap-2">
+                    <x-outline-link href="{{ route('docs.index') }}" wire:navigate>
+                        <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                        {{ __('Documentation') }}
+                    </x-outline-link>
+                </div>
+            </div>
+            <dl class="grid grid-cols-3 gap-2 lg:col-span-5">
+                <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Sessions') }}</dt>
+                    <dd class="mt-1 flex items-baseline gap-1.5">
+                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $sessionCount }}</span>
+                        <span class="text-[11px] text-brand-moss">{{ trans_choice('session|sessions', $sessionCount) }}</span>
+                    </dd>
+                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Active devices') }}</p>
+                </div>
+                <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Organizations') }}</dt>
+                    <dd class="mt-1 flex items-baseline gap-1.5">
+                        <span class="font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $orgCount }}</span>
+                        <span class="text-[11px] text-brand-moss">{{ trans_choice('available|available', $orgCount) }}</span>
+                    </dd>
+                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('You administer') }}</p>
+                </div>
+                <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Last used') }}</dt>
+                    <dd class="mt-1 flex items-baseline gap-1.5">
+                        <span class="text-sm font-semibold text-brand-ink">{{ $lastUsed ? $lastUsed->diffForHumans() : '—' }}</span>
+                    </dd>
+                    <p class="mt-1 text-[11px] text-brand-mist">{{ __('Most recent sign-in') }}</p>
+                </div>
+            </dl>
+        </div>
+    </section>
 
     @if ($organizations->isEmpty())
         <section class="dply-card mt-6 overflow-hidden p-6 sm:p-8">

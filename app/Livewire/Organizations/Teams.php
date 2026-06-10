@@ -36,12 +36,14 @@ class Teams extends Component
     {
         $this->authorize('view', $organization);
         $this->organization = $organization;
-        $this->refreshOrganization();
+        // The route-bound model is already fresh — only the relations need
+        // loading. Skipping fresh() here avoids a duplicate organizations SELECT.
+        $this->refreshOrganization(fresh: false);
     }
 
-    protected function refreshOrganization(): void
+    protected function refreshOrganization(bool $fresh = true): void
     {
-        $this->organization = $this->organization->fresh()
+        $this->organization = ($fresh ? $this->organization->fresh() : $this->organization)
             ->load([
                 'users',
                 'teams' => fn ($q) => $q->withCount('users')->with('users'),

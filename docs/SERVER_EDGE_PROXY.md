@@ -1,3 +1,12 @@
+---
+title: "Edge proxy add-on"
+slug: server-edge-proxy
+category: "Servers"
+order: 200
+description: "Manage an optional L7 reverse proxy such as Traefik, HAProxy, Envoy, or OpenResty in front of the primary webserver, with per-engine tabs and dashboards."
+group: servers
+---
+
 # Edge proxy add-on
 
 The **Edge proxy** section manages an optional L7 reverse proxy (Traefik, HAProxy, Envoy, OpenResty) in front of the primary **Webserver**.

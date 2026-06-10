@@ -242,6 +242,16 @@ class Server extends Model
     }
 
     /**
+     * Per-zone wildcard TLS certificates (e.g. *.on-dply.com) installed on this
+     * server, shared by every testing-hostname site on the matching zone. See
+     * {@see \App\Services\Certificates\WildcardCertificateIssuer}.
+     */
+    public function wildcardCertificates(): HasMany
+    {
+        return $this->hasMany(ServerWildcardCertificate::class);
+    }
+
+    /**
      * Multi-backend serving points hosted on this server (this server acting as a
      * backend for one or more sites' backend groups). See
      * docs/MULTI_BACKEND_SITES.md.

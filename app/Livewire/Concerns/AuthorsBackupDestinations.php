@@ -210,7 +210,9 @@ trait AuthorsBackupDestinations
 
         $base = [
             $nameKey => ['required', 'string', 'max:160'],
-            $providerKey => ['required', 'string', Rule::in(BackupConfiguration::providers())],
+            // Only S3-compatible providers are live; the rest are "coming soon"
+            // in the picker and rejected here so a tampered request can't slip through.
+            $providerKey => ['required', 'string', Rule::in(BackupConfiguration::availableProviders())],
         ];
 
         return array_merge($base, match ($provider) {

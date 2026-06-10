@@ -1,3 +1,12 @@
+---
+title: "Configuration editor"
+slug: server-configuration
+category: "Servers"
+order: 130
+description: "A remote file editor for allowlisted server config like nginx, PHP-FPM, and systemd units, with diffs, drift detection, and audited applies."
+group: servers
+---
+
 # Configuration editor
 
 The **Configuration** section is a remote file editor for allowlisted server config — nginx, PHP-FPM, systemd units, and stack-specific paths.

@@ -10,11 +10,16 @@ workers_dev = true
 # Deploy once to your platform account; dply provisions apps into it by
 # writing credentials into the APPS KV namespace (it never re-deploys the
 # Worker). See README.md.
-# Serve on the branded host. custom_domain provisions the hostname + TLS on the
-# on-dply.site zone (already in the account from Edge) at deploy time. Must stay
-# at the top level — a key under [vars] becomes an env var, not a route.
+#
+# Serve on the branded host via a SPECIFIC zone route, NOT a custom_domain.
+# The Edge worker owns a wildcard route `*.on-dply.site/*` on this same zone; a
+# custom_domain for realtime.on-dply.site is shadowed by that wildcard and falls
+# through to Edge (404 "Host not configured"). A more-specific route wins over
+# the wildcard, so realtime.on-dply.site/* routes here. Relies on the zone's
+# wildcard proxied DNS + Universal SSL (which covers one subdomain level). Must
+# stay at the top level — a key under [vars] becomes an env var, not a route.
 routes = [
-  { pattern = "realtime.on-dply.site", custom_domain = true },
+  { pattern = "realtime.on-dply.site/*", zone_name = "on-dply.site" },
 ]
 
 [vars]

@@ -1,3 +1,12 @@
+---
+title: "Cache snapshots"
+slug: server-snapshots
+category: "Servers"
+order: 60
+description: "Point-in-time RDB snapshots of a server's Redis-compatible cache engine, covering on-demand and scheduled captures, restore, and the S3-style destination."
+group: servers
+---
+
 # Cache snapshots
 
 Point-in-time **RDB snapshots** of the Redis-compatible cache engine on this server — for capturing cache or queue state you don't want to lose.

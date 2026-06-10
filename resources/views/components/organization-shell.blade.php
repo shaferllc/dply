@@ -1,6 +1,8 @@
 @props([
     'organization',
     'section' => 'overview',
+    /** Breadcrumb trail items, rendered above the whole shell (nav + content). */
+    'breadcrumb' => null,
 ])
 
 @php
@@ -15,11 +17,30 @@
     $ni = 'h-[1.125rem] w-[1.125rem] shrink-0 opacity-90';
 @endphp
 
+@if (! empty($breadcrumb))
+    {{-- Breadcrumb sits above the whole shell (nav + content), full width,
+         matching the settings layout. The contextual docs button mirrors the
+         server/site workspaces: the slug is resolved once here from the current
+         route so it survives wire:navigate renders. --}}
+    <x-breadcrumb-trail
+        :items="$breadcrumb"
+        doc-contextual
+        :contextual-doc-slug="app(\App\Support\Docs\ContextualDocResolver::class)->resolve()"
+    />
+@endif
+
 <div class="lg:grid lg:grid-cols-12 lg:gap-10">
     <aside class="sm:col-span-3 mb-8 lg:mb-0 shrink-0">
         <div class="dply-surface-nav">
             <p class="text-xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('Organization') }}</p>
-            <p class="mt-1 font-semibold text-brand-ink truncate" title="{{ $org->name }}">{{ $org->name }}</p>
+            <div class="mt-1 flex items-center gap-2">
+                @if ($org->hasIcon())
+                    <img src="{{ $org->iconUrl() }}" alt="" class="h-6 w-6 shrink-0 rounded-md object-cover ring-1 ring-brand-ink/10" />
+                @else
+                    <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-brand-moss/15 text-[0.625rem] font-semibold text-brand-moss ring-1 ring-brand-ink/10" aria-hidden="true">{{ $org->initials() }}</span>
+                @endif
+                <p class="font-semibold text-brand-ink truncate" title="{{ $org->name }}">{{ $org->name }}</p>
+            </div>
             <nav class="mt-4 space-y-0.5" aria-label="{{ __('Organization navigation') }}">
                 {{-- Overview is the workspace root — pinned first; everything below is alphabetical. --}}
                 <a
@@ -30,6 +51,16 @@
                     <x-heroicon-o-squares-2x2 class="{{ $ni }}" aria-hidden="true" />
                     {{ __('Overview') }}
                 </a>
+                @can('update', $org)
+                    <a
+                        href="{{ route('organizations.settings', $org) }}"
+                        wire:navigate
+                        @class([$navBase, $link('general')])
+                    >
+                        <x-heroicon-o-cog-6-tooth class="{{ $ni }}" aria-hidden="true" />
+                        {{ __('General') }}
+                    </a>
+                @endcan
                 @if ($org->hasAdminAccess(auth()->user()))
                     <a
                         href="{{ route('organizations.activity', $org) }}"

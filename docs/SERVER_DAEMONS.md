@@ -1,3 +1,12 @@
+---
+title: "Server daemons"
+slug: server-daemons
+category: "Servers"
+order: 160
+description: "Configure host-level Supervisor programs on a server, with status, log tails, and streaming start, stop, and restart actions."
+group: servers
+---
+
 # Server daemons
 
 The **Daemons** section configures **Supervisor** programs on the server — org-wide or default workers not tied to one site.

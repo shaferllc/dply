@@ -1,3 +1,11 @@
+---
+title: "Deploy to dply badge"
+slug: deploy-badge
+category: "Getting started"
+order: 50
+description: "A copy-paste deploy badge for template authors that sends visitors to a pre-filled Edge create form, with allow-listed params and auth handoff."
+---
+
 # Deploy to dply badge
 
 A copy-paste badge for template authors and demo repos. Visitors click the

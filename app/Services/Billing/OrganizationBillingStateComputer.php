@@ -39,6 +39,37 @@ class OrganizationBillingStateComputer
         private ServerResourceCostCalculator $serverResourceCalculator,
     ) {}
 
+    /**
+     * READY servers past the min-billable age, with the latest metric snapshot
+     * eager-loaded. Memoised per org per request: both the tier scan here and
+     * {@see BillingAnalytics::billableServers()} need this exact set, and the
+     * `latestMetricSnapshot` eager load is an expensive latestOfMany subquery —
+     * sharing it collapses what was a duplicate query into one.
+     *
+     * @var array<string, Collection<int, Server>>
+     */
+    private array $readyBillableServersMemo = [];
+
+    /**
+     * @return Collection<int, Server>
+     */
+    public function readyBillableServers(Organization $organization): Collection
+    {
+        if (isset($this->readyBillableServersMemo[$organization->id])) {
+            return $this->readyBillableServersMemo[$organization->id];
+        }
+
+        $ageCutoff = now()->subDays(max(0, (int) config('subscription.standard.min_billable_age_days', 1)));
+
+        return $this->readyBillableServersMemo[$organization->id] = $organization->servers()
+            ->where('status', Server::STATUS_READY)
+            ->where('created_at', '<=', $ageCutoff)
+            // billingTier() (and the managed-server cost calc) read the latest
+            // metric snapshot per server — eager load it to avoid an N+1.
+            ->with('latestMetricSnapshot')
+            ->get();
+    }
+
     public function compute(Organization $organization): DesiredBillingState
     {
         $tierQuantities = array_fill_keys(
@@ -55,10 +86,7 @@ class OrganizationBillingStateComputer
         /** @var Collection<int, Server> $managedServers */
         $managedServers = collect();
 
-        $organization->servers()
-            ->where('status', Server::STATUS_READY)
-            ->where('created_at', '<=', $ageCutoff)
-            ->get()
+        $this->readyBillableServers($organization)
             ->each(function (Server $server) use (&$tierQuantities, $managedServers): void {
                 if ($server->isManagedProductHost()) {
                     return;
@@ -133,11 +161,18 @@ class OrganizationBillingStateComputer
 
         $cloudResourceSubtotalCents = $this->cloudResourceCalculator->subtotalCents($billableCloudSites);
 
-        // Managed Realtime apps — flat per active app. No metered usage in v1.
-        $realtimeCount = $organization->realtimeApps()
+        // Managed Realtime apps — billed per connection-tier (one line per tier,
+        // quantity = active apps on that tier). Rows with a null/unknown tier are
+        // attributed to the default tier via RealtimeApp::tierSlug().
+        $realtimeTierQuantities = [];
+        $organization->realtimeApps()
             ->where('status', RealtimeApp::STATUS_ACTIVE)
             ->where('created_at', '<=', $ageCutoff)
-            ->count();
+            ->get(['tier'])
+            ->each(function (RealtimeApp $app) use (&$realtimeTierQuantities): void {
+                $slug = $app->tierSlug();
+                $realtimeTierQuantities[$slug] = ($realtimeTierQuantities[$slug] ?? 0) + 1;
+            });
 
         [$usagePeriodStart, $usagePeriodEnd] = $this->usageReader->currentMonthWindow();
         $usageTotals = $this->usageReader->totalsForOrganization($organization, $usagePeriodStart, $usagePeriodEnd);
@@ -188,8 +223,7 @@ class OrganizationBillingStateComputer
             edgeUnitCents: (int) config('subscription.standard.edge_cents', 200),
             edgeUsageSubtotalCents: $edgeUsageSubtotalCents,
             edgeUsageEstimate: $edgeUsageEstimate,
-            realtimeCount: $realtimeCount,
-            realtimeUnitCents: (int) config('subscription.standard.realtime_cents', 900),
+            realtimeTierQuantities: $realtimeTierQuantities,
         );
     }
 }

@@ -15,8 +15,12 @@
 
 <x-livewire-validation-errors />
 
-@if (! empty($breadcrumbs))
-    <x-breadcrumb-trail :items="$breadcrumbs" />
+{{-- On the settings layout the trail is hoisted above the nav + grid via the
+     stack; in the org shell it's passed to x-organization-shell's :breadcrumb. --}}
+@if (! empty($breadcrumbs) && empty($useOrgShell))
+    @push('breadcrumbs')
+        <x-breadcrumb-trail :items="$breadcrumbs" />
+    @endpush
 @endif
 
 @if (! empty($backUrl))

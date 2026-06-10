@@ -1,3 +1,12 @@
+---
+title: "Worker pool"
+slug: server-worker-pool
+category: "Servers"
+order: 40
+description: "Scaling background processing by cloning a worker server into a pool of a primary and replicas, covering convergence, draining, and Horizon tuning."
+group: servers
+---
+
 # Worker pool
 
 Scale background processing by cloning a worker server into a **pool**. The pool keeps one **primary** (which owns the scheduler) and adds queue-worker **replicas** that join the same queues.

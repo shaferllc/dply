@@ -1,3 +1,12 @@
+---
+title: "Errors"
+slug: server-errors
+category: "Servers"
+order: 50
+description: "A single newest-first stream of failures on a server and its sites, covering what lands here, dismissing or retrying errors, and how they are collected."
+group: servers
+---
+
 # Errors
 
 A single stream of every failure on this server and the sites it hosts — newest first — so you don't have to dig through logs to find what broke.

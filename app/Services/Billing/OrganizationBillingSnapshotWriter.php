@@ -69,6 +69,7 @@ final class OrganizationBillingSnapshotWriter
         // billed annually. Mirrors BillingAnalytics::subscriptionInterval.
         $yearlyIds = array_merge(
             array_values((array) config('subscription.standard.stripe.plans_yearly', [])),
+            array_values((array) config('subscription.standard.stripe.realtime_tiers_yearly', [])),
             [
                 (string) (config('subscription.standard.stripe.serverless_yearly') ?? ''),
                 (string) (config('subscription.standard.stripe.cloud_yearly') ?? ''),

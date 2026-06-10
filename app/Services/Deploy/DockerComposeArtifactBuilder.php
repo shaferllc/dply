@@ -11,7 +11,15 @@ final class DockerComposeArtifactBuilder
         private readonly DeploymentContractBuilder $contractBuilder,
     ) {}
 
-    public function build(Site $site): string
+    /**
+     * @param  string|null  $imageTag  When set, the service is tagged with this
+     *                                  image name so each release is a pinnable
+     *                                  artifact (enables image rollback).
+     * @param  bool  $withBuild  When false, the `build:` block is omitted so
+     *                           compose RUNS an already-built $imageTag instead of
+     *                           rebuilding — the rollback path.
+     */
+    public function build(Site $site, ?string $imageTag = null, bool $withBuild = true): string
     {
         $contract = $this->contractBuilder->build($site);
         $service = Str::slug($site->slug ?: $site->name ?: 'site', '-');
@@ -25,13 +33,17 @@ final class DockerComposeArtifactBuilder
             ->map(fn (string $value, string $key): string => '      '.$key.': '.$this->yamlScalar($value))
             ->implode("\n");
 
+        // `image:` names the built artifact so a prior release can be re-run by
+        // tag; `build:` is dropped on rollback so compose uses the existing image.
+        $imageLine = $imageTag !== null ? "    image: {$imageTag}\n" : '';
+        $buildBlock = $withBuild
+            ? "    build:\n      context: .\n      dockerfile: Dockerfile.dply\n"
+            : '';
+
         return <<<YAML
 services:
   {$service}:
-    build:
-      context: .
-      dockerfile: Dockerfile.dply
-    restart: unless-stopped
+{$imageLine}{$buildBlock}    restart: unless-stopped
     ports:
       - "{$publishedPort}:{$port}"
     environment:

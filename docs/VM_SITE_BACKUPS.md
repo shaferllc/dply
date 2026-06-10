@@ -1,3 +1,12 @@
+---
+title: "Site backups"
+slug: vm-site-backups
+category: "Sites & deploys"
+order: 50
+description: "Links to server backups with the site selected to configure scheduled database dumps, destinations, and restore caution for shared databases."
+group: sites
+---
+
 # Site backups
 
 The **Backups** section links to **Server → Backups** with this site selected — database backup jobs for engines this app uses.

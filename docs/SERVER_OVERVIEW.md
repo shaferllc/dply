@@ -1,3 +1,12 @@
+---
+title: "Server overview"
+slug: server-overview
+category: "Servers"
+order: 300
+description: "The home screen for a BYO VM server workspace showing status, IP, quick context cards, and the provision journey for setup and reconnection."
+group: servers
+---
+
 # Server overview
 
 The **Overview** tab is the home screen for a BYO VM server workspace. Use it to confirm the server is reachable, see quick context, and jump into **Sites** or **Run**.

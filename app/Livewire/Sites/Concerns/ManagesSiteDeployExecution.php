@@ -148,14 +148,26 @@ trait ManagesSiteDeployExecution
     public function rollbackRelease(int|string $releaseId, SiteReleaseRollback $rollback): void
     {
         $this->authorize('update', $this->site);
-        if (! $this->server->hostCapabilities()->supportsReleaseRollback()) {
-            $this->toastError(__('This host runtime does not support release rollback via server symlinks.'));
-
-            return;
-        }
 
         try {
             $release = SiteRelease::query()->where('site_id', $this->site->id)->findOrFail($releaseId);
+
+            // Image-method (VM Docker) sites roll back by re-running the prior
+            // tagged image, not by flipping the atomic `current` symlink.
+            if ($this->site->usesVmDockerRuntime()) {
+                app(\App\Services\Deploy\DockerImageReleaseRollback::class)->rollbackTo($this->site, $release);
+                $this->site->refresh();
+                $this->toastSuccess(__('Rolled back to the previous container image.'));
+
+                return;
+            }
+
+            if (! $this->server->hostCapabilities()->supportsReleaseRollback()) {
+                $this->toastError(__('This host runtime does not support release rollback via server symlinks.'));
+
+                return;
+            }
+
             $rollback->rollbackTo($this->site, $release);
             $this->site->refresh();
             $this->toastSuccess(__('Rolled back active release symlink. Re-install Nginx if document root changed.'));

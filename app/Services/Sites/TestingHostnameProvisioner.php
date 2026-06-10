@@ -476,6 +476,37 @@ class TestingHostnameProvisioner
     }
 
     /**
+     * Public routing summary for the operator credential that controls a site's
+     * testing zone — used by the wildcard-certificate issuer to drive certbot
+     * DNS-01 hooks against the right provider with the right token. Mirrors the
+     * credential resolution in {@see resolveTestingProviderForSite()} and folds
+     * in the app-level DigitalOcean token fallback so callers always get a
+     * usable token when one is available.
+     *
+     * @return array{provider: string, credential: ?ProviderCredential, token: string}
+     */
+    public function testingDnsRoutingForSite(Site $site): array
+    {
+        $site->loadMissing(['server', 'organization', 'dnsProviderCredential']);
+
+        $routing = $this->resolveTestingProviderForSite($site);
+        $credential = $routing['credential'];
+
+        $token = $credential?->getApiToken();
+        if (! is_string($token) || trim($token) === '') {
+            $token = $routing['provider'] === 'digitalocean'
+                ? trim((string) config('services.digitalocean.token'))
+                : '';
+        }
+
+        return [
+            'provider' => $routing['provider'],
+            'credential' => $credential,
+            'token' => is_string($token) ? trim($token) : '',
+        ];
+    }
+
+    /**
      * Decide which DNS provider + zone pool to use for a site's testing
      * hostname. Preference order:
      *   1) The org has a credential for a provider that has a non-empty

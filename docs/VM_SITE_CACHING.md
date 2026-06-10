@@ -1,3 +1,12 @@
+---
+title: "Site caching"
+slug: vm-site-caching
+category: "Sites & deploys"
+order: 60
+description: "Configure HTTP caching for a VM site, setting browser cache headers, proxy cache behavior, and bypass rules that merge into the site vhost."
+group: sites
+---
+
 # Site caching
 
 The **Caching** section configures **HTTP caching** for this site — browser headers and proxy cache behavior.

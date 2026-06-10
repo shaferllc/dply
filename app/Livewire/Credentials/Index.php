@@ -226,14 +226,41 @@ class Index extends Component
         return $providerId;
     }
 
-    public function credentialCountFor(string $provider): int
+    /**
+     * Per-provider credential counts, resolved in a single grouped query and
+     * memoised for the request. The provider nav calls credentialCountFor()
+     * once per provider in two places, so without this each card fired its own
+     * COUNT (N×2 duplicate queries).
+     *
+     * @var array<string, int>|null
+     */
+    private ?array $credentialCountsMemo = null;
+
+    /** @return array<string, int> provider => count */
+    protected function credentialCounts(): array
     {
+        if ($this->credentialCountsMemo !== null) {
+            return $this->credentialCountsMemo;
+        }
+
         $org = $this->organization ?: auth()->user()->currentOrganization();
         $query = $org
             ? ProviderCredential::query()->where('organization_id', $org->id)
             : auth()->user()->providerCredentials()->whereNull('organization_id');
 
-        return (int) $query->where('provider', $provider)->count();
+        return $this->credentialCountsMemo = $query
+            ->toBase()
+            ->select('provider')
+            ->selectRaw('count(*) as aggregate')
+            ->groupBy('provider')
+            ->pluck('aggregate', 'provider')
+            ->map(fn ($n): int => (int) $n)
+            ->all();
+    }
+
+    public function credentialCountFor(string $provider): int
+    {
+        return $this->credentialCounts()[$provider] ?? 0;
     }
 
     #[On('provider-credential-created')]

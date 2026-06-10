@@ -1,3 +1,12 @@
+---
+title: "Metrics monitor"
+slug: server-metrics
+category: "Servers"
+order: 290
+description: "Charts CPU, memory, disk, and network usage for a server over selectable time ranges from agent or provider data to spot spikes and load."
+group: servers
+---
+
 # Metrics monitor
 
 The **Metrics** section (sidebar **Metrics**) charts CPU, memory, disk, and network usage for the server over time.

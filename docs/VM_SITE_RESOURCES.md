@@ -1,3 +1,12 @@
+---
+title: "Site resources"
+slug: vm-site-resources
+category: "Sites & deploys"
+order: 30
+description: "Attach or detach managed databases and caches for a site, merging connection variables into the .env and queuing a redeploy automatically."
+group: sites
+---
+
 # Site resources
 
 Every backing service attached to this app — managed databases and caches — in one place. Attach more in a click; detach in place.

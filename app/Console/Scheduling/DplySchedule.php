@@ -41,6 +41,7 @@ use App\Console\Commands\PruneServerCreateDraftsCommand;
 use App\Console\Commands\PruneServerCronJobRunsCommand;
 use App\Console\Commands\PruneSiteUptimeCheckResultsCommand;
 use App\Console\Commands\PruneTestingHostnameRecordsCommand;
+use App\Console\Commands\RenewServerWildcardCertificatesCommand;
 use App\Console\Commands\RevokeExpiredServerSshSessionsCommand;
 use App\Console\Commands\RollupEdgeAnalyticsEngineCommand;
 use App\Console\Commands\RunDueDeploymentSchedulesCommand;
@@ -193,6 +194,10 @@ final class DplySchedule
         $schedule->command(CheckEdgeRumAlertsCommand::class)->hourly()->withoutOverlapping();
         $schedule->command(DeployIntelligenceScanCommand::class)->hourly()->withoutOverlapping();
         $schedule->command(PruneTestingHostnameRecordsCommand::class)->dailyAt('03:30');
+        $schedule->command(RenewServerWildcardCertificatesCommand::class)
+            ->dailyAt('03:35')
+            ->withoutOverlapping()
+            ->name('renew-server-wildcard-certs');
         $schedule->command(PruneServerCreateDraftsCommand::class)->dailyAt('03:45');
         $schedule->command(PruneFunctionInvocationsCommand::class)->dailyAt('03:50');
         $schedule->command(PruneSiteUptimeCheckResultsCommand::class)->dailyAt('03:55');

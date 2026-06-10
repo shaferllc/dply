@@ -92,6 +92,8 @@
                         @include('livewire.sites.settings.partials.settings-tab')
                     @elseif ($section === 'routing')
                         @include('livewire.sites.settings.partials.routing')
+                    @elseif ($section === 'backends')
+                        @livewire(\App\Livewire\Sites\Backends::class, ['server' => $server, 'site' => $site], key('backends-'.$site->id))
                     @elseif ($section === 'certificates')
                         @include('livewire.sites.settings.partials.certificates')
                     @elseif ($section === 'repository')

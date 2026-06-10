@@ -1,3 +1,12 @@
+---
+title: "SSH keys on server"
+slug: server-ssh-keys
+category: "Servers"
+order: 410
+description: "Syncs a server's authorized_keys with keys managed in dply from profile, team, and server sources, with sync and connection repair."
+group: servers
+---
+
 # SSH keys on server
 
 The **SSH keys** section syncs **authorized_keys** on the server with keys managed in dply.
