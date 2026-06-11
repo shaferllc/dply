@@ -4,6 +4,10 @@
      (autoscale, cross-region, queue/Horizon config) live on the pool page. --}}
 @php
     $pools = $site->attachedWorkerPools();
+    // Candidate pools in the org not yet attached (the picker), and which of the
+    // attached pools are EXPLICIT (operator-defined → detachable) vs implicit.
+    $availablePools = $site->availableWorkerPools();
+    $explicitPoolIds = $site->workerPools()->pluck('worker_pools.id')->all();
     // Running worker processes on a member (from the last stats probe) — the best
     // available proxy for how much of the shared pull-queue this box is draining.
     $workerProcs = function ($m) {
@@ -52,9 +56,20 @@
                                 <p class="font-semibold text-brand-ink">{{ $pool->name ?: __('Worker pool') }}</p>
                                 <p class="mt-0.5 text-xs text-brand-moss">{{ trans_choice(':n worker|:n workers', $active, ['n' => $active]) }} · {{ __('target') }} {{ $desired ?: $active }} · {{ __('max') }} {{ $cap }} · {{ __('status') }} {{ $pool->status }}</p>
                             </div>
-                            @if ($primary)
-                                <a href="{{ route('servers.worker-pool', ['server' => $primary]) }}" wire:navigate class="shrink-0 text-xs font-semibold text-brand-forest hover:underline">{{ __('Autoscale · queues · cross-region') }} →</a>
-                            @endif
+                            <div class="flex shrink-0 items-center gap-3">
+                                @if ($primary)
+                                    <a href="{{ route('servers.worker-pool', ['server' => $primary]) }}" wire:navigate class="text-xs font-semibold text-brand-forest hover:underline">{{ __('Autoscale · queues · cross-region') }} →</a>
+                                @endif
+                                @can('update', $site)
+                                    @if (in_array($pool->id, $explicitPoolIds, true))
+                                        <button type="button"
+                                            wire:click="detachWorkerPool(@js((string) $pool->id))"
+                                            wire:confirm="{{ __('Detach this worker pool from the site? The pool keeps running; it just stops being listed here.') }}"
+                                            wire:loading.attr="disabled"
+                                            class="rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-moss hover:bg-brand-sand/40 disabled:opacity-50">{{ __('Detach') }}</button>
+                                    @endif
+                                @endcan
+                            </div>
                         </div>
 
                         @can('update', $site)
@@ -135,5 +150,37 @@
                 @endforeach
             </div>
         @endif
+
+        {{-- Attach existing worker pools in this organization. Lets the operator
+             define which workers serve this site (instead of only the implicit
+             "pool whose source server is this site's server"). --}}
+        @can('update', $site)
+            @if ($availablePools->isNotEmpty())
+                <div class="mt-6 rounded-2xl border border-brand-ink/10 bg-brand-sand/15 p-4">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Attach worker servers') }}</p>
+                    <p class="mt-1 text-sm text-brand-moss">{{ __('Worker pools in this organization you can attach to this site.') }}</p>
+                    <ul class="mt-3 divide-y divide-brand-ink/10 overflow-hidden rounded-xl border border-brand-ink/10 bg-white">
+                        @foreach ($availablePools as $candidate)
+                            <li class="flex items-center justify-between gap-3 px-3 py-2.5 text-sm" wire:key="attach-pool-{{ $candidate->id }}">
+                                <div class="min-w-0">
+                                    <p class="truncate font-medium text-brand-ink">{{ $candidate->name ?: __('Worker pool') }}</p>
+                                    <p class="mt-0.5 truncate text-[11px] text-brand-mist">
+                                        {{ trans_choice(':n worker|:n workers', $candidate->servers->count(), ['n' => $candidate->servers->count()]) }}
+                                        @if ($candidate->sourceServer)· {{ __('source') }}: {{ $candidate->sourceServer->name }}@endif
+                                        · {{ __('status') }} {{ $candidate->status }}
+                                    </p>
+                                </div>
+                                <button type="button"
+                                    wire:click="attachWorkerPool(@js((string) $candidate->id))"
+                                    wire:loading.attr="disabled"
+                                    class="inline-flex shrink-0 items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink hover:border-brand-forest/30 hover:bg-brand-forest/5 hover:text-brand-forest disabled:opacity-50">
+                                    <x-heroicon-o-link class="h-3.5 w-3.5" /> {{ __('Attach') }}
+                                </button>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+        @endcan
     </div>
 </section>

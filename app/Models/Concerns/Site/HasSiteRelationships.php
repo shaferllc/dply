@@ -86,21 +86,62 @@ trait HasSiteRelationships
      */
     public function attachedWorkerPools(): Collection
     {
-        $serverId = $this->server_id;
+        // Explicit attachments (see {@see workerPools()}) win: once an operator
+        // defines the set on the Worker servers page, it fully controls which
+        // pools serve this site — even pools whose source server is another box.
+        $explicit = $this->workerPools()
+            ->with(['servers', 'primaryServer'])
+            ->orderBy('created_at')
+            ->get();
 
+        if ($explicit->isNotEmpty()) {
+            return $explicit;
+        }
+
+        // Back-compat fallback (no explicit attachments): a pool that scales this
+        // site's OWN server — its source_server_id. A pool runs the source
+        // server's code + queues, so by default it belongs to sites on that box.
+        $serverId = $this->server_id;
         if ($serverId === null) {
             return new Collection;
         }
 
-        // A worker pool scales out exactly one box — its source_server_id (the
-        // server whose code + queues the replicas run). It's "attached" to a site
-        // only when it scales THAT site's own server. Scoping by workspace/org
-        // instead made every site in a workspace that owns any pool anywhere
-        // (e.g. dply's control-plane pool) falsely show workers attached.
         return WorkerPool::query()
             ->where('source_server_id', $serverId)
             ->with(['servers', 'primaryServer'])
             ->orderBy('created_at')
+            ->get();
+    }
+
+    /**
+     * Explicitly-attached worker pools (the operator-defined set). Many-to-many
+     * so a site can be served by several pools and a pool can serve several sites.
+     */
+    public function workerPools(): BelongsToMany
+    {
+        return $this->belongsToMany(WorkerPool::class, 'site_worker_pool')->withTimestamps();
+    }
+
+    /**
+     * Worker pools in this site's organization that are NOT currently attached —
+     * the candidates the Worker servers picker offers. Lets the operator see what
+     * workers exist (answering "I have workers, why aren't they here?") and pick.
+     *
+     * @return Collection<int, WorkerPool>
+     */
+    public function availableWorkerPools(): Collection
+    {
+        if ($this->organization_id === null) {
+            return new Collection;
+        }
+
+        $attachedIds = $this->attachedWorkerPools()->pluck('id')->all();
+
+        return WorkerPool::query()
+            ->where('organization_id', $this->organization_id)
+            ->whereNotIn('id', $attachedIds)
+            ->with(['servers', 'sourceServer'])
+            ->orderBy('name')
             ->get();
     }
 

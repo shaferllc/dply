@@ -1772,6 +1772,39 @@ class Settings extends Show
         return $this->site->attachedWorkerPools()->firstWhere('id', $poolId);
     }
 
+    /**
+     * Explicitly attach an existing org worker pool to this site. Once any pool
+     * is explicitly attached, the explicit set fully defines the site's workers
+     * (see {@see \App\Models\Concerns\Site\HasSiteRelationships::attachedWorkerPools()}).
+     */
+    public function attachWorkerPool(string $poolId): void
+    {
+        $this->authorize('update', $this->site);
+
+        $pool = WorkerPool::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->whereKey($poolId)
+            ->first();
+
+        if ($pool === null) {
+            $this->toastError(__('Worker pool not found in this organization.'));
+
+            return;
+        }
+
+        $this->site->workerPools()->syncWithoutDetaching([$pool->id]);
+        $this->toastSuccess(__('Attached :name to this site.', ['name' => $pool->name ?: __('worker pool')]));
+    }
+
+    /** Detach an explicitly-attached worker pool from this site (does not delete the pool). */
+    public function detachWorkerPool(string $poolId): void
+    {
+        $this->authorize('update', $this->site);
+
+        $this->site->workerPools()->detach($poolId);
+        $this->toastSuccess(__('Detached the worker pool from this site.'));
+    }
+
     /** Scale an attached worker pool to N members (declarative — reconciler converges). */
     public function scaleWorkerPool(string $poolId, int $count, WorkerPoolManager $manager): void
     {
