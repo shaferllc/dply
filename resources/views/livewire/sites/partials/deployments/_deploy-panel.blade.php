@@ -670,4 +670,39 @@
     @if (method_exists($this, 'applyPipelineOptimization'))
         @include('livewire.sites.partials.pipeline._optimize-preview-modal')
     @endif
+
+    @if (method_exists($this, 'deployWithIdentity'))
+        <x-modal name="supply-deploy-identity" maxWidth="lg" overlayClass="bg-brand-ink/40" focusable>
+            <div class="p-6">
+                <div class="flex items-start gap-3">
+                    <x-heroicon-o-key class="h-6 w-6 shrink-0 text-brand-forest" />
+                    <div class="min-w-0">
+                        <h2 class="text-base font-semibold text-brand-ink">{{ __('Supply your organization key') }}</h2>
+                        <p class="mt-1 text-sm text-brand-moss">
+                            {{ __('This site has secrets under a customer-held key, so dply cannot decrypt them on its own. Paste your age identity to deploy. It is used for this deploy only and is never stored.') }}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <x-input-label for="deploy_identity" :value="__('age identity (AGE-SECRET-KEY-…)')" />
+                    <textarea
+                        id="deploy_identity"
+                        wire:model="deploy_identity"
+                        rows="4"
+                        class="mt-1 w-full rounded-lg border border-brand-ink/15 bg-white px-3 py-2 font-mono text-[12px] shadow-sm focus:border-brand-sage focus:ring-brand-sage/30"
+                        placeholder="AGE-SECRET-KEY-1…"
+                    ></textarea>
+                    <x-input-error :messages="$errors->get('deploy_identity')" class="mt-1" />
+                </div>
+
+                <div class="mt-5 flex items-center justify-end gap-2">
+                    <x-secondary-button type="button" x-on:click="$dispatch('close-modal', 'supply-deploy-identity')">{{ __('Cancel') }}</x-secondary-button>
+                    <x-primary-button type="button" wire:click="deployWithIdentity" wire:loading.attr="disabled" wire:target="deployWithIdentity">
+                        {{ __('Deploy') }}
+                    </x-primary-button>
+                </div>
+            </div>
+        </x-modal>
+    @endif
 </div>

@@ -691,13 +691,23 @@
                                 @if ($backup->error_message)
                                     <p class="mt-1 truncate text-xs text-rose-700">{{ $backup->error_message }}</p>
                                 @endif
+                                @if (isset($stagingErrors[$backup->id]))
+                                    <p class="mt-1 text-xs text-rose-700">{{ $stagingErrors[$backup->id] }}</p>
+                                @endif
                             </div>
                             <div class="flex shrink-0 items-center gap-1.5">
                                 @if ($backup->isDownloadable())
-                                    <button type="button" wire:click="downloadDatabaseBackup('{{ $backup->id }}')" class="{{ $btnOutline }}">
-                                        <x-heroicon-m-arrow-down-tray class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                        {{ __('Download') }}
-                                    </button>
+                                    @if ($stagingBackupId === $backup->id)
+                                        <span class="{{ $btnOutline }} cursor-default opacity-70" aria-live="polite">
+                                            <x-spinner size="sm" />
+                                            {{ __('Preparing…') }}
+                                        </span>
+                                    @else
+                                        <button type="button" wire:click="requestDownload('database', '{{ $backup->id }}')" wire:loading.attr="disabled" wire:target="requestDownload" class="{{ $btnOutline }}">
+                                            <x-heroicon-m-arrow-down-tray class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                            {{ __('Download') }}
+                                        </button>
+                                    @endif
                                 @endif
                                 <button
                                     type="button"
@@ -756,13 +766,23 @@
                                 @if ($backup->error_message)
                                     <p class="mt-1 truncate text-xs text-rose-700">{{ $backup->error_message }}</p>
                                 @endif
+                                @if (isset($stagingErrors[$backup->id]))
+                                    <p class="mt-1 text-xs text-rose-700">{{ $stagingErrors[$backup->id] }}</p>
+                                @endif
                             </div>
                             <div class="flex shrink-0 items-center gap-1.5">
-                                @if ($backup->status === 'completed' && ! empty($backup->disk_path))
-                                    <button type="button" wire:click="downloadFileBackup('{{ $backup->id }}')" class="{{ $btnOutline }}">
-                                        <x-heroicon-m-arrow-down-tray class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                        {{ __('Download') }}
-                                    </button>
+                                @if ($backup->isDownloadable())
+                                    @if ($stagingBackupId === $backup->id)
+                                        <span class="{{ $btnOutline }} cursor-default opacity-70" aria-live="polite">
+                                            <x-spinner size="sm" />
+                                            {{ __('Preparing…') }}
+                                        </span>
+                                    @else
+                                        <button type="button" wire:click="requestDownload('site_files', '{{ $backup->id }}')" wire:loading.attr="disabled" wire:target="requestDownload" class="{{ $btnOutline }}">
+                                            <x-heroicon-m-arrow-down-tray class="h-4 w-4 shrink-0" aria-hidden="true" />
+                                            {{ __('Download') }}
+                                        </button>
+                                    @endif
                                 @endif
                                 <button
                                     type="button"
@@ -789,6 +809,11 @@
     @endif
 
     </div>{{-- /tab container --}}
+
+    {{-- Poll the staging row while a download is being prepared, then it redirects. --}}
+    @if ($stagingId !== null)
+        <div wire:poll.2s="pollStaging" class="hidden" aria-hidden="true"></div>
+    @endif
 
     {{-- Lightweight refresh so pending → completed transitions show without manual reload. --}}
     @if ($databaseBackups->where('status', 'pending')->isNotEmpty() || $fileBackups->where('status', 'pending')->isNotEmpty())

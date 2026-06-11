@@ -177,10 +177,17 @@
                                                         <li wire:key="site-file-bu-{{ $b->id }}" class="flex flex-wrap items-center gap-2">
                                                             <span class="text-brand-mist">{{ $b->created_at->timezone(config('app.timezone'))->format('Y-m-d H:i') }}</span>
                                                             <span class="font-medium text-brand-ink">{{ str($b->status)->replace('_', ' ')->title() }}</span>
-                                                            @if ($b->status === \App\Models\SiteFileBackup::STATUS_COMPLETED && $b->disk_path)
-                                                                <button type="button" wire:click="downloadSiteFileBackup('{{ $b->id }}')" class="text-brand-sage hover:text-brand-ink font-medium">
-                                                                    {{ __('Download') }}
-                                                                </button>
+                                                            @if ($b->isDownloadable())
+                                                                @if ($stagingBackupId === $b->id)
+                                                                    <span class="font-medium text-brand-mist">{{ __('Preparing…') }}</span>
+                                                                @else
+                                                                    <button type="button" wire:click="requestDownload('site_files', '{{ $b->id }}')" wire:loading.attr="disabled" wire:target="requestDownload" class="text-brand-sage hover:text-brand-ink font-medium">
+                                                                        {{ __('Download') }}
+                                                                    </button>
+                                                                @endif
+                                                            @endif
+                                                            @if (isset($stagingErrors[$b->id]))
+                                                                <span class="w-full text-rose-700">{{ $stagingErrors[$b->id] }}</span>
                                                             @endif
                                                         </li>
                                                     @endforeach
@@ -214,4 +221,8 @@
             </p>
         </div>
     </div>
+
+    @if ($stagingId !== null)
+        <div wire:poll.2s="pollStaging" class="hidden" aria-hidden="true"></div>
+    @endif
 </div>

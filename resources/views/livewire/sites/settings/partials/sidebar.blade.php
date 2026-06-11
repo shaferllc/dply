@@ -78,7 +78,17 @@
                 @endif
             </div>
         </div>
-        <nav id="site-settings-sidebar" class="flex flex-col gap-0.5 p-2" aria-label="{{ __($resourceNoun.' settings sections') }}">
+        <nav
+            id="site-settings-sidebar"
+            class="flex flex-col gap-0.5 p-2"
+            aria-label="{{ __($resourceNoun.' settings sections') }}"
+            x-data="{
+                _k: 'dply.siteNav.collapsed:{{ $site->id }}',
+                collapsed: {},
+                init() { try { this.collapsed = JSON.parse(localStorage.getItem(this._k)) || {}; } catch (e) { this.collapsed = {}; } },
+                toggle(g) { this.collapsed[g] = ! this.collapsed[g]; localStorage.setItem(this._k, JSON.stringify(this.collapsed)); },
+            }"
+        >
             @php
                 $groupLabels = (array) config('site_settings.nav_groups', []);
                 $orderedGroupKeys = [];
@@ -91,15 +101,57 @@
                 $itemsByGroup = collect($settingsSidebarItems)->groupBy(fn ($i) => $i['group'] ?? '_ungrouped');
             @endphp
             @foreach ($orderedGroupKeys as $groupKey)
-                @php $itemsInGroup = $itemsByGroup[$groupKey] ?? collect(); @endphp
+                @php
+                    $itemsInGroup = $itemsByGroup[$groupKey] ?? collect();
+
+                    // Roll alert signals up to the (collapsible) group header so a
+                    // count/dot stays visible even when the section is collapsed.
+                    $groupAlertCount = 0;
+                    $groupNeedsSetup = false;
+                    foreach ($itemsInGroup as $gi) {
+                        if (($gi['id'] ?? null) === 'errors' && empty($gi['preview_only'])) {
+                            $groupAlertCount += \App\Models\ErrorEvent::undismissedCountForSite((string) $site->id);
+                        }
+                        if (! empty($gi['needs_setup'])) {
+                            $groupNeedsSetup = true;
+                        }
+                    }
+                    $isCollapsibleGroup = $groupKey !== '_ungrouped' && isset($groupLabels[$groupKey]);
+                @endphp
                 @if ($itemsInGroup->isEmpty())
                     @continue
                 @endif
-                @if ($groupKey !== '_ungrouped' && isset($groupLabels[$groupKey]))
-                    <p class="{{ ! $loop->first ? 'mt-3 ' : '' }}px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist">
-                        {{ __($groupLabels[$groupKey]) }}
-                    </p>
+                @if ($isCollapsibleGroup)
+                    <button
+                        type="button"
+                        x-on:click="toggle('{{ $groupKey }}')"
+                        :aria-expanded="(! collapsed['{{ $groupKey }}']).toString()"
+                        class="{{ ! $loop->first ? 'mt-3 ' : '' }}group flex w-full items-center gap-1.5 rounded-md px-3 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-brand-mist hover:text-brand-moss"
+                    >
+                        <span x-bind:class="collapsed['{{ $groupKey }}'] ? '' : 'rotate-90'" class="inline-flex transition-transform">
+                            <x-heroicon-o-chevron-right class="h-3 w-3" />
+                        </span>
+                        <span class="flex-1 text-left">{{ __($groupLabels[$groupKey]) }}</span>
+                        @if ($groupAlertCount > 0)
+                            <span
+                                x-show="collapsed['{{ $groupKey }}']"
+                                class="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold text-rose-700"
+                            >{{ $groupAlertCount > 99 ? '99+' : $groupAlertCount }}</span>
+                        @endif
+                        @if ($groupNeedsSetup)
+                            <span
+                                x-show="collapsed['{{ $groupKey }}']"
+                                class="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
+                                role="img"
+                                aria-label="{{ __('Setup required') }}"
+                            ></span>
+                        @endif
+                    </button>
                 @endif
+                <div
+                    class="flex flex-col gap-0.5"
+                    @if ($isCollapsibleGroup) x-show="! collapsed['{{ $groupKey }}']" x-collapse @endif
+                >
                 @foreach ($itemsInGroup as $item)
                     @php
                         $isChild = ! empty($item['parent'] ?? null);
@@ -163,6 +215,7 @@
                         @endif
                     </a>
                 @endforeach
+                </div>
             @endforeach
         </nav>
         <div class="border-t border-brand-ink/10 p-3">

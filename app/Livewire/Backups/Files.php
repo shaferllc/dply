@@ -4,21 +4,21 @@ namespace App\Livewire\Backups;
 
 use App\Jobs\ExportSiteFileBackupJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\StagesBackupDownloads;
 use App\Models\BackupConfiguration;
 use App\Models\Site;
 use App\Models\SiteFileBackup;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 #[Layout('layouts.app')]
 class Files extends Component
 {
     use DispatchesToastNotifications;
+    use StagesBackupDownloads;
 
     public function queueFullBackup(string $siteId): void
     {
@@ -52,11 +52,19 @@ class Files extends Component
         $this->toastSuccess(__('Full backup queued. Refresh shortly to download the archive when it completes.'));
     }
 
-    public function downloadSiteFileBackup(string $backupId): StreamedResponse|Response|null
+    /**
+     * Resolve + authorize a site-file backup for the Hetzner staging download
+     * flow. Org-scoped to the user's current organization.
+     */
+    protected function resolveDownloadableBackup(string $type, string $backupId): ?Model
     {
+        if ($type !== 'site_files') {
+            return null;
+        }
+
         $org = auth()->user()->currentOrganization();
         if (! $org) {
-            abort(403, 'Select an organization first.');
+            return null;
         }
 
         $serverIds = $org->servers()->pluck('id');
@@ -64,26 +72,16 @@ class Files extends Component
         $backup = SiteFileBackup::query()
             ->whereKey($backupId)
             ->whereHas('site', fn ($q) => $q->whereIn('server_id', $serverIds))
-            ->firstOrFail();
+            ->with('site.server')
+            ->first();
+
+        if ($backup === null) {
+            return null;
+        }
 
         $this->authorize('update', $backup->site);
 
-        if ($backup->status !== SiteFileBackup::STATUS_COMPLETED || empty($backup->disk_path)) {
-            $this->toastError(__('Backup is not ready yet.'));
-
-            return null;
-        }
-
-        if (! Storage::disk('local')->exists($backup->disk_path)) {
-            $this->toastError(__('Backup file is missing from storage.'));
-
-            return null;
-        }
-
-        $slug = $backup->site?->slug;
-        $name = 'site-files-'.(($slug !== null && $slug !== '') ? $slug : 'site').'-'.$backup->id.'.tar.gz';
-
-        return Storage::disk('local')->download($backup->disk_path, $name);
+        return $backup;
     }
 
     public function render(): View

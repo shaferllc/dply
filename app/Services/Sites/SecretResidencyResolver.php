@@ -68,6 +68,25 @@ class SecretResidencyResolver
     }
 
     /**
+     * Whether deploying/pushing this site needs the customer to supply an age
+     * identity: it has escrowed (Tier 2) secrets AND the org key is customer-held
+     * (dply holds no identity, so it cannot decrypt them on its own).
+     */
+    public function requiresEphemeralIdentity(Site $site): bool
+    {
+        if ($site->organization_id === null) {
+            return false;
+        }
+        if (! $site->secretResidencies()->where('mode', SiteSecretResidency::MODE_ESCROW)->exists()) {
+            return false;
+        }
+
+        $orgKey = $site->organization?->secretKey;
+
+        return $orgKey !== null && ! $orgKey->dplyCanDecrypt();
+    }
+
+    /**
      * @param  array<string, string>  $vars
      */
     private function hasPlaceholder(array $vars): bool

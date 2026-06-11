@@ -35,6 +35,7 @@ use App\Console\Commands\PruneAppLogsCommand;
 use App\Console\Commands\PruneAuditLogsCommand;
 use App\Console\Commands\PruneErrorEventsCommand;
 use App\Console\Commands\PruneFunctionInvocationsCommand;
+use App\Console\Commands\PruneBackupDownloadStagingsCommand;
 use App\Console\Commands\PruneLocalWorkspaceArtifactsCommand;
 use App\Console\Commands\PruneRemoteTaskRunnerCommand;
 use App\Console\Commands\PruneServerCreateDraftsCommand;
@@ -206,6 +207,12 @@ final class DplySchedule
             ->withoutOverlapping()
             ->name('renew-server-wildcard-certs');
         $schedule->command(PruneServerCreateDraftsCommand::class)->dailyAt('03:45');
+        // 4h-TTL download stagings need finer-than-daily pruning (S3 lifecycle min
+        // is 1 day), so sweep every 15 minutes. onOneServer is auto-applied below.
+        $schedule->command(PruneBackupDownloadStagingsCommand::class)
+            ->everyFifteenMinutes()
+            ->withoutOverlapping()
+            ->name('prune-backup-download-stagings');
         $schedule->command(PruneFunctionInvocationsCommand::class)->dailyAt('03:50');
         $schedule->command(PruneSiteUptimeCheckResultsCommand::class)->dailyAt('03:55');
         $schedule->command(PruneAppLogsCommand::class)->dailyAt('04:05');

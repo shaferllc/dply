@@ -7,6 +7,7 @@ use App\Jobs\ExportSiteFileBackupJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\RequiresFeature;
+use App\Livewire\Concerns\StagesBackupDownloads;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesBackupDestinationModal;
@@ -21,24 +22,20 @@ use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Models\SiteFileBackup;
 use App\Notifications\BackupFailureNotification;
-use App\Services\Servers\DatabaseBackupDownloader;
 use App\Services\Servers\DatabaseBackupExporter;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\DatabaseBackupSettings;
 use Cron\CronExpression;
 use Illuminate\Contracts\View\View;
-use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
-use Illuminate\Support\Facades\Storage;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use Livewire\Attributes\Lazy;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Backups workspace at {@see servers.backups} (server-wide) and {@see sites.backups}
@@ -61,6 +58,7 @@ class WorkspaceBackups extends Component
     use ManagesBackupDestinationModal;
     use ManagesBackupNotifications;
     use RequiresFeature;
+    use StagesBackupDownloads;
 
     protected string $requiredFeature = 'workspace.backups';
 
@@ -545,53 +543,24 @@ class WorkspaceBackups extends Component
         $this->liveDbDumpTargets = $targets;
     }
 
-    public function downloadDatabaseBackup(string $backupId, DatabaseBackupDownloader $downloader): StreamedResponse|Response|null
+    /**
+     * Resolve + authorize a backup for the Hetzner staging download flow. DB
+     * backups allow remote-attached databases (their dump runs on the home
+     * server); site-file backups are scoped to this server's sites.
+     */
+    protected function resolveDownloadableBackup(string $type, string $backupId): ?\Illuminate\Database\Eloquent\Model
     {
         $this->authorize('update', $this->server);
-        $backup = $this->resolveDatabaseBackupForServer($backupId);
-        if ($backup === null) {
-            $this->toastError(__('Backup not found.'));
 
-            return null;
-        }
-
-        $extension = $backup->serverDatabase?->engine === 'sqlite' ? 'db' : 'sql';
-        $filename = ($backup->serverDatabase?->name ?? 'database').'-'.$backup->id.'.'.$extension;
-
-        try {
-            return $downloader->response($backup, $filename);
-        } catch (\Throwable $e) {
-            $this->toastError($e->getMessage());
-
-            return null;
-        }
-    }
-
-    public function downloadFileBackup(string $backupId): StreamedResponse|Response|null
-    {
-        $this->authorize('update', $this->server);
-        $backup = SiteFileBackup::query()
-            ->whereKey($backupId)
-            ->whereHas('site', fn ($q) => $q->where('server_id', $this->server->id))
-            ->with('site')
-            ->firstOrFail();
-
-        if ($backup->status !== SiteFileBackup::STATUS_COMPLETED || empty($backup->disk_path)) {
-            $this->toastError(__('Backup is not ready yet.'));
-
-            return null;
-        }
-
-        if (! Storage::disk('local')->exists($backup->disk_path)) {
-            $this->toastError(__('Backup file is missing from storage.'));
-
-            return null;
-        }
-
-        $slug = $backup->site?->slug;
-        $name = 'site-files-'.(($slug !== null && $slug !== '') ? $slug : 'site').'-'.$backup->id.'.tar.gz';
-
-        return Storage::disk('local')->download($backup->disk_path, $name);
+        return match ($type) {
+            'database' => $this->resolveDatabaseBackupForServer($backupId),
+            'site_files' => SiteFileBackup::query()
+                ->whereKey($backupId)
+                ->whereHas('site', fn ($q) => $q->where('server_id', $this->server->id))
+                ->with('site.server')
+                ->first(),
+            default => null,
+        };
     }
 
     public function deleteSchedule(string $scheduleId): void
@@ -903,6 +872,7 @@ class WorkspaceBackups extends Component
         }
 
         app(DatabaseBackupExporter::class)->deleteArtifact($backup);
+        $this->purgeBackupStagings($backup);
         $snapshot = [
             'backup_id' => (string) $backup->id,
             'server_database_id' => (string) $backup->server_database_id,
@@ -936,9 +906,8 @@ class WorkspaceBackups extends Component
             return;
         }
 
-        if (! empty($backup->disk_path) && Storage::disk('local')->exists($backup->disk_path)) {
-            Storage::disk('local')->delete($backup->disk_path);
-        }
+        app(\App\Services\Servers\SiteFileBackupExporter::class)->deleteArtifact($backup);
+        $this->purgeBackupStagings($backup);
         $snapshot = [
             'backup_id' => (string) $backup->id,
             'site_id' => (string) $backup->site_id,

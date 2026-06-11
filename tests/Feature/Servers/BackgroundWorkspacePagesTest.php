@@ -6,6 +6,7 @@ namespace Tests\Feature\Servers\BackgroundWorkspacePagesTest;
 
 use App\Jobs\ExportServerDatabaseBackupJob;
 use App\Jobs\ExportSiteFileBackupJob;
+use App\Jobs\StageBackupDownloadJob;
 use App\Livewire\Servers\WorkspaceActivity;
 use App\Livewire\Servers\WorkspaceBackups;
 use App\Livewire\Servers\WorkspaceDaemons;
@@ -13,6 +14,7 @@ use App\Livewire\Servers\WorkspaceOverview;
 use App\Livewire\Servers\WorkspaceSchedule;
 use App\Models\AuditLog;
 use App\Models\Organization;
+use App\Models\BackupDownloadStaging;
 use App\Models\Server;
 use App\Models\ServerBackupSchedule;
 use App\Models\ServerCronJob;
@@ -31,6 +33,7 @@ use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -310,9 +313,16 @@ test('backups route denied for user outside organization', function () {
         ->get(route('servers.backups', $server))
         ->assertForbidden();
 });
-test('download database backup returns file response when completed', function () {
+test('requesting a database backup download stages it and dispatches the upload job', function () {
     Storage::fake('local');
-    config(['server_database.allow_control_plane_storage' => true]);
+    Queue::fake();
+    config([
+        'server_database.allow_control_plane_storage' => true,
+        'backup_staging.hetzner.enabled' => true,
+        'backup_staging.hetzner.bucket' => 'dply-downloads',
+        'backup_staging.hetzner.access_key' => 'key',
+        'backup_staging.hetzner.secret' => 'secret',
+    ]);
 
     $user = actingOrgUser();
     $server = readyServer($user);
@@ -333,10 +343,23 @@ test('download database backup returns file response when completed', function (
 
     Livewire::actingAs($user)
         ->test(WorkspaceBackups::class, ['server' => $server])
-        ->call('downloadDatabaseBackup', $backup->id)
-        ->assertSuccessful();
+        ->call('requestDownload', 'database', $backup->id)
+        ->assertSet('stagingId', fn ($v) => $v !== null);
+
+    expect(BackupDownloadStaging::query()
+        ->where('backupable_id', $backup->id)
+        ->where('status', BackupDownloadStaging::STATUS_PENDING)
+        ->exists())->toBeTrue();
+
+    Queue::assertPushed(StageBackupDownloadJob::class);
 });
-test('download database backup short circuits when pending', function () {
+test('requesting a download without a configured staging bucket does not stage', function () {
+    Storage::fake('local');
+    config([
+        'server_database.allow_control_plane_storage' => true,
+        'backup_staging.hetzner.enabled' => false,
+    ]);
+
     $user = actingOrgUser();
     $server = readyServer($user);
     $database = $server->serverDatabases()->create([
@@ -345,18 +368,21 @@ test('download database backup short circuits when pending', function () {
         'username' => '',
         'password' => '',
     ]);
+    Storage::disk('local')->put('backup.sql', "-- dump --\n");
     $backup = ServerDatabaseBackup::create([
         'server_database_id' => $database->id,
         'user_id' => $user->id,
-        'status' => ServerDatabaseBackup::STATUS_PENDING,
+        'status' => ServerDatabaseBackup::STATUS_COMPLETED,
+        'storage_kind' => 'control_plane',
+        'disk_path' => 'backup.sql',
     ]);
 
-    // Pending → toast error, no download response.
     Livewire::actingAs($user)
         ->test(WorkspaceBackups::class, ['server' => $server])
-        ->call('downloadDatabaseBackup', $backup->id);
+        ->call('requestDownload', 'database', $backup->id)
+        ->assertSet('stagingId', null);
 
-    expect(ServerDatabaseBackup::find($backup->id)->disk_path)->toBeNull();
+    expect(BackupDownloadStaging::count())->toBe(0);
 });
 test('empty state explainer offers inline add destination', function () {
     // With org-scoped destinations and the inline "Add destination" modal,

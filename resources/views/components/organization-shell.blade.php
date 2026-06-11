@@ -172,9 +172,27 @@
                     </a>
                 @endcan
             </nav>
-            <div class="mt-4 border-t border-brand-ink/10 pt-4">
-                <p class="text-xs font-semibold uppercase tracking-wider text-brand-moss">{{ __('Guides') }}</p>
-                <nav class="mt-2 space-y-0.5" aria-label="{{ __('Documentation guides') }}">
+            <div
+                class="mt-4 border-t border-brand-ink/10 pt-4"
+                x-data="{
+                    _k: 'dply.orgNav.guidesCollapsed:{{ $org->id }}',
+                    collapsed: false,
+                    init() { try { this.collapsed = JSON.parse(localStorage.getItem(this._k)) || false; } catch (e) { this.collapsed = false; } },
+                    toggle() { this.collapsed = ! this.collapsed; localStorage.setItem(this._k, JSON.stringify(this.collapsed)); },
+                }"
+            >
+                <button
+                    type="button"
+                    x-on:click="toggle()"
+                    :aria-expanded="(! collapsed).toString()"
+                    class="flex w-full items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-brand-moss hover:text-brand-ink"
+                >
+                    <span x-bind:class="collapsed ? '' : 'rotate-90'" class="inline-flex transition-transform">
+                        <x-heroicon-o-chevron-right class="h-3 w-3" />
+                    </span>
+                    <span class="flex-1 text-left">{{ __('Guides') }}</span>
+                </button>
+                <nav class="mt-2 space-y-0.5" aria-label="{{ __('Documentation guides') }}" x-show="! collapsed" x-collapse>
                     <a
                         href="{{ route('docs.connect-provider') }}"
                         wire:navigate

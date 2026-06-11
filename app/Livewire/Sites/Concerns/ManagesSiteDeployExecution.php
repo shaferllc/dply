@@ -28,22 +28,71 @@ use Livewire\Component;
  */
 trait ManagesSiteDeployExecution
 {
+    /** A customer-held org age identity supplied for one deploy; never persisted. */
+    public string $deploy_identity = '';
+
     public function deployNow(): void
     {
         $this->authorize('update', $this->site);
 
-        // Queue the deploy on a worker instead of running it inline. SSH must
-        // never block a Livewire/HTTP request (PHP max_execution_time), so the
-        // job runs the clone/build/release steps off-request. Seed the active
-        // marker now so the panel immediately reads "Deploying…" and starts
-        // polling; the job overwrites it with the real deployment id once it
-        // creates the running record.
+        // A site whose escrowed secrets sit under a CUSTOMER-held org key can't be
+        // resolved by dply alone — prompt for the identity instead of deploying.
+        if (app(\App\Services\Sites\SecretResidencyResolver::class)->requiresEphemeralIdentity($this->site)) {
+            $this->dispatch('open-modal', 'supply-deploy-identity');
+
+            return;
+        }
+
+        $this->dispatchDeployJob(null);
+    }
+
+    /**
+     * Deploy after the customer pastes their org key identity. The raw key is
+     * stashed in the cache under a random token (NOT serialized into the job) and
+     * pulled-and-forgotten by {@see RunSiteDeploymentJob}; the field is cleared.
+     */
+    public function deployWithIdentity(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $identity = trim($this->deploy_identity);
+        if ($identity === '') {
+            $this->addError('deploy_identity', __('Paste your organization key identity to deploy.'));
+
+            return;
+        }
+
+        $token = bin2hex(random_bytes(16));
+        Cache::put(
+            \App\Jobs\PushSiteEnvJob::EPHEMERAL_IDENTITY_CACHE_PREFIX.$token,
+            $identity,
+            now()->addMinutes(10),
+        );
+
+        $this->reset('deploy_identity');
+        $this->dispatch('close-modal', 'supply-deploy-identity');
+        $this->dispatchDeployJob($token);
+    }
+
+    /**
+     * Queue the deploy on a worker instead of running it inline. SSH must never
+     * block a Livewire/HTTP request (PHP max_execution_time), so the job runs the
+     * clone/build/release steps off-request. Seed the active marker now so the
+     * panel immediately reads "Deploying…" and starts polling; the job overwrites
+     * it with the real deployment id once it creates the running record.
+     */
+    private function dispatchDeployJob(?string $ephemeralIdentityToken): void
+    {
         Cache::put('site-deploy-active:'.$this->site->id, [
             'started_at' => now()->toIso8601String(),
             'deployment_id' => null,
         ], 600);
 
-        RunSiteDeploymentJob::dispatch($this->site, SiteDeployment::TRIGGER_MANUAL);
+        RunSiteDeploymentJob::dispatch(
+            $this->site,
+            SiteDeployment::TRIGGER_MANUAL,
+            ephemeralIdentityToken: $ephemeralIdentityToken,
+        );
 
         $this->toastSuccess(__('Deployment queued. Watch the phase timeline below.'));
     }
