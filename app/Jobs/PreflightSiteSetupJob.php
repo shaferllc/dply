@@ -65,6 +65,9 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
         public ?string $userId = null,
     ) {}
 
+    /** Auto-expire the unique lock so a lost/killed run can't wedge it forever. */
+    public int $uniqueFor = 600;
+
     public function uniqueId(): string
     {
         return 'preflight-setup:'.$this->siteId;
@@ -300,7 +303,7 @@ class PreflightSiteSetupJob implements ShouldBeUnique, ShouldQueue
      * (everything in .env.example or a no-default env() call); holding the
      * deploy on all of them is unusable, so optional integrations never block —
      * they're surfaced in the wizard as advanced/optional instead.
-     * See {@see \App\Support\Sites\BootCriticalEnv}.
+     * See {@see BootCriticalEnv}.
      *
      * @param  array{keys: list<array{key: string, example: ?string, sources: list<string>, required: bool}>}  $requirements
      * @return list<string>

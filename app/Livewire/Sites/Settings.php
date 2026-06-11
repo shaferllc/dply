@@ -1793,6 +1793,16 @@ class Settings extends Show
         }
 
         $this->site->workerPools()->syncWithoutDetaching([$pool->id]);
+
+        // Reinforce the UI confirm server-side: a pool whose source server isn't
+        // this site's box only drains the site's jobs if they share queues/Redis.
+        $crossServer = $pool->source_server_id !== null && $pool->source_server_id !== $this->site->server_id;
+        if ($crossServer) {
+            $this->toastWarning(__('Attached :name — note it runs a different server’s code/queues, so it only processes this site’s jobs if they share the same queue connection/Redis.', ['name' => $pool->name ?: __('worker pool')]));
+
+            return;
+        }
+
         $this->toastSuccess(__('Attached :name to this site.', ['name' => $pool->name ?: __('worker pool')]));
     }
 

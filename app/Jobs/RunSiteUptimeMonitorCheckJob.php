@@ -36,6 +36,9 @@ class RunSiteUptimeMonitorCheckJob implements ShouldBeUnique, ShouldQueue
         public ?string $userId = null,
     ) {}
 
+    /** Auto-expire the unique lock so a lost/killed run can't wedge it forever. */
+    public int $uniqueFor = 120;
+
     public function uniqueId(): string
     {
         return 'console-action:uptime_check:'.$this->siteUptimeMonitorId;

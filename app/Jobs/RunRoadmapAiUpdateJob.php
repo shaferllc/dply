@@ -30,6 +30,9 @@ class RunRoadmapAiUpdateJob implements ShouldBeUnique, ShouldQueue
 
     public function __construct(public ?string $deployedCommit = null) {}
 
+    /** Auto-expire the unique lock so a lost/killed run can't wedge it forever. */
+    public int $uniqueFor = 600;
+
     public function uniqueId(): string
     {
         return 'roadmap-ai-update:'.($this->deployedCommit ?: 'head');

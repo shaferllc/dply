@@ -35,6 +35,9 @@ class UninstallLogAgentJob implements ShouldBeUnique, ShouldQueue
         }
     }
 
+    /** Auto-expire the unique lock so a lost/killed run can't wedge it forever. */
+    public int $uniqueFor = 600;
+
     public function uniqueId(): string
     {
         return 'uninstall-log-agent:'.$this->serverLogAgentId;

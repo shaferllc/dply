@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\Site;
+use App\Services\Deploy\SiteBindingManager;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\SiteEnvReader;
 use Illuminate\Bus\Queueable;
@@ -43,6 +44,9 @@ class SyncEnvFromServerJob implements ShouldBeUnique, ShouldQueue
         public ?string $userId = null,
         public ?string $seededConsoleRunId = null,
     ) {}
+
+    /** Auto-expire the unique lock so a lost/killed run can't wedge it forever. */
+    public int $uniqueFor = 300;
 
     public function uniqueId(): string
     {
@@ -95,7 +99,7 @@ class SyncEnvFromServerJob implements ShouldBeUnique, ShouldQueue
             // (REDIS_*, MAIL_*, DB_*, …) as loose rows. Re-adopt so they stay
             // managed under their resource instead of bouncing into the
             // editable list after every sync.
-            $reAdopted = app(\App\Services\Deploy\SiteBindingManager::class)->reAdoptAll($site);
+            $reAdopted = app(SiteBindingManager::class)->reAdoptAll($site);
             if ($reAdopted !== []) {
                 $emit->step('sync', sprintf('Re-adopted %d key(s) into connected resources.', count($reAdopted)));
             }

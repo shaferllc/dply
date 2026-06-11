@@ -30,6 +30,9 @@ class RunServerMonitoringProbeJob implements ShouldBeUnique, ShouldQueue
         return [10, 30, 60];
     }
 
+    /** Auto-expire the unique lock so a lost/killed run can't wedge it forever. */
+    public int $uniqueFor = 300;
+
     public function uniqueId(): string
     {
         return 'server-monitoring-probe:'.$this->serverId;

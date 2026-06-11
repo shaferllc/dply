@@ -28,6 +28,9 @@ class ApplySiteWebserverConfigJob implements ShouldBeUnique, ShouldQueue
         public ?string $seededConsoleRunId = null,
     ) {}
 
+    /** Auto-expire the unique lock so a lost/killed run can't wedge it forever. */
+    public int $uniqueFor = 300;
+
     public function uniqueId(): string
     {
         return 'console-action:webserver_config:'.$this->siteId;

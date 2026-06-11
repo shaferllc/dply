@@ -38,6 +38,9 @@ class InstallLogAgentJob implements ShouldBeUnique, ShouldQueue
         }
     }
 
+    /** Auto-expire the unique lock so a lost/killed run can't wedge it forever. */
+    public int $uniqueFor = 900;
+
     public function uniqueId(): string
     {
         return 'install-log-agent:'.$this->serverLogAgentId;

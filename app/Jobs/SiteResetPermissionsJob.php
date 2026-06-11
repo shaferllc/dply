@@ -27,6 +27,9 @@ class SiteResetPermissionsJob implements ShouldBeUnique, ShouldQueue
         public ?string $userId = null,
     ) {}
 
+    /** Auto-expire the unique lock so a lost/killed run can't wedge it forever. */
+    public int $uniqueFor = 1200;
+
     public function uniqueId(): string
     {
         return 'console-action:permissions:'.$this->siteId;
