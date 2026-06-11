@@ -29,6 +29,9 @@
             'ai' => __('AI / LLM'),
             'captcha' => __('CAPTCHA'),
             'sms' => __('SMS / push'),
+            'search' => __('Search'),
+            'payments' => __('Payments'),
+            'oauth' => __('OAuth login'),
             'scheduler' => __('Scheduler'),
             'workers' => __('Workers'),
             'publication' => __('Publication'),
@@ -39,7 +42,7 @@
         // card carries only the runtime resources that don't map to env vars.
         $resourceBindings = array_values(array_filter(
             $siteBindings,
-            fn ($b) => ! in_array($b->type, ['database', 'redis', 'queue', 'cache', 'session', 'storage', 'logging', 'mail', 'broadcasting', 'error_tracking', 'ai', 'captcha', 'sms'], true),
+            fn ($b) => ! in_array($b->type, ['database', 'redis', 'queue', 'cache', 'session', 'storage', 'logging', 'mail', 'broadcasting', 'error_tracking', 'ai', 'captcha', 'sms', 'search', 'payments', 'oauth'], true),
         ));
     @endphp
     {{-- $bindingModalOnly: the Resources hub includes this partial solely to
@@ -140,7 +143,7 @@
     <x-modal name="site-binding-modal" maxWidth="2xl" overlayClass="bg-brand-ink/40">
         @php $bindingModalLabel = $bindingTypeLabels[$bindingModalType] ?? str($bindingModalType)->replace('_', ' ')->title(); @endphp
         <div class="relative border-b border-brand-ink/10 px-6 py-5">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ $bindingModalMode === 'provision' ? __('Provision new') : (in_array($bindingModalType, ['logging', 'mail', 'broadcasting', 'error_tracking', 'ai', 'captcha', 'sms']) ? __('Configure') : __('Attach existing')) }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ $bindingModalMode === 'provision' ? __('Provision new') : (in_array($bindingModalType, ['logging', 'mail', 'broadcasting', 'error_tracking', 'ai', 'captcha', 'sms', 'search', 'payments', 'oauth']) ? __('Configure') : __('Attach existing')) }}</p>
             <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ $bindingModalLabel ?: __('Binding') }}</h2>
             <button type="button" x-on:click="$dispatch('close')" class="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist transition-colors hover:bg-brand-sand/40 hover:text-brand-ink focus:outline-none focus:ring-2 focus:ring-brand-sage/40" aria-label="{{ __('Close') }}">
                 <x-heroicon-o-x-mark class="h-5 w-5" />
@@ -732,6 +735,81 @@
                             {{ __('Injects FCM_SERVER_KEY at deploy.') }}
                         @endif
                     </p>
+                </div>
+            @elseif ($bindingModalType === 'search')
+                @php $searchProvider = (string) ($bindingForm['provider'] ?? 'meilisearch'); @endphp
+                <div class="space-y-4">
+                    <div>
+                        <x-input-label for="binding_search_provider" :value="__('Driver')" />
+                        <select id="binding_search_provider" wire:model.live="bindingForm.provider" class="dply-input">
+                            <option value="meilisearch">{{ __('Meilisearch') }}</option>
+                            <option value="typesense">{{ __('Typesense') }}</option>
+                            <option value="algolia">{{ __('Algolia') }}</option>
+                        </select>
+                    </div>
+                    @include('livewire.sites.settings.partials.environment.search-credential-fields', ['searchProvider' => $searchProvider])
+                    @php $searchPackage = \App\Services\Deploy\SiteBindingManager::SEARCH_PACKAGES[$searchProvider] ?? null; @endphp
+                    <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                        {{ __('Requires') }} <code class="font-mono font-semibold">laravel/scout</code>@if ($searchPackage) {{ __(' and ') }}<code class="font-mono font-semibold">{{ $searchPackage }}</code>@endif. {{ __('Add to composer.json before deploying.') }}
+                    </div>
+                    @if (in_array($searchProvider, ['meilisearch', 'typesense'], true))
+                        <p class="text-xs text-brand-moss">{{ __('Point this at a Meilisearch/Typesense endpoint you run (on this server\'s loopback/private network, or hosted). On-server provisioning is coming soon.') }}</p>
+                    @endif
+                </div>
+            @elseif ($bindingModalType === 'payments')
+                @php
+                    $paymentsProvider = (string) ($bindingForm['provider'] ?? 'stripe');
+                    $webhookPreview = $this->paymentsWebhookPreview($paymentsProvider);
+                @endphp
+                <div class="space-y-4">
+                    <div>
+                        <x-input-label for="binding_payments_provider" :value="__('Provider')" />
+                        <select id="binding_payments_provider" wire:model.live="bindingForm.provider" class="dply-input">
+                            <option value="stripe">{{ __('Stripe') }}</option>
+                            <option value="paddle">{{ __('Paddle') }}</option>
+                        </select>
+                    </div>
+                    @include('livewire.sites.settings.partials.environment.payments-credential-fields', ['paymentsProvider' => $paymentsProvider])
+                    @if ($webhookPreview)
+                        <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-4 py-3 text-xs text-brand-moss">
+                            <p class="font-semibold text-brand-ink">{{ __('Webhook endpoint') }}</p>
+                            <p class="mt-1">{{ __('Register this URL in your :provider dashboard:', ['provider' => ucfirst($paymentsProvider)]) }}</p>
+                            <code class="mt-1 block break-all font-mono text-brand-ink">{{ $webhookPreview }}</code>
+                        </div>
+                    @else
+                        <p class="text-xs text-amber-700">{{ __('Add a primary domain to this site to get a webhook endpoint URL.') }}</p>
+                    @endif
+                    <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                        {{ __('Requires') }} <code class="font-mono font-semibold">laravel/cashier{{ $paymentsProvider === 'paddle' ? '-paddle' : '' }}</code>. {{ __('Add to composer.json before deploying.') }}
+                    </div>
+                </div>
+            @elseif ($bindingModalType === 'oauth')
+                @php
+                    $oauthProvider = (string) ($bindingForm['provider'] ?? 'github');
+                    $redirectPreview = $this->oauthRedirectPreview($oauthProvider);
+                @endphp
+                <div class="space-y-4">
+                    <div>
+                        <x-input-label for="binding_oauth_provider" :value="__('Provider')" />
+                        <select id="binding_oauth_provider" wire:model.live="bindingForm.provider" class="dply-input">
+                            <option value="github">{{ __('GitHub') }}</option>
+                            <option value="google">{{ __('Google') }}</option>
+                            <option value="facebook">{{ __('Facebook') }}</option>
+                            <option value="gitlab">{{ __('GitLab') }}</option>
+                            <option value="linkedin">{{ __('LinkedIn') }}</option>
+                        </select>
+                    </div>
+                    @include('livewire.sites.settings.partials.environment.oauth-credential-fields', ['oauthProvider' => $oauthProvider])
+                    <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-4 py-3 text-xs text-brand-moss">
+                        <p class="font-semibold text-brand-ink">{{ __('Redirect / callback URL') }}</p>
+                        @if ($redirectPreview)
+                            <p class="mt-1">{{ __('Auto-filled from this site — paste it into the provider\'s OAuth app:') }}</p>
+                            <code class="mt-1 block break-all font-mono text-brand-ink">{{ $redirectPreview }}</code>
+                        @else
+                            <p class="mt-1 text-amber-700">{{ __('Add a primary domain (or enter a redirect URL below) so the callback URL can be derived.') }}</p>
+                        @endif
+                    </div>
+                    <p class="text-xs text-brand-moss">{{ __('Injects :p_CLIENT_ID, :p_CLIENT_SECRET and :p_REDIRECT_URI at deploy.', ['p' => strtoupper($oauthProvider)]) }}</p>
                 </div>
             @elseif ($bindingModalType === 'redis')
                 @php

@@ -16,6 +16,7 @@ use App\Mcp\Tools\Sites\ListSites;
 use App\Mcp\Tools\Sites\ListSiteSchedules;
 use App\Mcp\Tools\Sites\ListSiteWorkers;
 use Laravel\Mcp\Server;
+use Laravel\Mcp\Server\Tool;
 
 class DplyServer extends Server
 {
@@ -44,7 +45,7 @@ class DplyServer extends Server
         MARKDOWN;
 
     /**
-     * @var array<int, class-string<\Laravel\Mcp\Server\Tool>>
+     * @var array<int, class-string<Tool>>
      */
     protected array $tools = [
         // Discovery / read
@@ -62,7 +63,7 @@ class DplyServer extends Server
     ];
 
     /**
-     * @var array<int, class-string<\Laravel\Mcp\Server\Resource>>
+     * @var array<int, class-string<Server\Resource>>
      */
     protected array $resources = [
         SiteListResource::class,

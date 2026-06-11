@@ -14,6 +14,4 @@ use RuntimeException;
  * MCP error response so the AI client sees a clean explanation rather than a
  * 500. Use it for "the caller did something we can explain" — not for bugs.
  */
-class DplyMcpException extends RuntimeException
-{
-}
+class DplyMcpException extends RuntimeException {}

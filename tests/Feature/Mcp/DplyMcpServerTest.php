@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Mcp\DplyMcpServerTest;
 
 use App\Jobs\RunSiteDeploymentJob;
+use App\Mcp\Resources\SiteListResource;
 use App\Mcp\Servers\DplyServer;
 use App\Mcp\Tools\Deploy\DeploySite;
 use App\Mcp\Tools\Sites\GetSite;
@@ -89,14 +90,14 @@ test('deploy_site queues RunSiteDeploymentJob for a site with a repo', function 
 });
 
 test('deploy_site is rejected for a read-only token', function (): void {
+    Queue::fake();
     [, $site] = mcpContext(['sites.read']);
 
     DplyServer::tool(DeploySite::class, ['site_id' => $site->id])
         ->assertHasErrors()
         ->assertSee('sites.deploy');
 
-    Queue::fake();
-    Queue::assertNothingPushed();
+    Queue::assertNotPushed(RunSiteDeploymentJob::class);
 });
 
 test('deploy_site refuses a site without a git repository', function (): void {
@@ -108,5 +109,14 @@ test('deploy_site refuses a site without a git repository', function (): void {
         ->assertHasErrors()
         ->assertSee('Git repository');
 
-    Queue::assertNothingPushed();
+    Queue::assertNotPushed(RunSiteDeploymentJob::class);
+});
+
+test('the sites resource exposes the org\'s sites', function (): void {
+    [, $site] = mcpContext();
+
+    DplyServer::resource(SiteListResource::class)
+        ->assertOk()
+        ->assertSee($site->id)
+        ->assertSee('acme-app');
 });

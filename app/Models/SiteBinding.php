@@ -39,6 +39,9 @@ class SiteBinding extends Model
         'ai',
         'captcha',
         'sms',
+        'search',
+        'payments',
+        'oauth',
     ];
 
     public const STATUS_CONFIGURED = 'configured';

@@ -14,7 +14,7 @@
     $hubGroups = SiteBindingCatalog::grouped('vm', $hubBindings);
     $networkedAttached = $hubBindings->filter(fn ($b) => BindingReachability::isNetworked($b->type))->count();
     $provisionTypes = ['database', 'redis', 'storage'];
-    $configTypes = ['cache', 'queue', 'session', 'mail', 'broadcasting'];
+    $configTypes = ['cache', 'queue', 'session', 'mail', 'broadcasting', 'error_tracking', 'ai', 'captcha', 'sms', 'search', 'payments', 'oauth'];
     $statusBadge = [
         'configured' => 'bg-emerald-100 text-emerald-800',
         'pending' => 'bg-amber-100 text-amber-900',
