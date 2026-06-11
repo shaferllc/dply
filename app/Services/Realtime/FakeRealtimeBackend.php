@@ -43,6 +43,12 @@ class FakeRealtimeBackend implements RealtimeBackend
         return null;
     }
 
+    public function fetchStats(RealtimeApp $app): ?array
+    {
+        // No live relay in fake mode — report nothing rather than fake numbers.
+        return null;
+    }
+
     public function resetPeakConnections(RealtimeApp $app): void
     {
         // No-op: nothing to reset without a live relay.

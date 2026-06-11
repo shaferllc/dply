@@ -12,7 +12,6 @@ use App\Models\RealtimeApp;
 use App\Models\SiteBinding;
 use App\Services\Realtime\RealtimeBackendFactory;
 use Illuminate\Contracts\View\View;
-use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -38,6 +37,9 @@ class RealtimeAppShow extends Component
 
     /** Whether the delete-confirmation modal is armed. */
     public bool $confirmingDelete = false;
+
+    /** Current live connection count from the last stats read (transient). */
+    public ?int $liveConnections = null;
 
     public function mount(Organization $organization, RealtimeApp $realtimeApp): void
     {
@@ -123,28 +125,53 @@ class RealtimeAppShow extends Component
     }
 
     /**
-     * Pull the live peak-concurrent count from the relay's stats endpoint and
-     * persist it, so the card reflects current usage on demand.
+     * Pull the live stats (current + peak connections) from the relay and
+     * persist the peak high-water mark, so the page reflects current usage on
+     * demand. Surfaces a toast (used by the manual Refresh button).
      */
     public function refreshStats(): void
     {
-        $this->authorize('view', $this->organization);
-
-        $peak = RealtimeBackendFactory::make()->fetchPeakConnections($this->app);
-
-        if ($peak === null) {
+        if (! $this->pullStats()) {
             $this->toastWarning(__('Could not read live stats from the relay right now.'));
 
             return;
         }
 
+        $this->toastSuccess(__('Live stats refreshed.'));
+    }
+
+    /**
+     * Silent stats poll for wire:poll — keeps the live connection count fresh
+     * without a toast on every tick. No-op when stats are unavailable (fake
+     * mode / relay unreachable).
+     */
+    public function pollStats(): void
+    {
+        $this->pullStats();
+    }
+
+    /**
+     * Read live stats from the relay, persist the peak, and stash the current
+     * connection count. Returns false when stats are unavailable.
+     */
+    private function pullStats(): bool
+    {
+        $this->authorize('view', $this->organization);
+
+        $stats = RealtimeBackendFactory::make()->fetchStats($this->app);
+
+        if ($stats === null) {
+            return false;
+        }
+
+        $this->liveConnections = $stats['connections'];
         $this->app->forceFill([
-            'peak_connections' => $peak,
+            'peak_connections' => $stats['peakConnections'],
             'last_stats_at' => now(),
         ])->save();
         $this->app->refresh();
 
-        $this->toastSuccess(__('Live stats refreshed.'));
+        return true;
     }
 
     public function render(): View

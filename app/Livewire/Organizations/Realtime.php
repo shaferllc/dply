@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Organizations;
 
+use App\Actions\Realtime\CreateRealtimeApp;
 use App\Actions\Realtime\DeleteRealtimeApp;
 use App\Actions\Realtime\UpdateRealtimeApp;
 use App\Livewire\Concerns\DispatchesToastNotifications;
@@ -40,10 +41,86 @@ class Realtime extends Component
     /** The app currently open in the delete-confirmation modal, if any. */
     public ?string $deletingAppId = null;
 
+    /** Create-app modal form. */
+    public string $createName = '';
+
+    public string $createTier = '';
+
+    public bool $confirmCreateCharge = false;
+
     public function mount(Organization $organization): void
     {
         $this->organization = $organization;
         $this->authorize('view', $organization);
+        $this->createTier = (string) config('realtime.default_tier', 'starter');
+    }
+
+    /**
+     * Open the create-app modal. Managed apps are a billed, dply-hosted resource,
+     * so creation is gated on the surface flag (BYO broadcasting is always
+     * available on a site) and org-update permission.
+     */
+    public function startCreate(): void
+    {
+        $this->authorize('update', $this->organization);
+
+        if (! Feature::for($this->organization)->active('surface.realtime')) {
+            $this->toastError(__('Managed realtime isn’t enabled for this workspace.'));
+
+            return;
+        }
+
+        $this->reset(['createName', 'confirmCreateCharge']);
+        $this->createTier = (string) config('realtime.default_tier', 'starter');
+        $this->dispatch('open-modal', 'realtime-create-modal');
+    }
+
+    public function cancelCreate(): void
+    {
+        $this->reset(['createName', 'confirmCreateCharge']);
+        $this->createTier = (string) config('realtime.default_tier', 'starter');
+        $this->dispatch('close-modal', 'realtime-create-modal');
+    }
+
+    public function createApp(CreateRealtimeApp $action): void
+    {
+        $this->authorize('update', $this->organization);
+
+        if (! Feature::for($this->organization)->active('surface.realtime')) {
+            $this->toastError(__('Managed realtime isn’t enabled for this workspace.'));
+
+            return;
+        }
+
+        $name = trim($this->createName);
+        if ($name === '') {
+            $this->toastError(__('Give the app a name.'));
+
+            return;
+        }
+
+        $tiers = (array) config('realtime.tiers', []);
+        if (! array_key_exists($this->createTier, $tiers)) {
+            $this->toastError(__('Pick a connection tier.'));
+
+            return;
+        }
+
+        // Provisioning a managed app adds its tier price to the workspace bill —
+        // require explicit consent before spending money.
+        if (! $this->confirmCreateCharge) {
+            $this->toastError(__('Confirm the monthly charge to create the app.'));
+
+            return;
+        }
+
+        $app = $action->handle(auth()->user(), $this->organization, [
+            'name' => $name,
+            'tier' => $this->createTier,
+        ]);
+
+        $this->toastSuccess(__('Provisioning :name — it’ll go active in a moment and is added to your workspace bill.', ['name' => $app->name]));
+        $this->cancelCreate();
     }
 
     public function startTierChange(string $appId): void

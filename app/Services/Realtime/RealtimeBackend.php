@@ -33,6 +33,15 @@ interface RealtimeBackend
     public function fetchPeakConnections(RealtimeApp $app): ?int;
 
     /**
+     * Live stats snapshot for the app: current concurrent connections plus the
+     * peak high-water mark since the last reset. Null when stats are unavailable
+     * (relay unreachable, or no live relay in fake mode).
+     *
+     * @return array{connections: int, peakConnections: int}|null
+     */
+    public function fetchStats(RealtimeApp $app): ?array;
+
+    /**
      * Reset the peak-concurrent high-water mark to the current live count.
      * Called per billing window so the next read reflects only that window.
      */

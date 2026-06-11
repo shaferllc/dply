@@ -297,6 +297,27 @@
                             $conn = $attached && is_array($binding->config) ? ($binding->config['connectivity'] ?? null) : null;
                             $reachTarget = $attached ? BindingReachability::target($binding) : null;
                             $isUnreachable = $conn !== null && ! ($conn['ok'] ?? false);
+
+                            // Human-readable explanation of THIS tile's current state, surfaced as an
+                            // HTML tooltip on the status dot + badge so a hover tells you what's wrong.
+                            $cfg = $attached && is_array($binding->config) ? $binding->config : [];
+                            $reasonMap = [
+                                'drivers_reference_redis_without_connection' => __('Cache, queue, or session is set to redis, but no Redis connection is configured yet — attach Redis.'),
+                                's3_disk_without_bucket' => __('The filesystem disk is S3-compatible, but AWS_BUCKET is not set.'),
+                                'bucket_without_keys' => __('A bucket or URL is set, but the AWS access keys are missing.'),
+                                'incomplete_object_storage_env' => __('Object storage configuration is incomplete.'),
+                            ];
+                            $statusHint = match (true) {
+                                $attached && filled($binding->last_error ?? null) => (string) $binding->last_error,
+                                $isUnreachable && filled($conn['detail'] ?? null) => (string) $conn['detail'],
+                                $isUnreachable => __('The server could not open a connection to this resource.'),
+                                filled($cfg['reason'] ?? null) && isset($reasonMap[$cfg['reason']]) => $reasonMap[$cfg['reason']],
+                                filled($cfg['reason'] ?? null) => \Illuminate\Support\Str::headline((string) $cfg['reason']),
+                                $attached && $binding->status === 'configured' => __('Configured and ready.'),
+                                $attached && $binding->status === 'pending' => __('Attached, but not fully configured yet.'),
+                                $attached => \Illuminate\Support\Str::headline((string) $binding->status),
+                                default => __('Not attached yet.'),
+                            };
                         @endphp
                         <div
                             wire:key="res-{{ $type }}"
@@ -331,7 +352,7 @@
                                 <span class="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg {{ $attached ? 'bg-brand-forest/10 text-brand-forest' : 'bg-brand-sand/50 text-brand-moss' }}">
                                     <x-dynamic-component :component="$t['icon']" class="h-5 w-5" />
                                     @if ($attached)
-                                        <span class="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-white {{ $statusDot[$binding->status] ?? 'bg-brand-moss' }}"></span>
+                                        <span title="{{ $statusHint }}" class="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-white {{ $statusDot[$binding->status] ?? 'bg-brand-moss' }}"></span>
                                     @endif
                                 </span>
                                 <div class="min-w-0 flex-1">
@@ -346,7 +367,7 @@
                                     @if ($attached)
                                         <div class="mt-0.5 flex flex-wrap items-center gap-1.5">
                                             <span class="truncate font-mono text-[11px] font-medium text-brand-moss">{{ $binding->name ?: $type }}</span>
-                                            <span class="rounded-full px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide {{ $statusBadge[$binding->status] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $binding->status }}</span>
+                                            <span title="{{ $statusHint }}" class="cursor-help rounded-full px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide {{ $statusBadge[$binding->status] ?? 'bg-brand-sand/60 text-brand-moss' }}">{{ $binding->status }}</span>
                                         </div>
                                         @if ($conn !== null)
                                             @php

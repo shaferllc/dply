@@ -38,6 +38,11 @@
                             <p class="mt-1 text-xs text-brand-moss">
                                 {{ trans_choice('{0}No active apps yet.|{1}:count active app across your sites.|[2,*]:count active apps across your sites.', $activeCount, ['count' => $activeCount]) }}
                             </p>
+                            @if ($featureActive && $canManage)
+                                <x-primary-button type="button" wire:click="startCreate" class="mt-4 w-full justify-center text-sm">
+                                    <x-heroicon-o-plus class="-ml-0.5 mr-1.5 h-4 w-4" /> {{ __('New app') }}
+                                </x-primary-button>
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -51,8 +56,13 @@
                     </x-icon-badge>
                     <h3 class="mt-4 text-base font-semibold text-brand-ink">{{ __('No broadcasting apps yet') }}</h3>
                     <p class="mx-auto mt-2 max-w-md text-sm leading-relaxed text-brand-moss">
-                        {{ __('Add managed broadcasting to a site from its Resources tab → Configure broadcasting → dply realtime. Provisioned apps show up here to manage and bill.') }}
+                        {{ __('Create one here, or add managed broadcasting to a site from its Resources tab → Configure broadcasting → dply realtime. Provisioned apps show up here to manage and bill.') }}
                     </p>
+                    @if ($featureActive && $canManage)
+                        <x-primary-button type="button" wire:click="startCreate" class="mx-auto mt-4 text-sm">
+                            <x-heroicon-o-plus class="-ml-0.5 mr-1.5 h-4 w-4" /> {{ __('New app') }}
+                        </x-primary-button>
+                    @endif
                     @unless ($featureActive)
                         <p class="mx-auto mt-3 max-w-md text-xs text-brand-moss">
                             {{ __('Managed realtime isn’t enabled for this workspace yet. Bring-your-own broadcasting is always available on a site.') }}
@@ -66,14 +76,19 @@
                             $sites = $siteUsage->get($app->id) ?? collect();
                             $tier = $app->tierConfig();
                         @endphp
-                        <article class="dply-card p-5 sm:p-6" @if ($app->status === \App\Models\RealtimeApp::STATUS_PROVISIONING) wire:poll.5s @endif>
-                            <div class="flex flex-wrap items-start justify-between gap-4">
+                        <article class="dply-card relative p-5 sm:p-6 transition hover:border-brand-forest/40 hover:shadow-md" @if ($app->status === \App\Models\RealtimeApp::STATUS_PROVISIONING) wire:poll.5s @endif>
+                            {{-- Stretched link: the whole card clicks through to the app's detail
+                                 page; the action buttons below sit above it via z-10. --}}
+                            <a href="{{ route('organizations.realtime.show', [$organization, $app]) }}" wire:navigate
+                                class="absolute inset-0 z-0 rounded-[inherit]" aria-label="{{ __('View :name', ['name' => $app->name]) }}"></a>
+                            <div class="relative z-10 flex flex-wrap items-start justify-between gap-4 pointer-events-none">
                                 <div class="min-w-0">
                                     <div class="flex items-center gap-2">
                                         <h3 class="truncate text-base font-semibold text-brand-ink">{{ $app->name }}</h3>
                                         <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset {{ $statusTone[$app->status] ?? 'bg-brand-sand/55 text-brand-moss ring-brand-ink/10' }}">
                                             {{ ucfirst($app->status) }}
                                         </span>
+                                        <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-mist" />
                                     </div>
                                     <p class="mt-1 font-mono text-xs text-brand-moss">{{ $app->app_key }}</p>
                                     <p class="mt-0.5 font-mono text-[11px] text-brand-moss/80">{{ $app->host() }}</p>
@@ -90,7 +105,7 @@
                             </div>
 
                             {{-- Sites depending on this app. --}}
-                            <div class="mt-4 flex flex-wrap items-center gap-2 border-t border-brand-ink/10 pt-4">
+                            <div class="relative z-10 mt-4 flex flex-wrap items-center gap-2 border-t border-brand-ink/10 pt-4 pointer-events-none">
                                 @if ($sites->isNotEmpty())
                                     <span class="text-xs text-brand-moss">{{ __('Used by') }}</span>
                                     @foreach ($sites as $binding)
@@ -102,20 +117,16 @@
                                     <span class="text-xs text-brand-moss">{{ __('Not attached to any site.') }}</span>
                                 @endif
 
-                                <div class="ml-auto flex items-center gap-2">
-                                    <a href="{{ route('organizations.realtime.show', [$organization, $app]) }}" wire:navigate
-                                        class="inline-flex items-center gap-1 text-xs font-semibold text-brand-forest hover:underline">
-                                        {{ __('Manage') }} <x-heroicon-o-arrow-right class="h-3.5 w-3.5" />
-                                    </a>
-                                    @if ($canManage)
+                                @if ($canManage)
+                                    <div class="ml-auto flex items-center gap-2 pointer-events-auto">
                                         <x-secondary-button type="button" wire:click="startTierChange('{{ $app->id }}')" class="text-xs">
                                             {{ __('Change tier') }}
                                         </x-secondary-button>
                                         <button type="button" wire:click="confirmDelete('{{ $app->id }}')" class="text-xs font-medium text-red-600 hover:text-red-700">
                                             {{ __('Delete') }}
                                         </button>
-                                    @endif
-                                </div>
+                                    </div>
+                                @endif
                             </div>
                         </article>
                     @endforeach
@@ -207,5 +218,58 @@
                 </div>
             </div>
         @endif
+    </x-modal>
+
+    {{-- Create-app modal: name + tier + billing consent. --}}
+    <x-modal name="realtime-create-modal" :show="false" maxWidth="lg" overlayClass="bg-brand-ink/30" focusable>
+        @php
+            $createCents = (int) ($tiers[$createTier]['price_cents'] ?? 0);
+        @endphp
+        <form wire:submit="createApp">
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+                <x-icon-badge>
+                    <x-heroicon-o-signal class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('New broadcasting app') }}</p>
+                    <h2 class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Provision a managed relay') }}</h2>
+                    <p class="mt-1 text-sm leading-6 text-brand-moss">{{ __('Spins up a Pusher-compatible relay app you can attach to any site. Billed monthly by its connection tier and added to this workspace’s subscription.') }}</p>
+                </div>
+            </div>
+
+            <div class="space-y-5 px-6 py-6">
+                <div>
+                    <label for="create-name" class="block text-xs font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('App name') }}</label>
+                    <input id="create-name" type="text" wire:model="createName" placeholder="{{ __('e.g. Production realtime') }}"
+                        class="mt-1.5 block w-full rounded-lg border-brand-ink/15 text-sm text-brand-ink shadow-sm focus:border-brand-forest focus:ring-brand-forest" />
+                </div>
+
+                <div>
+                    <p class="block text-xs font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('Connection tier') }}</p>
+                    <div class="mt-1.5 grid gap-2 sm:grid-cols-3">
+                        @foreach ($tiers as $slug => $tierOption)
+                            <button type="button" wire:click="$set('createTier', '{{ $slug }}')" class="rounded-lg border p-3 text-left transition-colors {{ $createTier === $slug ? 'border-brand-forest bg-brand-forest/5 ring-1 ring-brand-forest/40' : 'border-brand-ink/10 hover:bg-brand-sand/30' }}">
+                                <div class="text-sm font-semibold text-brand-ink">{{ $tierOption['label'] }}</div>
+                                <div class="mt-0.5 text-[11px] text-brand-moss">{{ number_format($tierOption['max_connections']) }} {{ __('connections') }}</div>
+                                <div class="mt-1 text-xs font-semibold text-brand-forest">{{ $money((int) $tierOption['price_cents']) }}/{{ __('mo') }}</div>
+                            </button>
+                        @endforeach
+                    </div>
+                </div>
+
+                <label class="flex items-start gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2.5 text-xs text-brand-moss">
+                    <input type="checkbox" wire:model="confirmCreateCharge" class="mt-0.5 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" />
+                    <span>{{ __('I understand this adds :price/mo to this workspace’s bill while the app is active.', ['price' => $money($createCents)]) }}</span>
+                </label>
+            </div>
+
+            <div class="flex flex-wrap justify-end gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+                <x-secondary-button type="button" wire:click="cancelCreate">{{ __('Cancel') }}</x-secondary-button>
+                <x-primary-button type="submit" wire:loading.attr="disabled" wire:target="createApp">
+                    <span wire:loading.remove wire:target="createApp">{{ __('Create app') }}</span>
+                    <span wire:loading wire:target="createApp" class="inline-flex items-center gap-2"><x-spinner variant="cream" size="sm" />{{ __('Creating…') }}</span>
+                </x-primary-button>
+            </div>
+        </form>
     </x-modal>
 </div>
