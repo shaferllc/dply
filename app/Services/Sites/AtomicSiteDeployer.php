@@ -7,6 +7,7 @@ use App\Models\Site;
 use App\Models\SiteDeployHook;
 use App\Models\SiteDeployment;
 use App\Models\SiteRelease;
+use App\Services\Deploy\DeployResumePlan;
 use App\Services\Deploy\Manifest\SiteManifestCodeShapeSync;
 use App\Services\Servers\SupervisorDeployRestarter;
 use App\Services\SourceControl\GitIdentityResolver;
@@ -23,8 +24,13 @@ class AtomicSiteDeployer
         protected SshConnectionFactory $sshFactory
     ) {}
 
-    public function deploy(Site $site, ?SiteDeployment $deployment = null): array
+    public function deploy(Site $site, ?SiteDeployment $deployment = null, ?DeployResumePlan $resume = null): array
     {
+        // A resume re-attaches to an already-staged release and runs only the
+        // phases from $resume->startFromPhase onward; a normal deploy runs every
+        // phase. This gate expresses "is this phase at or after the start point".
+        $shouldRun = fn (string $phase): bool => $resume === null || $resume->shouldRun($phase);
+
         $server = $site->server;
         if (! $server->isReady() || empty($server->ssh_private_key)) {
             throw new \RuntimeException('Server must be ready with an SSH key.');
@@ -78,7 +84,13 @@ class AtomicSiteDeployer
         // is a guaranteed one-flip back to it. Everything else (clone/build/env/
         // activate/health) is identical to atomic.
         $blueGreen = DeploymentMethod::forSite($site)->placement() === 'blue_green';
-        if ($blueGreen) {
+        if ($resume !== null) {
+            // Resume: re-use the release the failed deploy already staged
+            // instead of minting a fresh one. Resume only covers pre-cutover
+            // failures, so this folder was never made live — re-running it
+            // can't disturb whatever `current` is serving.
+            $folder = $resume->releaseFolder;
+        } elseif ($blueGreen) {
             $liveSlot = basename(trim($ssh->exec(
                 sprintf('readlink -f %s/current 2>/dev/null || true', escapeshellarg($base)),
                 30
@@ -96,6 +108,42 @@ class AtomicSiteDeployer
 
         $baseEsc = escapeshellarg($base);
         $newEsc = escapeshellarg($newRelease);
+
+        // Persist the release folder on the deployment row as soon as it's
+        // known — BEFORE build/release can throw — so a deploy that fails before
+        // cutover still records which staged release a later "resume" attaches
+        // to. (On a normal deploy the dir doesn't exist on disk until CLONE
+        // below; this is just metadata.)
+        $deployment?->update(['release_folder' => $folder]);
+
+        // Needed by the post-activate health-check auto-rollback regardless of
+        // whether CLONE runs this pass, so resolve it before the phase gate.
+        $previousActiveRelease = SiteRelease::query()
+            ->where('site_id', $site->id)
+            ->where('is_active', true)
+            ->first();
+
+        // Resume guard: the staged release must still exist and be non-empty.
+        // A later successful deploy's prune can delete it; flipping/building
+        // against a missing dir would be an outage, so fail loud and clear.
+        if ($resume !== null) {
+            $check = trim($ssh->exec(sprintf(
+                'if [ -d %1$s ] && [ -n "$(ls -A %1$s 2>/dev/null)" ]; then echo DPLY_RESUME_OK; else echo DPLY_RESUME_MISSING; fi',
+                $newEsc
+            ), 30));
+            if (! str_contains($check, 'DPLY_RESUME_OK')) {
+                throw new \RuntimeException(sprintf(
+                    'Cannot resume from the %s phase: the staged release "%s" is no longer on the server (likely pruned by a later deploy). Run a full deploy instead.',
+                    $resume->startFromPhase,
+                    $folder
+                ));
+            }
+            $log .= sprintf(
+                "\n[dply] RESUME → re-attaching to staged release %s; restarting from the %s phase (earlier phases carried forward)\n",
+                $newRelease,
+                $resume->startFromPhase
+            );
+        }
 
         // ── PLAN ── dump every resolved path up front so the deployment log
         // shows exactly where each phase will run. Zero-downtime (atomic)
@@ -122,76 +170,76 @@ class AtomicSiteDeployer
         $log .= "===============================================\n";
 
         // ── CLONE ── make releases dir, checkout into the new release folder.
-        $cloneStart = microtime(true);
-        $log .= sprintf("\n[dply] CLONE → mkdir -p %s/releases, then clone %s\n", $base, $newRelease);
-        $cloneLog = $ssh->exec("mkdir -p {$baseEsc}/releases", 60);
+        // Skipped on resume: the staged release already holds the checkout (and,
+        // for a resume-from-release, the built vendor/) — re-cloning would wipe
+        // it. The carried-forward clone results keep the timeline whole.
+        if ($shouldRun('clone')) {
+            $cloneStart = microtime(true);
+            $log .= sprintf("\n[dply] CLONE → mkdir -p %s/releases, then clone %s\n", $base, $newRelease);
+            $cloneLog = $ssh->exec("mkdir -p {$baseEsc}/releases", 60);
 
-        // Pre-clone snapshot: show server state before any git work.
-        $cloneLog .= $ssh->exec(sprintf(
-            'echo "=== [dply] PRE-CLONE SNAPSHOT ==="; '
-            .'echo "[dply] whoami=$(whoami)"; '
-            .'echo "[dply] hostname=$(hostname)"; '
-            .'echo "[dply] base=%1$s"; '
-            .'echo "[dply] new-release=%2$s"; '
-            .'echo "[dply] disk:"; df -h %1$s 2>&1; '
-            .'echo "[dply] releases-ls:"; ls -la %1$s/releases 2>&1 | head -n 20; '
-            .'echo "=== [dply] END PRE-CLONE SNAPSHOT ==="',
-            $baseEsc,
-            $newEsc
-        ), 30);
+            // Pre-clone snapshot: show server state before any git work.
+            $cloneLog .= $ssh->exec(sprintf(
+                'echo "=== [dply] PRE-CLONE SNAPSHOT ==="; '
+                .'echo "[dply] whoami=$(whoami)"; '
+                .'echo "[dply] hostname=$(hostname)"; '
+                .'echo "[dply] base=%1$s"; '
+                .'echo "[dply] new-release=%2$s"; '
+                .'echo "[dply] disk:"; df -h %1$s 2>&1; '
+                .'echo "[dply] releases-ls:"; ls -la %1$s/releases 2>&1 | head -n 20; '
+                .'echo "=== [dply] END PRE-CLONE SNAPSHOT ==="',
+                $baseEsc,
+                $newEsc
+            ), 30);
 
-        $previousActiveRelease = SiteRelease::query()
-            ->where('site_id', $site->id)
-            ->where('is_active', true)
-            ->first();
+            $cloneLog .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_BEFORE_CLONE, $base);
+            $this->hookRunner->assertHooksSucceeded($cloneLog, 'before_clone');
 
-        $cloneLog .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_BEFORE_CLONE, $base);
-        $this->hookRunner->assertHooksSucceeded($cloneLog, 'before_clone');
+            $cloneLog .= $this->anchorRunner->runClone($ssh, $site, $newRelease, $gitSsh, $repo, $branch, true, false);
+            $this->hookRunner->assertHooksSucceeded($cloneLog, 'clone');
+            $this->anchorRunner->assertReleaseHasGit($ssh, $newRelease);
 
-        $cloneLog .= $this->anchorRunner->runClone($ssh, $site, $newRelease, $gitSsh, $repo, $branch, true, false);
-        $this->hookRunner->assertHooksSucceeded($cloneLog, 'clone');
-        $this->anchorRunner->assertReleaseHasGit($ssh, $newRelease);
+            // Post-clone snapshot: confirm exactly what landed in the release dir.
+            $cloneSha = trim($ssh->exec(sprintf('git -C %s rev-parse --verify HEAD 2>/dev/null', $newEsc), 15));
+            $cloneLog .= $ssh->exec(sprintf(
+                'echo "=== [dply] POST-CLONE SNAPSHOT ==="; '
+                .'echo "[dply] whoami=$(whoami)"; '
+                .'echo "[dply] sha=%1$s"; '
+                .'echo "[dply] git-log:"; git -C %2$s log --oneline -10 2>&1; '
+                .'echo "[dply] git-branch:"; git -C %2$s branch -a 2>&1; '
+                .'echo "[dply] git-remote:"; git -C %2$s remote -v 2>&1; '
+                .'echo "[dply] git-status:"; git -C %2$s status 2>&1; '
+                .'echo "[dply] composer.json=$([ -f %2$s/composer.json ] && echo PRESENT || echo MISSING)"; '
+                .'echo "[dply] package.json=$([ -f %2$s/package.json ] && echo PRESENT || echo MISSING)"; '
+                .'echo "[dply] artisan=$([ -f %2$s/artisan ] && echo PRESENT || echo MISSING)"; '
+                .'echo "[dply] .env.example=$([ -f %2$s/.env.example ] && echo PRESENT || echo MISSING)"; '
+                .'echo "[dply] disk:"; df -h %2$s 2>&1; '
+                .'echo "[dply] ls:"; ls -la %2$s 2>&1; '
+                .'echo "=== [dply] END POST-CLONE SNAPSHOT ==="',
+                $cloneSha !== '' ? $cloneSha : '(none)',
+                $newEsc
+            ), 45);
 
-        // Post-clone snapshot: confirm exactly what landed in the release dir.
-        $cloneSha = trim($ssh->exec(sprintf('git -C %s rev-parse --verify HEAD 2>/dev/null', $newEsc), 15));
-        $cloneLog .= $ssh->exec(sprintf(
-            'echo "=== [dply] POST-CLONE SNAPSHOT ==="; '
-            .'echo "[dply] whoami=$(whoami)"; '
-            .'echo "[dply] sha=%1$s"; '
-            .'echo "[dply] git-log:"; git -C %2$s log --oneline -10 2>&1; '
-            .'echo "[dply] git-branch:"; git -C %2$s branch -a 2>&1; '
-            .'echo "[dply] git-remote:"; git -C %2$s remote -v 2>&1; '
-            .'echo "[dply] git-status:"; git -C %2$s status 2>&1; '
-            .'echo "[dply] composer.json=$([ -f %2$s/composer.json ] && echo PRESENT || echo MISSING)"; '
-            .'echo "[dply] package.json=$([ -f %2$s/package.json ] && echo PRESENT || echo MISSING)"; '
-            .'echo "[dply] artisan=$([ -f %2$s/artisan ] && echo PRESENT || echo MISSING)"; '
-            .'echo "[dply] .env.example=$([ -f %2$s/.env.example ] && echo PRESENT || echo MISSING)"; '
-            .'echo "[dply] disk:"; df -h %2$s 2>&1; '
-            .'echo "[dply] ls:"; ls -la %2$s 2>&1; '
-            .'echo "=== [dply] END POST-CLONE SNAPSHOT ==="',
-            $cloneSha !== '' ? $cloneSha : '(none)',
-            $newEsc
-        ), 45);
+            $cloneLog .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_CLONE, $newRelease);
+            $this->hookRunner->assertHooksSucceeded($cloneLog, 'after_clone');
 
-        $cloneLog .= $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_CLONE, $newRelease);
-        $this->hookRunner->assertHooksSucceeded($cloneLog, 'after_clone');
+            $log .= $cloneLog;
+            // assertReleaseHasGit() above throws if the checkout is missing, so
+            // reaching here means clone succeeded.
+            $deployment?->recordPhaseResults('clone', [[
+                'step_id' => 'clone',
+                'step_type' => 'clone',
+                'command' => null,
+                'ok' => true,
+                'output' => $cloneLog,
+                'duration_ms' => (int) round((microtime(true) - $cloneStart) * 1000),
+                'skipped' => false,
+            ]]);
 
-        $log .= $cloneLog;
-        // assertReleaseHasGit() above throws if the checkout is missing, so
-        // reaching here means clone succeeded.
-        $deployment?->recordPhaseResults('clone', [[
-            'step_id' => 'clone',
-            'step_type' => 'clone',
-            'command' => null,
-            'ok' => true,
-            'output' => $cloneLog,
-            'duration_ms' => (int) round((microtime(true) - $cloneStart) * 1000),
-            'skipped' => false,
-        ]]);
+            $log .= sprintf("[dply] CLONE done in %dms → %s\n", (int) round((microtime(true) - $cloneStart) * 1000), $newRelease);
 
-        $log .= sprintf("[dply] CLONE done in %dms → %s\n", (int) round((microtime(true) - $cloneStart) * 1000), $newRelease);
-
-        app(VmSiteComposerDetectionPersister::class)->persistFromReleasePath($site, $ssh, $newRelease);
+            app(VmSiteComposerDetectionPersister::class)->persistFromReleasePath($site, $ssh, $newRelease);
+        }
 
         // ── ENV ── seed the fresh release's .env. A release is a clean git
         // checkout and .env is gitignored, so without this every build/release
@@ -256,20 +304,29 @@ class AtomicSiteDeployer
         }
 
         // ── BUILD ── install deps / compile assets in the new release.
-        $log .= sprintf("\n[dply] BUILD → running build-phase steps in %s\n", $newRelease);
-        $buildProgress = $deployment
-            ? static fn (array $full) => $deployment->recordPhaseResults('build', $full)
-            : null;
-        $build = $this->pipelineRunner->runBuild($ssh, $site, $newRelease, $buildProgress);
-        $log .= $build['log'];
-        // Final clean record (no running/pending placeholders) — overwrites the
-        // last live snapshot with the settled step results.
-        $deployment?->recordPhaseResults('build', $build['steps']);
-        if (! $build['ok']) {
-            throw new \RuntimeException('Deploy failed during the build phase. See the deployment log for details.');
-        }
+        // Skipped only when resuming from a LATER phase (release): the build
+        // already succeeded on the original attempt, so vendor/ + compiled
+        // assets are intact in the staged release and rebuilding would be wasted
+        // work. Resuming FROM build (the build broke) re-runs it here. The
+        // carried-forward build results keep the timeline complete on skip.
+        if ($shouldRun('build')) {
+            $log .= sprintf("\n[dply] BUILD → running build-phase steps in %s\n", $newRelease);
+            $buildProgress = $deployment
+                ? static fn (array $full) => $deployment->recordPhaseResults('build', $full)
+                : null;
+            $build = $this->pipelineRunner->runBuild($ssh, $site, $newRelease, $buildProgress);
+            $log .= $build['log'];
+            // Final clean record (no running/pending placeholders) — overwrites the
+            // last live snapshot with the settled step results.
+            $deployment?->recordPhaseResults('build', $build['steps']);
+            if (! $build['ok']) {
+                throw new \RuntimeException('Deploy failed during the build phase. See the deployment log for details.');
+            }
 
-        $log .= sprintf("[dply] BUILD done → %d step(s), ok=%s\n", count($build['steps']), $build['ok'] ? 'true' : 'false');
+            $log .= sprintf("[dply] BUILD done → %d step(s), ok=%s\n", count($build['steps']), $build['ok'] ? 'true' : 'false');
+        } else {
+            $log .= sprintf("\n[dply] BUILD → skipped (resume from %s); reusing the build already staged in %s\n", $resume->startFromPhase, $newRelease);
+        }
 
         // ── LOGGING ── overlay dply's generated config/logging.php into the new
         // release now that vendor/ is installed (the probe boots the app) and
