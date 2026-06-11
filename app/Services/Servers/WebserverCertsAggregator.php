@@ -42,13 +42,6 @@ class WebserverCertsAggregator
 
     private const URGENCY_WARN_DAYS = 60;
 
-    /**
-     * Prefix the scan script uses to tag a live-progress line on stdout (vs. a
-     * `path|subject|issuer|notAfter` data line). The streaming callback peels
-     * these off into the progress buffer; everything else is cert data.
-     */
-    private const SCAN_PROGRESS_MARKER = '__DPLY_SCAN__ ';
-
     /** TTL + cap for the per-server live-progress log the scanning UI polls. */
     private const PROGRESS_TTL_SECONDS = 180;
 
@@ -228,43 +221,60 @@ class WebserverCertsAggregator
     {
         $serverId = (string) $server->id;
 
-        // Stream the sweep so the live-progress log fills in real time: the bash
-        // script tags progress lines with SCAN_PROGRESS_MARKER and emits cert data
-        // as plain `path|...` lines. We reassemble chunk boundaries into lines and
-        // route each to the progress buffer or the data accumulator.
-        $dataLines = [];
-        $pending = '';
-        $consume = function (string $chunk) use (&$pending, &$dataLines, $serverId): void {
-            $pending .= $chunk;
-            while (($pos = strpos($pending, "\n")) !== false) {
-                $line = rtrim(substr($pending, 0, $pos), "\r");
-                $pending = substr($pending, $pos + 1);
-                $this->routeScanLine($line, $serverId, $dataLines);
-            }
-        };
-
+        // Find first (one fast round-trip), then read certs in chunks over
+        // separate round-trips. Each chunk returns promptly and we push a
+        // progress frame right after — so the live log fills second-by-second.
+        // A single buffered sweep can't do this: a non-TTY pipe block-buffers
+        // the whole (tiny) output and flushes it all at once at command exit,
+        // which the UI then resolves to the result before any frame is seen.
         try {
             $ssh = new SshConnection($server);
-            $this->pushProgress($serverId, 'Connected over SSH — sweeping certificate paths…');
-            [, $exit] = $ssh->execWithCallbackAndExit($this->buildScanScript(), $consume, 20);
+            $this->pushProgress($serverId, 'Connected over SSH — searching certificate directories…');
+            $findOut = $ssh->exec($this->buildFindScript(), 20);
+            $findExit = $ssh->lastExecExitCode();
         } catch (\Throwable) {
             $this->pushProgress($serverId, 'SSH connection failed — could not run the scan.');
 
             return ['certs' => [], 'scanned_at' => null, 'unreadable' => true];
         }
 
-        // Flush any trailing partial line the script emitted without a newline.
-        if ($pending !== '') {
-            $this->routeScanLine(rtrim($pending, "\r"), $serverId, $dataLines);
-        }
-
-        if ($exit !== null && $exit !== 0) {
-            $this->pushProgress($serverId, 'Scan command exited with an error.');
+        if ($findExit !== null && $findExit !== 0) {
+            $this->pushProgress($serverId, 'Could not search certificate directories (sudo/find failed).');
 
             return ['certs' => [], 'scanned_at' => null, 'unreadable' => true];
         }
 
-        $certs = $this->parseScanOutput(implode("\n", $dataLines));
+        $files = array_values(array_filter(
+            array_map('trim', preg_split('/\R/', $findOut) ?: []),
+            fn (string $f): bool => $f !== '',
+        ));
+        $total = count($files);
+        $this->pushProgress($serverId, sprintf('Found %d candidate certificate file(s).', $total));
+
+        if ($total === 0) {
+            $this->pushProgress($serverId, 'No certificates found under the scanned paths.');
+
+            return ['certs' => [], 'scanned_at' => CarbonImmutable::now(), 'unreadable' => false];
+        }
+
+        // Cap frames/round-trips at ~24 so a big box doesn't fan out unbounded;
+        // small boxes read one cert per round-trip for the nicest live feel.
+        $chunkSize = max(1, (int) ceil($total / 24));
+        $certs = [];
+        $read = 0;
+        foreach (array_chunk($files, $chunkSize) as $chunk) {
+            try {
+                $out = $ssh->exec($this->buildReadScript($chunk), 20);
+            } catch (\Throwable) {
+                $out = '';
+            }
+            $rows = $this->parseScanOutput($out);
+            foreach ($rows as $row) {
+                $certs[] = $row;
+            }
+            $read += count($chunk);
+            $this->pushProgress($serverId, $this->frameLine($read, $total, $chunk, $rows));
+        }
 
         usort($certs, function (array $a, array $b): int {
             $aDays = $a['days_until_expiry'] ?? PHP_INT_MAX;
@@ -273,7 +283,7 @@ class WebserverCertsAggregator
             return $aDays <=> $bDays;
         });
 
-        $this->pushProgress($serverId, sprintf('Parsed %d certificate(s) — done.', count($certs)));
+        $this->pushProgress($serverId, sprintf('Done — parsed %d certificate(s).', count($certs)));
 
         return [
             'certs' => $certs,
@@ -282,18 +292,24 @@ class WebserverCertsAggregator
         ];
     }
 
-    /** Send a reassembled stdout line to the progress buffer (tagged) or the cert-data accumulator. */
-    private function routeScanLine(string $line, string $serverId, array &$dataLines): void
+    /**
+     * A "[read/total] name · Nd" progress frame naming the cert just read, with
+     * its days-until-expiry when we got one — so each frame is informative.
+     *
+     * @param  list<string>  $chunk
+     * @param  list<array<string, mixed>>  $rows
+     */
+    private function frameLine(int $read, int $total, array $chunk, array $rows): string
     {
-        if ($line === '') {
-            return;
-        }
-        if (str_starts_with($line, self::SCAN_PROGRESS_MARKER)) {
-            $this->pushProgress($serverId, substr($line, strlen(self::SCAN_PROGRESS_MARKER)));
+        $last = end($chunk);
+        $label = is_string($last) && $last !== '' ? basename($last) : '';
 
-            return;
+        $lastRow = end($rows);
+        if (is_array($lastRow) && ($lastRow['days_until_expiry'] ?? null) !== null) {
+            $label = trim($label.' · '.(int) $lastRow['days_until_expiry'].'d');
         }
-        $dataLines[] = $line;
+
+        return trim(sprintf('[%d/%d] %s', min($read, $total), $total, $label));
     }
 
     /**
@@ -307,32 +323,39 @@ class WebserverCertsAggregator
      * sudo -n so we can read /etc/letsencrypt/live/* (root:root 0700 on
      * stock Ubuntu) without prompting.
      */
-    private function buildScanScript(): string
+    /**
+     * Step 1: list candidate cert files only (one path per line). Filter rules
+     * skip privkey-style files (which openssl x509 would refuse) and OS CA bundle
+     * paths — the goal is the server's own server-certs, not the trust store.
+     */
+    private function buildFindScript(): string
     {
         $paths = implode(' ', array_map('escapeshellarg', self::SEARCH_PATHS));
-        $marker = self::SCAN_PROGRESS_MARKER;
 
-        // Progress lines are emitted via emit() tagged with the marker so the
-        // streaming callback can split them from `path|...` cert-data lines and
-        // surface them in the live log. Filter rules skip privkey-style files
-        // (which openssl x509 would refuse) and OS CA bundle paths — the goal is
-        // the server's own server-certs, not the trust store.
         return <<<BASH
 set +e
-emit() { printf '%s%s\\n' '{$marker}' "\$1"; }
-emit "Searching certificate directories…"
-files=\$(sudo -n find {$paths} -type f -maxdepth 5 \\
+sudo -n find {$paths} -type f -maxdepth 5 \\
     \\( -name '*.pem' -o -name '*.crt' -o -name '*.cer' -o -name 'fullchain.pem' -o -name 'cert.pem' \\) \\
     2>/dev/null \\
     | grep -Ev '/(privkey|key|cabundle|ca-bundle|ca-certificates|chain)\\.pem\$' \\
-    | sort -u)
-count=\$(printf '%s\\n' "\$files" | grep -c .)
-emit "Found \$count candidate certificate file(s)."
-n=0
-printf '%s\\n' "\$files" | while IFS= read -r f; do
-    [ -z "\$f" ] && continue
-    n=\$((n+1))
-    emit "[\$n/\$count] reading \$f"
+    | sort -u
+BASH;
+    }
+
+    /**
+     * Step 2: openssl-read a specific batch of files, emitting one
+     * `path|subject|issuer|notAfter` line each (the format {@see parseScanOutput}
+     * consumes). Unreadable/non-cert files are skipped silently.
+     *
+     * @param  list<string>  $files
+     */
+    private function buildReadScript(array $files): string
+    {
+        $list = implode(' ', array_map('escapeshellarg', $files));
+
+        return <<<BASH
+set +e
+for f in {$list}; do
     out=\$(sudo -n openssl x509 -in "\$f" -noout -subject -issuer -enddate 2>/dev/null)
     if [ -z "\$out" ]; then
         continue
@@ -342,7 +365,6 @@ printf '%s\\n' "\$files" | while IFS= read -r f; do
     exp=\$(printf %s "\$out" | sed -n 's/^notAfter= *//p' | head -n 1)
     printf '%s|%s|%s|%s\\n' "\$f" "\$subj" "\$iss" "\$exp"
 done
-emit "Reading complete."
 BASH;
     }
 

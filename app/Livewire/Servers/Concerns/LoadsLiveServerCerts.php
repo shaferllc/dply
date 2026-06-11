@@ -26,7 +26,7 @@ trait LoadsLiveServerCerts
      * comfortably cover the job's own 90s timeout + queue latency without
      * leaving the operator staring at a spinner if the worker is down.
      */
-    private const LIVE_CERTS_POLL_INTERVAL_SECONDS = 2;
+    private const LIVE_CERTS_POLL_INTERVAL_SECONDS = 1;
 
     private const LIVE_CERTS_POLL_TIMEOUT_SECONDS = 60;
 
