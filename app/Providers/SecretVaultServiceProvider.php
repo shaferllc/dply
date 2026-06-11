@@ -15,15 +15,23 @@ class SecretVaultServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        // Transient so each resolution gets a fresh UTC stamp for the blob key.
-        $this->app->bind(SecretVault::class, function (): SecretVault {
+        // The single crypto seam — shared by the platform DR path (SecretVault)
+        // and the per-org secret-residency path (OrgSecretKeyManager). Stateless,
+        // so a singleton is fine.
+        $this->app->singleton(AgeEncryptor::class, function (): AgeEncryptor {
             $cfg = (array) config('secret_vault');
 
-            $age = new AgeEncryptor(
+            return new AgeEncryptor(
                 ageBin: (string) ($cfg['age_bin'] ?? 'age'),
                 recipientsPath: (string) ($cfg['recipients_path'] ?? ''),
                 identityPath: $cfg['identity_path'] ?? null,
+                keygenBin: (string) ($cfg['age_keygen_bin'] ?? 'age-keygen'),
             );
+        });
+
+        // Transient so each resolution gets a fresh UTC stamp for the blob key.
+        $this->app->bind(SecretVault::class, function (): SecretVault {
+            $cfg = (array) config('secret_vault');
 
             // Order = read preference (object primary, then git, then 1Password).
             $stores = [
@@ -33,7 +41,7 @@ class SecretVaultServiceProvider extends ServiceProvider
             ];
 
             return new SecretVault(
-                age: $age,
+                age: $this->app->make(AgeEncryptor::class),
                 stores: $stores,
                 keyPrefix: trim((string) ($cfg['key_prefix'] ?? 'secret-vault/v1'), '/'),
                 utcStamp: gmdate('Ymd\THis\Z'),

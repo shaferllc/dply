@@ -4,7 +4,9 @@ namespace App\Jobs;
 
 use App\Jobs\Concerns\DispatchesServerProvisionJob;
 use App\Jobs\Concerns\HandlesFakeCloudPoll;
+use App\Models\PrivateNetwork;
 use App\Models\Server;
+use App\Services\Servers\ServerPrivateNetworkRecorder;
 use App\Services\VultrService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -41,10 +43,29 @@ class PollVultrIpJob implements ShouldQueue
         $ip = VultrService::getPublicIp($instance);
 
         if ($ip) {
-            $this->server->update([
+            $updates = [
                 'ip_address' => $ip,
                 'status' => Server::STATUS_READY,
-            ]);
+            ];
+
+            // Vultr only has a private IP when an instance is attached to a VPC.
+            $privateIp = VultrService::getPrivateIp($instance);
+            if ($privateIp !== null && blank($this->server->private_ip_address)) {
+                $updates['private_ip_address'] = $privateIp;
+            }
+
+            $this->server->update($updates);
+
+            // Record the attached VPC (if any) so same-VPC peers can reach it.
+            $vpcId = VultrService::getInstanceVpcId($instance);
+            if ($vpcId !== null) {
+                app(ServerPrivateNetworkRecorder::class)->record(
+                    $this->server,
+                    PrivateNetwork::PROVIDER_VULTR,
+                    $vpcId,
+                    VultrService::getInstanceVpcRange($instance),
+                );
+            }
 
             $this->dispatchServerProvisionIfNeeded($this->server);
 
