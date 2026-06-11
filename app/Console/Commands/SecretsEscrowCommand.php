@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Models\Site;
 use App\Services\Secrets\Scope;
 use App\Services\Secrets\SecretVault;
 use App\Services\Secrets\Sources\CriticalKeysSource;
 use App\Services\Secrets\Sources\DbDumpSource;
 use App\Services\Secrets\Sources\PlatformEnvSource;
+use App\Services\Secrets\Sources\SiteEnvBundleSource;
 use Illuminate\Console\Command;
 
 /**
@@ -19,7 +21,8 @@ class SecretsEscrowCommand extends Command
 {
     protected $signature = 'secrets:escrow
         {--scope=platform : platform | org-<id>}
-        {--source=platform-env : platform-env | db-dump | critical-keys}
+        {--source=platform-env : platform-env | db-dump | critical-keys | site-env}
+        {--site= : site id (required for --source=site-env); scope is derived from the site}
         {--force : escrow even if an identical blob already exists}';
 
     protected $description = 'Escrow secrets (age-encrypted) to the off-box vault stores.';
@@ -29,15 +32,29 @@ class SecretsEscrowCommand extends Command
         $scope = Scope::fromKey((string) $this->option('scope'));
         $sourceKey = (string) $this->option('source');
 
-        $source = match ($sourceKey) {
-            'platform-env' => new PlatformEnvSource(base_path('.env')),
-            'db-dump' => new DbDumpSource,
-            'critical-keys' => new CriticalKeysSource,
-            default => null,
-        };
+        // A site backup ("site-env") is keyed to the site and scoped to its org —
+        // the operator picks the site, not the scope, so we derive both here.
+        if ($sourceKey === 'site-env') {
+            $siteId = trim((string) $this->option('site'));
+            $site = $siteId !== '' ? Site::find($siteId) : null;
+            if ($site === null) {
+                $this->error('--source=site-env requires a valid --site=<id>.');
+
+                return self::FAILURE;
+            }
+            $source = new SiteEnvBundleSource($site);
+            $scope = $source->scope();
+        } else {
+            $source = match ($sourceKey) {
+                'platform-env' => new PlatformEnvSource(base_path('.env')),
+                'db-dump' => new DbDumpSource,
+                'critical-keys' => new CriticalKeysSource,
+                default => null,
+            };
+        }
 
         if ($source === null) {
-            $this->error("Unknown source: {$sourceKey} (expected platform-env or db-dump).");
+            $this->error("Unknown source: {$sourceKey} (expected platform-env, db-dump, critical-keys or site-env).");
 
             return self::FAILURE;
         }
