@@ -6,6 +6,7 @@ namespace App\Services\Deploy\Concerns;
 
 use App\Models\PrivateNetwork;
 use App\Models\Server;
+use App\Models\SiteBinding;
 
 /**
  * Private-network reachability helpers shared by the resource bindings that
@@ -13,6 +14,39 @@ use App\Models\Server;
  */
 trait ResolvesReachableResources
 {
+    /**
+     * How many OTHER sites already bind each of the given resources, keyed by
+     * target_id. Lets the attach pickers warn that a Redis/database/realtime app
+     * is shared so the operator sets a prefix / separate DB to avoid collisions.
+     *
+     * @param  list<string>  $targetIds
+     * @return array<string, int>  target_id => distinct other-site count
+     */
+    private function bindingConsumerCounts(string $targetType, array $targetIds, ?string $exceptSiteId): array
+    {
+        if ($targetIds === []) {
+            return [];
+        }
+
+        return SiteBinding::query()
+            ->where('target_type', $targetType)
+            ->whereIn('target_id', $targetIds)
+            ->when($exceptSiteId !== null, fn ($q) => $q->where('site_id', '!=', $exceptSiteId))
+            ->selectRaw('target_id, COUNT(DISTINCT site_id) as c')
+            ->groupBy('target_id')
+            ->pluck('c', 'target_id')
+            ->map(fn ($v): int => (int) $v)
+            ->all();
+    }
+
+    /** Human " · used by N app(s)" / " · unused" suffix for an attach-option label. */
+    private function usageSuffix(int $consumers): string
+    {
+        return ' · '.($consumers > 0
+            ? trans_choice('used by :count app|used by :count apps', $consumers, ['count' => $consumers])
+            : __('unused'));
+    }
+
     /**
      * Server IDs whose databases $server can reach: itself, plus every same-org
      * peer that shares a private network with it (see {@see sharePrivateNetwork}).

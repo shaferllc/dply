@@ -35,12 +35,20 @@ trait ManagesDatabaseBindings
             return [];
         }
 
-        return ServerDatabase::query()
+        $databases = ServerDatabase::query()
             ->whereIn('server_id', $this->reachableServerIds($server))
             ->with('server:id,name,organization_id,private_ip_address,private_network_id')
             ->orderBy('name')
-            ->get()
-            ->map(function (ServerDatabase $db) use ($server): array {
+            ->get();
+
+        $consumers = $this->bindingConsumerCounts(
+            'server_database',
+            $databases->map(fn (ServerDatabase $d): string => (string) $d->id)->all(),
+            (string) $site->id,
+        );
+
+        return $databases
+            ->map(function (ServerDatabase $db) use ($server, $consumers): array {
                 $sameBox = (string) $db->server_id === (string) $server->id;
                 if ($sameBox) {
                     $where = __('this server');
@@ -48,11 +56,14 @@ trait ManagesDatabaseBindings
                     $where = ($db->server?->name ?: __('network peer'))
                         .($db->remote_access ? '' : ' — '.__('remote access off'));
                 }
+                $used = $consumers[(string) $db->id] ?? 0;
 
                 return [
                     'id' => (string) $db->id,
-                    'label' => $db->name.' ('.$db->engine.') · '.$where,
+                    'label' => $db->name.' ('.$db->engine.') · '.$where.$this->usageSuffix($used),
                     'engine' => (string) $db->engine,
+                    'group' => $sameBox ? 'local' : 'peer',
+                    'consumers' => $used,
                 ];
             })
             ->all();

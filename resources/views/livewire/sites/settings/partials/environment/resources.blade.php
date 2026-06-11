@@ -200,12 +200,14 @@
                 {{-- Primary database --}}
                 <div>
                     <x-input-label for="binding_db_target" :value="__('Database')" />
-                    <select id="binding_db_target" wire:model.live="bindingForm.target_id" class="dply-input">
-                        <option value="">{{ __('Choose a database…') }}</option>
-                        @foreach ($bindingTargets as $target)
-                            <option value="{{ $target['id'] }}">{{ $target['label'] }}</option>
-                        @endforeach
-                    </select>
+                    <x-binding-target-select
+                        id="binding_db_target"
+                        model="bindingForm.target_id"
+                        :live="true"
+                        :targets="$bindingTargets"
+                        :selected="$bindingForm['target_id'] ?? ''"
+                        :placeholder="__('Choose a database…')"
+                    />
                     @if ($bindingTargets === [])
                         <p class="mt-2 text-xs text-brand-moss">{{ __('No reachable databases yet. Create one on this server, or add a server to this private network.') }}</p>
                         <button type="button" wire:click="openBindingModal('database', 'provision')" class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
@@ -213,7 +215,7 @@
                             {{ __('Provision new database') }}
                         </button>
                     @else
-                        <p class="mt-2 text-xs text-brand-moss">{{ __('Lists databases on this server and on peers in the same private network. Injects DATABASE_URL and DB_* at deploy — peers connect over the private IP, so the database must allow remote access from this server.') }}</p>
+                        <p class="mt-2 text-xs text-brand-moss">{{ __('Grouped by location: services on this server (loopback) and on private-network peers (private IP — adds a network hop and must allow remote access from this server). Each option shows how many other apps already use it; sharing one database/Redis means a shared keyspace, so set a prefix or a separate database. Injects DATABASE_URL and DB_* at deploy.') }}</p>
                     @endif
                 </div>
 
@@ -821,12 +823,13 @@
                 @endphp
                 <div>
                     <x-input-label for="binding_redis_target" :value="__('Redis service')" />
-                    <select id="binding_redis_target" wire:model="bindingForm.target_id" class="dply-input">
-                        <option value="">{{ __('Choose a Redis service…') }}</option>
-                        @foreach ($bindingTargets as $target)
-                            <option value="{{ $target['id'] }}">{{ $target['label'] }}</option>
-                        @endforeach
-                    </select>
+                    <x-binding-target-select
+                        id="binding_redis_target"
+                        model="bindingForm.target_id"
+                        :targets="$bindingTargets"
+                        :selected="$bindingForm['target_id'] ?? ''"
+                        :placeholder="__('Choose a Redis service…')"
+                    />
                     @if ($bindingTargets === [])
                         <p class="mt-2 text-xs text-brand-moss">{{ __('No Redis-compatible service is reachable on this server or its private network peers.') }}</p>
                         @if ($existingCacheService === null)
@@ -858,7 +861,7 @@
                             </div>
                         @endif
                     @else
-                        <p class="mt-2 text-xs text-brand-moss">{{ __('Lists Redis-family services on this server and on peers in the same private network. Injects REDIS_HOST / REDIS_PORT / REDIS_CLIENT (plus password and prefix when set) at deploy — peers connect over the private IP.') }}</p>
+                        <p class="mt-2 text-xs text-brand-moss">{{ __('Grouped by location: Redis-family services on this server (loopback) and on private-network peers (private IP). Each option shows how many other apps already use it — sharing one instance means a shared keyspace, so set a prefix to isolate this app. Injects REDIS_HOST / REDIS_PORT / REDIS_CLIENT (plus password and prefix when set) at deploy.') }}</p>
                         @if ($existingCacheService !== null && in_array($existingCacheService->engine, ['redis', 'valkey'], true))
                             <div class="mt-3 border-t border-brand-ink/10 pt-3">
                                 <p class="text-[11px] text-brand-mist">{{ __('Want a different engine?') }}</p>
@@ -1008,12 +1011,13 @@
                         @if (! $bcProvision)
                             <div>
                                 <x-input-label for="binding_bc_app" :value="__('Broadcasting app')" />
-                                <select id="binding_bc_app" wire:model="bindingForm.realtime_app_id" class="dply-input">
-                                    <option value="">{{ __('Choose an app…') }}</option>
-                                    @foreach ($bindingTargets as $target)
-                                        <option value="{{ $target['id'] }}">{{ $target['label'] }}</option>
-                                    @endforeach
-                                </select>
+                                <x-binding-target-select
+                                    id="binding_bc_app"
+                                    model="bindingForm.realtime_app_id"
+                                    :targets="$bindingTargets"
+                                    :selected="$bindingForm['realtime_app_id'] ?? ''"
+                                    :placeholder="__('Choose an app…')"
+                                />
                                 @if ($bindingTargets === [])
                                     <p class="mt-2 text-xs text-brand-moss">{{ __('No managed broadcasting apps yet — provision a new one.') }}</p>
                                     <button type="button" wire:click="$set('bindingForm.provision', true)" class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
@@ -1021,7 +1025,7 @@
                                         {{ __('Provision new app') }}
                                     </button>
                                 @else
-                                    <p class="mt-2 text-xs text-brand-moss">{{ __('Attaching an existing app reuses it (and its existing charge) across sites. Injects BROADCAST_CONNECTION=pusher and the PUSHER_* + VITE_PUSHER_* variables at deploy.') }}</p>
+                                    <p class="mt-2 text-xs text-brand-moss">{{ __('Attaching an existing app reuses it (and its existing charge) across sites — each option shows how many other apps already share it. Injects BROADCAST_CONNECTION=pusher and the PUSHER_* + VITE_PUSHER_* variables at deploy.') }}</p>
                                 @endif
                             </div>
                         @else

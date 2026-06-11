@@ -30,20 +30,32 @@ trait ManagesRedisBindings
             return [];
         }
 
-        return ServerCacheService::query()
+        $services = ServerCacheService::query()
             ->whereIn('server_id', $this->reachableServerIds($server))
             ->whereIn('engine', ServerCacheService::FAMILY_REDIS_ENGINES)
             ->with('server:id,name,organization_id,private_ip_address,private_network_id')
             ->orderBy('engine')
-            ->get()
-            ->map(function (ServerCacheService $svc) use ($server): array {
+            ->get();
+
+        $consumers = $this->bindingConsumerCounts(
+            'server_cache_service',
+            $services->map(fn (ServerCacheService $s): string => (string) $s->id)->all(),
+            (string) $site->id,
+        );
+
+        return $services
+            ->map(function (ServerCacheService $svc) use ($server, $consumers): array {
                 $sameBox = (string) $svc->server_id === (string) $server->id;
                 $where = $sameBox ? __('this server') : ($svc->server?->name ?: __('network peer'));
                 $state = $svc->status === ServerCacheService::STATUS_RUNNING ? '' : ' — '.$svc->status;
+                $used = $consumers[(string) $svc->id] ?? 0;
 
                 return [
                     'id' => (string) $svc->id,
-                    'label' => ucfirst((string) $svc->engine).' · '.$where.$state,
+                    'label' => ucfirst((string) $svc->engine).' · '.$where.$state.$this->usageSuffix($used),
+                    'engine' => (string) $svc->engine,
+                    'group' => $sameBox ? 'local' : 'peer',
+                    'consumers' => $used,
                 ];
             })
             ->all();

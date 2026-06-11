@@ -33,15 +33,29 @@ trait ManagesBroadcastingBindings
      */
     private function attachableRealtimeApps(Site $site): array
     {
-        return RealtimeApp::query()
+        $apps = RealtimeApp::query()
             ->where('organization_id', $site->organization_id)
             ->whereIn('status', [RealtimeApp::STATUS_ACTIVE, RealtimeApp::STATUS_PROVISIONING])
             ->orderBy('name')
-            ->get()
-            ->map(fn (RealtimeApp $app): array => [
-                'id' => (string) $app->id,
-                'label' => $app->name.' · '.$app->tierConfig()['label'],
-            ])
+            ->get();
+
+        $consumers = $this->bindingConsumerCounts(
+            'realtime_app',
+            $apps->map(fn (RealtimeApp $a): string => (string) $a->id)->all(),
+            (string) $site->id,
+        );
+
+        return $apps
+            ->map(function (RealtimeApp $app) use ($consumers): array {
+                $used = $consumers[(string) $app->id] ?? 0;
+
+                return [
+                    'id' => (string) $app->id,
+                    'label' => $app->name.' · '.$app->tierConfig()['label'].$this->usageSuffix($used),
+                    'group' => 'app',
+                    'consumers' => $used,
+                ];
+            })
             ->all();
     }
 

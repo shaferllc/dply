@@ -310,14 +310,26 @@
                 </div>
             </div>
             <div class="space-y-3 p-6 sm:p-7">
-                @if ($databases->isEmpty())
+                @php $remoteDbs = $remoteDatabases ?? collect(); @endphp
+                @if ($databases->isEmpty() && $remoteDbs->isEmpty())
                     <p class="text-sm text-brand-moss">{{ __('No databases on this server yet.') }}</p>
                 @else
                     <select wire:model="run_database_id" class="{{ $input }}">
                         <option value="">{{ __('Pick a database…') }}</option>
-                        @foreach ($databases as $db)
-                            <option value="{{ $db->id }}">{{ $db->name }} ({{ $db->engine }})</option>
-                        @endforeach
+                        @if ($databases->isNotEmpty())
+                            <optgroup label="{{ __('On this server') }}">
+                                @foreach ($databases as $db)
+                                    <option value="{{ $db->id }}">{{ $db->name }} ({{ $db->engine }})</option>
+                                @endforeach
+                            </optgroup>
+                        @endif
+                        @if ($remoteDbs->isNotEmpty())
+                            <optgroup label="{{ __('Attached from other servers — dumped on their host') }}">
+                                @foreach ($remoteDbs as $db)
+                                    <option value="{{ $db->id }}">{{ $db->name }} ({{ $db->engine }}) — {{ $db->server?->name }}</option>
+                                @endforeach
+                            </optgroup>
+                        @endif
                     </select>
                     @if ($backupConfigurations->isNotEmpty())
                         <select wire:model="run_database_backup_configuration_id" class="{{ $input }}">
