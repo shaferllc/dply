@@ -41,8 +41,9 @@
     $groupCount = count($hubGroups);
 
     // Attached worker SERVER pool(s) get their own graph column on the right, so the
-    // scalable background fleet shows as an attached resource. Workspace-scoped; see
-    // Site::attachedWorkerPools(). Widen the grid by one column when present.
+    // scalable background fleet shows as an attached resource. Scoped to pools that
+    // scale THIS site's own server; see Site::attachedWorkerPools(). Widen the grid
+    // by one column when present.
     $workerPools = $site->attachedWorkerPools();
     $mapCols = $groupCount + ($workerPools->isNotEmpty() ? 1 : 0);
 

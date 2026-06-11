@@ -84,19 +84,19 @@ trait HasSiteRelationships
      */
     public function attachedWorkerPools(): Collection
     {
-        $workspaceId = $this->workspace_id;
-        $organizationId = $this->organization_id;
+        $serverId = $this->server_id;
 
-        if ($workspaceId === null && $organizationId === null) {
+        if ($serverId === null) {
             return new Collection;
         }
 
+        // A worker pool scales out exactly one box — its source_server_id (the
+        // server whose code + queues the replicas run). It's "attached" to a site
+        // only when it scales THAT site's own server. Scoping by workspace/org
+        // instead made every site in a workspace that owns any pool anywhere
+        // (e.g. dply's control-plane pool) falsely show workers attached.
         return WorkerPool::query()
-            ->whereHas('servers', function ($q) use ($workspaceId, $organizationId): void {
-                $workspaceId !== null
-                    ? $q->where('workspace_id', $workspaceId)
-                    : $q->where('organization_id', $organizationId);
-            })
+            ->where('source_server_id', $serverId)
             ->with(['servers', 'primaryServer'])
             ->orderBy('created_at')
             ->get();
