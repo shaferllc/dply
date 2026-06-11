@@ -6,14 +6,18 @@ namespace App\Services\Deploy;
 
 use App\Models\Site;
 use App\Models\SiteBinding;
+use App\Services\Deploy\Concerns\ManagesAiBindings;
 use App\Services\Deploy\Concerns\ManagesBroadcastingBindings;
 use App\Services\Deploy\Concerns\ManagesCacheBindings;
+use App\Services\Deploy\Concerns\ManagesCaptchaBindings;
 use App\Services\Deploy\Concerns\ManagesDatabaseBindings;
+use App\Services\Deploy\Concerns\ManagesErrorTrackingBindings;
 use App\Services\Deploy\Concerns\ManagesLoggingBindings;
 use App\Services\Deploy\Concerns\ManagesMailBindings;
 use App\Services\Deploy\Concerns\ManagesQueueBindings;
 use App\Services\Deploy\Concerns\ManagesRedisBindings;
 use App\Services\Deploy\Concerns\ManagesSessionBindings;
+use App\Services\Deploy\Concerns\ManagesSmsBindings;
 use App\Services\Deploy\Concerns\ManagesStorageBindings;
 use App\Services\Deploy\Concerns\ResolvesReachableResources;
 use App\Services\Servers\ServerDatabaseProvisioner;
@@ -37,14 +41,18 @@ use InvalidArgumentException;
  */
 class SiteBindingManager
 {
+    use ManagesAiBindings;
     use ManagesBroadcastingBindings;
     use ManagesCacheBindings;
+    use ManagesCaptchaBindings;
     use ManagesDatabaseBindings;
+    use ManagesErrorTrackingBindings;
     use ManagesLoggingBindings;
     use ManagesMailBindings;
     use ManagesQueueBindings;
     use ManagesRedisBindings;
     use ManagesSessionBindings;
+    use ManagesSmsBindings;
     use ManagesStorageBindings;
     use ResolvesReachableResources;
 
@@ -88,6 +96,10 @@ class SiteBindingManager
             'logging' => $this->attachLogging($site, $params),
             'mail' => $this->attachMail($site, $params),
             'broadcasting' => $this->attachBroadcasting($site, $params),
+            'error_tracking' => $this->attachErrorTracking($site, $params),
+            'ai' => $this->attachAi($site, $params),
+            'captcha' => $this->attachCaptcha($site, $params),
+            'sms' => $this->attachSms($site, $params),
             'scheduler', 'workers' => $this->attachMarker($site, $type),
             default => throw new InvalidArgumentException(__('This binding type cannot be attached yet.')),
         };
@@ -233,6 +245,20 @@ class SiteBindingManager
             // Broadcasting fully owns BROADCAST_CONNECTION — the binding is the
             // single source of truth for the driver, so a loose copy is stale.
             'broadcasting' => ['BROADCAST_CONNECTION'],
+            // Error tracking owns every provider's key namespace, so switching
+            // providers (or attaching one) clears stale loose keys from another.
+            'error_tracking' => [
+                'SENTRY_LARAVEL_DSN', 'SENTRY_TRACES_SAMPLE_RATE',
+                'BUGSNAG_API_KEY', 'FLARE_KEY',
+            ],
+            // AI owns every provider's key namespace, so switching providers
+            // clears the previous provider's loose key.
+            'ai' => [
+                'OPENAI_API_KEY', 'OPENAI_ORGANIZATION', 'ANTHROPIC_API_KEY',
+                'GEMINI_API_KEY', 'GROQ_API_KEY', 'MISTRAL_API_KEY',
+            ],
+            'captcha' => $this->captchaOwnedEnvKeys(),
+            'sms' => $this->smsOwnedEnvKeys(),
             default => [],
         };
     }

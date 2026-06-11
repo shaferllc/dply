@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Sites;
 
 use App\Models\SiteBinding;
+use Illuminate\Support\Collection;
 
 /**
  * Describes the palette for the site Resources hub — the grouped, full set of
@@ -24,6 +25,7 @@ final class SiteBindingCatalog
     public const GROUPS = [
         'data' => 'Data & cache',
         'delivery' => 'Delivery & comms',
+        'integrations' => 'Integrations',
         'runtime' => 'Runtime',
     ];
 
@@ -92,6 +94,30 @@ final class SiteBindingCatalog
                 'env' => ['LOG_CHANNEL'],
                 'runtimes' => ['vm'],
             ],
+            'error_tracking' => [
+                'group' => 'delivery', 'label' => 'Error tracking', 'icon' => 'heroicon-o-bug-ant',
+                'purpose' => 'Report exceptions to Sentry, Bugsnag or Flare.',
+                'env' => ['SENTRY_LARAVEL_DSN'],
+                'runtimes' => ['vm'],
+            ],
+            'ai' => [
+                'group' => 'integrations', 'label' => 'AI / LLM', 'icon' => 'heroicon-o-sparkles',
+                'purpose' => 'Provider API key for OpenAI, Anthropic, Gemini…',
+                'env' => ['OPENAI_API_KEY'],
+                'runtimes' => ['vm'],
+            ],
+            'captcha' => [
+                'group' => 'integrations', 'label' => 'CAPTCHA', 'icon' => 'heroicon-o-shield-check',
+                'purpose' => 'reCAPTCHA, Turnstile or hCaptcha keys (+ Vite mirror).',
+                'env' => ['TURNSTILE_SITE_KEY'],
+                'runtimes' => ['vm'],
+            ],
+            'sms' => [
+                'group' => 'integrations', 'label' => 'SMS / push', 'icon' => 'heroicon-o-chat-bubble-left-right',
+                'purpose' => 'Twilio, Vonage or FCM notification channel keys.',
+                'env' => ['TWILIO_SID'],
+                'runtimes' => ['vm'],
+            ],
             'scheduler' => [
                 'group' => 'runtime', 'label' => 'Scheduler', 'icon' => 'heroicon-o-clock',
                 'purpose' => 'Run the Laravel scheduler (cron) for this site.',
@@ -117,7 +143,7 @@ final class SiteBindingCatalog
      * The catalog grouped for rendering, filtered to a runtime, with each type's
      * currently-attached binding (or null) resolved from the site's rows.
      *
-     * @param  \Illuminate\Support\Collection<int, SiteBinding>  $bindings
+     * @param  Collection<int, SiteBinding>  $bindings
      * @return array<string, array{label: string, types: list<array<string, mixed>>}>
      */
     public static function grouped(string $runtime, $bindings): array

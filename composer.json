@@ -36,6 +36,7 @@
         "laravel/cashier": "^16.5",
         "laravel/framework": "^13.0",
         "laravel/horizon": "^5.45",
+        "laravel/mcp": "^0.8.0",
         "laravel/passkeys": "^0.1.0",
         "laravel/pennant": "^1.23",
         "laravel/pulse": "^1.7",
