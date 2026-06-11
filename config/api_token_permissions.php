@@ -14,14 +14,17 @@ use App\Models\ApiToken;
  * The MCP server (routes/ai.php → App\Mcp) reuses these SAME abilities — each tool
  * declares the ability it requires and AbstractDplyTool enforces it via
  * $token->allows(), so an existing token (read/deploy/ops/full preset, or the
- * deployer allowlist) works unchanged over MCP. Tool → ability map (PR1):
+ * deployer allowlist) works unchanged over MCP. Tool → ability map:
  *   list_sites / get_site / list_site_workers / list_site_schedules
- *     / list_deployments / get_deployment / get_operation_status .... sites.read
+ *     / list_deployments / get_deployment / get_operation_status
+ *     / get_site_env ..................................................... sites.read
  *   list_servers ........................................................ servers.read
  *   deploy_site ......................................................... sites.deploy
- * Later PRs add env (sites.read/sites.write), database (database.read/write),
- * domains (sites.read/sites.write), SSL (certificates.read/write), and
- * maintenance/basic-auth (sites.write / auth_users.*) tools.
+ *   set_site_env_var / delete_site_env_var / push_site_env .............. sites.write
+ *   list_site_databases ................................................. database.read
+ *   create_site_database ................................................ database.write
+ * Later PRs add domains (sites.read/sites.write), SSL (certificates.read/write),
+ * and maintenance/basic-auth (sites.write / auth_users.*) tools.
  *
  * @see ApiToken::tokenAllowsAbility()
  * @see AbstractDplyTool
