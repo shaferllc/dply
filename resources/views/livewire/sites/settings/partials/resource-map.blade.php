@@ -45,6 +45,16 @@
     // Site::attachedWorkerPools(). Widen the grid by one column when present.
     $workerPools = $site->attachedWorkerPools();
     $mapCols = $groupCount + ($workerPools->isNotEmpty() ? 1 : 0);
+
+    // Inbound routing — the "front door" node above the site. Requests reach the
+    // site through its routing (domains/redirects/SSL) before fanning out to the
+    // backing resources below, so it anchors the top of the graph. Derived live
+    // from the existing Routing tab's data; no binding row, see the Routing
+    // section (route sites.show?section=routing).
+    $routingPrimary = $site->primaryDomain();
+    $routingDomainCount = $site->domains->count();
+    $routingRedirectCount = $site->redirects->count();
+    $routingActive = $routingDomainCount > 0;
 @endphp
 
 <div class="space-y-5">
@@ -142,6 +152,18 @@
                     const addDot = (p, kind) => frag.appendChild(mk('circle', { cx: p.x, cy: p.y, r: 3.5 },
                         { fill: kind === 'idle' ? INK : FOREST, opacity: kind === 'idle' ? 0.3 : 1 }));
 
+                    // Inbound routing (bottom) flows down into the site (top) —
+                    // the front door of the request path. Animates only when the
+                    // site has a public domain.
+                    const routing = this.$refs.routing;
+                    if (routing) {
+                        const rBottom = this.point(routing.getBoundingClientRect(), wrap, 'bottom');
+                        const sTop = this.point(site.getBoundingClientRect(), wrap, 'top');
+                        const rKind = {{ $routingActive ? "'trunk'" : "'idle'" }};
+                        addEdge(this.curve(rBottom, DOWN, sTop, UP), rKind, i++);
+                        addDot(sTop, rKind);
+                    }
+
                     // Site (bottom) fans down to each group hub (top).
                     const start = this.point(site.getBoundingClientRect(), wrap, 'bottom');
                     const hubBottom = {};
@@ -187,8 +209,44 @@
                 <g x-ref="layer" wire:ignore></g>
             </svg>
 
-            {{-- Site node (anchors the whole graph, top-centered) --}}
+            {{-- Inbound routing node — the front door above the site. Reuses the
+                 existing Routing tab (domains / redirects / SSL) for all config. --}}
             <div class="relative z-10 flex justify-center" style="grid-column: 1 / -1; grid-row: 1;">
+                <div x-ref="routing" @class([
+                    'w-56 rounded-2xl border bg-white p-4 shadow-sm transition',
+                    'border-brand-forest/25 ring-1 ring-brand-forest/5' => $routingActive,
+                    'border-dashed border-brand-ink/15' => ! $routingActive,
+                ])>
+                    <div class="flex items-center gap-2.5">
+                        <span class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl {{ $routingActive ? 'bg-brand-forest/10 text-brand-forest' : 'bg-brand-sand/50 text-brand-moss' }}">
+                            <x-heroicon-o-arrows-right-left class="h-5 w-5" />
+                            @if ($routingActive)
+                                <span class="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-white"></span>
+                            @endif
+                        </span>
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-semibold text-brand-ink">{{ __('Routing') }}</p>
+                            <p class="text-[11px] font-medium uppercase tracking-wide text-brand-mist">{{ __('Inbound') }}</p>
+                        </div>
+                    </div>
+                    <div class="mt-3 border-t border-brand-ink/10 pt-2.5">
+                        @if ($routingActive)
+                            <p class="truncate font-mono text-[11px] font-medium text-brand-moss">{{ $routingPrimary?->hostname ?? __('Configured') }}</p>
+                            <p class="mt-0.5 text-[11px] text-brand-mist">
+                                {{ trans_choice(':n domain|:n domains', $routingDomainCount, ['n' => $routingDomainCount]) }}@if ($routingRedirectCount > 0) · {{ trans_choice(':n redirect|:n redirects', $routingRedirectCount, ['n' => $routingRedirectCount]) }}@endif
+                            </p>
+                        @else
+                            <p class="text-[11px] text-brand-moss">{{ __('No public domain yet') }}</p>
+                        @endif
+                        <a href="{{ $sectionUrl('routing') }}" wire:navigate class="mt-2 inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                            <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5 text-brand-forest" /> {{ __('Manage routing') }}
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Site node (anchors the whole graph, top-centered) --}}
+            <div class="relative z-10 flex justify-center" style="grid-column: 1 / -1; grid-row: 2;">
                 <div x-ref="site" class="w-56 rounded-2xl border border-brand-forest/25 bg-white p-4 shadow-md ring-1 ring-brand-forest/5">
                     <div class="flex items-center gap-2.5">
                         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-forest text-brand-cream">
@@ -215,7 +273,7 @@
                 @endphp
 
                 {{-- Group hub --}}
-                <div class="relative z-10 flex justify-center" style="grid-column: {{ $col }}; grid-row: 2;">
+                <div class="relative z-10 flex justify-center" style="grid-column: {{ $col }}; grid-row: 3;">
                     <div data-hub="{{ $groupKey }}" class="w-44 rounded-xl border border-brand-ink/10 bg-white/90 px-3.5 py-2.5 text-center shadow-sm backdrop-blur">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-ink">{{ $group['label'] }}</p>
                         <p class="mt-0.5 text-[11px] font-medium text-brand-mist">{{ $gAttached }}/{{ $gTotal }} {{ __('attached') }}</p>
@@ -223,7 +281,7 @@
                 </div>
 
                 {{-- Resource nodes for this group (left gutter leaves room for the branch curves) --}}
-                <div class="relative z-10 flex flex-col gap-3 pl-9" style="grid-column: {{ $col }}; grid-row: 3;">
+                <div class="relative z-10 flex flex-col gap-3 pl-9" style="grid-column: {{ $col }}; grid-row: 4;">
                     @foreach ($group['types'] as $t)
                         @php
                             $type = $t['type'];
@@ -465,13 +523,13 @@
                  (branch into each pool node), the same mechanism the binding groups use. --}}
             @if ($workerPools->isNotEmpty())
                 @php $wcol = $groupCount + 1; @endphp
-                <div class="relative z-10 flex justify-center" style="grid-column: {{ $wcol }}; grid-row: 2;">
+                <div class="relative z-10 flex justify-center" style="grid-column: {{ $wcol }}; grid-row: 3;">
                     <div data-hub="workers" class="w-44 rounded-xl border border-violet-200 bg-white/90 px-3.5 py-2.5 text-center shadow-sm backdrop-blur">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-violet-800">{{ __('Workers') }}</p>
                         <p class="mt-0.5 text-[11px] font-medium text-brand-mist">{{ trans_choice(':n pool|:n pools', $workerPools->count(), ['n' => $workerPools->count()]) }} {{ __('attached') }}</p>
                     </div>
                 </div>
-                <div class="relative z-10 flex flex-col gap-3 pl-9" style="grid-column: {{ $wcol }}; grid-row: 3;">
+                <div class="relative z-10 flex flex-col gap-3 pl-9" style="grid-column: {{ $wcol }}; grid-row: 4;">
                     @foreach ($workerPools as $pool)
                         @php $primary = $pool->primaryServer; @endphp
                         <div
