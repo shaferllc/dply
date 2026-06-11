@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Enums\DeploymentMethod;
 use App\Models\ConsoleAction;
 use App\Models\Site;
 use App\Models\SiteDeployment;
@@ -14,7 +15,10 @@ use App\Services\Deploy\DeployResumePlan;
 use App\Services\Deploy\EphemeralDeployCredentialManager;
 use App\Services\Notifications\DeployDigestBuffer;
 use App\Services\Notifications\NotificationPublisher;
+use App\Services\Notifications\ServerDeployPolicyNotificationDispatcher;
 use App\Services\Servers\ServerDeployPolicyGuard;
+use App\Services\Sites\Backends\CanarySiteDeployer;
+use App\Services\Sites\Backends\RollingSiteDeployer;
 use App\Services\Sites\RequiredEnvEvaluator;
 use App\Support\DeployLogRedactor;
 use App\Support\ProductLine\ProductLineKillSwitches;
@@ -23,6 +27,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
@@ -181,9 +186,18 @@ class RunSiteDeploymentJob implements ShouldQueue
             $this->notifyDeploymentStarted($deployment, $notificationPublisher);
 
             $ephemeralCredential = null;
+            $ephemeralLog = [];
             if ($ephemeralCredentials->shouldUseForSite($this->site)) {
                 $ephemeralCredential = $ephemeralCredentials->provision($this->site, $deployment);
                 $ephemeralCredentials->activateForDeploy($ephemeralCredential);
+
+                // Surface the per-deploy key issuance in the deploy output (not
+                // just the audit log) so operators can see the feature working.
+                $fingerprint = 'SHA256:'.(string) $ephemeralCredential->public_key_fingerprint;
+                $ephemeralLog[] = '── Ephemeral deploy credentials ──';
+                $ephemeralLog[] = 'Issued a one-time ed25519 deploy key ('.$fingerprint.').';
+                $ephemeralLog[] = 'Installed on '.($this->site->server?->name ?? 'the server')
+                    .' via the operational SSH key; this deploy authenticates with it.';
             }
 
             try {
@@ -198,11 +212,11 @@ class RunSiteDeploymentJob implements ShouldQueue
                 // out across backends (rolling = drain→deploy→re-add per box;
                 // canary = ramp a weighted slice then promote) instead of the
                 // single-server engine run. Every other method/site is unaffected.
-                $cutover = \App\Enums\DeploymentMethod::forSite($this->site)->cutover();
+                $cutover = DeploymentMethod::forSite($this->site)->cutover();
                 if ($this->site->isMultiBackend() && in_array($cutover, ['rolling', 'canary'], true)) {
                     $result = $cutover === 'canary'
-                        ? app(\App\Services\Sites\Backends\CanarySiteDeployer::class)->deploy($this->site, $deployment)
-                        : app(\App\Services\Sites\Backends\RollingSiteDeployer::class)->deploy($this->site, $deployment);
+                        ? app(CanarySiteDeployer::class)->deploy($this->site, $deployment)
+                        : app(RollingSiteDeployer::class)->deploy($this->site, $deployment);
                 } else {
                     $engine = $deployEngineResolver->forProject($this->site->project);
                     $result = $engine->run(new DeployContext(
@@ -214,7 +228,7 @@ class RunSiteDeploymentJob implements ShouldQueue
                         resume: $resumePlan,
                     ));
                 }
-                $redacted = DeployLogRedactor::redact($result['output']);
+                $redacted = $this->withEphemeralLog($ephemeralLog, DeployLogRedactor::redact($result['output']));
                 $deployment->update([
                     'status' => SiteDeployment::STATUS_SUCCESS,
                     'git_sha' => $result['sha'],
@@ -274,7 +288,7 @@ class RunSiteDeploymentJob implements ShouldQueue
                     }
                 }
             } catch (\Throwable $e) {
-                $msg = DeployLogRedactor::redact($e->getMessage());
+                $msg = $this->withEphemeralLog($ephemeralLog, DeployLogRedactor::redact($e->getMessage()));
                 $deployment->update([
                     'status' => SiteDeployment::STATUS_FAILED,
                     'exit_code' => 1,
@@ -289,6 +303,16 @@ class RunSiteDeploymentJob implements ShouldQueue
             } finally {
                 if ($ephemeralCredential instanceof SiteDeploymentEphemeralCredential) {
                     $ephemeralCredentials->revoke($ephemeralCredential);
+
+                    // Close out the key lifecycle in the deploy output (the log
+                    // was already saved above; append so issue → use → revoke is
+                    // all visible). The fingerprint is public — safe to show.
+                    $deployment->update([
+                        'log_output' => trim((string) $deployment->log_output
+                            ."\nRevoked the ephemeral deploy key (SHA256:"
+                            .(string) $ephemeralCredential->public_key_fingerprint
+                            .'); removed from authorized_keys.'),
+                    ]);
                 }
             }
 
@@ -299,6 +323,22 @@ class RunSiteDeploymentJob implements ShouldQueue
             $lock->release();
             $this->clearIdempotencyInflight();
         }
+    }
+
+    /**
+     * Prepend the ephemeral-credential issuance lines to a deploy log so the
+     * per-deploy key is visible in the deployment output. No-op when ephemeral
+     * credentials weren't used for this deploy.
+     *
+     * @param  list<string>  $lines
+     */
+    private function withEphemeralLog(array $lines, string $log): string
+    {
+        if ($lines === []) {
+            return $log;
+        }
+
+        return implode("\n", $lines)."\n\n".$log;
     }
 
     /**
@@ -561,7 +601,7 @@ class RunSiteDeploymentJob implements ShouldQueue
      * subscribed on the deploy-window workspace. Best-effort: never let a
      * notification failure derail the (already-skipped) deploy.
      *
-     * @param  array{allowed: bool, reason: ?string, policy: array<string, mixed>, next_allowed_at: ?\Illuminate\Support\Carbon}  $policyDecision
+     * @param  array{allowed: bool, reason: ?string, policy: array<string, mixed>, next_allowed_at: ?Carbon}  $policyDecision
      */
     protected function notifyDeployWindowBlocked(array $policyDecision): void
     {
@@ -581,7 +621,7 @@ class RunSiteDeploymentJob implements ShouldQueue
                 $details[] = __('Allowed again: :time', ['time' => $nextAllowedAt->timezone($tz)->format('D H:i T')]);
             }
 
-            app(\App\Services\Notifications\ServerDeployPolicyNotificationDispatcher::class)->notify(
+            app(ServerDeployPolicyNotificationDispatcher::class)->notify(
                 $server,
                 'deploy_blocked',
                 $details,

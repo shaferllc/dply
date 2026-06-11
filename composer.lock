@@ -1154,7 +1154,7 @@
         },
         {
             "name": "dply/log-parser",
-            "version": "dev-feat/resume-from-phase",
+            "version": "dev-main",
             "dist": {
                 "type": "path",
                 "url": "packages/log-parser",
@@ -1198,7 +1198,7 @@
         },
         {
             "name": "dply/nginx-config",
-            "version": "dev-feat/resume-from-phase",
+            "version": "dev-main",
             "dist": {
                 "type": "path",
                 "url": "packages/nginx-config",

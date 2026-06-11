@@ -379,7 +379,7 @@
                                                     @php $oEditHint = \App\Support\Sites\SiteEnvFieldHints::hint((string) $editing_env_key, (string) $editing_env_value); @endphp
                                                     <div class="flex-1 min-w-[12rem]" x-data="{ showValue: true }">
                                                         <label class="mb-1 flex items-center justify-between text-sm font-medium text-brand-ink" for="og_edit_val_{{ md5($oKey) }}">
-                                                            <span>{{ __('Value') }}@if ($oEditHint['type'] === 'bool')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(true / false)') }}</span>@elseif ($oEditHint['type'] === 'enum')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(pick one)') }}</span>@endif</span>
+                                                            <span>{{ __('Value') }}@if ($oEditHint['type'] === 'bool')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(true / false)') }}</span>@elseif ($oEditHint['type'] === 'enum')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(pick or type)') }}</span>@endif</span>
                                                             @if ($oEditHint['type'] === 'text')
                                                                 <button type="button" class="text-xs font-medium text-brand-sage hover:underline" @click="showValue = !showValue">
                                                                     <span x-show="!showValue">{{ __('Show') }}</span>
@@ -387,15 +387,7 @@
                                                                 </button>
                                                             @endif
                                                         </label>
-                                                        @if ($oEditHint['type'] !== 'text')
-                                                            <select id="og_edit_val_{{ md5($oKey) }}" wire:model="editing_env_value" class="block w-full rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-sm text-brand-ink">
-                                                                @foreach ($oEditHint['options'] as $oOpt)
-                                                                    <option value="{{ $oOpt }}">{{ $oOpt }}</option>
-                                                                @endforeach
-                                                            </select>
-                                                        @else
-                                                            <input id="og_edit_val_{{ md5($oKey) }}" wire:model="editing_env_value" x-bind:type="showValue ? 'text' : 'password'" autocomplete="off" spellcheck="false" class="block w-full rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-sm text-brand-ink" />
-                                                        @endif
+                                                        @include('livewire.sites.settings.partials.environment._value-input', ['hint' => $oEditHint, 'model' => 'editing_env_value', 'id' => 'og_edit_val_'.md5($oKey)])
                                                         <x-input-error :messages="$errors->get('editing_env_value')" class="mt-1" />
                                                     </div>
                                                 </div>
@@ -498,7 +490,7 @@
                                                 @php $oEditHint = \App\Support\Sites\SiteEnvFieldHints::hint((string) $editing_env_key, (string) $editing_env_value); @endphp
                                                 <div class="flex-1 min-w-[12rem]" x-data="{ showValue: true }">
                                                     <label class="mb-1 flex items-center justify-between text-sm font-medium text-brand-ink" for="og_edit_val_{{ md5($oKey) }}">
-                                                        <span>{{ __('Value') }}@if ($oEditHint['type'] === 'bool')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(true / false)') }}</span>@elseif ($oEditHint['type'] === 'enum')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(pick one)') }}</span>@endif</span>
+                                                        <span>{{ __('Value') }}@if ($oEditHint['type'] === 'bool')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(true / false)') }}</span>@elseif ($oEditHint['type'] === 'enum')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(pick or type)') }}</span>@endif</span>
                                                         @if ($oEditHint['type'] === 'text')
                                                             <button type="button" class="text-xs font-medium text-brand-sage hover:underline" @click="showValue = !showValue">
                                                                 <span x-show="!showValue">{{ __('Show') }}</span>
@@ -506,15 +498,7 @@
                                                             </button>
                                                         @endif
                                                     </label>
-                                                    @if ($oEditHint['type'] !== 'text')
-                                                        <select id="og_edit_val_{{ md5($oKey) }}" wire:model="editing_env_value" class="block w-full rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-sm text-brand-ink">
-                                                            @foreach ($oEditHint['options'] as $oOpt)
-                                                                <option value="{{ $oOpt }}">{{ $oOpt }}</option>
-                                                            @endforeach
-                                                        </select>
-                                                    @else
-                                                        <input id="og_edit_val_{{ md5($oKey) }}" wire:model="editing_env_value" x-bind:type="showValue ? 'text' : 'password'" autocomplete="off" spellcheck="false" class="block w-full rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-sm text-brand-ink" />
-                                                    @endif
+                                                    @include('livewire.sites.settings.partials.environment._value-input', ['hint' => $oEditHint, 'model' => 'editing_env_value', 'id' => 'og_edit_val_'.md5($oKey)])
                                                     <x-input-error :messages="$errors->get('editing_env_value')" class="mt-1" />
                                                 </div>
                                             </div>
@@ -614,7 +598,7 @@
                                     @php $editHint = \App\Support\Sites\SiteEnvFieldHints::hint((string) $editing_env_key, (string) $editing_env_value); @endphp
                                     <div class="flex-1 min-w-[12rem]" x-data="{ showValue: true }">
                                         <label class="mb-1 flex items-center justify-between text-sm font-medium text-brand-ink" for="editing_env_value_{{ md5($key) }}">
-                                            <span>{{ __('Value') }}@if ($editHint['type'] === 'bool')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(true / false)') }}</span>@elseif ($editHint['type'] === 'enum')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(pick one)') }}</span>@endif</span>
+                                            <span>{{ __('Value') }}@if ($editHint['type'] === 'bool')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(true / false)') }}</span>@elseif ($editHint['type'] === 'enum')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(pick or type)') }}</span>@endif</span>
                                             @if ($editHint['type'] === 'text')
                                                 <button type="button" class="text-xs font-medium text-brand-sage hover:underline" @click="showValue = !showValue">
                                                     <span x-show="!showValue">{{ __('Show') }}</span>
@@ -622,29 +606,7 @@
                                                 </button>
                                             @endif
                                         </label>
-                                        @if ($editHint['type'] !== 'text')
-                                            {{-- Toggle/dropdown for known boolean & enum keys (APP_DEBUG,
-                                                 APP_ENV, LOG_LEVEL, MAIL_MAILER, …). The current value is
-                                                 always one of the options so nothing is lost. --}}
-                                            <select
-                                                id="editing_env_value_{{ md5($key) }}"
-                                                wire:model="editing_env_value"
-                                                class="block w-full rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-sm text-brand-ink"
-                                            >
-                                                @foreach ($editHint['options'] as $opt)
-                                                    <option value="{{ $opt }}">{{ $opt }}</option>
-                                                @endforeach
-                                            </select>
-                                        @else
-                                            <input
-                                                id="editing_env_value_{{ md5($key) }}"
-                                                wire:model="editing_env_value"
-                                                x-bind:type="showValue ? 'text' : 'password'"
-                                                autocomplete="off"
-                                                spellcheck="false"
-                                                class="block w-full rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-sm text-brand-ink"
-                                            />
-                                        @endif
+                                        @include('livewire.sites.settings.partials.environment._value-input', ['hint' => $editHint, 'model' => 'editing_env_value', 'id' => 'editing_env_value_'.md5($key)])
                                         <x-input-error :messages="$errors->get('editing_env_value')" class="mt-1" />
                                     </div>
                                 </div>

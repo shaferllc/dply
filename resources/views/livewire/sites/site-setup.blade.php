@@ -310,4 +310,9 @@
 @else
             </div>
 @endif
+
+{{-- The env partial's Remove/Sync actions open the shared confirm modal; render
+     it so the confirmation dialog actually appears (otherwise removal silently
+     no-ops). --}}
+@include('livewire.partials.confirm-action-modal')
 </div>

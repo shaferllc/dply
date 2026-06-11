@@ -172,6 +172,16 @@
     @endif
 
     <div class="flex-1 overflow-y-auto px-4 py-4">
+        {{-- While a guide/index is loading (the open + loadGuide + showIndex
+             round-trips), show a spinner instead of the previous content so the
+             panel never flashes the index or a stale page on the way to the
+             requested guide. --}}
+        <div wire:loading.flex wire:target="open, loadGuide, showIndex" class="hidden items-center justify-center gap-2 py-10 text-sm text-brand-moss">
+            <x-spinner size="sm" />
+            <span>{{ __('Loading…') }}</span>
+        </div>
+
+        <div wire:loading.remove wire:target="open, loadGuide, showIndex">
         @if ($isIndex)
             <p class="text-sm text-brand-moss">{{ __('Choose a guide to read in this panel, or open the full documentation index.') }}</p>
             <ul class="mt-4 space-y-2">
@@ -216,6 +226,7 @@
         @else
             <p class="text-sm text-brand-moss">{{ __('This guide is not available yet.') }}</p>
         @endif
+        </div>
     </div>
 
     <div class="border-t border-brand-ink/10 px-4 py-3 dark:border-brand-mist/20">
