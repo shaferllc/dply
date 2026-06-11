@@ -22,6 +22,7 @@ use App\Services\WorkerPools\WorkerCloneProvisioner;
 use App\Services\WorkerPools\WorkerPoolManager;
 use App\Support\WorkerPools\WorkerPoolHorizonConfig;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Lazy;
@@ -134,6 +135,14 @@ class WorkspaceWorkerPool extends Component
             $this->hz_process_manager = $pool->processManager();
         } else {
             $this->pool_name = $server->name.' pool';
+        }
+
+        // Landing straight on the Horizon tab (?tab=horizon): pull a fresh
+        // snapshot immediately so stats + Live jobs fill in without waiting for
+        // the first poll tick or a manual Refresh. Throttled, so a recent pull
+        // is reused.
+        if ($this->tab === 'horizon') {
+            $this->pollHorizon();
         }
         // Catalog (region/size dropdowns) is loaded lazily when the operator picks
         // a provider/credential — not on mount, to avoid a provider API call on
@@ -753,6 +762,92 @@ class WorkspaceWorkerPool extends Component
             'received_at' => (float) ($job['received_at'] ?? 0),
         ]);
         $this->liveJobs = array_slice($this->liveJobs, 0, 30);
+    }
+
+    /**
+     * The Live-jobs feed for the Horizon tab. Real-time Echo events win when they
+     * arrive; otherwise — the common case, since most pools have no per-job
+     * broadcaster wired on the workers — fall back to the freshest jobs from the
+     * Horizon snapshot pulled over SSH, so the panel actually fills in whenever
+     * Horizon has activity instead of sitting on "waiting for job activity…".
+     *
+     * @return list<array{name: string, queue: string, status: string, received_at: float}>
+     */
+    public function liveJobsFeed(): array
+    {
+        if ($this->liveJobs !== []) {
+            return $this->liveJobs;
+        }
+
+        $pool = $this->pool();
+        $hz = is_array($pool?->meta['horizon'] ?? null) ? $pool->meta['horizon'] : [];
+        // No fallback when the app doesn't ship Horizon (nothing to read).
+        if (($hz['horizon_installed'] ?? null) === false) {
+            return [];
+        }
+
+        $collectedAt = ! empty($hz['collected_at'])
+            ? Carbon::parse($hz['collected_at'])->getTimestamp()
+            : now()->getTimestamp();
+
+        // Snapshot jobs carry `age` (seconds, computed on the box at collection):
+        // rebuild a dply-clock `received_at` so the view's "x ago" renders right.
+        $map = fn (array $jobs, ?string $forceStatus): array => collect($jobs)->map(fn ($j) => [
+            'name' => (string) ($j['name'] ?? 'job'),
+            'queue' => (string) ($j['queue'] ?? '?'),
+            'status' => $forceStatus ?? (string) ($j['status'] ?? 'processing'),
+            'received_at' => isset($j['age']) && $j['age'] !== null
+                ? (float) $collectedAt - (float) $j['age']
+                : (float) $collectedAt,
+        ])->all();
+
+        $feed = array_merge(
+            $map((array) ($hz['recent_jobs'] ?? []), null),
+            $map((array) ($hz['pending_jobs'] ?? []), 'pending'),
+        );
+
+        usort($feed, fn ($a, $b) => $b['received_at'] <=> $a['received_at']);
+
+        return array_slice($feed, 0, 30);
+    }
+
+    /**
+     * Keep the Horizon tab fresh without the operator clicking Refresh: while the
+     * tab is open, re-pull the SSH snapshot on a throttle. Stops re-pulling once
+     * the app reports Horizon isn't installed (one pull is enough to learn that),
+     * and skips when a recent pull is still fresh/in-flight so concurrent SSH
+     * pulls don't pile up. Wired to a wire:poll on the Horizon tab.
+     */
+    public function pollHorizon(): void
+    {
+        if ($this->tab !== 'horizon') {
+            return;
+        }
+
+        $pool = $this->pool();
+        if (! $pool) {
+            return;
+        }
+
+        $hz = is_array($pool->meta['horizon'] ?? null) ? $pool->meta['horizon'] : [];
+        if (($hz['horizon_installed'] ?? null) === false) {
+            return;
+        }
+
+        // ~12s throttle: the snapshot job updates last_attempt_at when it runs;
+        // we also stamp it optimistically below so the next poll (every 10s)
+        // doesn't double-dispatch before the in-flight pull lands.
+        $last = ! empty($hz['last_attempt_at']) ? Carbon::parse($hz['last_attempt_at']) : null;
+        if ($last !== null && $last->gt(now()->subSeconds(12))) {
+            return;
+        }
+
+        $hz['last_attempt_at'] = now()->toIso8601String();
+        $meta = is_array($pool->meta) ? $pool->meta : [];
+        $meta['horizon'] = $hz;
+        $pool->forceFill(['meta' => $meta])->save();
+
+        CollectWorkerPoolHorizonSnapshotJob::dispatch((string) $pool->id);
     }
 
     public function testRun(): ?ConsoleAction

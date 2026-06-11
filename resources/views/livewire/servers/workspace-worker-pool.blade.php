@@ -553,9 +553,11 @@
                 }
             }
         @endphp
-        {{-- No wire:poll here: the Live jobs feed is pushed over Reverb in real
-             time. Aggregate tiles/lists refresh on Refresh Horizon / Snapshot. --}}
-        <div class="mt-6 space-y-6">
+        {{-- Auto-refresh while the tab is open: pollHorizon re-pulls the SSH
+             snapshot on a throttle so the tiles, workload and Live jobs stay
+             current without a manual Refresh. Real-time Reverb events still take
+             precedence in the Live jobs feed when they arrive. --}}
+        <div class="mt-6 space-y-6" wire:poll.10s="pollHorizon">
             @unless ($hzInstalled)
                 <div class="flex items-start gap-2 rounded-xl border border-brand-ink/15 bg-brand-sand/30 px-4 py-3 text-sm text-brand-moss">
                     <x-heroicon-o-information-circle class="mt-0.5 h-4 w-4 shrink-0 text-brand-mist" />
@@ -659,9 +661,11 @@
                 @endif
             </section>
 
-            {{-- Live jobs — real-time per-job feed pushed from the worker boxes
-                 over Reverb (no polling); newest first. Populated by the
-                 #[On('worker-pool-job')] handler as Echo delivers events. --}}
+            {{-- Live jobs — newest first. Real-time Reverb/Echo events
+                 (#[On('worker-pool-job')]) when available; otherwise the freshest
+                 recent/pending jobs from the Horizon snapshot pulled over SSH, so
+                 the feed fills in whenever Horizon has activity. --}}
+            @php $liveFeed = $this->liveJobsFeed(); @endphp
             <section class="dply-card overflow-hidden" x-data="{ open: true }">
                 <button type="button" x-on:click="open = ! open" class="flex w-full items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-4 text-left sm:px-7">
                     <div class="flex items-center gap-2">
@@ -672,14 +676,14 @@
                         </span>
                         <h3 class="text-sm font-semibold text-brand-ink">{{ __('Live jobs') }}</h3>
                     </div>
-                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-xs font-semibold text-brand-moss">{{ count($liveJobs) }}</span>
+                    <span class="rounded-full bg-brand-sand/60 px-2 py-0.5 text-xs font-semibold text-brand-moss">{{ count($liveFeed) }}</span>
                 </button>
                 <div x-show="open" x-collapse>
-                @if (empty($liveJobs))
-                    <div class="px-6 py-5 text-sm text-brand-moss sm:px-7">{{ __('Waiting for job activity… events stream in here the instant workers process them.') }}</div>
+                @if (empty($liveFeed))
+                    <div class="px-6 py-5 text-sm text-brand-moss sm:px-7">{{ __('Waiting for job activity… recent and in-flight jobs appear here as Horizon picks them up.') }}</div>
                 @else
                     <div class="divide-y divide-brand-ink/5">
-                        @foreach ($liveJobs as $i => $j)
+                        @foreach ($liveFeed as $i => $j)
                             @php $liveAge = ! empty($j['received_at']) ? max(0, now()->timestamp - (int) $j['received_at']) : null; @endphp
                             <div class="flex flex-wrap items-center gap-2 px-6 py-2.5 sm:px-7" wire:key="livejob-{{ $i }}-{{ $j['received_at'] ?? $i }}">
                                 <span class="text-sm font-medium text-brand-ink">{{ $j['name'] }}</span>
