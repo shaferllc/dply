@@ -127,6 +127,9 @@ final class SiteResourceBindingResolver
         $bindings[] = $this->aiBinding($env);
         $bindings[] = $this->captchaBinding($env);
         $bindings[] = $this->smsBinding($env);
+        $bindings[] = $this->searchBinding($env);
+        $bindings[] = $this->paymentsBinding($env);
+        $bindings[] = $this->oauthBinding($env);
 
         // A persisted SiteBinding (an explicit operator attach/provision) is
         // authoritative: it replaces the derived inference for its type so the
@@ -432,6 +435,53 @@ final class SiteResourceBindingResolver
         };
 
         return $this->configBindingFromProvider('sms', $provider);
+    }
+
+    /**
+     * @param  array<string, string>  $env
+     */
+    private function searchBinding(array $env): SiteResourceBinding
+    {
+        $driver = strtolower(trim((string) ($env['SCOUT_DRIVER'] ?? '')));
+        $provider = match (true) {
+            $driver === 'algolia' || $this->envFilled($env, 'ALGOLIA_APP_ID') => 'algolia',
+            $driver === 'meilisearch' || $this->envFilled($env, 'MEILISEARCH_HOST') => 'meilisearch',
+            $driver === 'typesense' || $this->envFilled($env, 'TYPESENSE_HOST') => 'typesense',
+            default => '',
+        };
+
+        return $this->configBindingFromProvider('search', $provider);
+    }
+
+    /**
+     * @param  array<string, string>  $env
+     */
+    private function paymentsBinding(array $env): SiteResourceBinding
+    {
+        $provider = match (true) {
+            $this->envFilled($env, 'STRIPE_KEY') => 'stripe',
+            $this->envFilled($env, 'PADDLE_API_KEY') => 'paddle',
+            default => '',
+        };
+
+        return $this->configBindingFromProvider('payments', $provider);
+    }
+
+    /**
+     * @param  array<string, string>  $env
+     */
+    private function oauthBinding(array $env): SiteResourceBinding
+    {
+        $provider = match (true) {
+            $this->envFilled($env, 'GITHUB_CLIENT_ID') => 'github',
+            $this->envFilled($env, 'GOOGLE_CLIENT_ID') => 'google',
+            $this->envFilled($env, 'FACEBOOK_CLIENT_ID') => 'facebook',
+            $this->envFilled($env, 'GITLAB_CLIENT_ID') => 'gitlab',
+            $this->envFilled($env, 'LINKEDIN_CLIENT_ID') => 'linkedin',
+            default => '',
+        };
+
+        return $this->configBindingFromProvider('oauth', $provider);
     }
 
     /**

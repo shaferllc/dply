@@ -1,5 +1,6 @@
 <?php
 
+use App\Mcp\Tools\AbstractDplyTool;
 use App\Models\ApiToken;
 
 /**
@@ -10,7 +11,20 @@ use App\Models\ApiToken;
  * - Deployer role API/runtime cap (must be subset of catalog): deployer_api_allowlist
  * - HTTP API v1 route middleware: http_route_abilities (values must exist in catalog or *)
  *
+ * The MCP server (routes/ai.php → App\Mcp) reuses these SAME abilities — each tool
+ * declares the ability it requires and AbstractDplyTool enforces it via
+ * $token->allows(), so an existing token (read/deploy/ops/full preset, or the
+ * deployer allowlist) works unchanged over MCP. Tool → ability map (PR1):
+ *   list_sites / get_site / list_site_workers / list_site_schedules
+ *     / list_deployments / get_deployment / get_operation_status .... sites.read
+ *   list_servers ........................................................ servers.read
+ *   deploy_site ......................................................... sites.deploy
+ * Later PRs add env (sites.read/sites.write), database (database.read/write),
+ * domains (sites.read/sites.write), SSL (certificates.read/write), and
+ * maintenance/basic-auth (sites.write / auth_users.*) tools.
+ *
  * @see ApiToken::tokenAllowsAbility()
+ * @see AbstractDplyTool
  */
 
 return [

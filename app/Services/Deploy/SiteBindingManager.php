@@ -14,8 +14,11 @@ use App\Services\Deploy\Concerns\ManagesDatabaseBindings;
 use App\Services\Deploy\Concerns\ManagesErrorTrackingBindings;
 use App\Services\Deploy\Concerns\ManagesLoggingBindings;
 use App\Services\Deploy\Concerns\ManagesMailBindings;
+use App\Services\Deploy\Concerns\ManagesOauthBindings;
+use App\Services\Deploy\Concerns\ManagesPaymentsBindings;
 use App\Services\Deploy\Concerns\ManagesQueueBindings;
 use App\Services\Deploy\Concerns\ManagesRedisBindings;
+use App\Services\Deploy\Concerns\ManagesSearchBindings;
 use App\Services\Deploy\Concerns\ManagesSessionBindings;
 use App\Services\Deploy\Concerns\ManagesSmsBindings;
 use App\Services\Deploy\Concerns\ManagesStorageBindings;
@@ -49,8 +52,11 @@ class SiteBindingManager
     use ManagesErrorTrackingBindings;
     use ManagesLoggingBindings;
     use ManagesMailBindings;
+    use ManagesOauthBindings;
+    use ManagesPaymentsBindings;
     use ManagesQueueBindings;
     use ManagesRedisBindings;
+    use ManagesSearchBindings;
     use ManagesSessionBindings;
     use ManagesSmsBindings;
     use ManagesStorageBindings;
@@ -100,6 +106,9 @@ class SiteBindingManager
             'ai' => $this->attachAi($site, $params),
             'captcha' => $this->attachCaptcha($site, $params),
             'sms' => $this->attachSms($site, $params),
+            'search' => $this->attachSearch($site, $params),
+            'payments' => $this->attachPayments($site, $params),
+            'oauth' => $this->attachOauth($site, $params),
             'scheduler', 'workers' => $this->attachMarker($site, $type),
             default => throw new InvalidArgumentException(__('This binding type cannot be attached yet.')),
         };
@@ -259,6 +268,9 @@ class SiteBindingManager
             ],
             'captcha' => $this->captchaOwnedEnvKeys(),
             'sms' => $this->smsOwnedEnvKeys(),
+            'search' => $this->searchOwnedEnvKeys(),
+            'payments' => $this->paymentsOwnedEnvKeys(),
+            'oauth' => $this->oauthOwnedEnvKeys(),
             default => [],
         };
     }

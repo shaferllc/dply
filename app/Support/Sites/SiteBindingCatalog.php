@@ -118,6 +118,24 @@ final class SiteBindingCatalog
                 'env' => ['TWILIO_SID'],
                 'runtimes' => ['vm'],
             ],
+            'search' => [
+                'group' => 'data', 'label' => 'Search', 'icon' => 'heroicon-o-magnifying-glass',
+                'purpose' => 'Laravel Scout driver — Algolia, Meilisearch or Typesense.',
+                'env' => ['SCOUT_DRIVER'],
+                'runtimes' => ['vm'],
+            ],
+            'payments' => [
+                'group' => 'integrations', 'label' => 'Payments', 'icon' => 'heroicon-o-credit-card',
+                'purpose' => 'Stripe or Paddle keys (Cashier) + webhook endpoint.',
+                'env' => ['STRIPE_KEY'],
+                'runtimes' => ['vm'],
+            ],
+            'oauth' => [
+                'group' => 'integrations', 'label' => 'OAuth login', 'icon' => 'heroicon-o-finger-print',
+                'purpose' => 'Socialite client keys with an auto-filled redirect URL.',
+                'env' => ['GITHUB_CLIENT_ID'],
+                'runtimes' => ['vm'],
+            ],
             'scheduler' => [
                 'group' => 'runtime', 'label' => 'Scheduler', 'icon' => 'heroicon-o-clock',
                 'purpose' => 'Run the Laravel scheduler (cron) for this site.',

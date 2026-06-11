@@ -299,11 +299,11 @@ return [
         // exit: ship as a standalone product launch with its own positioning
         'status_pages' => env('FEATURE_SURFACE_STATUS_PAGES', false),
         // exit: ship when Edge build → R2 → CF Worker loop is green in staging
-        'edge' => false,
+        'edge' => env('FEATURE_SURFACE_EDGE', false),
         // Gates the managed (dply-hosted) option of a site's broadcasting
         // binding — the billed Cloudflare relay path. BYO broadcasting stays
         // available regardless. There is no standalone /realtime surface.
-        'realtime' => env('FEATURE_SURFACE_REALTIME', false),
+        'realtime' => env('FEATURE_SURFACE_REALTIME', true),
         // exit: ship once OpenWhisk multi-language adapters + billing are GA
         'serverless' => false,
         // exit: offer the dply-managed serverless option (dply runs the function

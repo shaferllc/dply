@@ -15,9 +15,12 @@ use App\Models\CaptchaCredential;
 use App\Models\ErrorTrackingCredential;
 use App\Models\LogDrainCredential;
 use App\Models\MailCredential;
+use App\Models\OauthCredential;
 use App\Models\ObjectStorageCredential;
+use App\Models\PaymentCredential;
 use App\Models\ProviderCredential;
 use App\Models\RealtimeApp;
+use App\Models\SearchCredential;
 use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Models\ServerDatabase;
@@ -416,6 +419,9 @@ trait ManagesSiteBindings
             $type === 'ai' => $this->defaultAiBindingForm(),
             $type === 'captcha' => $this->defaultCaptchaBindingForm(),
             $type === 'sms' => $this->defaultSmsBindingForm(),
+            $type === 'search' => $this->defaultSearchBindingForm(),
+            $type === 'payments' => $this->defaultPaymentsBindingForm(),
+            $type === 'oauth' => $this->defaultOauthBindingForm(),
             default => [],
         };
     }
@@ -1058,6 +1064,232 @@ trait ManagesSiteBindings
     }
 
     /**
+     * Default search (Scout) form. Prefills provider from an existing binding;
+     * secrets are never echoed back.
+     *
+     * @return array<string, mixed>
+     */
+    private function defaultSearchBindingForm(): array
+    {
+        $existing = $this->site->bindings->firstWhere('type', 'search');
+        $cfg = is_array($existing?->config) ? $existing->config : [];
+
+        return [
+            'provider' => (string) ($cfg['provider'] ?? 'meilisearch'),
+            // Algolia
+            'app_id' => '',
+            'secret' => '',
+            // Meilisearch + Typesense share host.
+            'host' => '',
+            'key' => '',
+            // Typesense
+            'port' => '8108',
+            'protocol' => 'http',
+            'api_key' => '',
+            'credential_id' => '',
+            'save_credential' => false,
+            'credential_name' => '',
+        ];
+    }
+
+    /**
+     * @return list<array{id: string, label: string}>
+     */
+    public function searchCredentialsFor(string $provider): array
+    {
+        return SearchCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->where('provider', $provider)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (SearchCredential $c): array => ['id' => (string) $c->id, 'label' => (string) $c->name])
+            ->all();
+    }
+
+    public function deleteSearchCredential(string $credentialId): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $cred = SearchCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->whereKey($credentialId)
+            ->first();
+
+        if (! $cred instanceof SearchCredential) {
+            return;
+        }
+
+        $cred->delete();
+
+        if (($this->bindingForm['credential_id'] ?? '') === $credentialId) {
+            $this->bindingForm['credential_id'] = '';
+        }
+
+        $this->toastSuccess(__('Saved search credential removed.'));
+    }
+
+    /**
+     * Default payments form. Prefills provider from an existing binding; secrets
+     * are never echoed back.
+     *
+     * @return array<string, mixed>
+     */
+    private function defaultPaymentsBindingForm(): array
+    {
+        $existing = $this->site->bindings->firstWhere('type', 'payments');
+        $cfg = is_array($existing?->config) ? $existing->config : [];
+
+        return [
+            'provider' => (string) ($cfg['provider'] ?? 'stripe'),
+            // Stripe
+            'key' => '',
+            'secret' => '',
+            'currency' => '',
+            // Paddle
+            'api_key' => '',
+            'client_side_token' => '',
+            'sandbox' => '',
+            // Shared
+            'webhook_secret' => '',
+            'credential_id' => '',
+            'save_credential' => false,
+            'credential_name' => '',
+        ];
+    }
+
+    /**
+     * @return list<array{id: string, label: string}>
+     */
+    public function paymentCredentialsFor(string $provider): array
+    {
+        return PaymentCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->where('provider', $provider)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (PaymentCredential $c): array => ['id' => (string) $c->id, 'label' => (string) $c->name])
+            ->all();
+    }
+
+    public function deletePaymentCredential(string $credentialId): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $cred = PaymentCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->whereKey($credentialId)
+            ->first();
+
+        if (! $cred instanceof PaymentCredential) {
+            return;
+        }
+
+        $cred->delete();
+
+        if (($this->bindingForm['credential_id'] ?? '') === $credentialId) {
+            $this->bindingForm['credential_id'] = '';
+        }
+
+        $this->toastSuccess(__('Saved payments credential removed.'));
+    }
+
+    /**
+     * The Cashier webhook URL preview for the current payments provider, derived
+     * from the site's primary hostname — shown in the modal so the operator can
+     * register it. Null when the site has no public URL yet.
+     */
+    public function paymentsWebhookPreview(string $provider): ?string
+    {
+        $host = $this->site->primaryDomain()?->hostname;
+        if (! is_string($host) || trim($host) === '') {
+            $host = $this->site->testingHostname();
+        }
+        $host = strtolower(trim((string) $host));
+        if ($host === '') {
+            return null;
+        }
+
+        $path = $provider === 'paddle' ? '/paddle/webhook' : '/stripe/webhook';
+
+        return 'https://'.$host.$path;
+    }
+
+    /**
+     * Default OAuth form. Prefills provider from an existing binding; the
+     * redirect override is left blank so attach auto-derives it.
+     *
+     * @return array<string, mixed>
+     */
+    private function defaultOauthBindingForm(): array
+    {
+        $existing = $this->site->bindings->firstWhere('type', 'oauth');
+        $cfg = is_array($existing?->config) ? $existing->config : [];
+
+        return [
+            'provider' => (string) ($cfg['provider'] ?? 'github'),
+            'client_id' => '',
+            'client_secret' => '',
+            // Blank => auto-derive {site}/auth/{provider}/callback.
+            'redirect' => '',
+            'credential_id' => '',
+            'save_credential' => false,
+            'credential_name' => '',
+        ];
+    }
+
+    /**
+     * The auto-derived OAuth redirect URL preview for the current provider,
+     * shown in the modal (the footgun this binding removes). Null when the site
+     * has no public URL yet.
+     */
+    public function oauthRedirectPreview(string $provider): ?string
+    {
+        $host = $this->site->primaryDomain()?->hostname;
+        if (! is_string($host) || trim($host) === '') {
+            $host = $this->site->testingHostname();
+        }
+        $host = strtolower(trim((string) $host));
+
+        return $host !== '' ? 'https://'.$host.'/auth/'.$provider.'/callback' : null;
+    }
+
+    /**
+     * @return list<array{id: string, label: string}>
+     */
+    public function oauthCredentialsFor(string $provider): array
+    {
+        return OauthCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->where('provider', $provider)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (OauthCredential $c): array => ['id' => (string) $c->id, 'label' => (string) $c->name])
+            ->all();
+    }
+
+    public function deleteOauthCredential(string $credentialId): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $cred = OauthCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->whereKey($credentialId)
+            ->first();
+
+        if (! $cred instanceof OauthCredential) {
+            return;
+        }
+
+        $cred->delete();
+
+        if (($this->bindingForm['credential_id'] ?? '') === $credentialId) {
+            $this->bindingForm['credential_id'] = '';
+        }
+
+        $this->toastSuccess(__('Saved OAuth credential removed.'));
+    }
+
+    /**
      * Saved log drain credentials the site's org can reuse for $provider.
      *
      * @return list<array{id: string, label: string}>
@@ -1301,6 +1533,79 @@ trait ManagesSiteBindings
             if (is_string($key) && preg_match('/^legs\.(\d+)\.provider$/', $key, $m) === 1) {
                 $i = (int) $m[1];
                 $this->bindingForm['legs'][$i] = $this->emptyMailLeg((string) $value);
+            }
+
+            return;
+        }
+
+        if ($this->bindingModalType === 'search') {
+            if ($key === 'provider') {
+                foreach (['credential_id', 'app_id', 'secret', 'host', 'key', 'api_key'] as $f) {
+                    $this->bindingForm[$f] = '';
+                }
+                $this->bindingForm['port'] = '8108';
+                $this->bindingForm['protocol'] = 'http';
+            }
+
+            if ($key === 'credential_id' && is_string($value) && $value !== '') {
+                $cred = SearchCredential::query()
+                    ->where('organization_id', $this->site->organization_id)
+                    ->where('provider', (string) ($this->bindingForm['provider'] ?? ''))
+                    ->whereKey($value)
+                    ->first();
+                if ($cred instanceof SearchCredential) {
+                    $c = is_array($cred->credentials) ? $cred->credentials : [];
+                    foreach (['app_id', 'secret', 'host', 'key', 'api_key', 'port', 'protocol'] as $f) {
+                        $this->bindingForm[$f] = (string) ($c[$f] ?? $this->bindingForm[$f] ?? '');
+                    }
+                }
+            }
+
+            return;
+        }
+
+        if ($this->bindingModalType === 'payments') {
+            if ($key === 'provider') {
+                foreach (['credential_id', 'key', 'secret', 'currency', 'api_key', 'client_side_token', 'sandbox', 'webhook_secret'] as $f) {
+                    $this->bindingForm[$f] = '';
+                }
+            }
+
+            if ($key === 'credential_id' && is_string($value) && $value !== '') {
+                $cred = PaymentCredential::query()
+                    ->where('organization_id', $this->site->organization_id)
+                    ->where('provider', (string) ($this->bindingForm['provider'] ?? ''))
+                    ->whereKey($value)
+                    ->first();
+                if ($cred instanceof PaymentCredential) {
+                    $c = is_array($cred->credentials) ? $cred->credentials : [];
+                    foreach (['key', 'secret', 'currency', 'api_key', 'client_side_token', 'sandbox', 'webhook_secret'] as $f) {
+                        $this->bindingForm[$f] = (string) ($c[$f] ?? '');
+                    }
+                }
+            }
+
+            return;
+        }
+
+        if ($this->bindingModalType === 'oauth') {
+            if ($key === 'provider') {
+                foreach (['credential_id', 'client_id', 'client_secret'] as $f) {
+                    $this->bindingForm[$f] = '';
+                }
+            }
+
+            if ($key === 'credential_id' && is_string($value) && $value !== '') {
+                $cred = OauthCredential::query()
+                    ->where('organization_id', $this->site->organization_id)
+                    ->where('provider', (string) ($this->bindingForm['provider'] ?? ''))
+                    ->whereKey($value)
+                    ->first();
+                if ($cred instanceof OauthCredential) {
+                    $c = is_array($cred->credentials) ? $cred->credentials : [];
+                    $this->bindingForm['client_id'] = (string) ($c['client_id'] ?? '');
+                    $this->bindingForm['client_secret'] = (string) ($c['client_secret'] ?? '');
+                }
             }
 
             return;
