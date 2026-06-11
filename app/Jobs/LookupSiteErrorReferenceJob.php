@@ -77,6 +77,19 @@ class LookupSiteErrorReferenceJob implements ShouldQueue
                 $emit->info(__('At :at', ['at' => $result['occurred_at']]));
             }
 
+            // Lead with the single most actionable parsed line (highest severity,
+            // app log preferred) before the full correlated dump below.
+            if (($result['primary'] ?? null) !== null) {
+                $primary = $result['primary'];
+                $emit->error(__(':level: :message', [
+                    'level' => $primary['level'] ?? __('ERROR'),
+                    'message' => $primary['message'] ?? '',
+                ]));
+                foreach (array_slice($primary['trace'] ?? [], 0, 20) as $traceLine) {
+                    $emit->info($traceLine);
+                }
+            }
+
             if ($result['trace'] === []) {
                 $emit->warn($result['note'] ?? __('No error line was located around that time.'));
             } else {

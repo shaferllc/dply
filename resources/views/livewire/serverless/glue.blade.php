@@ -256,7 +256,7 @@
                                     <li>{{ __('Cloud') }} · {{ $cloud['name'] }} @if ($cloud['redeploy_hook'])<span class="font-mono text-xs">{{ $cloud['redeploy_hook'] }}</span>@endif</li>
                                 @endforeach
                                 @foreach ($snapshot['byo_crons'] as $cron)
-                                    <li>{{ __('BYO cron') }} · {{ $cron['server_name'] }} <span class="font-mono text-xs">{{ $cron['cron_expression'] }}</span></li>
+                                    <li>{{ __('BYO cron') }} · {{ $cron['server_name'] }} <span class="font-mono text-xs">{{ $cron['cron_expression'] }}</span>@if ($cronDesc = cron_describe($cron['cron_expression'])) <span class="text-xs text-brand-mist">· {{ $cronDesc }}</span>@endif</li>
                                 @endforeach
                             </ul>
                         </div>

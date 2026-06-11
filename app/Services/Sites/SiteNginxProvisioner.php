@@ -4,6 +4,7 @@ namespace App\Services\Sites;
 
 use App\Enums\SiteType;
 use App\Models\ConsoleAction;
+use App\Models\Server;
 use App\Models\ServerWebserverCacheFeature;
 use App\Models\Site;
 use App\Models\SiteWebserverConfigProfile;
@@ -12,6 +13,7 @@ use App\Services\Sites\Contracts\SiteWebserverProvisioner;
 use App\Services\SshConnection;
 use App\Support\Servers\CaddyEdgeBackendLayout;
 use App\Support\Servers\NginxServiceScript;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements SiteWebserverProvisioner
@@ -19,6 +21,7 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
     public function __construct(
         protected NginxSiteConfigBuilder $builder,
         ?SitePlaceholderPageBuilder $placeholderPageBuilder = null,
+        protected NginxConfigGuard $guard = new NginxConfigGuard,
     ) {
         parent::__construct($placeholderPageBuilder);
     }
@@ -55,6 +58,10 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         $site->setRelation('webserverConfigProfile', $profile);
 
         $config = $this->builder->build($site, $profile);
+        // Stamp ownership so a later read-back can tell a dply-written vhost from
+        // a hand-authored one. The marker is a comment, so it never affects the
+        // directive-level diff the guard performs.
+        $config = $this->guard->stamp($config, $this->configBasename($site));
         $available = rtrim(config('sites.nginx_sites_available'), '/');
         $enabled = rtrim(config('sites.nginx_sites_enabled'), '/');
         $confFile = $available.'/'.$this->configBasename($site).'.conf';
@@ -84,6 +91,10 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         // Pool first: the vhost below points fastcgi_pass at this pool's socket,
         // so it must exist (and php-fpm reloaded) before nginx reloads onto it.
         $this->ensurePhpFpmPool($site, $ssh, $emit);
+
+        // Read-back guard: parse what's on the box and warn (or abort, per
+        // config) before an overwrite silently discards manual vhost edits.
+        $this->guardAgainstForeignOverwrite($server, $ssh, $confFile, $config, $emit);
 
         // Vhost write only emits when content actually changed; an apply that
         // didn't touch anything the vhost references (e.g. a sync that found
@@ -128,6 +139,48 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         ]);
 
         return $out;
+    }
+
+    /**
+     * Read the current on-box vhost and, if overwriting it with $incoming would
+     * delete directives a human added by hand, either warn the deploy console
+     * (default) or abort the write (when DPLY_NGINX_OVERWRITE_GUARD=abort).
+     *
+     * Cheap and best-effort: a missing/empty current file or a parse failure is
+     * treated as "nothing to protect" — `nginx -t` below remains the real syntax
+     * gate, and this never blocks a deploy in the default warn mode.
+     *
+     * @param  Server  $server
+     */
+    protected function guardAgainstForeignOverwrite($server, SshConnection $ssh, string $confFile, string $incoming, ConsoleEmitter $emit): void
+    {
+        if ($this->guard->mode() === NginxConfigGuard::MODE_OFF) {
+            return;
+        }
+
+        $current = $this->readRemoteFile($server, $ssh, $confFile);
+        $foreign = $this->guard->foreignDirectives($current, $incoming);
+        if ($foreign === []) {
+            return;
+        }
+
+        $summary = $this->guard->summarize($foreign);
+
+        Log::warning('nginx vhost overwrite would drop manual directives', [
+            'conf_file' => $confFile,
+            'foreign' => $foreign,
+            'mode' => $this->guard->mode(),
+        ]);
+
+        if ($this->guard->mode() === NginxConfigGuard::MODE_ABORT) {
+            throw new \RuntimeException($summary);
+        }
+
+        foreach (preg_split('/\r\n|\r|\n/', $summary) ?: [] as $line) {
+            if (trim($line) !== '') {
+                $emit->warn($line, 'nginx');
+            }
+        }
     }
 
     /**

@@ -62,8 +62,10 @@
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">{{ __('Resume available') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Retry from the :phase phase', ['phase' => $resumePhase]) }}</h3>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                        @if ($resumePhase === 'release')
-                            {{ __('The build succeeded but a release step failed. Resume re-uses that build and re-runs only the release phase onward — the previous release stays live until it passes. Note: this re-runs migrations.') }}
+                        @if ($resumePhase === 'restart')
+                            {{ __('The new release is already live — only a post-cutover step (the post-deploy command or a worker restart) failed. Resume re-runs just that tail: no re-clone, re-build, re-migrate, or symlink flip.') }}
+                        @elseif ($resumePhase === 'release')
+                            {{ __('The build succeeded but a release step failed before cutover. Resume re-uses that build and re-runs the release phase onward — the previous release stays live until it passes. Note: this re-runs migrations.') }}
                         @else
                             {{ __('A build step failed before cutover. Resume re-uses the existing checkout and re-runs from the build phase — the previous release stays live until the new build passes.') }}
                         @endif

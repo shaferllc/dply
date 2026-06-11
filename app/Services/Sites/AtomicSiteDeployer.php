@@ -138,6 +138,23 @@ class AtomicSiteDeployer
                     $folder
                 ));
             }
+            // A post-cutover (restart) resume re-runs the live release's tail and
+            // does NOT re-flip the symlink — so `current` must still point at this
+            // release. If the failed deploy auto-rolled-back, it won't; refuse
+            // rather than bounce workers against a release that isn't serving.
+            if ($resume->startFromPhase === 'restart') {
+                $currentTarget = basename(trim($ssh->exec(
+                    sprintf('readlink -f %s/current 2>/dev/null || true', $baseEsc),
+                    30
+                )));
+                if ($currentTarget !== $folder) {
+                    throw new \RuntimeException(sprintf(
+                        'Cannot resume from the restart phase: `current` points at "%s", not the failed release "%s" (it was likely rolled back). Run a full deploy instead.',
+                        $currentTarget !== '' ? $currentTarget : '(none)',
+                        $folder
+                    ));
+                }
+            }
             $log .= sprintf(
                 "\n[dply] RESUME → re-attaching to staged release %s; restarting from the %s phase (earlier phases carried forward)\n",
                 $newRelease,
@@ -347,50 +364,73 @@ class AtomicSiteDeployer
         // (Running against the real release dir also means `php artisan …` always
         // finds `artisan`, never "Could not open input file: artisan" off a stale
         // `current` — the failure mode for first deploys and worker-host sites.)
-        $log .= sprintf("\n[dply] RELEASE → running release-phase steps in %s (before cutover)\n", $newRelease);
-        $releaseProgress = $deployment
-            ? static fn (array $full) => $deployment->recordPhaseResults('release', $full)
-            : null;
-        $release = $this->pipelineRunner->runRelease($ssh, $site, $newRelease, $releaseProgress);
-        $releaseSteps = $release['steps'];
-        $releaseLog = $release['log'];
-        $releaseLog .= sprintf("[dply] RELEASE steps done → %d step(s), ok=%s\n", count($release['steps']), $release['ok'] ? 'true' : 'false');
-        $log .= $releaseLog;
-        $deployment?->recordPhaseResults('release', $releaseSteps);
-        if (! $release['ok']) {
-            throw new \RuntimeException('Deploy failed during the release phase before cutover — the previous release is still live and nothing changed. See the deployment log for details.');
+        // Skipped on a post-cutover (restart) resume: the migrations/release
+        // steps already ran and succeeded on the original attempt, and the
+        // release is already live — re-running migrations here would be both
+        // wasteful and unsafe. The carried-forward release results keep the
+        // timeline complete.
+        if ($shouldRun('release')) {
+            $log .= sprintf("\n[dply] RELEASE → running release-phase steps in %s (before cutover)\n", $newRelease);
+            $releaseProgress = $deployment
+                ? static fn (array $full) => $deployment->recordPhaseResults('release', $full)
+                : null;
+            $release = $this->pipelineRunner->runRelease($ssh, $site, $newRelease, $releaseProgress);
+            $releaseSteps = $release['steps'];
+            $releaseLog = $release['log'];
+            $releaseLog .= sprintf("[dply] RELEASE steps done → %d step(s), ok=%s\n", count($release['steps']), $release['ok'] ? 'true' : 'false');
+            $log .= $releaseLog;
+            $deployment?->recordPhaseResults('release', $releaseSteps);
+            if (! $release['ok']) {
+                throw new \RuntimeException('Deploy failed during the release phase before cutover — the previous release is still live and nothing changed. See the deployment log for details.');
+            }
+        } else {
+            $log .= sprintf("\n[dply] RELEASE → skipped (resume from restart); migrations already ran and %s is already live\n", $newRelease);
         }
 
         // ── ACTIVATE ── before-activate hooks + the atomic symlink flip. Reached
         // only after build AND release steps pass, so the cutover is the final
         // action of a healthy deploy — any failure above left `current` pointing
         // at the prior release, exactly as if the deploy had never run.
-        $activateStart = microtime(true);
-        $log .= sprintf("\n[dply] ACTIVATE → before-activate hooks + flip %s -> %s\n", $currentPath, $newRelease);
-        $activateLog = $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::ANCHOR_BEFORE_ACTIVATE, $newRelease);
-        $this->hookRunner->assertHooksSucceeded($activateLog, 'before_activate');
-        $activateOut = $this->anchorRunner->runActivate($ssh, $site, $newRelease, $gitSsh, $repo, $branch);
-        $activateLog .= $activateOut;
-        // Confirm the flip actually landed: show what `current` resolves to now.
-        $resolved = trim($ssh->exec(sprintf('readlink -f %s/current 2>/dev/null || echo "(missing)"', $baseEsc), 30));
-        $activateLog .= sprintf("\n[dply] current now resolves to: %s\n", $resolved !== '' ? $resolved : '(empty)');
-        $this->hookRunner->assertHooksSucceeded($activateLog, 'activate');
-        $log .= $activateLog;
-        $deployment?->recordPhaseResults('activate', [[
-            'step_id' => 'activate',
-            'step_type' => 'activate',
-            'command' => null,
-            'ok' => true,
-            'output' => $activateLog,
-            'duration_ms' => (int) round((microtime(true) - $activateStart) * 1000),
-            'skipped' => trim($activateOut) === '',
-        ]]);
+        // Skipped on a post-cutover (restart) resume: `current` already points
+        // at this release from the original attempt, so re-flipping is needless.
+        if ($shouldRun('activate')) {
+            $activateStart = microtime(true);
+            $log .= sprintf("\n[dply] ACTIVATE → before-activate hooks + flip %s -> %s\n", $currentPath, $newRelease);
+            $activateLog = $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::ANCHOR_BEFORE_ACTIVATE, $newRelease);
+            $this->hookRunner->assertHooksSucceeded($activateLog, 'before_activate');
+            $activateOut = $this->anchorRunner->runActivate($ssh, $site, $newRelease, $gitSsh, $repo, $branch);
+            $activateLog .= $activateOut;
+            // Confirm the flip actually landed: show what `current` resolves to now.
+            $resolved = trim($ssh->exec(sprintf('readlink -f %s/current 2>/dev/null || echo "(missing)"', $baseEsc), 30));
+            $activateLog .= sprintf("\n[dply] current now resolves to: %s\n", $resolved !== '' ? $resolved : '(empty)');
+            $this->hookRunner->assertHooksSucceeded($activateLog, 'activate');
+            $log .= $activateLog;
+            $deployment?->recordPhaseResults('activate', [[
+                'step_id' => 'activate',
+                'step_type' => 'activate',
+                'command' => null,
+                'ok' => true,
+                'output' => $activateLog,
+                'duration_ms' => (int) round((microtime(true) - $activateStart) * 1000),
+                'skipped' => trim($activateOut) === '',
+            ]]);
+        } else {
+            $log .= sprintf("\n[dply] ACTIVATE → skipped (resume from restart); current already points at %s\n", $newRelease);
+        }
 
         // ── POST-ACTIVATE ── after-activate hooks + the user post-deploy command
         // run now that `current` points at the new release (they are post-cutover
         // by definition — e.g. warming the live site). A failure here still fails
         // the deploy, but the release is already live; the health-check +
         // auto-rollback below is the safety net for a bad cutover.
+        //
+        // These — and the RESTART steps below — are the post-cutover tail a Tier 2
+        // "resume from restart" re-runs (RELEASE + ACTIVATE were skipped above).
+        // The post-deploy step is recorded under the RESTART phase, its true
+        // post-cutover home: a post-deploy failure then reads as a restart-phase
+        // failure, so resume re-runs it WITHOUT re-migrating or re-flipping, and
+        // never clobbers the carried-forward RELEASE steps.
+        $postCutoverSteps = [];
         $afterActivateLog = $this->hookRunner->runPhase($ssh, $site, SiteDeployHook::PHASE_AFTER_ACTIVATE, $newRelease);
         $log .= $afterActivateLog;
 
@@ -404,8 +444,7 @@ class AtomicSiteDeployer
             );
             $log .= sprintf("\n--- post deploy (in %s) ---\n", $newRelease).$postOut;
             $postOk = ! (preg_match('/DPLY_STEP_EXIT:(\d+)/', $postOut, $m) && (int) $m[1] !== 0);
-            // Append to the recorded release phase so it still shows on the timeline.
-            $releaseSteps[] = [
+            $postCutoverSteps[] = [
                 'step_id' => 'post_deploy',
                 'step_type' => 'post_deploy',
                 'command' => $post,
@@ -414,7 +453,9 @@ class AtomicSiteDeployer
                 'duration_ms' => (int) round((microtime(true) - $postStart) * 1000),
                 'skipped' => false,
             ];
-            $deployment?->recordPhaseResults('release', $releaseSteps);
+            // Record incrementally so a post-deploy failure still surfaces on the
+            // timeline (under Restart) before the throw below.
+            $deployment?->recordPhaseResults('restart', $postCutoverSteps);
         }
 
         $this->hookRunner->assertHooksSucceeded($afterActivateLog, 'after_activate');
@@ -434,7 +475,7 @@ class AtomicSiteDeployer
         $userRestart = $this->pipelineRunner->runRestart($ssh, $site, $newRelease);
         $log .= $userRestart['log'];
 
-        $restartSteps = array_merge($managedRestart['steps'], $userRestart['steps']);
+        $restartSteps = array_merge($postCutoverSteps, $managedRestart['steps'], $userRestart['steps']);
         if ($restartSteps !== []) {
             $deployment?->recordPhaseResults('restart', $restartSteps);
         }

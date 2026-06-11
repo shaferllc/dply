@@ -9,6 +9,20 @@
         {
             "type": "vcs",
             "url": "https://github.com/shaferllc/dply-php-lambda.git"
+        },
+        {
+            "type": "path",
+            "url": "packages/log-parser",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "packages/nginx-config",
+            "options": {
+                "symlink": true
+            }
         }
     ],
     "require": {
@@ -17,6 +31,8 @@
         "bacon/bacon-qr-code": "^3.0",
         "blade-ui-kit/blade-heroicons": "^2.7",
         "blade-ui-kit/blade-icons": "^1.9",
+        "dply/log-parser": "@dev",
+        "dply/nginx-config": "@dev",
         "laravel/cashier": "^16.5",
         "laravel/framework": "^13.0",
         "laravel/horizon": "^5.45",
@@ -30,16 +46,13 @@
         "livewire/blaze": "^1.0",
         "livewire/livewire": "^4.0",
         "lorisleiva/cron-translator": "^0.5.1",
-        "nelexa/crossplane": "^1.0",
         "phpseclib/phpseclib": "^3.0",
         "pragmarx/google2fa": "^9.0",
-        "roma-glushko/monolog-parser": "^1.0",
         "sebastian/diff": "^7.0",
         "shaferllc/dply-php-lambda": "@dev",
         "spatie/temporary-directory": "^2.3",
         "symfony/http-client": "^8.1",
         "symfony/yaml": "^8.0",
-        "tm/error-log-parser": "^1.2",
         "yosymfony/toml": "^1.0"
     },
     "require-dev": {

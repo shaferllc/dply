@@ -137,8 +137,11 @@
                                                 </span>
                                             </div>
                                         </td>
-                                        <td class="px-4 py-3 font-mono text-xs text-brand-moss">
-                                            {{ $schedule->cron_expression }}
+                                        <td class="px-4 py-3 text-xs text-brand-moss">
+                                            <span class="font-mono">{{ $schedule->cron_expression }}</span>
+                                            @if ($cronDesc = $schedule->cronDescription())
+                                                <span class="mt-0.5 block text-[11px] text-brand-mist">{{ $cronDesc }}</span>
+                                            @endif
                                         </td>
                                         <td class="px-4 py-3">
                                             @if ($schedule->is_active)
