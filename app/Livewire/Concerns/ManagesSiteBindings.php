@@ -51,6 +51,13 @@ trait ManagesSiteBindings
     /** attach | provision */
     public string $bindingModalMode = 'attach';
 
+    /**
+     * When set, the open binding modal is EDITING this specific binding row
+     * rather than adding a new one. Only meaningful for multi-instance types
+     * (storage), where one site holds several bindings of the same type.
+     */
+    public ?string $bindingModalBindingId = null;
+
     /** @var array<string, mixed> */
     public array $bindingForm = [];
 
@@ -60,16 +67,59 @@ trait ManagesSiteBindings
     /** Recipient for the mail binding's "send test email" action. */
     public string $mailTestRecipient = '';
 
-    public function openBindingModal(string $type, string $mode = 'attach'): void
+    public function openBindingModal(string $type, string $mode = 'attach', ?string $bindingId = null): void
     {
         Gate::authorize('update', $this->site);
 
         $this->resetErrorBag();
         $this->bindingModalType = $type;
         $this->bindingModalMode = $mode === 'provision' ? 'provision' : 'attach';
+        $this->bindingModalBindingId = null;
         $this->bindingForm = $this->defaultBindingForm($type, $this->bindingModalMode);
+
+        // Editing a specific existing binding (multi-instance types like storage):
+        // pre-fill the non-secret fields from that row. Secrets are never echoed,
+        // so the operator re-supplies keys (or reuses a saved credential).
+        if ($bindingId !== null) {
+            $this->seedBindingFormForEdit($type, $bindingId);
+        }
+
         $this->bindingTargets = app(SiteBindingManager::class)->attachableTargets($this->site, $type);
         $this->dispatch('open-modal', 'site-binding-modal');
+    }
+
+    /**
+     * Pre-fill {@see $bindingForm} from an existing binding row for editing.
+     * Currently only `storage` supports multiple rows per site; other types
+     * already round-trip via their own default-form prefill.
+     */
+    private function seedBindingFormForEdit(string $type, string $bindingId): void
+    {
+        $binding = SiteBinding::query()
+            ->where('site_id', $this->site->id)
+            ->where('type', $type)
+            ->whereKey($bindingId)
+            ->first();
+
+        if (! $binding instanceof SiteBinding) {
+            return;
+        }
+
+        $this->bindingModalBindingId = (string) $binding->id;
+
+        if ($type === 'storage') {
+            $config = (array) $binding->config;
+            // Legacy rows stored the bucket in `name` with no `config['disk']`;
+            // treat those as the primary `s3` disk.
+            $this->bindingForm['disk'] = (string) ($config['disk'] ?? 's3');
+            $this->bindingForm['bucket'] = (string) ($config['bucket'] ?? '');
+            if (($config['provider'] ?? '') !== '') {
+                $this->bindingForm['provider'] = (string) $config['provider'];
+            }
+            if (($config['region'] ?? '') !== '') {
+                $this->bindingForm['region'] = (string) $config['region'];
+            }
+        }
     }
 
     /**
@@ -95,10 +145,14 @@ trait ManagesSiteBindings
     {
         Gate::authorize('update', $this->site);
 
+        // Carry which row (if any) we're editing so multi-instance types (storage)
+        // can update that row instead of rejecting it as a duplicate disk name.
+        $params = $this->bindingForm + ['binding_id' => $this->bindingModalBindingId];
+
         try {
             $binding = $this->bindingModalMode === 'provision'
-                ? $manager->provisionNew($this->site, $this->bindingModalType, $this->bindingForm)
-                : $manager->attachExisting($this->site, $this->bindingModalType, $this->bindingForm);
+                ? $manager->provisionNew($this->site, $this->bindingModalType, $params)
+                : $manager->attachExisting($this->site, $this->bindingModalType, $params);
         } catch (\Throwable $e) {
             $this->toastError($e->getMessage());
 
@@ -685,7 +739,13 @@ trait ManagesSiteBindings
 
         [$keySource, $cloudCredId] = $this->storageKeySourceDefault($provider, $mode);
 
+        // First bucket on a site defaults to the primary `s3` disk (zero app
+        // config); once that exists, an additional bucket must be named so it maps
+        // to its own filesystem disk.
+        $hasStorage = $this->site->bindings()->where('type', 'storage')->exists();
+
         return [
+            'disk' => $hasStorage ? '' : 's3',
             'provider' => $provider,
             'region' => $regions[0] ?? '',
             'bucket' => '',
@@ -752,6 +812,46 @@ trait ManagesSiteBindings
                 'label' => (string) ($c->name ?: ucfirst($apiProvider).' token'),
             ])
             ->all();
+    }
+
+    /**
+     * The filesystem-disk slug a storage binding maps to. Legacy rows stored the
+     * bucket in `name` with no `config['disk']`; those are the primary `s3` disk.
+     */
+    public function storageDiskLabel(SiteBinding $binding): string
+    {
+        return (string) (((array) $binding->config)['disk'] ?? 's3');
+    }
+
+    /**
+     * The human bucket name behind a storage binding (falls back to the row name).
+     */
+    public function storageBucketLabel(SiteBinding $binding): string
+    {
+        return (string) (((array) $binding->config)['bucket'] ?? $binding->name ?? '');
+    }
+
+    /**
+     * The `config/filesystems.php` disk array to paste into the app for a
+     * non-primary storage disk (empty for the primary `s3` disk).
+     */
+    public function storageDiskSnippet(SiteBinding $binding): string
+    {
+        return app(SiteBindingManager::class)->storageFilesystemSnippet($this->storageDiskLabel($binding));
+    }
+
+    /** Normalize a typed disk name to its slug, for live preview in the modal. */
+    public function storageDiskSlugPreview(mixed $name): string
+    {
+        return app(SiteBindingManager::class)->storageDiskSlug($name);
+    }
+
+    /** Live `config/filesystems.php` snippet for the disk name being typed. */
+    public function storageSnippetForDiskName(mixed $name): string
+    {
+        $manager = app(SiteBindingManager::class);
+
+        return $manager->storageFilesystemSnippet($manager->storageDiskSlug($name));
     }
 
     /**

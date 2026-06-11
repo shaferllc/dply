@@ -549,6 +549,7 @@
                         <x-input-label for="binding_storage_bucket" :value="__('New bucket name')" />
                         <x-text-input id="binding_storage_bucket" wire:model="bindingForm.bucket" class="mt-1 block w-full font-mono text-sm" placeholder="my-app-assets" />
                     </div>
+                    @include('livewire.sites.settings.partials.environment.storage-disk-field')
                     @if ($osApiMode)
                         @if (count($osCloudCreds) > 1)
                             <div class="sm:col-span-2">
@@ -597,6 +598,7 @@
                         <x-input-label for="binding_storage_bucket" :value="__('Bucket')" />
                         <x-text-input id="binding_storage_bucket" wire:model="bindingForm.bucket" class="mt-1 block w-full font-mono text-sm" placeholder="my-app-assets" />
                     </div>
+                    @include('livewire.sites.settings.partials.environment.storage-disk-field')
                     @include('livewire.sites.settings.partials.environment.storage-credential-fields')
                     <div>
                         <x-input-label for="binding_storage_region" :value="$osIsCustom ? __('Region (optional)') : __('Region')" />
@@ -626,7 +628,7 @@
                 @elseif ($osIsCustom)
                     <p class="text-xs text-brand-moss">{{ __('Custom S3 storage needs the endpoint of your provider (path-style or virtual-hosted).') }}</p>
                 @endif
-                <p class="text-xs text-brand-moss">{{ __('Injects FILESYSTEM_DISK=s3 and the AWS_* connection variables at deploy.') }}</p>
+                <p class="text-xs text-brand-moss">{{ __('Injects the AWS_* connection variables at deploy (FILESYSTEM_DISK=s3 for the default disk; namespaced AWS_<DISK>_* for additional disks).') }}</p>
             @elseif ($bindingModalType === 'logging')
                 @php $logProvider = (string) ($bindingForm['provider'] ?? 'papertrail'); @endphp
                 <div class="space-y-4">

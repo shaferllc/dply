@@ -57,19 +57,22 @@ trait ManagesStorageBindings
             throw new InvalidArgumentException(__('Custom S3 storage needs an endpoint.'));
         }
 
+        $disk = $this->resolveStorageDisk($site, $params);
+
         $binding = $this->persist($site, 'storage', [
             'mode' => 'attach_existing',
             'status' => SiteBinding::STATUS_CONFIGURED,
-            'name' => $bucket,
+            'name' => $disk,
             'target_type' => 'object_storage',
             'target_id' => null,
-            'injected_env' => $this->storageEnv($bucket, $key, $secret, $region, $endpoint, (string) ($params['url'] ?? '')),
+            'injected_env' => $this->storageEnv($bucket, $key, $secret, $region, $endpoint, (string) ($params['url'] ?? ''), $disk),
             'config' => array_filter([
+                'disk' => $disk,
                 'bucket' => $bucket,
                 'provider' => $provider,
                 'region' => $region ?: null,
             ]),
-        ]);
+        ], ['site_id', 'type', 'name']);
 
         $this->maybeSaveStorageCredential($site, $provider, $params, $key, $secret, $region, $endpoint);
 
@@ -131,24 +134,27 @@ trait ManagesStorageBindings
         // storage binding (one row per site+type).
         // Auto-minted keys (DO Spaces) aren't active on the S3 gateway for a few
         // seconds, so let the provisioner retry the rejection codes in that case.
+        $disk = $this->resolveStorageDisk($site, $params);
+
         $result = $this->bucketProvisioner->create($provider, $region, $key, $secret, $bucket, awaitKeyPropagation: $autoMinted);
         $endpoint = (string) ($result['endpoint'] ?? '');
 
         $binding = $this->persist($site, 'storage', [
             'mode' => 'provision_new',
             'status' => SiteBinding::STATUS_CONFIGURED,
-            'name' => $bucket,
+            'name' => $disk,
             'target_type' => 'object_storage',
             'target_id' => null,
-            'injected_env' => $this->storageEnv($bucket, $key, $secret, $region, $endpoint, (string) ($params['url'] ?? '')),
+            'injected_env' => $this->storageEnv($bucket, $key, $secret, $region, $endpoint, (string) ($params['url'] ?? ''), $disk),
             'config' => array_filter([
+                'disk' => $disk,
                 'bucket' => $bucket,
                 'provider' => $provider,
                 'region' => $region ?: null,
                 'api_managed' => $autoMinted ?: null,
             ]),
             'last_error' => null,
-        ]);
+        ], ['site_id', 'type', 'name']);
 
         // API-minted keys aren't from the form, so there's nothing to "save for
         // reuse" — the binding already carries them.
@@ -289,20 +295,115 @@ trait ManagesStorageBindings
 
     /**
      * Build the S3 connection variables a storage binding injects at deploy.
-     * Shared by attach and provision so both wire identical AWS_* keys.
+     *
+     * A site can attach several buckets, each its own Laravel filesystem disk.
+     * The PRIMARY disk (`s3`) keeps the bare, framework-default keyset
+     * (FILESYSTEM_DISK=s3 + AWS_*) so the common single-bucket case needs no app
+     * changes. Every ADDITIONAL disk namespaces its keys by the uppercased disk
+     * slug (AWS_<DISK>_*) and deliberately omits FILESYSTEM_DISK so two buckets
+     * never collide on the same env keys when merged into the deploy .env.
      *
      * @return array<string, string>
      */
-    private function storageEnv(string $bucket, string $key, string $secret, string $region, string $endpoint, string $url): array
+    private function storageEnv(string $bucket, string $key, string $secret, string $region, string $endpoint, string $url, string $disk = 's3'): array
     {
+        $url = trim($url);
+
+        if ($this->storageDiskIsPrimary($disk)) {
+            return array_filter([
+                'FILESYSTEM_DISK' => 's3',
+                'AWS_BUCKET' => $bucket,
+                'AWS_ACCESS_KEY_ID' => $key,
+                'AWS_SECRET_ACCESS_KEY' => $secret,
+                'AWS_DEFAULT_REGION' => $region !== '' ? $region : null,
+                'AWS_URL' => $url !== '' ? $url : null,
+                'AWS_ENDPOINT' => $endpoint !== '' ? $endpoint : null,
+            ], fn ($v) => $v !== null);
+        }
+
+        $p = 'AWS_'.strtoupper($disk).'_';
+
         return array_filter([
-            'FILESYSTEM_DISK' => 's3',
-            'AWS_BUCKET' => $bucket,
-            'AWS_ACCESS_KEY_ID' => $key,
-            'AWS_SECRET_ACCESS_KEY' => $secret,
-            'AWS_DEFAULT_REGION' => $region !== '' ? $region : null,
-            'AWS_URL' => trim($url) !== '' ? trim($url) : null,
-            'AWS_ENDPOINT' => $endpoint !== '' ? $endpoint : null,
+            $p.'BUCKET' => $bucket,
+            $p.'ACCESS_KEY_ID' => $key,
+            $p.'SECRET_ACCESS_KEY' => $secret,
+            $p.'DEFAULT_REGION' => $region !== '' ? $region : null,
+            $p.'URL' => $url !== '' ? $url : null,
+            $p.'ENDPOINT' => $endpoint !== '' ? $endpoint : null,
         ], fn ($v) => $v !== null);
+    }
+
+    /**
+     * Normalize an operator-entered disk name into a Laravel-disk-safe slug:
+     * lowercase, alphanumerics + underscores, no leading digit/underscore. Blank
+     * input defaults to the primary `s3` disk.
+     */
+    public function storageDiskSlug(mixed $name): string
+    {
+        $slug = Str::of((string) $name)->lower()->replaceMatches('/[^a-z0-9]+/', '_')->trim('_')->value();
+        $slug = ltrim($slug, '0123456789_');
+
+        return $slug === '' ? 's3' : $slug;
+    }
+
+    private function storageDiskIsPrimary(string $disk): bool
+    {
+        return $disk === 's3';
+    }
+
+    /**
+     * Resolve + validate the disk slug for a storage binding. Each disk is unique
+     * per site (two buckets can't share a disk, or their env would collide). When
+     * editing an existing binding ($params['binding_id']), a same-slug match on
+     * that row is allowed (it's an update); any other collision is rejected.
+     *
+     * @param  array<string, mixed>  $params
+     */
+    private function resolveStorageDisk(Site $site, array $params): string
+    {
+        $disk = $this->storageDiskSlug($params['disk'] ?? '');
+        $editingId = trim((string) ($params['binding_id'] ?? ''));
+
+        $clash = $site->bindings()
+            ->where('type', 'storage')
+            ->where('name', $disk)
+            ->when($editingId !== '', fn ($q) => $q->whereKeyNot($editingId))
+            ->exists();
+
+        if ($clash) {
+            throw new InvalidArgumentException($this->storageDiskIsPrimary($disk)
+                ? __('A default object-storage disk (s3) is already attached. Give this bucket a different disk name to attach it alongside.')
+                : __('A storage disk named ":disk" is already attached to this site.', ['disk' => $disk]));
+        }
+
+        return $disk;
+    }
+
+    /**
+     * The `config/filesystems.php` disk array an operator must paste into their
+     * app for a NON-primary bucket (the primary `s3` disk ships with Laravel, so
+     * it needs none). Mirrors the mail binding's config-snippet pattern.
+     */
+    public function storageFilesystemSnippet(string $disk): string
+    {
+        if ($this->storageDiskIsPrimary($disk)) {
+            return '';
+        }
+
+        $p = 'AWS_'.strtoupper($disk).'_';
+
+        return <<<PHP
+        '{$disk}' => [
+            'driver' => 's3',
+            'key' => env('{$p}ACCESS_KEY_ID'),
+            'secret' => env('{$p}SECRET_ACCESS_KEY'),
+            'region' => env('{$p}DEFAULT_REGION'),
+            'bucket' => env('{$p}BUCKET'),
+            'url' => env('{$p}URL'),
+            'endpoint' => env('{$p}ENDPOINT'),
+            'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
+            'throw' => false,
+        ],
+        PHP;
     }
 }

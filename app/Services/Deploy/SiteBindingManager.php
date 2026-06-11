@@ -264,9 +264,11 @@ class SiteBindingManager
                 'POSTMARK_TOKEN', 'POSTMARK_MESSAGE_STREAM_ID',
                 'RESEND_KEY',
             ],
-            // Storage fully owns FILESYSTEM_DISK — attaching it sets the disk to
-            // s3, so the loose default (local) should be cleared.
-            'storage' => ['FILESYSTEM_DISK'],
+            // Only the PRIMARY storage disk (s3) owns FILESYSTEM_DISK — attaching
+            // it sets the disk to s3, so the loose default (local) should be
+            // cleared. Additional named disks (AWS_<DISK>_*) don't touch the
+            // default disk, so they own none of the loose env.
+            'storage' => (((array) $binding->config)['disk'] ?? 's3') === 's3' ? ['FILESYSTEM_DISK'] : [],
             // Broadcasting fully owns BROADCAST_CONNECTION — the binding is the
             // single source of truth for the driver, so a loose copy is stale.
             'broadcasting' => ['BROADCAST_CONNECTION'],
@@ -338,7 +340,7 @@ class SiteBindingManager
      *
      * @param  array<string, mixed>  $attributes
      * @param  list<string>  $matchOn  Attribute keys (from $attributes, plus the
-     *                                  implicit site_id/type) to match the existing row on.
+     *                                 implicit site_id/type) to match the existing row on.
      */
     private function persist(Site $site, string $type, array $attributes, array $matchOn = []): SiteBinding
     {
