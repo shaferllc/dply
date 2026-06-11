@@ -187,6 +187,51 @@ BASH,
     }
 
     /**
+     * Bash that ensures the engine accepts TCP connections on 127.0.0.1 — the
+     * address the deployed app (DB_HOST=127.0.0.1) and the binding connectivity
+     * probe dial. A fresh install normally already binds localhost; this is the
+     * remediation we run only when the post-install loopback check FAILS, so it
+     * never clobbers a working config.
+     *
+     * Writes a LOW-numbered conf.d override (`00-dply-loopback`) so a later
+     * remote-access override (`99-dply`, listen `*` / bind `0.0.0.0`) still wins —
+     * both of which already include loopback. Returns '' for engines we don't
+     * enforce here.
+     */
+    public static function ensureLoopbackListeningScript(string $engine): string
+    {
+        return match (true) {
+            $engine === 'postgres' => <<<'BASH'
+set -e
+PG_VER=$(pg_lsclusters --no-header 2>/dev/null | awk '{print $1}' | sort -rn | head -1)
+if [ -z "$PG_VER" ]; then PG_VER=$(ls /etc/postgresql/ 2>/dev/null | sort -rn | head -1); fi
+if [ -z "$PG_VER" ]; then echo "[dply] ERROR: could not detect PostgreSQL version" >&2; exit 1; fi
+CONF_DIR="/etc/postgresql/${PG_VER}/main/conf.d"
+mkdir -p "${CONF_DIR}"
+cat > "${CONF_DIR}/00-dply-loopback.conf" <<'EOF'
+listen_addresses = 'localhost'
+EOF
+systemctl restart postgresql
+echo "loopback_listen_ensured"
+BASH,
+            in_array($engine, ['mysql', 'mariadb'], true) => <<<'BASH'
+set -e
+for d in /etc/mysql/mysql.conf.d /etc/mysql/mariadb.conf.d; do
+  if [ -d "$d" ]; then
+    cat > "$d/00-dply-loopback.cnf" <<'EOF'
+[mysqld]
+bind-address = 127.0.0.1
+EOF
+  fi
+done
+systemctl restart mysql 2>/dev/null || systemctl restart mariadb
+echo "loopback_listen_ensured"
+BASH,
+            default => '',
+        };
+    }
+
+    /**
      * Bash that enables remote access for a specific database (pg_hba / mysql user grant).
      *
      * Postgres: ensures listen_addresses = '*', then upserts a pg_hba.conf rule scoped

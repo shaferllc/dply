@@ -37,7 +37,7 @@ class SiteEnvFieldHints
         'SESSION_DRIVER' => ['database', 'file', 'cookie', 'redis', 'memcached', 'array'],
         'BROADCAST_CONNECTION' => ['reverb', 'pusher', 'ably', 'redis', 'log', 'null'],
         'BROADCAST_DRIVER' => ['reverb', 'pusher', 'ably', 'redis', 'log', 'null'],
-        'MAIL_MAILER' => ['smtp', 'sendmail', 'mailgun', 'ses', 'postmark', 'resend', 'log', 'array', 'failover'],
+        'MAIL_MAILER' => ['smtp', 'sendmail', 'mailgun', 'ses', 'postmark', 'resend', 'sendgrid', 'cloudflare', 'log', 'array', 'failover', 'roundrobin'],
         'MAIL_SCHEME' => ['smtp', 'smtps'],
         'FILESYSTEM_DISK' => ['local', 'public', 's3'],
         'REDIS_CLIENT' => ['phpredis', 'predis'],

@@ -49,6 +49,11 @@ class CloudflareRealtimeBackend implements RealtimeBackend
 
     public function fetchPeakConnections(RealtimeApp $app): ?int
     {
+        return $this->fetchStats($app)['peakConnections'] ?? null;
+    }
+
+    public function fetchStats(RealtimeApp $app): ?array
+    {
         $response = Http::withHeaders($app->statsAuthHeaders())
             ->acceptJson()
             ->get($app->statsEndpoint());
@@ -63,8 +68,16 @@ class CloudflareRealtimeBackend implements RealtimeBackend
         }
 
         $peak = $response->json('peakConnections');
+        if (! is_numeric($peak)) {
+            return null;
+        }
 
-        return is_numeric($peak) ? (int) $peak : null;
+        $current = $response->json('connections');
+
+        return [
+            'connections' => is_numeric($current) ? (int) $current : 0,
+            'peakConnections' => (int) $peak,
+        ];
     }
 
     public function resetPeakConnections(RealtimeApp $app): void

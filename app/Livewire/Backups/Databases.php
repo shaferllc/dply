@@ -83,9 +83,16 @@ class Databases extends Component
 
         $destinations = $org->backupConfigurations()->orderBy('name')->get();
 
+        $databases = ServerDatabase::query()
+            ->whereIn('server_id', $serverIds)
+            ->with('server')
+            ->orderBy('name')
+            ->get();
+
         return view('livewire.backups.databases', [
             'featureActive' => true,
             'organization'  => $org,
+            'databases'     => $databases,
             'metrics'       => [
                 'completed7d'       => $completed7d,
                 'failed7d'          => $failed7d,

@@ -4,6 +4,7 @@ namespace App\Services\Servers;
 
 use App\Models\Server;
 use App\Models\ServerDatabaseAdminCredential;
+use App\Models\ServerDatabaseEngine;
 use Illuminate\Support\Str;
 
 class ServerDatabaseRemoteExec
@@ -484,6 +485,41 @@ BASH;
             .' psql -h 127.0.0.1 -U '.escapeshellarg($username).' -d '.escapeshellarg($database).' 2>&1';
 
         return $this->execWithCandidates($server, 'bash -lc '.escapeshellarg($inner), $timeout);
+    }
+
+    /**
+     * Whether the engine is actually accepting TCP connections on 127.0.0.1:<port>
+     * — the address the deployed app (and {@see \App\Jobs\ValidateBindingConnectivityJob})
+     * dials. This is STRICTER than the socket/sudo-based capability probe: an
+     * engine can be "installed" (e.g. `sudo -u postgres psql` over the unix socket
+     * works) yet not be listening on TCP localhost, in which case the app can't
+     * connect at all — the "I made a database but it can't reach itself" trap.
+     * sqlite has no TCP surface, so it's always considered reachable.
+     */
+    public function engineListeningOnLoopback(Server $server, string $engine, ?int $port = null): bool
+    {
+        if ($engine === 'sqlite') {
+            return true;
+        }
+        if (! $server->isReady() || empty($server->ssh_private_key)) {
+            return false;
+        }
+
+        $port ??= ServerDatabaseEngine::defaultPortFor($engine);
+        if ($port < 1) {
+            return true; // unknown port → don't block on a check we can't make
+        }
+
+        $inner = 'timeout 3 bash -c '.escapeshellarg('</dev/tcp/127.0.0.1/'.$port)
+            .' >/dev/null 2>&1 && echo DPLY_LISTEN_OK || echo DPLY_LISTEN_FAIL';
+
+        try {
+            [$out] = $this->shellRunWithExit($server, $inner, 20);
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return str_contains($out, 'DPLY_LISTEN_OK');
     }
 
     /**

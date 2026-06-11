@@ -8,17 +8,25 @@ use App\Jobs\FixSiteBindingConnectivityJob;
 use App\Jobs\InstallCacheServiceJob;
 use App\Jobs\SendBindingTestEmailJob;
 use App\Jobs\SwitchCacheServiceJob;
+use App\Jobs\TestBroadcastingBindingJob;
 use App\Jobs\ValidateBindingConnectivityJob;
 use App\Jobs\ValidateSiteBindingsReachableJob;
+use App\Models\AiCredential;
+use App\Models\CaptchaCredential;
+use App\Models\ErrorTrackingCredential;
 use App\Models\LogDrainCredential;
 use App\Models\MailCredential;
+use App\Models\OauthCredential;
 use App\Models\ObjectStorageCredential;
+use App\Models\PaymentCredential;
 use App\Models\ProviderCredential;
 use App\Models\RealtimeApp;
+use App\Models\SearchCredential;
 use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Models\ServerDatabase;
 use App\Models\SiteBinding;
+use App\Models\SmsCredential;
 use App\Services\Deploy\DeploymentSecretInventory;
 use App\Services\Deploy\SiteBindingManager;
 use App\Support\Servers\CacheEngineAvailability;
@@ -125,7 +133,9 @@ trait ManagesSiteBindings
      */
     private function validateBindingConnectivity(SiteBinding $binding): void
     {
-        if (! in_array($binding->type, ['database', 'redis'], true)) {
+        // database/redis probe their own endpoint; cache/queue/session probe the
+        // underlying engine they ride on (resolved in ValidateBindingConnectivityJob).
+        if (! in_array($binding->type, ['database', 'redis', 'cache', 'queue', 'session'], true)) {
             return;
         }
         if (! method_exists($this, 'seedQueuedConsoleAction') || ! method_exists($this, 'watchConsoleAction')) {
@@ -370,9 +380,13 @@ trait ManagesSiteBindings
             return [];
         }
 
-        $orgServerIds = Server::query()
-            ->where('organization_id', $this->site->server?->organization_id)
-            ->pluck('id');
+        // Only offer backends this site can actually reach: its own server
+        // (loopback) plus same-private-network peers. Listing the whole org let a
+        // site re-point at a database on an unrelated network it can never dial.
+        $reachableServerIds = app(SiteBindingManager::class)->reachableServerIdsForSite($this->site);
+        if ($reachableServerIds === []) {
+            return [];
+        }
 
         $row = fn ($r): array => [
             'id' => (string) $r->id,
@@ -383,8 +397,8 @@ trait ManagesSiteBindings
         ];
 
         return match ($binding->type) {
-            'database' => ServerDatabase::query()->whereIn('server_id', $orgServerIds)->with('server')->get()->map($row)->values()->all(),
-            'redis' => ServerCacheService::query()->whereIn('server_id', $orgServerIds)
+            'database' => ServerDatabase::query()->whereIn('server_id', $reachableServerIds)->with('server')->get()->map($row)->values()->all(),
+            'redis' => ServerCacheService::query()->whereIn('server_id', $reachableServerIds)
                 ->whereIn('engine', ServerCacheService::FAMILY_REDIS_ENGINES)->with('server')->get()->map($row)->values()->all(),
             default => [],
         };
@@ -406,6 +420,13 @@ trait ManagesSiteBindings
             $type === 'logging' => $this->defaultLoggingBindingForm(),
             $type === 'mail' => $this->defaultMailBindingForm(),
             $type === 'broadcasting' => $this->defaultBroadcastingBindingForm(),
+            $type === 'error_tracking' => $this->defaultErrorTrackingBindingForm(),
+            $type === 'ai' => $this->defaultAiBindingForm(),
+            $type === 'captcha' => $this->defaultCaptchaBindingForm(),
+            $type === 'sms' => $this->defaultSmsBindingForm(),
+            $type === 'search' => $this->defaultSearchBindingForm(),
+            $type === 'payments' => $this->defaultPaymentsBindingForm(),
+            $type === 'oauth' => $this->defaultOauthBindingForm(),
             default => [],
         };
     }
@@ -800,6 +821,480 @@ trait ManagesSiteBindings
     }
 
     /**
+     * Default error-tracking form. Prefills provider from an existing binding's
+     * config so re-opening "Configure" keeps the current provider selected;
+     * secrets (DSN/key) are never echoed back.
+     *
+     * @return array<string, mixed>
+     */
+    private function defaultErrorTrackingBindingForm(): array
+    {
+        $existing = $this->site->bindings->firstWhere('type', 'error_tracking');
+        $cfg = is_array($existing?->config) ? $existing->config : [];
+
+        return [
+            'provider' => (string) ($cfg['provider'] ?? 'sentry'),
+            // Sentry
+            'dsn' => '',
+            'traces_sample_rate' => '',
+            // Bugsnag
+            'api_key' => '',
+            // Flare
+            'key' => '',
+            // Saved-credential reuse + save-for-reuse.
+            'credential_id' => '',
+            'save_credential' => false,
+            'credential_name' => '',
+        ];
+    }
+
+    /**
+     * Saved error-tracking credentials the site's org can reuse for $provider.
+     *
+     * @return list<array{id: string, label: string}>
+     */
+    public function errorTrackingCredentialsFor(string $provider): array
+    {
+        return ErrorTrackingCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->where('provider', $provider)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (ErrorTrackingCredential $c): array => [
+                'id' => (string) $c->id,
+                'label' => (string) $c->name,
+            ])
+            ->all();
+    }
+
+    public function deleteErrorTrackingCredential(string $credentialId): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $cred = ErrorTrackingCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->whereKey($credentialId)
+            ->first();
+
+        if (! $cred instanceof ErrorTrackingCredential) {
+            return;
+        }
+
+        $cred->delete();
+
+        if (($this->bindingForm['credential_id'] ?? '') === $credentialId) {
+            $this->bindingForm['credential_id'] = '';
+        }
+
+        $this->toastSuccess(__('Saved error tracking credential removed.'));
+    }
+
+    /**
+     * Default AI/LLM key form. Prefills provider from an existing binding so
+     * re-opening keeps the selection; the key is never echoed back.
+     *
+     * @return array<string, mixed>
+     */
+    private function defaultAiBindingForm(): array
+    {
+        $existing = $this->site->bindings->firstWhere('type', 'ai');
+        $cfg = is_array($existing?->config) ? $existing->config : [];
+
+        return [
+            'provider' => (string) ($cfg['provider'] ?? 'openai'),
+            'api_key' => '',
+            'organization' => '',
+            'credential_id' => '',
+            'save_credential' => false,
+            'credential_name' => '',
+        ];
+    }
+
+    /**
+     * @return list<array{id: string, label: string}>
+     */
+    public function aiCredentialsFor(string $provider): array
+    {
+        return AiCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->where('provider', $provider)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (AiCredential $c): array => ['id' => (string) $c->id, 'label' => (string) $c->name])
+            ->all();
+    }
+
+    public function deleteAiCredential(string $credentialId): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $cred = AiCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->whereKey($credentialId)
+            ->first();
+
+        if (! $cred instanceof AiCredential) {
+            return;
+        }
+
+        $cred->delete();
+
+        if (($this->bindingForm['credential_id'] ?? '') === $credentialId) {
+            $this->bindingForm['credential_id'] = '';
+        }
+
+        $this->toastSuccess(__('Saved AI credential removed.'));
+    }
+
+    /**
+     * Default CAPTCHA form. Prefills provider from an existing binding; keys are
+     * never echoed back.
+     *
+     * @return array<string, mixed>
+     */
+    private function defaultCaptchaBindingForm(): array
+    {
+        $existing = $this->site->bindings->firstWhere('type', 'captcha');
+        $cfg = is_array($existing?->config) ? $existing->config : [];
+
+        return [
+            'provider' => (string) ($cfg['provider'] ?? 'turnstile'),
+            'site_key' => '',
+            'secret_key' => '',
+            'credential_id' => '',
+            'save_credential' => false,
+            'credential_name' => '',
+        ];
+    }
+
+    /**
+     * @return list<array{id: string, label: string}>
+     */
+    public function captchaCredentialsFor(string $provider): array
+    {
+        return CaptchaCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->where('provider', $provider)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (CaptchaCredential $c): array => ['id' => (string) $c->id, 'label' => (string) $c->name])
+            ->all();
+    }
+
+    public function deleteCaptchaCredential(string $credentialId): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $cred = CaptchaCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->whereKey($credentialId)
+            ->first();
+
+        if (! $cred instanceof CaptchaCredential) {
+            return;
+        }
+
+        $cred->delete();
+
+        if (($this->bindingForm['credential_id'] ?? '') === $credentialId) {
+            $this->bindingForm['credential_id'] = '';
+        }
+
+        $this->toastSuccess(__('Saved CAPTCHA credential removed.'));
+    }
+
+    /**
+     * Default SMS / push form. Prefills provider from an existing binding;
+     * secrets are never echoed back.
+     *
+     * @return array<string, mixed>
+     */
+    private function defaultSmsBindingForm(): array
+    {
+        $existing = $this->site->bindings->firstWhere('type', 'sms');
+        $cfg = is_array($existing?->config) ? $existing->config : [];
+
+        return [
+            'provider' => (string) ($cfg['provider'] ?? 'twilio'),
+            // Twilio
+            'sid' => '',
+            'auth_token' => '',
+            // Twilio + Vonage share a from number.
+            'from' => '',
+            // Vonage
+            'key' => '',
+            'secret' => '',
+            // FCM
+            'server_key' => '',
+            'credential_id' => '',
+            'save_credential' => false,
+            'credential_name' => '',
+        ];
+    }
+
+    /**
+     * @return list<array{id: string, label: string}>
+     */
+    public function smsCredentialsFor(string $provider): array
+    {
+        return SmsCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->where('provider', $provider)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (SmsCredential $c): array => ['id' => (string) $c->id, 'label' => (string) $c->name])
+            ->all();
+    }
+
+    public function deleteSmsCredential(string $credentialId): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $cred = SmsCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->whereKey($credentialId)
+            ->first();
+
+        if (! $cred instanceof SmsCredential) {
+            return;
+        }
+
+        $cred->delete();
+
+        if (($this->bindingForm['credential_id'] ?? '') === $credentialId) {
+            $this->bindingForm['credential_id'] = '';
+        }
+
+        $this->toastSuccess(__('Saved SMS credential removed.'));
+    }
+
+    /**
+     * Default search (Scout) form. Prefills provider from an existing binding;
+     * secrets are never echoed back.
+     *
+     * @return array<string, mixed>
+     */
+    private function defaultSearchBindingForm(): array
+    {
+        $existing = $this->site->bindings->firstWhere('type', 'search');
+        $cfg = is_array($existing?->config) ? $existing->config : [];
+
+        return [
+            'provider' => (string) ($cfg['provider'] ?? 'meilisearch'),
+            // Algolia
+            'app_id' => '',
+            'secret' => '',
+            // Meilisearch + Typesense share host.
+            'host' => '',
+            'key' => '',
+            // Typesense
+            'port' => '8108',
+            'protocol' => 'http',
+            'api_key' => '',
+            'credential_id' => '',
+            'save_credential' => false,
+            'credential_name' => '',
+        ];
+    }
+
+    /**
+     * @return list<array{id: string, label: string}>
+     */
+    public function searchCredentialsFor(string $provider): array
+    {
+        return SearchCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->where('provider', $provider)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (SearchCredential $c): array => ['id' => (string) $c->id, 'label' => (string) $c->name])
+            ->all();
+    }
+
+    public function deleteSearchCredential(string $credentialId): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $cred = SearchCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->whereKey($credentialId)
+            ->first();
+
+        if (! $cred instanceof SearchCredential) {
+            return;
+        }
+
+        $cred->delete();
+
+        if (($this->bindingForm['credential_id'] ?? '') === $credentialId) {
+            $this->bindingForm['credential_id'] = '';
+        }
+
+        $this->toastSuccess(__('Saved search credential removed.'));
+    }
+
+    /**
+     * Default payments form. Prefills provider from an existing binding; secrets
+     * are never echoed back.
+     *
+     * @return array<string, mixed>
+     */
+    private function defaultPaymentsBindingForm(): array
+    {
+        $existing = $this->site->bindings->firstWhere('type', 'payments');
+        $cfg = is_array($existing?->config) ? $existing->config : [];
+
+        return [
+            'provider' => (string) ($cfg['provider'] ?? 'stripe'),
+            // Stripe
+            'key' => '',
+            'secret' => '',
+            'currency' => '',
+            // Paddle
+            'api_key' => '',
+            'client_side_token' => '',
+            'sandbox' => '',
+            // Shared
+            'webhook_secret' => '',
+            'credential_id' => '',
+            'save_credential' => false,
+            'credential_name' => '',
+        ];
+    }
+
+    /**
+     * @return list<array{id: string, label: string}>
+     */
+    public function paymentCredentialsFor(string $provider): array
+    {
+        return PaymentCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->where('provider', $provider)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (PaymentCredential $c): array => ['id' => (string) $c->id, 'label' => (string) $c->name])
+            ->all();
+    }
+
+    public function deletePaymentCredential(string $credentialId): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $cred = PaymentCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->whereKey($credentialId)
+            ->first();
+
+        if (! $cred instanceof PaymentCredential) {
+            return;
+        }
+
+        $cred->delete();
+
+        if (($this->bindingForm['credential_id'] ?? '') === $credentialId) {
+            $this->bindingForm['credential_id'] = '';
+        }
+
+        $this->toastSuccess(__('Saved payments credential removed.'));
+    }
+
+    /**
+     * The Cashier webhook URL preview for the current payments provider, derived
+     * from the site's primary hostname — shown in the modal so the operator can
+     * register it. Null when the site has no public URL yet.
+     */
+    public function paymentsWebhookPreview(string $provider): ?string
+    {
+        $host = $this->site->primaryDomain()?->hostname;
+        if (! is_string($host) || trim($host) === '') {
+            $host = $this->site->testingHostname();
+        }
+        $host = strtolower(trim((string) $host));
+        if ($host === '') {
+            return null;
+        }
+
+        $path = $provider === 'paddle' ? '/paddle/webhook' : '/stripe/webhook';
+
+        return 'https://'.$host.$path;
+    }
+
+    /**
+     * Default OAuth form. Prefills provider from an existing binding; the
+     * redirect override is left blank so attach auto-derives it.
+     *
+     * @return array<string, mixed>
+     */
+    private function defaultOauthBindingForm(): array
+    {
+        $existing = $this->site->bindings->firstWhere('type', 'oauth');
+        $cfg = is_array($existing?->config) ? $existing->config : [];
+
+        return [
+            'provider' => (string) ($cfg['provider'] ?? 'github'),
+            'client_id' => '',
+            'client_secret' => '',
+            // Blank => auto-derive {site}/auth/{provider}/callback.
+            'redirect' => '',
+            'credential_id' => '',
+            'save_credential' => false,
+            'credential_name' => '',
+        ];
+    }
+
+    /**
+     * The auto-derived OAuth redirect URL preview for the current provider,
+     * shown in the modal (the footgun this binding removes). Null when the site
+     * has no public URL yet.
+     */
+    public function oauthRedirectPreview(string $provider): ?string
+    {
+        $host = $this->site->primaryDomain()?->hostname;
+        if (! is_string($host) || trim($host) === '') {
+            $host = $this->site->testingHostname();
+        }
+        $host = strtolower(trim((string) $host));
+
+        return $host !== '' ? 'https://'.$host.'/auth/'.$provider.'/callback' : null;
+    }
+
+    /**
+     * @return list<array{id: string, label: string}>
+     */
+    public function oauthCredentialsFor(string $provider): array
+    {
+        return OauthCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->where('provider', $provider)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (OauthCredential $c): array => ['id' => (string) $c->id, 'label' => (string) $c->name])
+            ->all();
+    }
+
+    public function deleteOauthCredential(string $credentialId): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $cred = OauthCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->whereKey($credentialId)
+            ->first();
+
+        if (! $cred instanceof OauthCredential) {
+            return;
+        }
+
+        $cred->delete();
+
+        if (($this->bindingForm['credential_id'] ?? '') === $credentialId) {
+            $this->bindingForm['credential_id'] = '';
+        }
+
+        $this->toastSuccess(__('Saved OAuth credential removed.'));
+    }
+
+    /**
      * Saved log drain credentials the site's org can reuse for $provider.
      *
      * @return list<array{id: string, label: string}>
@@ -1002,6 +1497,58 @@ trait ManagesSiteBindings
     }
 
     /**
+     * Test a broadcasting binding. For a managed dply Realtime app, publish a
+     * harmless test event to the relay from the control plane (no SSH) — a 2xx
+     * proves the relay is live and the app credentials are accepted. BYO
+     * bindings have no managed relay, so they fall back to the TCP reachability
+     * probe (which already resolves PUSHER_HOST:443 via BindingReachability).
+     * Either path records config.connectivity so the card badge flips.
+     */
+    public function testBroadcastingBinding(string $bindingId): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $binding = SiteBinding::query()
+            ->where('site_id', $this->site->id)
+            ->whereKey($bindingId)
+            ->first();
+
+        if (! $binding instanceof SiteBinding || $binding->type !== 'broadcasting') {
+            return;
+        }
+
+        // BYO broadcasting points at the operator's own Pusher/Reverb/Ably — no
+        // managed app to authenticate against, so probe TCP reachability from
+        // the server like the other networked bindings.
+        if ($binding->target_type !== 'realtime_app') {
+            $this->validateBindingConnectivity($binding);
+
+            return;
+        }
+
+        if (! method_exists($this, 'seedQueuedConsoleAction') || ! method_exists($this, 'watchConsoleAction')) {
+            $this->toastError(__('Testing broadcasting is available from the deploy hub.'));
+
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('broadcasting_test', __('Testing broadcasting'));
+
+        TestBroadcastingBindingJob::dispatch(
+            (string) $run->id,
+            (string) $this->site->id,
+            (string) $binding->id,
+        );
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            __('Broadcasting relay reachable — a test event published successfully.'),
+            __('Could not publish a test event to the relay — see the console for details.'),
+        );
+    }
+
+    /**
      * When the storage provider changes, reset the region to that provider's
      * first known region so the derived endpoint stays consistent — an AWS
      * region left selected after switching to Hetzner would build a bogus
@@ -1043,6 +1590,176 @@ trait ManagesSiteBindings
             if (is_string($key) && preg_match('/^legs\.(\d+)\.provider$/', $key, $m) === 1) {
                 $i = (int) $m[1];
                 $this->bindingForm['legs'][$i] = $this->emptyMailLeg((string) $value);
+            }
+
+            return;
+        }
+
+        if ($this->bindingModalType === 'search') {
+            if ($key === 'provider') {
+                foreach (['credential_id', 'app_id', 'secret', 'host', 'key', 'api_key'] as $f) {
+                    $this->bindingForm[$f] = '';
+                }
+                $this->bindingForm['port'] = '8108';
+                $this->bindingForm['protocol'] = 'http';
+            }
+
+            if ($key === 'credential_id' && is_string($value) && $value !== '') {
+                $cred = SearchCredential::query()
+                    ->where('organization_id', $this->site->organization_id)
+                    ->where('provider', (string) ($this->bindingForm['provider'] ?? ''))
+                    ->whereKey($value)
+                    ->first();
+                if ($cred instanceof SearchCredential) {
+                    $c = is_array($cred->credentials) ? $cred->credentials : [];
+                    foreach (['app_id', 'secret', 'host', 'key', 'api_key', 'port', 'protocol'] as $f) {
+                        $this->bindingForm[$f] = (string) ($c[$f] ?? $this->bindingForm[$f] ?? '');
+                    }
+                }
+            }
+
+            return;
+        }
+
+        if ($this->bindingModalType === 'payments') {
+            if ($key === 'provider') {
+                foreach (['credential_id', 'key', 'secret', 'currency', 'api_key', 'client_side_token', 'sandbox', 'webhook_secret'] as $f) {
+                    $this->bindingForm[$f] = '';
+                }
+            }
+
+            if ($key === 'credential_id' && is_string($value) && $value !== '') {
+                $cred = PaymentCredential::query()
+                    ->where('organization_id', $this->site->organization_id)
+                    ->where('provider', (string) ($this->bindingForm['provider'] ?? ''))
+                    ->whereKey($value)
+                    ->first();
+                if ($cred instanceof PaymentCredential) {
+                    $c = is_array($cred->credentials) ? $cred->credentials : [];
+                    foreach (['key', 'secret', 'currency', 'api_key', 'client_side_token', 'sandbox', 'webhook_secret'] as $f) {
+                        $this->bindingForm[$f] = (string) ($c[$f] ?? '');
+                    }
+                }
+            }
+
+            return;
+        }
+
+        if ($this->bindingModalType === 'oauth') {
+            if ($key === 'provider') {
+                foreach (['credential_id', 'client_id', 'client_secret'] as $f) {
+                    $this->bindingForm[$f] = '';
+                }
+            }
+
+            if ($key === 'credential_id' && is_string($value) && $value !== '') {
+                $cred = OauthCredential::query()
+                    ->where('organization_id', $this->site->organization_id)
+                    ->where('provider', (string) ($this->bindingForm['provider'] ?? ''))
+                    ->whereKey($value)
+                    ->first();
+                if ($cred instanceof OauthCredential) {
+                    $c = is_array($cred->credentials) ? $cred->credentials : [];
+                    $this->bindingForm['client_id'] = (string) ($c['client_id'] ?? '');
+                    $this->bindingForm['client_secret'] = (string) ($c['client_secret'] ?? '');
+                }
+            }
+
+            return;
+        }
+
+        if ($this->bindingModalType === 'ai') {
+            if ($key === 'provider') {
+                foreach (['credential_id', 'api_key', 'organization'] as $f) {
+                    $this->bindingForm[$f] = '';
+                }
+            }
+
+            if ($key === 'credential_id' && is_string($value) && $value !== '') {
+                $cred = AiCredential::query()
+                    ->where('organization_id', $this->site->organization_id)
+                    ->where('provider', (string) ($this->bindingForm['provider'] ?? ''))
+                    ->whereKey($value)
+                    ->first();
+                if ($cred instanceof AiCredential) {
+                    $c = is_array($cred->credentials) ? $cred->credentials : [];
+                    $this->bindingForm['api_key'] = (string) ($c['api_key'] ?? '');
+                    $this->bindingForm['organization'] = (string) ($c['organization'] ?? '');
+                }
+            }
+
+            return;
+        }
+
+        if ($this->bindingModalType === 'captcha') {
+            if ($key === 'provider') {
+                foreach (['credential_id', 'site_key', 'secret_key'] as $f) {
+                    $this->bindingForm[$f] = '';
+                }
+            }
+
+            if ($key === 'credential_id' && is_string($value) && $value !== '') {
+                $cred = CaptchaCredential::query()
+                    ->where('organization_id', $this->site->organization_id)
+                    ->where('provider', (string) ($this->bindingForm['provider'] ?? ''))
+                    ->whereKey($value)
+                    ->first();
+                if ($cred instanceof CaptchaCredential) {
+                    $c = is_array($cred->credentials) ? $cred->credentials : [];
+                    $this->bindingForm['site_key'] = (string) ($c['site_key'] ?? '');
+                    $this->bindingForm['secret_key'] = (string) ($c['secret_key'] ?? '');
+                }
+            }
+
+            return;
+        }
+
+        if ($this->bindingModalType === 'sms') {
+            if ($key === 'provider') {
+                foreach (['credential_id', 'sid', 'auth_token', 'from', 'key', 'secret', 'server_key'] as $f) {
+                    $this->bindingForm[$f] = '';
+                }
+            }
+
+            if ($key === 'credential_id' && is_string($value) && $value !== '') {
+                $cred = SmsCredential::query()
+                    ->where('organization_id', $this->site->organization_id)
+                    ->where('provider', (string) ($this->bindingForm['provider'] ?? ''))
+                    ->whereKey($value)
+                    ->first();
+                if ($cred instanceof SmsCredential) {
+                    $c = is_array($cred->credentials) ? $cred->credentials : [];
+                    foreach (['sid', 'auth_token', 'from', 'key', 'secret', 'server_key'] as $f) {
+                        $this->bindingForm[$f] = (string) ($c[$f] ?? '');
+                    }
+                }
+            }
+
+            return;
+        }
+
+        if ($this->bindingModalType === 'error_tracking') {
+            if ($key === 'provider') {
+                foreach (['credential_id', 'dsn', 'traces_sample_rate', 'api_key', 'key'] as $f) {
+                    $this->bindingForm[$f] = '';
+                }
+            }
+
+            if ($key === 'credential_id' && is_string($value) && $value !== '') {
+                $provider = (string) ($this->bindingForm['provider'] ?? '');
+                $cred = ErrorTrackingCredential::query()
+                    ->where('organization_id', $this->site->organization_id)
+                    ->where('provider', $provider)
+                    ->whereKey($value)
+                    ->first();
+
+                if ($cred instanceof ErrorTrackingCredential) {
+                    $credentials = is_array($cred->credentials) ? $cred->credentials : [];
+                    $this->bindingForm['dsn'] = (string) ($credentials['dsn'] ?? '');
+                    $this->bindingForm['traces_sample_rate'] = (string) ($credentials['traces_sample_rate'] ?? '');
+                    $this->bindingForm['api_key'] = (string) ($credentials['api_key'] ?? '');
+                    $this->bindingForm['key'] = (string) ($credentials['key'] ?? '');
+                }
             }
 
             return;

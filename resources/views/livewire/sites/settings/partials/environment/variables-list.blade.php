@@ -379,7 +379,7 @@
                                                     @php $oEditHint = \App\Support\Sites\SiteEnvFieldHints::hint((string) $editing_env_key, (string) $editing_env_value); @endphp
                                                     <div class="flex-1 min-w-[12rem]" x-data="{ showValue: true }">
                                                         <label class="mb-1 flex items-center justify-between text-sm font-medium text-brand-ink" for="og_edit_val_{{ md5($oKey) }}">
-                                                            <span>{{ __('Value') }}@if ($oEditHint['type'] === 'bool')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(true / false)') }}</span>@elseif ($oEditHint['type'] === 'enum')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(pick one)') }}</span>@endif</span>
+                                                            <span>{{ __('Value') }}@if ($oEditHint['type'] === 'bool')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(true / false)') }}</span>@elseif ($oEditHint['type'] === 'enum')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(pick or type)') }}</span>@endif</span>
                                                             @if ($oEditHint['type'] === 'text')
                                                                 <button type="button" class="text-xs font-medium text-brand-sage hover:underline" @click="showValue = !showValue">
                                                                     <span x-show="!showValue">{{ __('Show') }}</span>
@@ -387,15 +387,7 @@
                                                                 </button>
                                                             @endif
                                                         </label>
-                                                        @if ($oEditHint['type'] !== 'text')
-                                                            <select id="og_edit_val_{{ md5($oKey) }}" wire:model="editing_env_value" class="block w-full rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-sm text-brand-ink">
-                                                                @foreach ($oEditHint['options'] as $oOpt)
-                                                                    <option value="{{ $oOpt }}">{{ $oOpt }}</option>
-                                                                @endforeach
-                                                            </select>
-                                                        @else
-                                                            <input id="og_edit_val_{{ md5($oKey) }}" wire:model="editing_env_value" x-bind:type="showValue ? 'text' : 'password'" autocomplete="off" spellcheck="false" class="block w-full rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-sm text-brand-ink" />
-                                                        @endif
+                                                        @include('livewire.sites.settings.partials.environment._value-input', ['hint' => $oEditHint, 'model' => 'editing_env_value', 'id' => 'og_edit_val_'.md5($oKey)])
                                                         <x-input-error :messages="$errors->get('editing_env_value')" class="mt-1" />
                                                     </div>
                                                 </div>
@@ -498,7 +490,7 @@
                                                 @php $oEditHint = \App\Support\Sites\SiteEnvFieldHints::hint((string) $editing_env_key, (string) $editing_env_value); @endphp
                                                 <div class="flex-1 min-w-[12rem]" x-data="{ showValue: true }">
                                                     <label class="mb-1 flex items-center justify-between text-sm font-medium text-brand-ink" for="og_edit_val_{{ md5($oKey) }}">
-                                                        <span>{{ __('Value') }}@if ($oEditHint['type'] === 'bool')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(true / false)') }}</span>@elseif ($oEditHint['type'] === 'enum')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(pick one)') }}</span>@endif</span>
+                                                        <span>{{ __('Value') }}@if ($oEditHint['type'] === 'bool')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(true / false)') }}</span>@elseif ($oEditHint['type'] === 'enum')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(pick or type)') }}</span>@endif</span>
                                                         @if ($oEditHint['type'] === 'text')
                                                             <button type="button" class="text-xs font-medium text-brand-sage hover:underline" @click="showValue = !showValue">
                                                                 <span x-show="!showValue">{{ __('Show') }}</span>
@@ -506,15 +498,7 @@
                                                             </button>
                                                         @endif
                                                     </label>
-                                                    @if ($oEditHint['type'] !== 'text')
-                                                        <select id="og_edit_val_{{ md5($oKey) }}" wire:model="editing_env_value" class="block w-full rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-sm text-brand-ink">
-                                                            @foreach ($oEditHint['options'] as $oOpt)
-                                                                <option value="{{ $oOpt }}">{{ $oOpt }}</option>
-                                                            @endforeach
-                                                        </select>
-                                                    @else
-                                                        <input id="og_edit_val_{{ md5($oKey) }}" wire:model="editing_env_value" x-bind:type="showValue ? 'text' : 'password'" autocomplete="off" spellcheck="false" class="block w-full rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-sm text-brand-ink" />
-                                                    @endif
+                                                    @include('livewire.sites.settings.partials.environment._value-input', ['hint' => $oEditHint, 'model' => 'editing_env_value', 'id' => 'og_edit_val_'.md5($oKey)])
                                                     <x-input-error :messages="$errors->get('editing_env_value')" class="mt-1" />
                                                 </div>
                                             </div>
@@ -573,6 +557,36 @@
             </div>
         @endif
 
+        {{-- Bulk-action bar: appears once one or more rows are ticked. The whole
+             selection is removed in a single cache write + single SSH push. --}}
+        @if (method_exists($this, 'removeSelectedEnvVars') && count($selected_env_keys) > 0)
+            <div class="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-brand-ink/10 bg-brand-sage/10 px-6 py-3 sm:px-8">
+                <span class="text-sm font-semibold text-brand-ink">
+                    {{ trans_choice('{1} :count selected|[2,*] :count selected', count($selected_env_keys), ['count' => count($selected_env_keys)]) }}
+                </span>
+                <div class="flex flex-wrap items-center gap-2 sm:ml-auto">
+                    <button type="button" wire:click="toggleSelectAllEnvVars" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                        <x-heroicon-o-check-circle class="h-4 w-4" />
+                        {{ __('Select all') }}
+                    </button>
+                    <button type="button" wire:click="clearEnvSelection" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                        <x-heroicon-o-x-mark class="h-4 w-4" />
+                        {{ __('Clear') }}
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="confirmRemoveSelectedEnvVars"
+                        wire:loading.attr="disabled"
+                        wire:target="confirmRemoveSelectedEnvVars"
+                        class="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-60"
+                    >
+                        <x-heroicon-o-trash class="h-4 w-4" />
+                        {{ trans_choice('{1} Remove selected|[2,*] Remove :count selected', count($selected_env_keys), ['count' => count($selected_env_keys)]) }}
+                    </button>
+                </div>
+            </div>
+        @endif
+
         @if ($variableCount === 0 && $bindingManagedEnv === [])
             <div class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center sm:px-8">
                 <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-moss">
@@ -586,6 +600,7 @@
                 @if ($filteredEnvMap === [] && ($envSearchTerm !== '' || $selectedEnvGroup !== ''))
                     <li class="px-6 py-10 text-center text-sm text-brand-moss sm:px-8">{{ __('No variables match the current filter.') }}</li>
                 @endif
+                @php $residencyMap = method_exists($this, 'secretResidencyMap') ? $this->secretResidencyMap() : []; @endphp
                 @foreach ($listEnvMap as $key => $value)
                     @continue(isset($overrideGroupedKeySet[$key]))
                     @php
@@ -596,6 +611,11 @@
                         $valueLength = strlen($value);
                         $rowComment = $envComments[$key] ?? null;
                         $overridesBinding = $bindingProvidedKeys[$key] ?? null;
+                        // Secret residency: this key's value lives off the plaintext .env
+                        // (escrowed under the org key, or referenced from an external store).
+                        $residency = $residencyMap[$key] ?? null;
+                        $escrowRevealed = $residency && array_key_exists($key, $revealed_escrow_values ?? []);
+                        $canManageResidency = method_exists($this, 'escalateEnvVar');
                     @endphp
                     <li class="px-6 py-3 sm:px-8" wire:key="env-row-{{ md5($key) }}">
                         @if ($isEditing)
@@ -614,7 +634,7 @@
                                     @php $editHint = \App\Support\Sites\SiteEnvFieldHints::hint((string) $editing_env_key, (string) $editing_env_value); @endphp
                                     <div class="flex-1 min-w-[12rem]" x-data="{ showValue: true }">
                                         <label class="mb-1 flex items-center justify-between text-sm font-medium text-brand-ink" for="editing_env_value_{{ md5($key) }}">
-                                            <span>{{ __('Value') }}@if ($editHint['type'] === 'bool')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(true / false)') }}</span>@elseif ($editHint['type'] === 'enum')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(pick one)') }}</span>@endif</span>
+                                            <span>{{ __('Value') }}@if ($editHint['type'] === 'bool')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(true / false)') }}</span>@elseif ($editHint['type'] === 'enum')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(pick or type)') }}</span>@endif</span>
                                             @if ($editHint['type'] === 'text')
                                                 <button type="button" class="text-xs font-medium text-brand-sage hover:underline" @click="showValue = !showValue">
                                                     <span x-show="!showValue">{{ __('Show') }}</span>
@@ -622,29 +642,7 @@
                                                 </button>
                                             @endif
                                         </label>
-                                        @if ($editHint['type'] !== 'text')
-                                            {{-- Toggle/dropdown for known boolean & enum keys (APP_DEBUG,
-                                                 APP_ENV, LOG_LEVEL, MAIL_MAILER, …). The current value is
-                                                 always one of the options so nothing is lost. --}}
-                                            <select
-                                                id="editing_env_value_{{ md5($key) }}"
-                                                wire:model="editing_env_value"
-                                                class="block w-full rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-sm text-brand-ink"
-                                            >
-                                                @foreach ($editHint['options'] as $opt)
-                                                    <option value="{{ $opt }}">{{ $opt }}</option>
-                                                @endforeach
-                                            </select>
-                                        @else
-                                            <input
-                                                id="editing_env_value_{{ md5($key) }}"
-                                                wire:model="editing_env_value"
-                                                x-bind:type="showValue ? 'text' : 'password'"
-                                                autocomplete="off"
-                                                spellcheck="false"
-                                                class="block w-full rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-sm text-brand-ink"
-                                            />
-                                        @endif
+                                        @include('livewire.sites.settings.partials.environment._value-input', ['hint' => $editHint, 'model' => 'editing_env_value', 'id' => 'editing_env_value_'.md5($key)])
                                         <x-input-error :messages="$errors->get('editing_env_value')" class="mt-1" />
                                     </div>
                                 </div>
@@ -670,6 +668,15 @@
                         @else
                             <div class="flex flex-wrap items-center justify-between gap-3">
                                 <div class="flex min-w-0 items-center gap-3">
+                                    @if (method_exists($this, 'removeSelectedEnvVars'))
+                                        <input
+                                            type="checkbox"
+                                            value="{{ $key }}"
+                                            wire:model.live="selected_env_keys"
+                                            aria-label="{{ __('Select :key for bulk actions', ['key' => $key]) }}"
+                                            class="h-4 w-4 shrink-0 rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage/40"
+                                        />
+                                    @endif
                                     <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/40 text-brand-forest ring-brand-ink/10">
                                         <x-heroicon-o-key class="h-4 w-4" />
                                     </span>
@@ -703,9 +710,26 @@
                                                     {{ __('Overrides :type', ['type' => $bindingTypeLabelsInline[$overridesBinding['type']] ?? $overridesBinding['type']]) }}
                                                 </span>
                                             @endif
+                                            @if ($residency)
+                                                <span
+                                                    class="inline-flex items-center gap-1 rounded-full bg-brand-forest/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-forest ring-1 ring-inset ring-brand-forest/20"
+                                                    title="{{ $residency['mode'] === 'external' ? __('Value is referenced from an external secret store; it is never stored in dply.') : __('Value is encrypted under your organization key, not stored in the plaintext .env.') }}"
+                                                >
+                                                    <x-heroicon-m-lock-closed class="h-3 w-3" />
+                                                    {{ $residency['mode'] === 'external' ? __('External') : __('Org key') }}
+                                                </span>
+                                            @endif
                                         </p>
                                         <p class="mt-0.5 break-all font-mono text-[11px] text-brand-moss">
-                                            @if ($isRevealed)
+                                            @if ($residency)
+                                                @if ($escrowRevealed)
+                                                    {{ $revealed_escrow_values[$key] === '' ? '(empty)' : $revealed_escrow_values[$key] }}
+                                                @elseif ($residency['mode'] === 'external')
+                                                    <span class="text-brand-mist">{{ __('resolved from external store at deploy') }}</span>
+                                                @else
+                                                    <span class="text-brand-mist">{{ __('held in the organization key') }}</span>
+                                                @endif
+                                            @elseif ($isRevealed)
                                                 {{ $value === '' ? '(empty)' : $value }}
                                             @else
                                                 @if ($valueLength === 0)
@@ -728,6 +752,34 @@
                                 </div>
 
                                 <div class="flex flex-wrap items-center gap-2">
+                                    @if ($residency)
+                                        @if ($residency['mode'] !== 'external' && $residency['can_reveal'])
+                                            <button
+                                                type="button"
+                                                wire:click="revealEscrowedEnvVar('{{ $key }}')"
+                                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                                title="{{ $escrowRevealed ? __('Hide value') : __('Reveal value') }}"
+                                            >
+                                                @if ($escrowRevealed)
+                                                    <x-heroicon-o-eye-slash class="h-4 w-4" />{{ __('Hide') }}
+                                                @else
+                                                    <x-heroicon-o-eye class="h-4 w-4" />{{ __('Reveal') }}
+                                                @endif
+                                            </button>
+                                        @endif
+                                        @if ($residency['mode'] !== 'external' && $canManageResidency)
+                                            <button
+                                                type="button"
+                                                wire:click="demoteEnvVar('{{ $key }}')"
+                                                wire:loading.attr="disabled"
+                                                wire:target="demoteEnvVar('{{ $key }}')"
+                                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-40"
+                                                title="{{ __('Move this secret back into the editable .env') }}"
+                                            >
+                                                <x-heroicon-o-lock-open class="h-4 w-4" />{{ __('Move back') }}
+                                            </button>
+                                        @endif
+                                    @else
                                     <button
                                         type="button"
                                         wire:click="toggleRevealEnvVar('{{ $key }}')"
@@ -773,6 +825,21 @@
                                         <span wire:loading wire:target="confirmRemoveEnvVar('{{ $key }}')"><x-spinner variant="forest" size="sm" /></span>
                                         {{ __('Remove') }}
                                     </button>
+                                    @if ($canManageResidency && $valueLength > 0)
+                                        <button
+                                            type="button"
+                                            wire:click="escalateEnvVar('{{ $key }}')"
+                                            wire:loading.attr="disabled"
+                                            wire:target="escalateEnvVar('{{ $key }}')"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:border-brand-forest/30 hover:bg-brand-forest/5 hover:text-brand-forest disabled:cursor-not-allowed disabled:opacity-40"
+                                            title="{{ __('Encrypt this value under your organization key and keep it out of the plaintext .env') }}"
+                                        >
+                                            <x-heroicon-o-lock-closed class="h-4 w-4" wire:loading.remove wire:target="escalateEnvVar('{{ $key }}')" />
+                                            <span wire:loading wire:target="escalateEnvVar('{{ $key }}')"><x-spinner variant="forest" size="sm" /></span>
+                                            {{ __('Move to org key') }}
+                                        </button>
+                                    @endif
+                                    @endif
                                 </div>
                             </div>
                         @endif

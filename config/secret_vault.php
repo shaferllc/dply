@@ -16,6 +16,10 @@ return [
     // known version+sha under shared/secrets/bin; locally just use PATH.
     'age_bin' => env('SECRET_VAULT_AGE_BIN', 'age'),
 
+    // Path to the `age-keygen` binary (generates per-org keypairs). Pinned next
+    // to `age` by deploy/secrets/install-cron.sh; locally just use PATH.
+    'age_keygen_bin' => env('SECRET_VAULT_AGE_KEYGEN_BIN', 'age-keygen'),
+
     // Public age recipients (one per line). Encryption needs only this; it is
     // safe on every box. The matching private identity is held OFFLINE.
     'recipients_path' => env('SECRET_VAULT_RECIPIENTS_PATH', '/home/dply/shared/secrets/age-recipients.txt'),
@@ -102,6 +106,19 @@ return [
 
     'db' => [
         'retention_days' => (int) env('SECRET_VAULT_DB_RETENTION_DAYS', 30),
+    ],
+
+    // Customer-facing per-key secret residency (see project_secret_residency).
+    'residency' => [
+        // On-box external resolution (Tier 3+, true end-to-end ZK): when a site
+        // has external secrets marked resolution=onbox, the server itself fetches
+        // the values via a shipped shim using the box's own credentials, and dply
+        // never sees them. OFF by default — until enabled (and validated on a live
+        // box), a site with on-box secrets FAILS CLOSED on push rather than
+        // shipping an unresolved directive. Flipping this on is a deliberate,
+        // box-validated step (the shim needs curl/jq, or the AWS CLI / instance
+        // IAM, present on the target server).
+        'onbox_enabled' => (bool) env('SECRET_RESIDENCY_ONBOX_ENABLED', false),
     ],
 
     // Box-to-box APP_KEY drift check (W5). Targets are the adopted control-plane

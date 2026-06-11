@@ -38,6 +38,7 @@ use App\Models\SitePreviewDomain;
 use App\Models\SiteProcess;
 use App\Models\SiteRedirect;
 use App\Models\SiteRelease;
+use App\Models\SiteSecretResidency;
 use App\Models\SiteTenantDomain;
 use App\Models\SiteUptimeMonitor;
 use App\Models\SiteWebserverConfigProfile;
@@ -75,28 +76,29 @@ trait HasSiteRelationships
     }
 
     /**
-     * Worker pools "attached" to this site — workspace-scoped: pools that own a
-     * server in this site's workspace (falling back to its organization). Not a
-     * true relation (the link is via the pool's member servers, not a FK), so
-     * this returns a resolved collection. Drives the site's Workers panel.
+     * Worker pools "attached" to this site: those that scale out the site's OWN
+     * server (WorkerPool.source_server_id == this site's server_id). A pool runs
+     * the source server's code + queues, so it belongs only to sites on that box —
+     * NOT to every site in the workspace. Not a true relation (resolved via the
+     * source-server FK), so this returns a collection. Drives the Workers panel.
      *
      * @return Collection<int, WorkerPool>
      */
     public function attachedWorkerPools(): Collection
     {
-        $workspaceId = $this->workspace_id;
-        $organizationId = $this->organization_id;
+        $serverId = $this->server_id;
 
-        if ($workspaceId === null && $organizationId === null) {
+        if ($serverId === null) {
             return new Collection;
         }
 
+        // A worker pool scales out exactly one box — its source_server_id (the
+        // server whose code + queues the replicas run). It's "attached" to a site
+        // only when it scales THAT site's own server. Scoping by workspace/org
+        // instead made every site in a workspace that owns any pool anywhere
+        // (e.g. dply's control-plane pool) falsely show workers attached.
         return WorkerPool::query()
-            ->whereHas('servers', function ($q) use ($workspaceId, $organizationId): void {
-                $workspaceId !== null
-                    ? $q->where('workspace_id', $workspaceId)
-                    : $q->where('organization_id', $organizationId);
-            })
+            ->where('source_server_id', $serverId)
             ->with(['servers', 'primaryServer'])
             ->orderBy('created_at')
             ->get();
@@ -319,6 +321,17 @@ trait HasSiteRelationships
     public function bindings(): HasMany
     {
         return $this->hasMany(SiteBinding::class);
+    }
+
+    /**
+     * Per-key secret residency records — the env vars this site keeps OUT of the
+     * loose plaintext-in-DB `.env` blob (escrowed under an org key, or referenced
+     * from an external store). The blob carries only placeholders for these keys;
+     * {@see \App\Services\Sites\SecretResidencyResolver} resolves them at push.
+     */
+    public function secretResidencies(): HasMany
+    {
+        return $this->hasMany(SiteSecretResidency::class);
     }
 
     public function redirects(): HasMany

@@ -20,6 +20,8 @@ class PrivateNetwork extends Model
 
     public const PROVIDER_HETZNER = 'hetzner';
     public const PROVIDER_DO      = 'digitalocean';
+    public const PROVIDER_VULTR   = 'vultr';
+    public const PROVIDER_LINODE  = 'linode';
 
     protected $fillable = [
         'organization_id',

@@ -35,6 +35,13 @@ class SiteBinding extends Model
         'logging',
         'mail',
         'broadcasting',
+        'error_tracking',
+        'ai',
+        'captcha',
+        'sms',
+        'search',
+        'payments',
+        'oauth',
     ];
 
     public const STATUS_CONFIGURED = 'configured';

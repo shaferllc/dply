@@ -97,9 +97,9 @@ trait InteractsWithServerWorkspace
     }
 
     /** True when the server is ready for SSH-based workspace operations (inventory, manage, metrics install, etc.). */
-    protected function serverOpsReady(): bool
+    protected function serverOpsReady(?Server $server = null): bool
     {
-        $s = $this->server;
+        $s = $server ?? $this->server;
 
         return $s->isReady()
             && $s->isVmHost()

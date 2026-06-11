@@ -18,6 +18,7 @@ use App\Models\ServerCronJob;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseBackup;
 use App\Models\Site;
+use App\Models\SiteBinding;
 use App\Models\SiteFileBackup;
 use App\Notifications\BackupFailureNotification;
 use App\Services\Servers\DatabaseBackupDownloader;
@@ -27,6 +28,7 @@ use App\Support\Servers\DatabaseBackupSettings;
 use Cron\CronExpression;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Response;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -99,6 +101,20 @@ class WorkspaceBackups extends Component
 
     /** overview | schedules | history */
     public string $backups_workspace_tab = 'overview';
+
+    /**
+     * Live databases discovered ON THE BOX for the Quick-download card — including
+     * ones dply never catalogued as a {@see ServerDatabase} row. Populated off the
+     * render path via {@see detectLiveDatabases()} (wire:init), so a server whose
+     * database was created outside dply can still be dumped. Each entry is
+     * ['engine' => string, 'name' => string].
+     *
+     * @var list<array{engine: string, name: string}>
+     */
+    public array $liveDbDumpTargets = [];
+
+    /** True once {@see detectLiveDatabases()} has run (drives the card's spinner). */
+    public bool $liveDbDetected = false;
 
     public function setBackupsWorkspaceTab(string $tab): void
     {
@@ -250,6 +266,14 @@ class WorkspaceBackups extends Component
             ->whereKey($this->run_database_id)
             ->first();
 
+        // Fall back to a database hosted on another server that a site here
+        // attaches to. Its backup still runs on its OWN home server (the export
+        // job dumps where $db->server lives), so this is purely a surfacing
+        // convenience — same org + binding constraints enforced by the helper.
+        if ($database === null) {
+            $database = $this->remoteAttachedDatabases()->firstWhere('id', $this->run_database_id);
+        }
+
         if ($database === null) {
             $this->toastError(__('Pick a database to back up.'));
 
@@ -286,6 +310,68 @@ class WorkspaceBackups extends Component
 
         $this->run_database_id = '';
         $this->toastSuccess(__('Database backup queued for :name.', ['name' => $database->name]));
+    }
+
+    /**
+     * Databases that sites on THIS server attach to but which are hosted on a
+     * DIFFERENT server (remote bindings). They're still ServerDatabase rows, so
+     * a backup of one runs — correctly — on its own home server: the export job
+     * resolves $db->server and dumps over that box's local socket. We surface
+     * them here as a convenience for the consuming server. Scoped to the same
+     * organization and, in site context, to the focused site's bindings.
+     *
+     * @return Collection<int, ServerDatabase>
+     */
+    private function remoteAttachedDatabases(): Collection
+    {
+        $siteScope = $this->siteDedicatedContext ? $this->context_site_id : null;
+
+        $targetIds = SiteBinding::query()
+            ->where('target_type', 'server_database')
+            ->whereHas('site', fn ($q) => $q
+                ->where('server_id', $this->server->id)
+                ->when($siteScope !== null, fn ($q2) => $q2->whereKey($siteScope)))
+            ->pluck('target_id')
+            ->filter()
+            ->unique()
+            ->all();
+
+        if ($targetIds === []) {
+            return collect();
+        }
+
+        return ServerDatabase::query()
+            ->whereIn('id', $targetIds)
+            ->where('server_id', '!=', $this->server->id)
+            ->whereHas('server', fn ($q) => $q->where('organization_id', $this->server->organization_id))
+            ->with('server')
+            ->orderBy('name')
+            ->get();
+    }
+
+    /**
+     * Resolve a database backup this server's workspace may act on: its database
+     * is hosted here, OR it's one a site here attaches to remotely (the same set
+     * surfaced in history). Returns null when not found or not allowed — so a
+     * remote-attached backup no longer 404s the download/delete action. The
+     * downloader streams from the database's own home server regardless.
+     */
+    private function resolveDatabaseBackupForServer(string $backupId): ?ServerDatabaseBackup
+    {
+        $backup = ServerDatabaseBackup::query()
+            ->whereKey($backupId)
+            ->with('serverDatabase.server')
+            ->first();
+
+        $db = $backup?->serverDatabase;
+        if ($db === null) {
+            return null;
+        }
+
+        $allowed = (string) $db->server_id === (string) $this->server->id
+            || $this->remoteAttachedDatabases()->contains('id', $db->id);
+
+        return $allowed ? $backup : null;
     }
 
     public function runSiteFilesBackup(): void
@@ -414,14 +500,60 @@ class WorkspaceBackups extends Component
         $this->toastSuccess(__('Backup schedule added.'));
     }
 
+    /**
+     * Off-render-path probe (wire:init) that lists databases actually present on
+     * the server — registered or not — so the Quick-download card can offer an
+     * instant dump of each. Mirrors the drift analyzer's live listing. Runs in
+     * server context only; site context already scopes to linked databases. Never
+     * throws into the render path — engine probe failures degrade to an empty list.
+     */
+    public function detectLiveDatabases(
+        \App\Support\Servers\ServerDatabaseHostCapabilities $capabilities,
+        \App\Services\Servers\ServerDatabaseProvisioner $provisioner,
+    ): void {
+        $this->liveDbDetected = true;
+
+        if ($this->context_site_id !== null) {
+            return;
+        }
+
+        $this->authorize('update', $this->server);
+
+        $caps = $capabilities->forServer($this->server);
+        $targets = [];
+
+        if (($caps['mysql'] ?? false) || ($caps['mariadb'] ?? false)) {
+            try {
+                foreach ($provisioner->listMysqlDatabaseNames($this->server) as $name) {
+                    $targets[] = ['engine' => 'mysql', 'name' => $name];
+                }
+            } catch (\Throwable) {
+                // ignore — engine present but unreachable
+            }
+        }
+
+        if ($caps['postgres'] ?? false) {
+            try {
+                foreach ($provisioner->listPostgresDatabaseNames($this->server) as $name) {
+                    $targets[] = ['engine' => 'postgres', 'name' => $name];
+                }
+            } catch (\Throwable) {
+                // ignore
+            }
+        }
+
+        $this->liveDbDumpTargets = $targets;
+    }
+
     public function downloadDatabaseBackup(string $backupId, DatabaseBackupDownloader $downloader): StreamedResponse|Response|null
     {
         $this->authorize('update', $this->server);
-        $backup = ServerDatabaseBackup::query()
-            ->whereKey($backupId)
-            ->whereHas('serverDatabase', fn ($q) => $q->where('server_id', $this->server->id))
-            ->with('serverDatabase')
-            ->firstOrFail();
+        $backup = $this->resolveDatabaseBackupForServer($backupId);
+        if ($backup === null) {
+            $this->toastError(__('Backup not found.'));
+
+            return null;
+        }
 
         $extension = $backup->serverDatabase?->engine === 'sqlite' ? 'db' : 'sql';
         $filename = ($backup->serverDatabase?->name ?? 'database').'-'.$backup->id.'.'.$extension;
@@ -765,10 +897,7 @@ class WorkspaceBackups extends Component
     {
         $this->authorize('update', $this->server);
 
-        $backup = ServerDatabaseBackup::query()
-            ->whereKey($backupId)
-            ->whereHas('serverDatabase', fn ($q) => $q->where('server_id', $this->server->id))
-            ->first();
+        $backup = $this->resolveDatabaseBackupForServer($backupId);
         if ($backup === null) {
             return;
         }
@@ -860,6 +989,25 @@ class WorkspaceBackups extends Component
             ->orderBy('name')
             ->get();
 
+        // Databases hosted on other servers that sites here attach to. Listed in
+        // the run-now picker; their backup runs on their own home server.
+        $remoteDatabases = $this->remoteAttachedDatabases();
+
+        // The run button gates on the server that will ACTUALLY run the dump —
+        // the selected database's home server. A remote-attached DB dumps on its
+        // own box, so this server being un-ready must not block it (and vice
+        // versa). Empty selection → not ready, so the button stays disabled.
+        $runDatabaseReady = false;
+        if ($this->run_database_id !== '') {
+            if ($databases->contains('id', $this->run_database_id)) {
+                $runDatabaseReady = $this->serverOpsReady();
+            } else {
+                $remoteSelected = $remoteDatabases->firstWhere('id', $this->run_database_id);
+                $runDatabaseReady = $remoteSelected?->server !== null
+                    && $this->serverOpsReady($remoteSelected->server);
+            }
+        }
+
         $sites = Site::query()
             ->where('server_id', $this->server->id)
             ->when($this->context_site_id !== null, fn ($q) => $q->whereKey($this->context_site_id))
@@ -869,7 +1017,7 @@ class WorkspaceBackups extends Component
         // $databases / $sites are already scoped to the focused site in site
         // context, so the id lists follow directly: DB history shows the site's
         // linked databases (if any), file history shows just this site.
-        $databaseIds = $databases->pluck('id')->all();
+        $databaseIds = $databases->pluck('id')->merge($remoteDatabases->pluck('id'))->unique()->all();
         $siteIds = $sites->pluck('id')->all();
 
         $databaseBackups = ServerDatabaseBackup::query()
@@ -997,6 +1145,8 @@ class WorkspaceBackups extends Component
             'contextSite' => $contextSite,
             'siteDedicatedContext' => $this->siteDedicatedContext,
             'databases' => $databases,
+            'remoteDatabases' => $remoteDatabases,
+            'runDatabaseReady' => $runDatabaseReady,
             'sites' => $sites,
             'databaseBackups' => $databaseBackups,
             'fileBackups' => $fileBackups,

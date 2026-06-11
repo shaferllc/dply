@@ -11,6 +11,7 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 
 uses(RefreshDatabase::class);
 
@@ -85,4 +86,38 @@ test('sync rows report finished when every peer deploy has settled', function ()
     $rows = $component->syncRows();
     expect(collect($rows)->every(fn ($r) => $r['in_progress'] === false))->toBeTrue();
     expect(collect($rows)->every(fn ($r) => $r['status'] === 'success'))->toBeTrue();
+});
+
+test('a row clears as soon as every phase is done, before the deployment row is finalised', function () {
+    [$primary] = syncSites();
+
+    // The worker writes phase_results (all phases done) BEFORE it flips the row
+    // to success + sets finished_at. Reproduce that window: status still RUNNING,
+    // finished_at null, every phase recorded ok, and an active deploy lock held.
+    $primary->deployments()->create([
+        'project_id' => $primary->project_id,
+        'status' => SiteDeployment::STATUS_RUNNING,
+        'finished_at' => null,
+        'trigger' => SiteDeployment::TRIGGER_MANUAL,
+        'phase_results' => [
+            'clone' => [['step_type' => 'clone', 'ok' => true, 'skipped' => false, 'output' => 'ok', 'duration_ms' => 10]],
+            'build' => [['step_type' => 'composer_install', 'ok' => true, 'skipped' => false, 'output' => 'ok', 'duration_ms' => 10]],
+            'release' => [['step_type' => 'artisan_migrate', 'ok' => true, 'skipped' => false, 'output' => 'ok', 'duration_ms' => 10]],
+            'activate' => [['step_type' => 'activate', 'ok' => true, 'skipped' => false, 'output' => 'ok', 'duration_ms' => 10]],
+        ],
+    ]);
+
+    // Pre-fix, this lock forced status 'starting' + a spinner until its TTL.
+    Cache::put('site-deploy-active:'.$primary->id, ['started_at' => now()->toIso8601String(), 'deployment_id' => null], 600);
+
+    $component = new DeployControl;
+    $component->site = $primary;
+    $component->syncedSiteIds = [(string) $primary->id];
+
+    $row = collect($component->syncRows())->firstWhere('id', (string) $primary->id);
+
+    expect($row['phase_total'])->toBeGreaterThan(0);
+    expect($row['phase_done'])->toBe($row['phase_total']);
+    expect($row['status'])->not->toBe('starting');
+    expect($row['in_progress'])->toBeFalse();
 });

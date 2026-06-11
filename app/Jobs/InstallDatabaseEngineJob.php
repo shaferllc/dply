@@ -10,6 +10,7 @@ use App\Models\ServerDatabaseEngine;
 use App\Models\ServerDatabaseEngineAuditEvent;
 use App\Services\Servers\DatabaseEngineAuditLogger;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
+use App\Services\Servers\ServerDatabaseRemoteExec;
 use App\Support\Servers\DatabaseEngineInstallScripts;
 use App\Support\Servers\ServerDatabaseHostCapabilities;
 use App\Support\Servers\ServerResourcePreflight;
@@ -134,6 +135,12 @@ class InstallDatabaseEngineJob implements ShouldQueue
 
             $version = $this->parseVersion($output->buffer);
 
+            // The app dials the engine over TCP 127.0.0.1:<port>, but apt only
+            // guarantees the daemon is up — not that it's listening on loopback
+            // TCP. Verify, remediate if not, and re-verify so an engine never lands
+            // "running" while being unreachable to the very apps it's installed for.
+            $this->ensureLoopbackListening($row, $executor, $emit);
+
             $row->update([
                 'status' => ServerDatabaseEngine::STATUS_RUNNING,
                 'version' => $version,
@@ -171,6 +178,50 @@ class InstallDatabaseEngineJob implements ShouldQueue
             $emit->error('db', $message);
             $this->failConsoleAction($message);
         }
+    }
+
+    /**
+     * Ensure the freshly-installed engine accepts TCP on 127.0.0.1:<port>. Only
+     * enforced for the relational engines apps connect to over TCP loopback
+     * (postgres/mysql/mariadb). No-op when already listening — remediation runs
+     * only on failure, so a working config is never touched. Throws (→ FAILED)
+     * when the engine still isn't reachable after remediation.
+     */
+    private function ensureLoopbackListening(ServerDatabaseEngine $row, ExecuteRemoteTaskOnServer $executor, $emit): void
+    {
+        $engine = $row->engine;
+        if (! in_array($engine, ['postgres', 'mysql', 'mariadb'], true)) {
+            return;
+        }
+
+        $remote = app(ServerDatabaseRemoteExec::class);
+        if ($remote->engineListeningOnLoopback($row->server, $engine)) {
+            return;
+        }
+
+        $emit->step('db', __('Engine not reachable on 127.0.0.1 yet — applying loopback listen config …'));
+        $script = DatabaseEngineInstallScripts::ensureLoopbackListeningScript($engine);
+        if ($script !== '') {
+            $executor->runInlineBash(
+                $row->server,
+                'database-engine:ensure-listen:'.$engine,
+                $script,
+                timeoutSeconds: 120,
+                asRoot: true,
+            );
+        }
+
+        if (! $remote->engineListeningOnLoopback($row->server, $engine)) {
+            throw new \RuntimeException(__(':engine installed but is not listening on 127.0.0.1::port even after remediation — check its service and config.', [
+                'engine' => $engine,
+                'port' => DatabaseEngineInstallScripts::defaultPortFor($engine),
+            ]));
+        }
+
+        $emit->success('db', __(':engine is listening on 127.0.0.1::port.', [
+            'engine' => $engine,
+            'port' => DatabaseEngineInstallScripts::defaultPortFor($engine),
+        ]));
     }
 
     private function parseVersion(string $stdout): ?string

@@ -41,10 +41,24 @@ class PollLinodeIpJob implements ShouldQueue
         $ip = LinodeService::getPublicIp($instance);
 
         if ($ip) {
-            $this->server->update([
+            $updates = [
                 'ip_address' => $ip,
                 'status' => Server::STATUS_READY,
-            ]);
+            ];
+
+            // Capture Linode's private IP for reference, but DO NOT record a
+            // PrivateNetwork from it: Linode's legacy private address (192.168/17)
+            // is shared across EVERY Linode the account owns in the datacenter — it
+            // is not an isolated network, so treating it as one would falsely make
+            // unrelated Linodes "reachable" peers (exactly the over-bridging we're
+            // eliminating). Isolated Linode VPCs need the VPC config-interface API;
+            // that integration is a follow-up.
+            $privateIp = LinodeService::getPrivateIp($instance);
+            if ($privateIp !== null && blank($this->server->private_ip_address)) {
+                $updates['private_ip_address'] = $privateIp;
+            }
+
+            $this->server->update($updates);
 
             $this->dispatchServerProvisionIfNeeded($this->server);
 

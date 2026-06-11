@@ -186,7 +186,10 @@ class SendBindingTestEmailJob implements ShouldQueue
             $legDsns = [];
             foreach ($legs as $leg) {
                 $slug = strtolower(trim((string) $leg));
-                if ($slug === 'log') {
+                // `log` is a Laravel mailer with no Symfony transport; `cloudflare`
+                // uses a pseudo-DSN that can't nest inside Symfony's failover(…)
+                // composite — both are skipped from the live chain test.
+                if (in_array($slug, ['log', 'cloudflare'], true)) {
                     continue;
                 }
                 $legDsn = $this->buildDsn($slug, $env);
@@ -214,6 +217,15 @@ class SendBindingTestEmailJob implements ShouldQueue
                 : null,
             'resend' => ($env['RESEND_KEY'] ?? '') !== ''
                 ? sprintf('resend+api://%s@default', $enc($env['RESEND_KEY']))
+                : null,
+            'sendgrid' => ($env['SENDGRID_API_KEY'] ?? '') !== ''
+                ? sprintf('sendgrid+api://%s@default', $enc($env['SENDGRID_API_KEY']))
+                : null,
+            // Cloudflare has no Symfony DSN scheme — it's a Laravel-native
+            // transport. We emit a pseudo-DSN the runner recognizes and turns
+            // into an Illuminate CloudflareTransport built from these creds.
+            'cloudflare' => ($env['CLOUDFLARE_ACCOUNT_ID'] ?? '') !== '' && ($env['CLOUDFLARE_KEY'] ?? '') !== ''
+                ? sprintf('cloudflare://%s:%s@default', $enc($env['CLOUDFLARE_ACCOUNT_ID']), $enc($env['CLOUDFLARE_KEY']))
                 : null,
             default => null,
         };
@@ -269,7 +281,24 @@ use Symfony\Component\Mime\Address;
 use Symfony\Component\Mime\Email;
 
 try {
-    $transport = Transport::fromDsn((string) getenv('DPLY_MAIL_DSN'));
+    $dsn = (string) getenv('DPLY_MAIL_DSN');
+
+    // Cloudflare isn't a Symfony transport (no DSN scheme) — it's a Laravel
+    // transport class. Recognize our pseudo-DSN `cloudflare://ACCOUNT:KEY@…`
+    // and build Illuminate's CloudflareTransport directly. Needs the app's
+    // illuminate/mail (always present) + symfony/http-client.
+    if (strncmp($dsn, 'cloudflare://', 13) === 0) {
+        $p = parse_url($dsn);
+        if (! class_exists(\Illuminate\Mail\Transport\CloudflareTransport::class)) {
+            throw new \RuntimeException('This app\'s Laravel version has no Cloudflare mail transport (needs Laravel 13+).');
+        }
+        $transport = new \Illuminate\Mail\Transport\CloudflareTransport(
+            rawurldecode((string) ($p['user'] ?? '')),
+            rawurldecode((string) ($p['pass'] ?? '')),
+        );
+    } else {
+        $transport = Transport::fromDsn($dsn);
+    }
     $mailer = new Mailer($transport);
 
     $fromName = (string) getenv('DPLY_MAIL_FROMNAME');

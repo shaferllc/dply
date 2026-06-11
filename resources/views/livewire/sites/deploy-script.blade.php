@@ -8,7 +8,7 @@
         @php
             $phases = [
                 'build' => ['label' => __('Build'), 'desc' => __('Runs after clone, before the release is activated — install dependencies, build assets.')],
-                'release' => ['label' => __('Release'), 'desc' => __('Runs after the new release is activated — migrations, cache warming.')],
+                'release' => ['label' => __('Release'), 'desc' => __('Runs in the new release before cutover — migrations, cache warming. A failure here aborts the deploy without going live.')],
                 'restart' => ['label' => __('Restart'), 'desc' => __('Runs after dply restarts services — restart your own workers/daemons.')],
             ];
             $shellKind = \App\Models\SiteDeployHook::KIND_SHELL;
@@ -63,16 +63,24 @@
                         </button>
                     </div>
 
-                    {{-- Typed steps from the visual builder run in this phase but aren't
-                         editable as text — shown read-only so the run order is honest. --}}
+                    {{-- Steps that run in this phase but aren't editable as text — typed
+                         builder steps plus any custom step pinned before them (e.g. a
+                         pre-migrate backup) — shown read-only in true run order so the
+                         ordering is honest and a text save never relocates them. --}}
                     @if (! empty($locked))
+                        @php $customType = \App\Models\SiteDeployStep::TYPE_CUSTOM; @endphp
                         <div class="mt-3 space-y-1.5">
                             @foreach ($locked as $step)
+                                @php $pinnedCustom = $step->step_type === $customType; @endphp
                                 <div class="flex items-center gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/30 px-2.5 py-1.5">
                                     <x-heroicon-m-lock-closed class="h-3.5 w-3.5 shrink-0 text-brand-mist" />
                                     <span class="shrink-0 text-xs font-semibold text-brand-ink">{{ $step->pillLabel() }}</span>
                                     <span class="min-w-0 flex-1 truncate font-mono text-[10px] text-brand-mist">{{ $step->commandFor() }}</span>
-                                    <span class="shrink-0 rounded-full bg-brand-ink/5 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-brand-moss">{{ __('Builder') }}</span>
+                                    <span @class([
+                                        'shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide',
+                                        'bg-brand-gold/20 text-brand-ink' => $pinnedCustom,
+                                        'bg-brand-ink/5 text-brand-moss' => ! $pinnedCustom,
+                                    ])>{{ $pinnedCustom ? __('Pinned') : __('Builder') }}</span>
                                 </div>
                             @endforeach
                             <p class="text-[10px] text-brand-mist">{{ __('Your commands below run after these.') }}</p>

@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Jobs\Concerns\WritesConsoleAction;
+use App\Jobs\Middleware\SerializeServerSsh;
 use App\Models\Site;
 use App\Services\Sites\ReleaseEnvLinkChecker;
 use App\Services\Sites\SiteEnvPusher;
@@ -28,18 +29,71 @@ use Illuminate\Support\Facades\Log;
  *
  * Errors fail the run and are surfaced in the banner; the editable cache
  * is preserved so the operator can retry from the manual Push button.
+ *
+ * Per-SERVER serialization via {@see SerializeServerSsh}: while ShouldBeUnique
+ * stops a single site double-pushing, this stops many sites on the SAME box
+ * opening concurrent SSH sessions and saturating it. Contended pushes release
+ * and retry (not fail) until they get the server's SSH slot.
  */
 class PushSiteEnvJob implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, WritesConsoleAction;
 
-    public int $tries = 1;
+    /**
+     * A contended {@see SerializeServerSsh} release counts as an attempt, so a
+     * plain `tries` cap would exhaust while waiting for the SSH slot. Bound the
+     * wait by time instead ({@see retryUntil}) and cap real failures with
+     * {@see $maxExceptions} so a broken push fails once instead of re-SSHing.
+     */
+    public int $maxExceptions = 1;
 
+    /**
+     * Safety TTL on the per-site uniqueness lock. With the debounced dispatch
+     * ({@see \App\Services\Sites\SiteEnvPushScheduler}) plus the SSH-slot wait,
+     * the unique lock is held a while; keep this larger than {@see retryUntil}
+     * so a long wait can't expire the lock and let a duplicate push slip in.
+     */
+    public int $uniqueFor = 600;
+
+    /**
+     * @param  string|null  $ephemeralIdentityToken  a cache key (NOT the secret)
+     *   under which a customer-held org age identity was stashed for this single
+     *   apply. The raw identity is never serialized into the job payload; handle()
+     *   pulls-and-forgets it from the cache and passes it to the pusher.
+     */
     public function __construct(
         public string $siteId,
         public ?string $userId = null,
         public ?string $seededConsoleRunId = null,
+        public ?string $ephemeralIdentityToken = null,
     ) {}
+
+    /** Cache-key prefix for a show-once ephemeral identity handed to a push. */
+    public const EPHEMERAL_IDENTITY_CACHE_PREFIX = 'env-push:ephemeral-identity:';
+
+    /**
+     * Bound how long the job waits for the server's SSH slot. Releases from the
+     * serialization middleware retry until this moment; a real handler error
+     * hits {@see $maxExceptions} first and fails immediately.
+     */
+    public function retryUntil(): \DateTimeInterface
+    {
+        return now()->addMinutes(5);
+    }
+
+    /**
+     * Serialize SSH pushes per target server. Resolved at runtime (the job only
+     * carries the site id); skipped if the site/server vanished so the job can
+     * still run and no-op cleanly.
+     *
+     * @return array<int, object>
+     */
+    public function middleware(): array
+    {
+        $serverId = Site::query()->whereKey($this->siteId)->value('server_id');
+
+        return $serverId !== null ? [new SerializeServerSsh((string) $serverId)] : [];
+    }
 
     public function uniqueId(): string
     {
@@ -75,7 +129,14 @@ class PushSiteEnvJob implements ShouldBeUnique, ShouldQueue
             $emit->step('push', __('Resolving server connection'));
             $emit->step('push', __('Writing .env to :path', ['path' => $site->effectiveEnvFilePath()]));
 
-            $path = $pusher->push($site);
+            // Pull-and-forget any customer-held identity stashed for this apply.
+            // It lives in the cache (transient) keyed by a token carried in the
+            // payload — never the raw key — and is dropped the instant it is read.
+            $ephemeralIdentity = $this->ephemeralIdentityToken !== null
+                ? \Illuminate\Support\Facades\Cache::pull(self::EPHEMERAL_IDENTITY_CACHE_PREFIX.$this->ephemeralIdentityToken)
+                : null;
+
+            $path = $pusher->push($site, null, $ephemeralIdentity);
 
             // Make the write actually take effect on the running app: rebuild
             // cached config + reload (no-op for sites that read .env live). The

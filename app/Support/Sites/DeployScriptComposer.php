@@ -31,9 +31,12 @@ class DeployScriptComposer
 
     /**
      * Render a site's freeform (TYPE_CUSTOM) deploy commands to one editable
-     * script per phase. Typed steps are deliberately excluded — they're shown
-     * read-only in the editor via {@see lockedSteps()} and managed in the visual
-     * builder — so the textarea only ever contains what the text editor owns.
+     * script per phase. Only the *trailing* custom block is the text editor's:
+     * typed steps and any custom steps pinned before them (e.g. a safety
+     * preset's pre-migrate DB snapshot inserted ahead of `migrate`) are shown
+     * read-only via {@see lockedSteps()}, so the textarea never absorbs — and
+     * a later save can never relocate — a command that must run before a
+     * builder step. See {@see typedCutoff()} for the boundary.
      *
      * @return array<string, string>  phase => script text
      */
@@ -43,9 +46,11 @@ class DeployScriptComposer
 
         $out = [];
         foreach (self::PHASES as $phase) {
+            $cutoff = $this->typedCutoff($site, $phase);
             $lines = $site->deploySteps
                 ->where('phase', $phase)
                 ->where('step_type', SiteDeployStep::TYPE_CUSTOM)
+                ->filter(fn (SiteDeployStep $s) => $cutoff === null || (int) $s->sort_order > $cutoff)
                 ->sortBy('sort_order')
                 ->map(fn (SiteDeployStep $s) => $s->commandFor())
                 ->filter(fn ($c) => is_string($c) && trim($c) !== '')
@@ -58,13 +63,14 @@ class DeployScriptComposer
     }
 
     /**
-     * Typed (non-custom) steps per phase — the structured steps the text editor
-     * does NOT own. Shown as locked read-only rows so the run order is honest
-     * even though the textarea only edits the freeform portion. Normally empty
-     * for text-authored pipelines; populated when a pipeline was built in the
-     * visual builder.
+     * Steps per phase the text editor does NOT own — shown as locked read-only
+     * rows so the run order is honest even though the textarea only edits the
+     * trailing freeform portion. This is every typed (non-custom) step PLUS any
+     * custom step pinned at or before the last typed step (preset/visual-builder
+     * authored, e.g. a pre-migrate backup). Returned in true execution order.
+     * Normally empty for purely text-authored pipelines.
      *
-     * @return array<string, list<SiteDeployStep>>  phase => typed steps
+     * @return array<string, list<SiteDeployStep>>  phase => locked steps
      */
     public function lockedSteps(Site $site): array
     {
@@ -72,15 +78,34 @@ class DeployScriptComposer
 
         $out = [];
         foreach (self::PHASES as $phase) {
+            $cutoff = $this->typedCutoff($site, $phase);
             $out[$phase] = $site->deploySteps
                 ->where('phase', $phase)
-                ->where('step_type', '!=', SiteDeployStep::TYPE_CUSTOM)
+                ->filter(fn (SiteDeployStep $s) => $s->step_type !== SiteDeployStep::TYPE_CUSTOM
+                    || ($cutoff !== null && (int) $s->sort_order <= $cutoff))
                 ->sortBy('sort_order')
                 ->values()
                 ->all();
         }
 
         return $out;
+    }
+
+    /**
+     * The sort_order of the last typed (non-custom) step in a phase, or null
+     * when the phase has none. Custom steps at or before this boundary are
+     * "pinned" (run among the typed steps and are locked); custom steps after
+     * it form the trailing freeform block the text editor owns. With no typed
+     * steps every custom step is trailing — the original text-pipeline shape.
+     */
+    private function typedCutoff(Site $site, string $phase): ?int
+    {
+        $orders = $site->deploySteps
+            ->where('phase', $phase)
+            ->where('step_type', '!=', SiteDeployStep::TYPE_CUSTOM)
+            ->pluck('sort_order');
+
+        return $orders->isEmpty() ? null : (int) $orders->max();
     }
 
     /**
@@ -115,11 +140,13 @@ class DeployScriptComposer
 
     /**
      * Persist the text blocks as exactly one TYPE_CUSTOM step per phase, WITHOUT
-     * destroying structure: only the existing freeform custom step(s) in each
-     * phase are replaced — typed steps and hooks authored in the visual builder
-     * are left untouched. The custom blob sorts after any typed steps so deps
-     * install first, then your commands. An empty block clears that phase's
-     * custom step.
+     * destroying structure: only the *trailing* freeform custom step(s) — the
+     * ones after the last typed step — are replaced. Typed steps, hooks, and
+     * custom steps pinned before a typed step (e.g. a pre-migrate DB snapshot a
+     * safety preset inserts ahead of `migrate`) are left exactly where they are,
+     * so saving the text editor can never yank such a command past its
+     * migration. The blob sorts after every surviving step. An empty block
+     * clears only the phase's trailing custom step.
      *
      * @param  array<string, string>  $scripts  phase => script text
      */
@@ -128,18 +155,27 @@ class DeployScriptComposer
         $pipeline = app(SiteDeployPipelineManager::class)->ensureDefaultPipeline($site);
 
         foreach (self::PHASES as $phase) {
-            // Replace only the freeform portion; preserve typed steps + hooks.
-            $pipeline->steps()
+            // Replace ONLY the trailing freeform portion (custom steps after the
+            // last typed step); preserve typed steps, hooks, and pinned customs.
+            $typedMax = $pipeline->steps()
                 ->where('phase', $phase)
-                ->where('step_type', SiteDeployStep::TYPE_CUSTOM)
-                ->delete();
+                ->where('step_type', '!=', SiteDeployStep::TYPE_CUSTOM)
+                ->max('sort_order');
+
+            $trailing = $pipeline->steps()
+                ->where('phase', $phase)
+                ->where('step_type', SiteDeployStep::TYPE_CUSTOM);
+            if ($typedMax !== null) {
+                $trailing->where('sort_order', '>', $typedMax);
+            }
+            $trailing->delete();
 
             $text = trim((string) ($scripts[$phase] ?? ''));
             if ($text === '') {
                 continue;
             }
 
-            // Run the custom blob after any surviving typed steps in this phase.
+            // Run the custom blob after every surviving step in this phase.
             $maxOrder = (int) $pipeline->steps()->where('phase', $phase)->max('sort_order');
 
             $pipeline->steps()->create([

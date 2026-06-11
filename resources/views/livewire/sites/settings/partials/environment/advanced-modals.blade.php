@@ -82,7 +82,7 @@
             <form wire:submit="saveFixedEnvVar" id="fix-env-var-form" class="space-y-3" wire:key="fix-field-{{ md5($fixKey) }}">
                 <div x-data="{ showValue: true }">
                     <label class="mb-1 flex items-center justify-between text-sm font-medium text-brand-ink" for="fixing_env_value">
-                        <span>{{ __('Value') }}@if ($fixHint['type'] === 'bool')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(true / false)') }}</span>@elseif ($fixHint['type'] === 'enum')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(pick one)') }}</span>@endif</span>
+                        <span>{{ __('Value') }}@if ($fixHint['type'] === 'bool')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(true / false)') }}</span>@elseif ($fixHint['type'] === 'enum')<span class="ml-1 font-normal text-[11px] text-brand-mist">{{ __('(pick or type)') }}</span>@endif</span>
                         @if ($fixHint['type'] === 'text')
                             <button type="button" class="text-xs font-medium text-brand-sage hover:underline" @click="showValue = !showValue">
                                 <span x-show="!showValue">{{ __('Show') }}</span>
@@ -90,26 +90,7 @@
                             </button>
                         @endif
                     </label>
-                    @if ($fixHint['type'] !== 'text')
-                        <select
-                            id="fixing_env_value"
-                            wire:model="fixing_env_value"
-                            class="block w-full rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-sm text-brand-ink"
-                        >
-                            @foreach ($fixHint['options'] as $opt)
-                                <option value="{{ $opt }}">{{ $opt }}</option>
-                            @endforeach
-                        </select>
-                    @else
-                        <input
-                            id="fixing_env_value"
-                            wire:model="fixing_env_value"
-                            x-bind:type="showValue ? 'text' : 'password'"
-                            autocomplete="off"
-                            spellcheck="false"
-                            class="block w-full rounded-xl border border-brand-ink/15 bg-brand-cream/50 px-3 py-2 font-mono text-sm text-brand-ink"
-                        />
-                    @endif
+                    @include('livewire.sites.settings.partials.environment._value-input', ['hint' => $fixHint, 'model' => 'fixing_env_value', 'id' => 'fixing_env_value'])
                     <x-input-error :messages="$errors->get('fixing_env_value')" class="mt-1" />
                 </div>
                 @if ($fixSuggestion !== null)

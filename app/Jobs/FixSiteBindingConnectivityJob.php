@@ -101,7 +101,31 @@ class FixSiteBindingConnectivityJob implements ShouldQueue
                 $backend->name,
             ), 'fix');
 
-            // 2. Ensure the consumer is on the backend's private network — auto-attach if not.
+            // Same-box short-circuit: when the resource lives on the SAME server as
+            // the site, there is no network to cross — it must be reached over
+            // loopback. A stored private-IP host (e.g. 10.x saved at provision) is
+            // not bound by the engine and reads as unreachable. Repoint to
+            // 127.0.0.1 and re-probe; no private network, no firewall, no
+            // provider-specific network attach. This is the common "local database"
+            // case and must never fall through to the cross-network path below.
+            if ((string) $backend->id === (string) $consumer->id) {
+                $hostKey = $binding->type === 'database' ? 'DB_HOST' : 'REDIS_HOST';
+                $env = $binding->connectionEnv();
+                $env[$hostKey] = '127.0.0.1';
+                $binding->forceFill(['injected_env' => $env, 'last_error' => null])->save();
+
+                $emit->success(sprintf(
+                    '%s is co-located with %s — repointed %s to 127.0.0.1 (loopback). Re-probing…',
+                    $target->name ?: $target->engine, $consumer->name, $hostKey,
+                ), 'fix');
+
+                $this->reprobe($site, $binding);
+                $this->finish(true);
+
+                return;
+            }
+
+            // 2. Ensure the consumer is on the backend's private network.
             $backendNet = $this->resolveNetwork($backend);
             $emit->info($backendNet !== null
                 ? sprintf('Backend private network: “%s” (Hetzner #%s, range %s).', $backendNet->name, $backendNet->hetznerNetworkId() ?: '—', $backendNet->ip_range)
@@ -120,31 +144,21 @@ class FixSiteBindingConnectivityJob implements ShouldQueue
             );
             $emit->info($onSameNet
                 ? 'Consumer and backend share a private network — proceeding to open access.'
-                : 'Consumer is NOT on the backend network — will attempt to attach it.', 'fix');
+                : 'Consumer and backend are NOT on a shared private network.', 'fix');
 
+            // Cross-box without a shared private network: do NOT auto-attach one.
+            // Joining a server to a private network is a deliberate topology change,
+            // it's provider-specific (DigitalOcean VPC vs Hetzner network vs …), and
+            // silently bridging two boxes that the operator didn't put on the same
+            // network is exactly the isolation we must preserve. Warn and stop —
+            // private connectivity requires an explicit shared network, otherwise the
+            // resource has to be reached publicly.
             if (! $onSameNet) {
-                if ($backendNet === null || ! $backendNet->hetznerNetworkId()) {
-                    $emit->warn(sprintf('Couldn’t resolve a Hetzner network for %s to attach %s to — attach it on the network page.', $backend->name, $consumer->name), 'fix');
-                    $this->finish(false);
-
-                    return;
-                }
-                // Overlap guard: refuse if the consumer is on a DIFFERENT network
-                // whose range overlaps — a second same-range interface makes routing
-                // ambiguous and wouldn't actually fix reachability.
-                $consumerNet = $this->resolveNetwork($consumer);
-                if ($consumerNet !== null && (string) $consumerNet->id !== (string) $backendNet->id
-                    && $this->rangesOverlap((string) $consumerNet->ip_range, (string) $backendNet->ip_range)) {
-                    $emit->error(sprintf('%s is on “%s” (%s), which overlaps “%s” (%s) — attaching would make routing ambiguous. Consolidate both servers onto one network instead.', $consumer->name, $consumerNet->name, $consumerNet->ip_range, $backendNet->name, $backendNet->ip_range), 'fix');
-                    $this->finish(false);
-
-                    return;
-                }
-
-                $emit->step('fix', sprintf('Attaching %s to “%s” …', $consumer->name, $backendNet->name));
-                AttachServerToNetworkJob::dispatch((string) $consumer->id, $backendNet->hetznerNetworkId(), (string) $backendNet->id);
-                $emit->success(sprintf('Attaching %s to “%s” — its private IP lands in ~30s. Re-run “Fix connectivity” once it shows to open access + re-probe.', $consumer->name, $backendNet->name), 'fix');
-                $this->finish(true);
+                $emit->warn(sprintf(
+                    '%s and %s aren’t on a shared private network, so %s can’t reach it over a private IP. dply won’t auto-attach a network — put both servers on the same private network from the network page, or expose the resource publicly. If the database actually lives on %s, re-point this binding to it instead (it’ll then use loopback).',
+                    $consumer->name, $backend->name, $consumer->name, $consumer->name,
+                ), 'fix');
+                $this->finish(false);
 
                 return;
             }
@@ -168,15 +182,7 @@ class FixSiteBindingConnectivityJob implements ShouldQueue
 
             // 4. Re-probe (its own console action so the badge re-evaluates).
             $emit->step('fix', sprintf('Re-testing %s → %s:%d …', $consumer->name, $backendPriv, $port));
-            $probe = ConsoleAction::query()->create([
-                'subject_type' => $consumer->getMorphClass(),
-                'subject_id' => $consumer->getKey(),
-                'kind' => 'binding_validate',
-                'status' => ConsoleAction::STATUS_QUEUED,
-                'user_id' => $this->userId,
-                'output' => ['v' => (int) config('console_actions.current_version', 1), 'lines' => []],
-            ]);
-            ValidateBindingConnectivityJob::dispatch((string) $probe->id, (string) $site->id, (string) $binding->id);
+            $this->reprobe($site, $binding);
 
             $emit->success(sprintf('Exposed %s on %s to %s and re-probing — the badge updates shortly.', $label, $backend->name, $cidr), 'fix');
             $this->finish(true);
@@ -210,33 +216,23 @@ class FixSiteBindingConnectivityJob implements ShouldQueue
         return PrivateNetwork::query()->whereHas('servers', fn ($q) => $q->whereKey($server->id))->first();
     }
 
-    /** Whether two IPv4 CIDR ranges intersect (overlap → ambiguous routing). */
-    private function rangesOverlap(string $a, string $b): bool
+    /** Queue a fresh connectivity probe so the binding's reachable badge re-evaluates. */
+    private function reprobe(Site $site, SiteBinding $binding): void
     {
-        [$an, $ab] = $this->cidrBounds($a);
-        [$bn, $bb] = $this->cidrBounds($b);
-        if ($an === null || $bn === null) {
-            return false;
+        $consumer = $site->server;
+        if ($consumer === null) {
+            return;
         }
 
-        return $an <= $bb && $bn <= $ab;
-    }
-
-    /**
-     * @return array{0: ?int, 1: ?int}  [network address, broadcast address] or [null, null]
-     */
-    private function cidrBounds(string $cidr): array
-    {
-        $parts = explode('/', trim($cidr));
-        $ip = ip2long($parts[0] ?? '');
-        if ($ip === false) {
-            return [null, null];
-        }
-        $bits = isset($parts[1]) ? max(0, min(32, (int) $parts[1])) : 32;
-        $mask = $bits === 0 ? 0 : ((~((1 << (32 - $bits)) - 1)) & 0xFFFFFFFF);
-        $net = $ip & $mask;
-
-        return [$net, $net | ((~$mask) & 0xFFFFFFFF)];
+        $probe = ConsoleAction::query()->create([
+            'subject_type' => $consumer->getMorphClass(),
+            'subject_id' => $consumer->getKey(),
+            'kind' => 'binding_validate',
+            'status' => ConsoleAction::STATUS_QUEUED,
+            'user_id' => $this->userId,
+            'output' => ['v' => (int) config('console_actions.current_version', 1), 'lines' => []],
+        ]);
+        ValidateBindingConnectivityJob::dispatch((string) $probe->id, (string) $site->id, (string) $binding->id);
     }
 
     private function resolveTarget(SiteBinding $binding): ServerDatabase|ServerCacheService|null

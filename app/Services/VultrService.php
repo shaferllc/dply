@@ -155,6 +155,43 @@ class VultrService
     }
 
     /**
+     * The id of the VPC the instance is attached to (Vultr instances are NOT on a
+     * private network by default — this is null unless one was attached). The id
+     * is the identity used to record the instance's private network.
+     */
+    public static function getInstanceVpcId(array $instance): ?string
+    {
+        foreach ($instance['vpcs'] ?? [] as $vpc) {
+            $id = is_array($vpc) ? ($vpc['id'] ?? null) : null;
+            if (is_string($id) && trim($id) !== '') {
+                return trim($id);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Best-effort CIDR for the attached VPC (subnet + mask). Null when the mask
+     * isn't present — recording by VPC id alone still enables peering.
+     */
+    public static function getInstanceVpcRange(array $instance): ?string
+    {
+        foreach ($instance['vpcs'] ?? [] as $vpc) {
+            if (! is_array($vpc)) {
+                continue;
+            }
+            $subnet = trim((string) ($vpc['subnet'] ?? ''));
+            $mask = (int) ($vpc['subnet_size'] ?? $vpc['mask'] ?? 0);
+            if ($subnet !== '' && $mask > 0 && $mask <= 32) {
+                return $subnet.'/'.$mask;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Destroy (delete) an instance by ID.
      */
     public function destroyInstance(string $id): void

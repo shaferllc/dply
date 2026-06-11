@@ -100,6 +100,35 @@
             <x-input-label for="binding_mail_key" :value="__('Resend API key')" />
             <x-text-input id="binding_mail_key" type="password" wire:model="bindingForm.key" class="mt-1 block w-full font-mono text-sm" placeholder="re_…" />
         </div>
+    @elseif ($mailProvider === 'sendgrid')
+        <div>
+            <x-input-label for="binding_mail_sgkey" :value="__('SendGrid API key')" />
+            <x-text-input id="binding_mail_sgkey" type="password" wire:model="bindingForm.api_key" class="mt-1 block w-full font-mono text-sm" placeholder="SG.…" />
+        </div>
+    @elseif ($mailProvider === 'cloudflare')
+        <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+                <x-input-label for="binding_mail_cfacct" :value="__('Account ID')" />
+                <x-text-input id="binding_mail_cfacct" wire:model="bindingForm.account_id" class="mt-1 block w-full font-mono text-sm" />
+            </div>
+            <div>
+                <x-input-label for="binding_mail_cfkey" :value="__('API key')" />
+                <x-text-input id="binding_mail_cfkey" type="password" wire:model="bindingForm.key" class="mt-1 block w-full font-mono text-sm" />
+            </div>
+        </div>
+    @endif
+
+    @if (in_array($mailProvider, ['sendgrid', 'cloudflare'], true))
+        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+            <p class="font-semibold">{{ __('One-time app change required') }}</p>
+            <p class="mt-1">
+                @if ($mailProvider === 'cloudflare')
+                    {{ __("Laravel's default config/mail.php doesn't ship a cloudflare mailer. Add a 'cloudflare' => ['transport' => 'cloudflare'] entry to its mailers array and a 'cloudflare' => ['account_id' => env('CLOUDFLARE_ACCOUNT_ID'), 'key' => env('CLOUDFLARE_KEY')] block to config/services.php.") }}
+                @else
+                    {{ __("SendGrid isn't a built-in Laravel mailer. Register it once (e.g. Mail::extend('sendgrid', …) using Symfony's SendgridTransportFactory with SENDGRID_API_KEY) so MAIL_MAILER=sendgrid resolves.") }}
+                @endif
+            </p>
+        </div>
     @endif
 
     @if ($mailPackage)

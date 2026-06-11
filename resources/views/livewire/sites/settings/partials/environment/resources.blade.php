@@ -25,6 +25,13 @@
             'storage' => __('Object storage'),
             'logging' => __('Logging'),
             'mail' => __('Mail'),
+            'error_tracking' => __('Error tracking'),
+            'ai' => __('AI / LLM'),
+            'captcha' => __('CAPTCHA'),
+            'sms' => __('SMS / push'),
+            'search' => __('Search'),
+            'payments' => __('Payments'),
+            'oauth' => __('OAuth login'),
             'scheduler' => __('Scheduler'),
             'workers' => __('Workers'),
             'publication' => __('Publication'),
@@ -35,7 +42,7 @@
         // card carries only the runtime resources that don't map to env vars.
         $resourceBindings = array_values(array_filter(
             $siteBindings,
-            fn ($b) => ! in_array($b->type, ['database', 'redis', 'queue', 'cache', 'session', 'storage', 'logging', 'mail', 'broadcasting'], true),
+            fn ($b) => ! in_array($b->type, ['database', 'redis', 'queue', 'cache', 'session', 'storage', 'logging', 'mail', 'broadcasting', 'error_tracking', 'ai', 'captcha', 'sms', 'search', 'payments', 'oauth'], true),
         ));
     @endphp
     {{-- $bindingModalOnly: the Resources hub includes this partial solely to
@@ -136,7 +143,7 @@
     <x-modal name="site-binding-modal" maxWidth="2xl" overlayClass="bg-brand-ink/40">
         @php $bindingModalLabel = $bindingTypeLabels[$bindingModalType] ?? str($bindingModalType)->replace('_', ' ')->title(); @endphp
         <div class="relative border-b border-brand-ink/10 px-6 py-5">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ $bindingModalMode === 'provision' ? __('Provision new') : (in_array($bindingModalType, ['logging', 'mail', 'broadcasting']) ? __('Configure') : __('Attach existing')) }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ $bindingModalMode === 'provision' ? __('Provision new') : (in_array($bindingModalType, ['logging', 'mail', 'broadcasting', 'error_tracking', 'ai', 'captcha', 'sms', 'search', 'payments', 'oauth']) ? __('Configure') : __('Attach existing')) }}</p>
             <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ $bindingModalLabel ?: __('Binding') }}</h2>
             <button type="button" x-on:click="$dispatch('close')" class="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist transition-colors hover:bg-brand-sand/40 hover:text-brand-ink focus:outline-none focus:ring-2 focus:ring-brand-sage/40" aria-label="{{ __('Close') }}">
                 <x-heroicon-o-x-mark class="h-5 w-5" />
@@ -193,12 +200,14 @@
                 {{-- Primary database --}}
                 <div>
                     <x-input-label for="binding_db_target" :value="__('Database')" />
-                    <select id="binding_db_target" wire:model.live="bindingForm.target_id" class="dply-input">
-                        <option value="">{{ __('Choose a database…') }}</option>
-                        @foreach ($bindingTargets as $target)
-                            <option value="{{ $target['id'] }}">{{ $target['label'] }}</option>
-                        @endforeach
-                    </select>
+                    <x-binding-target-select
+                        id="binding_db_target"
+                        model="bindingForm.target_id"
+                        :live="true"
+                        :targets="$bindingTargets"
+                        :selected="$bindingForm['target_id'] ?? ''"
+                        :placeholder="__('Choose a database…')"
+                    />
                     @if ($bindingTargets === [])
                         <p class="mt-2 text-xs text-brand-moss">{{ __('No reachable databases yet. Create one on this server, or add a server to this private network.') }}</p>
                         <button type="button" wire:click="openBindingModal('database', 'provision')" class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
@@ -206,7 +215,7 @@
                             {{ __('Provision new database') }}
                         </button>
                     @else
-                        <p class="mt-2 text-xs text-brand-moss">{{ __('Lists databases on this server and on peers in the same private network. Injects DATABASE_URL and DB_* at deploy — peers connect over the private IP, so the database must allow remote access from this server.') }}</p>
+                        <p class="mt-2 text-xs text-brand-moss">{{ __('Grouped by location: services on this server (loopback) and on private-network peers (private IP — adds a network hop and must allow remote access from this server). Each option shows how many other apps already use it; sharing one database/Redis means a shared keyspace, so set a prefix or a separate database. Injects DATABASE_URL and DB_* at deploy.') }}</p>
                     @endif
                 </div>
 
@@ -645,6 +654,165 @@
                         </p>
                     @endif
                 </div>
+            @elseif ($bindingModalType === 'error_tracking')
+                @php $etProvider = (string) ($bindingForm['provider'] ?? 'sentry'); @endphp
+                <div class="space-y-4">
+                    <div>
+                        <x-input-label for="binding_et_provider" :value="__('Provider')" />
+                        <select id="binding_et_provider" wire:model.live="bindingForm.provider" class="dply-input">
+                            <option value="sentry">{{ __('Sentry') }}</option>
+                            <option value="bugsnag">{{ __('Bugsnag') }}</option>
+                            <option value="flare">{{ __('Flare') }}</option>
+                        </select>
+                    </div>
+                    @include('livewire.sites.settings.partials.environment.error-tracking-credential-fields', ['etProvider' => $etProvider])
+                    @php $etPackage = \App\Services\Deploy\SiteBindingManager::ERROR_TRACKING_PACKAGES[$etProvider] ?? null; @endphp
+                    @if ($etPackage)
+                        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                            {{ __('Requires the') }} <code class="font-mono font-semibold">{{ $etPackage }}</code> {{ __('package. Add it to your') }} <code class="font-mono font-semibold">composer.json</code> {{ __('before deploying.') }}
+                        </div>
+                    @endif
+                    <p class="text-xs text-brand-moss">
+                        @if ($etProvider === 'sentry')
+                            {{ __('Injects SENTRY_LARAVEL_DSN (and SENTRY_TRACES_SAMPLE_RATE when set) at deploy.') }}
+                        @elseif ($etProvider === 'bugsnag')
+                            {{ __('Injects BUGSNAG_API_KEY at deploy.') }}
+                        @elseif ($etProvider === 'flare')
+                            {{ __('Injects FLARE_KEY at deploy. Flare ships with Laravel via spatie/laravel-ignition.') }}
+                        @endif
+                    </p>
+                </div>
+            @elseif ($bindingModalType === 'ai')
+                @php $aiProvider = (string) ($bindingForm['provider'] ?? 'openai'); @endphp
+                <div class="space-y-4">
+                    <div>
+                        <x-input-label for="binding_ai_provider" :value="__('Provider')" />
+                        <select id="binding_ai_provider" wire:model.live="bindingForm.provider" class="dply-input">
+                            <option value="openai">{{ __('OpenAI') }}</option>
+                            <option value="anthropic">{{ __('Anthropic') }}</option>
+                            <option value="gemini">{{ __('Google Gemini') }}</option>
+                            <option value="groq">{{ __('Groq') }}</option>
+                            <option value="mistral">{{ __('Mistral') }}</option>
+                        </select>
+                    </div>
+                    @include('livewire.sites.settings.partials.environment.ai-credential-fields', ['aiProvider' => $aiProvider])
+                    <p class="text-xs text-brand-moss">
+                        {{ __('Injects') }} <code class="font-mono">{{ \App\Services\Deploy\SiteBindingManager::AI_KEY_ENV[$aiProvider] ?? 'OPENAI_API_KEY' }}</code>
+                        @if ($aiProvider === 'openai') {{ __('(and OPENAI_ORGANIZATION when set)') }} @endif
+                        {{ __('at deploy.') }}
+                    </p>
+                </div>
+            @elseif ($bindingModalType === 'captcha')
+                @php $captchaProvider = (string) ($bindingForm['provider'] ?? 'turnstile'); @endphp
+                <div class="space-y-4">
+                    <div>
+                        <x-input-label for="binding_captcha_provider" :value="__('Provider')" />
+                        <select id="binding_captcha_provider" wire:model.live="bindingForm.provider" class="dply-input">
+                            <option value="turnstile">{{ __('Cloudflare Turnstile') }}</option>
+                            <option value="recaptcha">{{ __('Google reCAPTCHA') }}</option>
+                            <option value="hcaptcha">{{ __('hCaptcha') }}</option>
+                        </select>
+                    </div>
+                    @include('livewire.sites.settings.partials.environment.captcha-credential-fields', ['captchaProvider' => $captchaProvider])
+                    <p class="text-xs text-brand-moss">{{ __('Injects the site key + secret, plus a VITE_ mirror of the public site key for the browser bundle. The secret stays server-only.') }}</p>
+                </div>
+            @elseif ($bindingModalType === 'sms')
+                @php $smsProvider = (string) ($bindingForm['provider'] ?? 'twilio'); @endphp
+                <div class="space-y-4">
+                    <div>
+                        <x-input-label for="binding_sms_provider" :value="__('Provider')" />
+                        <select id="binding_sms_provider" wire:model.live="bindingForm.provider" class="dply-input">
+                            <option value="twilio">{{ __('Twilio') }}</option>
+                            <option value="vonage">{{ __('Vonage') }}</option>
+                            <option value="fcm">{{ __('Firebase Cloud Messaging') }}</option>
+                        </select>
+                    </div>
+                    @include('livewire.sites.settings.partials.environment.sms-credential-fields', ['smsProvider' => $smsProvider])
+                    <p class="text-xs text-brand-moss">
+                        @if ($smsProvider === 'twilio')
+                            {{ __('Injects TWILIO_SID, TWILIO_AUTH_TOKEN and TWILIO_FROM at deploy.') }}
+                        @elseif ($smsProvider === 'vonage')
+                            {{ __('Injects VONAGE_KEY, VONAGE_SECRET and VONAGE_SMS_FROM at deploy.') }}
+                        @elseif ($smsProvider === 'fcm')
+                            {{ __('Injects FCM_SERVER_KEY at deploy.') }}
+                        @endif
+                    </p>
+                </div>
+            @elseif ($bindingModalType === 'search')
+                @php $searchProvider = (string) ($bindingForm['provider'] ?? 'meilisearch'); @endphp
+                <div class="space-y-4">
+                    <div>
+                        <x-input-label for="binding_search_provider" :value="__('Driver')" />
+                        <select id="binding_search_provider" wire:model.live="bindingForm.provider" class="dply-input">
+                            <option value="meilisearch">{{ __('Meilisearch') }}</option>
+                            <option value="typesense">{{ __('Typesense') }}</option>
+                            <option value="algolia">{{ __('Algolia') }}</option>
+                        </select>
+                    </div>
+                    @include('livewire.sites.settings.partials.environment.search-credential-fields', ['searchProvider' => $searchProvider])
+                    @php $searchPackage = \App\Services\Deploy\SiteBindingManager::SEARCH_PACKAGES[$searchProvider] ?? null; @endphp
+                    <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                        {{ __('Requires') }} <code class="font-mono font-semibold">laravel/scout</code>@if ($searchPackage) {{ __(' and ') }}<code class="font-mono font-semibold">{{ $searchPackage }}</code>@endif. {{ __('Add to composer.json before deploying.') }}
+                    </div>
+                    @if (in_array($searchProvider, ['meilisearch', 'typesense'], true))
+                        <p class="text-xs text-brand-moss">{{ __('Point this at a Meilisearch/Typesense endpoint you run (on this server\'s loopback/private network, or hosted). On-server provisioning is coming soon.') }}</p>
+                    @endif
+                </div>
+            @elseif ($bindingModalType === 'payments')
+                @php
+                    $paymentsProvider = (string) ($bindingForm['provider'] ?? 'stripe');
+                    $webhookPreview = $this->paymentsWebhookPreview($paymentsProvider);
+                @endphp
+                <div class="space-y-4">
+                    <div>
+                        <x-input-label for="binding_payments_provider" :value="__('Provider')" />
+                        <select id="binding_payments_provider" wire:model.live="bindingForm.provider" class="dply-input">
+                            <option value="stripe">{{ __('Stripe') }}</option>
+                            <option value="paddle">{{ __('Paddle') }}</option>
+                        </select>
+                    </div>
+                    @include('livewire.sites.settings.partials.environment.payments-credential-fields', ['paymentsProvider' => $paymentsProvider])
+                    @if ($webhookPreview)
+                        <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-4 py-3 text-xs text-brand-moss">
+                            <p class="font-semibold text-brand-ink">{{ __('Webhook endpoint') }}</p>
+                            <p class="mt-1">{{ __('Register this URL in your :provider dashboard:', ['provider' => ucfirst($paymentsProvider)]) }}</p>
+                            <code class="mt-1 block break-all font-mono text-brand-ink">{{ $webhookPreview }}</code>
+                        </div>
+                    @else
+                        <p class="text-xs text-amber-700">{{ __('Add a primary domain to this site to get a webhook endpoint URL.') }}</p>
+                    @endif
+                    <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                        {{ __('Requires') }} <code class="font-mono font-semibold">laravel/cashier{{ $paymentsProvider === 'paddle' ? '-paddle' : '' }}</code>. {{ __('Add to composer.json before deploying.') }}
+                    </div>
+                </div>
+            @elseif ($bindingModalType === 'oauth')
+                @php
+                    $oauthProvider = (string) ($bindingForm['provider'] ?? 'github');
+                    $redirectPreview = $this->oauthRedirectPreview($oauthProvider);
+                @endphp
+                <div class="space-y-4">
+                    <div>
+                        <x-input-label for="binding_oauth_provider" :value="__('Provider')" />
+                        <select id="binding_oauth_provider" wire:model.live="bindingForm.provider" class="dply-input">
+                            <option value="github">{{ __('GitHub') }}</option>
+                            <option value="google">{{ __('Google') }}</option>
+                            <option value="facebook">{{ __('Facebook') }}</option>
+                            <option value="gitlab">{{ __('GitLab') }}</option>
+                            <option value="linkedin">{{ __('LinkedIn') }}</option>
+                        </select>
+                    </div>
+                    @include('livewire.sites.settings.partials.environment.oauth-credential-fields', ['oauthProvider' => $oauthProvider])
+                    <div class="rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-4 py-3 text-xs text-brand-moss">
+                        <p class="font-semibold text-brand-ink">{{ __('Redirect / callback URL') }}</p>
+                        @if ($redirectPreview)
+                            <p class="mt-1">{{ __('Auto-filled from this site — paste it into the provider\'s OAuth app:') }}</p>
+                            <code class="mt-1 block break-all font-mono text-brand-ink">{{ $redirectPreview }}</code>
+                        @else
+                            <p class="mt-1 text-amber-700">{{ __('Add a primary domain (or enter a redirect URL below) so the callback URL can be derived.') }}</p>
+                        @endif
+                    </div>
+                    <p class="text-xs text-brand-moss">{{ __('Injects :p_CLIENT_ID, :p_CLIENT_SECRET and :p_REDIRECT_URI at deploy.', ['p' => strtoupper($oauthProvider)]) }}</p>
+                </div>
             @elseif ($bindingModalType === 'redis')
                 @php
                     $existingCacheService = \App\Models\ServerCacheService::query()
@@ -655,12 +823,13 @@
                 @endphp
                 <div>
                     <x-input-label for="binding_redis_target" :value="__('Redis service')" />
-                    <select id="binding_redis_target" wire:model="bindingForm.target_id" class="dply-input">
-                        <option value="">{{ __('Choose a Redis service…') }}</option>
-                        @foreach ($bindingTargets as $target)
-                            <option value="{{ $target['id'] }}">{{ $target['label'] }}</option>
-                        @endforeach
-                    </select>
+                    <x-binding-target-select
+                        id="binding_redis_target"
+                        model="bindingForm.target_id"
+                        :targets="$bindingTargets"
+                        :selected="$bindingForm['target_id'] ?? ''"
+                        :placeholder="__('Choose a Redis service…')"
+                    />
                     @if ($bindingTargets === [])
                         <p class="mt-2 text-xs text-brand-moss">{{ __('No Redis-compatible service is reachable on this server or its private network peers.') }}</p>
                         @if ($existingCacheService === null)
@@ -692,7 +861,7 @@
                             </div>
                         @endif
                     @else
-                        <p class="mt-2 text-xs text-brand-moss">{{ __('Lists Redis-family services on this server and on peers in the same private network. Injects REDIS_HOST / REDIS_PORT / REDIS_CLIENT (plus password and prefix when set) at deploy — peers connect over the private IP.') }}</p>
+                        <p class="mt-2 text-xs text-brand-moss">{{ __('Grouped by location: Redis-family services on this server (loopback) and on private-network peers (private IP). Each option shows how many other apps already use it — sharing one instance means a shared keyspace, so set a prefix to isolate this app. Injects REDIS_HOST / REDIS_PORT / REDIS_CLIENT (plus password and prefix when set) at deploy.') }}</p>
                         @if ($existingCacheService !== null && in_array($existingCacheService->engine, ['redis', 'valkey'], true))
                             <div class="mt-3 border-t border-brand-ink/10 pt-3">
                                 <p class="text-[11px] text-brand-mist">{{ __('Want a different engine?') }}</p>
@@ -724,6 +893,8 @@
                             <option value="postmark">{{ __('Postmark') }}</option>
                             <option value="ses">{{ __('Amazon SES') }}</option>
                             <option value="resend">{{ __('Resend') }}</option>
+                            <option value="sendgrid">{{ __('SendGrid') }}</option>
+                            <option value="cloudflare">{{ __('Cloudflare') }}</option>
                             <option value="log">{{ __('Log (no delivery — dev/staging)') }}</option>
                             <option value="failover">{{ __('Failover (primary + backups)') }}</option>
                             <option value="roundrobin">{{ __('Round-robin (load balance)') }}</option>
@@ -787,6 +958,10 @@
                                 {{ __('Injects MAIL_MAILER=ses, the AWS_* credentials, and the from-address at deploy.') }}
                             @elseif ($mailProvider === 'resend')
                                 {{ __('Injects MAIL_MAILER=resend, RESEND_KEY, and the from-address at deploy.') }}
+                            @elseif ($mailProvider === 'sendgrid')
+                                {{ __('Injects MAIL_MAILER=sendgrid, SENDGRID_API_KEY, and the from-address at deploy.') }}
+                            @elseif ($mailProvider === 'cloudflare')
+                                {{ __('Injects MAIL_MAILER=cloudflare, CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_KEY, and the from-address at deploy.') }}
                             @endif
                         </p>
                     @else
@@ -836,12 +1011,13 @@
                         @if (! $bcProvision)
                             <div>
                                 <x-input-label for="binding_bc_app" :value="__('Broadcasting app')" />
-                                <select id="binding_bc_app" wire:model="bindingForm.realtime_app_id" class="dply-input">
-                                    <option value="">{{ __('Choose an app…') }}</option>
-                                    @foreach ($bindingTargets as $target)
-                                        <option value="{{ $target['id'] }}">{{ $target['label'] }}</option>
-                                    @endforeach
-                                </select>
+                                <x-binding-target-select
+                                    id="binding_bc_app"
+                                    model="bindingForm.realtime_app_id"
+                                    :targets="$bindingTargets"
+                                    :selected="$bindingForm['realtime_app_id'] ?? ''"
+                                    :placeholder="__('Choose an app…')"
+                                />
                                 @if ($bindingTargets === [])
                                     <p class="mt-2 text-xs text-brand-moss">{{ __('No managed broadcasting apps yet — provision a new one.') }}</p>
                                     <button type="button" wire:click="$set('bindingForm.provision', true)" class="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-xs font-semibold text-brand-cream shadow-sm hover:bg-brand-forest/90">
@@ -849,7 +1025,7 @@
                                         {{ __('Provision new app') }}
                                     </button>
                                 @else
-                                    <p class="mt-2 text-xs text-brand-moss">{{ __('Attaching an existing app reuses it (and its existing charge) across sites. Injects BROADCAST_CONNECTION=pusher and the PUSHER_* + VITE_PUSHER_* variables at deploy.') }}</p>
+                                    <p class="mt-2 text-xs text-brand-moss">{{ __('Attaching an existing app reuses it (and its existing charge) across sites — each option shows how many other apps already share it. Injects BROADCAST_CONNECTION=pusher and the PUSHER_* + VITE_PUSHER_* variables at deploy.') }}</p>
                                 @endif
                             </div>
                         @else

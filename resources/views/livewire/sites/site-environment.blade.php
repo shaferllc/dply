@@ -73,4 +73,9 @@
             </main>
         </div>
     </div>
+
+    {{-- Required by the env partial's confirm-driven actions (Remove variable,
+         Sync from server, …): without it, clicking Remove flips the confirm
+         state but no dialog renders, so the removal never gets confirmed. --}}
+    @include('livewire.partials.confirm-action-modal')
 </div>

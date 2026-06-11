@@ -12,6 +12,8 @@ class SiteEnvPusher
         protected DotEnvFileParser $parser,
         protected DotEnvFileWriter $writer,
         protected SiteEnvWriteGuard $guard,
+        protected SecretResidencyResolver $residency,
+        protected OnBoxSecretManifestBuilder $onBox,
     ) {}
 
     /**
@@ -36,7 +38,7 @@ class SiteEnvPusher
      *   has none) BEFORE build/release steps run — otherwise artisan reads
      *   Laravel's defaults (pgsql 127.0.0.1:5432) and migrations fail.
      */
-    public function push(Site $site, ?string $overridePath = null): string
+    public function push(Site $site, ?string $overridePath = null, ?string $ephemeralIdentity = null): string
     {
         $server = $site->server;
         if (! $server->hostCapabilities()->supportsEnvPushToHost()) {
@@ -64,6 +66,18 @@ class SiteEnvPusher
             ? array_merge($bindingEnv, $parsed['variables'])
             : $parsed['variables'];
 
+        // Resolve any non-resident secrets (escrowed / external references) to
+        // their real values just-in-time. The loose blob only carries
+        // `${dply:secret:<id>}` placeholders for these keys; this swaps each for
+        // the resolved value so the app receives the real secret. No-op for the
+        // common case — a site with no residency rows has no placeholders.
+        // Fall back to a job-scoped identity (set by the deploy job from a pulled
+        // cache token) when the caller didn't pass one explicitly — this is how a
+        // customer-held key is decrypted during a deploy, not just a manual push.
+        $ephemeralIdentity ??= app(\App\Services\Secrets\EphemeralSecretIdentityContext::class)->get();
+
+        $mergedVars = $this->residency->resolve($site, $mergedVars, $ephemeralIdentity);
+
         // Test it's valid first. Only on real operator pushes ($overridePath is
         // null) — the deploy-seeding path runs the pipeline's own required-env
         // gate and seeds before the release is built (nothing to live-test).
@@ -74,9 +88,11 @@ class SiteEnvPusher
             $this->guard->assertSafeToWrite($mergedVars);
         }
 
-        // When a binding contributed keys the cache lacks, re-render the file so
-        // they're physically written to the server's .env.
-        if ($bindingEnv !== [] && $mergedVars !== $parsed['variables']) {
+        // Re-render whenever the final map diverges from what we parsed out of
+        // the blob — either a binding contributed keys the cache lacks, or a
+        // residency placeholder was resolved to its real value. The placeholder
+        // text must never reach the server's .env.
+        if ($mergedVars !== $parsed['variables']) {
             $content = $this->writer->render($mergedVars, $parsed['comments']);
         }
 
@@ -86,7 +102,10 @@ class SiteEnvPusher
         $tmp = '/tmp/dply-env-'.Str::lower(Str::random(20));
 
         try {
-            return $this->writeViaTmp($ssh, $site, $content, $tmp, $path, $parent, $validateBeforeWrite, $this->activeAppDir($site));
+            $written = $this->writeViaTmp($ssh, $site, $content, $tmp, $path, $parent, $validateBeforeWrite, $this->activeAppDir($site));
+            $this->resolveOnBoxSecrets($ssh, $site, $written, $mergedVars);
+
+            return $written;
         } finally {
             // Defence-in-depth: the success path rm's $tmp inside the sudo
             // script below, but any throw before that point would otherwise
@@ -186,6 +205,63 @@ class SiteEnvPusher
         }
 
         return $path;
+    }
+
+    /**
+     * Tier 3+ on-box resolution: when the rendered env carries on-box directives
+     * (left by {@see SecretResidencyResolver} only when onbox is enabled — so
+     * this is inert by default), stage the manifest + shim and run the shim to
+     * fetch each value ON THE BOX and rewrite the .env in place. dply never sees
+     * those values.
+     *
+     * GUARDED + UNVALIDATED-ON-LIVE-BOX: directives never appear unless
+     * secret_vault.residency.onbox_enabled is true, so default deploys never
+     * reach this. Enabling on-box is a deliberate step that must be validated on
+     * a real server (the shim needs jq + curl / the AWS CLI present).
+     *
+     * @param  array<string, string>  $mergedVars
+     */
+    private function resolveOnBoxSecrets(SshConnection $ssh, Site $site, string $envPath, array $mergedVars): void
+    {
+        $hasDirective = false;
+        foreach ($mergedVars as $value) {
+            if (is_string($value) && str_contains($value, OnBoxSecretManifestBuilder::DIRECTIVE_PREFIX)) {
+                $hasDirective = true;
+                break;
+            }
+        }
+        if (! $hasDirective) {
+            return;
+        }
+
+        $manifestJson = json_encode($this->onBox->buildFor($site), JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        $manifestTmp = '/tmp/dply-onbox-'.Str::lower(Str::random(20)).'.json';
+        $shimTmp = '/tmp/dply-resolve-secrets-'.Str::lower(Str::random(12)).'.sh';
+        $shim = (string) file_get_contents(resource_path('secrets/dply-resolve-secrets.sh'));
+
+        try {
+            $ssh->putFile($manifestTmp, $manifestJson);
+            $ssh->putFile($shimTmp, $shim);
+
+            // The shim rewrites $envPath in place and deletes the manifest itself.
+            $script = sprintf(
+                'set -e; chmod 600 %s; chmod +x %s; sudo -n bash %s %s %s',
+                escapeshellarg($manifestTmp),
+                escapeshellarg($shimTmp),
+                escapeshellarg($shimTmp),
+                escapeshellarg($manifestTmp),
+                escapeshellarg($envPath),
+            );
+            $out = $ssh->exec($script, 120);
+            $this->assertExitOk($ssh, $out, 'resolving on-box secrets');
+        } finally {
+            // Best-effort cleanup of the shim + any manifest the shim didn't remove.
+            try {
+                $ssh->exec('rm -f '.escapeshellarg($shimTmp).' '.escapeshellarg($manifestTmp));
+            } catch (\Throwable) {
+                // ignore — cleanup is best-effort
+            }
+        }
     }
 
     /**

@@ -143,6 +143,16 @@
                         {{ __('Server providers') }}
                     </a>
                 @endcan
+                @can('view', $org)
+                    <a
+                        href="{{ route('organizations.secrets', $org) }}"
+                        wire:navigate
+                        @class([$navBase, $link('secrets')])
+                    >
+                        <x-heroicon-o-lock-closed class="{{ $ni }}" aria-hidden="true" />
+                        {{ __('Secrets') }}
+                    </a>
+                @endcan
                 <a
                     href="{{ route('organizations.teams', $org) }}"
                     wire:navigate

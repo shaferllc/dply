@@ -57,6 +57,18 @@ class Sidebar extends Component
 
     public bool $askLoading = false;
 
+    public function mount(): void
+    {
+        // The panel is mounted persistently (hidden) and Alpine reveals it the
+        // instant the user clicks "Documentation" — a tick BEFORE the
+        // docs-sidebar-open event loads a slug. Without seeding a coherent
+        // default here, that first paint renders empty derived state
+        // ($slug='docs-index' but $isIndex=false, no html/summary), which falls
+        // straight through to the "This guide is not available yet" fallback.
+        // Initialise to the index so the first paint is the real index.
+        $this->resetToIndex();
+    }
+
     #[On('docs-sidebar-open')]
     public function open(?string $slug = null, ?string $docRoute = null, ?string $docSlug = null): void
     {

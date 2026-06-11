@@ -16,6 +16,7 @@ use App\Models\SiteDeployment;
 use App\Support\Sites\SiteDeployTimeline;
 use App\Support\Sites\SiteFixers;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
@@ -114,15 +115,6 @@ class DeployControl extends Component
             $lock = Cache::get('site-deploy-active:'.$peer->id);
             $lockStarted = ($lock && ! empty($lock['started_at'])) ? Carbon::parse($lock['started_at']) : null;
 
-            // Just-queued but the worker hasn't recorded a running deployment yet.
-            $startingFresh = $lock !== null && (
-                $latest === null
-                || ($latest->status !== SiteDeployment::STATUS_RUNNING
-                    && ($latest->finished_at === null || $lockStarted === null || $lockStarted->greaterThanOrEqualTo($latest->finished_at)))
-            );
-            $running = $latest?->status === SiteDeployment::STATUS_RUNNING;
-            $inProgress = $running || ($startingFresh && $lockStarted !== null && $lockStarted->greaterThan(now()->subSeconds(90)));
-
             $phases = $latest ? SiteDeployTimeline::forDeployment($peer, $latest) : [];
             $done = 0;
             $current = null;
@@ -134,6 +126,23 @@ class DeployControl extends Component
                 }
             }
 
+            // Every phase has reached a terminal good state (success/skipped) =
+            // the deploy is visibly finished. The worker writes phase_results
+            // before it flips the deployment row to success + sets finished_at,
+            // so without this the "Starting" label and spinner linger for that
+            // whole window (and the lock's 10-min TTL). Treat all-phases-done as
+            // done NOW so the card clears as soon as the work is.
+            $phasesComplete = $phases !== [] && $done === count($phases);
+
+            // Just-queued but the worker hasn't recorded a running deployment yet.
+            $startingFresh = ! $phasesComplete && $lock !== null && (
+                $latest === null
+                || ($latest->status !== SiteDeployment::STATUS_RUNNING
+                    && ($latest->finished_at === null || $lockStarted === null || $lockStarted->greaterThanOrEqualTo($latest->finished_at)))
+            );
+            $running = ! $phasesComplete && $latest?->status === SiteDeployment::STATUS_RUNNING;
+            $inProgress = $running || ($startingFresh && $lockStarted !== null && $lockStarted->greaterThan(now()->subSeconds(90)));
+
             $rows[] = [
                 'id' => (string) $peer->id,
                 'name' => $peer->name,
@@ -141,7 +150,15 @@ class DeployControl extends Component
                 'is_self' => (string) $peer->id === (string) $this->site?->id,
                 'is_worker' => $peer->isWorkerSite(),
                 'latest' => $latest,
-                'status' => $startingFresh ? 'starting' : ($latest?->status ?? 'queued'),
+                'status' => match (true) {
+                    $startingFresh => 'starting',
+                    // All phases done — show the recorded terminal status, or
+                    // 'success' if the row hasn't been finalised yet.
+                    $phasesComplete => ($latest && $latest->status !== SiteDeployment::STATUS_RUNNING)
+                        ? $latest->status
+                        : 'success',
+                    default => $latest?->status ?? 'queued',
+                },
                 'phases' => $phases,
                 'phase_done' => $done,
                 'phase_total' => count($phases),
@@ -174,10 +191,10 @@ class DeployControl extends Component
      * authorises each peer (a partial server:id,name load nulls the policy
      * columns and silently skips every site).
      *
-     * @return \Illuminate\Support\Collection<int, Site>
+     * @return Collection<int, Site>
      */
     #[Computed]
-    public function syncPeers(): \Illuminate\Support\Collection
+    public function syncPeers(): Collection
     {
         if ($this->site === null) {
             return collect();

@@ -248,10 +248,17 @@ class SiteDeployment extends Model
     public function stepClasses(array $step): string
     {
         $skipped = ($step['skipped'] ?? false) === true;
+        $pending = ($step['pending'] ?? false) === true;
         $ok = ($step['ok'] ?? false) === true;
 
         if ($skipped) {
             return 'bg-amber-100 text-amber-900';
+        }
+
+        // A queued step hasn't run yet — keep it neutral so it doesn't read
+        // as a failure (red) before it has had a chance to succeed.
+        if ($pending) {
+            return 'bg-brand-sand/60 text-brand-ink';
         }
 
         return $ok ? 'bg-emerald-100 text-emerald-900' : 'bg-rose-100 text-rose-900';
@@ -265,6 +272,11 @@ class SiteDeployment extends Model
     public function stepGlyph(array $step): string
     {
         if (($step['skipped'] ?? false) === true) {
+            return '·';
+        }
+
+        // Queued steps show a neutral dot rather than the failure cross.
+        if (($step['pending'] ?? false) === true) {
             return '·';
         }
 

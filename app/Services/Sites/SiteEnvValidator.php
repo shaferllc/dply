@@ -228,6 +228,8 @@ class SiteEnvValidator
             'mailgun' => ['MAILGUN_DOMAIN', 'MAILGUN_SECRET'],
             'postmark' => ['POSTMARK_TOKEN'],
             'resend' => ['RESEND_KEY'],
+            'sendgrid' => ['SENDGRID_API_KEY'],
+            'cloudflare' => ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_KEY'],
             'ses' => ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY'],
             default => [],
         };

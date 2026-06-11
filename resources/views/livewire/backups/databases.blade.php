@@ -206,6 +206,43 @@
             @endif
         </section>
 
+        {{-- Quick download (live stream, no S3) --}}
+        @if (! $databases->isEmpty())
+            <section class="mb-8">
+                <div class="mb-4">
+                    <h2 class="text-base font-semibold text-brand-ink">{{ __('Quick download') }}</h2>
+                    <p class="text-xs text-brand-moss mt-0.5">{{ __('Stream a fresh SQL dump straight from the server to your browser — no schedule, no S3. Capped at :cap.', ['cap' => \Illuminate\Support\Number::fileSize((int) config('quick_download.max_bytes', 262_144_000))]) }}</p>
+                </div>
+
+                <div class="dply-card overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-brand-ink/10 bg-brand-sand/20 text-left text-xs font-semibold uppercase tracking-wide text-brand-moss">
+                                    <th class="px-4 py-3 sm:px-6">{{ __('Database') }}</th>
+                                    <th class="px-4 py-3">{{ __('Server') }}</th>
+                                    <th class="px-4 py-3">{{ __('Engine') }}</th>
+                                    <th class="px-4 py-3 text-right">{{ __('Download') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-brand-ink/10">
+                                @foreach ($databases as $database)
+                                    <tr wire:key="qd-db-{{ $database->id }}" class="hover:bg-brand-sand/10">
+                                        <td class="px-4 py-3 sm:px-6 font-medium text-brand-ink">{{ $database->name }}</td>
+                                        <td class="px-4 py-3 text-brand-moss">{{ $database->server?->name ?? '—' }}</td>
+                                        <td class="px-4 py-3 text-brand-moss">{{ \Illuminate\Support\Str::title($database->engine) }}</td>
+                                        <td class="px-4 py-3 text-right">
+                                            <x-quick-download.database-link :server="$database->server" :database="$database" />
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        @endif
+
         {{-- Recent runs --}}
         <section class="mb-8">
             <div class="mb-4">

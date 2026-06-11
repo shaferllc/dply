@@ -216,6 +216,18 @@ class DigitalOceanService
     }
 
     /**
+     * The UUID of the VPC the droplet is attached to. Every droplet belongs to a
+     * VPC — the region's default one when none is specified at create — so this
+     * is the stable identity for recording the droplet's private network.
+     */
+    public static function getDropletVpcUuid(array $droplet): ?string
+    {
+        $uuid = $droplet['vpc_uuid'] ?? null;
+
+        return is_string($uuid) && trim($uuid) !== '' ? trim($uuid) : null;
+    }
+
+    /**
      * Get available regions.
      *
      * @return array<int, array<string, mixed>>
