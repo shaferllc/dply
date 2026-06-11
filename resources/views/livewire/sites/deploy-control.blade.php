@@ -50,6 +50,7 @@
             $syncRows = $this->syncRows;
             $syncConsoleMode = $syncRows !== [];
             $syncBusy = $this->syncInProgress;
+            $syncFinished = $syncConsoleMode && ! $syncBusy;
         @endphp
 
         <div
@@ -320,7 +321,7 @@
                     <div class="flex items-center justify-between border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-4">
                         <div class="min-w-0">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Sync deploy') }}</p>
-                            <p class="truncate text-sm font-semibold text-brand-ink">{{ $syncConsoleMode ? __('Deploying :n sites', ['n' => count($syncRows)]) : __('Deploy together') }}</p>
+                            <p class="truncate text-sm font-semibold text-brand-ink">{{ ! $syncConsoleMode ? __('Deploy together') : ($syncBusy ? __('Deploying :n sites', ['n' => count($syncRows)]) : __('Synced :n sites', ['n' => count($syncRows)])) }}</p>
                         </div>
                         <div class="flex items-center gap-2">
                             @if ($syncConsoleMode)
@@ -416,7 +417,14 @@
                             @if ($syncBusy)
                                 <span class="inline-flex items-center gap-1.5"><x-spinner size="sm" /> {{ __('Deploying — this updates live.') }}</span>
                             @else
-                                {{ __('All synced deploys finished.') }}
+                                <div class="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5">
+                                    <button type="button" wire:click="deployAgain" wire:loading.attr="disabled" wire:target="deployAgain" class="inline-flex items-center gap-1.5 rounded-lg bg-brand-forest px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-brand-forest/90 disabled:opacity-60">
+                                        <x-heroicon-o-arrow-path class="h-3.5 w-3.5" wire:loading.remove wire:target="deployAgain" />
+                                        <x-spinner size="sm" wire:loading wire:target="deployAgain" />
+                                        {{ __('Deploy again') }}
+                                    </button>
+                                    <span>{{ __('All synced deploys finished.') }}</span>
+                                </div>
                             @endif
                         </div>
                     @else

@@ -73,42 +73,30 @@
             </button>
         </div>
     @elseif (! $liveCertsLoaded)
-        {{-- Scanning state: polls for the async job's result, then stops once a
-             result is cached OR the poll budget runs out (pollLiveCerts flips to the
-             timed-out state above), so the panel never spins indefinitely. While it
-             polls it also renders the job's streamed progress log so the operator
-             sees what the sweep is doing in real time. --}}
-        <div class="px-6 py-6 sm:px-7" @if ($liveCertsScanning) wire:poll.{{ $this->liveCertsPollInterval() }}s="pollLiveCerts" @endif>
-            <div class="flex items-center gap-2 text-sm text-brand-moss">
+        {{-- Scanning: poll until the job caches a result (or the budget runs out and
+             pollLiveCerts flips to the timed-out state above). The worker's captured
+             frames are replayed once the result lands (below), so this stays a simple
+             spinner — a ~1.7s scan is too fast to animate via polling anyway. --}}
+        <div class="px-6 py-8 sm:px-7" @if ($liveCertsScanning) wire:poll.{{ $this->liveCertsPollInterval() }}s="pollLiveCerts" @endif>
+            <span class="inline-flex items-center gap-2 text-sm text-brand-moss">
                 <x-spinner class="h-4 w-4" /> {{ __('Scanning certificates on the server…') }}
-            </div>
-            @if (! empty($liveCertsProgress))
-                <div
-                    wire:key="live-certs-log-{{ count($liveCertsProgress) }}"
-                    x-data
-                    x-init="$el.scrollTop = $el.scrollHeight"
-                    class="mt-3 max-h-48 overflow-y-auto rounded-md border border-brand-ink/10 bg-brand-ink/[0.03] px-3 py-2 font-mono text-[11px] leading-relaxed text-brand-ink/80"
-                >
-                    @foreach ($liveCertsProgress as $entry)
-                        <div class="flex gap-2">
-                            <span class="select-none text-brand-mist" aria-hidden="true">›</span>
-                            <span class="break-all">{{ $entry['line'] ?? '' }}</span>
-                        </div>
-                    @endforeach
-                </div>
-            @endif
-        </div>
-    @elseif ($liveCertsUnreadable)
-        <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7">
-            {{ __('Could not run the cert scan over SSH. Check that the deploy user has passwordless sudo for `find` + `openssl`.') }}
-        </div>
-    @elseif (empty($liveCerts))
-        <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7">
-            <x-heroicon-o-shield-check class="mx-auto h-6 w-6 text-brand-mist" aria-hidden="true" />
-            <p class="mt-2">{{ __('No server certificates found under the scanned paths.') }}</p>
+            </span>
         </div>
     @else
-        @php
+        {{-- Replay the worker's captured frames, then fade in the result — so the
+             steps are always visible no matter how fast the scan finished. --}}
+        <x-replay-log :frames="$liveCertsProgress">
+            @if ($liveCertsUnreadable)
+                <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7">
+                    {{ __('Could not run the cert scan over SSH. Check that the deploy user has passwordless sudo for `find` + `openssl`.') }}
+                </div>
+            @elseif (empty($liveCerts))
+                <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7">
+                    <x-heroicon-o-shield-check class="mx-auto h-6 w-6 text-brand-mist" aria-hidden="true" />
+                    <p class="mt-2">{{ __('No server certificates found under the scanned paths.') }}</p>
+                </div>
+            @else
+                @php
             $liveUrgencyCounts = ['expired' => 0, 'danger' => 0, 'warn' => 0, 'ok' => 0, 'unknown' => 0];
             foreach ($liveCerts as $c) {
                 $u = (string) ($c['urgency'] ?? 'unknown');
@@ -192,5 +180,7 @@
                 </tbody>
             </table>
         </div>
+            @endif
+        </x-replay-log>
     @endif
 </section>

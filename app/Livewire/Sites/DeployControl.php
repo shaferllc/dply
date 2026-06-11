@@ -73,6 +73,20 @@ class DeployControl extends Component
         }
     }
 
+    /**
+     * Re-run the exact batch shown in the finished console — one click to ship
+     * the same peers again. deploySelected() reads $syncSelected, so point it at
+     * the current batch and reuse that path (re-dispatch, re-arm polling, etc.).
+     */
+    public function deployAgain(): void
+    {
+        if ($this->syncedSiteIds === []) {
+            return;
+        }
+        $this->syncSelected = $this->syncedSiteIds;
+        $this->deploySelected();
+    }
+
     /** Clear the active sync batch and return the drawer to peer selection. */
     public function newSync(): void
     {

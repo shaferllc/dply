@@ -113,6 +113,10 @@ trait LoadsLiveServerCerts
 
         $cached = $aggregator->cached($this->server);
         if ($cached !== null) {
+            // Capture the complete frame set before resolving — the worker caches
+            // the result only after its final progress line, so this read has them
+            // all — and the panel replays them on completion (see the blade).
+            $this->liveCertsProgress = $aggregator->progress($this->server);
             $this->applyLiveCertResult($cached);
 
             return;
