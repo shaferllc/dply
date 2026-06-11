@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Services\Secrets\AgeEncryptor;
+use App\Services\Secrets\EphemeralSecretIdentityContext;
 use App\Services\Secrets\SecretVault;
 use App\Services\Secrets\Stores\GitOpsRepoVaultStore;
 use App\Services\Secrets\Stores\ObjectStorageVaultStore;
@@ -18,6 +19,10 @@ class SecretVaultServiceProvider extends ServiceProvider
         // The single crypto seam — shared by the platform DR path (SecretVault)
         // and the per-org secret-residency path (OrgSecretKeyManager). Stateless,
         // so a singleton is fine.
+        // Job-scoped holder for a customer-supplied identity (deploy path). One
+        // per container so the deploy job and the env push it triggers share it.
+        $this->app->singleton(EphemeralSecretIdentityContext::class);
+
         $this->app->singleton(AgeEncryptor::class, function (): AgeEncryptor {
             $cfg = (array) config('secret_vault');
 

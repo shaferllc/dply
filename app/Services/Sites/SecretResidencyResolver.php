@@ -102,14 +102,19 @@ class SecretResidencyResolver
             throw new RuntimeException("external secret '{$residency->key}' has no reference.");
         }
 
-        // On-box resolution: dply must NOT fetch — the value is materialized on
-        // the server by the deploy-time shim (PR4). Reaching here means a push
-        // path that doesn't yet stage the directive; fail clearly rather than
-        // silently pull the value into dply.
+        // On-box resolution: dply must NEVER fetch the value. When on-box is
+        // enabled we leave a directive the server's shim rewrites in place (see
+        // SiteEnvPusher::stageOnBoxResolution + dply-resolve-secrets.sh). When it
+        // is NOT enabled we fail closed rather than ship an unresolved directive
+        // or silently pull the secret into dply.
         if ($store->resolvesOnBox()) {
-            throw new RuntimeException(
-                "external secret '{$residency->key}' resolves on the server (on-box mode); dply does not fetch it."
-            );
+            if (! config('secret_vault.residency.onbox_enabled')) {
+                throw new RuntimeException(
+                    "external secret '{$residency->key}' resolves on the server (on-box mode), which is not enabled on this platform."
+                );
+            }
+
+            return OnBoxSecretManifestBuilder::directiveFor($residency->id);
         }
 
         return $this->stores->for($store)->fetch($store, $residency->reference);

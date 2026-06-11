@@ -14,8 +14,10 @@ use App\Livewire\Sites\Show;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteSecretResidency;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
+use App\Services\Sites\SecretEscalator;
 use App\Services\Sites\SiteEnvPushScheduler;
 use App\Support\Sites\SiteFixers;
 use Livewire\Component;
@@ -69,6 +71,9 @@ trait ManagesSiteEnvironment
 
     /** @var list<string> */
     public array $revealed_env_keys = [];
+
+    /** Decrypted plaintext of escrowed (residency) keys the operator revealed, keyed by env key. */
+    public array $revealed_escrow_values = [];
 
     public string $env_file_path_override = '';
 
@@ -908,6 +913,112 @@ trait ManagesSiteEnvironment
             return;
         }
         $this->revealed_env_keys[] = $key;
+    }
+
+    /**
+     * The site's escrowed/external secrets keyed by env var name, for the view:
+     * [KEY => ['mode' => escrow|external, 'placeholder' => '${dply:secret:…}',
+     *          'can_reveal' => bool]]. can_reveal is true only for escrow under a
+     * dply-held org key (dply can decrypt); customer-held / external cannot be
+     * revealed here.
+     *
+     * @return array<string, array{mode: string, placeholder: string, can_reveal: bool}>
+     */
+    public function secretResidencyMap(): array
+    {
+        $map = [];
+        foreach ($this->site->secretResidencies()->get() as $residency) {
+            /** @var SiteSecretResidency $residency */
+            $canReveal = false;
+            if ($residency->mode === SiteSecretResidency::MODE_ESCROW) {
+                $orgKey = $this->site->organization?->secretKey;
+                $canReveal = (bool) $orgKey?->dplyCanDecrypt();
+            }
+
+            $map[$residency->key] = [
+                'mode' => $residency->mode,
+                'placeholder' => $residency->placeholder(),
+                'can_reveal' => $canReveal,
+            ];
+        }
+
+        return $map;
+    }
+
+    /**
+     * Move an env var off the plaintext-in-DB blob into the org's encryption key
+     * (Tier 2a/2b). The value becomes an age blob; the loose .env keeps only a
+     * placeholder. Pushes so the server still receives the real value.
+     */
+    public function escalateEnvVar(string $key): void
+    {
+        $this->authorize('update', $this->site);
+        if ($this->blockedForDerivedWorker()) {
+            return;
+        }
+
+        try {
+            app(SecretEscalator::class)->escalate($this->site, $key);
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+
+            return;
+        }
+
+        $this->site->refresh();
+        $this->autoPushAfterCacheMutation(__(':key moved to the organization key.', ['key' => $key]));
+    }
+
+    /** Pull an escrowed secret back into the editable .env (dply-held only here). */
+    public function demoteEnvVar(string $key): void
+    {
+        $this->authorize('update', $this->site);
+        if ($this->blockedForDerivedWorker()) {
+            return;
+        }
+
+        $residency = $this->site->secretResidencies()->where('key', $key)->first();
+        if ($residency === null) {
+            $this->toastError(__(':key is not escrowed.', ['key' => $key]));
+
+            return;
+        }
+
+        try {
+            app(SecretEscalator::class)->demote($this->site, $residency);
+        } catch (\Throwable $e) {
+            // Customer-held keys need the customer's identity — not available here.
+            $this->toastError($e->getMessage());
+
+            return;
+        }
+
+        unset($this->revealed_escrow_values[$key]);
+        $this->site->refresh();
+        $this->autoPushAfterCacheMutation(__(':key moved back into the editable environment.', ['key' => $key]));
+    }
+
+    /** Reveal an escrowed secret's plaintext (dply-held org key only). */
+    public function revealEscrowedEnvVar(string $key): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (array_key_exists($key, $this->revealed_escrow_values)) {
+            unset($this->revealed_escrow_values[$key]);
+
+            return;
+        }
+
+        $residency = $this->site->secretResidencies()->where('key', $key)->first();
+        if ($residency === null) {
+            return;
+        }
+
+        try {
+            $this->revealed_escrow_values[$key] = app(SecretEscalator::class)->reveal($residency);
+        } catch (\Throwable $e) {
+            $this->toastError($e->getMessage());
+        }
     }
 
     /**

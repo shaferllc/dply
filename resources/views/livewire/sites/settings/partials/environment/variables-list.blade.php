@@ -600,6 +600,7 @@
                 @if ($filteredEnvMap === [] && ($envSearchTerm !== '' || $selectedEnvGroup !== ''))
                     <li class="px-6 py-10 text-center text-sm text-brand-moss sm:px-8">{{ __('No variables match the current filter.') }}</li>
                 @endif
+                @php $residencyMap = method_exists($this, 'secretResidencyMap') ? $this->secretResidencyMap() : []; @endphp
                 @foreach ($listEnvMap as $key => $value)
                     @continue(isset($overrideGroupedKeySet[$key]))
                     @php
@@ -610,6 +611,11 @@
                         $valueLength = strlen($value);
                         $rowComment = $envComments[$key] ?? null;
                         $overridesBinding = $bindingProvidedKeys[$key] ?? null;
+                        // Secret residency: this key's value lives off the plaintext .env
+                        // (escrowed under the org key, or referenced from an external store).
+                        $residency = $residencyMap[$key] ?? null;
+                        $escrowRevealed = $residency && array_key_exists($key, $revealed_escrow_values ?? []);
+                        $canManageResidency = method_exists($this, 'escalateEnvVar');
                     @endphp
                     <li class="px-6 py-3 sm:px-8" wire:key="env-row-{{ md5($key) }}">
                         @if ($isEditing)
@@ -704,9 +710,26 @@
                                                     {{ __('Overrides :type', ['type' => $bindingTypeLabelsInline[$overridesBinding['type']] ?? $overridesBinding['type']]) }}
                                                 </span>
                                             @endif
+                                            @if ($residency)
+                                                <span
+                                                    class="inline-flex items-center gap-1 rounded-full bg-brand-forest/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-forest ring-1 ring-inset ring-brand-forest/20"
+                                                    title="{{ $residency['mode'] === 'external' ? __('Value is referenced from an external secret store; it is never stored in dply.') : __('Value is encrypted under your organization key, not stored in the plaintext .env.') }}"
+                                                >
+                                                    <x-heroicon-m-lock-closed class="h-3 w-3" />
+                                                    {{ $residency['mode'] === 'external' ? __('External') : __('Org key') }}
+                                                </span>
+                                            @endif
                                         </p>
                                         <p class="mt-0.5 break-all font-mono text-[11px] text-brand-moss">
-                                            @if ($isRevealed)
+                                            @if ($residency)
+                                                @if ($escrowRevealed)
+                                                    {{ $revealed_escrow_values[$key] === '' ? '(empty)' : $revealed_escrow_values[$key] }}
+                                                @elseif ($residency['mode'] === 'external')
+                                                    <span class="text-brand-mist">{{ __('resolved from external store at deploy') }}</span>
+                                                @else
+                                                    <span class="text-brand-mist">{{ __('held in the organization key') }}</span>
+                                                @endif
+                                            @elseif ($isRevealed)
                                                 {{ $value === '' ? '(empty)' : $value }}
                                             @else
                                                 @if ($valueLength === 0)
@@ -729,6 +752,34 @@
                                 </div>
 
                                 <div class="flex flex-wrap items-center gap-2">
+                                    @if ($residency)
+                                        @if ($residency['mode'] !== 'external' && $residency['can_reveal'])
+                                            <button
+                                                type="button"
+                                                wire:click="revealEscrowedEnvVar('{{ $key }}')"
+                                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40"
+                                                title="{{ $escrowRevealed ? __('Hide value') : __('Reveal value') }}"
+                                            >
+                                                @if ($escrowRevealed)
+                                                    <x-heroicon-o-eye-slash class="h-4 w-4" />{{ __('Hide') }}
+                                                @else
+                                                    <x-heroicon-o-eye class="h-4 w-4" />{{ __('Reveal') }}
+                                                @endif
+                                            </button>
+                                        @endif
+                                        @if ($residency['mode'] !== 'external' && $canManageResidency)
+                                            <button
+                                                type="button"
+                                                wire:click="demoteEnvVar('{{ $key }}')"
+                                                wire:loading.attr="disabled"
+                                                wire:target="demoteEnvVar('{{ $key }}')"
+                                                class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-40"
+                                                title="{{ __('Move this secret back into the editable .env') }}"
+                                            >
+                                                <x-heroicon-o-lock-open class="h-4 w-4" />{{ __('Move back') }}
+                                            </button>
+                                        @endif
+                                    @else
                                     <button
                                         type="button"
                                         wire:click="toggleRevealEnvVar('{{ $key }}')"
@@ -774,6 +825,21 @@
                                         <span wire:loading wire:target="confirmRemoveEnvVar('{{ $key }}')"><x-spinner variant="forest" size="sm" /></span>
                                         {{ __('Remove') }}
                                     </button>
+                                    @if ($canManageResidency && $valueLength > 0)
+                                        <button
+                                            type="button"
+                                            wire:click="escalateEnvVar('{{ $key }}')"
+                                            wire:loading.attr="disabled"
+                                            wire:target="escalateEnvVar('{{ $key }}')"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:border-brand-forest/30 hover:bg-brand-forest/5 hover:text-brand-forest disabled:cursor-not-allowed disabled:opacity-40"
+                                            title="{{ __('Encrypt this value under your organization key and keep it out of the plaintext .env') }}"
+                                        >
+                                            <x-heroicon-o-lock-closed class="h-4 w-4" wire:loading.remove wire:target="escalateEnvVar('{{ $key }}')" />
+                                            <span wire:loading wire:target="escalateEnvVar('{{ $key }}')"><x-spinner variant="forest" size="sm" /></span>
+                                            {{ __('Move to org key') }}
+                                        </button>
+                                    @endif
+                                    @endif
                                 </div>
                             </div>
                         @endif

@@ -108,6 +108,19 @@ return [
         'retention_days' => (int) env('SECRET_VAULT_DB_RETENTION_DAYS', 30),
     ],
 
+    // Customer-facing per-key secret residency (see project_secret_residency).
+    'residency' => [
+        // On-box external resolution (Tier 3+, true end-to-end ZK): when a site
+        // has external secrets marked resolution=onbox, the server itself fetches
+        // the values via a shipped shim using the box's own credentials, and dply
+        // never sees them. OFF by default — until enabled (and validated on a live
+        // box), a site with on-box secrets FAILS CLOSED on push rather than
+        // shipping an unresolved directive. Flipping this on is a deliberate,
+        // box-validated step (the shim needs curl/jq, or the AWS CLI / instance
+        // IAM, present on the target server).
+        'onbox_enabled' => (bool) env('SECRET_RESIDENCY_ONBOX_ENABLED', false),
+    ],
+
     // Box-to-box APP_KEY drift check (W5). Targets are the adopted control-plane
     // Servers (web + worker); the check SSHes each (via dply's own connection),
     // hashes the APP_KEY value on the box, and alerts if the hashes diverge. The

@@ -12,6 +12,7 @@ use App\Notifications\SiteDeploymentCompletedNotification;
 use App\Services\Deploy\DeployContext;
 use App\Services\Deploy\DeployEngineResolver;
 use App\Services\Deploy\DeployResumePlan;
+use App\Services\Secrets\EphemeralSecretIdentityContext;
 use App\Services\Deploy\EphemeralDeployCredentialManager;
 use App\Services\Notifications\DeployDigestBuffer;
 use App\Services\Notifications\NotificationPublisher;
@@ -51,6 +52,10 @@ class RunSiteDeploymentJob implements ShouldQueue
         // failed at, re-using its staged release, instead of a fresh full
         // deploy. Honoured only when that deployment is genuinely resumable.
         public ?string $resumeFromDeploymentId = null,
+        // Cache token (NOT the raw key) under which a customer-held org age
+        // identity was stashed for this deploy, so the env push can decrypt
+        // customer-held escrowed secrets. Pulled-and-forgotten in handle().
+        public ?string $ephemeralIdentityToken = null,
     ) {}
 
     public function handle(
@@ -200,6 +205,12 @@ class RunSiteDeploymentJob implements ShouldQueue
                     .' via the operational SSH key; this deploy authenticates with it.';
             }
 
+            // Make any customer-supplied identity available to the env push that
+            // runs deep inside the deploy engine, so a site with customer-held
+            // escrowed secrets can be deployed. Cleared in the finally below so
+            // it never leaks into the next job on this worker.
+            app(EphemeralSecretIdentityContext::class)->set($this->pullEphemeralIdentity());
+
             try {
                 // Fail fast (with a clear, actionable message) when the live
                 // .env is missing variables the code can't run without, rather
@@ -301,6 +312,10 @@ class RunSiteDeploymentJob implements ShouldQueue
                 $this->notifyStakeholders($deployment, $notificationPublisher);
                 throw $e;
             } finally {
+                // Drop the customer-held identity so it never leaks into a later
+                // job on this (reused) worker container.
+                app(EphemeralSecretIdentityContext::class)->forget();
+
                 if ($ephemeralCredential instanceof SiteDeploymentEphemeralCredential) {
                     $ephemeralCredentials->revoke($ephemeralCredential);
 
@@ -339,6 +354,22 @@ class RunSiteDeploymentJob implements ShouldQueue
         }
 
         return implode("\n", $lines)."\n\n".$log;
+    }
+
+    /**
+     * Pull-and-forget the customer-held org identity stashed for this deploy.
+     * Mirrors {@see PushSiteEnvJob} — the payload carries only a cache token, the
+     * raw key lives transiently in the cache and is dropped the moment it's read.
+     */
+    private function pullEphemeralIdentity(): ?string
+    {
+        if ($this->ephemeralIdentityToken === null) {
+            return null;
+        }
+
+        $identity = Cache::pull(PushSiteEnvJob::EPHEMERAL_IDENTITY_CACHE_PREFIX.$this->ephemeralIdentityToken);
+
+        return is_string($identity) ? $identity : null;
     }
 
     /**
