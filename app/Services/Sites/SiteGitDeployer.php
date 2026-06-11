@@ -20,7 +20,7 @@ class SiteGitDeployer
         protected SshConnectionFactory $sshFactory
     ) {}
 
-    public function run(Site $site, ?SiteDeployment $deployment = null): array
+    public function run(Site $site, ?SiteDeployment $deployment = null, ?\App\Services\Deploy\DeployResumePlan $resume = null): array
     {
         // Cutover wrapper: maintenance/recreate methods bracket the whole deploy
         // with a pre/post action (raise the maintenance page / stop the runtime
@@ -28,7 +28,7 @@ class SiteGitDeployer
         // atomic, …) skip this entirely, so existing deploys are untouched.
         $cutover = \App\Enums\DeploymentMethod::forSite($site)->cutover();
         if (! in_array($cutover, ['maintenance', 'recreate'], true)) {
-            return $this->runInner($site, $deployment);
+            return $this->runInner($site, $deployment, $resume);
         }
 
         $server = $site->server;
@@ -38,7 +38,7 @@ class SiteGitDeployer
 
         $log = $ssh !== null ? $this->cutoverPre($cutover, $site, $ssh) : '';
         try {
-            $result = $this->runInner($site, $deployment);
+            $result = $this->runInner($site, $deployment, $resume);
             if ($ssh !== null) {
                 $log .= $this->cutoverPost($cutover, $site, $ssh);
             }
@@ -97,11 +97,15 @@ class SiteGitDeployer
             .$ssh->exec(sprintf('sudo -n systemctl start %1$s 2>&1 || systemctl start %1$s 2>&1 || echo "[dply]   (no managed unit — skipped)"', $unit), 60);
     }
 
-    private function runInner(Site $site, ?SiteDeployment $deployment = null): array
+    private function runInner(Site $site, ?SiteDeployment $deployment = null, ?\App\Services\Deploy\DeployResumePlan $resume = null): array
     {
         if (($site->deploy_strategy ?? 'simple') === 'atomic') {
-            return app(AtomicSiteDeployer::class)->deploy($site, $deployment);
+            return app(AtomicSiteDeployer::class)->deploy($site, $deployment, $resume);
         }
+
+        // Resume is an atomic-only capability (it re-attaches to a staged
+        // release dir). A simple/flat deploy has no staged release, so fall
+        // through to a normal full deploy if a resume plan ever reaches here.
 
         $server = $site->server;
         if (! $server->isReady() || empty($server->ssh_private_key)) {

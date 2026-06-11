@@ -7,6 +7,8 @@ namespace App\Livewire\Sites\Concerns;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Actions\Sites\ScheduleSiteDeploy;
+use App\Models\ScheduledDeploy;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
@@ -44,6 +46,44 @@ trait ManagesSiteDeployExecution
         RunSiteDeploymentJob::dispatch($this->site, SiteDeployment::TRIGGER_MANUAL);
 
         $this->toastSuccess(__('Deployment queued. Watch the phase timeline below.'));
+    }
+
+    /**
+     * Schedule a one-off deploy for a future moment. `$when` is either a number
+     * of minutes from now (preset buttons) or an absolute datetime string (the
+     * custom picker). Replaces any existing pending delayed deploy for the site
+     * — one queued deploy at a time. The RunDueScheduledDeploysCommand tick
+     * fires it when due.
+     */
+    public function scheduleDeploy(string $when): void
+    {
+        $this->authorize('update', $this->site);
+
+        $scheduled = app(ScheduleSiteDeploy::class)->schedule($this->site, $when, auth()->id());
+        if ($scheduled === null) {
+            $this->toastError(__('Pick a time in the future to schedule the deploy.'));
+
+            return;
+        }
+
+        unset($this->pendingScheduledDeploy);
+        $this->toastSuccess(__('Deploy scheduled :when.', ['when' => $scheduled->run_at->diffForHumans()]));
+    }
+
+    public function cancelScheduledDeploy(): void
+    {
+        $this->authorize('update', $this->site);
+
+        app(ScheduleSiteDeploy::class)->cancelPending($this->site);
+
+        unset($this->pendingScheduledDeploy);
+        $this->toastSuccess(__('Scheduled deploy canceled.'));
+    }
+
+    /** The site's pending one-off delayed deploy, if any. */
+    public function getPendingScheduledDeployProperty(): ?ScheduledDeploy
+    {
+        return app(ScheduleSiteDeploy::class)->pendingFor($this->site);
     }
 
     public function queueDeploy(SiteDeploySyncCoordinator $coordinator): void
@@ -143,6 +183,72 @@ trait ManagesSiteDeployExecution
             __('Rollback'),
             true,
         );
+    }
+
+    /**
+     * Open the confirm modal for resuming a failed deploy from the phase it
+     * died at. The release phase re-runs migrations, which may have partially
+     * applied on the failed attempt, so it gets a sharper warning than build.
+     */
+    public function confirmResumeDeployment(string $deploymentId): void
+    {
+        $this->authorize('update', $this->site);
+
+        $deployment = SiteDeployment::query()
+            ->where('site_id', $this->site->id)
+            ->find($deploymentId);
+
+        $phase = $deployment?->resumeStartPhase();
+        if ($deployment === null || $phase === null) {
+            $this->toastError(__('This deployment can no longer be resumed. Run a full deploy instead.'));
+
+            return;
+        }
+
+        $body = $phase === 'release'
+            ? __('Re-run the deploy from the release phase, reusing the build that already succeeded? This re-runs migrations — if the failed attempt partially applied a migration, run it manually or roll back the database first.')
+            : __('Re-run the deploy from the build phase, reusing the release that was already cloned? The live site is untouched until the new build passes.');
+
+        $this->openConfirmActionModal(
+            'resumeDeployment',
+            [$deploymentId],
+            __('Resume from :phase phase', ['phase' => $phase]),
+            $body,
+            __('Resume deploy'),
+            $phase === 'release',
+        );
+    }
+
+    public function resumeDeployment(string $deploymentId): void
+    {
+        $this->authorize('update', $this->site);
+
+        $deployment = SiteDeployment::query()
+            ->where('site_id', $this->site->id)
+            ->find($deploymentId);
+
+        if ($deployment === null || ! $deployment->isResumable()) {
+            $this->toastError(__('This deployment can no longer be resumed. Run a full deploy instead.'));
+
+            return;
+        }
+
+        // Same optimistic marker as deployNow so the panel immediately reads
+        // "Deploying…" and starts polling.
+        Cache::put('site-deploy-active:'.$this->site->id, [
+            'started_at' => now()->toIso8601String(),
+            'deployment_id' => null,
+        ], 600);
+
+        RunSiteDeploymentJob::dispatch(
+            $this->site,
+            SiteDeployment::TRIGGER_RESUME,
+            null,
+            auth()->id(),
+            $deployment->id,
+        );
+
+        $this->toastSuccess(__('Resuming from the :phase phase. Watch the timeline below.', ['phase' => $deployment->resumeStartPhase()]));
     }
 
     public function rollbackRelease(int|string $releaseId, SiteReleaseRollback $rollback): void

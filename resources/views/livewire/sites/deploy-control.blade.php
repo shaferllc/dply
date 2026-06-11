@@ -44,6 +44,8 @@
             // Sync: this site + repo/server peers that can ship together.
             $syncPeers = $this->syncPeers;
             $hasSyncPeers = $syncPeers->count() > 1;
+            // A one-off delayed deploy waiting to fire.
+            $pendingSchedule = $this->pendingScheduledDeploy;
             // Combined live console for a launched sync batch.
             $syncRows = $this->syncRows;
             $syncConsoleMode = $syncRows !== [];
@@ -74,6 +76,17 @@
                     <span>{{ __('Deploy') }}</span>
                 @endif
             </button>
+
+            {{-- Pending delayed deploy: shown/cancelable from any page. --}}
+            @if ($pendingSchedule)
+                <span class="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-900" title="{{ __('Deploy scheduled for :at', ['at' => $pendingSchedule->run_at->toDayDateTimeString()]) }}">
+                    <x-heroicon-o-clock class="h-4 w-4 text-amber-700" />
+                    {{ $pendingSchedule->run_at->diffForHumans(null, true) }}
+                    <button type="button" wire:click="cancelScheduledDeploy" wire:target="cancelScheduledDeploy" class="text-amber-700 hover:text-amber-900" title="{{ __('Cancel scheduled deploy') }}">
+                        <x-heroicon-m-x-mark class="h-3.5 w-3.5" />
+                    </button>
+                </span>
+            @endif
 
             {{-- Console toggle. --}}
             <button

@@ -46,6 +46,47 @@
         @include('livewire.sites.partials.deployments._remediation-panel', ['deployment' => $latest])
     @endif
 
+    {{-- Resume-from-phase: the deploy failed AFTER staging a release but BEFORE
+         cutover (a build step or a migration broke), so the prior release is
+         still live and the staged release is intact on disk. Offer to re-run
+         from the failed phase — reusing the clone (and, past build, the built
+         vendor/) — instead of a full deploy from scratch. Atomic only. --}}
+    @if ($latest && $latest->status === 'failed' && $site->isAtomicDeploys() && $latest->isResumable() && method_exists($this, 'confirmResumeDeployment'))
+        @php $resumePhase = $latest->resumeStartPhase(); @endphp
+        <div class="mb-6 overflow-hidden rounded-2xl border border-sky-200 bg-sky-50/60">
+            <div class="flex items-start gap-3 px-6 py-5 sm:px-7">
+                <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-700 ring-1 ring-sky-600/20">
+                    <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0 flex-1">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">{{ __('Resume available') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Retry from the :phase phase', ['phase' => $resumePhase]) }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                        @if ($resumePhase === 'release')
+                            {{ __('The build succeeded but a release step failed. Resume re-uses that build and re-runs only the release phase onward — the previous release stays live until it passes. Note: this re-runs migrations.') }}
+                        @else
+                            {{ __('A build step failed before cutover. Resume re-uses the existing checkout and re-runs from the build phase — the previous release stays live until the new build passes.') }}
+                        @endif
+                    </p>
+                    <div class="mt-4 flex flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            wire:click="confirmResumeDeployment('{{ $latest->id }}')"
+                            wire:loading.attr="disabled"
+                            wire:target="confirmResumeDeployment('{{ $latest->id }}')"
+                            @disabled($deployInProgress)
+                            class="inline-flex items-center gap-2 rounded-lg bg-sky-700 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-800 disabled:opacity-60"
+                        >
+                            <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
+                            {{ __('Resume from :phase', ['phase' => $resumePhase]) }}
+                        </button>
+                        <span class="text-[11px] text-brand-mist">{{ __('Or use Deploy above for a clean full run.') }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
     @if ($this->deployLockInfo ?? null)
         <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             <div class="flex flex-wrap items-center gap-2">
@@ -379,8 +420,53 @@
                         {{ __('Deploy linked sites') }}
                     </button>
                 @endif
+
+                {{-- Schedule a one-off deploy for later (delay presets + custom time). --}}
+                <div x-data="{ open: false, custom: '' }" class="relative">
+                    <button type="button" x-on:click="open = ! open" title="{{ __('Schedule this deploy for later') }}" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
+                        <x-heroicon-o-clock class="h-4 w-4" />
+                        {{ __('Schedule') }}
+                        <x-heroicon-m-chevron-down class="h-3.5 w-3.5 opacity-60" />
+                    </button>
+                    <div x-show="open" x-cloak x-on:click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 w-60 rounded-xl border border-brand-ink/10 bg-white p-1.5 shadow-xl">
+                        <p class="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Deploy in') }}</p>
+                        @foreach (['15' => __('15 minutes'), '60' => __('1 hour'), '180' => __('3 hours'), '720' => __('12 hours')] as $mins => $label)
+                            <button type="button" wire:click="scheduleDeploy('{{ $mins }}')" x-on:click="open = false" class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-brand-ink hover:bg-brand-sand/40">
+                                <x-heroicon-o-clock class="h-3.5 w-3.5 text-brand-moss" />
+                                {{ $label }}
+                            </button>
+                        @endforeach
+                        <div class="my-1 border-t border-brand-ink/10"></div>
+                        <div class="px-2 py-1.5">
+                            <label class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Custom time') }}</label>
+                            <input type="datetime-local" x-model="custom" class="dply-input mt-1 w-full text-xs" />
+                            <button type="button" x-on:click="if (custom) { $wire.scheduleDeploy(custom); open = false; custom = '' }" x-bind:disabled="! custom" class="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-forest disabled:opacity-50">
+                                <x-heroicon-o-clock class="h-3.5 w-3.5" />
+                                {{ __('Schedule deploy') }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
+
+        {{-- Pending delayed deploy banner. --}}
+        @if ($this->pendingScheduledDeploy)
+            @php $pendingSchedule = $this->pendingScheduledDeploy; @endphp
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-6 py-3 sm:px-8">
+                <p class="flex items-center gap-2 text-sm text-amber-900">
+                    <x-heroicon-o-clock class="h-4 w-4 shrink-0 text-amber-700" />
+                    <span>
+                        {{ __('Deploy scheduled :rel', ['rel' => $pendingSchedule->run_at->diffForHumans()]) }}
+                        <span class="text-amber-700/80" title="{{ $pendingSchedule->run_at->toDayDateTimeString() }}">· {{ $pendingSchedule->run_at->isoFormat('MMM D, h:mm A') }}</span>
+                    </span>
+                </p>
+                <button type="button" wire:click="cancelScheduledDeploy" wire:loading.attr="disabled" wire:target="cancelScheduledDeploy" class="inline-flex items-center gap-1 text-xs font-semibold text-amber-800 hover:underline">
+                    <x-heroicon-o-x-mark class="h-4 w-4" />
+                    {{ __('Cancel') }}
+                </button>
+            </div>
+        @endif
 
         {{-- Summary stats — hairline-divided cells (gap-px over a tinted track)
              so the four read as one continuous strip rather than four boxes,

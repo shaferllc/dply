@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
+use App\Actions\Sites\ScheduleSiteDeploy;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Jobs\RunSiteFixerJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
-use App\Livewire\Sites\Concerns\ManagesSiteDeployExecution;
 use App\Models\ConsoleAction;
+use App\Models\ScheduledDeploy;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
@@ -359,6 +360,44 @@ class DeployControl extends Component
 
         $this->toastSuccess(__('Deployment queued — watch the console.'));
         $this->dispatch('deploy-console-open');
+    }
+
+    /** The site's pending one-off delayed deploy, shown/cancelable from anywhere. */
+    #[Computed]
+    public function pendingScheduledDeploy(): ?ScheduledDeploy
+    {
+        return $this->site ? app(ScheduleSiteDeploy::class)->pendingFor($this->site) : null;
+    }
+
+    public function scheduleDeploy(string $when): void
+    {
+        if (! $this->canDeploy()) {
+            return;
+        }
+        Gate::authorize('update', $this->site);
+
+        $scheduled = app(ScheduleSiteDeploy::class)->schedule($this->site, $when, auth()->id());
+        if ($scheduled === null) {
+            $this->toastError(__('Pick a time in the future to schedule the deploy.'));
+
+            return;
+        }
+
+        unset($this->pendingScheduledDeploy);
+        $this->toastSuccess(__('Deploy scheduled :when.', ['when' => $scheduled->run_at->diffForHumans()]));
+    }
+
+    public function cancelScheduledDeploy(): void
+    {
+        if ($this->site === null) {
+            return;
+        }
+        Gate::authorize('update', $this->site);
+
+        app(ScheduleSiteDeploy::class)->cancelPending($this->site);
+
+        unset($this->pendingScheduledDeploy);
+        $this->toastSuccess(__('Scheduled deploy canceled.'));
     }
 
     /**

@@ -23,6 +23,8 @@ class SiteDeployment extends Model
 
     public const TRIGGER_SCHEDULE = 'schedule';
 
+    public const TRIGGER_RESUME = 'resume';
+
     public const STATUS_RUNNING = 'running';
 
     public const STATUS_SUCCESS = 'success';
@@ -38,6 +40,8 @@ class SiteDeployment extends Model
         'trigger',
         'status',
         'git_sha',
+        'release_folder',
+        'resume_of_deployment_id',
         'exit_code',
         'log_output',
         'phase_results',
@@ -156,6 +160,63 @@ class SiteDeployment extends Model
         $results = is_array($this->phase_results) ? $this->phase_results : [];
 
         return is_array($results[$phase] ?? null);
+    }
+
+    /**
+     * The first recorded phase (in canonical run order) that contains a failed
+     * step, or null when nothing recorded failed. Drives "Retry from {phase}":
+     * a failure at `build` means re-run build→release→activate; at `release`,
+     * re-run release→activate. Returns null when the failure happened in an
+     * unrecorded phase (env/activate-flip/…), in which case resume isn't offered.
+     */
+    public function failedPhase(): ?string
+    {
+        $results = is_array($this->phase_results) ? $this->phase_results : [];
+        foreach (\App\Services\Deploy\DeployResumePlan::PHASE_ORDER as $phase) {
+            $steps = $results[$phase] ?? null;
+            if (! is_array($steps)) {
+                continue;
+            }
+            foreach ($steps as $step) {
+                if (($step['ok'] ?? false) !== true && ($step['skipped'] ?? false) !== true) {
+                    return $phase;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The phase a "resume" should restart from, or null when this deployment
+     * can't be resumed. Resumable only when it failed in a recorded, pre-cutover
+     * phase ({@see DeployResumePlan::RESUMABLE_PHASES}) AND we still know which
+     * staged release folder to re-attach to.
+     */
+    public function resumeStartPhase(): ?string
+    {
+        if ($this->status !== self::STATUS_FAILED) {
+            return null;
+        }
+        if (empty($this->release_folder)) {
+            return null;
+        }
+        $phase = $this->failedPhase();
+        if ($phase === null || ! in_array($phase, \App\Services\Deploy\DeployResumePlan::RESUMABLE_PHASES, true)) {
+            return null;
+        }
+
+        return $phase;
+    }
+
+    public function isResumable(): bool
+    {
+        return $this->resumeStartPhase() !== null;
+    }
+
+    public function resumeOf(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'resume_of_deployment_id');
     }
 
     /**
