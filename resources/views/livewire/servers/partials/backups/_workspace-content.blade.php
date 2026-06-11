@@ -558,6 +558,44 @@
 
     @if ($backups_workspace_tab === 'history')
     <x-server-workspace-tab-panel id="backups-panel-history" labelled-by="backups-tab-history" panel-class="space-y-6">
+    {{-- Quick download: live stream a fresh dump/archive straight off the box, no S3. --}}
+    @if ($databases->isNotEmpty() || $sites->isNotEmpty())
+        <section class="dply-card overflow-hidden">
+            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                <div class="flex items-start gap-3">
+                    <x-icon-badge>
+                        <x-heroicon-o-arrow-down-tray class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Instant') }}</p>
+                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Quick download') }}</h3>
+                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Stream a fresh dump or archive straight from the server — no schedule, no S3. Capped at :cap; larger payloads should use a scheduled backup.', ['cap' => \Illuminate\Support\Number::fileSize((int) config('quick_download.max_bytes', 262_144_000))]) }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="divide-y divide-brand-ink/10">
+                @foreach ($databases as $db)
+                    <div wire:key="qd-db-{{ $db->id }}" class="flex items-center gap-4 px-6 py-3 sm:px-7">
+                        <div class="min-w-0 flex-1">
+                            <p class="truncate text-sm font-medium text-brand-ink">{{ $db->name }}</p>
+                            <p class="text-xs text-brand-moss">{{ __('Database') }} · {{ \Illuminate\Support\Str::title($db->engine) }}</p>
+                        </div>
+                        <x-quick-download.database-link :server="$server" :database="$db" />
+                    </div>
+                @endforeach
+                @foreach ($sites as $qdSite)
+                    <div wire:key="qd-site-{{ $qdSite->id }}" class="flex items-center gap-4 px-6 py-3 sm:px-7">
+                        <div class="min-w-0 flex-1">
+                            <p class="truncate text-sm font-medium text-brand-ink">{{ $qdSite->name }}</p>
+                            <p class="text-xs text-brand-moss">{{ __('Site files, .env, vhost, logs, home, or a combined bundle') }}</p>
+                        </div>
+                        <x-quick-download.site-menu :server="$server" :site="$qdSite" />
+                    </div>
+                @endforeach
+            </div>
+        </section>
+    @endif
+
     {{-- Recent runs ---------------------------------------------------------------- --}}
     <div class="grid gap-4 lg:grid-cols-2">
         <section class="dply-card overflow-hidden">

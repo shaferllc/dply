@@ -26,6 +26,7 @@ use App\Http\Controllers\ServerCredentialShareController;
 use App\Http\Controllers\ServerlessFunctionProxyController;
 use App\Http\Controllers\Servers\ServerWorkspaceFileDownloadController;
 use App\Http\Controllers\SiteDeployWebhookController;
+use App\Http\Controllers\QuickDownloadController;
 use App\Http\Controllers\Sites\SiteFileDownloadController;
 use App\Http\Controllers\SiteScheduleController;
 use App\Http\Controllers\SiteWorkspaceController;
@@ -753,6 +754,8 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('servers/{server}/sites/{site}/database', SitesDatabase::class)->name('sites.database');
     Route::livewire('servers/{server}/sites/{site}/files', Files::class)->name('sites.files');
     Route::get('servers/{server}/sites/{site}/files/download', SiteFileDownloadController::class)->name('sites.files.download');
+    Route::get('servers/{server}/sites/{site}/quick-download/{artifact}', [QuickDownloadController::class, 'siteArtifact'])->name('sites.quick-download');
+    Route::get('servers/{server}/databases/{database}/quick-dump', [QuickDownloadController::class, 'databaseDump'])->name('servers.databases.quick-dump');
     // Legacy redirect for the previous URL shape /sites/{site}/settings/{section}. The
     // {section} is required — without it the bare /sites/{site}/settings URL collides
     // with the new "Settings" tab on the wildcard route below, which sends you back to

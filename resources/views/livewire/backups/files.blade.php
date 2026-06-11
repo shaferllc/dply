@@ -165,6 +165,9 @@
                                                     {{ __('Queue full backup') }}
                                                 </button>
                                                 <p class="text-xs text-brand-mist">{{ __('Full snapshot of the repository root (compressed). Vendor, node_modules, .git, and similar paths are excluded by default.') }}</p>
+                                                <div class="pt-1">
+                                                    <x-quick-download.site-menu :server="$site->server" :site="$site" />
+                                                </div>
                                             @else
                                                 <p class="text-sm">{{ __('Full file backup requires an SSH-ready VM site.') }}</p>
                                             @endif
