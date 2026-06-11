@@ -12,6 +12,7 @@ class SiteEnvPusher
         protected DotEnvFileParser $parser,
         protected DotEnvFileWriter $writer,
         protected SiteEnvWriteGuard $guard,
+        protected SecretResidencyResolver $residency,
     ) {}
 
     /**
@@ -64,6 +65,13 @@ class SiteEnvPusher
             ? array_merge($bindingEnv, $parsed['variables'])
             : $parsed['variables'];
 
+        // Resolve any non-resident secrets (escrowed / external references) to
+        // their real values just-in-time. The loose blob only carries
+        // `${dply:secret:<id>}` placeholders for these keys; this swaps each for
+        // the resolved value so the app receives the real secret. No-op for the
+        // common case — a site with no residency rows has no placeholders.
+        $mergedVars = $this->residency->resolve($site, $mergedVars);
+
         // Test it's valid first. Only on real operator pushes ($overridePath is
         // null) — the deploy-seeding path runs the pipeline's own required-env
         // gate and seeds before the release is built (nothing to live-test).
@@ -74,9 +82,11 @@ class SiteEnvPusher
             $this->guard->assertSafeToWrite($mergedVars);
         }
 
-        // When a binding contributed keys the cache lacks, re-render the file so
-        // they're physically written to the server's .env.
-        if ($bindingEnv !== [] && $mergedVars !== $parsed['variables']) {
+        // Re-render whenever the final map diverges from what we parsed out of
+        // the blob — either a binding contributed keys the cache lacks, or a
+        // residency placeholder was resolved to its real value. The placeholder
+        // text must never reach the server's .env.
+        if ($mergedVars !== $parsed['variables']) {
             $content = $this->writer->render($mergedVars, $parsed['comments']);
         }
 

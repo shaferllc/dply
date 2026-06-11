@@ -77,10 +77,21 @@ trait ResolvesReachableResources
     }
 
     /**
-     * Whether two servers sit on the same private network and can reach each
-     * other over their private IPs. True when they're linked to the same
-     * PrivateNetwork row, OR a PrivateNetwork in the org has a CIDR covering
-     * both private IPs, OR (no network row links them) the IPs share a /24.
+     * Whether two servers sit on the same EXPLICIT private network and can reach
+     * each other over their private IPs. True only when they're linked to the same
+     * PrivateNetwork row, OR a PrivateNetwork in the org has a CIDR range covering
+     * both private IPs.
+     *
+     * Deliberately does NOT fall back to a "same /24" heuristic: two servers
+     * coincidentally sharing a /24 (e.g. unrelated boxes a provider happened to
+     * place in 10.x) are NOT a private network the operator declared, and silently
+     * treating them as reachable would let services that aren't really networked
+     * together see each other. A resource is reachable privately only across a
+     * modeled shared network; otherwise it must be reached publicly.
+     *
+     * Caveat: a provider VPC that dply hasn't recorded as a PrivateNetwork row
+     * (e.g. a DigitalOcean VPC with no row + no private_network_id on the servers)
+     * will NOT count here — record the network so its CIDR/link is known.
      */
     private function sharePrivateNetwork(Server $a, Server $b): bool
     {
@@ -105,7 +116,7 @@ trait ResolvesReachableResources
             }
         }
 
-        return $this->sameSubnet24($aIp, $bIp);
+        return false;
     }
 
     /** IPv4 CIDR-membership test. Non-IPv4 / unparseable inputs return false. */
@@ -130,19 +141,5 @@ trait ResolvesReachableResources
         $mask = $bits === 0 ? 0 : ((~0 << (32 - $bits)) & 0xFFFFFFFF);
 
         return ($ipLong & $mask) === ($subnetLong & $mask);
-    }
-
-    /** Whether two IPv4 addresses share the same /24 subnet. */
-    private function sameSubnet24(string $a, string $b): bool
-    {
-        $al = ip2long($a);
-        $bl = ip2long($b);
-        if ($al === false || $bl === false) {
-            return false;
-        }
-
-        $mask = (~0 << 8) & 0xFFFFFFFF;
-
-        return ($al & $mask) === ($bl & $mask);
     }
 }

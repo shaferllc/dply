@@ -363,7 +363,7 @@ trait ManagesDatabaseBindings
 
     /**
      * The address $site should dial to reach $db:
-     *  - same server  → loopback (127.0.0.1), or the stored host if customised
+     *  - same server  → loopback (127.0.0.1), ALWAYS
      *  - network peer → the peer server's private IP
      *  - otherwise    → the stored host (a public IP/hostname set deliberately)
      */
@@ -372,12 +372,28 @@ trait ManagesDatabaseBindings
         $siteServer = $site->server;
         $dbServer = $db->server;
 
-        if ($siteServer !== null && $dbServer !== null && (string) $dbServer->id !== (string) $siteServer->id) {
-            if ($this->sharePrivateNetwork($siteServer, $dbServer) && filled($dbServer->private_ip_address)) {
-                return (string) $dbServer->private_ip_address;
-            }
+        $sameBox = $siteServer !== null && $dbServer !== null
+            && (string) $dbServer->id === (string) $siteServer->id;
+
+        // Co-located DB → loopback, unconditionally. The engine listens on
+        // localhost by default (Postgres listen_addresses='localhost', MySQL
+        // bind-address 127.0.0.1); a stored private-IP host (e.g. a 10.x address
+        // saved at provision time) is NOT bound there, so dialing it reads as
+        // "unreachable" even though the database is right here. 127.0.0.1 is
+        // always reachable and needs no private network or firewall rule.
+        if ($sameBox) {
+            return '127.0.0.1';
         }
 
+        // Different boxes that share a private network → the backend's private IP.
+        if ($siteServer !== null && $dbServer !== null
+            && $this->sharePrivateNetwork($siteServer, $dbServer)
+            && filled($dbServer->private_ip_address)) {
+            return (string) $dbServer->private_ip_address;
+        }
+
+        // Cross-box with no shared private network → the stored host, which must
+        // be a publicly reachable endpoint the operator configured deliberately.
         return (string) ($db->host ?: '127.0.0.1');
     }
 }
