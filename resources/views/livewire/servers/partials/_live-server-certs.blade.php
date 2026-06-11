@@ -53,6 +53,14 @@
             <x-heroicon-o-clock class="mx-auto h-6 w-6 text-brand-mist" aria-hidden="true" />
             <p class="mt-2 font-medium text-brand-ink">{{ __('Scan didn\'t return in time') }}</p>
             <p class="mt-1">{{ __('The certificate scan was queued but no result came back. The scan worker may be busy or offline.') }}</p>
+            @if (! empty($liveCertsProgress))
+                {{-- Show how far the sweep got before the poll budget ran out. --}}
+                <div class="mx-auto mt-4 max-h-40 max-w-xl overflow-y-auto rounded-md border border-brand-ink/10 bg-brand-ink/[0.03] px-3 py-2 text-left font-mono text-[11px] leading-relaxed text-brand-ink/70">
+                    @foreach ($liveCertsProgress as $entry)
+                        <div class="break-all">{{ $entry['line'] ?? '' }}</div>
+                    @endforeach
+                </div>
+            @endif
             <button
                 type="button"
                 wire:click="refreshLiveCerts"
@@ -65,13 +73,30 @@
             </button>
         </div>
     @elseif (! $liveCertsLoaded)
-        {{-- Scanning placeholder polls for the async job's result, then stops once a
+        {{-- Scanning state: polls for the async job's result, then stops once a
              result is cached OR the poll budget runs out (pollLiveCerts flips to the
-             timed-out state above), so the panel never spins indefinitely. --}}
-        <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7" @if ($liveCertsScanning) wire:poll.{{ $this->liveCertsPollInterval() }}s="pollLiveCerts" @endif>
-            <span class="inline-flex items-center gap-2">
+             timed-out state above), so the panel never spins indefinitely. While it
+             polls it also renders the job's streamed progress log so the operator
+             sees what the sweep is doing in real time. --}}
+        <div class="px-6 py-6 sm:px-7" @if ($liveCertsScanning) wire:poll.{{ $this->liveCertsPollInterval() }}s="pollLiveCerts" @endif>
+            <div class="flex items-center gap-2 text-sm text-brand-moss">
                 <x-spinner class="h-4 w-4" /> {{ __('Scanning certificates on the server…') }}
-            </span>
+            </div>
+            @if (! empty($liveCertsProgress))
+                <div
+                    wire:key="live-certs-log-{{ count($liveCertsProgress) }}"
+                    x-data
+                    x-init="$el.scrollTop = $el.scrollHeight"
+                    class="mt-3 max-h-48 overflow-y-auto rounded-md border border-brand-ink/10 bg-brand-ink/[0.03] px-3 py-2 font-mono text-[11px] leading-relaxed text-brand-ink/80"
+                >
+                    @foreach ($liveCertsProgress as $entry)
+                        <div class="flex gap-2">
+                            <span class="select-none text-brand-mist" aria-hidden="true">›</span>
+                            <span class="break-all">{{ $entry['line'] ?? '' }}</span>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
         </div>
     @elseif ($liveCertsUnreadable)
         <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7">

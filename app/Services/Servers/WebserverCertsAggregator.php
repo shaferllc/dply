@@ -43,6 +43,18 @@ class WebserverCertsAggregator
     private const URGENCY_WARN_DAYS = 60;
 
     /**
+     * Prefix the scan script uses to tag a live-progress line on stdout (vs. a
+     * `path|subject|issuer|notAfter` data line). The streaming callback peels
+     * these off into the progress buffer; everything else is cert data.
+     */
+    private const SCAN_PROGRESS_MARKER = '__DPLY_SCAN__ ';
+
+    /** TTL + cap for the per-server live-progress log the scanning UI polls. */
+    private const PROGRESS_TTL_SECONDS = 180;
+
+    private const PROGRESS_MAX_LINES = 80;
+
+    /**
      * Where to look. Order is preserved in the result so dply-managed
      * paths sort above ad-hoc operator drops under /etc/ssl/certs.
      *
@@ -68,6 +80,57 @@ class WebserverCertsAggregator
     public static function inflightKey(string $serverId): string
     {
         return 'dply.webserver-certs:inflight:'.$serverId;
+    }
+
+    /** Holds the live, append-only progress log the scanning UI polls and renders. */
+    public static function progressKey(string $serverId): string
+    {
+        return 'dply.webserver-certs:progress:'.$serverId;
+    }
+
+    /**
+     * The live-progress lines for the in-flight (or most recent) scan, oldest
+     * first. The scan job appends to this as it streams over SSH; the Livewire
+     * surfaces poll it so the operator sees what the sweep is doing instead of a
+     * bare spinner.
+     *
+     * @return list<array{t: int, line: string}>
+     */
+    public function progress(Server $server): array
+    {
+        $raw = Cache::get(self::progressKey((string) $server->id));
+
+        return is_array($raw) ? array_values(array_filter($raw, 'is_array')) : [];
+    }
+
+    /** Clear the progress log for a fresh scan, optionally seeding the first line. */
+    public function resetProgress(string $serverId, ?string $seed = null): void
+    {
+        $lines = $seed !== null ? [['t' => $this->nowMs(), 'line' => $seed]] : [];
+        Cache::put(self::progressKey($serverId), $lines, now()->addSeconds(self::PROGRESS_TTL_SECONDS));
+    }
+
+    /** Append one line to the live-progress log, capped to the most recent N. */
+    public function pushProgress(string $serverId, string $line): void
+    {
+        $line = trim($line);
+        if ($line === '') {
+            return;
+        }
+
+        $raw = Cache::get(self::progressKey($serverId));
+        $lines = is_array($raw) ? array_values(array_filter($raw, 'is_array')) : [];
+        $lines[] = ['t' => $this->nowMs(), 'line' => mb_substr($line, 0, 300)];
+        if (count($lines) > self::PROGRESS_MAX_LINES) {
+            $lines = array_slice($lines, -self::PROGRESS_MAX_LINES);
+        }
+
+        Cache::put(self::progressKey($serverId), $lines, now()->addSeconds(self::PROGRESS_TTL_SECONDS));
+    }
+
+    private function nowMs(): int
+    {
+        return (int) round(microtime(true) * 1000);
     }
 
     /**
@@ -104,6 +167,7 @@ class WebserverCertsAggregator
         }
 
         Cache::put(self::inflightKey($serverId), true, now()->addSeconds(180));
+        $this->resetProgress($serverId, 'Scan queued — waiting for a worker to pick it up…');
         ScanServerLiveCertsJob::dispatch($serverId);
     }
 
@@ -135,6 +199,7 @@ class WebserverCertsAggregator
             now()->addSeconds(self::CACHE_TTL_SECONDS),
         );
         Cache::forget(self::inflightKey($serverId));
+        $this->pushProgress($serverId, 'Scan failed — the worker could not complete it.');
     }
 
     /**
@@ -161,18 +226,45 @@ class WebserverCertsAggregator
      */
     private function runScan(Server $server): array
     {
+        $serverId = (string) $server->id;
+
+        // Stream the sweep so the live-progress log fills in real time: the bash
+        // script tags progress lines with SCAN_PROGRESS_MARKER and emits cert data
+        // as plain `path|...` lines. We reassemble chunk boundaries into lines and
+        // route each to the progress buffer or the data accumulator.
+        $dataLines = [];
+        $pending = '';
+        $consume = function (string $chunk) use (&$pending, &$dataLines, $serverId): void {
+            $pending .= $chunk;
+            while (($pos = strpos($pending, "\n")) !== false) {
+                $line = rtrim(substr($pending, 0, $pos), "\r");
+                $pending = substr($pending, $pos + 1);
+                $this->routeScanLine($line, $serverId, $dataLines);
+            }
+        };
+
         try {
             $ssh = new SshConnection($server);
-            $output = $ssh->exec($this->buildScanScript(), 20);
-            $exit = $ssh->lastExecExitCode();
+            $this->pushProgress($serverId, 'Connected over SSH — sweeping certificate paths…');
+            [, $exit] = $ssh->execWithCallbackAndExit($this->buildScanScript(), $consume, 20);
         } catch (\Throwable) {
-            return ['certs' => [], 'scanned_at' => null, 'unreadable' => true];
-        }
-        if ($exit !== null && $exit !== 0) {
+            $this->pushProgress($serverId, 'SSH connection failed — could not run the scan.');
+
             return ['certs' => [], 'scanned_at' => null, 'unreadable' => true];
         }
 
-        $certs = $this->parseScanOutput((string) $output);
+        // Flush any trailing partial line the script emitted without a newline.
+        if ($pending !== '') {
+            $this->routeScanLine(rtrim($pending, "\r"), $serverId, $dataLines);
+        }
+
+        if ($exit !== null && $exit !== 0) {
+            $this->pushProgress($serverId, 'Scan command exited with an error.');
+
+            return ['certs' => [], 'scanned_at' => null, 'unreadable' => true];
+        }
+
+        $certs = $this->parseScanOutput(implode("\n", $dataLines));
 
         usort($certs, function (array $a, array $b): int {
             $aDays = $a['days_until_expiry'] ?? PHP_INT_MAX;
@@ -181,11 +273,27 @@ class WebserverCertsAggregator
             return $aDays <=> $bDays;
         });
 
+        $this->pushProgress($serverId, sprintf('Parsed %d certificate(s) — done.', count($certs)));
+
         return [
             'certs' => $certs,
             'scanned_at' => CarbonImmutable::now(),
             'unreadable' => false,
         ];
+    }
+
+    /** Send a reassembled stdout line to the progress buffer (tagged) or the cert-data accumulator. */
+    private function routeScanLine(string $line, string $serverId, array &$dataLines): void
+    {
+        if ($line === '') {
+            return;
+        }
+        if (str_starts_with($line, self::SCAN_PROGRESS_MARKER)) {
+            $this->pushProgress($serverId, substr($line, strlen(self::SCAN_PROGRESS_MARKER)));
+
+            return;
+        }
+        $dataLines[] = $line;
     }
 
     /**
@@ -202,27 +310,39 @@ class WebserverCertsAggregator
     private function buildScanScript(): string
     {
         $paths = implode(' ', array_map('escapeshellarg', self::SEARCH_PATHS));
+        $marker = self::SCAN_PROGRESS_MARKER;
 
-        // Filter rules at the awk stage: skip privkey-style files (which
-        // openssl x509 would refuse) and OS CA bundle paths (the goal is
-        // the server's own server-certs, not the trust store).
+        // Progress lines are emitted via emit() tagged with the marker so the
+        // streaming callback can split them from `path|...` cert-data lines and
+        // surface them in the live log. Filter rules skip privkey-style files
+        // (which openssl x509 would refuse) and OS CA bundle paths — the goal is
+        // the server's own server-certs, not the trust store.
         return <<<BASH
 set +e
-sudo -n find {$paths} -type f -maxdepth 5 \\
+emit() { printf '%s%s\\n' '{$marker}' "\$1"; }
+emit "Searching certificate directories…"
+files=\$(sudo -n find {$paths} -type f -maxdepth 5 \\
     \\( -name '*.pem' -o -name '*.crt' -o -name '*.cer' -o -name 'fullchain.pem' -o -name 'cert.pem' \\) \\
     2>/dev/null \\
-    | grep -Ev '/(privkey|key|cabundle|ca-bundle|ca-certificates|chain)\\.pem$' \\
-    | sort -u \\
-    | while IFS= read -r f; do
-        out=\$(sudo -n openssl x509 -in "\$f" -noout -subject -issuer -enddate 2>/dev/null)
-        if [ -z "\$out" ]; then
-            continue
-        fi
-        subj=\$(printf %s "\$out" | sed -n 's/^subject= *//p' | head -n 1)
-        iss=\$(printf %s "\$out" | sed -n 's/^issuer= *//p' | head -n 1)
-        exp=\$(printf %s "\$out" | sed -n 's/^notAfter= *//p' | head -n 1)
-        printf '%s|%s|%s|%s\\n' "\$f" "\$subj" "\$iss" "\$exp"
-    done
+    | grep -Ev '/(privkey|key|cabundle|ca-bundle|ca-certificates|chain)\\.pem\$' \\
+    | sort -u)
+count=\$(printf '%s\\n' "\$files" | grep -c .)
+emit "Found \$count candidate certificate file(s)."
+n=0
+printf '%s\\n' "\$files" | while IFS= read -r f; do
+    [ -z "\$f" ] && continue
+    n=\$((n+1))
+    emit "[\$n/\$count] reading \$f"
+    out=\$(sudo -n openssl x509 -in "\$f" -noout -subject -issuer -enddate 2>/dev/null)
+    if [ -z "\$out" ]; then
+        continue
+    fi
+    subj=\$(printf %s "\$out" | sed -n 's/^subject= *//p' | head -n 1)
+    iss=\$(printf %s "\$out" | sed -n 's/^issuer= *//p' | head -n 1)
+    exp=\$(printf %s "\$out" | sed -n 's/^notAfter= *//p' | head -n 1)
+    printf '%s|%s|%s|%s\\n' "\$f" "\$subj" "\$iss" "\$exp"
+done
+emit "Reading complete."
 BASH;
     }
 

@@ -26,7 +26,7 @@ trait LoadsLiveServerCerts
      * comfortably cover the job's own 90s timeout + queue latency without
      * leaving the operator staring at a spinner if the worker is down.
      */
-    private const LIVE_CERTS_POLL_INTERVAL_SECONDS = 4;
+    private const LIVE_CERTS_POLL_INTERVAL_SECONDS = 2;
 
     private const LIVE_CERTS_POLL_TIMEOUT_SECONDS = 60;
 
@@ -48,6 +48,15 @@ trait LoadsLiveServerCerts
     /** Number of poll ticks elapsed for the in-flight scan; drives the client-side timeout. */
     public int $liveCertsPollCount = 0;
 
+    /**
+     * Live progress lines streamed by the scan job (oldest first), rendered as a
+     * terminal-style log in the panel so the operator sees what the sweep is doing
+     * — and, on timeout, how far it got — instead of a bare spinner.
+     *
+     * @var list<array{t: int, line: string}>
+     */
+    public array $liveCertsProgress = [];
+
     /** Fired from wire:init (and the Rescan button via refreshLiveCerts). */
     public function loadLiveCerts(bool $forceFresh = false): void
     {
@@ -58,6 +67,7 @@ trait LoadsLiveServerCerts
             $this->liveCertsLoaded = true;
             $this->liveCertsScanning = false;
             $this->liveCertsTimedOut = false;
+            $this->liveCertsProgress = [];
 
             return;
         }
@@ -80,6 +90,7 @@ trait LoadsLiveServerCerts
         $this->liveCertsTimedOut = false;
         $this->liveCertsError = null;
         $this->liveCertsPollCount = 0;
+        $this->liveCertsProgress = $aggregator->progress($this->server);
     }
 
     /**
@@ -94,7 +105,13 @@ trait LoadsLiveServerCerts
             return;
         }
 
-        $cached = app(WebserverCertsAggregator::class)->cached($this->server);
+        $aggregator = app(WebserverCertsAggregator::class);
+
+        // Surface whatever the job has streamed so far, every tick, so the log
+        // grows live even before a final result lands (or never does).
+        $this->liveCertsProgress = $aggregator->progress($this->server);
+
+        $cached = $aggregator->cached($this->server);
         if ($cached !== null) {
             $this->applyLiveCertResult($cached);
 
@@ -144,5 +161,6 @@ trait LoadsLiveServerCerts
         $this->liveCertsTimedOut = false;
         $this->liveCertsError = null;
         $this->liveCertsPollCount = 0;
+        $this->liveCertsProgress = [];
     }
 }
