@@ -91,11 +91,14 @@
             <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7" @if ($caddy_managed_certs_scanning) wire:poll.2s="pollCaddyManagedCerts" @endif>
                 <span class="inline-flex items-center gap-2"><x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" /> {{ __('Reading Caddy certificate…') }}</span>
             </div>
-        @elseif ($caddy_managed_certs_unreadable)
-            <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7">
-                {{ __('Could not read the certificate over SSH. Caddy still serves TLS — check that the deploy user has passwordless sudo for `find` + `openssl`.') }}
-            </div>
-        @elseif (empty($caddy_managed_certs))
+        @else
+            {{-- Replay the captured scan frames, then fade in the result. --}}
+            <x-replay-log :frames="$caddy_managed_certs_progress">
+                @if ($caddy_managed_certs_unreadable)
+                    <div class="px-6 py-8 text-center text-sm text-brand-moss sm:px-7">
+                        {{ __('Could not read the certificate over SSH. Caddy still serves TLS — check that the deploy user has passwordless sudo for `find` + `openssl`.') }}
+                    </div>
+                @elseif (empty($caddy_managed_certs))
             <div class="flex flex-col items-center justify-center gap-2 px-6 py-10 text-center sm:px-7">
                 <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-moss"><x-heroicon-o-clock class="h-6 w-6" /></span>
                 <p class="text-sm font-medium text-brand-ink">{{ __('Caddy hasn’t issued a certificate yet.') }}</p>
@@ -146,6 +149,8 @@
                     </li>
                 @endforeach
             </ul>
+                @endif
+            </x-replay-log>
         @endif
     </section>
 @endif

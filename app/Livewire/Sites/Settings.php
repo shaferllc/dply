@@ -326,6 +326,9 @@ class Settings extends Show
 
     public ?string $caddy_managed_certs_scanned_at_iso = null;
 
+    /** Captured scan progress frames (shared sweep); replayed on completion. @var list<array{t:int,line:string}> */
+    public array $caddy_managed_certs_progress = [];
+
     public ?string $laravel_ssh_setup_pending_action = null;
 
     public ?string $laravel_ssh_setup_error = null;
@@ -3857,6 +3860,7 @@ class Settings extends Show
         $this->caddy_managed_certs_scanning = true;
         $this->caddy_managed_certs_loaded = false;
         $this->caddy_managed_certs_error = null;
+        $this->caddy_managed_certs_progress = $aggregator->progress($this->server);
     }
 
     /** Driven by wire:poll while a scan is in flight; resolves once the job caches a result. */
@@ -3866,7 +3870,9 @@ class Settings extends Show
             return;
         }
 
-        $cached = app(WebserverCertsAggregator::class)->cached($this->server);
+        $aggregator = app(WebserverCertsAggregator::class);
+        $this->caddy_managed_certs_progress = $aggregator->progress($this->server);
+        $cached = $aggregator->cached($this->server);
         if ($cached !== null) {
             $this->applyCaddyManagedCerts($cached);
         }
