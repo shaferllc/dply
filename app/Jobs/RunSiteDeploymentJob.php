@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Notifications\SiteDeploymentCompletedNotification;
 use App\Services\Deploy\DeployContext;
 use App\Services\Deploy\DeployEngineResolver;
+use App\Services\Deploy\DeployResumePlan;
 use App\Services\Deploy\EphemeralDeployCredentialManager;
 use App\Services\Notifications\DeployDigestBuffer;
 use App\Services\Notifications\NotificationPublisher;
@@ -41,6 +42,10 @@ class RunSiteDeploymentJob implements ShouldQueue
         public string $trigger = SiteDeployment::TRIGGER_MANUAL,
         public ?string $apiIdempotencyHash = null,
         public ?string $auditUserId = null,
+        // When set, resume the given prior failed deployment from the phase it
+        // failed at, re-using its staged release, instead of a fresh full
+        // deploy. Honoured only when that deployment is genuinely resumable.
+        public ?string $resumeFromDeploymentId = null,
     ) {}
 
     public function handle(
@@ -154,14 +159,20 @@ class RunSiteDeploymentJob implements ShouldQueue
         ], $this->timeout + 120);
 
         try {
-            $deployment = SiteDeployment::query()->create([
+            // Resume: when this run continues a prior failed deploy, build the
+            // plan and carry that deploy's already-run phases onto the new row
+            // so the timeline reads as the full pipeline (not just the tail).
+            // Invalid/stale ids silently fall back to a normal full deploy.
+            [$resumePlan, $resumeSeed] = $this->resolveResumePlan();
+
+            $deployment = SiteDeployment::query()->create(array_merge([
                 'site_id' => $this->site->id,
                 'project_id' => $this->site->project_id,
                 'trigger' => $this->trigger,
                 'status' => SiteDeployment::STATUS_RUNNING,
                 'started_at' => now(),
                 'idempotency_key' => $this->apiIdempotencyHash,
-            ]);
+            ], $resumeSeed));
             Cache::put($activeKey, [
                 'started_at' => now()->toIso8601String(),
                 'deployment_id' => $deployment->id,
@@ -200,6 +211,7 @@ class RunSiteDeploymentJob implements ShouldQueue
                         apiIdempotencyHash: $this->apiIdempotencyHash,
                         auditUserId: $this->auditUserId,
                         deployment: $deployment,
+                        resume: $resumePlan,
                     ));
                 }
                 $redacted = DeployLogRedactor::redact($result['output']);
@@ -320,6 +332,54 @@ class RunSiteDeploymentJob implements ShouldQueue
             'Deployment blocked: the app requires environment variables that are not set: '
             .$shown.$more.'. Add them on the Deploy panel (or Settings → Environment) and redeploy.'
         );
+    }
+
+    /**
+     * Resolve the resume plan + the seed attributes for the new deployment row.
+     * Returns [null, []] for a normal deploy or when the referenced deployment
+     * isn't (or is no longer) resumable — so a stale "Retry from phase" click
+     * safely degrades to a full deploy rather than erroring.
+     *
+     * @return array{0: ?DeployResumePlan, 1: array<string, mixed>}
+     */
+    protected function resolveResumePlan(): array
+    {
+        if ($this->resumeFromDeploymentId === null) {
+            return [null, []];
+        }
+
+        $origin = SiteDeployment::query()
+            ->where('site_id', $this->site->id)
+            ->find($this->resumeFromDeploymentId);
+
+        $startPhase = $origin?->resumeStartPhase();
+        if ($origin === null || $startPhase === null) {
+            return [null, []];
+        }
+
+        // Carry forward every phase that ran before the resume point so the new
+        // deployment's timeline shows the whole pipeline. The atomic deployer
+        // skips those phases on disk; these records keep them visible.
+        $carried = [];
+        $originPhases = is_array($origin->phase_results) ? $origin->phase_results : [];
+        foreach (DeployResumePlan::PHASE_ORDER as $phase) {
+            if ($phase === $startPhase) {
+                break;
+            }
+            if (isset($originPhases[$phase])) {
+                $carried[$phase] = $originPhases[$phase];
+            }
+        }
+
+        return [
+            new DeployResumePlan((string) $origin->release_folder, $startPhase),
+            [
+                'resume_of_deployment_id' => $origin->id,
+                'release_folder' => $origin->release_folder,
+                'git_sha' => $origin->git_sha,
+                'phase_results' => $carried !== [] ? $carried : null,
+            ],
+        ];
     }
 
     protected function clearIdempotencyInflight(): void

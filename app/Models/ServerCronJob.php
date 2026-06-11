@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\DescribesCronExpression;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ServerCronJob extends Model
 {
-    use HasUlids;
+    use DescribesCronExpression, HasUlids;
 
     public const OVERLAP_ALLOW = 'allow';
 

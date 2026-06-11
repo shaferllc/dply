@@ -45,6 +45,7 @@ use App\Console\Commands\RenewServerWildcardCertificatesCommand;
 use App\Console\Commands\RevokeExpiredServerSshSessionsCommand;
 use App\Console\Commands\RollupEdgeAnalyticsEngineCommand;
 use App\Console\Commands\RunDueDeploymentSchedulesCommand;
+use App\Console\Commands\RunDueScheduledDeploysCommand;
 use App\Console\Commands\SecretsCheckDriftCommand;
 use App\Console\Commands\SecretsEscrowCommand;
 use App\Console\Commands\SecretsRestoreDrillCommand;
@@ -109,6 +110,12 @@ final class DplySchedule
             ->everyMinute()
             ->withoutOverlapping()
             ->name('run-due-deployment-schedules');
+
+        // One-off delayed deploys (deploy at a future time, single shot).
+        $schedule->command(RunDueScheduledDeploysCommand::class)
+            ->everyMinute()
+            ->withoutOverlapping()
+            ->name('run-due-scheduled-deploys');
 
         // Worker pools: autoscale by queue backlog, and alert when a pool's
         // primary is unhealthy (manual promote — see WorkerPoolPrimaryHealthCommand).

@@ -161,9 +161,10 @@ class OptimizeSitePipelineJob implements ShouldQueue
             $needed[] = ['type' => SiteDeployStep::TYPE_ARTISAN_MIGRATE, 'phase' => SiteDeployStep::PHASE_RELEASE, 'command' => null, 'label' => 'Run migrations'];
             $needed[] = ['type' => SiteDeployStep::TYPE_ARTISAN_OPTIMIZE, 'phase' => SiteDeployStep::PHASE_RELEASE, 'command' => null, 'label' => 'Cache config & routes (optimize)'];
             $needed[] = ['type' => SiteDeployStep::TYPE_ARTISAN_STORAGE_LINK, 'phase' => SiteDeployStep::PHASE_RELEASE, 'command' => null, 'label' => 'Link public storage'];
-            if (isset($require['laravel/horizon'])) {
-                $needed[] = ['type' => SiteDeployStep::TYPE_ARTISAN_HORIZON_TERMINATE, 'phase' => SiteDeployStep::PHASE_RELEASE, 'command' => null, 'label' => 'Restart Horizon'];
-            }
+            // Horizon + queue workers are restarted post-cutover by dply's own
+            // managed restart (guarded on the package + command existing), so we
+            // no longer add an explicit horizon:terminate step — it was redundant
+            // and, in the release phase, bounced workers onto the old release.
             if (isset($require['laravel/octane'])) {
                 $needed[] = ['type' => SiteDeployStep::TYPE_CUSTOM, 'phase' => SiteDeployStep::PHASE_RELEASE, 'command' => 'php artisan octane:reload', 'label' => 'Reload Octane'];
             }

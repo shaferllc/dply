@@ -16,6 +16,6 @@ final class ByoServerDeployEngine implements DeployEngine
 
     public function run(DeployContext $context): array
     {
-        return $this->gitDeployer->run($context->site(), $context->deployment);
+        return $this->gitDeployer->run($context->site(), $context->deployment, $context->resume);
     }
 }

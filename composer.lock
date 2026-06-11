@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "557328ef3593e03f838ffac4860d0c9c",
+    "content-hash": "dc28a71200b3454303c4953eb56b1cca",
     "packages": [
         {
             "name": "aws/aws-crt-php",
@@ -1151,6 +1151,93 @@
                 "source": "https://github.com/doctrine/sql-formatter/tree/1.5.4"
             },
             "time": "2026-02-08T16:21:46+00:00"
+        },
+        {
+            "name": "dply/log-parser",
+            "version": "dev-feat/resume-from-phase",
+            "dist": {
+                "type": "path",
+                "url": "packages/log-parser",
+                "reference": "62955051d2aba6b5f82517b8d1b3b29da54ede55"
+            },
+            "require": {
+                "ext-json": "*",
+                "php": ">=8.3"
+            },
+            "require-dev": {
+                "pestphp/pest": "^4.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Dply\\LogParser\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Dply\\LogParser\\Tests\\": "tests/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Tolerant, dependency-free parsers that turn raw Laravel/Monolog and NGINX/Apache error-log text into structured records.",
+            "keywords": [
+                "apache",
+                "dply",
+                "laravel",
+                "log",
+                "monolog",
+                "nginx",
+                "parser"
+            ],
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "dply/nginx-config",
+            "version": "dev-feat/resume-from-phase",
+            "dist": {
+                "type": "path",
+                "url": "packages/nginx-config",
+                "reference": "917a6644a82eb793c738478e96cc210c4a60e0aa"
+            },
+            "require": {
+                "ext-json": "*",
+                "ext-mbstring": "*",
+                "php": ">=8.3"
+            },
+            "require-dev": {
+                "pestphp/pest": "^4.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Dply\\NginxConfig\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Dply\\NginxConfig\\Tests\\": "tests/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Parse, build and diff NGINX configuration as a structured directive tree. A modernized fork of nelexa/crossplane (a PHP port of nginx's crossplane), trimmed to the parser core.",
+            "keywords": [
+                "config",
+                "crossplane",
+                "dply",
+                "nginx",
+                "parser"
+            ],
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
         },
         {
             "name": "dragonmantank/cron-expression",
@@ -3833,6 +3920,62 @@
                 }
             ],
             "time": "2026-04-02T20:48:35+00:00"
+        },
+        {
+            "name": "lorisleiva/cron-translator",
+            "version": "v0.5.1",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/lorisleiva/cron-translator.git",
+                "reference": "99e87184dc4b535c157af888782e84ba1d397b6e"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/lorisleiva/cron-translator/zipball/99e87184dc4b535c157af888782e84ba1d397b6e",
+                "reference": "99e87184dc4b535c157af888782e84ba1d397b6e",
+                "shasum": ""
+            },
+            "require": {
+                "php": "^8.0"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^9.5"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Lorisleiva\\CronTranslator\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Loris LEIVA",
+                    "email": "loris.leiva@gmail.com",
+                    "homepage": "https://lorisleiva.com"
+                }
+            ],
+            "description": "Makes CRON expressions human-readable",
+            "homepage": "https://github.com/lorisleiva/cron-translator",
+            "keywords": [
+                "cron",
+                "expression",
+                "human"
+            ],
+            "support": {
+                "issues": "https://github.com/lorisleiva/cron-translator/issues",
+                "source": "https://github.com/lorisleiva/cron-translator/tree/v0.5.1"
+            },
+            "funding": [
+                {
+                    "url": "https://github.com/lorisleiva",
+                    "type": "github"
+                }
+            ],
+            "time": "2026-03-27T10:08:36+00:00"
         },
         {
             "name": "moneyphp/money",
@@ -14821,6 +14964,8 @@
     "aliases": [],
     "minimum-stability": "dev",
     "stability-flags": {
+        "dply/log-parser": 20,
+        "dply/nginx-config": 20,
         "shaferllc/dply-php-lambda": 20,
         "soloterm/solo": 20
     },

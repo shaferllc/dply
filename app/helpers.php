@@ -7,9 +7,23 @@ use App\Models\Site;
 use App\Models\User;
 use App\Services\Ai\LlmSynthesizer;
 use App\Services\OpsCopilot\OpsCopilotContextBuilder;
+use App\Support\Cron\CronDescriber;
 use App\Support\Servers\ServerInstalledServices;
 use Illuminate\Database\Eloquent\Model;
 use Laravel\Pennant\Feature;
+
+if (! function_exists('cron_describe')) {
+    /**
+     * Human-readable description of a cron expression ("Every day at 3:00am"),
+     * for render points where the expression is an array value or raw string
+     * rather than a model using the DescribesCronExpression trait. Null when the
+     * expression is empty or untranslatable.
+     */
+    function cron_describe(?string $expression): ?string
+    {
+        return CronDescriber::describe($expression);
+    }
+}
 
 if (! function_exists('reverb_health_check_url')) {
     /**

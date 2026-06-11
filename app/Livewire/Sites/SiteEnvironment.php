@@ -59,7 +59,9 @@ class SiteEnvironment extends Component
         // deployment contract/preflight (same as the Deploy hub did for its
         // Environment tab).
         $contract = app(DeploymentContractBuilder::class)->build($this->site);
-        $preflight = app(DeploymentPreflightValidator::class)->validate($this->site);
+        // Pass the contract we just built — validate() rebuilds it otherwise,
+        // doubling the most expensive piece of every render on this page.
+        $preflight = app(DeploymentPreflightValidator::class)->validate($this->site, $contract);
 
         return view('livewire.sites.site-environment', array_merge(
             SiteSettingsViewData::for(

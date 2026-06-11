@@ -148,6 +148,39 @@ trait ResolvesSiteUrls
         return 'https://github.com/'.$repo.'.git';
     }
 
+    /**
+     * Web URL to view a commit on the site's git provider, derived from its
+     * remote ({@see sourceControlRepositoryUrl()}). Handles SSH and HTTPS
+     * remotes and the path quirks of GitHub (/commit), GitLab (/-/commit) and
+     * Bitbucket (/commits). Null when there's no remote or sha.
+     */
+    public function commitWebUrl(?string $sha): ?string
+    {
+        $sha = trim((string) $sha);
+        $remote = trim((string) $this->sourceControlRepositoryUrl());
+        if ($sha === '' || $remote === '') {
+            return null;
+        }
+
+        // git@host:owner/repo(.git) → host + owner/repo
+        if (preg_match('#^[\w.-]+@([^:]+):(.+?)(?:\.git)?/?$#', $remote, $m) === 1) {
+            [$host, $path] = [$m[1], $m[2]];
+        // scheme://[user@]host/owner/repo(.git)
+        } elseif (preg_match('#^[a-z]+://(?:[^@/]+@)?([^/]+)/(.+?)(?:\.git)?/?$#i', $remote, $m) === 1) {
+            [$host, $path] = [$m[1], $m[2]];
+        } else {
+            return null;
+        }
+
+        $base = 'https://'.$host.'/'.$path;
+
+        return match (true) {
+            str_contains($host, 'gitlab') => $base.'/-/commit/'.$sha,
+            str_contains($host, 'bitbucket') => $base.'/commits/'.$sha,
+            default => $base.'/commit/'.$sha, // GitHub + generic
+        };
+    }
+
     public function deployHookUrl(): string
     {
         return route('hooks.site.deploy', ['site' => $this->id]);

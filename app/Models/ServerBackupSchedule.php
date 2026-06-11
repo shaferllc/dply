@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\DescribesCronExpression;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ServerBackupSchedule extends Model
 {
-    use HasUlids;
+    use DescribesCronExpression, HasUlids;
 
     public const TARGET_DATABASE = 'database';
 

@@ -36,6 +36,9 @@
                             'bg-brand-mist' => ! $schedule->is_active,
                         ]) title="{{ $schedule->is_active ? __('Active') : __('Paused') }}"></span>
                         <code class="rounded bg-white px-1.5 py-0.5 font-mono text-xs text-brand-ink ring-1 ring-inset ring-brand-ink/10">{{ $schedule->cron_expression }}</code>
+                        @if ($cronDesc = $schedule->cronDescription())
+                            <span class="truncate text-[11px] text-brand-mist">{{ $cronDesc }}</span>
+                        @endif
                         <span class="truncate text-[11px] text-brand-mist">
                             @if ($schedule->last_run_at)
                                 {{ __('last run :time', ['time' => $schedule->last_run_at->diffForHumans()]) }}

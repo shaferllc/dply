@@ -455,6 +455,9 @@
                                         @else
                                             <span class="font-mono text-brand-ink">{{ $schedule->cron_expression }}</span>
                                         @endif
+                                        @if ($cronDesc = $schedule->cronDescription())
+                                            <span class="text-[11px] text-brand-mist">{{ $cronDesc }}</span>
+                                        @endif
                                         <span aria-hidden="true" class="text-brand-mist/60">·</span>
                                         <button type="button" wire:click="toggleNotifyOnFailure('{{ $schedule->id }}')"
                                             title="{{ $schedule->notify_on_failure ? __('Email alerts on failure are ON. Click to disable.') : __('Email alerts on failure are OFF. Click to enable.') }}"

@@ -6,6 +6,8 @@ namespace App\Services\Sites;
 
 use App\Models\Site;
 use App\Services\SshConnectionFactory;
+use Dply\LogParser\LaravelLogParser;
+use Dply\LogParser\WebserverErrorLogParser;
 use Throwable;
 
 /**
@@ -31,10 +33,12 @@ final class SiteErrorReferenceResolver
 
     public function __construct(
         private readonly SshConnectionFactory $sshFactory,
+        private readonly LaravelLogParser $laravelParser = new LaravelLogParser,
+        private readonly WebserverErrorLogParser $webserverParser = new WebserverErrorLogParser,
     ) {}
 
     /**
-     * @return array{found: bool, reference: string, request: ?string, occurred_at: ?string, trace: list<string>, note: ?string}
+     * @return array{found: bool, reference: string, request: ?string, occurred_at: ?string, trace: list<string>, entries: list<array<string, mixed>>, primary: ?array<string, mixed>, note: ?string}
      */
     public function resolve(Site $site, string $reference): array
     {
@@ -45,6 +49,8 @@ final class SiteErrorReferenceResolver
             'request' => null,
             'occurred_at' => null,
             'trace' => [],
+            'entries' => [],
+            'primary' => null,
             'note' => $note,
         ];
 
@@ -68,14 +74,30 @@ final class SiteErrorReferenceResolver
             return $miss(__('Could not reach the server to search its logs.'));
         }
 
-        return $this->parse($raw, $reference, $miss);
+        return $this->parse($raw, $reference, $miss, $this->sourceMap($site));
     }
 
     /**
-     * @param  callable(?string): array{found: bool, reference: string, request: ?string, occurred_at: ?string, trace: list<string>, note: ?string}  $miss
-     * @return array{found: bool, reference: string, request: ?string, occurred_at: ?string, trace: list<string>, note: ?string}
+     * Map each remote log path the lookup script greps to the parser family that
+     * understands it, so a trace section can be parsed with the right grammar.
+     *
+     * @return array<string, 'laravel'|'fpm'|'web'>
      */
-    private function parse(string $raw, string $reference, callable $miss): array
+    private function sourceMap(Site $site): array
+    {
+        return [
+            $site->laravelLogPath() => 'laravel',
+            $site->phpFpmPoolErrorLogPath() => 'fpm',
+            $site->webserverErrorLogPath() => 'web',
+        ];
+    }
+
+    /**
+     * @param  callable(?string): array<string, mixed>  $miss
+     * @param  array<string, 'laravel'|'fpm'|'web'>  $sourceMap
+     * @return array{found: bool, reference: string, request: ?string, occurred_at: ?string, trace: list<string>, entries: list<array<string, mixed>>, primary: ?array<string, mixed>, note: ?string}
+     */
+    private function parse(string $raw, string $reference, callable $miss, array $sourceMap = []): array
     {
         $request = null;
         $occurredAt = null;
@@ -107,14 +129,123 @@ final class SiteErrorReferenceResolver
             return $miss(__('No request with that reference was found in the recent logs. The code may be older than log retention, or the request never reached PHP (for example, the app was down and the webserver returned the error itself).'));
         }
 
+        $entries = $this->structureTrace($trace, $sourceMap);
+
         return [
             'found' => true,
             'reference' => $reference,
             'request' => $request,
             'occurred_at' => $occurredAt,
             'trace' => array_slice($trace, 0, self::TRACE_LINE_CAP),
+            'entries' => $entries,
+            'primary' => $this->pickPrimary($entries),
             'note' => $trace === [] ? __('The request was found, but no matching error line was located in the app logs around that time.') : null,
         ];
+    }
+
+    /**
+     * Turn the raw, mixed-source trace lines into structured log entries. The
+     * lookup script delimits each log file with a `── /path ──` header; we use
+     * the path to pick the right parser grammar (Laravel/Monolog for the app and
+     * FPM logs, nginx/apache for the webserver error log). Lines that don't parse
+     * are simply dropped from `entries` — they remain verbatim in `trace`.
+     *
+     * @param  list<string>  $trace
+     * @param  array<string, 'laravel'|'fpm'|'web'>  $sourceMap
+     * @return list<array<string, mixed>>
+     */
+    private function structureTrace(array $trace, array $sourceMap): array
+    {
+        $entries = [];
+        $file = null;
+        $source = null;
+        $buffer = [];
+
+        $flush = function () use (&$entries, &$buffer, &$file, &$source): void {
+            $lines = $buffer;
+            $buffer = [];
+            if ($source === null || $lines === []) {
+                return;
+            }
+
+            $text = implode("\n", $lines);
+            $records = $source === 'web'
+                ? $this->webserverParser->parse($text)
+                : $this->laravelParser->parse($text);
+
+            foreach ($records as $record) {
+                if (($record['parsed'] ?? false) !== true) {
+                    continue;
+                }
+                $entries[] = $this->normalizeEntry($record, $source, $file);
+            }
+        };
+
+        foreach ($trace as $line) {
+            if (preg_match('/^──\s*(.+?)\s*──$/', trim($line), $m)) {
+                $flush();
+                $file = $m[1];
+                $source = $sourceMap[$file] ?? 'laravel';
+
+                continue;
+            }
+            $buffer[] = $line;
+        }
+        $flush();
+
+        return array_slice($entries, 0, self::TRACE_LINE_CAP);
+    }
+
+    /**
+     * Flatten a parser record (Laravel or webserver) into a uniform entry shape.
+     *
+     * @param  array<string, mixed>  $record
+     * @return array<string, mixed>
+     */
+    private function normalizeEntry(array $record, string $source, ?string $file): array
+    {
+        $datetime = $record['datetime'] ?? null;
+        $level = (string) ($record['level'] ?? '');
+
+        return [
+            'source' => $source,
+            'file' => $file,
+            'level' => $level !== '' ? strtoupper($level) : null,
+            'datetime' => $datetime instanceof \DateTimeInterface ? $datetime->format(DATE_ATOM) : null,
+            'message' => trim((string) ($record['message'] ?? '')),
+            'trace' => array_values(array_map('strval', (array) ($record['trace'] ?? []))),
+            'raw' => (string) ($record['raw'] ?? ''),
+        ];
+    }
+
+    /**
+     * Pick the single most actionable entry to surface as the headline error:
+     * the highest-severity line, breaking ties toward the application (Laravel)
+     * log since that's where the stack trace and root cause live.
+     *
+     * @param  list<array<string, mixed>>  $entries
+     * @return ?array<string, mixed>
+     */
+    private function pickPrimary(array $entries): ?array
+    {
+        $rank = [
+            'EMERGENCY' => 7, 'EMERG' => 7, 'ALERT' => 6, 'CRITICAL' => 5, 'CRIT' => 5,
+            'ERROR' => 4, 'WARNING' => 3, 'WARN' => 3, 'NOTICE' => 2, 'INFO' => 1, 'DEBUG' => 0,
+        ];
+
+        $best = null;
+        $bestScore = -1;
+        foreach ($entries as $entry) {
+            $severity = $rank[strtoupper((string) ($entry['level'] ?? ''))] ?? 1;
+            // Weight severity above source, then prefer the app log on a tie.
+            $score = ($severity * 2) + (($entry['source'] ?? '') === 'laravel' ? 1 : 0);
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $best = $entry;
+            }
+        }
+
+        return $best;
     }
 
     /**

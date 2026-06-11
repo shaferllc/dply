@@ -11,6 +11,7 @@ class SiteEnvPusher
     public function __construct(
         protected DotEnvFileParser $parser,
         protected DotEnvFileWriter $writer,
+        protected SiteEnvWriteGuard $guard,
     ) {}
 
     /**
@@ -56,14 +57,27 @@ class SiteEnvPusher
         }
 
         // Compose attached-resource bindings under the cache (cache/override
-        // wins). When a binding contributes keys the cache lacks, re-render the
-        // file so they're physically written to the server's .env.
+        // wins). The merged map is both what gets written AND what we validate —
+        // a binding-supplied DB_HOST/REDIS_HOST shouldn't read as "missing".
         $bindingEnv = $this->bindingEnv($site);
-        if ($bindingEnv !== []) {
-            $merged = array_merge($bindingEnv, $parsed['variables']);
-            if ($merged !== $parsed['variables']) {
-                $content = $this->writer->render($merged, $parsed['comments']);
-            }
+        $mergedVars = $bindingEnv !== []
+            ? array_merge($bindingEnv, $parsed['variables'])
+            : $parsed['variables'];
+
+        // Test it's valid first. Only on real operator pushes ($overridePath is
+        // null) — the deploy-seeding path runs the pipeline's own required-env
+        // gate and seeds before the release is built (nothing to live-test).
+        // Static danger check here (fail fast, no round-trip); the live boot
+        // test runs server-side just before the swap, inside writeViaTmp().
+        $validateBeforeWrite = $overridePath === null;
+        if ($validateBeforeWrite) {
+            $this->guard->assertSafeToWrite($mergedVars);
+        }
+
+        // When a binding contributed keys the cache lacks, re-render the file so
+        // they're physically written to the server's .env.
+        if ($bindingEnv !== [] && $mergedVars !== $parsed['variables']) {
+            $content = $this->writer->render($mergedVars, $parsed['comments']);
         }
 
         $path = $overridePath ?? $site->effectiveEnvFilePath();
@@ -72,7 +86,7 @@ class SiteEnvPusher
         $tmp = '/tmp/dply-env-'.Str::lower(Str::random(20));
 
         try {
-            return $this->writeViaTmp($ssh, $site, $content, $tmp, $path, $parent, $overridePath === null);
+            return $this->writeViaTmp($ssh, $site, $content, $tmp, $path, $parent, $validateBeforeWrite, $this->activeAppDir($site));
         } finally {
             // Defence-in-depth: the success path rm's $tmp inside the sudo
             // script below, but any throw before that point would otherwise
@@ -99,7 +113,8 @@ class SiteEnvPusher
         string $tmp,
         string $path,
         string $parent,
-        bool $updateCacheOrigin = true,
+        bool $operatorPush = true,
+        string $activeDir = '',
     ): string {
         $ssh->putFile($tmp, $content);
         // Stage the tmp file world-readable so root's `cp` (below) can read
@@ -107,6 +122,15 @@ class SiteEnvPusher
         // sandbox/quota error can't fail silently.
         $stageOut = $ssh->exec('chmod 644 '.escapeshellarg($tmp));
         $this->assertExitOk($ssh, $stageOut, 'staging tmp file');
+
+        // Live boot test: confirm the deployed app can actually load this
+        // candidate .env before we swap it into place. Throws on a boot
+        // failure (leaving the live .env untouched); gracefully skips when
+        // there's no built app to boot. Operator pushes only — the deploy
+        // seeding path has no built release to test against yet.
+        if ($operatorPush && $activeDir !== '') {
+            $this->guard->assertBootsOnServer($ssh, $activeDir, $tmp);
+        }
 
         // Unified flow: ALWAYS sudo. Whether the destination is inside the
         // docroot (default) or somewhere outside (e.g. /etc/dply/<slug>.env),
@@ -157,11 +181,27 @@ class SiteEnvPusher
         // edits, not from a server read. The "edited :time" pill is the
         // accurate label for this state. Skip when seeding a release dir
         // during deploy (override path) — that's not an operator edit.
-        if ($updateCacheOrigin) {
+        if ($operatorPush) {
             $site->forceFill(['env_cache_origin' => 'local-edit'])->save();
         }
 
         return $path;
+    }
+
+    /**
+     * The directory of the running app the live boot test should exercise:
+     * the `current` symlink for atomic deploys, else the repository root.
+     * Mirrors {@see SiteEnvRuntimeApplier}. Empty string when the site has no
+     * resolvable path yet (skips the live test).
+     */
+    private function activeAppDir(Site $site): string
+    {
+        $base = rtrim($site->effectiveRepositoryPath(), '/');
+        if ($base === '') {
+            return '';
+        }
+
+        return $site->isAtomicDeploys() ? $base.'/current' : $base;
     }
 
     /**

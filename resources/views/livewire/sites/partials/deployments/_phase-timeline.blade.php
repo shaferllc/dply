@@ -135,37 +135,10 @@
                 @if ($phase['steps'] !== [])
                     <ul class="mt-2 space-y-1.5">
                         @foreach ($phase['steps'] as $step)
-                            @php($stepFailed = ! $step['ok'] && ! $step['skipped'] && ! ($step['pending'] ?? false))
-                            @php($stepPending = $step['pending'] ?? false)
-                            <li>
-                                <div class="flex items-center gap-2 text-xs">
-                                    <span class="inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[9px] font-bold {{ $step['glyph_classes'] }}">{{ $step['glyph'] }}</span>
-                                    <span @class([
-                                        'min-w-0 truncate',
-                                        'font-medium text-rose-800' => $stepFailed,
-                                        'text-brand-mist' => $stepPending,
-                                        'text-brand-ink' => ! $stepFailed && ! $stepPending,
-                                    ])>{{ $step['label'] }}</span>
-                                    @if ($stepPending)
-                                        <span class="rounded bg-brand-sand/40 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-brand-mist">{{ __('queued') }}</span>
-                                    @elseif ($step['skipped'])
-                                        <span class="rounded bg-amber-50 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-amber-800 ring-1 ring-inset ring-amber-200/70">{{ __('skipped') }}</span>
-                                    @elseif ($step['duration_ms'] > 0)
-                                        <span class="font-mono tabular-nums text-brand-mist">{{ $step['duration_ms'] >= 1000 ? number_format($step['duration_ms'] / 1000, 1).'s' : $step['duration_ms'].'ms' }}</span>
-                                    @endif
-                                </div>
-                                @if (($step['output'] ?? '') !== '')
-                                    {{-- Any step with output is expandable (failed steps open by default). --}}
-                                    <div x-data="{ open: @js($stepFailed) }" class="mt-1 pl-[26px]">
-                                        <button type="button" x-on:click="open = ! open"
-                                            class="inline-flex items-center gap-1 text-[10px] font-semibold {{ $stepFailed ? 'text-rose-700' : 'text-brand-moss' }} hover:underline">
-                                            <span class="font-mono" x-text="open ? '▾' : '▸'"></span>
-                                            <span x-text="open ? @js(__('Hide output')) : @js(__('Show output'))"></span>
-                                        </button>
-                                        <pre x-show="open" x-cloak class="mt-1.5 max-h-96 overflow-auto rounded-lg bg-brand-ink p-3 font-mono text-[11px] leading-relaxed {{ $stepFailed ? 'text-rose-100/95' : 'text-brand-cream/90' }}">{{ $step['output'] }}</pre>
-                                    </div>
-                                @endif
-                            </li>
+                            @include('livewire.sites.partials.deployments._phase-timeline-step', [
+                                'step' => $step,
+                                'stepKeyBase' => 'step-out-'.($step['id'] ?? $loop->index),
+                            ])
                         @endforeach
                     </ul>
                 @endif

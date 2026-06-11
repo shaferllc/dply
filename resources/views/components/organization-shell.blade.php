@@ -123,6 +123,16 @@
                         {{ __('Notification channels') }}
                     </a>
                 @endcan
+                @if (\Laravel\Pennant\Feature::for($org)->active('surface.realtime') || $org->realtimeApps()->exists())
+                    <a
+                        href="{{ route('organizations.realtime', $org) }}"
+                        wire:navigate
+                        @class([$navBase, $link('realtime')])
+                    >
+                        <x-heroicon-o-signal class="{{ $ni }}" aria-hidden="true" />
+                        {{ __('Realtime') }}
+                    </a>
+                @endif
                 @can('viewAny', \App\Models\ProviderCredential::class)
                     <a
                         href="{{ route('organizations.credentials', $org) }}"

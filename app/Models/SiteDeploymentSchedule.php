@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Console\Commands\RunDueDeploymentSchedulesCommand;
+use App\Jobs\RunSiteDeploymentJob;
+use App\Models\Concerns\DescribesCronExpression;
 use Cron\CronExpression;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
@@ -12,13 +15,13 @@ use Illuminate\Support\Carbon;
 
 /**
  * A recurring, cron-scheduled deploy for a site. Evaluated on the control-plane
- * Laravel scheduler (see {@see \App\Console\Commands\RunDueDeploymentSchedulesCommand}),
- * which dispatches {@see \App\Jobs\RunSiteDeploymentJob} when a schedule is due —
+ * Laravel scheduler (see {@see RunDueDeploymentSchedulesCommand}),
+ * which dispatches {@see RunSiteDeploymentJob} when a schedule is due —
  * deploys are control-plane orchestrated (SSH out), so this is NOT a remote crontab.
  */
 class SiteDeploymentSchedule extends Model
 {
-    use HasUlids;
+    use DescribesCronExpression, HasUlids;
 
     protected $table = 'site_deployment_schedules';
 

@@ -65,11 +65,23 @@ class SiteDeployStep extends Model
         self::TYPE_ARTISAN_MIGRATE_PRETEND,
         self::TYPE_ARTISAN_OPTIMIZE,
         self::TYPE_ARTISAN_STORAGE_LINK,
-        self::TYPE_ARTISAN_QUEUE_RESTART,
-        self::TYPE_ARTISAN_HORIZON_TERMINATE,
         self::TYPE_ARTISAN_DB_SEED,
         self::TYPE_ARTISAN_CACHE_CLEAR,
         self::TYPE_ARTISAN_PENNANT_CLEAR,
+    ];
+
+    /**
+     * Step types that restart long-running processes. These belong in the
+     * POST-ACTIVATE restart phase: in the release phase they'd run before the
+     * `current` symlink flip and bounce workers onto the OLD release. Running
+     * them after cutover reloads workers onto the new code. Each is also guarded
+     * on the command existing (see {@see command()}).
+     *
+     * @return list<string>
+     */
+    public const RESTART_STEP_TYPES = [
+        self::TYPE_ARTISAN_QUEUE_RESTART,
+        self::TYPE_ARTISAN_HORIZON_TERMINATE,
     ];
 
     /**
@@ -80,14 +92,14 @@ class SiteDeployStep extends Model
      *
      *   - BUILD   runs in releases/{id}/ before the symlink flip:
      *             dependency installs, asset builds, one-shot scaffolding.
+     *   - RELEASE runs in the new release BEFORE the cutover (so a failed
+     *             migration never goes live): DB migrations, optimize, etc.
      *   - SWAP    is dply-owned: the atomic `current` symlink flip.
      *             No user-configurable steps land here.
-     *   - RELEASE runs after the swap when the new release is live but
-     *             traffic might already be flowing: DB migrations,
-     *             post-deploy cache priming, etc.
-     *   - RESTART is dply-owned: `systemctl reload php-fpm` for PHP
-     *             sites, `systemctl restart dply-site-{id}` for non-PHP.
-     *             Not user-editable — preserves FPM-reload correctness.
+     *   - RESTART runs AFTER cutover: dply's own managed reload (FPM/Octane,
+     *             Horizon + queue workers it detects) runs first, then any
+     *             user RESTART-phase steps — the place for worker/daemon
+     *             restarts so they reload onto the new release, not the old.
      */
     public const PHASE_BUILD = 'build';
 
@@ -98,7 +110,7 @@ class SiteDeployStep extends Model
     public const PHASE_RESTART = 'restart';
 
     /** @return list<string> phases users can author steps in */
-    public const USER_PHASES = [self::PHASE_BUILD, self::PHASE_RELEASE];
+    public const USER_PHASES = [self::PHASE_BUILD, self::PHASE_RELEASE, self::PHASE_RESTART];
 
     /** @return list<string> all phases in canonical pipeline order */
     public const ALL_PHASES = [
@@ -143,9 +155,11 @@ class SiteDeployStep extends Model
      */
     public static function defaultPhaseFor(string $stepType): string
     {
-        return in_array($stepType, self::RELEASE_STEP_TYPES, true)
-            ? self::PHASE_RELEASE
-            : self::PHASE_BUILD;
+        return match (true) {
+            in_array($stepType, self::RESTART_STEP_TYPES, true) => self::PHASE_RESTART,
+            in_array($stepType, self::RELEASE_STEP_TYPES, true) => self::PHASE_RELEASE,
+            default => self::PHASE_BUILD,
+        };
     }
 
     /** @return list<string> */
@@ -215,20 +229,27 @@ class SiteDeployStep extends Model
             self::TYPE_ARTISAN_REVERB_INSTALL => 'php artisan reverb:install --no-interaction',
             self::TYPE_ARTISAN_STORAGE_LINK => 'php artisan storage:link',
             self::TYPE_ARTISAN_EVENT_CACHE => 'php artisan event:cache',
-            self::TYPE_ARTISAN_QUEUE_RESTART => 'php artisan queue:restart',
-            // Terminate gracefully, then VERIFY the process supervisor brought
-            // Horizon back. `horizon:terminate` exits 0 (a clean exit), so a unit
-            // with Restart=on-failure would silently leave Horizon dead after the
-            // deploy. We only check when Horizon was running beforehand (skips a
-            // false alarm on first deploy) and only WARN — never fail the deploy.
-            self::TYPE_ARTISAN_HORIZON_TERMINATE => 'BEFORE=$(pgrep -fc "artisan horizon" 2>/dev/null || echo 0); '
+            // Guarded on the command existing — skips cleanly (exit 0) on an app
+            // that doesn't register queue:restart rather than failing the deploy.
+            self::TYPE_ARTISAN_QUEUE_RESTART => '{ [ -f artisan ] && php artisan list 2>/dev/null | grep -q "queue:restart"; } '
+                .'&& php artisan queue:restart '
+                .'|| echo "[dply] queue:restart not available — skipping (no queue worker / command not installed)."',
+            // Only run when laravel/horizon is installed (horizon:terminate is
+            // registered). Then terminate gracefully and VERIFY the process
+            // supervisor brought Horizon back — `horizon:terminate` exits 0 (a
+            // clean exit), so a unit with Restart=on-failure would silently leave
+            // Horizon dead. We only check when Horizon was running beforehand
+            // (skips a false alarm on first deploy) and only WARN — never fail.
+            self::TYPE_ARTISAN_HORIZON_TERMINATE => 'if [ -f artisan ] && php artisan list 2>/dev/null | grep -q "horizon:terminate"; then '
+                .'BEFORE=$(pgrep -fc "artisan horizon" 2>/dev/null || echo 0); '
                 .'php artisan horizon:terminate; '
                 .'if [ "$BEFORE" -gt 0 ] 2>/dev/null; then '
                 .'for _i in 1 2 3 4 5 6 7 8; do sleep 1; pgrep -f "artisan horizon" >/dev/null 2>&1 && break; done; '
                 .'pgrep -f "artisan horizon" >/dev/null 2>&1 '
                 .'&& echo "[dply] Horizon is running after terminate." '
                 .'|| echo "[dply] WARNING: Horizon did not restart after horizon:terminate — verify its systemd unit is enabled with Restart=always."; '
-                .'else echo "[dply] Horizon was not running before terminate; skipping restart check."; fi',
+                .'else echo "[dply] Horizon was not running before terminate; skipping restart check."; fi; '
+                .'else echo "[dply] horizon:terminate not installed (no laravel/horizon) — skipping."; fi',
             self::TYPE_ARTISAN_DB_SEED => 'php artisan db:seed --force',
             self::TYPE_ARTISAN_CACHE_CLEAR => 'php artisan cache:clear',
             self::TYPE_ARTISAN_PENNANT_CLEAR => 'php artisan pennant:clear',

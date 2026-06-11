@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\Site;
+use App\Services\Sites\ReleaseEnvLinkChecker;
 use App\Services\Sites\SiteEnvPusher;
 use App\Services\Sites\SiteEnvRuntimeApplier;
 use Illuminate\Bus\Queueable;
@@ -96,6 +97,20 @@ class PushSiteEnvJob implements ShouldBeUnique, ShouldQueue
                 ]);
             }
 
+            // Drift check: with a relocated env (shared/.env), every release's
+            // .env should symlink to that one canonical file so this push reaches
+            // them all. Warn if a release carries a real/divergent .env — a
+            // rollback to it would serve stale secrets. Best-effort: never let a
+            // probe failure fail the push.
+            try {
+                $this->warnOnReleaseEnvDrift($site, $emit);
+            } catch (\Throwable $driftEx) {
+                Log::warning('PushSiteEnvJob: release .env drift check failed', [
+                    'site_id' => $this->siteId,
+                    'reason' => $driftEx->getMessage(),
+                ]);
+            }
+
             $this->completeConsoleAction();
         } catch (\Throwable $e) {
             $emit->error($e->getMessage(), 'push');
@@ -108,5 +123,40 @@ class PushSiteEnvJob implements ShouldBeUnique, ShouldQueue
 
             throw $e;
         }
+    }
+
+    /**
+     * Scan the atomic releases and surface a banner warning if any release's
+     * .env has drifted off the shared canonical file. No-op for layouts where
+     * each release legitimately owns its .env (see {@see ReleaseEnvLinkChecker}).
+     */
+    private function warnOnReleaseEnvDrift(Site $site, \App\Services\ConsoleActions\ConsoleEmitter $emit): void
+    {
+        $result = app(ReleaseEnvLinkChecker::class)->check($site);
+        if (! $result['applicable'] || $result['drifted'] === []) {
+            return;
+        }
+
+        $describe = static function (array $d): string {
+            $label = match ($d['kind']) {
+                'real_file' => __('real file'),
+                'missing' => __('no .env'),
+                'wrong_target' => __('→ :t', ['t' => (string) ($d['target'] ?? '?')]),
+                default => $d['kind'],
+            };
+
+            return $d['release'].' ('.$label.')';
+        };
+
+        $names = array_map($describe, array_slice($result['drifted'], 0, 5));
+        $more = count($result['drifted']) - count($names);
+        $list = implode(', ', $names).($more > 0 ? __(' +:n more', ['n' => $more]) : '');
+
+        $emit->warn(__(':n of :total release(s) do not symlink the shared .env (:canonical) — this push did not reach them, and a rollback to them would serve a stale or wrong .env. Re-deploy to relink: :list', [
+            'n' => count($result['drifted']),
+            'total' => $result['checked'],
+            'canonical' => $result['canonical'] !== '' ? $result['canonical'] : $site->effectiveEnvFilePath(),
+            'list' => $list,
+        ]), 'push');
     }
 }

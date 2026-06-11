@@ -117,6 +117,9 @@
                         @else
                             <p class="mt-1 text-xs text-brand-moss">
                                 <span class="font-mono">{{ $cardData['cron_expression'] }}</span>
+                                @if ($cronDesc = cron_describe($cardData['cron_expression']))
+                                    · <span class="text-brand-moss/80">{{ $cronDesc }}</span>
+                                @endif
                                 @if ($cardData['last_tick_at'])
                                     · {{ __('last tick :ago', ['ago' => $cardData['last_tick_at']->diffForHumans()]) }}
                                 @endif

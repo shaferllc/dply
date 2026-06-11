@@ -46,13 +46,14 @@ test('default phase for custom step is build', function () {
 test('default phase for unknown type falls back to build', function () {
     expect(SiteDeployStep::defaultPhaseFor('something_new'))->toBe(SiteDeployStep::PHASE_BUILD);
 });
-test('user phases excludes swap and restart', function () {
+test('user phases are build, release and restart but never the dply-owned swap', function () {
     $userPhases = SiteDeployStep::userPhases();
 
     expect($userPhases)->toContain(SiteDeployStep::PHASE_BUILD);
     expect($userPhases)->toContain(SiteDeployStep::PHASE_RELEASE);
+    // Restart is now author-able (post-cutover worker/daemon restarts).
+    expect($userPhases)->toContain(SiteDeployStep::PHASE_RESTART);
     expect($userPhases)->not->toContain(SiteDeployStep::PHASE_SWAP);
-    expect($userPhases)->not->toContain(SiteDeployStep::PHASE_RESTART);
 });
 test('all phases in canonical pipeline order', function () {
     expect(SiteDeployStep::allPhases())->toBe(['build', 'swap', 'release', 'restart']);

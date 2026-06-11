@@ -325,4 +325,21 @@ return [
         'max_age_hours' => max(1, (int) env('DPLY_REMOTE_TASK_RUNNER_MAX_AGE_HOURS', 48)),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Nginx overwrite guard
+    |--------------------------------------------------------------------------
+    | Before dply overwrites a site's nginx vhost it parses the current on-box
+    | config (via dply/nginx-config) and reports any directives a hand-edit added
+    | that the regenerated config would destroy. Modes:
+    |   'warn'  — log + emit the foreign directives to the deploy console, then
+    |             write anyway (default; never blocks a deploy).
+    |   'abort' — refuse the write and throw, so a manually-customized vhost is
+    |             never clobbered until the operator folds the change into dply.
+    |   'off'   — skip the read-back entirely.
+    | `nginx -t` on the box remains the authority on syntax; this only guards
+    | against silently discarding manual edits.
+    */
+    'nginx_overwrite_guard' => env('DPLY_NGINX_OVERWRITE_GUARD', 'warn'),
+
 ];

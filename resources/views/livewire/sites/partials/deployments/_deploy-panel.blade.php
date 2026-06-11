@@ -19,6 +19,10 @@
         : $site->deployments()->where('status', 'success')->latest()->first();
     $deployedSha = $deployedDeployment?->git_sha;
     $shortSha = $deployedSha ? \Illuminate\Support\Str::limit($deployedSha, 7, '') : null;
+    // Detail-modal data for the deployed commit badge.
+    $commitWebUrl = $deployedSha ? $site->commitWebUrl($deployedSha) : null;
+    $deployedBranch = trim((string) ($site->git_branch ?? ''));
+    $deployedDurationMs = $deployedDeployment ? $deployedDeployment->phaseTotalDurationMs() : 0;
     $totalDurationMs = $latest ? $latest->phaseTotalDurationMs() : 0;
     // Phase timeline derived from the site's pipeline (Clone → Build →
     // Release → Activate) overlaid with this deployment's recorded steps.
@@ -40,6 +44,49 @@
     @endif
     @if ($latest && $latest->status === 'failed')
         @include('livewire.sites.partials.deployments._remediation-panel', ['deployment' => $latest])
+    @endif
+
+    {{-- Resume-from-phase: the deploy failed AFTER staging a release but BEFORE
+         cutover (a build step or a migration broke), so the prior release is
+         still live and the staged release is intact on disk. Offer to re-run
+         from the failed phase — reusing the clone (and, past build, the built
+         vendor/) — instead of a full deploy from scratch. Atomic only. --}}
+    @if ($latest && $latest->status === 'failed' && $site->isAtomicDeploys() && $latest->isResumable() && method_exists($this, 'confirmResumeDeployment'))
+        @php $resumePhase = $latest->resumeStartPhase(); @endphp
+        <div class="mb-6 overflow-hidden rounded-2xl border border-sky-200 bg-sky-50/60">
+            <div class="flex items-start gap-3 px-6 py-5 sm:px-7">
+                <span class="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-700 ring-1 ring-sky-600/20">
+                    <x-heroicon-o-arrow-path class="h-5 w-5" aria-hidden="true" />
+                </span>
+                <div class="min-w-0 flex-1">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">{{ __('Resume available') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Retry from the :phase phase', ['phase' => $resumePhase]) }}</h3>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                        @if ($resumePhase === 'restart')
+                            {{ __('The new release is already live — only a post-cutover step (the post-deploy command or a worker restart) failed. Resume re-runs just that tail: no re-clone, re-build, re-migrate, or symlink flip.') }}
+                        @elseif ($resumePhase === 'release')
+                            {{ __('The build succeeded but a release step failed before cutover. Resume re-uses that build and re-runs the release phase onward — the previous release stays live until it passes. Note: this re-runs migrations.') }}
+                        @else
+                            {{ __('A build step failed before cutover. Resume re-uses the existing checkout and re-runs from the build phase — the previous release stays live until the new build passes.') }}
+                        @endif
+                    </p>
+                    <div class="mt-4 flex flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            wire:click="confirmResumeDeployment('{{ $latest->id }}')"
+                            wire:loading.attr="disabled"
+                            wire:target="confirmResumeDeployment('{{ $latest->id }}')"
+                            @disabled($deployInProgress)
+                            class="inline-flex items-center gap-2 rounded-lg bg-sky-700 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-800 disabled:opacity-60"
+                        >
+                            <x-heroicon-o-arrow-path class="h-4 w-4" aria-hidden="true" />
+                            {{ __('Resume from :phase', ['phase' => $resumePhase]) }}
+                        </button>
+                        <span class="text-[11px] text-brand-mist">{{ __('Or use Deploy above for a clean full run.') }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
     @endif
 
     @if ($this->deployLockInfo ?? null)
@@ -375,12 +422,53 @@
                         {{ __('Deploy linked sites') }}
                     </button>
                 @endif
-                <button type="button" wire:click="setTab('sync')" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-brand-moss transition-colors hover:text-brand-ink" title="{{ __('Pick several sites (this one + its worker) and deploy them together.') }}">
-                    <x-heroicon-o-arrows-right-left class="h-4 w-4" />
-                    {{ __('Sync deploy') }}
-                </button>
+
+                {{-- Schedule a one-off deploy for later (delay presets + custom time). --}}
+                <div x-data="{ open: false, custom: '' }" class="relative">
+                    <button type="button" x-on:click="open = ! open" title="{{ __('Schedule this deploy for later') }}" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40">
+                        <x-heroicon-o-clock class="h-4 w-4" />
+                        {{ __('Schedule') }}
+                        <x-heroicon-m-chevron-down class="h-3.5 w-3.5 opacity-60" />
+                    </button>
+                    <div x-show="open" x-cloak x-on:click.outside="open = false" x-transition class="absolute right-0 z-20 mt-1 w-60 rounded-xl border border-brand-ink/10 bg-white p-1.5 shadow-xl">
+                        <p class="px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Deploy in') }}</p>
+                        @foreach (['15' => __('15 minutes'), '60' => __('1 hour'), '180' => __('3 hours'), '720' => __('12 hours')] as $mins => $label)
+                            <button type="button" wire:click="scheduleDeploy('{{ $mins }}')" x-on:click="open = false" class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-brand-ink hover:bg-brand-sand/40">
+                                <x-heroicon-o-clock class="h-3.5 w-3.5 text-brand-moss" />
+                                {{ $label }}
+                            </button>
+                        @endforeach
+                        <div class="my-1 border-t border-brand-ink/10"></div>
+                        <div class="px-2 py-1.5">
+                            <label class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Custom time') }}</label>
+                            <input type="datetime-local" x-model="custom" class="dply-input mt-1 w-full text-xs" />
+                            <button type="button" x-on:click="if (custom) { $wire.scheduleDeploy(custom); open = false; custom = '' }" x-bind:disabled="! custom" class="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream hover:bg-brand-forest disabled:opacity-50">
+                                <x-heroicon-o-clock class="h-3.5 w-3.5" />
+                                {{ __('Schedule deploy') }}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
+
+        {{-- Pending delayed deploy banner. --}}
+        @if ($this->pendingScheduledDeploy)
+            @php $pendingSchedule = $this->pendingScheduledDeploy; @endphp
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-6 py-3 sm:px-8">
+                <p class="flex items-center gap-2 text-sm text-amber-900">
+                    <x-heroicon-o-clock class="h-4 w-4 shrink-0 text-amber-700" />
+                    <span>
+                        {{ __('Deploy scheduled :rel', ['rel' => $pendingSchedule->run_at->diffForHumans()]) }}
+                        <span class="text-amber-700/80" title="{{ $pendingSchedule->run_at->toDayDateTimeString() }}">· {{ $pendingSchedule->run_at->isoFormat('MMM D, h:mm A') }}</span>
+                    </span>
+                </p>
+                <button type="button" wire:click="cancelScheduledDeploy" wire:loading.attr="disabled" wire:target="cancelScheduledDeploy" class="inline-flex items-center gap-1 text-xs font-semibold text-amber-800 hover:underline">
+                    <x-heroicon-o-x-mark class="h-4 w-4" />
+                    {{ __('Cancel') }}
+                </button>
+            </div>
+        @endif
 
         {{-- Summary stats — hairline-divided cells (gap-px over a tinted track)
              so the four read as one continuous strip rather than four boxes,
@@ -393,7 +481,15 @@
                 </dt>
                 <dd class="mt-1.5 truncate">
                     @if ($shortSha)
-                        <span class="rounded bg-brand-sand/60 px-1.5 py-0.5 font-mono text-xs font-semibold text-brand-sage" title="{{ $deployedSha }}">{{ $shortSha }}</span>
+                        <button
+                            type="button"
+                            x-on:click="$dispatch('open-modal', 'deployed-commit')"
+                            title="{{ __('View commit details') }}"
+                            class="inline-flex items-center gap-1 rounded bg-brand-sand/60 px-1.5 py-0.5 font-mono text-xs font-semibold text-brand-sage transition-colors hover:bg-brand-sand hover:text-brand-forest focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-sage/40"
+                        >
+                            {{ $shortSha }}
+                            <x-heroicon-m-arrow-top-right-on-square class="h-3 w-3 opacity-60" aria-hidden="true" />
+                        </button>
                     @elseif ($latest)
                         <span class="text-brand-mist">{{ __('No successful deploy yet') }}</span>
                     @else
@@ -497,6 +593,79 @@
             </div>
         </div>
     </section>
+
+    {{-- Deployed-commit detail modal (opened from the summary badge). --}}
+    @if ($deployedDeployment)
+        <x-modal name="deployed-commit" maxWidth="lg" overlayClass="bg-brand-ink/30" focusable>
+            <div class="flex items-start gap-3 border-b border-brand-ink/10 px-6 py-5">
+                <x-icon-badge>
+                    <x-heroicon-o-code-bracket class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0">
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Deployed commit') }}</p>
+                    <h2 class="mt-1 font-mono text-lg font-semibold text-brand-ink">{{ $shortSha }}</h2>
+                    <p class="mt-1 text-sm text-brand-moss">{{ __('The commit currently live for this site (last successful deploy).') }}</p>
+                </div>
+            </div>
+
+            <div class="space-y-4 px-6 py-6">
+                {{-- Full SHA + copy. --}}
+                <div x-data="{ copied: false }">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ __('Full SHA') }}</p>
+                    <div class="mt-1 flex items-center gap-2">
+                        <code class="min-w-0 flex-1 truncate rounded-lg bg-brand-sand/40 px-3 py-2 font-mono text-xs text-brand-ink ring-1 ring-inset ring-brand-ink/10">{{ $deployedSha }}</code>
+                        <button
+                            type="button"
+                            x-on:click="navigator.clipboard.writeText(@js($deployedSha)); copied = true; setTimeout(() => copied = false, 1500)"
+                            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-2 text-xs font-semibold text-brand-ink hover:bg-brand-sand/40"
+                        >
+                            <template x-if="! copied"><span class="inline-flex items-center gap-1.5"><x-heroicon-o-clipboard-document class="h-4 w-4" /> {{ __('Copy') }}</span></template>
+                            <template x-if="copied"><span class="inline-flex items-center gap-1.5 text-emerald-700"><x-heroicon-o-check class="h-4 w-4" /> {{ __('Copied') }}</span></template>
+                        </button>
+                    </div>
+                </div>
+
+                {{-- Facts grid. Built as a list so an odd cell count makes the
+                     last cell span both columns — no empty grey track cell. --}}
+                @php
+                    $deployedAt = $deployedDeployment->finished_at ?? $deployedDeployment->created_at;
+                    $facts = [];
+                    if ($deployedBranch !== '') {
+                        $facts[] = ['label' => __('Branch'), 'value' => $deployedBranch, 'class' => 'truncate font-mono text-xs text-brand-ink'];
+                    }
+                    $facts[] = ['label' => __('Status'), 'value' => ucfirst($deployedDeployment->status), 'class' => 'text-xs font-semibold text-emerald-700'];
+                    $facts[] = ['label' => __('Deployed'), 'value' => $deployedAt?->diffForHumans(), 'class' => 'text-xs text-brand-ink', 'title' => $deployedAt?->toDayDateTimeString()];
+                    $facts[] = ['label' => __('Trigger'), 'value' => ucfirst((string) ($deployedDeployment->trigger ?? '—')), 'class' => 'text-xs text-brand-ink'];
+                    if ($deployedDurationMs > 0) {
+                        $facts[] = ['label' => __('Duration'), 'value' => number_format($deployedDurationMs / 1000, 1).'s', 'class' => 'font-mono text-xs text-brand-ink'];
+                    }
+                    $oddCount = count($facts) % 2 === 1;
+                @endphp
+                <dl class="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-brand-ink/[0.06] ring-1 ring-inset ring-brand-ink/10">
+                    @foreach ($facts as $fact)
+                        <div @class(['bg-white px-4 py-3', 'col-span-2' => $oddCount && $loop->last])>
+                            <dt class="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-mist">{{ $fact['label'] }}</dt>
+                            <dd class="mt-1 {{ $fact['class'] }}" @isset($fact['title']) title="{{ $fact['title'] }}" @endisset>{{ $fact['value'] }}</dd>
+                        </div>
+                    @endforeach
+                </dl>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-3 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
+                <div class="flex flex-wrap items-center gap-3">
+                    @if ($commitWebUrl)
+                        <a href="{{ $commitWebUrl }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-forest hover:underline">
+                            <x-heroicon-o-arrow-top-right-on-square class="h-4 w-4" /> {{ __('View on provider') }}
+                        </a>
+                    @endif
+                    <a href="{{ route('sites.deployments.show', ['server' => $server ?? $site->server, 'site' => $site, 'deployment' => $deployedDeployment]) }}" wire:navigate class="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-forest hover:underline">
+                        <x-heroicon-o-document-text class="h-4 w-4" /> {{ __('Open deployment') }}
+                    </a>
+                </div>
+                <x-secondary-button type="button" x-on:click="$dispatch('close-modal', 'deployed-commit')">{{ __('Close') }}</x-secondary-button>
+            </div>
+        </x-modal>
+    @endif
 
     @if (method_exists($this, 'applyPipelineOptimization'))
         @include('livewire.sites.partials.pipeline._optimize-preview-modal')
