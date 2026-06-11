@@ -8,6 +8,7 @@ use App\Jobs\EnsureSitePhpDatabaseDriverJob;
 use App\Models\ServerDatabase;
 use App\Models\Site;
 use App\Models\SiteBinding;
+use App\Services\Servers\DatabaseEngineReadinessGuard;
 use App\Services\Servers\ServerDatabaseProvisioner;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -206,6 +207,14 @@ trait ManagesDatabaseBindings
         $name = trim((string) ($params['name'] ?? ''));
         if ($name === '' || preg_match('/^[a-zA-Z0-9_]+$/', $name) !== 1) {
             throw new InvalidArgumentException(__('Database name must be alphanumeric/underscore.'));
+        }
+
+        // Don't create a row for an engine that isn't installed + TCP-listening —
+        // otherwise the binding is born unreachable. (This path previously had no
+        // engine check at all.)
+        $readiness = app(DatabaseEngineReadinessGuard::class)->check($server, $engine);
+        if (! $readiness['ok']) {
+            throw new RuntimeException((string) $readiness['reason']);
         }
 
         $isSqlite = $engine === 'sqlite';
