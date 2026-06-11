@@ -451,7 +451,24 @@
                                             class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
                                             <x-heroicon-o-signal class="h-3.5 w-3.5 text-brand-forest" /> {{ __('Test') }}
                                         </button>
+                                    @elseif ($type === 'broadcasting' && method_exists($this, 'testBroadcastingBinding'))
+                                        {{-- Managed apps publish a test event to the relay; BYO falls back
+                                             to the server-side TCP probe (handled in the method). --}}
+                                        <button type="button" wire:click="testBroadcastingBinding(@js((string) $binding->id))" wire:loading.attr="disabled" wire:target="testBroadcastingBinding"
+                                            title="{{ __('Publish a test event to the relay now.') }}"
+                                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
+                                            <x-heroicon-o-signal class="h-3.5 w-3.5 text-brand-forest" /> {{ __('Test') }}
+                                        </button>
                                     @endif
+                                @endif
+                                {{-- Jump from a managed broadcasting binding to the relay app's own page
+                                     (credentials, live stats, connected sites, tier). --}}
+                                @if ($type === 'broadcasting' && $attached && $binding->target_type === 'realtime_app' && (auth()->user()?->can('view', $site->organization) ?? false))
+                                    <a href="{{ route('organizations.realtime.show', [$site->organization, $binding->target_id]) }}" wire:navigate
+                                        title="{{ __('Manage the relay app (credentials, stats, tier).') }}"
+                                        class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                                        <x-heroicon-o-arrow-top-right-on-square class="h-3.5 w-3.5 text-brand-forest" /> {{ __('Manage app') }}
+                                    </a>
                                 @endif
                                 @if ($isLogging)
                                     <a href="{{ $sectionUrl('logs') }}" wire:navigate class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">

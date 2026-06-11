@@ -38,6 +38,16 @@ final class QuickDownloadController extends Controller
         return $this->respond(fn () => $streamer->prepareDatabaseDump($database), $streamer);
     }
 
+    public function adhocDatabaseDump(Server $server, \Illuminate\Http\Request $request, QuickDownloadStreamer $streamer): StreamedResponse|Response
+    {
+        $this->guard($server);
+
+        $engine = (string) $request->query('engine', '');
+        $name = (string) $request->query('name', '');
+
+        return $this->respond(fn () => $streamer->prepareAdHocDatabaseDump($server, $engine, $name), $streamer);
+    }
+
     public function siteArtifact(Server $server, Site $site, string $artifact, QuickDownloadStreamer $streamer): StreamedResponse|Response
     {
         $this->guard($server);

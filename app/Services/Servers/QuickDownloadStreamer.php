@@ -110,6 +110,53 @@ final class QuickDownloadStreamer
     }
 
     /**
+     * Dump a database that exists ON THE BOX but may not be catalogued as a
+     * {@see ServerDatabase} row, using dply's stored admin credentials (the same
+     * ones the drift analyzer / provisioner use to `SHOW DATABASES`). This is
+     * what lets an operator pull a dump of a database dply discovered but never
+     * formally registered.
+     */
+    public function prepareAdHocDatabaseDump(Server $server, string $engine, string $name): PreparedQuickDownload
+    {
+        $name = trim($name);
+        if ($name === '' || ! preg_match('/^[A-Za-z0-9_.\-]+$/', $name)) {
+            throw new \RuntimeException(__('Invalid database name.'));
+        }
+
+        $remote = app(ServerDatabaseRemoteExec::class);
+        $cred = $remote->adminCredential($server);
+        $tmp = '/tmp/dply-qd-'.Str::ulid().'.sql';
+
+        $command = match ($engine) {
+            'mysql', 'mariadb' => (($cred && $cred->mysql_root_password) ? 'env MYSQL_PWD='.escapeshellarg((string) $cred->mysql_root_password).' ' : '')
+                .'mysqldump -u '.escapeshellarg($cred?->mysql_root_username ?: 'root')
+                .' --single-transaction --quick --routines=false '.escapeshellarg($name).' > "$TMP"',
+            'postgres' => (! $cred || $cred->postgres_use_sudo)
+                ? 'sudo -u postgres pg_dump '.escapeshellarg($name).' > "$TMP"'
+                : (($cred->postgres_password ? 'env PGPASSWORD='.escapeshellarg((string) $cred->postgres_password).' ' : '')
+                    .'pg_dump -h 127.0.0.1 -U '.escapeshellarg($cred->postgres_superuser ?: 'postgres').' '.escapeshellarg($name).' > "$TMP"'),
+            default => throw new \RuntimeException(__('Quick download is not supported for :engine databases.', ['engine' => $engine])),
+        };
+
+        $bytes = $this->runBuild(
+            $server,
+            $this->buildToTempScript($tmp, $command),
+            useRoot: (bool) config('server_database.use_root_ssh', true),
+            fallbackToDeploy: (bool) config('server_database.fallback_to_deploy_user_ssh', true),
+        );
+
+        return new PreparedQuickDownload(
+            server: $server,
+            remotePath: $tmp,
+            bytes: $bytes,
+            filename: $name.'-'.now()->format('Ymd-His').'.sql',
+            mime: 'application/sql',
+            useRoot: (bool) config('server_database.use_root_ssh', true),
+            cleanup: true,
+        );
+    }
+
+    /**
      * Build one of the per-site artifacts into a server temp file (or, for
      * single small files like .env / the vhost, point straight at the file).
      */

@@ -8,6 +8,7 @@ use App\Jobs\FixSiteBindingConnectivityJob;
 use App\Jobs\InstallCacheServiceJob;
 use App\Jobs\SendBindingTestEmailJob;
 use App\Jobs\SwitchCacheServiceJob;
+use App\Jobs\TestBroadcastingBindingJob;
 use App\Jobs\ValidateBindingConnectivityJob;
 use App\Jobs\ValidateSiteBindingsReachableJob;
 use App\Models\AiCredential;
@@ -1488,6 +1489,58 @@ trait ManagesSiteBindings
             $run,
             __('Test email sent to :to — check the inbox (and spam).', ['to' => $recipient]),
             __('The test email could not be sent — see the console for the transport error.'),
+        );
+    }
+
+    /**
+     * Test a broadcasting binding. For a managed dply Realtime app, publish a
+     * harmless test event to the relay from the control plane (no SSH) — a 2xx
+     * proves the relay is live and the app credentials are accepted. BYO
+     * bindings have no managed relay, so they fall back to the TCP reachability
+     * probe (which already resolves PUSHER_HOST:443 via BindingReachability).
+     * Either path records config.connectivity so the card badge flips.
+     */
+    public function testBroadcastingBinding(string $bindingId): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $binding = SiteBinding::query()
+            ->where('site_id', $this->site->id)
+            ->whereKey($bindingId)
+            ->first();
+
+        if (! $binding instanceof SiteBinding || $binding->type !== 'broadcasting') {
+            return;
+        }
+
+        // BYO broadcasting points at the operator's own Pusher/Reverb/Ably — no
+        // managed app to authenticate against, so probe TCP reachability from
+        // the server like the other networked bindings.
+        if ($binding->target_type !== 'realtime_app') {
+            $this->validateBindingConnectivity($binding);
+
+            return;
+        }
+
+        if (! method_exists($this, 'seedQueuedConsoleAction') || ! method_exists($this, 'watchConsoleAction')) {
+            $this->toastError(__('Testing broadcasting is available from the deploy hub.'));
+
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('broadcasting_test', __('Testing broadcasting'));
+
+        TestBroadcastingBindingJob::dispatch(
+            (string) $run->id,
+            (string) $this->site->id,
+            (string) $binding->id,
+        );
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction(
+            $run,
+            __('Broadcasting relay reachable — a test event published successfully.'),
+            __('Could not publish a test event to the relay — see the console for details.'),
         );
     }
 

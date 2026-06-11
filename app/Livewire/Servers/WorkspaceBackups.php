@@ -100,6 +100,20 @@ class WorkspaceBackups extends Component
     /** overview | schedules | history */
     public string $backups_workspace_tab = 'overview';
 
+    /**
+     * Live databases discovered ON THE BOX for the Quick-download card — including
+     * ones dply never catalogued as a {@see ServerDatabase} row. Populated off the
+     * render path via {@see detectLiveDatabases()} (wire:init), so a server whose
+     * database was created outside dply can still be dumped. Each entry is
+     * ['engine' => string, 'name' => string].
+     *
+     * @var list<array{engine: string, name: string}>
+     */
+    public array $liveDbDumpTargets = [];
+
+    /** True once {@see detectLiveDatabases()} has run (drives the card's spinner). */
+    public bool $liveDbDetected = false;
+
     public function setBackupsWorkspaceTab(string $tab): void
     {
         $this->backups_workspace_tab = in_array($tab, ['overview', 'schedules', 'history', 'notifications'], true) ? $tab : 'overview';
@@ -412,6 +426,51 @@ class WorkspaceBackups extends Component
         $this->reset(['new_target_id', 'new_backup_configuration_id']);
         $this->new_cron_expression = '0 3 * * *';
         $this->toastSuccess(__('Backup schedule added.'));
+    }
+
+    /**
+     * Off-render-path probe (wire:init) that lists databases actually present on
+     * the server — registered or not — so the Quick-download card can offer an
+     * instant dump of each. Mirrors the drift analyzer's live listing. Runs in
+     * server context only; site context already scopes to linked databases. Never
+     * throws into the render path — engine probe failures degrade to an empty list.
+     */
+    public function detectLiveDatabases(
+        \App\Support\Servers\ServerDatabaseHostCapabilities $capabilities,
+        \App\Services\Servers\ServerDatabaseProvisioner $provisioner,
+    ): void {
+        $this->liveDbDetected = true;
+
+        if ($this->context_site_id !== null) {
+            return;
+        }
+
+        $this->authorize('update', $this->server);
+
+        $caps = $capabilities->forServer($this->server);
+        $targets = [];
+
+        if (($caps['mysql'] ?? false) || ($caps['mariadb'] ?? false)) {
+            try {
+                foreach ($provisioner->listMysqlDatabaseNames($this->server) as $name) {
+                    $targets[] = ['engine' => 'mysql', 'name' => $name];
+                }
+            } catch (\Throwable) {
+                // ignore — engine present but unreachable
+            }
+        }
+
+        if ($caps['postgres'] ?? false) {
+            try {
+                foreach ($provisioner->listPostgresDatabaseNames($this->server) as $name) {
+                    $targets[] = ['engine' => 'postgres', 'name' => $name];
+                }
+            } catch (\Throwable) {
+                // ignore
+            }
+        }
+
+        $this->liveDbDumpTargets = $targets;
     }
 
     public function downloadDatabaseBackup(string $backupId, DatabaseBackupDownloader $downloader): StreamedResponse|Response|null

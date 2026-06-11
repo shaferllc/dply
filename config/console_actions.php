@@ -84,6 +84,12 @@ return [
             'failed' => 'The test email could not be sent — see the transport error.',
             'stale' => 'Test email did not finish.',
         ],
+        'broadcasting_test' => [
+            'running' => 'Publishing a test event to the relay …',
+            'completed' => 'Relay reachable — the test event published successfully.',
+            'failed' => 'The relay could not be reached — see the error output.',
+            'stale' => 'Broadcasting test did not finish.',
+        ],
         'disk_usage_measure' => [
             'running' => 'Measuring :host disk usage …',
             'completed' => 'Disk usage updated.',
@@ -329,7 +335,7 @@ return [
         'basic-auth' => ['basic_auth_sync', 'webserver_config'],
         'webserver-config' => ['webserver_config'],
         'environment' => ['env_sync', 'env_push', 'env_scan', 'binding_connectivity_fix', 'mail_test'],
-        'resources' => ['bindings_reachable', 'binding_validate', 'binding_connectivity_fix', 'mail_test'],
+        'resources' => ['bindings_reachable', 'binding_validate', 'binding_connectivity_fix', 'mail_test', 'broadcasting_test'],
     ],
 
     /*

@@ -102,16 +102,20 @@
                                     <span class="text-xs text-brand-moss">{{ __('Not attached to any site.') }}</span>
                                 @endif
 
-                                @if ($canManage)
-                                    <div class="ml-auto flex items-center gap-2">
+                                <div class="ml-auto flex items-center gap-2">
+                                    <a href="{{ route('organizations.realtime.show', [$organization, $app]) }}" wire:navigate
+                                        class="inline-flex items-center gap-1 text-xs font-semibold text-brand-forest hover:underline">
+                                        {{ __('Manage') }} <x-heroicon-o-arrow-right class="h-3.5 w-3.5" />
+                                    </a>
+                                    @if ($canManage)
                                         <x-secondary-button type="button" wire:click="startTierChange('{{ $app->id }}')" class="text-xs">
                                             {{ __('Change tier') }}
                                         </x-secondary-button>
                                         <button type="button" wire:click="confirmDelete('{{ $app->id }}')" class="text-xs font-medium text-red-600 hover:text-red-700">
                                             {{ __('Delete') }}
                                         </button>
-                                    </div>
-                                @endif
+                                    @endif
+                                </div>
                             </div>
                         </article>
                     @endforeach

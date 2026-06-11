@@ -93,6 +93,7 @@ use App\Livewire\Organizations\Index as OrganizationsIndex;
 use App\Livewire\Organizations\Members as OrganizationsMembers;
 use App\Livewire\Organizations\NotificationChannels as OrganizationsNotificationChannels;
 use App\Livewire\Organizations\Realtime as OrganizationsRealtime;
+use App\Livewire\Organizations\RealtimeAppShow as OrganizationsRealtimeShow;
 use App\Livewire\Organizations\Show as OrganizationsShow;
 use App\Livewire\Organizations\Teams as OrganizationsTeams;
 use App\Livewire\OrgNetworking;
@@ -507,6 +508,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::livewire('organizations/{organization}/subscription', BillingShow::class)->name('subscription.show');
     Route::livewire('organizations/{organization}/invoices', BillingInvoices::class)->name('billing.invoices');
     Route::livewire('organizations/{organization}/realtime', OrganizationsRealtime::class)->name('organizations.realtime');
+    Route::livewire('organizations/{organization}/realtime/{realtimeApp}', OrganizationsRealtimeShow::class)->name('organizations.realtime.show');
     Route::livewire('organizations/{organization}/credentials', CredentialsIndex::class)->name('organizations.credentials');
     Route::livewire('organizations/{organization}/webserver-templates', SettingsWebserverTemplates::class)->name('organizations.webserver-templates');
 
@@ -756,6 +758,7 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
     Route::get('servers/{server}/sites/{site}/files/download', SiteFileDownloadController::class)->name('sites.files.download');
     Route::get('servers/{server}/sites/{site}/quick-download/{artifact}', [QuickDownloadController::class, 'siteArtifact'])->name('sites.quick-download');
     Route::get('servers/{server}/databases/{database}/quick-dump', [QuickDownloadController::class, 'databaseDump'])->name('servers.databases.quick-dump');
+    Route::get('servers/{server}/quick-dump', [QuickDownloadController::class, 'adhocDatabaseDump'])->name('servers.quick-dump');
     // Legacy redirect for the previous URL shape /sites/{site}/settings/{section}. The
     // {section} is required — without it the bare /sites/{site}/settings URL collides
     // with the new "Settings" tab on the wildcard route below, which sends you back to

@@ -153,6 +153,80 @@
 
     @if ($backups_workspace_tab === 'overview')
     <x-server-workspace-tab-panel id="backups-panel-overview" labelled-by="backups-tab-overview" panel-class="space-y-6">
+    {{-- Quick download: live-stream a fresh dump/archive straight off the box (no S3).
+         detectLiveDatabases() (wire:init) surfaces databases dply never catalogued. --}}
+    @php
+        $registeredDbNames = $databases->pluck('name')->all();
+        $adHocDbTargets = collect($liveDbDumpTargets)->reject(fn ($t) => in_array($t['name'], $registeredDbNames, true))->values();
+    @endphp
+    <section class="dply-card overflow-hidden" wire:init="detectLiveDatabases">
+        <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <div class="flex items-start gap-3">
+                <x-icon-badge>
+                    <x-heroicon-o-arrow-down-tray class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0 flex-1">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Instant') }}</p>
+                    <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Quick download') }}</h3>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Stream a fresh dump or archive straight from the server — no schedule, no S3. Capped at :cap; larger payloads should use a scheduled backup.', ['cap' => \Illuminate\Support\Number::fileSize((int) config('quick_download.max_bytes', 262_144_000))]) }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="divide-y divide-brand-ink/10">
+            {{-- Registered databases (per-database credentials) --}}
+            @foreach ($databases as $db)
+                <div wire:key="qd-db-{{ $db->id }}" class="flex items-center gap-4 px-6 py-3 sm:px-7">
+                    <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm font-medium text-brand-ink">{{ $db->name }}</p>
+                        <p class="text-xs text-brand-moss">{{ __('Database') }} · {{ \Illuminate\Support\Str::title($db->engine) }}</p>
+                    </div>
+                    <x-quick-download.database-link :server="$server" :database="$db" />
+                </div>
+            @endforeach
+
+            {{-- Databases discovered on the box but not catalogued by dply (admin-credential dump) --}}
+            @foreach ($adHocDbTargets as $target)
+                <div wire:key="qd-adhoc-{{ $target['engine'] }}-{{ $target['name'] }}" class="flex items-center gap-4 px-6 py-3 sm:px-7">
+                    <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm font-medium text-brand-ink">{{ $target['name'] }}</p>
+                        <p class="text-xs text-brand-moss">{{ \Illuminate\Support\Str::title($target['engine']) }} · {{ __('detected on server (not yet managed)') }}</p>
+                    </div>
+                    <a
+                        href="{{ route('servers.quick-dump', $server) }}?engine={{ $target['engine'] }}&name={{ urlencode($target['name']) }}"
+                        class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
+                    >
+                        <x-heroicon-m-arrow-down-tray class="h-4 w-4" aria-hidden="true" />
+                        {{ __('Download dump') }}
+                    </a>
+                </div>
+            @endforeach
+
+            {{-- Sites --}}
+            @foreach ($sites as $qdSite)
+                <div wire:key="qd-site-{{ $qdSite->id }}" class="flex items-center gap-4 px-6 py-3 sm:px-7">
+                    <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm font-medium text-brand-ink">{{ $qdSite->name }}</p>
+                        <p class="text-xs text-brand-moss">{{ __('Site files, .env, vhost, logs, home, or a combined bundle') }}</p>
+                    </div>
+                    <x-quick-download.site-menu :server="$server" :site="$qdSite" />
+                </div>
+            @endforeach
+
+            {{-- Detection state --}}
+            @if (! $liveDbDetected && ! $contextSite)
+                <div class="flex items-center gap-2 px-6 py-3 text-xs text-brand-moss sm:px-7">
+                    <svg class="h-3.5 w-3.5 animate-spin text-brand-sage" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                    </svg>
+                    {{ __('Scanning the server for databases…') }}
+                </div>
+            @elseif ($databases->isEmpty() && $adHocDbTargets->isEmpty() && $sites->isEmpty())
+                <p class="px-6 py-3 text-sm text-brand-moss sm:px-7">{{ __('No databases or SSH-ready sites found on this server.') }}</p>
+            @endif
+        </div>
+    </section>
+
     <section class="dply-card overflow-hidden">
         <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <div class="flex items-start gap-3">
@@ -558,44 +632,6 @@
 
     @if ($backups_workspace_tab === 'history')
     <x-server-workspace-tab-panel id="backups-panel-history" labelled-by="backups-tab-history" panel-class="space-y-6">
-    {{-- Quick download: live stream a fresh dump/archive straight off the box, no S3. --}}
-    @if ($databases->isNotEmpty() || $sites->isNotEmpty())
-        <section class="dply-card overflow-hidden">
-            <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
-                <div class="flex items-start gap-3">
-                    <x-icon-badge>
-                        <x-heroicon-o-arrow-down-tray class="h-5 w-5" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0 flex-1">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Instant') }}</p>
-                        <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Quick download') }}</h3>
-                        <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Stream a fresh dump or archive straight from the server — no schedule, no S3. Capped at :cap; larger payloads should use a scheduled backup.', ['cap' => \Illuminate\Support\Number::fileSize((int) config('quick_download.max_bytes', 262_144_000))]) }}</p>
-                    </div>
-                </div>
-            </div>
-            <div class="divide-y divide-brand-ink/10">
-                @foreach ($databases as $db)
-                    <div wire:key="qd-db-{{ $db->id }}" class="flex items-center gap-4 px-6 py-3 sm:px-7">
-                        <div class="min-w-0 flex-1">
-                            <p class="truncate text-sm font-medium text-brand-ink">{{ $db->name }}</p>
-                            <p class="text-xs text-brand-moss">{{ __('Database') }} · {{ \Illuminate\Support\Str::title($db->engine) }}</p>
-                        </div>
-                        <x-quick-download.database-link :server="$server" :database="$db" />
-                    </div>
-                @endforeach
-                @foreach ($sites as $qdSite)
-                    <div wire:key="qd-site-{{ $qdSite->id }}" class="flex items-center gap-4 px-6 py-3 sm:px-7">
-                        <div class="min-w-0 flex-1">
-                            <p class="truncate text-sm font-medium text-brand-ink">{{ $qdSite->name }}</p>
-                            <p class="text-xs text-brand-moss">{{ __('Site files, .env, vhost, logs, home, or a combined bundle') }}</p>
-                        </div>
-                        <x-quick-download.site-menu :server="$server" :site="$qdSite" />
-                    </div>
-                @endforeach
-            </div>
-        </section>
-    @endif
-
     {{-- Recent runs ---------------------------------------------------------------- --}}
     <div class="grid gap-4 lg:grid-cols-2">
         <section class="dply-card overflow-hidden">

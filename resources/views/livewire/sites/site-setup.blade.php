@@ -288,14 +288,19 @@
 
                             <div class="mt-6 flex items-center justify-between">
                                 <button type="button" wire:click="goToStep('environment')" class="text-sm font-medium text-brand-moss hover:text-brand-ink">{{ __('← Back') }}</button>
-                                <button type="button" wire:click="finishAndDeploy" wire:loading.attr="disabled"
-                                    @if (! empty($missing)) wire:confirm="{{ __('Deploy with :count required variable(s) unset? The app may fail to boot until you set them.', ['count' => count($missing)]) }}" @endif
+                                <button type="button" wire:loading.attr="disabled" wire:target="finishAndDeploy"
+                                    @if (! empty($missing))
+                                        wire:click="openConfirmActionModal('finishAndDeploy', [], @js(__('Deploy with required variables unset?')), @js(__('Deploy with :count required variable(s) unset? The app may fail to boot until you set them.', ['count' => count($missing)])), @js(__('Deploy anyway')), false, @js([['label' => __('Unset variables'), 'value' => implode(', ', $missing), 'mono' => true]]))"
+                                    @else
+                                        wire:click="finishAndDeploy"
+                                    @endif
                                     @class([
-                                        'inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-colors',
-                                        'bg-brand-forest text-brand-cream hover:bg-brand-forest/90' => empty($missing),
-                                        'bg-brand-gold text-brand-ink hover:bg-brand-gold/90' => ! empty($missing),
+                                        'group inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold shadow-sm transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-brand-cream active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60',
+                                        'bg-brand-forest text-brand-cream shadow-brand-forest/20 hover:bg-brand-forest/90 hover:shadow-md focus-visible:ring-brand-forest' => empty($missing),
+                                        'bg-brand-gold text-brand-ink shadow-brand-gold/30 hover:bg-brand-gold/90 hover:shadow-md focus-visible:ring-brand-gold' => ! empty($missing),
                                     ])>
-                                    <x-heroicon-o-rocket-launch class="h-4 w-4" />
+                                    <x-heroicon-o-rocket-launch class="h-4 w-4 transition-transform duration-150 group-hover:-translate-y-0.5 group-hover:translate-x-0.5" wire:loading.remove wire:target="finishAndDeploy" />
+                                    <svg wire:loading wire:target="finishAndDeploy" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" /><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
                                     <span wire:loading.remove wire:target="finishAndDeploy">{{ empty($missing) ? __('Deploy now') : __('Deploy anyway') }}</span>
                                     <span wire:loading wire:target="finishAndDeploy">{{ __('Starting deploy…') }}</span>
                                 </button>
