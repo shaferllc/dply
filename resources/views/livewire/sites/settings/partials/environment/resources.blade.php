@@ -724,6 +724,8 @@
                             <option value="postmark">{{ __('Postmark') }}</option>
                             <option value="ses">{{ __('Amazon SES') }}</option>
                             <option value="resend">{{ __('Resend') }}</option>
+                            <option value="sendgrid">{{ __('SendGrid') }}</option>
+                            <option value="cloudflare">{{ __('Cloudflare') }}</option>
                             <option value="log">{{ __('Log (no delivery — dev/staging)') }}</option>
                             <option value="failover">{{ __('Failover (primary + backups)') }}</option>
                             <option value="roundrobin">{{ __('Round-robin (load balance)') }}</option>
@@ -787,6 +789,10 @@
                                 {{ __('Injects MAIL_MAILER=ses, the AWS_* credentials, and the from-address at deploy.') }}
                             @elseif ($mailProvider === 'resend')
                                 {{ __('Injects MAIL_MAILER=resend, RESEND_KEY, and the from-address at deploy.') }}
+                            @elseif ($mailProvider === 'sendgrid')
+                                {{ __('Injects MAIL_MAILER=sendgrid, SENDGRID_API_KEY, and the from-address at deploy.') }}
+                            @elseif ($mailProvider === 'cloudflare')
+                                {{ __('Injects MAIL_MAILER=cloudflare, CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_KEY, and the from-address at deploy.') }}
                             @endif
                         </p>
                     @else

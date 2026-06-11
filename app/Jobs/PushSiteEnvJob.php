@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Jobs\Concerns\WritesConsoleAction;
+use App\Jobs\Middleware\SerializeServerSsh;
 use App\Models\Site;
 use App\Services\Sites\ReleaseEnvLinkChecker;
 use App\Services\Sites\SiteEnvPusher;
@@ -28,18 +29,61 @@ use Illuminate\Support\Facades\Log;
  *
  * Errors fail the run and are surfaced in the banner; the editable cache
  * is preserved so the operator can retry from the manual Push button.
+ *
+ * Per-SERVER serialization via {@see SerializeServerSsh}: while ShouldBeUnique
+ * stops a single site double-pushing, this stops many sites on the SAME box
+ * opening concurrent SSH sessions and saturating it. Contended pushes release
+ * and retry (not fail) until they get the server's SSH slot.
  */
 class PushSiteEnvJob implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, WritesConsoleAction;
 
-    public int $tries = 1;
+    /**
+     * A contended {@see SerializeServerSsh} release counts as an attempt, so a
+     * plain `tries` cap would exhaust while waiting for the SSH slot. Bound the
+     * wait by time instead ({@see retryUntil}) and cap real failures with
+     * {@see $maxExceptions} so a broken push fails once instead of re-SSHing.
+     */
+    public int $maxExceptions = 1;
+
+    /**
+     * Safety TTL on the per-site uniqueness lock. With the debounced dispatch
+     * ({@see \App\Services\Sites\SiteEnvPushScheduler}) plus the SSH-slot wait,
+     * the unique lock is held a while; keep this larger than {@see retryUntil}
+     * so a long wait can't expire the lock and let a duplicate push slip in.
+     */
+    public int $uniqueFor = 600;
 
     public function __construct(
         public string $siteId,
         public ?string $userId = null,
         public ?string $seededConsoleRunId = null,
     ) {}
+
+    /**
+     * Bound how long the job waits for the server's SSH slot. Releases from the
+     * serialization middleware retry until this moment; a real handler error
+     * hits {@see $maxExceptions} first and fails immediately.
+     */
+    public function retryUntil(): \DateTimeInterface
+    {
+        return now()->addMinutes(5);
+    }
+
+    /**
+     * Serialize SSH pushes per target server. Resolved at runtime (the job only
+     * carries the site id); skipped if the site/server vanished so the job can
+     * still run and no-op cleanly.
+     *
+     * @return array<int, object>
+     */
+    public function middleware(): array
+    {
+        $serverId = Site::query()->whereKey($this->siteId)->value('server_id');
+
+        return $serverId !== null ? [new SerializeServerSsh((string) $serverId)] : [];
+    }
 
     public function uniqueId(): string
     {

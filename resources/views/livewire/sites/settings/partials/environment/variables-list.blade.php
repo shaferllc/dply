@@ -557,6 +557,36 @@
             </div>
         @endif
 
+        {{-- Bulk-action bar: appears once one or more rows are ticked. The whole
+             selection is removed in a single cache write + single SSH push. --}}
+        @if (method_exists($this, 'removeSelectedEnvVars') && count($selected_env_keys) > 0)
+            <div class="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b border-brand-ink/10 bg-brand-sage/10 px-6 py-3 sm:px-8">
+                <span class="text-sm font-semibold text-brand-ink">
+                    {{ trans_choice('{1} :count selected|[2,*] :count selected', count($selected_env_keys), ['count' => count($selected_env_keys)]) }}
+                </span>
+                <div class="flex flex-wrap items-center gap-2 sm:ml-auto">
+                    <button type="button" wire:click="toggleSelectAllEnvVars" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                        <x-heroicon-o-check-circle class="h-4 w-4" />
+                        {{ __('Select all') }}
+                    </button>
+                    <button type="button" wire:click="clearEnvSelection" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
+                        <x-heroicon-o-x-mark class="h-4 w-4" />
+                        {{ __('Clear') }}
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="confirmRemoveSelectedEnvVars"
+                        wire:loading.attr="disabled"
+                        wire:target="confirmRemoveSelectedEnvVars"
+                        class="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-red-700 disabled:opacity-60"
+                    >
+                        <x-heroicon-o-trash class="h-4 w-4" />
+                        {{ trans_choice('{1} Remove selected|[2,*] Remove :count selected', count($selected_env_keys), ['count' => count($selected_env_keys)]) }}
+                    </button>
+                </div>
+            </div>
+        @endif
+
         @if ($variableCount === 0 && $bindingManagedEnv === [])
             <div class="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center sm:px-8">
                 <span class="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-sand/40 text-brand-moss">
@@ -632,6 +662,15 @@
                         @else
                             <div class="flex flex-wrap items-center justify-between gap-3">
                                 <div class="flex min-w-0 items-center gap-3">
+                                    @if (method_exists($this, 'removeSelectedEnvVars'))
+                                        <input
+                                            type="checkbox"
+                                            value="{{ $key }}"
+                                            wire:model.live="selected_env_keys"
+                                            aria-label="{{ __('Select :key for bulk actions', ['key' => $key]) }}"
+                                            class="h-4 w-4 shrink-0 rounded border-brand-ink/25 text-brand-forest focus:ring-brand-sage/40"
+                                        />
+                                    @endif
                                     <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 bg-brand-sand/40 text-brand-forest ring-brand-ink/10">
                                         <x-heroicon-o-key class="h-4 w-4" />
                                     </span>

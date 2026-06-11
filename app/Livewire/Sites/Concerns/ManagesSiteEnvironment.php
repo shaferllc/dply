@@ -16,6 +16,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
+use App\Services\Sites\SiteEnvPushScheduler;
 use App\Support\Sites\SiteFixers;
 use Livewire\Component;
 
@@ -44,6 +45,14 @@ trait ManagesSiteEnvironment
     public string $new_env_comment = '';
 
     public string $bulk_env_input = '';
+
+    /**
+     * Keys ticked for bulk removal. Bound to the per-row checkboxes; cleared
+     * after a bulk remove. Bulk delete writes the cache once and pushes once.
+     *
+     * @var list<string>
+     */
+    public array $selected_env_keys = [];
 
     public ?string $env_import_key = null;
 
@@ -769,9 +778,106 @@ trait ManagesSiteEnvironment
         $this->autoPushAfterCacheMutation(__('Variable removed.'));
     }
 
+    /** Select every key in the cache, or clear if all are already selected. */
+    public function toggleSelectAllEnvVars(DotEnvFileParser $parser): void
+    {
+        $this->authorize('update', $this->site);
+        $all = array_keys($parser->parse((string) ($this->site->env_file_content ?? ''))['variables']);
+        $allSelected = $all !== [] && array_diff($all, $this->selected_env_keys) === [];
+        $this->selected_env_keys = $allSelected ? [] : array_values($all);
+    }
+
+    public function clearEnvSelection(): void
+    {
+        $this->selected_env_keys = [];
+    }
+
+    /**
+     * Confirm bulk removal of the ticked variables. The actual delete +
+     * single push runs in {@see removeSelectedEnvVars} after confirmation.
+     */
+    public function confirmRemoveSelectedEnvVars(): void
+    {
+        $this->authorize('update', $this->site);
+        $keys = $this->normalizedSelectedEnvKeys();
+        if ($keys === []) {
+            $this->toastError(__('Select at least one variable to remove.'));
+
+            return;
+        }
+
+        $preview = implode(', ', array_slice($keys, 0, 8)).(count($keys) > 8 ? ' …' : '');
+        $this->openConfirmActionModal(
+            'removeSelectedEnvVars',
+            [],
+            trans_choice('{1} Remove 1 variable?|[2,*] Remove :count variables?', count($keys), ['count' => count($keys)]),
+            __('This deletes them from the cache and pushes the change to the server in a single push: :list', ['list' => $preview]),
+            trans_choice('{1} Remove 1|[2,*] Remove :count', count($keys), ['count' => count($keys)]),
+            true,
+        );
+    }
+
+    /**
+     * Bulk-remove the ticked variables in ONE cache write and ONE server push —
+     * the whole point of bulk delete: N removals don't fan out to N SSH pushes.
+     */
+    public function removeSelectedEnvVars(DotEnvFileParser $parser, DotEnvFileWriter $writer): void
+    {
+        $this->authorize('update', $this->site);
+        if ($this->blockedForDerivedWorker()) {
+            return;
+        }
+        $keys = $this->normalizedSelectedEnvKeys();
+        if ($keys === []) {
+            return;
+        }
+
+        $parsed = $parser->parse((string) ($this->site->env_file_content ?? ''));
+        $removed = [];
+        foreach ($keys as $key) {
+            if (array_key_exists($key, $parsed['variables'])) {
+                unset($parsed['variables'][$key], $parsed['comments'][$key]);
+                $removed[] = $key;
+            }
+        }
+
+        $this->selected_env_keys = [];
+        if ($removed === []) {
+            return;
+        }
+
+        $this->site->forceFill([
+            'env_file_content' => $writer->render($parsed['variables'], $parsed['comments']),
+            'env_cache_origin' => 'local-edit',
+        ])->save();
+
+        $org = $this->site->server?->organization;
+        if ($org) {
+            audit_log($org, auth()->user(), 'site.env.vars_removed', $this->site, ['keys' => $removed, 'count' => count($removed)], null);
+        }
+
+        $this->revealed_env_keys = array_values(array_diff($this->revealed_env_keys, $removed));
+        $this->autoPushAfterCacheMutation(
+            trans_choice('{1} :count variable removed.|[2,*] :count variables removed.', count($removed), ['count' => count($removed)])
+        );
+    }
+
+    /** @return list<string> */
+    protected function normalizedSelectedEnvKeys(): array
+    {
+        return array_values(array_filter(
+            array_unique($this->selected_env_keys),
+            static fn ($k): bool => is_string($k) && $k !== ''
+        ));
+    }
+
     /**
      * Dispatch the push job after a successful cache mutation. No-op on hosts
      * without a server-side .env (Docker/K8s/Serverless inject at deploy time).
+     *
+     * Routes through {@see SiteEnvPushScheduler}, which coalesces a burst of
+     * mutations into a single SSH push (debounce + ride-the-pending-push) so
+     * editing several variables in a row doesn't open one SSH session per edit.
      */
     protected function autoPushAfterCacheMutation(string $savedMessage): void
     {
@@ -781,20 +887,16 @@ trait ManagesSiteEnvironment
             return;
         }
 
-        $run = $this->seedQueuedConsoleAction('env_push');
-
-        PushSiteEnvJob::dispatch(
-            $this->site->id,
-            (string) (auth()->id() ?? ''),
-            (string) $run->id,
-        );
+        $scheduled = app(SiteEnvPushScheduler::class)->schedule($this->site, (string) (auth()->id() ?? ''));
 
         $this->watchConsoleAction(
-            $run,
+            $scheduled['run'],
             $savedMessage.' '.__('Pushed to server.'),
             __('Push to server did not finish.'),
         );
-        $this->toastSuccess($savedMessage.' '.__('Pushing to server — the console banner will confirm when it finishes.'));
+        $this->toastSuccess($scheduled['coalesced']
+            ? $savedMessage.' '.__('Queued with the pending push to the server.')
+            : $savedMessage.' '.__('Pushing to server — the console banner will confirm when it finishes.'));
     }
 
     public function toggleRevealEnvVar(string $key): void
