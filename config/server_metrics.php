@@ -34,7 +34,7 @@ return [
     'guest_script' => [
         'relative_path' => '.dply/bin/server-metrics-snapshot.py',
         'auto_upgrade_on_collect' => (bool) env('DPLY_METRICS_GUEST_SCRIPT_AUTO_UPGRADE', true),
-        'upgrade_queue' => env('SERVER_METRICS_GUEST_SCRIPT_UPGRADE_QUEUE'),
+        'upgrade_queue' => env('SERVER_METRICS_GUEST_SCRIPT_UPGRADE_QUEUE', 'dply'),
     ],
 
     /*
@@ -53,7 +53,7 @@ return [
 
     'guest_push' => [
         'enabled' => (bool) env('DPLY_METRICS_GUEST_PUSH_ENABLED', true),
-        'deploy_queue' => env('SERVER_METRICS_GUEST_PUSH_DEPLOY_QUEUE'),
+        'deploy_queue' => env('SERVER_METRICS_GUEST_PUSH_DEPLOY_QUEUE', 'dply'),
 
         /** Five-field cron expression for the guest user crontab (path uses $HOME). */
         'cron_expression' => env('DPLY_METRICS_GUEST_PUSH_CRON', '* * * * *'),
@@ -121,7 +121,7 @@ return [
     */
 
     'probe' => [
-        'queue' => env('SERVER_METRICS_PROBE_QUEUE'),
+        'queue' => env('SERVER_METRICS_PROBE_QUEUE', 'dply'),
     ],
 
     /*
@@ -154,7 +154,7 @@ return [
 
         'timeout' => (int) env('DPLY_METRICS_INGEST_TIMEOUT', 15),
 
-        'queue' => env('SERVER_METRICS_INGEST_QUEUE'),
+        'queue' => env('SERVER_METRICS_INGEST_QUEUE', 'dply'),
     ],
 
 ];

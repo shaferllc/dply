@@ -48,7 +48,7 @@ if (is_string($horizonQueuesOverride) && trim($horizonQueuesOverride) !== '') {
     // provisioning jobs jump ahead of routine control-plane work. It's always
     // WATCHED here (so routing a job to it can never silently stall), but jobs
     // only land on it when server_provision.queue is set to it (default 'dply').
-    $horizonWorkerQueues = array_values(array_unique(array_merge(['dply-provision', 'dply', 'dply-control'], $horizonExtraQueues, $probeQueues)));
+    $horizonWorkerQueues = array_values(array_unique(array_merge(['default', 'dply-provision', 'dply', 'dply-control', 'dply-manage'], $horizonExtraQueues, $probeQueues)));
 }
 
 // dply-managed Horizon worker knobs — all env-driven so the pool UI can tune
@@ -57,6 +57,27 @@ $horizonBalance = (string) (env('HORIZON_BALANCE') ?: 'auto');
 $horizonMinProcesses = max(1, (int) env('HORIZON_MIN_PROCESSES', 1));
 $horizonWorkerMemory = max(32, (int) env('HORIZON_WORKER_MEMORY', 128));
 $horizonWorkerTries = max(1, (int) env('HORIZON_TRIES', 1));
+
+// Total worker ceiling for the supervisor. Under the 'auto' balancer Horizon
+// scales the pool between minProcesses (kept warm PER watched queue) and
+// maxProcesses (the SUPERVISOR-WIDE total). With this many watched queues a flat
+// ceiling of 10 can't staff every list, so the lower-priority queues starve under
+// load. Default the cap to ~3 processes per watched queue (never below 10) so the
+// pool can fan out across all of them, while staying fully overridable per box via
+// HORIZON_MAX_PROCESSES. The floor also guarantees minProcesses can be honoured for
+// every queue (count * minProcesses) before any extra headroom is added.
+$horizonQueueCount = max(1, count($horizonWorkerQueues));
+$horizonMaxProcessesFloor = max(10, $horizonQueueCount * $horizonMinProcesses);
+$horizonMaxProcesses = max(
+    $horizonMaxProcessesFloor,
+    (int) env('HORIZON_MAX_PROCESSES', max($horizonMaxProcessesFloor, $horizonQueueCount * 3))
+);
+// How aggressively 'auto' rebalances: how many processes it may add/remove per
+// scaling decision (balanceMaxShift) and how long it waits between decisions
+// (balanceCooldown, seconds). Higher shift + lower cooldown = the pool reaches its
+// ceiling faster when a queue backs up, instead of trickling one process at a time.
+$horizonBalanceMaxShift = max(1, (int) env('HORIZON_BALANCE_MAX_SHIFT', 3));
+$horizonBalanceCooldown = max(1, (int) env('HORIZON_BALANCE_COOLDOWN', 2));
 
 return [
 
@@ -290,11 +311,11 @@ return [
                 'queue' => $horizonWorkerQueues,
                 'balance' => $horizonBalance,
                 'minProcesses' => $horizonMinProcesses,
-                'maxProcesses' => max($horizonMinProcesses, (int) env('HORIZON_MAX_PROCESSES', 10)),
+                'maxProcesses' => $horizonMaxProcesses,
                 'memory' => $horizonWorkerMemory,
                 'tries' => $horizonWorkerTries,
-                'balanceMaxShift' => 1,
-                'balanceCooldown' => 3,
+                'balanceMaxShift' => $horizonBalanceMaxShift,
+                'balanceCooldown' => $horizonBalanceCooldown,
                 'timeout' => (int) env('HORIZON_PROD_JOB_TIMEOUT', env('HORIZON_JOB_TIMEOUT', 720)),
             ],
         ],
@@ -306,9 +327,11 @@ return [
                 'balance' => (string) (env('HORIZON_BALANCE') ?: 'simple'),
                 'minProcesses' => $horizonMinProcesses,
                 // Concurrent workers for local dev (Redis default maxclients is usually plenty).
-                'maxProcesses' => max($horizonMinProcesses, (int) env('HORIZON_LOCAL_MAX_PROCESSES', 8)),
+                'maxProcesses' => max($horizonMinProcesses, (int) env('HORIZON_LOCAL_MAX_PROCESSES', $horizonMaxProcesses)),
                 'memory' => max(32, (int) env('HORIZON_LOCAL_WORKER_MEMORY', $horizonWorkerMemory)),
                 'tries' => $horizonWorkerTries,
+                'balanceMaxShift' => $horizonBalanceMaxShift,
+                'balanceCooldown' => $horizonBalanceCooldown,
                 'timeout' => (int) env('HORIZON_LOCAL_JOB_TIMEOUT', 720),
                 'nice' => 0,
             ],

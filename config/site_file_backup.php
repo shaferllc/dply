@@ -7,7 +7,7 @@ return [
     /**
      * Optional dedicated queue for site file export jobs (Horizon merges this name into workers when set).
      */
-    'export_queue' => env('SITE_FILE_BACKUP_EXPORT_QUEUE'),
+    'export_queue' => env('SITE_FILE_BACKUP_EXPORT_QUEUE', 'dply'),
 
     /**
      * Maximum size of a downloaded archive (bytes). Streams stop and the job fails if exceeded.

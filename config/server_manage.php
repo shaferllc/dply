@@ -64,7 +64,7 @@ return [
     /**
      * Optional queue name for manage SSH jobs (null = default queue).
      */
-    'remote_task_queue' => env('SERVER_MANAGE_REMOTE_TASK_QUEUE'),
+    'remote_task_queue' => env('SERVER_MANAGE_REMOTE_TASK_QUEUE', 'dply'),
 
     /** Cache TTL (seconds) for in-flight manage task status shown while the UI polls. */
     'remote_task_cache_ttl_seconds' => (int) env('SERVER_MANAGE_REMOTE_TASK_CACHE_TTL', 900),

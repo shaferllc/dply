@@ -85,7 +85,7 @@ return [
     'systemd_inventory_schedule_enabled' => (bool) env('SERVER_SYSTEMD_INVENTORY_SCHEDULE_ENABLED', true),
 
     /** Optional queue name for systemd inventory jobs (Horizon must list it when set). */
-    'sync_queue' => env('SERVER_SYSTEMD_SYNC_QUEUE'),
+    'sync_queue' => env('SERVER_SYSTEMD_SYNC_QUEUE', 'dply'),
 
     /*
     | Merged with Organization.services_preferences via array_replace_recursive.

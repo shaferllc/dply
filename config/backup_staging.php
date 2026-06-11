@@ -40,6 +40,6 @@ return [
     'presign_put_minutes' => (int) env('BACKUP_STAGING_PRESIGN_PUT_MINUTES', 30),
 
     /** Optional dedicated queue for the staging upload job (set to the worker queue in split deploys). */
-    'upload_queue' => env('BACKUP_STAGING_UPLOAD_QUEUE'),
+    'upload_queue' => env('BACKUP_STAGING_UPLOAD_QUEUE', 'dply'),
 
 ];

@@ -25,7 +25,7 @@ return [
      * must list this queue (see config/horizon.php) for workers to pick it up;
      * the default queue is used when unset. Mirrors server_cache.install_queue.
      */
-    'install_queue' => env('SERVER_LOGS_INSTALL_QUEUE'),
+    'install_queue' => env('SERVER_LOGS_INSTALL_QUEUE', 'dply'),
 
     /**
      * Pinned Vector release installed on the box. Vector ships a single static

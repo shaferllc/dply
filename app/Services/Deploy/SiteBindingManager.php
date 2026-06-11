@@ -330,14 +330,27 @@ class SiteBindingManager
     }
 
     /**
+     * Upsert a binding row. By default the natural key is (site_id, type) — one
+     * binding per type per site. The storage type passes a wider key including
+     * `name` (the disk slug) so a site can hold several object-storage buckets,
+     * each its own filesystem disk; every other caller keeps the narrow key and
+     * is therefore unaffected.
+     *
      * @param  array<string, mixed>  $attributes
+     * @param  list<string>  $matchOn  Attribute keys (from $attributes, plus the
+     *                                  implicit site_id/type) to match the existing row on.
      */
-    private function persist(Site $site, string $type, array $attributes): SiteBinding
+    private function persist(Site $site, string $type, array $attributes, array $matchOn = []): SiteBinding
     {
-        return SiteBinding::query()->updateOrCreate(
-            ['site_id' => $site->id, 'type' => $type],
-            $attributes,
-        );
+        $key = ['site_id' => $site->id, 'type' => $type];
+        foreach ($matchOn as $attr) {
+            if (in_array($attr, ['site_id', 'type'], true)) {
+                continue;
+            }
+            $key[$attr] = $attributes[$attr] ?? null;
+        }
+
+        return SiteBinding::query()->updateOrCreate($key, $attributes);
     }
 
     private function assertType(string $type): void

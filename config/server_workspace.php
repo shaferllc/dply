@@ -18,7 +18,7 @@ return [
         'cache_ttl_seconds' => (int) env('SERVER_CRON_RUN_CACHE_TTL', 900),
         'broadcast_chunk_interval_ms' => (int) env('SERVER_CRON_RUN_BROADCAST_CHUNK_MS', 120),
         /** Optional Redis queue name; default queue if unset. Horizon must list this queue (see config/horizon.php). */
-        'queue' => env('SERVER_CRON_RUN_QUEUE'),
+        'queue' => env('SERVER_CRON_RUN_QUEUE', 'dply'),
     ],
 
     /*

@@ -44,13 +44,13 @@ return [
     /**
      * Optional dedicated queue for SQL export jobs (Horizon merges this name into workers when set).
      */
-    'export_queue' => env('SERVER_DATABASE_EXPORT_QUEUE'),
+    'export_queue' => env('SERVER_DATABASE_EXPORT_QUEUE', 'dply'),
 
     /**
      * Optional dedicated queue for engine install / uninstall jobs (apt round-trips can take
      * minutes on small boxes; isolating them keeps short-running queue work snappy).
      */
-    'install_queue' => env('SERVER_DATABASE_INSTALL_QUEUE'),
+    'install_queue' => env('SERVER_DATABASE_INSTALL_QUEUE', 'dply'),
 
     /**
      * When false (default), export jobs never persist backups on the Dply app host — only on the
