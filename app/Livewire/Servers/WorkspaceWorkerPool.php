@@ -6,6 +6,7 @@ use App\Actions\Servers\ResolveServerCreateCatalog;
 use App\Jobs\ApplyWorkerPoolExposureJob;
 use App\Jobs\CollectWorkerPoolHorizonSnapshotJob;
 use App\Jobs\CollectWorkerPoolStatsJob;
+use App\Jobs\DetectWorkerPoolHorizonConfigJob;
 use App\Jobs\PushWorkerPoolHorizonConfigJob;
 use App\Jobs\ReconcileWorkerPoolJob;
 use App\Jobs\RunWorkerPoolTestJobsJob;
@@ -93,6 +94,12 @@ class WorkspaceWorkerPool extends Component
 
     /** Process manager the pool's worker daemons run under: systemd | supervisor. */
     public string $hz_process_manager = WorkerPool::PM_SYSTEMD;
+
+    /** True while a queue auto-detection run is in flight (drives the spinner + poll). */
+    public bool $hzDetecting = false;
+
+    /** ISO8601 stamp of when the current detection was requested, to recognise its result. */
+    public ?string $hzDetectRequestedAt = null;
 
     /**
      * Live per-job feed, newest first, pushed over Reverb from the worker boxes
@@ -290,6 +297,93 @@ class WorkspaceWorkerPool extends Component
         }
 
         $this->toastSuccess(__('Horizon config saved — applying to workers over SSH (they restart in a few seconds).'));
+    }
+
+    /**
+     * Auto-detect the queues the pool's app actually uses (and a right-sized
+     * process/memory recommendation) by introspecting a member over SSH. The
+     * result lands on the pool meta and is surfaced as a one-click suggestion —
+     * it NEVER pushes to the boxes. The operator reviews, applies, then saves.
+     */
+    public function detectHorizonConfig(): void
+    {
+        Gate::authorize('update', $this->server);
+
+        $pool = $this->pool();
+        if (! $pool) {
+            $this->toastError(__('No pool.'));
+
+            return;
+        }
+
+        $this->hzDetecting = true;
+        $this->hzDetectRequestedAt = now()->toIso8601String();
+        DetectWorkerPoolHorizonConfigJob::dispatch((string) $pool->id);
+
+        $this->toastSuccess(__('Detecting the app\'s queues over SSH — suggestions appear in a few seconds.'));
+    }
+
+    /**
+     * Polled (every few seconds) while a detection is in flight: clears the
+     * spinner once the job has written a result newer than our request. Each
+     * poll re-renders, so the blade picks up the fresh suggestion from meta.
+     */
+    public function checkHorizonDetection(): void
+    {
+        if (! $this->hzDetecting) {
+            return;
+        }
+
+        $pool = $this->pool();
+        $detection = is_array($pool?->meta['horizon_detection'] ?? null) ? $pool->meta['horizon_detection'] : [];
+        $detectedAt = is_string($detection['detected_at'] ?? null) ? $detection['detected_at'] : null;
+
+        // ISO8601 timestamps compare lexicographically; a result at/after our
+        // request stamp is this run's.
+        if ($detectedAt !== null && ($this->hzDetectRequestedAt === null || $detectedAt >= $this->hzDetectRequestedAt)) {
+            $this->hzDetecting = false;
+        }
+    }
+
+    /**
+     * Copy the detected recommendation into the form fields. Does NOT save or
+     * push — the operator still clicks Save & apply (which validates and writes
+     * the boxes via PushWorkerPoolHorizonConfigJob).
+     */
+    public function applyDetectedHorizonConfig(): void
+    {
+        Gate::authorize('update', $this->server);
+
+        $pool = $this->pool();
+        if (! $pool) {
+            $this->toastError(__('No pool.'));
+
+            return;
+        }
+
+        $detection = is_array($pool->meta['horizon_detection'] ?? null) ? $pool->meta['horizon_detection'] : [];
+        $rec = is_array($detection['recommended'] ?? null) ? $detection['recommended'] : [];
+        if (empty($rec['queues']) || ! is_array($rec['queues'])) {
+            $this->toastError(__('No detection result to apply yet — run Detect first.'));
+
+            return;
+        }
+
+        $this->hz_queues = implode(', ', array_map('strval', $rec['queues']));
+        $this->hz_min_processes = (int) ($rec['min_processes'] ?? $this->hz_min_processes);
+        $this->hz_max_processes = (int) ($rec['max_processes'] ?? $this->hz_max_processes);
+        $this->hz_memory = (int) ($rec['memory'] ?? $this->hz_memory);
+        $this->hz_timeout = (int) ($rec['timeout'] ?? $this->hz_timeout);
+        if (isset($rec['tries'])) {
+            $this->hz_tries = (int) $rec['tries'];
+        }
+        if (in_array($rec['balance'] ?? null, WorkerPoolHorizonConfig::BALANCES, true)) {
+            $this->hz_balance = (string) $rec['balance'];
+        }
+
+        // Re-sync the Alpine queue preview (its x-data initialised from the old value).
+        $this->dispatch('horizon-config-applied', queues: $this->hz_queues);
+        $this->toastSuccess(__('Suggestions applied to the form — review, then Save & apply to push to the workers.'));
     }
 
     public function saveProcessManager(WorkerPoolManager $manager): void

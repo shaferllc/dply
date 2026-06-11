@@ -524,6 +524,11 @@
             // regardless; the Horizon aggregate layer is gated on this.
             $hzInstalled = ($hz['horizon_installed'] ?? null) !== false;
 
+            // Auto-detected queue config (DetectWorkerPoolHorizonConfigJob) —
+            // advisory only; the operator applies it into the form then saves.
+            $hzDetection = is_array($pool->meta['horizon_detection'] ?? null) ? $pool->meta['horizon_detection'] : [];
+            $hzRec = is_array($hzDetection['recommended'] ?? null) ? $hzDetection['recommended'] : [];
+
             // Compact relative-time formatter for a seconds value ("3s", "2m", "1h").
             $fmtAge = function ($seconds) {
                 if ($seconds === null) { return null; }
@@ -766,12 +771,58 @@
                     <x-heroicon-o-chevron-right class="h-4 w-4 shrink-0 text-brand-mist transition-transform" x-bind:class="open ? 'rotate-90' : ''" />
                 </button>
                 <form wire:submit="saveHorizonConfig" x-show="open" x-cloak class="space-y-5 px-6 py-6 sm:px-7">
+                    {{-- Auto-detect: SSH to a member, introspect the app's real queues +
+                         box spec, and offer a one-click suggestion. Advisory only —
+                         nothing is pushed until the operator hits Save & apply below. --}}
+                    @if ($hzDetecting)
+                        <div wire:poll.3s="checkHorizonDetection" class="flex items-center gap-2 rounded-xl border border-brand-ink/15 bg-brand-sand/30 px-4 py-3 text-sm text-brand-moss">
+                            <x-heroicon-o-arrow-path class="h-4 w-4 shrink-0 animate-spin text-brand-mist" />
+                            <span>{{ __('Detecting the app\'s queues over SSH — this takes a few seconds.') }}</span>
+                        </div>
+                    @elseif (! empty($hzRec['queues']))
+                        @php
+                            $detQueues = implode(', ', array_map('strval', $hzRec['queues']));
+                            $detSource = ($hzDetection['source'] ?? null) === 'package' ? __('package introspection') : __('code scan');
+                            $detDiffers = $detQueues !== implode(', ', \App\Support\WorkerPools\WorkerPoolHorizonConfig::for($pool)['queues']);
+                        @endphp
+                        <div class="rounded-xl border border-brand-forest/25 bg-brand-forest/5 px-4 py-3">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <p class="text-xs font-semibold text-brand-ink">
+                                        {{ __('Detected configuration') }}
+                                        <span class="ml-1 font-normal text-brand-moss">· {{ $detSource }}</span>
+                                    </p>
+                                    <p class="mt-1 break-words font-mono text-xs text-brand-ink">{{ $detQueues }}</p>
+                                    <p class="mt-1 text-[11px] text-brand-moss">
+                                        {{ __('Suggested :min–:max processes · :mem MB · :to s timeout', [
+                                            'min' => $hzRec['min_processes'] ?? '—',
+                                            'max' => $hzRec['max_processes'] ?? '—',
+                                            'mem' => $hzRec['memory'] ?? '—',
+                                            'to' => $hzRec['timeout'] ?? '—',
+                                        ]) }}
+                                        @unless ($detDiffers)<span class="text-brand-mist"> · {{ __('matches current') }}</span>@endunless
+                                    </p>
+                                </div>
+                                <x-secondary-button type="button" wire:click="applyDetectedHorizonConfig" class="shrink-0 text-xs">
+                                    {{ __('Apply suggestions') }}
+                                </x-secondary-button>
+                            </div>
+                            <p class="mt-2 text-[11px] text-brand-moss">{{ __('Fills the fields below — review, then Save & apply to push to the workers.') }}</p>
+                        </div>
+                    @endif
+
                     <div x-data="{
                         q: @js((string) $hz_queues),
                         get tokens() { return this.q.split(',').map(s => s.trim()).filter(Boolean); },
                         get first() { return this.tokens[0] || '—'; },
-                    }">
-                        <x-input-label for="hz_queues" :value="__('Queues watched')" />
+                    }" x-on:horizon-config-applied.window="q = $event.detail.queues">
+                        <div class="flex items-center justify-between gap-3">
+                            <x-input-label for="hz_queues" :value="__('Queues watched')" />
+                            <button type="button" wire:click="detectHorizonConfig" wire:loading.attr="disabled" wire:target="detectHorizonConfig" class="inline-flex items-center gap-1 text-xs font-medium text-brand-forest hover:text-brand-ink disabled:opacity-50">
+                                <x-heroicon-o-sparkles class="h-3.5 w-3.5" />
+                                {{ __('Detect') }}
+                            </button>
+                        </div>
                         <x-text-input id="hz_queues" wire:model="hz_queues" x-on:input="q = $event.target.value" class="mt-2 block w-full font-mono text-sm" placeholder="default, emails, notifications" />
                         <p class="mt-1 text-xs text-brand-moss">{{ __('Comma-separated. Workers process these queues in priority order.') }}</p>
                         {{-- Live preview: the FIRST queue is the dispatch target (REDIS_QUEUE) —

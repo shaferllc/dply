@@ -62,9 +62,12 @@ return [
     'queue_remote_tasks' => (bool) env('SERVER_MANAGE_QUEUE_REMOTE_TASKS', true),
 
     /**
-     * Optional queue name for manage SSH jobs (null = default queue).
+     * Queue for manage SSH jobs (diagnostics, service actions, config previews).
+     * Defaults to 'dply-manage' — its own Horizon-watched lane — so interactive
+     * manage tasks get their own worker allocation instead of queuing behind the
+     * general 'dply' backlog. Only use a queue Horizon actually watches.
      */
-    'remote_task_queue' => env('SERVER_MANAGE_REMOTE_TASK_QUEUE', 'dply'),
+    'remote_task_queue' => env('SERVER_MANAGE_REMOTE_TASK_QUEUE', 'dply-manage'),
 
     /** Cache TTL (seconds) for in-flight manage task status shown while the UI polls. */
     'remote_task_cache_ttl_seconds' => (int) env('SERVER_MANAGE_REMOTE_TASK_CACHE_TTL', 900),

@@ -61,12 +61,12 @@ return [
     | Queue for server-provisioning jobs
     |--------------------------------------------------------------------------
     | Provisioning jobs (cloud create → poll IP → wait SSH → run setup) run on
-    | this queue. Default 'dply' = same as today. Set to 'dply-provision' (which
-    | Horizon already watches, at top priority) so a create doesn't wait behind
-    | routine control-plane jobs. Only use a queue Horizon actually watches, or
-    | the jobs will silently stall.
+    | this queue. Defaults to 'dply-provision' — the dedicated lane Horizon
+    | watches at TOP priority — so a server create jumps ahead of routine
+    | control-plane work instead of waiting behind it. Only use a queue Horizon
+    | actually watches, or the jobs will silently stall.
     */
-    'queue' => env('DPLY_PROVISION_QUEUE', 'dply'),
+    'queue' => env('DPLY_PROVISION_QUEUE', 'dply-provision'),
 
     /*
     |--------------------------------------------------------------------------
