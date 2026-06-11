@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "7589fc22671952a498b4c637e46da71d",
+    "content-hash": "dc28a71200b3454303c4953eb56b1cca",
     "packages": [
         {
             "name": "aws/aws-crt-php",
@@ -1151,6 +1151,93 @@
                 "source": "https://github.com/doctrine/sql-formatter/tree/1.5.4"
             },
             "time": "2026-02-08T16:21:46+00:00"
+        },
+        {
+            "name": "dply/log-parser",
+            "version": "dev-feat/resume-from-phase",
+            "dist": {
+                "type": "path",
+                "url": "packages/log-parser",
+                "reference": "62955051d2aba6b5f82517b8d1b3b29da54ede55"
+            },
+            "require": {
+                "ext-json": "*",
+                "php": ">=8.3"
+            },
+            "require-dev": {
+                "pestphp/pest": "^4.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Dply\\LogParser\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Dply\\LogParser\\Tests\\": "tests/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Tolerant, dependency-free parsers that turn raw Laravel/Monolog and NGINX/Apache error-log text into structured records.",
+            "keywords": [
+                "apache",
+                "dply",
+                "laravel",
+                "log",
+                "monolog",
+                "nginx",
+                "parser"
+            ],
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "dply/nginx-config",
+            "version": "dev-feat/resume-from-phase",
+            "dist": {
+                "type": "path",
+                "url": "packages/nginx-config",
+                "reference": "917a6644a82eb793c738478e96cc210c4a60e0aa"
+            },
+            "require": {
+                "ext-json": "*",
+                "ext-mbstring": "*",
+                "php": ">=8.3"
+            },
+            "require-dev": {
+                "pestphp/pest": "^4.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Dply\\NginxConfig\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Dply\\NginxConfig\\Tests\\": "tests/"
+                }
+            },
+            "license": [
+                "Apache-2.0"
+            ],
+            "description": "Parse, build and diff NGINX configuration as a structured directive tree. A modernized fork of nelexa/crossplane (a PHP port of nginx's crossplane), trimmed to the parser core.",
+            "keywords": [
+                "config",
+                "crossplane",
+                "dply",
+                "nginx",
+                "parser"
+            ],
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
         },
         {
             "name": "dragonmantank/cron-expression",
@@ -4150,65 +4237,6 @@
             "time": "2024-09-04T18:46:31+00:00"
         },
         {
-            "name": "nelexa/crossplane",
-            "version": "1.0.3",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/Ne-Lexa/php-crossplane.git",
-                "reference": "2a8182d0b9c7e24cfbda39ffd5a5731688fa4795"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/Ne-Lexa/php-crossplane/zipball/2a8182d0b9c7e24cfbda39ffd5a5731688fa4795",
-                "reference": "2a8182d0b9c7e24cfbda39ffd5a5731688fa4795",
-                "shasum": ""
-            },
-            "require": {
-                "ext-json": "*",
-                "ext-mbstring": "*",
-                "php": ">=7.1.3",
-                "symfony/console": "*",
-                "symfony/polyfill-php73": "^1.23",
-                "symfony/polyfill-php80": "^1.23"
-            },
-            "require-dev": {
-                "phpunit/phpunit": "^7.5 | ^8.5 | ^9.5"
-            },
-            "suggest": {
-                "symfony/polyfill-mbstring": "To support UTF-8 if the Mbstring PHP extension is not enabled"
-            },
-            "bin": [
-                "bin/crossplane"
-            ],
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "Nelexa\\NginxParser\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "Apache-2.0"
-            ],
-            "authors": [
-                {
-                    "name": "Ne-Lexa",
-                    "email": "alexey@nelexa.ru"
-                }
-            ],
-            "description": "Reliable and fast NGINX configuration file parser and builder. This is a PHP port of the Nginx Python crossplane package.",
-            "keywords": [
-                "creossplane",
-                "nginx",
-                "parser"
-            ],
-            "support": {
-                "issues": "https://github.com/Ne-Lexa/php-crossplane/issues",
-                "source": "https://github.com/Ne-Lexa/php-crossplane/tree/1.0.3"
-            },
-            "time": "2022-10-03T12:55:54+00:00"
-        },
-        {
             "name": "nesbot/carbon",
             "version": "3.11.4",
             "source": {
@@ -6820,49 +6848,6 @@
             "time": "2026-01-15T11:08:16+00:00"
         },
         {
-            "name": "roma-glushko/monolog-parser",
-            "version": "1.0.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/roma-glushko/monolog-parser.git",
-                "reference": "7dd600173865f49faeb37ba07b00fc51d5c342b4"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/roma-glushko/monolog-parser/zipball/7dd600173865f49faeb37ba07b00fc51d5c342b4",
-                "reference": "7dd600173865f49faeb37ba07b00fc51d5c342b4",
-                "shasum": ""
-            },
-            "require-dev": {
-                "phpunit/phpunit": "^8.5"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-0": {
-                    "MonologParser": "src/MonologParser"
-                },
-                "classmap": [
-                    "src/"
-                ]
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Roman Glushko",
-                    "email": "roman.glushko.m@gmail.com"
-                }
-            ],
-            "description": "A parser for monolog log records",
-            "support": {
-                "issues": "https://github.com/roma-glushko/monolog-parser/issues",
-                "source": "https://github.com/roma-glushko/monolog-parser/tree/1.0.0"
-            },
-            "time": "2020-03-29T09:55:27+00:00"
-        },
-        {
             "name": "sebastian/diff",
             "version": "7.0.0",
             "source": {
@@ -9013,86 +8998,6 @@
             "time": "2026-04-10T17:25:58+00:00"
         },
         {
-            "name": "symfony/polyfill-php73",
-            "version": "v1.37.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/symfony/polyfill-php73.git",
-                "reference": "0f68c03565dcaaf25a890667542e8bd75fe7e5bb"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/symfony/polyfill-php73/zipball/0f68c03565dcaaf25a890667542e8bd75fe7e5bb",
-                "reference": "0f68c03565dcaaf25a890667542e8bd75fe7e5bb",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=7.2"
-            },
-            "type": "library",
-            "extra": {
-                "thanks": {
-                    "url": "https://github.com/symfony/polyfill",
-                    "name": "symfony/polyfill"
-                }
-            },
-            "autoload": {
-                "files": [
-                    "bootstrap.php"
-                ],
-                "psr-4": {
-                    "Symfony\\Polyfill\\Php73\\": ""
-                },
-                "classmap": [
-                    "Resources/stubs"
-                ]
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Nicolas Grekas",
-                    "email": "p@tchwork.com"
-                },
-                {
-                    "name": "Symfony Community",
-                    "homepage": "https://symfony.com/contributors"
-                }
-            ],
-            "description": "Symfony polyfill backporting some PHP 7.3+ features to lower PHP versions",
-            "homepage": "https://symfony.com",
-            "keywords": [
-                "compatibility",
-                "polyfill",
-                "portable",
-                "shim"
-            ],
-            "support": {
-                "source": "https://github.com/symfony/polyfill-php73/tree/v1.37.0"
-            },
-            "funding": [
-                {
-                    "url": "https://symfony.com/sponsor",
-                    "type": "custom"
-                },
-                {
-                    "url": "https://github.com/fabpot",
-                    "type": "github"
-                },
-                {
-                    "url": "https://github.com/nicolas-grekas",
-                    "type": "github"
-                },
-                {
-                    "url": "https://tidelift.com/funding/github/packagist/symfony/symfony",
-                    "type": "tidelift"
-                }
-            ],
-            "time": "2024-09-09T11:45:10+00:00"
-        },
-        {
             "name": "symfony/polyfill-php80",
             "version": "v1.37.0",
             "source": {
@@ -10727,62 +10632,6 @@
                 "source": "https://github.com/tijsverkoyen/CssToInlineStyles/tree/v2.4.0"
             },
             "time": "2025-12-02T11:56:42+00:00"
-        },
-        {
-            "name": "tm/error-log-parser",
-            "version": "1.2.1",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/tommy-muehle/error-log-parser.git",
-                "reference": "a1ffaef2a1cc1af0bc91b354b10d25ec834784f3"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/tommy-muehle/error-log-parser/zipball/a1ffaef2a1cc1af0bc91b354b10d25ec834784f3",
-                "reference": "a1ffaef2a1cc1af0bc91b354b10d25ec834784f3",
-                "shasum": ""
-            },
-            "require": {
-                "php": ">=5.6.0"
-            },
-            "require-dev": {
-                "phpunit/phpunit": "5.7.*"
-            },
-            "type": "library",
-            "autoload": {
-                "psr-4": {
-                    "TM\\ErrorLogParser\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Tommy Muehle",
-                    "email": "tommy.muehle@gmail.com",
-                    "homepage": "https://tommy-muehle.de"
-                }
-            ],
-            "description": "PHP error_log parser library.",
-            "homepage": "https://github.com/tommy-muehle/error-log-parser",
-            "keywords": [
-                "apache",
-                "error",
-                "error_log",
-                "log",
-                "nginx",
-                "parser"
-            ],
-            "support": {
-                "docs": "https://github.com/tommy-muehle/error-log-parser/blob/master/README.md",
-                "email": "tommy.muehle@gmail.com",
-                "issues": "https://github.com/tommy-muehle/error-log-parser/issues",
-                "source": "https://github.com/tommy-muehle/error-log-parser/tree/master"
-            },
-            "abandoned": true,
-            "time": "2017-10-30T07:42:46+00:00"
         },
         {
             "name": "vlucas/phpdotenv",
@@ -15115,6 +14964,8 @@
     "aliases": [],
     "minimum-stability": "dev",
     "stability-flags": {
+        "dply/log-parser": 20,
+        "dply/nginx-config": 20,
         "shaferllc/dply-php-lambda": 20,
         "soloterm/solo": 20
     },

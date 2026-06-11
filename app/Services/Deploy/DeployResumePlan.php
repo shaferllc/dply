@@ -21,16 +21,20 @@ final class DeployResumePlan
      *
      * @var list<string>
      */
-    public const PHASE_ORDER = ['clone', 'env', 'manifest', 'build', 'logging', 'release', 'activate', 'post_activate', 'restart'];
+    public const PHASE_ORDER = ['clone', 'env', 'manifest', 'build', 'logging', 'release', 'activate', 'restart'];
 
     /**
-     * Phases a deploy may be resumed FROM. Restricted to the two recorded,
-     * pre-cutover phases that fail with an `ok=false` step — the common,
-     * low-risk cases (a build step broke, or a migration/release step broke).
+     * Phases a deploy may be resumed FROM:
+     *   build / release — PRE-cutover (Tier 1): the staged release was never
+     *     made live, so re-running it can't disturb what's serving.
+     *   restart — POST-cutover (Tier 2): the symlink already flipped and the new
+     *     release is live, but a finishing step failed (the post-deploy command
+     *     or a worker restart). Resume re-runs only that post-cutover tail —
+     *     it does NOT re-clone, re-build, re-migrate, or re-flip.
      *
      * @var list<string>
      */
-    public const RESUMABLE_PHASES = ['build', 'release'];
+    public const RESUMABLE_PHASES = ['build', 'release', 'restart'];
 
     public function __construct(
         public readonly string $releaseFolder,

@@ -187,8 +187,11 @@ trait ManagesSiteDeployExecution
 
     /**
      * Open the confirm modal for resuming a failed deploy from the phase it
-     * died at. The release phase re-runs migrations, which may have partially
-     * applied on the failed attempt, so it gets a sharper warning than build.
+     * died at. Three cases, each with its own warning:
+     *   build   — pre-cutover; the live site is untouched.
+     *   release — pre-cutover; re-runs migrations (may have partially applied).
+     *   restart — POST-cutover; the new release is already live and resume
+     *             re-runs only the post-deploy command / worker restarts.
      */
     public function confirmResumeDeployment(string $deploymentId): void
     {
@@ -205,9 +208,11 @@ trait ManagesSiteDeployExecution
             return;
         }
 
-        $body = $phase === 'release'
-            ? __('Re-run the deploy from the release phase, reusing the build that already succeeded? This re-runs migrations — if the failed attempt partially applied a migration, run it manually or roll back the database first.')
-            : __('Re-run the deploy from the build phase, reusing the release that was already cloned? The live site is untouched until the new build passes.');
+        $body = match ($phase) {
+            'release' => __('Re-run the deploy from the release phase, reusing the build that already succeeded? This re-runs migrations — if the failed attempt partially applied a migration, run it manually or roll back the database first.'),
+            'restart' => __('The new release is already live — only a post-cutover step (post-deploy command or worker restart) failed. Resume re-runs just that tail: it does not re-clone, re-build, re-migrate, or re-flip the symlink.'),
+            default => __('Re-run the deploy from the build phase, reusing the release that was already cloned? The live site is untouched until the new build passes.'),
+        };
 
         $this->openConfirmActionModal(
             'resumeDeployment',

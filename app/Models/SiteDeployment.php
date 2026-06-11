@@ -189,9 +189,15 @@ class SiteDeployment extends Model
 
     /**
      * The phase a "resume" should restart from, or null when this deployment
-     * can't be resumed. Resumable only when it failed in a recorded, pre-cutover
+     * can't be resumed. Resumable only when it failed in a recorded, resumable
      * phase ({@see DeployResumePlan::RESUMABLE_PHASES}) AND we still know which
-     * staged release folder to re-attach to.
+     * release folder to re-attach to.
+     *
+     *   build / release — pre-cutover; the staged release was never made live.
+     *   restart — post-cutover; the new release IS live but a finishing step
+     *     (post-deploy command / worker restart) failed. Guarded on a recorded,
+     *     succeeded `activate` so we never treat a half-flipped deploy as a
+     *     clean post-cutover state.
      */
     public function resumeStartPhase(): ?string
     {
@@ -206,7 +212,20 @@ class SiteDeployment extends Model
             return null;
         }
 
+        // A post-cutover (restart) resume only makes sense if the cutover
+        // actually happened — i.e. the symlink flipped and `current` points at
+        // this release. Without a clean recorded activate we can't assume that.
+        if ($phase === 'restart' && ! $this->phaseOk('activate')) {
+            return null;
+        }
+
         return $phase;
+    }
+
+    /** True when resuming this deployment re-runs work AFTER the cutover (release already live). */
+    public function resumeIsPostCutover(): bool
+    {
+        return $this->resumeStartPhase() === 'restart';
     }
 
     public function isResumable(): bool

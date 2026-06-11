@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\DescribesCronExpression;
 use Database\Factories\ServerSchedulerHeartbeatFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -23,7 +24,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class ServerSchedulerHeartbeat extends Model
 {
     /** @use HasFactory<ServerSchedulerHeartbeatFactory> */
-    use HasFactory, HasUlids;
+    use DescribesCronExpression, HasFactory, HasUlids;
 
     public const KIND_LARAVEL = 'laravel';
 

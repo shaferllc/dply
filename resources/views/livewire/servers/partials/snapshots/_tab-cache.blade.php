@@ -99,6 +99,9 @@
                                 <p class="text-sm font-semibold text-brand-ink">
                                     {{ $schedule->cacheService?->engine ? ucfirst($schedule->cacheService->engine) : '—' }}
                                     <span class="ml-2 inline-flex items-center rounded-full bg-brand-sand/60 px-2 py-0.5 font-mono text-[11px] text-brand-moss">{{ $schedule->cron_expression }}</span>
+                                    @if ($cronDesc = $schedule->cronDescription())
+                                        <span class="ml-2 text-[11px] text-brand-mist">{{ $cronDesc }}</span>
+                                    @endif
                                     @if (! $schedule->is_active)
                                         <span class="ml-2 inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 ring-1 ring-amber-200">{{ __('Paused') }}</span>
                                     @endif

@@ -205,6 +205,9 @@
                                     {{ $cj->cron_expression }}
                                 </span>
                             @endif
+                            @if ($cronDesc = $cj->cronDescription())
+                                <span class="text-[11px] text-brand-ink/50">{{ $cronDesc }}</span>
+                            @endif
                             {{-- user chip --}}
                             <span class="inline-flex items-center gap-1 rounded-md bg-white px-1.5 py-0.5 text-[11px] text-brand-ink/80 ring-1 ring-brand-ink/10">
                                 <x-heroicon-m-user class="h-3 w-3 text-brand-moss" />
