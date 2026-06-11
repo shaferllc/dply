@@ -517,7 +517,12 @@ class WorkspaceMonitor extends Component
             return;
         }
 
-        if ($at->lt(now()->subMinutes(15))) {
+        // A probe finishes in seconds; anything older than the stale window means
+        // the job was lost/killed before clearing the flag (e.g. a deploy
+        // restarted Horizon mid-probe). Release it so the next poll re-dispatches
+        // instead of spinning "still running" for many minutes.
+        $staleSeconds = (int) config('server_metrics.probe.stale_pending_seconds', 120);
+        if ($at->lt(now()->subSeconds($staleSeconds))) {
             unset($meta['monitoring_probe_pending'], $meta['monitoring_probe_pending_at']);
             $server->update(['meta' => $meta]);
             $this->server = $server->fresh();

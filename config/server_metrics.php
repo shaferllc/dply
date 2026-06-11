@@ -122,6 +122,13 @@ return [
 
     'probe' => [
         'queue' => env('SERVER_METRICS_PROBE_QUEUE', 'dply'),
+        // How long the "probe pending" banner may persist before it's treated as
+        // stale and auto-released so the page can re-dispatch. A probe normally
+        // finishes in a few seconds; a much longer wedge means the job was killed
+        // mid-flight (e.g. a deploy restarted Horizon) and never ran its
+        // pending-clear. Keep this short so a killed probe self-heals fast
+        // instead of spinning "still running" for many minutes.
+        'stale_pending_seconds' => max(30, (int) env('SERVER_METRICS_PROBE_STALE_PENDING', 120)),
     ],
 
     /*
