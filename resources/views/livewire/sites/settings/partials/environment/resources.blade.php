@@ -25,6 +25,10 @@
             'storage' => __('Object storage'),
             'logging' => __('Logging'),
             'mail' => __('Mail'),
+            'error_tracking' => __('Error tracking'),
+            'ai' => __('AI / LLM'),
+            'captcha' => __('CAPTCHA'),
+            'sms' => __('SMS / push'),
             'scheduler' => __('Scheduler'),
             'workers' => __('Workers'),
             'publication' => __('Publication'),
@@ -35,7 +39,7 @@
         // card carries only the runtime resources that don't map to env vars.
         $resourceBindings = array_values(array_filter(
             $siteBindings,
-            fn ($b) => ! in_array($b->type, ['database', 'redis', 'queue', 'cache', 'session', 'storage', 'logging', 'mail', 'broadcasting'], true),
+            fn ($b) => ! in_array($b->type, ['database', 'redis', 'queue', 'cache', 'session', 'storage', 'logging', 'mail', 'broadcasting', 'error_tracking', 'ai', 'captcha', 'sms'], true),
         ));
     @endphp
     {{-- $bindingModalOnly: the Resources hub includes this partial solely to
@@ -136,7 +140,7 @@
     <x-modal name="site-binding-modal" maxWidth="2xl" overlayClass="bg-brand-ink/40">
         @php $bindingModalLabel = $bindingTypeLabels[$bindingModalType] ?? str($bindingModalType)->replace('_', ' ')->title(); @endphp
         <div class="relative border-b border-brand-ink/10 px-6 py-5">
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ $bindingModalMode === 'provision' ? __('Provision new') : (in_array($bindingModalType, ['logging', 'mail', 'broadcasting']) ? __('Configure') : __('Attach existing')) }}</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ $bindingModalMode === 'provision' ? __('Provision new') : (in_array($bindingModalType, ['logging', 'mail', 'broadcasting', 'error_tracking', 'ai', 'captcha', 'sms']) ? __('Configure') : __('Attach existing')) }}</p>
             <h2 class="mt-2 text-xl font-semibold text-brand-ink">{{ $bindingModalLabel ?: __('Binding') }}</h2>
             <button type="button" x-on:click="$dispatch('close')" class="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-lg text-brand-mist transition-colors hover:bg-brand-sand/40 hover:text-brand-ink focus:outline-none focus:ring-2 focus:ring-brand-sage/40" aria-label="{{ __('Close') }}">
                 <x-heroicon-o-x-mark class="h-5 w-5" />
@@ -644,6 +648,90 @@
                             @endif
                         </p>
                     @endif
+                </div>
+            @elseif ($bindingModalType === 'error_tracking')
+                @php $etProvider = (string) ($bindingForm['provider'] ?? 'sentry'); @endphp
+                <div class="space-y-4">
+                    <div>
+                        <x-input-label for="binding_et_provider" :value="__('Provider')" />
+                        <select id="binding_et_provider" wire:model.live="bindingForm.provider" class="dply-input">
+                            <option value="sentry">{{ __('Sentry') }}</option>
+                            <option value="bugsnag">{{ __('Bugsnag') }}</option>
+                            <option value="flare">{{ __('Flare') }}</option>
+                        </select>
+                    </div>
+                    @include('livewire.sites.settings.partials.environment.error-tracking-credential-fields', ['etProvider' => $etProvider])
+                    @php $etPackage = \App\Services\Deploy\SiteBindingManager::ERROR_TRACKING_PACKAGES[$etProvider] ?? null; @endphp
+                    @if ($etPackage)
+                        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                            {{ __('Requires the') }} <code class="font-mono font-semibold">{{ $etPackage }}</code> {{ __('package. Add it to your') }} <code class="font-mono font-semibold">composer.json</code> {{ __('before deploying.') }}
+                        </div>
+                    @endif
+                    <p class="text-xs text-brand-moss">
+                        @if ($etProvider === 'sentry')
+                            {{ __('Injects SENTRY_LARAVEL_DSN (and SENTRY_TRACES_SAMPLE_RATE when set) at deploy.') }}
+                        @elseif ($etProvider === 'bugsnag')
+                            {{ __('Injects BUGSNAG_API_KEY at deploy.') }}
+                        @elseif ($etProvider === 'flare')
+                            {{ __('Injects FLARE_KEY at deploy. Flare ships with Laravel via spatie/laravel-ignition.') }}
+                        @endif
+                    </p>
+                </div>
+            @elseif ($bindingModalType === 'ai')
+                @php $aiProvider = (string) ($bindingForm['provider'] ?? 'openai'); @endphp
+                <div class="space-y-4">
+                    <div>
+                        <x-input-label for="binding_ai_provider" :value="__('Provider')" />
+                        <select id="binding_ai_provider" wire:model.live="bindingForm.provider" class="dply-input">
+                            <option value="openai">{{ __('OpenAI') }}</option>
+                            <option value="anthropic">{{ __('Anthropic') }}</option>
+                            <option value="gemini">{{ __('Google Gemini') }}</option>
+                            <option value="groq">{{ __('Groq') }}</option>
+                            <option value="mistral">{{ __('Mistral') }}</option>
+                        </select>
+                    </div>
+                    @include('livewire.sites.settings.partials.environment.ai-credential-fields', ['aiProvider' => $aiProvider])
+                    <p class="text-xs text-brand-moss">
+                        {{ __('Injects') }} <code class="font-mono">{{ \App\Services\Deploy\SiteBindingManager::AI_KEY_ENV[$aiProvider] ?? 'OPENAI_API_KEY' }}</code>
+                        @if ($aiProvider === 'openai') {{ __('(and OPENAI_ORGANIZATION when set)') }} @endif
+                        {{ __('at deploy.') }}
+                    </p>
+                </div>
+            @elseif ($bindingModalType === 'captcha')
+                @php $captchaProvider = (string) ($bindingForm['provider'] ?? 'turnstile'); @endphp
+                <div class="space-y-4">
+                    <div>
+                        <x-input-label for="binding_captcha_provider" :value="__('Provider')" />
+                        <select id="binding_captcha_provider" wire:model.live="bindingForm.provider" class="dply-input">
+                            <option value="turnstile">{{ __('Cloudflare Turnstile') }}</option>
+                            <option value="recaptcha">{{ __('Google reCAPTCHA') }}</option>
+                            <option value="hcaptcha">{{ __('hCaptcha') }}</option>
+                        </select>
+                    </div>
+                    @include('livewire.sites.settings.partials.environment.captcha-credential-fields', ['captchaProvider' => $captchaProvider])
+                    <p class="text-xs text-brand-moss">{{ __('Injects the site key + secret, plus a VITE_ mirror of the public site key for the browser bundle. The secret stays server-only.') }}</p>
+                </div>
+            @elseif ($bindingModalType === 'sms')
+                @php $smsProvider = (string) ($bindingForm['provider'] ?? 'twilio'); @endphp
+                <div class="space-y-4">
+                    <div>
+                        <x-input-label for="binding_sms_provider" :value="__('Provider')" />
+                        <select id="binding_sms_provider" wire:model.live="bindingForm.provider" class="dply-input">
+                            <option value="twilio">{{ __('Twilio') }}</option>
+                            <option value="vonage">{{ __('Vonage') }}</option>
+                            <option value="fcm">{{ __('Firebase Cloud Messaging') }}</option>
+                        </select>
+                    </div>
+                    @include('livewire.sites.settings.partials.environment.sms-credential-fields', ['smsProvider' => $smsProvider])
+                    <p class="text-xs text-brand-moss">
+                        @if ($smsProvider === 'twilio')
+                            {{ __('Injects TWILIO_SID, TWILIO_AUTH_TOKEN and TWILIO_FROM at deploy.') }}
+                        @elseif ($smsProvider === 'vonage')
+                            {{ __('Injects VONAGE_KEY, VONAGE_SECRET and VONAGE_SMS_FROM at deploy.') }}
+                        @elseif ($smsProvider === 'fcm')
+                            {{ __('Injects FCM_SERVER_KEY at deploy.') }}
+                        @endif
+                    </p>
                 </div>
             @elseif ($bindingModalType === 'redis')
                 @php

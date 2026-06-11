@@ -10,6 +10,9 @@ use App\Jobs\SendBindingTestEmailJob;
 use App\Jobs\SwitchCacheServiceJob;
 use App\Jobs\ValidateBindingConnectivityJob;
 use App\Jobs\ValidateSiteBindingsReachableJob;
+use App\Models\AiCredential;
+use App\Models\CaptchaCredential;
+use App\Models\ErrorTrackingCredential;
 use App\Models\LogDrainCredential;
 use App\Models\MailCredential;
 use App\Models\ObjectStorageCredential;
@@ -19,6 +22,7 @@ use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Models\ServerDatabase;
 use App\Models\SiteBinding;
+use App\Models\SmsCredential;
 use App\Services\Deploy\DeploymentSecretInventory;
 use App\Services\Deploy\SiteBindingManager;
 use App\Support\Servers\CacheEngineAvailability;
@@ -125,7 +129,9 @@ trait ManagesSiteBindings
      */
     private function validateBindingConnectivity(SiteBinding $binding): void
     {
-        if (! in_array($binding->type, ['database', 'redis'], true)) {
+        // database/redis probe their own endpoint; cache/queue/session probe the
+        // underlying engine they ride on (resolved in ValidateBindingConnectivityJob).
+        if (! in_array($binding->type, ['database', 'redis', 'cache', 'queue', 'session'], true)) {
             return;
         }
         if (! method_exists($this, 'seedQueuedConsoleAction') || ! method_exists($this, 'watchConsoleAction')) {
@@ -406,6 +412,10 @@ trait ManagesSiteBindings
             $type === 'logging' => $this->defaultLoggingBindingForm(),
             $type === 'mail' => $this->defaultMailBindingForm(),
             $type === 'broadcasting' => $this->defaultBroadcastingBindingForm(),
+            $type === 'error_tracking' => $this->defaultErrorTrackingBindingForm(),
+            $type === 'ai' => $this->defaultAiBindingForm(),
+            $type === 'captcha' => $this->defaultCaptchaBindingForm(),
+            $type === 'sms' => $this->defaultSmsBindingForm(),
             default => [],
         };
     }
@@ -800,6 +810,254 @@ trait ManagesSiteBindings
     }
 
     /**
+     * Default error-tracking form. Prefills provider from an existing binding's
+     * config so re-opening "Configure" keeps the current provider selected;
+     * secrets (DSN/key) are never echoed back.
+     *
+     * @return array<string, mixed>
+     */
+    private function defaultErrorTrackingBindingForm(): array
+    {
+        $existing = $this->site->bindings->firstWhere('type', 'error_tracking');
+        $cfg = is_array($existing?->config) ? $existing->config : [];
+
+        return [
+            'provider' => (string) ($cfg['provider'] ?? 'sentry'),
+            // Sentry
+            'dsn' => '',
+            'traces_sample_rate' => '',
+            // Bugsnag
+            'api_key' => '',
+            // Flare
+            'key' => '',
+            // Saved-credential reuse + save-for-reuse.
+            'credential_id' => '',
+            'save_credential' => false,
+            'credential_name' => '',
+        ];
+    }
+
+    /**
+     * Saved error-tracking credentials the site's org can reuse for $provider.
+     *
+     * @return list<array{id: string, label: string}>
+     */
+    public function errorTrackingCredentialsFor(string $provider): array
+    {
+        return ErrorTrackingCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->where('provider', $provider)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (ErrorTrackingCredential $c): array => [
+                'id' => (string) $c->id,
+                'label' => (string) $c->name,
+            ])
+            ->all();
+    }
+
+    public function deleteErrorTrackingCredential(string $credentialId): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $cred = ErrorTrackingCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->whereKey($credentialId)
+            ->first();
+
+        if (! $cred instanceof ErrorTrackingCredential) {
+            return;
+        }
+
+        $cred->delete();
+
+        if (($this->bindingForm['credential_id'] ?? '') === $credentialId) {
+            $this->bindingForm['credential_id'] = '';
+        }
+
+        $this->toastSuccess(__('Saved error tracking credential removed.'));
+    }
+
+    /**
+     * Default AI/LLM key form. Prefills provider from an existing binding so
+     * re-opening keeps the selection; the key is never echoed back.
+     *
+     * @return array<string, mixed>
+     */
+    private function defaultAiBindingForm(): array
+    {
+        $existing = $this->site->bindings->firstWhere('type', 'ai');
+        $cfg = is_array($existing?->config) ? $existing->config : [];
+
+        return [
+            'provider' => (string) ($cfg['provider'] ?? 'openai'),
+            'api_key' => '',
+            'organization' => '',
+            'credential_id' => '',
+            'save_credential' => false,
+            'credential_name' => '',
+        ];
+    }
+
+    /**
+     * @return list<array{id: string, label: string}>
+     */
+    public function aiCredentialsFor(string $provider): array
+    {
+        return AiCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->where('provider', $provider)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (AiCredential $c): array => ['id' => (string) $c->id, 'label' => (string) $c->name])
+            ->all();
+    }
+
+    public function deleteAiCredential(string $credentialId): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $cred = AiCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->whereKey($credentialId)
+            ->first();
+
+        if (! $cred instanceof AiCredential) {
+            return;
+        }
+
+        $cred->delete();
+
+        if (($this->bindingForm['credential_id'] ?? '') === $credentialId) {
+            $this->bindingForm['credential_id'] = '';
+        }
+
+        $this->toastSuccess(__('Saved AI credential removed.'));
+    }
+
+    /**
+     * Default CAPTCHA form. Prefills provider from an existing binding; keys are
+     * never echoed back.
+     *
+     * @return array<string, mixed>
+     */
+    private function defaultCaptchaBindingForm(): array
+    {
+        $existing = $this->site->bindings->firstWhere('type', 'captcha');
+        $cfg = is_array($existing?->config) ? $existing->config : [];
+
+        return [
+            'provider' => (string) ($cfg['provider'] ?? 'turnstile'),
+            'site_key' => '',
+            'secret_key' => '',
+            'credential_id' => '',
+            'save_credential' => false,
+            'credential_name' => '',
+        ];
+    }
+
+    /**
+     * @return list<array{id: string, label: string}>
+     */
+    public function captchaCredentialsFor(string $provider): array
+    {
+        return CaptchaCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->where('provider', $provider)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (CaptchaCredential $c): array => ['id' => (string) $c->id, 'label' => (string) $c->name])
+            ->all();
+    }
+
+    public function deleteCaptchaCredential(string $credentialId): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $cred = CaptchaCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->whereKey($credentialId)
+            ->first();
+
+        if (! $cred instanceof CaptchaCredential) {
+            return;
+        }
+
+        $cred->delete();
+
+        if (($this->bindingForm['credential_id'] ?? '') === $credentialId) {
+            $this->bindingForm['credential_id'] = '';
+        }
+
+        $this->toastSuccess(__('Saved CAPTCHA credential removed.'));
+    }
+
+    /**
+     * Default SMS / push form. Prefills provider from an existing binding;
+     * secrets are never echoed back.
+     *
+     * @return array<string, mixed>
+     */
+    private function defaultSmsBindingForm(): array
+    {
+        $existing = $this->site->bindings->firstWhere('type', 'sms');
+        $cfg = is_array($existing?->config) ? $existing->config : [];
+
+        return [
+            'provider' => (string) ($cfg['provider'] ?? 'twilio'),
+            // Twilio
+            'sid' => '',
+            'auth_token' => '',
+            // Twilio + Vonage share a from number.
+            'from' => '',
+            // Vonage
+            'key' => '',
+            'secret' => '',
+            // FCM
+            'server_key' => '',
+            'credential_id' => '',
+            'save_credential' => false,
+            'credential_name' => '',
+        ];
+    }
+
+    /**
+     * @return list<array{id: string, label: string}>
+     */
+    public function smsCredentialsFor(string $provider): array
+    {
+        return SmsCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->where('provider', $provider)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (SmsCredential $c): array => ['id' => (string) $c->id, 'label' => (string) $c->name])
+            ->all();
+    }
+
+    public function deleteSmsCredential(string $credentialId): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $cred = SmsCredential::query()
+            ->where('organization_id', $this->site->organization_id)
+            ->whereKey($credentialId)
+            ->first();
+
+        if (! $cred instanceof SmsCredential) {
+            return;
+        }
+
+        $cred->delete();
+
+        if (($this->bindingForm['credential_id'] ?? '') === $credentialId) {
+            $this->bindingForm['credential_id'] = '';
+        }
+
+        $this->toastSuccess(__('Saved SMS credential removed.'));
+    }
+
+    /**
      * Saved log drain credentials the site's org can reuse for $provider.
      *
      * @return list<array{id: string, label: string}>
@@ -1043,6 +1301,103 @@ trait ManagesSiteBindings
             if (is_string($key) && preg_match('/^legs\.(\d+)\.provider$/', $key, $m) === 1) {
                 $i = (int) $m[1];
                 $this->bindingForm['legs'][$i] = $this->emptyMailLeg((string) $value);
+            }
+
+            return;
+        }
+
+        if ($this->bindingModalType === 'ai') {
+            if ($key === 'provider') {
+                foreach (['credential_id', 'api_key', 'organization'] as $f) {
+                    $this->bindingForm[$f] = '';
+                }
+            }
+
+            if ($key === 'credential_id' && is_string($value) && $value !== '') {
+                $cred = AiCredential::query()
+                    ->where('organization_id', $this->site->organization_id)
+                    ->where('provider', (string) ($this->bindingForm['provider'] ?? ''))
+                    ->whereKey($value)
+                    ->first();
+                if ($cred instanceof AiCredential) {
+                    $c = is_array($cred->credentials) ? $cred->credentials : [];
+                    $this->bindingForm['api_key'] = (string) ($c['api_key'] ?? '');
+                    $this->bindingForm['organization'] = (string) ($c['organization'] ?? '');
+                }
+            }
+
+            return;
+        }
+
+        if ($this->bindingModalType === 'captcha') {
+            if ($key === 'provider') {
+                foreach (['credential_id', 'site_key', 'secret_key'] as $f) {
+                    $this->bindingForm[$f] = '';
+                }
+            }
+
+            if ($key === 'credential_id' && is_string($value) && $value !== '') {
+                $cred = CaptchaCredential::query()
+                    ->where('organization_id', $this->site->organization_id)
+                    ->where('provider', (string) ($this->bindingForm['provider'] ?? ''))
+                    ->whereKey($value)
+                    ->first();
+                if ($cred instanceof CaptchaCredential) {
+                    $c = is_array($cred->credentials) ? $cred->credentials : [];
+                    $this->bindingForm['site_key'] = (string) ($c['site_key'] ?? '');
+                    $this->bindingForm['secret_key'] = (string) ($c['secret_key'] ?? '');
+                }
+            }
+
+            return;
+        }
+
+        if ($this->bindingModalType === 'sms') {
+            if ($key === 'provider') {
+                foreach (['credential_id', 'sid', 'auth_token', 'from', 'key', 'secret', 'server_key'] as $f) {
+                    $this->bindingForm[$f] = '';
+                }
+            }
+
+            if ($key === 'credential_id' && is_string($value) && $value !== '') {
+                $cred = SmsCredential::query()
+                    ->where('organization_id', $this->site->organization_id)
+                    ->where('provider', (string) ($this->bindingForm['provider'] ?? ''))
+                    ->whereKey($value)
+                    ->first();
+                if ($cred instanceof SmsCredential) {
+                    $c = is_array($cred->credentials) ? $cred->credentials : [];
+                    foreach (['sid', 'auth_token', 'from', 'key', 'secret', 'server_key'] as $f) {
+                        $this->bindingForm[$f] = (string) ($c[$f] ?? '');
+                    }
+                }
+            }
+
+            return;
+        }
+
+        if ($this->bindingModalType === 'error_tracking') {
+            if ($key === 'provider') {
+                foreach (['credential_id', 'dsn', 'traces_sample_rate', 'api_key', 'key'] as $f) {
+                    $this->bindingForm[$f] = '';
+                }
+            }
+
+            if ($key === 'credential_id' && is_string($value) && $value !== '') {
+                $provider = (string) ($this->bindingForm['provider'] ?? '');
+                $cred = ErrorTrackingCredential::query()
+                    ->where('organization_id', $this->site->organization_id)
+                    ->where('provider', $provider)
+                    ->whereKey($value)
+                    ->first();
+
+                if ($cred instanceof ErrorTrackingCredential) {
+                    $credentials = is_array($cred->credentials) ? $cred->credentials : [];
+                    $this->bindingForm['dsn'] = (string) ($credentials['dsn'] ?? '');
+                    $this->bindingForm['traces_sample_rate'] = (string) ($credentials['traces_sample_rate'] ?? '');
+                    $this->bindingForm['api_key'] = (string) ($credentials['api_key'] ?? '');
+                    $this->bindingForm['key'] = (string) ($credentials['key'] ?? '');
+                }
             }
 
             return;

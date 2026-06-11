@@ -60,10 +60,10 @@ class ValidateBindingConnectivityJob implements ShouldQueue
         $conn = null;
 
         try {
-            [$host, $port] = $this->target($binding);
+            [$host, $port] = $this->target($site, $binding);
 
             if ($host === null || $port === null) {
-                $emit->info('No host/port on this binding to validate — nothing to check.');
+                $emit->info('No reachable host/port for this binding (it may use a file/array/sync driver) — nothing to probe.');
                 $this->finish($emit, $binding, true, null);
 
                 return;
@@ -108,29 +108,51 @@ class ValidateBindingConnectivityJob implements ShouldQueue
     }
 
     /**
-     * Host + port to probe for this binding, drawn from its injected connection
-     * variables. Only database/redis carry a reachable host:port; other types
-     * (storage talks to an external endpoint, markers carry nothing) return
-     * nulls and are skipped. Returns sanitized values or [null, null].
+     * Host + port to probe for this binding.
+     *
+     * database/redis carry their own host:port. cache/queue/session are config
+     * bindings with no endpoint of their own — they ride on an underlying engine
+     * (CACHE_STORE / QUEUE_CONNECTION / SESSION_DRIVER = redis|database), so we
+     * resolve that driver and read the REDIS or DB host:port from the site's
+     * merged binding env (the redis/database binding supplies them). Non-networked
+     * drivers (file/array/sync/cookie) and other types return nulls and skip.
      *
      * @return array{0: ?string, 1: ?int}
      */
-    private function target(SiteBinding $binding): array
+    private function target(Site $site, SiteBinding $binding): array
     {
         $env = $binding->connectionEnv();
 
-        [$hostKey, $portKey] = match ($binding->type) {
-            'database' => ['DB_HOST', 'DB_PORT'],
-            'redis' => ['REDIS_HOST', 'REDIS_PORT'],
-            default => [null, null],
-        };
+        if (in_array($binding->type, ['cache', 'queue', 'session'], true)) {
+            $driverKey = match ($binding->type) {
+                'cache' => 'CACHE_STORE',
+                'queue' => 'QUEUE_CONNECTION',
+                'session' => 'SESSION_DRIVER',
+            };
+            $driver = strtolower(trim((string) ($env[$driverKey] ?? $env['CACHE_DRIVER'] ?? '')));
+
+            if (! in_array($driver, ['redis', 'database'], true)) {
+                return [null, null]; // file/array/sync/cookie/null — nothing to probe
+            }
+
+            $env = $this->mergedConnectionEnv($site);
+            [$hostKey, $portKey] = $driver === 'redis' ? ['REDIS_HOST', 'REDIS_PORT'] : ['DB_HOST', 'DB_PORT'];
+            $defaultPort = $driver === 'redis' ? 6379 : 0;
+        } else {
+            [$hostKey, $portKey] = match ($binding->type) {
+                'database' => ['DB_HOST', 'DB_PORT'],
+                'redis' => ['REDIS_HOST', 'REDIS_PORT'],
+                default => [null, null],
+            };
+            $defaultPort = 0;
+        }
 
         if ($hostKey === null) {
             return [null, null];
         }
 
         $host = trim((string) ($env[$hostKey] ?? ''));
-        $port = (int) ($env[$portKey] ?? 0);
+        $port = (int) ($env[$portKey] ?? 0) ?: $defaultPort;
 
         // Guard the shell interpolation: hostnames/IPs only, valid TCP port.
         if ($host === '' || preg_match('/^[A-Za-z0-9_.:-]+$/', $host) !== 1) {
@@ -141,6 +163,25 @@ class ValidateBindingConnectivityJob implements ShouldQueue
         }
 
         return [$host, $port];
+    }
+
+    /**
+     * All bindings' connection variables merged into one map, so a config
+     * binding (cache/queue/session) can read the REDIS or DB host:port that the
+     * underlying redis/database binding injects.
+     *
+     * @return array<string, string>
+     */
+    private function mergedConnectionEnv(Site $site): array
+    {
+        $merged = [];
+        foreach ($site->bindings as $sibling) {
+            foreach ($sibling->connectionEnv() as $key => $value) {
+                $merged[$key] = (string) $value;
+            }
+        }
+
+        return $merged;
     }
 
     private function finish(ConsoleEmitter $emit, SiteBinding $binding, bool $ok, ?string $error, bool $failed = false): void

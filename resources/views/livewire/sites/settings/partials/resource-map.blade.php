@@ -377,6 +377,24 @@
                                         </button>
                                     @endif
                                 @endif
+                                {{-- Test the live binding: mail sends a real test email through the
+                                     transport; database/redis/cache/queue/session probe the connection
+                                     from the server (cache/queue/session resolve to their engine). --}}
+                                @if ($attached && method_exists($this, 'seedQueuedConsoleAction'))
+                                    @if ($type === 'mail' && method_exists($this, 'sendBindingTestEmail'))
+                                        <button type="button" wire:click="sendBindingTestEmail(@js((string) $binding->id))" wire:loading.attr="disabled" wire:target="sendBindingTestEmail"
+                                            title="{{ __('Send a test email through this transport to your account.') }}"
+                                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
+                                            <x-heroicon-o-paper-airplane class="h-3.5 w-3.5 text-brand-forest" /> {{ __('Test') }}
+                                        </button>
+                                    @elseif (in_array($type, ['database', 'redis', 'cache', 'queue', 'session'], true) && method_exists($this, 'verifyBinding'))
+                                        <button type="button" wire:click="verifyBinding(@js((string) $binding->id))" wire:loading.attr="disabled" wire:target="verifyBinding"
+                                            title="{{ __('Probe this connection from the server now.') }}"
+                                            class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40 disabled:opacity-60">
+                                            <x-heroicon-o-signal class="h-3.5 w-3.5 text-brand-forest" /> {{ __('Test') }}
+                                        </button>
+                                    @endif
+                                @endif
                                 @if ($isLogging)
                                     <a href="{{ $sectionUrl('logs') }}" wire:navigate class="inline-flex items-center gap-1 rounded-md border border-brand-ink/15 bg-white px-2 py-1 text-[11px] font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                                         <x-heroicon-o-cog-6-tooth class="h-3.5 w-3.5" /> {{ $attached ? __('Edit') : __('Configure') }}

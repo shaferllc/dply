@@ -123,6 +123,10 @@ final class SiteResourceBindingResolver
         $bindings[] = $this->cacheBinding($env);
         $bindings[] = $this->objectStorageBinding($env);
         $bindings[] = $this->broadcastingBinding($env);
+        $bindings[] = $this->errorTrackingBinding($env);
+        $bindings[] = $this->aiBinding($env);
+        $bindings[] = $this->captchaBinding($env);
+        $bindings[] = $this->smsBinding($env);
 
         // A persisted SiteBinding (an explicit operator attach/provision) is
         // authoritative: it replaces the derived inference for its type so the
@@ -345,6 +349,117 @@ final class SiteResourceBindingResolver
             source: $driver !== '' ? 'environment' : 'deferred',
             name: $configured ? 'broadcasting-'.$driver : null,
             config: $driver !== '' ? ['driver' => $driver] : [],
+        );
+    }
+
+    /**
+     * @param  array<string, string>  $env
+     */
+    private function errorTrackingBinding(array $env): SiteResourceBinding
+    {
+        $provider = match (true) {
+            $this->envFilled($env, 'SENTRY_LARAVEL_DSN') => 'sentry',
+            $this->envFilled($env, 'BUGSNAG_API_KEY') => 'bugsnag',
+            $this->envFilled($env, 'FLARE_KEY') => 'flare',
+            default => '',
+        };
+
+        if ($provider === '') {
+            return new SiteResourceBinding(
+                type: 'error_tracking',
+                mode: 'attach_existing',
+                required: false,
+                status: 'pending',
+                source: 'deferred',
+                name: null,
+                config: [],
+            );
+        }
+
+        return new SiteResourceBinding(
+            type: 'error_tracking',
+            mode: 'attach_existing',
+            required: false,
+            status: 'configured',
+            source: 'environment',
+            name: 'error-tracking-'.$provider,
+            config: ['provider' => $provider],
+        );
+    }
+
+    /**
+     * @param  array<string, string>  $env
+     */
+    private function aiBinding(array $env): SiteResourceBinding
+    {
+        $provider = match (true) {
+            $this->envFilled($env, 'OPENAI_API_KEY') => 'openai',
+            $this->envFilled($env, 'ANTHROPIC_API_KEY') => 'anthropic',
+            $this->envFilled($env, 'GEMINI_API_KEY') => 'gemini',
+            $this->envFilled($env, 'GROQ_API_KEY') => 'groq',
+            $this->envFilled($env, 'MISTRAL_API_KEY') => 'mistral',
+            default => '',
+        };
+
+        return $this->configBindingFromProvider('ai', $provider);
+    }
+
+    /**
+     * @param  array<string, string>  $env
+     */
+    private function captchaBinding(array $env): SiteResourceBinding
+    {
+        $provider = match (true) {
+            $this->envFilled($env, 'RECAPTCHA_SITE_KEY') => 'recaptcha',
+            $this->envFilled($env, 'TURNSTILE_SITE_KEY') => 'turnstile',
+            $this->envFilled($env, 'HCAPTCHA_SITEKEY') => 'hcaptcha',
+            default => '',
+        };
+
+        return $this->configBindingFromProvider('captcha', $provider);
+    }
+
+    /**
+     * @param  array<string, string>  $env
+     */
+    private function smsBinding(array $env): SiteResourceBinding
+    {
+        $provider = match (true) {
+            $this->envFilled($env, 'TWILIO_SID') => 'twilio',
+            $this->envFilled($env, 'VONAGE_KEY') => 'vonage',
+            $this->envFilled($env, 'FCM_SERVER_KEY') => 'fcm',
+            default => '',
+        };
+
+        return $this->configBindingFromProvider('sms', $provider);
+    }
+
+    /**
+     * Shared shape for the env-detected config bindings (ai/captcha/sms):
+     * configured when a provider's key is present, pending otherwise.
+     */
+    private function configBindingFromProvider(string $type, string $provider): SiteResourceBinding
+    {
+        if ($provider === '') {
+            return new SiteResourceBinding(
+                type: $type,
+                mode: 'attach_existing',
+                required: false,
+                status: 'pending',
+                source: 'deferred',
+                name: null,
+                config: [],
+            );
+        }
+
+        return new SiteResourceBinding(
+            type: $type,
+            mode: 'attach_existing',
+            required: false,
+            status: 'configured',
+            source: 'environment',
+            name: $type.'-'.$provider,
+            config: ['provider' => $provider],
         );
     }
 
