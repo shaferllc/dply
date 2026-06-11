@@ -970,6 +970,21 @@ class WorkspaceBackups extends Component
         // the run-now picker; their backup runs on their own home server.
         $remoteDatabases = $this->remoteAttachedDatabases();
 
+        // The run button gates on the server that will ACTUALLY run the dump —
+        // the selected database's home server. A remote-attached DB dumps on its
+        // own box, so this server being un-ready must not block it (and vice
+        // versa). Empty selection → not ready, so the button stays disabled.
+        $runDatabaseReady = false;
+        if ($this->run_database_id !== '') {
+            if ($databases->contains('id', $this->run_database_id)) {
+                $runDatabaseReady = $this->serverOpsReady();
+            } else {
+                $remoteSelected = $remoteDatabases->firstWhere('id', $this->run_database_id);
+                $runDatabaseReady = $remoteSelected?->server !== null
+                    && $this->serverOpsReady($remoteSelected->server);
+            }
+        }
+
         $sites = Site::query()
             ->where('server_id', $this->server->id)
             ->when($this->context_site_id !== null, fn ($q) => $q->whereKey($this->context_site_id))
@@ -1108,6 +1123,7 @@ class WorkspaceBackups extends Component
             'siteDedicatedContext' => $this->siteDedicatedContext,
             'databases' => $databases,
             'remoteDatabases' => $remoteDatabases,
+            'runDatabaseReady' => $runDatabaseReady,
             'sites' => $sites,
             'databaseBackups' => $databaseBackups,
             'fileBackups' => $fileBackups,

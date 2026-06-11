@@ -314,7 +314,7 @@
                 @if ($databases->isEmpty() && $remoteDbs->isEmpty())
                     <p class="text-sm text-brand-moss">{{ __('No databases on this server yet.') }}</p>
                 @else
-                    <select wire:model="run_database_id" class="{{ $input }}">
+                    <select wire:model.live="run_database_id" class="{{ $input }}">
                         <option value="">{{ __('Pick a database…') }}</option>
                         @if ($databases->isNotEmpty())
                             <optgroup label="{{ __('On this server') }}">
@@ -339,7 +339,7 @@
                             @endforeach
                         </select>
                     @endif
-                    <button type="button" wire:click="runDatabaseBackup" wire:loading.attr="disabled" wire:target="runDatabaseBackup" class="{{ $btnPrimary }}" @disabled(! $opsReady || $run_database_id === '')>
+                    <button type="button" wire:click="runDatabaseBackup" wire:loading.attr="disabled" wire:target="runDatabaseBackup" class="{{ $btnPrimary }}" @disabled(! ($runDatabaseReady ?? false))>
                         <span wire:loading.remove wire:target="runDatabaseBackup" class="inline-flex items-center gap-2">
                             <x-heroicon-o-play class="h-4 w-4 shrink-0" aria-hidden="true" />
                             {{ __('Run database backup now') }}
@@ -349,6 +349,9 @@
                             {{ __('Queueing…') }}
                         </span>
                     </button>
+                    @if ($run_database_id !== '' && ! ($runDatabaseReady ?? false))
+                        <p class="text-xs text-brand-moss">{{ __('The server that hosts this database isn’t ready for backups yet — it needs a ready status, an IP address, and a stored SSH key in dply.') }}</p>
+                    @endif
                 @endif
             </div>
         </section>
