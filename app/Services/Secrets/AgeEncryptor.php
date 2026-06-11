@@ -72,6 +72,10 @@ final class AgeEncryptor
      * lives in the DB ({@see \App\Models\OrgSecretKey::$public_recipient}), not
      * on the box. The platform DR path keeps using {@see encrypt()}.
      *
+     * ASCII-armored (`-a`) so the ciphertext is text-safe for a DB column; the
+     * platform DR path ({@see encrypt()}) stays binary because it writes to
+     * object storage. `age -d` auto-detects armor, so decryption needs no flag.
+     *
      * @param  array<int, string>  $recipients
      */
     public function encryptTo(string $plaintext, array $recipients): string
@@ -81,7 +85,7 @@ final class AgeEncryptor
             throw new RuntimeException('encryptTo requires at least one recipient.');
         }
 
-        $args = [$this->ageBin, '-e'];
+        $args = [$this->ageBin, '-e', '-a'];
         foreach ($recipients as $recipient) {
             $args[] = '-r';
             $args[] = $recipient;

@@ -380,9 +380,13 @@ trait ManagesSiteBindings
             return [];
         }
 
-        $orgServerIds = Server::query()
-            ->where('organization_id', $this->site->server?->organization_id)
-            ->pluck('id');
+        // Only offer backends this site can actually reach: its own server
+        // (loopback) plus same-private-network peers. Listing the whole org let a
+        // site re-point at a database on an unrelated network it can never dial.
+        $reachableServerIds = app(SiteBindingManager::class)->reachableServerIdsForSite($this->site);
+        if ($reachableServerIds === []) {
+            return [];
+        }
 
         $row = fn ($r): array => [
             'id' => (string) $r->id,
@@ -393,8 +397,8 @@ trait ManagesSiteBindings
         ];
 
         return match ($binding->type) {
-            'database' => ServerDatabase::query()->whereIn('server_id', $orgServerIds)->with('server')->get()->map($row)->values()->all(),
-            'redis' => ServerCacheService::query()->whereIn('server_id', $orgServerIds)
+            'database' => ServerDatabase::query()->whereIn('server_id', $reachableServerIds)->with('server')->get()->map($row)->values()->all(),
+            'redis' => ServerCacheService::query()->whereIn('server_id', $reachableServerIds)
                 ->whereIn('engine', ServerCacheService::FAMILY_REDIS_ENGINES)->with('server')->get()->map($row)->values()->all(),
             default => [],
         };

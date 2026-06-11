@@ -73,6 +73,22 @@ class SiteBindingManager
      *
      * @return list<array{id: string, label: string}>
      */
+    /**
+     * Server IDs whose resources this site can actually reach over the private
+     * network: its own server (loopback) plus same-private-network peers. Public
+     * wrapper over the reachability rule so UI surfaces (the re-point picker) can
+     * scope to reachable backends instead of the whole org. Empty when the site
+     * has no server.
+     *
+     * @return list<string>
+     */
+    public function reachableServerIdsForSite(Site $site): array
+    {
+        $server = $site->server;
+
+        return $server === null ? [] : $this->reachableServerIds($server);
+    }
+
     public function attachableTargets(Site $site, string $type): array
     {
         return match ($type) {
