@@ -77,9 +77,9 @@ class CreateSiteDatabase extends AbstractDplyTool
             throw new DplyMcpException('Specify an engine (the site has no default database engine configured).');
         }
 
-        $installed = app(ServerDatabaseHostCapabilities::class)->forServer($server);
-        if (! ($installed[$engine] ?? false)) {
-            throw new DplyMcpException(DatabaseWorkspaceEngines::label($engine).' is not installed on this server.');
+        $readiness = app(\App\Services\Servers\DatabaseEngineReadinessGuard::class)->check($server, $engine);
+        if (! $readiness['ok']) {
+            throw new DplyMcpException((string) $readiness['reason']);
         }
 
         $nameTaken = ServerDatabase::query()

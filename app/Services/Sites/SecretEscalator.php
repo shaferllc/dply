@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Sites;
 
+use App\Models\ExternalSecretStore;
 use App\Models\Site;
 use App\Models\SiteSecretResidency;
 use App\Services\Secrets\OrgSecretKeyManager;
@@ -62,6 +63,45 @@ class SecretEscalator
                     'ciphertext' => $ciphertext,
                     'store_id' => null,
                     'reference' => null,
+                ],
+            );
+
+            $vars = $parsed['variables'];
+            $vars[$key] = $residency->placeholder();
+            $site->forceFill(['env_file_content' => $this->writer->render($vars, $parsed['comments'])])->save();
+
+            return $residency;
+        });
+    }
+
+    /**
+     * Point an env key at an external store reference (Tier 3). Unlike escrow,
+     * NO value enters dply — only the pointer is stored, and the loose env keeps
+     * just the placeholder. The store must belong to the site's org.
+     */
+    public function escalateToExternal(Site $site, string $key, ExternalSecretStore $store, string $reference): SiteSecretResidency
+    {
+        if ($store->organization_id !== $site->organization_id) {
+            throw new RuntimeException('external store belongs to a different organization than the site.');
+        }
+        $reference = trim($reference);
+        if ($reference === '') {
+            throw new RuntimeException('a reference is required to point a key at an external store.');
+        }
+
+        $parsed = $this->parser->parse((string) $site->env_file_content);
+        if ($parsed['errors'] !== []) {
+            throw new RuntimeException('.env has parse errors — fix before escalating: '.implode('; ', $parsed['errors']));
+        }
+
+        return DB::transaction(function () use ($site, $key, $store, $reference, $parsed): SiteSecretResidency {
+            $residency = SiteSecretResidency::updateOrCreate(
+                ['site_id' => $site->id, 'key' => $key],
+                [
+                    'mode' => SiteSecretResidency::MODE_EXTERNAL,
+                    'ciphertext' => null,
+                    'store_id' => $store->id,
+                    'reference' => $reference,
                 ],
             );
 

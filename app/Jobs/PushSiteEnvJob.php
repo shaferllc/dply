@@ -55,11 +55,21 @@ class PushSiteEnvJob implements ShouldBeUnique, ShouldQueue
      */
     public int $uniqueFor = 600;
 
+    /**
+     * @param  string|null  $ephemeralIdentityToken  a cache key (NOT the secret)
+     *   under which a customer-held org age identity was stashed for this single
+     *   apply. The raw identity is never serialized into the job payload; handle()
+     *   pulls-and-forgets it from the cache and passes it to the pusher.
+     */
     public function __construct(
         public string $siteId,
         public ?string $userId = null,
         public ?string $seededConsoleRunId = null,
+        public ?string $ephemeralIdentityToken = null,
     ) {}
+
+    /** Cache-key prefix for a show-once ephemeral identity handed to a push. */
+    public const EPHEMERAL_IDENTITY_CACHE_PREFIX = 'env-push:ephemeral-identity:';
 
     /**
      * Bound how long the job waits for the server's SSH slot. Releases from the
@@ -119,7 +129,14 @@ class PushSiteEnvJob implements ShouldBeUnique, ShouldQueue
             $emit->step('push', __('Resolving server connection'));
             $emit->step('push', __('Writing .env to :path', ['path' => $site->effectiveEnvFilePath()]));
 
-            $path = $pusher->push($site);
+            // Pull-and-forget any customer-held identity stashed for this apply.
+            // It lives in the cache (transient) keyed by a token carried in the
+            // payload — never the raw key — and is dropped the instant it is read.
+            $ephemeralIdentity = $this->ephemeralIdentityToken !== null
+                ? \Illuminate\Support\Facades\Cache::pull(self::EPHEMERAL_IDENTITY_CACHE_PREFIX.$this->ephemeralIdentityToken)
+                : null;
+
+            $path = $pusher->push($site, null, $ephemeralIdentity);
 
             // Make the write actually take effect on the running app: rebuild
             // cached config + reload (no-op for sites that read .env live). The

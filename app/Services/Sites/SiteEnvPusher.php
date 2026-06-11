@@ -37,7 +37,7 @@ class SiteEnvPusher
      *   has none) BEFORE build/release steps run — otherwise artisan reads
      *   Laravel's defaults (pgsql 127.0.0.1:5432) and migrations fail.
      */
-    public function push(Site $site, ?string $overridePath = null): string
+    public function push(Site $site, ?string $overridePath = null, ?string $ephemeralIdentity = null): string
     {
         $server = $site->server;
         if (! $server->hostCapabilities()->supportsEnvPushToHost()) {
@@ -70,7 +70,7 @@ class SiteEnvPusher
         // `${dply:secret:<id>}` placeholders for these keys; this swaps each for
         // the resolved value so the app receives the real secret. No-op for the
         // common case — a site with no residency rows has no placeholders.
-        $mergedVars = $this->residency->resolve($site, $mergedVars);
+        $mergedVars = $this->residency->resolve($site, $mergedVars, $ephemeralIdentity);
 
         // Test it's valid first. Only on real operator pushes ($overridePath is
         // null) — the deploy-seeding path runs the pipeline's own required-env

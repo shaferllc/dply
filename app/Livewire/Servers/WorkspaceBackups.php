@@ -349,6 +349,31 @@ class WorkspaceBackups extends Component
             ->get();
     }
 
+    /**
+     * Resolve a database backup this server's workspace may act on: its database
+     * is hosted here, OR it's one a site here attaches to remotely (the same set
+     * surfaced in history). Returns null when not found or not allowed — so a
+     * remote-attached backup no longer 404s the download/delete action. The
+     * downloader streams from the database's own home server regardless.
+     */
+    private function resolveDatabaseBackupForServer(string $backupId): ?ServerDatabaseBackup
+    {
+        $backup = ServerDatabaseBackup::query()
+            ->whereKey($backupId)
+            ->with('serverDatabase.server')
+            ->first();
+
+        $db = $backup?->serverDatabase;
+        if ($db === null) {
+            return null;
+        }
+
+        $allowed = (string) $db->server_id === (string) $this->server->id
+            || $this->remoteAttachedDatabases()->contains('id', $db->id);
+
+        return $allowed ? $backup : null;
+    }
+
     public function runSiteFilesBackup(): void
     {
         $this->authorize('update', $this->server);
@@ -523,11 +548,12 @@ class WorkspaceBackups extends Component
     public function downloadDatabaseBackup(string $backupId, DatabaseBackupDownloader $downloader): StreamedResponse|Response|null
     {
         $this->authorize('update', $this->server);
-        $backup = ServerDatabaseBackup::query()
-            ->whereKey($backupId)
-            ->whereHas('serverDatabase', fn ($q) => $q->where('server_id', $this->server->id))
-            ->with('serverDatabase')
-            ->firstOrFail();
+        $backup = $this->resolveDatabaseBackupForServer($backupId);
+        if ($backup === null) {
+            $this->toastError(__('Backup not found.'));
+
+            return null;
+        }
 
         $extension = $backup->serverDatabase?->engine === 'sqlite' ? 'db' : 'sql';
         $filename = ($backup->serverDatabase?->name ?? 'database').'-'.$backup->id.'.'.$extension;
@@ -871,10 +897,7 @@ class WorkspaceBackups extends Component
     {
         $this->authorize('update', $this->server);
 
-        $backup = ServerDatabaseBackup::query()
-            ->whereKey($backupId)
-            ->whereHas('serverDatabase', fn ($q) => $q->where('server_id', $this->server->id))
-            ->first();
+        $backup = $this->resolveDatabaseBackupForServer($backupId);
         if ($backup === null) {
             return;
         }

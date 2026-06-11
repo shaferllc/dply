@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services\Sites;
 
+use App\Models\ExternalSecretStore;
 use App\Models\OrgSecretKey;
 use App\Models\Site;
 use App\Models\SiteSecretResidency;
+use App\Services\Secrets\External\SecretStoreDriverFactory;
 use App\Services\Secrets\OrgSecretKeyManager;
 use RuntimeException;
 
@@ -29,7 +31,10 @@ class SecretResidencyResolver
 {
     private const PLACEHOLDER_MARKER = '${dply:secret:';
 
-    public function __construct(private readonly OrgSecretKeyManager $orgKeys) {}
+    public function __construct(
+        private readonly OrgSecretKeyManager $orgKeys,
+        private readonly SecretStoreDriverFactory $stores,
+    ) {}
 
     /**
      * @param  array<string, string>  $vars  the merged env map (loose + bindings)
@@ -80,13 +85,34 @@ class SecretResidencyResolver
     {
         return match ($residency->mode) {
             SiteSecretResidency::MODE_ESCROW => $this->resolveEscrow($residency, $orgKey, $ephemeralIdentity),
-            SiteSecretResidency::MODE_EXTERNAL => throw new RuntimeException(
-                "Secret '{$residency->key}' uses external-store residency, which is not enabled yet."
-            ),
+            SiteSecretResidency::MODE_EXTERNAL => $this->resolveExternal($residency),
             default => throw new RuntimeException(
                 "Unknown secret residency mode '{$residency->mode}' for '{$residency->key}'."
             ),
         };
+    }
+
+    private function resolveExternal(SiteSecretResidency $residency): string
+    {
+        $store = $residency->store_id !== null ? ExternalSecretStore::find($residency->store_id) : null;
+        if ($store === null) {
+            throw new RuntimeException("external secret '{$residency->key}' has no store configured.");
+        }
+        if ($residency->reference === null || $residency->reference === '') {
+            throw new RuntimeException("external secret '{$residency->key}' has no reference.");
+        }
+
+        // On-box resolution: dply must NOT fetch — the value is materialized on
+        // the server by the deploy-time shim (PR4). Reaching here means a push
+        // path that doesn't yet stage the directive; fail clearly rather than
+        // silently pull the value into dply.
+        if ($store->resolvesOnBox()) {
+            throw new RuntimeException(
+                "external secret '{$residency->key}' resolves on the server (on-box mode); dply does not fetch it."
+            );
+        }
+
+        return $this->stores->for($store)->fetch($store, $residency->reference);
     }
 
     private function resolveEscrow(SiteSecretResidency $residency, ?OrgSecretKey $orgKey, ?string $ephemeralIdentity): string

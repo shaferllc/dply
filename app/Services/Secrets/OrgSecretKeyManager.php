@@ -59,6 +59,53 @@ class OrgSecretKeyManager
         return $this->ensureForOrg($organizationId)->public_recipient;
     }
 
+    /**
+     * Adopt a customer-SUPPLIED recipient as the org's key (BYO-key). dply stores
+     * only the public recipient and never holds an identity — it can encrypt new
+     * secrets to the customer but cannot decrypt them. Requires the org to have
+     * no escrowed secrets under a previous key it can no longer open (the caller
+     * is responsible for that check, since switching keys orphans old ciphertext).
+     */
+    public function adoptCustomerRecipient(string $organizationId, string $recipient): OrgSecretKey
+    {
+        $recipient = trim($recipient);
+        if (! preg_match('/^age1[0-9a-z]+$/', $recipient)) {
+            throw new RuntimeException('Not a valid age recipient (expected "age1…").');
+        }
+
+        $key = OrgSecretKey::query()->where('organization_id', $organizationId)->first()
+            ?? new OrgSecretKey(['organization_id' => $organizationId]);
+
+        $key->forceFill([
+            'organization_id' => $organizationId,
+            'public_recipient' => $recipient,
+            'identity_holder' => OrgSecretKey::HOLDER_CUSTOMER,
+            'dply_identity' => null,
+            'fingerprint' => substr(hash('sha256', $recipient), 0, 12),
+        ])->save();
+
+        return $key;
+    }
+
+    /**
+     * Convert an org to customer-held by MINTING a fresh keypair, returning the
+     * private identity to the caller exactly ONCE (to hand to the customer), then
+     * persisting only the public recipient. After this dply cannot decrypt this
+     * org's secrets — the returned identity is the only copy.
+     *
+     * Re-encrypts nothing: callers should run this on an org with no escrowed
+     * secrets yet, or re-escalate afterwards under the new recipient.
+     *
+     * @return array{key: OrgSecretKey, identity: string}  identity = show-once
+     */
+    public function promoteToCustomerHeld(string $organizationId): array
+    {
+        $kp = $this->age->generateKeypair();
+        $key = $this->adoptCustomerRecipient($organizationId, $kp['recipient']);
+
+        return ['key' => $key, 'identity' => $kp['identity']];
+    }
+
     /** age-encrypt a value to the org's recipient. */
     public function encryptForOrg(string $organizationId, string $plaintext): string
     {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Models\ExternalSecretStore;
 use App\Models\Site;
 use App\Models\SiteSecretResidency;
 use App\Services\Sites\SecretEscalator;
@@ -18,11 +19,13 @@ use Illuminate\Console\Command;
 class SecretsResidencyCommand extends Command
 {
     protected $signature = 'secrets:residency
-        {action : escalate | list | reveal | demote}
+        {action : escalate | escalate-external | list | reveal | demote}
         {site : site id}
-        {key? : env var name (escalate/reveal/demote)}
+        {key? : env var name (escalate/reveal/demote/escalate-external)}
         {--value= : plaintext to escrow on escalate (defaults to the current loose-env value)}
-        {--identity= : age identity to decrypt with, for a customer-held org key}';
+        {--identity= : age identity to decrypt with, for a customer-held org key}
+        {--store= : external secret store id (escalate-external)}
+        {--reference= : reference within the store, e.g. secret/data/stripe#key (escalate-external)}';
 
     protected $description = 'Manage per-key secret residency (escrow) for a site.';
 
@@ -43,6 +46,7 @@ class SecretsResidencyCommand extends Command
             return match ($action) {
                 'list' => $this->list($site),
                 'escalate' => $this->escalate($escalator, $site, $this->requireKey($key)),
+                'escalate-external' => $this->escalateExternal($escalator, $site, $this->requireKey($key)),
                 'reveal' => $this->reveal($escalator, $site, $this->requireKey($key), $identity),
                 'demote' => $this->demote($escalator, $site, $this->requireKey($key), $identity),
                 default => $this->failWith("Unknown action '{$action}' (escalate|list|reveal|demote)."),
@@ -77,6 +81,26 @@ class SecretsResidencyCommand extends Command
         $residency = $escalator->escalate($site, $key, $value);
         $this->info("Escalated {$key} → escrow ({$residency->placeholder()}).");
         $this->line('  The loose .env now holds only the placeholder; push to apply on the server.');
+
+        return self::SUCCESS;
+    }
+
+    private function escalateExternal(SecretEscalator $escalator, Site $site, string $key): int
+    {
+        $storeId = trim((string) ($this->option('store') ?? ''));
+        $reference = trim((string) ($this->option('reference') ?? ''));
+        if ($storeId === '' || $reference === '') {
+            throw new \RuntimeException('escalate-external requires --store and --reference.');
+        }
+
+        $store = ExternalSecretStore::find($storeId);
+        if ($store === null) {
+            throw new \RuntimeException("External store '{$storeId}' not found.");
+        }
+
+        $residency = $escalator->escalateToExternal($site, $key, $store, $reference);
+        $this->info("Pointed {$key} at {$store->driver}:{$reference} ({$residency->placeholder()}).");
+        $this->line('  No value entered dply; push to resolve and apply on the server.');
 
         return self::SUCCESS;
     }

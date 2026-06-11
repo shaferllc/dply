@@ -1838,9 +1838,9 @@ class WorkspaceDatabases extends Component
         $this->authorize('update', $this->server);
         $this->new_db_username = trim($this->new_db_username);
 
-        $capabilities = $capabilitiesService->forServer($this->server);
-        if (! ($capabilities[$this->new_db_engine] ?? false)) {
-            $this->addError('new_db_engine', __(':engine is not installed on this server.', ['engine' => DatabaseWorkspaceEngines::label($this->new_db_engine)]));
+        $readiness = app(\App\Services\Servers\DatabaseEngineReadinessGuard::class)->check($this->server, $this->new_db_engine);
+        if (! $readiness['ok']) {
+            $this->addError('new_db_engine', (string) $readiness['reason']);
 
             return;
         }
