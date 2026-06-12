@@ -53,7 +53,17 @@ while i < n:
     m = METHOD_RE.match(lines[i])
     if m and mmatch(m.group(3)):
         end = i + 1
-        while end < n and lines[end] != "    }":
+        heredoc = None
+        while end < n:
+            ln = lines[end]
+            if heredoc is None:
+                hm = re.search(r"<<<[\"']?(\w+)[\"']?\s*$", ln)
+                if hm:
+                    heredoc = hm.group(1)
+                elif ln == "    }":
+                    break
+            elif re.match(r"^\s*" + re.escape(heredoc) + r"\b", ln):
+                heredoc = None
             end += 1
         s = leading(i)
         extracted.append(("m", s, "\n".join(lines[s:end + 1])))

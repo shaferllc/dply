@@ -1,8 +1,14 @@
 {
   "version": 1,
   "lastRunAtMs": 1781150110317,
+<<<<<<< Updated upstream
   "turnsSinceLastRun": 8,
   "lastTranscriptMtimeMs": 1781150107574.5127,
   "lastProcessedGenerationId": "49253ac8-c1c1-46d3-b005-8f6f60d38c68",
+=======
+  "turnsSinceLastRun": 3,
+  "lastTranscriptMtimeMs": 1781150107574.5127,
+  "lastProcessedGenerationId": "0383d1ce-92f4-49d6-9c6b-572573da4c10",
+>>>>>>> Stashed changes
   "trialStartedAtMs": null
 }
