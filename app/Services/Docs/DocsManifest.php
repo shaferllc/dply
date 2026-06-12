@@ -31,6 +31,19 @@ final class DocsManifest
     private const CACHE_KEY = 'docs.manifest.v2';
 
     /**
+     * Request-scoped memo of the published set. build() globs + YAML-parses every
+     * docs/*.md, and find()/published() are called many times per request (e.g.
+     * indexEntries() resolves a title per slug). Without this memo that's O(n²)
+     * file I/O — locally, where the persistent cache below is intentionally
+     * bypassed, it added seconds to every authenticated page. The memo is per
+     * instance, so binding this as a scoped singleton keeps it to one build per
+     * request while still reflecting on-disk doc edits on the next request.
+     *
+     * @var Collection<string, array<string, mixed>>|null
+     */
+    private ?Collection $memo = null;
+
+    /**
      * Category display order. Anything unlisted sorts after these, alphabetically.
      */
     private const CATEGORY_ORDER = [
@@ -54,12 +67,18 @@ final class DocsManifest
      */
     public function published(): Collection
     {
-        // Skip the cache locally so editing a doc shows up immediately.
-        if (app()->environment('local')) {
-            return collect($this->build());
+        if ($this->memo !== null) {
+            return $this->memo;
         }
 
-        return collect(Cache::rememberForever(self::CACHE_KEY, fn (): array => $this->build()));
+        // Skip the persistent cache locally so editing a doc shows up on the next
+        // request. The in-request memo above still prevents repeated rebuilds
+        // within a single request.
+        if (app()->environment('local')) {
+            return $this->memo = collect($this->build());
+        }
+
+        return $this->memo = collect(Cache::rememberForever(self::CACHE_KEY, fn (): array => $this->build()));
     }
 
     /**

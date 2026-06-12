@@ -6,13 +6,16 @@ use App\Contracts\AwsLambdaGateway;
 use App\Events\Servers\ServerAuthorizedKeysSynced;
 use App\Jobs\CleanupRemoteSiteArtifactsJob;
 use App\Jobs\ProvisionDefaultUserSshKeysToServerJob;
+use App\Listeners\ForwardWorkerPoolJobEvent;
 use App\Listeners\ProcessReferralInvoicePayment;
 use App\Listeners\RecordLivewireDispatchedJob;
-use App\Listeners\ForwardWorkerPoolJobEvent;
 use App\Listeners\RecordServerRemoteAccessContext;
 use App\Listeners\Servers\DispatchServerAuthorizedKeysSyncedWebhook;
 use App\Listeners\SyncBillingOnSubscriptionWebhook;
 use App\Listeners\UpdateDispatchedJobLifecycle;
+use App\Livewire\Pulse\DatabaseServersCard;
+use App\Livewire\Pulse\RedisServersCard;
+use App\Livewire\Pulse\WorkerServersCard;
 use App\Models\BackupConfiguration;
 use App\Models\ImportServerMigration;
 use App\Models\Incident;
@@ -85,6 +88,7 @@ use App\Services\Deploy\RuntimeDetection\RuntimeDetectionEngine;
 use App\Services\Deploy\RuntimeDetection\StaticRuntimeDetector;
 use App\Services\Deploy\ServerlessProvisionerFactory;
 use App\Services\Deploy\SiteResourceBindingResolver;
+use App\Services\Docs\DocsManifest;
 use App\Services\Edge\CloudflareEdgeDelivery;
 use App\Services\Edge\EdgeArtifactPublisher;
 use App\Services\Edge\EdgeDeliveryContextResolver;
@@ -99,7 +103,6 @@ use App\Services\Servers\ServerMetricsGuestScript;
 use App\Services\Servers\ServerMetricsRangeQuery;
 use App\Services\Servers\ServerWebserverSitesProvider;
 use App\Services\Servers\WebserverSwitchPreflight;
-use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\Sites\DockerRuntimeSiteProvisioner;
 use App\Services\Sites\KubernetesRuntimeSiteProvisioner;
 use App\Services\Sites\RepositoryWebhookProvisioner;
@@ -111,6 +114,7 @@ use App\Services\Sites\SiteRuntimeProvisionerRegistry;
 use App\Services\Sites\SiteSystemdUnitBuilder;
 use App\Services\Sites\SiteTraefikProvisioner;
 use App\Services\Sites\SiteWebserverProvisionerRegistry;
+use App\Services\Sites\TestingHostnameProvisioner;
 use App\Services\Sites\UptimeProbeRegionResolver;
 use App\Services\Sites\UptimeProbeWorkerResolver;
 use App\Services\Sites\WebserverConfig\ApacheWebserverConfigEngine;
@@ -119,6 +123,7 @@ use App\Services\Sites\WebserverConfig\NginxWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\OpenLiteSpeedWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\TraefikWebserverConfigEngine;
 use App\Services\Sites\WebserverConfig\WebserverConfigEngineRegistry;
+use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\Webhooks\OutboundWebhookDispatcher;
 use App\Services\WordPress\Advisories\AdvisoryProvider;
 use App\Services\WordPress\Advisories\WordfenceIntelligenceProvider;
@@ -139,9 +144,10 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
-use Livewire\Blaze\Blaze;
 use Laravel\Cashier\Cashier;
 use Laravel\Cashier\Events\WebhookReceived;
+use Livewire\Blaze\Blaze;
+use Livewire\Livewire;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -178,6 +184,14 @@ class AppServiceProvider extends ServiceProvider
         // shared, request-memoized loader collapses those into one query set.
         $this->app->scoped(ServerWebserverSitesProvider::class);
         $this->app->scoped(ServerConsoleActionLookup::class);
+
+        // Scoped: the contextual docs sidebar renders on EVERY authenticated page
+        // and resolves a title/url per published doc (indexEntries), each of which
+        // calls DocsManifest::find(). Locally the persistent cache is bypassed so
+        // edits show up, so without one shared request-scoped instance (which
+        // memoizes the parsed manifest) every find() re-globbed + re-parsed all
+        // ~130 docs/*.md — O(n²) file I/O that added ~3.5s to every page.
+        $this->app->scoped(DocsManifest::class);
 
         // Scoped: queue jobs may override SSH private key for one deploy via
         // EphemeralDeployCredentialManager without touching the server key.
@@ -531,7 +545,7 @@ class AppServiceProvider extends ServiceProvider
             // would orphan the live DNS record (and a re-created same-slug site
             // would inherit a stale A record pointing at the old box).
             rescue(
-                fn () => app(\App\Services\Sites\TestingHostnameProvisioner::class)->delete($site),
+                fn () => app(TestingHostnameProvisioner::class)->delete($site),
                 report: false,
             );
             $site->previewDomains()->delete();
@@ -733,9 +747,9 @@ class AppServiceProvider extends ServiceProvider
      */
     private function registerCustomPulseCards(): void
     {
-        \Livewire\Livewire::component('pulse.redis-servers', \App\Livewire\Pulse\RedisServersCard::class);
-        \Livewire\Livewire::component('pulse.database-servers', \App\Livewire\Pulse\DatabaseServersCard::class);
-        \Livewire\Livewire::component('pulse.worker-servers', \App\Livewire\Pulse\WorkerServersCard::class);
+        Livewire::component('pulse.redis-servers', RedisServersCard::class);
+        Livewire::component('pulse.database-servers', DatabaseServersCard::class);
+        Livewire::component('pulse.worker-servers', WorkerServersCard::class);
     }
 
     private function registerEdgeR2FilesystemDisk(): void
