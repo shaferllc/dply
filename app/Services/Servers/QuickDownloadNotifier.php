@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
+use App\Events\Servers\QuickDownloadStatusBroadcast;
 use App\Models\QuickDownload;
 use App\Models\User;
 use App\Notifications\QuickDownloadFailedNotification;
@@ -13,11 +14,13 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\URL;
 
 /**
- * Tells the requesting user their quick download is ready (or failed) on BOTH
- * channels: an in-app inbox item (via {@see NotificationPublisher}) for users
- * still in the app, and a transactional email for those who walked away. The
- * ready link is a signed, login-gated route to {@see QuickDownloadController},
- * valid until the staging window closes.
+ * Tells the requesting user their quick download is ready (or failed) on THREE
+ * channels: an in-app inbox item (via {@see NotificationPublisher}) for the
+ * durable bell record, a transactional email for large artifacts, and an
+ * app-wide live toast (via {@see QuickDownloadStatusBroadcast}) so the requester
+ * gets an "it's done" nudge no matter which page they're on. The ready link is a
+ * signed, login-gated route to {@see QuickDownloadController}, valid until the
+ * retention window closes.
  */
 final class QuickDownloadNotifier
 {
@@ -35,16 +38,17 @@ final class QuickDownloadNotifier
             $row,
             'quick_download.ready',
             __('Your download is ready: :label', ['label' => $label]),
-            __('Click to download — the link works once and expires in 4 hours.'),
+            __('Click to download — saved and available for the next :window.', ['window' => self::retentionWindowLabel()]),
             $url,
         );
 
-        // Email only for large artifacts (the ones that don't auto-download), so a
-        // 1KB .env that auto-downloads doesn't also send an email.
+        // Email only for large artifacts, so a 1KB .env doesn't also send an email.
         $user = $row->requestedBy;
         if ($user instanceof User && $row->isLarge()) {
             Notification::send($user, new QuickDownloadReadyNotification($row, $label, $url));
         }
+
+        $this->broadcastToast($row, __('Your :label is ready — open notifications to download.', ['label' => $label]), 'success');
     }
 
     public function failed(QuickDownload $row, bool $overCap = false): void
@@ -65,6 +69,27 @@ final class QuickDownloadNotifier
         if ($user instanceof User) {
             Notification::send($user, new QuickDownloadFailedNotification($row, $label, $reason, $backupsUrl, $overCap));
         }
+
+        $this->broadcastToast($row, __('Download failed: :label', ['label' => $label]), 'error');
+    }
+
+    /**
+     * Fire the app-wide live toast for the requester. No-op when we can't target a
+     * user/org (the in-app inbox item is still the durable record either way).
+     */
+    private function broadcastToast(QuickDownload $row, string $message, string $type): void
+    {
+        if (blank($row->requested_by_user_id) || blank($row->organization_id)) {
+            return;
+        }
+
+        QuickDownloadStatusBroadcast::dispatch(
+            (string) $row->organization_id,
+            (string) $row->requested_by_user_id,
+            $message,
+            $type,
+            (string) $row->id,
+        );
     }
 
     /**
@@ -113,9 +138,29 @@ final class QuickDownloadNotifier
         );
     }
 
+    /** Human-facing retention window, e.g. "4 hours", "7 days", "90 minutes". */
+    public static function retentionWindowLabel(): string
+    {
+        $minutes = max(1, (int) config('quick_download.retention_minutes', 240));
+
+        if ($minutes % 1440 === 0) {
+            $days = intdiv($minutes, 1440);
+
+            return trans_choice('{1}:count day|[2,*]:count days', $days, ['count' => $days]);
+        }
+
+        if ($minutes % 60 === 0) {
+            $hours = intdiv($minutes, 60);
+
+            return trans_choice('{1}:count hour|[2,*]:count hours', $hours, ['count' => $hours]);
+        }
+
+        return trans_choice('{1}:count minute|[2,*]:count minutes', $minutes, ['count' => $minutes]);
+    }
+
     private function signedUrl(QuickDownload $row): string
     {
-        $expires = $row->expires_at ?? now()->addMinutes((int) config('backup_staging.ttl_minutes', 240));
+        $expires = $row->expires_at ?? now()->addMinutes((int) config('quick_download.retention_minutes', 10_080));
 
         return URL::temporarySignedRoute(
             'quick-download.fetch',

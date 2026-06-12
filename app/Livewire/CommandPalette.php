@@ -16,6 +16,8 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Support\Docs\ContextualDocResolver;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
@@ -64,6 +66,16 @@ class CommandPalette extends Component
      * documented page.
      */
     public ?string $contextDocSlug = null;
+
+    /**
+     * Site IDs ticked in the "Deploy together" multi-select context — the sites
+     * that ship when its "Deploy N sites" action fires. Seeded to every
+     * deployable peer when the operator drills into that context, then toggled
+     * per-row. Stored as strings to match the rendered row ids.
+     *
+     * @var list<string>
+     */
+    public array $deploySyncSelected = [];
 
     /** Per-list result cap so a broad context can't balloon the payload. */
     private const LIST_LIMIT = 50;
@@ -138,6 +150,18 @@ class CommandPalette extends Component
             $label = $this->scopedSite($org, $id)?->name;
         } elseif ($type === 'server' && $id !== null) {
             $label = $this->scopedServer($org, $id)?->name;
+        } elseif ($type === 'deploy-sync' && $id !== null) {
+            // Drilling into the multi-select: default-tick every deployable peer
+            // (matches the Deployments "Sync deploy" panel) so a drill-in + ↵ on
+            // the action ships the whole group without any extra ticking.
+            $anchor = $this->scopedSite($org, $id);
+            if ($anchor !== null) {
+                $label = __('Deploy together');
+                $this->deploySyncSelected = $this->deploySyncPeers($anchor)
+                    ->pluck('id')
+                    ->map(fn ($peerId): string => (string) $peerId)
+                    ->all();
+            }
         }
 
         if ($label === null) {
@@ -201,10 +225,25 @@ class CommandPalette extends Component
         return match ($key) {
             'site.deploy' => $this->runSiteDeploy($org, $id),
             'site.redeploy' => $this->runSiteRedeploy($org, $id),
+            'site.deploy-sync' => $this->runDeploySync($org, $id),
             'server.insights' => $this->runServerInsights($org, $id),
             'org.switch' => $this->runOrgSwitch($id),
             default => null,
         };
+    }
+
+    /**
+     * Tick a peer in or out of the "Deploy together" selection. Fires on its own
+     * (no stack change, no cmdk-changed) so the palette stays open and the
+     * keyboard cursor holds its place while the operator builds the set.
+     */
+    public function toggleDeploySync(string $id): void
+    {
+        $id = (string) $id;
+
+        $this->deploySyncSelected = in_array($id, $this->deploySyncSelected, true)
+            ? array_values(array_filter($this->deploySyncSelected, fn (string $v): bool => $v !== $id))
+            : [...$this->deploySyncSelected, $id];
     }
 
     /** Queue a manual deployment for a VM-hosted, org-scoped site. */
@@ -231,6 +270,84 @@ class CommandPalette extends Component
 
         RedeployCloudSiteJob::dispatch($site->id);
         $this->dispatch('notify', message: __('Redeploy queued for :site.', ['site' => $site->name]));
+    }
+
+    /**
+     * Deploy every site ticked in the "Deploy together" context — the anchor
+     * site and any repo-sharing peers (e.g. its worker) — each on its own job,
+     * exactly like pressing its own Deploy button. Re-resolves and re-authorizes
+     * every target; the optimistic deploy-active marker mirrors the Sync panel so
+     * each site's console shows "deploying" the instant it's queued.
+     */
+    private function runDeploySync(?Organization $org, ?string $id): void
+    {
+        $anchor = $this->scopedSite($org, $id);
+        if ($anchor === null) {
+            return;
+        }
+
+        $peers = $this->deploySyncPeers($anchor)->keyBy(fn (Site $site): string => (string) $site->id);
+        $ids = array_values(array_intersect(
+            array_map('strval', $this->deploySyncSelected),
+            $peers->keys()->all()
+        ));
+        if ($ids === []) {
+            return;
+        }
+
+        $queued = 0;
+        foreach ($ids as $siteId) {
+            $site = $peers->get($siteId);
+            if ($site === null || ! Gate::allows('update', $site)) {
+                continue;
+            }
+
+            if ($site->usesContainerRuntime()) {
+                RedeployCloudSiteJob::dispatch($site->id);
+            } else {
+                Cache::put('site-deploy-active:'.$site->id, [
+                    'started_at' => now()->toIso8601String(),
+                    'deployment_id' => null,
+                ], 600);
+                RunSiteDeploymentJob::dispatch($site->fresh(), SiteDeployment::TRIGGER_MANUAL);
+            }
+            $queued++;
+        }
+
+        $this->dispatch('notify', message: trans_choice(
+            '{1}Deployment queued for :count site.|[2,*]Deployments queued for :count sites.',
+            $queued,
+            ['count' => $queued],
+        ));
+    }
+
+    /**
+     * Sites that deploy *with* the given one — itself plus any peers sharing its
+     * git repository (or, for repo-less sites, its server). This is the same
+     * grouping the Deployments "Sync deploy" panel uses; filtered to peers the
+     * operator may deploy so the palette never offers an unactionable row.
+     *
+     * @return Collection<int, Site>
+     */
+    private function deploySyncPeers(Site $site): Collection
+    {
+        $repo = trim((string) $site->git_repository_url);
+
+        return Site::query()
+            ->where('organization_id', $site->organization_id)
+            ->where(function ($where) use ($repo, $site): void {
+                $where->where('id', $site->id);
+                if ($repo !== '') {
+                    $where->orWhere('git_repository_url', $repo);
+                } else {
+                    $where->orWhere('server_id', $site->server_id);
+                }
+            })
+            ->with('server')
+            ->orderBy('name')
+            ->get()
+            ->filter(fn (Site $peer): bool => Gate::allows('update', $peer))
+            ->values();
     }
 
     /** Queue a full server insights scan; findings land on the Insights tab. */
@@ -320,6 +437,7 @@ class CommandPalette extends Component
         $raw = match ($context['type'] ?? 'root') {
             'sites' => $this->sitesList($org, $query),
             'site' => $this->siteSubPages($org, $context['id'] ?? null, $query),
+            'deploy-sync' => $this->deploySyncContext($org, $context['id'] ?? null, $query),
             'servers' => $this->serversList($org, $query),
             'server' => $this->serverSubPages($org, $context['id'] ?? null, $query),
             'projects' => $this->workspaceList($org, $query),
@@ -833,12 +951,88 @@ class CommandPalette extends Component
             $actions[] = $deploy;
         }
 
+        // When this site shares a repo with others (typically its worker), offer
+        // a multi-select drill-in so the whole group ships from one place — no
+        // bouncing back to each site's deploy page. Only when there's more than
+        // one deployable peer (a lone site already has "Deploy now" above).
+        $peerCount = $this->deploySyncPeers($site)->count();
+        if ($peerCount > 1 && ($needle === '' || str_contains('deploy together sync linked sites workers all group', $needle))) {
+            $actions[] = [
+                'label' => __('Deploy together…'),
+                'sublabel' => __('Pick from :count linked sites and ship at once', ['count' => $peerCount]),
+                'into' => ['type' => 'deploy-sync', 'id' => $site->id],
+                'icon' => 'arrows-right-left',
+            ];
+        }
+
         $docGroup = $this->docGroupFor($this->siteFallbackDocSlug($site), $query);
 
         return array_values(array_filter([
             ['label' => __('Actions'), 'items' => $actions],
             ['label' => $site->name, 'items' => $this->resolveResourcePages($pages, [$server, $site], $query)],
             $docGroup ?? ['label' => '', 'items' => []],
+        ], fn (array $group): bool => $group['items'] !== []));
+    }
+
+    /**
+     * The "Deploy together" multi-select: a tickable row per repo-sharing peer
+     * (seeded all-ticked in {@see push()}) plus a "Deploy N sites" action that
+     * fires one deploy job per ticked site. Toggle rows fire {@see toggleDeploySync()}
+     * and keep the palette open; the action runs and closes like any other.
+     *
+     * @return list<array{label: string, items: list<array<string, mixed>>}>
+     */
+    private function deploySyncContext(?Organization $org, ?string $id, string $query): array
+    {
+        $site = $org !== null ? $this->scopedSite($org, $id) : null;
+        if ($site === null) {
+            return [];
+        }
+
+        $peers = $this->deploySyncPeers($site);
+        if ($peers->isEmpty()) {
+            return [];
+        }
+
+        // Keep the live selection honest against the peers actually shown (a peer
+        // could have dropped out of the group or the operator's reach mid-session).
+        $selected = array_values(array_intersect(
+            array_map('strval', $this->deploySyncSelected),
+            $peers->pluck('id')->map(fn ($peerId): string => (string) $peerId)->all(),
+        ));
+
+        $actions = [];
+        if ($selected !== []) {
+            $actions[] = [
+                'label' => trans_choice('{1}Deploy :count site|[2,*]Deploy :count sites', count($selected), ['count' => count($selected)]),
+                'sublabel' => __('Queue a deployment for every ticked site'),
+                'action' => ['key' => 'site.deploy-sync', 'id' => $site->id],
+                'icon' => 'arrows-right-left',
+                'confirm' => true,
+            ];
+        }
+
+        $needle = mb_strtolower(trim($query));
+        $rows = [];
+        foreach ($peers as $peer) {
+            if ($needle !== '' && ! str_contains(mb_strtolower($peer->name.' '.($peer->server?->name ?? '')), $needle)) {
+                continue;
+            }
+            $isSelf = (string) $peer->id === (string) $site->id;
+            $rows[] = [
+                'label' => $peer->name,
+                'sublabel' => $isSelf
+                    ? trim(($peer->server?->name ? $peer->server->name.' · ' : '').__('This site'))
+                    : $peer->server?->name,
+                'toggle' => ['id' => (string) $peer->id],
+                'selected' => in_array((string) $peer->id, $selected, true),
+                'icon' => 'globe-alt',
+            ];
+        }
+
+        return array_values(array_filter([
+            ['label' => __('Deploy together'), 'items' => $actions],
+            ['label' => __('Linked sites'), 'items' => $rows],
         ], fn (array $group): bool => $group['items'] !== []));
     }
 

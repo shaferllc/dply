@@ -73,6 +73,21 @@ function bindDplyOrganizationServerChannel() {
             },
         }));
     });
+
+    // Quick download finished (ready/failed) → transient app-wide toast for the
+    // requester, no matter which page they're on. Same shape + user filter as the
+    // backup toast above; the in-app bell stays the durable record.
+    orgChannel.listen('.quick-download.status', (payload) => {
+        if (!payload || String(payload.user_id) !== String(window.__dplyCurrentUserId ?? '')) {
+            return;
+        }
+        window.dispatchEvent(new CustomEvent('toast', {
+            detail: {
+                message: payload.message ?? 'Your download is ready',
+                type: payload.type ?? 'success',
+            },
+        }));
+    });
 }
 
 /**

@@ -49,8 +49,10 @@ class QuickDownloadReadyNotification extends Notification implements ShouldQueue
             $mail->line(__('Size: :size', ['size' => $size]));
         }
 
+        $window = \App\Services\Servers\QuickDownloadNotifier::retentionWindowLabel();
+
         return $mail
             ->action(__('Download now'), $this->downloadUrl)
-            ->line(__('This link works once and is deleted as soon as the download finishes — or automatically after 4 hours, whichever comes first. You may be asked to sign in first.'));
+            ->line(__('This link stays valid for :window and you can re-download as often as you need; after that it is automatically deleted. You may be asked to sign in first.', ['window' => $window]));
     }
 }

@@ -9,11 +9,11 @@ use App\Services\Servers\QuickDownloadBuildStager;
 use Illuminate\Console\Command;
 
 /**
- * Deletes expired quick-download staging objects (4h window) and prunes stale
- * rows. A scheduled command rather than an S3 lifecycle rule because lifecycle
- * granularity is 1 day, far coarser than the 4h download window — and because
- * consumed/failed rows should age out of the table too. Sibling to
- * {@see PruneBackupDownloadStagingsCommand}.
+ * Deletes quick-download staging objects whose retention window has closed (see
+ * config/quick_download.php retention_minutes) and prunes stale rows. A scheduled
+ * command rather than an S3 lifecycle rule so failed rows also age out of the
+ * table, and so retention can be tuned below lifecycle's 1-day granularity.
+ * Sibling to {@see PruneBackupDownloadStagingsCommand}.
  */
 class PruneQuickDownloadsCommand extends Command
 {

@@ -14,10 +14,12 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Streams a staged quick-download from the operator-managed download bucket to
- * the browser, then deletes it on a clean finish (single-use). Reaching it needs
- * BOTH a valid signed URL (handed out by the in-app inbox + email) AND an
- * authenticated session authorized on the server — so a leaked link can't, on its
- * own, exfiltrate a .env or database dump.
+ * the browser. The artifact is RETAINED for its full window (see
+ * config/quick_download.php retention_minutes) and stays re-downloadable — the
+ * sweeper prunes it at expiry, not on first download. Reaching it needs BOTH a
+ * valid signed URL (handed out by the in-app inbox + email) AND an authenticated
+ * session authorized on the server — so a leaked link can't, on its own,
+ * exfiltrate a .env or database dump.
  *
  * Plain signed GET route on purpose: returning a StreamedResponse from a Livewire
  * action corrupts the page with raw bytes (same reason as
@@ -55,28 +57,22 @@ final class QuickDownloadController extends Controller
         $expectedBytes = (int) ($quickDownload->bytes ?? 0);
 
         return new StreamedResponse(
-            function () use ($body, $quickDownload, $stager, $expectedBytes): void {
-                $sent = 0;
+            function () use ($body): void {
+                // Stream-only: the object is retained for its full window and the
+                // sweeper prunes it at expiry, so a download never deletes it and
+                // the same link works again until then.
                 while (! $body->eof()) {
                     $chunk = $body->read(1_048_576);
                     if ($chunk === '') {
                         break;
                     }
                     echo $chunk;
-                    $sent += strlen($chunk);
                     @ob_flush();
                     @flush();
 
-                    // Client went away mid-transfer: leave the object intact so they
-                    // can retry (or the sweeper clears it at the 4h mark).
                     if (connection_aborted() !== 0) {
                         return;
                     }
-                }
-
-                // Only consume (delete + mark) on a verified-complete download.
-                if (connection_aborted() === 0 && ($expectedBytes === 0 || $sent >= $expectedBytes)) {
-                    $stager->consume($quickDownload);
                 }
             },
             200,

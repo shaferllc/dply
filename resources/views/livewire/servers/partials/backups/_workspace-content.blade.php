@@ -179,7 +179,23 @@
         $registeredDbNames = $databases->pluck('name')->all();
         $adHocDbTargets = collect($liveDbDumpTargets)->reject(fn ($t) => in_array($t['name'], $registeredDbNames, true))->values();
     @endphp
-    <section class="dply-card overflow-hidden" wire:init="detectLiveDatabases">
+    {{-- Run a backup — one surface, two modes: Save a backup (durable, retained,
+         restorable, to your destination) vs Download now (ephemeral quick download
+         straight to the browser, no S3). They share the "run a backup now" intent
+         but differ in what happens to the artifact, so they're one group + toggle. --}}
+    <div x-data="{ runMode: 'save' }" class="space-y-6">
+        <div class="inline-flex items-center gap-1 rounded-xl border border-brand-ink/10 bg-white p-1 shadow-sm">
+            <button type="button" x-on:click="runMode = 'save'" :class="runMode === 'save' ? 'bg-brand-ink text-brand-cream shadow-sm' : 'text-brand-moss hover:text-brand-ink'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition">
+                <x-heroicon-o-archive-box class="h-4 w-4 shrink-0" aria-hidden="true" />
+                {{ __('Save a backup') }}
+            </button>
+            <button type="button" x-on:click="runMode = 'download'" :class="runMode === 'download' ? 'bg-brand-ink text-brand-cream shadow-sm' : 'text-brand-moss hover:text-brand-ink'" class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition">
+                <x-heroicon-o-arrow-down-tray class="h-4 w-4 shrink-0" aria-hidden="true" />
+                {{ __('Download now') }}
+            </button>
+        </div>
+
+    <section x-show="runMode === 'download'" x-cloak class="dply-card overflow-hidden" wire:init="detectLiveDatabases">
         <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <div class="flex items-start gap-3">
                 <x-icon-badge>
@@ -188,7 +204,7 @@
                 <div class="min-w-0 flex-1">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Instant') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Quick download') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Build a fresh dump or archive on the server and download it when it’s ready — we’ll notify you in-app and by email. Held for 4 hours, then auto-deleted. Capped at :cap; larger payloads should use a scheduled backup.', ['cap' => \Illuminate\Support\Number::fileSize((int) config('quick_download.max_bytes', 262_144_000))]) }}</p>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Build a fresh dump or archive on the server — we’ll notify you in-app and by email when it’s ready to grab. Saved to your cloud download bucket for :window and re-downloadable until then. Capped at :cap; larger payloads should use a scheduled backup.', ['window' => \App\Services\Servers\QuickDownloadNotifier::retentionWindowLabel(), 'cap' => \Illuminate\Support\Number::fileSize((int) config('quick_download.max_bytes', 262_144_000))]) }}</p>
                 </div>
             </div>
         </div>
@@ -258,7 +274,7 @@
         </div>
     </section>
 
-    <section class="dply-card overflow-hidden">
+    <section x-show="runMode === 'save'" x-cloak class="dply-card overflow-hidden">
         <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <div class="flex items-start gap-3">
                 <x-icon-badge>
@@ -311,8 +327,23 @@
                     </div>
                 @else
                     <div>
-                        <label class="block text-sm font-medium text-brand-ink">{{ __('Max space on server (GB)') }}</label>
-                        <input type="number" step="0.1" min="0.1" wire:model="db_backup_remote_max_gb" class="{{ $input }} mt-1" />
+                        <label class="block text-sm font-medium text-brand-ink">{{ __('Max space on server') }}</label>
+                        <div class="mt-1 flex items-stretch overflow-hidden rounded-lg border border-brand-ink/20 bg-white shadow-sm transition focus-within:border-brand-forest focus-within:ring-2 focus-within:ring-brand-forest/30">
+                            <input
+                                type="number" step="any" min="1"
+                                wire:model="db_backup_remote_max_value"
+                                placeholder="10"
+                                class="min-w-0 flex-1 border-0 bg-transparent px-3 py-2 text-sm text-brand-ink focus:outline-none focus:ring-0"
+                            />
+                            <select
+                                wire:model="db_backup_remote_max_unit"
+                                aria-label="{{ __('Unit') }}"
+                                class="shrink-0 border-0 border-l border-brand-ink/15 bg-brand-sand/30 py-2 pl-3 pr-9 text-sm font-semibold text-brand-ink focus:outline-none focus:ring-0"
+                            >
+                                <option value="MB">{{ __('MB') }}</option>
+                                <option value="GB">{{ __('GB') }}</option>
+                            </select>
+                        </div>
                         <p class="mt-1 text-xs text-brand-moss">
                             {{ __('Files live under :root — oldest backups are removed when this cap is exceeded.', ['root' => config('server_database.remote_backup_root')]) }}
                         </p>
@@ -326,7 +357,7 @@
     </section>
 
     {{-- Run now -------------------------------------------------------------------- --}}
-    <div class="grid gap-4 lg:grid-cols-2">
+    <div x-show="runMode === 'save'" x-cloak class="grid gap-4 lg:grid-cols-2">
         <section class="dply-card overflow-hidden">
             <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
                 <div class="flex items-start gap-3">
@@ -444,6 +475,7 @@
             </div>
         </section>
     </div>
+    </div>{{-- /run-a-backup toggle group --}}
 
     </x-server-workspace-tab-panel>
     @endif

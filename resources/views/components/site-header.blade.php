@@ -19,7 +19,6 @@
         ]);
     }
 
-    $notificationTablesReady = \App\Support\NotificationTablesReady::all();
     $featuresActive = $active === 'features' || request()->routeIs('features');
     $changelogActive = $active === 'changelog' || request()->routeIs('changelog');
     $pricingActive = $active === 'pricing' || request()->routeIs('pricing');
@@ -44,21 +43,6 @@
             || request()->is('pulse*')
         );
     $moreMenuActive = $moreMenuActive || $adminMenuActive;
-    $notificationMenuActive = request()->routeIs('notifications.*');
-    $notificationUnreadCount = auth()->check() && $notificationTablesReady
-        ? auth()->user()->notificationInboxItems()->whereNull('read_at')->count()
-        : 0;
-    $recentNotificationItems = auth()->check() && $notificationTablesReady
-        ? auth()->user()->notificationInboxItems()->with('event')->latest()->limit(6)->get()
-        : collect();
-
-    // Severity → leading icon + colour treatment for the notifications menu.
-    $notificationTones = [
-        'danger' => ['icon' => 'x-circle', 'wrap' => 'bg-red-50 text-red-600 ring-red-200', 'dot' => 'bg-red-500'],
-        'warning' => ['icon' => 'exclamation-triangle', 'wrap' => 'bg-amber-50 text-amber-600 ring-amber-200', 'dot' => 'bg-amber-500'],
-        'success' => ['icon' => 'check-circle', 'wrap' => 'bg-brand-sage/15 text-brand-forest ring-brand-sage/25', 'dot' => 'bg-brand-sage'],
-        'info' => ['icon' => 'information-circle', 'wrap' => 'bg-sky-50 text-sky-600 ring-sky-200', 'dot' => 'bg-sky-500'],
-    ];
 @endphp
 
 <header x-data="{ open: false }" class="border-b border-brand-ink/10 bg-brand-cream/85 backdrop-blur-xl sticky top-0 z-30">
@@ -318,135 +302,9 @@
                             </x-dropdown>
                         </nav>
                     </div>
-                    <div class="flex shrink-0 items-center border-l border-brand-ink/10 ps-1.5 lg:ps-2" aria-label="{{ __('Notifications') }}">
-                        <x-dropdown align="right" width="24rem" contentClasses="p-0 overflow-hidden">
-                            <x-slot name="trigger">
-                                <button
-                                    type="button"
-                                    class="group inline-flex shrink-0 items-center gap-1 whitespace-nowrap px-2 py-2 border-b-2 text-sm font-medium leading-5 transition duration-150 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-gold/40 rounded-t {{ $notificationMenuActive ? 'border-brand-gold text-brand-ink' : 'border-transparent text-brand-moss hover:text-brand-ink hover:border-brand-sage/40' }}"
-                                    aria-haspopup="menu"
-                                >
-                                    <span class="relative inline-flex">
-                                        <x-heroicon-o-bell class="h-5 w-5 shrink-0 opacity-90" />
-                                        @if ($notificationUnreadCount > 0)
-                                            <span class="absolute -right-1.5 -top-1.5 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-brand-gold px-1 text-[10px] font-semibold text-brand-ink">
-                                                {{ $notificationUnreadCount > 9 ? '9+' : $notificationUnreadCount }}
-                                            </span>
-                                        @endif
-                                    </span>
-                                    <span class="sr-only">{{ __('Notifications') }}</span>
-                                    <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 opacity-70" />
-                                </button>
-                            </x-slot>
-                            <x-slot name="content">
-                                {{-- Header: title, unread pill, inbox link. --}}
-                                <div class="flex items-center justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/25 px-4 py-3">
-                                    <div class="flex items-center gap-2">
-                                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-brand-ink ring-1 ring-brand-ink/10">
-                                            <x-heroicon-o-bell class="h-4 w-4" aria-hidden="true" />
-                                        </span>
-                                        <div>
-                                            <p class="text-sm font-semibold text-brand-ink">{{ __('Notifications') }}</p>
-                                            <p class="text-[11px] text-brand-moss">
-                                                @if ($notificationUnreadCount > 0)
-                                                    <span class="font-semibold text-brand-ink">{{ $notificationUnreadCount }}</span> {{ __('unread') }}
-                                                @else
-                                                    {{ __('You’re all caught up') }}
-                                                @endif
-                                            </p>
-                                        </div>
-                                    </div>
-                                    @if ($notificationTablesReady)
-                                        <a href="{{ route('notifications.index') }}" class="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-brand-moss shadow-sm ring-1 ring-brand-ink/10 transition hover:bg-brand-cream hover:text-brand-ink">
-                                            {{ __('Inbox') }}
-                                            <x-heroicon-m-arrow-up-right class="h-3.5 w-3.5 shrink-0 opacity-80" aria-hidden="true" />
-                                        </a>
-                                    @endif
-                                </div>
-
-                                {{-- Items. --}}
-                                <div class="max-h-[26rem] overflow-y-auto">
-                                    @forelse ($recentNotificationItems as $notificationItem)
-                                        @php
-                                            $event = $notificationItem->event;
-                                            $isResolved = str_contains(strtolower((string) $notificationItem->title), 'resolved');
-                                            $tone = $isResolved ? 'success' : match ($event?->severity) {
-                                                'critical', 'error', 'danger' => 'danger',
-                                                'warning' => 'warning',
-                                                'success', 'ok' => 'success',
-                                                default => 'info',
-                                            };
-                                            $visual = $notificationTones[$tone];
-                                            $category = $event?->category;
-                                            $isUnread = ! $notificationItem->read_at;
-                                        @endphp
-                                        <a
-                                            href="{{ $notificationItem->url ?: route('notifications.index') }}"
-                                            @class([
-                                                'group relative flex gap-3 border-b border-brand-ink/5 px-4 py-3 last:border-b-0 transition hover:bg-brand-sand/30',
-                                                'bg-brand-gold/[0.06]' => $isUnread,
-                                            ])
-                                        >
-                                            @if ($isUnread)
-                                                <span class="absolute inset-y-0 left-0 w-0.5 bg-brand-gold" aria-hidden="true"></span>
-                                            @endif
-                                            <span class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ring-1 {{ $visual['wrap'] }}" aria-hidden="true">
-                                                <x-dynamic-component :component="'heroicon-o-'.$visual['icon']" class="h-[1.05rem] w-[1.05rem]" />
-                                            </span>
-                                            <div class="min-w-0 flex-1">
-                                                <div class="flex items-start justify-between gap-2">
-                                                    <p @class([
-                                                        'line-clamp-2 text-sm leading-snug',
-                                                        'font-semibold text-brand-ink' => $isUnread,
-                                                        'font-medium text-brand-ink/90' => ! $isUnread,
-                                                    ])>{{ $notificationItem->title }}</p>
-                                                    @if ($isUnread)
-                                                        <span class="mt-1 inline-flex h-2 w-2 shrink-0 rounded-full {{ $visual['dot'] }}" aria-label="{{ __('Unread') }}"></span>
-                                                    @endif
-                                                </div>
-                                                @if ($notificationItem->body)
-                                                    <p class="mt-1 line-clamp-2 text-xs leading-relaxed text-brand-moss">{{ $notificationItem->body }}</p>
-                                                @endif
-                                                <div class="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-brand-mist">
-                                                    @if ($category)
-                                                        <span class="inline-flex items-center rounded-md bg-brand-ink/[0.045] px-1.5 py-0.5 font-semibold uppercase tracking-wide text-brand-moss ring-1 ring-brand-ink/[0.06]">{{ str_replace('_', ' ', $category) }}</span>
-                                                    @endif
-                                                    @if ($notificationItem->created_at)
-                                                        <span class="inline-flex items-center gap-1">
-                                                            <x-heroicon-m-clock class="h-3 w-3 shrink-0" aria-hidden="true" />
-                                                            {{ $notificationItem->created_at->diffForHumans(short: true) }}
-                                                        </span>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </a>
-                                    @empty
-                                        <div class="flex flex-col items-center gap-2 px-4 py-10 text-center">
-                                            <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-sand/45 text-brand-mist ring-1 ring-brand-ink/10">
-                                                <x-heroicon-o-bell-slash class="h-5 w-5" aria-hidden="true" />
-                                            </span>
-                                            <p class="text-sm font-medium text-brand-ink">
-                                                {{ $notificationTablesReady ? __('No notifications yet') : __('Notifications not ready') }}
-                                            </p>
-                                            <p class="max-w-[16rem] text-xs text-brand-moss">
-                                                {{ $notificationTablesReady
-                                                    ? __('Deploys, monitoring alerts, and SSL events will show up here.')
-                                                    : __('They’ll appear here once the latest database migrations are applied.') }}
-                                            </p>
-                                        </div>
-                                    @endforelse
-                                </div>
-
-                                {{-- Footer. --}}
-                                @if ($notificationTablesReady && $recentNotificationItems->isNotEmpty())
-                                    <a href="{{ route('notifications.index') }}" class="flex items-center justify-center gap-1.5 border-t border-brand-ink/10 bg-white px-4 py-2.5 text-xs font-semibold text-brand-moss transition hover:bg-brand-sand/30 hover:text-brand-ink">
-                                        {{ __('View all notifications') }}
-                                        <x-heroicon-m-arrow-right class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                                    </a>
-                                @endif
-                            </x-slot>
-                        </x-dropdown>
-                    </div>
+                    @auth
+                        <livewire:notifications.bell />
+                    @endauth
                     <div class="flex shrink-0 items-center border-l border-brand-ink/10 ps-1.5 lg:ps-2" aria-label="{{ __('More navigation') }}">
                         <x-dropdown align="right" width="36rem" contentClasses="p-0 overflow-hidden">
                             <x-slot name="trigger">

@@ -34,6 +34,7 @@ use App\Console\Commands\ProcessSshKeyRotationRemindersCommand;
 use App\Console\Commands\PruneAppLogsCommand;
 use App\Console\Commands\PruneAuditLogsCommand;
 use App\Console\Commands\PruneErrorEventsCommand;
+use App\Console\Commands\PruneNotificationInboxItemsCommand;
 use App\Console\Commands\PruneFunctionInvocationsCommand;
 use App\Console\Commands\PruneBackupDownloadStagingsCommand;
 use App\Console\Commands\PruneQuickDownloadsCommand;
@@ -171,6 +172,7 @@ final class DplySchedule
         // written via the query builder, which bypasses model events).
         $schedule->command(SyncErrorEventsCommand::class)->everyMinute()->withoutOverlapping();
         $schedule->command(PruneErrorEventsCommand::class)->dailyAt('03:25');
+        $schedule->command(PruneNotificationInboxItemsCommand::class)->dailyAt('03:35');
 
         // Backstop for remote tasks that go silent (rejected webhook, OOM/reboot,
         // dropped network): fail any `running` task past its timeout or with no

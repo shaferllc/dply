@@ -12,8 +12,8 @@ use Illuminate\Support\Str;
  * Drives a queued {@see QuickDownload} from `building` to `ready` (or `failed`):
  * builds the fresh artifact on the server, uploads it into the operator-managed
  * download bucket, records the staged object, and notifies the requester on both
- * channels. The proxy route streams it once and deletes it; the sweeper mops up
- * anything left after the 4h window.
+ * channels. The proxy route streams it on demand (re-downloadable, never deleted
+ * on download); the sweeper prunes it once its retention window closes.
  *
  * Never throws — every failure (incl. the over-cap case) lands on the row and a
  * failure notification, so the polling UI and the walked-away user both learn the
@@ -80,7 +80,7 @@ final class QuickDownloadBuildStager
                 'filename' => $prepared->filename,
                 'mime' => $prepared->mime,
                 'error_message' => null,
-                'expires_at' => now()->addMinutes((int) config('backup_staging.ttl_minutes', 240)),
+                'expires_at' => now()->addMinutes((int) config('quick_download.retention_minutes', 10_080)),
             ]);
         } catch (\Throwable $e) {
             $this->fail($row, Str::limit($e->getMessage(), 600));
@@ -117,18 +117,7 @@ final class QuickDownloadBuildStager
         return $result['Body'];
     }
 
-    /** Mark a fully-downloaded artifact consumed and delete its staged object. */
-    public function consume(QuickDownload $row): void
-    {
-        $this->deleteObject($row);
-
-        $row->update([
-            'status' => QuickDownload::STATUS_CONSUMED,
-            'consumed_at' => now(),
-        ]);
-    }
-
-    /** Best-effort delete of the staged bucket object (used on consume + sweep). */
+    /** Best-effort delete of the staged bucket object (used by the sweeper). */
     public function deleteObject(QuickDownload $row): void
     {
         if (! $row->hasStagedObject()) {

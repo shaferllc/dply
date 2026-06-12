@@ -11,16 +11,16 @@ use App\Services\Backups\BackupStagingS3ClientFactory;
 use App\Services\Servers\QuickDownloadNotifier;
 use App\Services\Servers\QuickDownloadStreamer;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\URL;
 
 /**
- * Shared "queue a quick download, then notify + auto-grab" flow for the backup
- * surfaces. A click no longer streams over a held-open SSH connection: it creates
- * a {@see QuickDownload}, dispatches {@see BuildQuickDownloadJob} (build on the
- * box → upload to the download bucket), and the view polls {@see pollQuickDownload()}
- * until the artifact is ready, then redirects the browser to the signed,
- * single-use proxy route. The requester is also notified in-app + by email, so
- * they can walk away and still grab it within the 4h window.
+ * Shared "queue a quick download, then notify" flow for the backup surfaces. A
+ * click no longer streams over a held-open SSH connection: it creates a
+ * {@see QuickDownload}, dispatches {@see BuildQuickDownloadJob} (build on the box
+ * → upload to the download bucket), and the view polls {@see pollQuickDownload()}
+ * until the artifact is ready. Nothing auto-downloads — the requester is notified
+ * in-app (plus email for large artifacts) with a signed link and grabs it from
+ * there. The artifact is retained and re-downloadable until its window closes
+ * (see config/quick_download.php retention_minutes).
  *
  * Self-contained authorization: every entry point re-resolves the target by id
  * and gates on `update` for its server, so a crafted id can't queue another org's
@@ -125,25 +125,22 @@ trait QueuesQuickDownloads
         }
 
         if ($row->isDownloadable()) {
-            // Large artifacts were notified in-app + by email; don't auto-yank a
-            // big file — stop polling and let the user grab it from the link.
-            if ($row->isLarge()) {
-                $label = $this->qdLabel ?? QuickDownloadNotifier::label($row);
-                $this->resetQuickDownloadState();
-                $this->toastSuccess(__('Your :label is ready — we’ve emailed you a link and added it to your notifications.', ['label' => $label]));
+            // Notify-only: nothing auto-downloads. The artifact is staged and
+            // retained; the requester grabs it from the in-app inbox (plus email
+            // for large ones). The "it's ready" toast is fired app-wide from the
+            // notifier ({@see QuickDownloadStatusBroadcast}) so it shows even off
+            // this page — we just stop polling and clear the spinner here.
+            $this->resetQuickDownloadState();
 
-                return null;
-            }
-
-            return $this->triggerQuickDownload($row);
+            return null;
         }
 
         if ($row->status === QuickDownload::STATUS_FAILED) {
-            $message = $row->error_message ?: __('The download could not be prepared.');
+            // Inline error next to the button (page-local); the failure toast is
+            // broadcast app-wide from the notifier, same as the ready case.
             if ($this->qdTargetKey !== null) {
-                $this->qdErrors[$this->qdTargetKey] = $message;
+                $this->qdErrors[$this->qdTargetKey] = $row->error_message ?: __('The download could not be prepared.');
             }
-            $this->toastError($message);
             $this->resetQuickDownloadState();
 
             return null;
@@ -170,15 +167,17 @@ trait QueuesQuickDownloads
 
         unset($this->qdErrors[$targetKey]);
 
-        // Dedup: reuse an active request for the same (server, target, user) rather
-        // than starting a second build on the box.
+        // Dedup: collapse a double-click onto an in-flight build for the same
+        // (server, target, user). A finished, still-retained artifact does NOT
+        // block a new request — each click is a fresh point-in-time copy.
         $existing = $this->activeQuickDownloadQuery($attrs)->latest()->first();
-        if ($existing instanceof QuickDownload && $existing->isActive()) {
+        if ($existing instanceof QuickDownload
+            && in_array($existing->status, [QuickDownload::STATUS_PENDING, QuickDownload::STATUS_BUILDING], true)) {
             $this->qdId = (string) $existing->id;
             $this->qdTargetKey = $targetKey;
             $this->qdLabel = QuickDownloadNotifier::label($existing);
 
-            return $existing->isDownloadable() ? $this->triggerQuickDownload($existing) : null;
+            return null;
         }
 
         $row = QuickDownload::create($attrs + [
@@ -192,9 +191,9 @@ trait QueuesQuickDownloads
 
         BuildQuickDownloadJob::dispatch((string) $row->id, (string) $row->server_id);
 
-        // Size is unknown until the build lands: small artifacts auto-download
-        // here in a moment; large ones notify in-app + email when ready.
-        $this->toastSuccess(__('Preparing your :label download — it’ll start automatically, or we’ll notify you if it’s large.', ['label' => $this->qdLabel]));
+        // The build runs on the box; when it lands we drop an in-app notification
+        // (plus email for large artifacts) carrying the download link.
+        $this->toastSuccess(__('Preparing your :label — we’ll notify you in-app when it’s ready to download.', ['label' => $this->qdLabel]));
 
         return null;
     }
@@ -225,20 +224,6 @@ trait QueuesQuickDownloads
                 ->where('meta->name', $attrs['meta']['name']),
             default => $query,
         };
-    }
-
-    private function triggerQuickDownload(QuickDownload $row): mixed
-    {
-        $url = URL::temporarySignedRoute(
-            'quick-download.fetch',
-            $row->expires_at ?? now()->addMinutes((int) config('backup_staging.ttl_minutes', 240)),
-            ['quickDownload' => $row->id],
-        );
-
-        $this->resetQuickDownloadState();
-
-        // Same-origin attachment route: the browser downloads without leaving the page.
-        return $this->redirect($url);
     }
 
     private function resetQuickDownloadState(): void

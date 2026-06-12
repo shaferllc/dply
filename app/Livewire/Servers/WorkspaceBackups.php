@@ -83,8 +83,11 @@ class WorkspaceBackups extends Component
 
     public string $db_backup_configuration_id = '';
 
-    /** Display field (GB); persisted as bytes in server meta. */
-    public string $db_backup_remote_max_gb = '';
+    /** Display value for the remote-disk cap; unit in {@see $db_backup_remote_max_unit}. Persisted as bytes. */
+    public string $db_backup_remote_max_value = '';
+
+    /** MB | GB — unit for {@see $db_backup_remote_max_value}. */
+    public string $db_backup_remote_max_unit = 'GB';
 
     /** Form state for "Run site files backup now". */
     public string $run_site_id = '';
@@ -322,7 +325,8 @@ class WorkspaceBackups extends Component
         $this->validate([
             'db_backup_default_kind' => 'required|in:remote_server,destination',
             'db_backup_configuration_id' => 'nullable|string',
-            'db_backup_remote_max_gb' => 'nullable|numeric|min:0.1|max:10000',
+            'db_backup_remote_max_value' => 'nullable|numeric|min:1|max:1048576',
+            'db_backup_remote_max_unit' => 'required|in:MB,GB',
         ]);
 
         if ($this->db_backup_default_kind === DatabaseBackupSettings::KIND_DESTINATION && $this->db_backup_configuration_id === '') {
@@ -332,8 +336,9 @@ class WorkspaceBackups extends Component
         }
 
         $maxBytes = null;
-        if ($this->db_backup_remote_max_gb !== '') {
-            $maxBytes = (int) round((float) $this->db_backup_remote_max_gb * 1024 * 1024 * 1024);
+        if ($this->db_backup_remote_max_value !== '') {
+            $factor = $this->db_backup_remote_max_unit === 'MB' ? 1024 * 1024 : 1024 * 1024 * 1024;
+            $maxBytes = (int) round((float) $this->db_backup_remote_max_value * $factor);
         }
 
         $settings = new DatabaseBackupSettings(
@@ -356,7 +361,14 @@ class WorkspaceBackups extends Component
         $this->db_backup_default_kind = $settings->defaultKind;
         $this->db_backup_configuration_id = $settings->backupConfigurationId ?? '';
         $bytes = $settings->remoteMaxBytes ?? (int) config('server_database.remote_backup_max_bytes_per_server', 10 * 1024 * 1024 * 1024);
-        $this->db_backup_remote_max_gb = (string) round($bytes / 1024 / 1024 / 1024, 1);
+        // Show sub-GB caps in MB so small values aren't awkward decimals (0.1 GB → 100 MB).
+        if ($bytes < 1024 * 1024 * 1024) {
+            $this->db_backup_remote_max_unit = 'MB';
+            $this->db_backup_remote_max_value = (string) max(1, (int) round($bytes / 1024 / 1024));
+        } else {
+            $this->db_backup_remote_max_unit = 'GB';
+            $this->db_backup_remote_max_value = (string) round($bytes / 1024 / 1024 / 1024, 1);
+        }
     }
 
     public function runDatabaseBackup(): void

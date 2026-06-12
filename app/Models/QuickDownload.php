@@ -12,9 +12,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * A queued quick-download request. The build job stages a freshly-built artifact
  * into the operator-managed download bucket (see config/backup_staging.php), the
- * user is notified in-app + by email, and the signed proxy route streams it once
- * then deletes the object. Anything still around at {@see expires_at} (4h) is
- * removed by the sweeper. This is a download, never a durable backup.
+ * user is notified in-app + by email, and the signed proxy route streams it on
+ * demand — re-downloadable, never deleted on download. The artifact is retained
+ * until {@see expires_at} (config/quick_download.php retention_minutes), when the
+ * sweeper prunes it. This is a short-lived download tier, not a durable backup.
  */
 class QuickDownload extends Model
 {
@@ -103,7 +104,7 @@ class QuickDownload extends Model
         return (int) ($this->bytes ?? 0) >= (int) config('quick_download.notify_threshold_bytes', 5_242_880);
     }
 
-    /** Ready, not yet consumed, and still inside its 4h window. */
+    /** Ready, not yet consumed, and still inside its retention window. */
     public function isDownloadable(): bool
     {
         return $this->status === self::STATUS_READY
