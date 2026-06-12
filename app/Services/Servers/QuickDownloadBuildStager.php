@@ -88,7 +88,14 @@ final class QuickDownloadBuildStager
             return;
         }
 
-        $this->notifier->ready($row->fresh() ?? $row);
+        $row = $row->fresh() ?? $row;
+
+        // Small artifacts auto-download from the page poll within a second or two,
+        // so they skip the notification. Large ones notify in-app + email and let
+        // the user grab them from the link (they shouldn't auto-yank a big file).
+        if ($row->isLarge()) {
+            $this->notifier->ready($row);
+        }
     }
 
     /**

@@ -125,6 +125,16 @@ trait QueuesQuickDownloads
         }
 
         if ($row->isDownloadable()) {
+            // Large artifacts were notified in-app + by email; don't auto-yank a
+            // big file — stop polling and let the user grab it from the link.
+            if ($row->isLarge()) {
+                $label = $this->qdLabel ?? QuickDownloadNotifier::label($row);
+                $this->resetQuickDownloadState();
+                $this->toastSuccess(__('Your :label is ready — we’ve emailed you a link and added it to your notifications.', ['label' => $label]));
+
+                return null;
+            }
+
             return $this->triggerQuickDownload($row);
         }
 
@@ -182,7 +192,9 @@ trait QueuesQuickDownloads
 
         BuildQuickDownloadJob::dispatch((string) $row->id, (string) $row->server_id);
 
-        $this->toastSuccess(__(':label is being prepared — we’ll notify you when it’s ready.', ['label' => $this->qdLabel]));
+        // Size is unknown until the build lands: small artifacts auto-download
+        // here in a moment; large ones notify in-app + email when ready.
+        $this->toastSuccess(__('Preparing your :label download — it’ll start automatically, or we’ll notify you if it’s large.', ['label' => $this->qdLabel]));
 
         return null;
     }

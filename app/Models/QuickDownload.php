@@ -93,6 +93,16 @@ class QuickDownload extends Model
         return $this->belongsTo(User::class, 'requested_by_user_id');
     }
 
+    /**
+     * "Large" artifacts (at/above the notify threshold) are delivered by
+     * notification + a link the user clicks; smaller ones auto-download from the
+     * page poll. Size is only known once the build lands, so this reads `bytes`.
+     */
+    public function isLarge(): bool
+    {
+        return (int) ($this->bytes ?? 0) >= (int) config('quick_download.notify_threshold_bytes', 5_242_880);
+    }
+
     /** Ready, not yet consumed, and still inside its 4h window. */
     public function isDownloadable(): bool
     {
