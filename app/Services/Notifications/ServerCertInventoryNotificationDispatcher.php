@@ -2,13 +2,14 @@
 
 namespace App\Services\Notifications;
 
+use App\Jobs\ExecuteSiteCertificateJob;
 use App\Models\Server;
 use App\Models\User;
 use App\Support\ServerCertInventoryNotificationKeys;
 
 /**
  * Publishes notifications for server-scoped TLS certificate lifecycle events
- * (issue / renewal success + failure), fired from {@see \App\Jobs\ExecuteSiteCertificateJob}.
+ * (issue / renewal success + failure), fired from {@see ExecuteSiteCertificateJob}.
  *
  * Mirrors {@see ServerWebserverNotificationDispatcher}. Subject is the {@see Server}
  * the certificate's site lives on; the per-kind title is pulled from the config label.

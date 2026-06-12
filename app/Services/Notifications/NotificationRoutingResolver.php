@@ -22,9 +22,9 @@ class NotificationRoutingResolver
      *                                           skipped here to avoid double-dispatch. Empty list
      *                                           preserves the original behaviour.
      * @param  list<string>  $excludeRecipientUserIds  User ULIDs that have already received this event
-     *                                           in-app from a sibling publish and should be skipped
-     *                                           here so the inbox isn't double-filled. Empty list
-     *                                           preserves the original behaviour.
+     *                                                 in-app from a sibling publish and should be skipped
+     *                                                 here so the inbox isn't double-filled. Empty list
+     *                                                 preserves the original behaviour.
      */
     public function route(NotificationEvent $event, array $recipientUserIds = [], array $excludeChannelIds = [], array $excludeRecipientUserIds = []): void
     {

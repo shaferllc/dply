@@ -10,6 +10,7 @@ use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Livewire\Servers\Concerns\RunsAllowlistedManageAction;
 use App\Livewire\Servers\Concerns\RunsServerInventoryProbe;
 use App\Models\ConsoleAction;
@@ -25,10 +26,9 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 
 /**
  * Remote Docker Engine inspector over SSH — containers, images, volumes,

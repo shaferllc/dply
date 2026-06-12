@@ -257,7 +257,7 @@ return [
         // to the site directory (see App\Livewire\Sites\Files::siteRoot). Real flag on,
         // preview off.
         'site_files' => env('FEATURE_WORKSPACE_SITE_FILES', true),
-        'site_files_preview' => env('FEATURE_WORKSPACE_SITE_FILES_PREVIEW',     ),
+        'site_files_preview' => env('FEATURE_WORKSPACE_SITE_FILES_PREVIEW'),
         'site_cli' => env('FEATURE_WORKSPACE_SITE_CLI', false),
         'site_cli_preview' => env('FEATURE_WORKSPACE_SITE_CLI_PREVIEW', true),
         // Live: assign the Linux account that owns a VM-backed PHP site's files

@@ -7,6 +7,7 @@ namespace App\Livewire\Organizations;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\ExternalSecretStore;
 use App\Models\Organization;
+use App\Models\OrgSecretKey;
 use App\Services\Secrets\OrgSecretKeyManager;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -122,7 +123,7 @@ class Secrets extends Component
             ->get();
     }
 
-    public function getOrgKeyProperty(): ?\App\Models\OrgSecretKey
+    public function getOrgKeyProperty(): ?OrgSecretKey
     {
         return $this->organization->secretKey()->first();
     }

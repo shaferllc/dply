@@ -8,6 +8,7 @@ use App\Services\Servers\QuickDownloadBuildStager;
 use App\Services\Servers\QuickDownloadNotifier;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Str;
 
 /**
  * Builds a queued quick-download artifact on the server and uploads it into the
@@ -75,7 +76,7 @@ class BuildQuickDownloadJob implements ShouldQueue
 
         $row->update([
             'status' => QuickDownload::STATUS_FAILED,
-            'error_message' => \Illuminate\Support\Str::limit($e->getMessage(), 600),
+            'error_message' => Str::limit($e->getMessage(), 600),
         ]);
 
         app(QuickDownloadNotifier::class)->failed($row->fresh() ?? $row);

@@ -5,8 +5,10 @@ namespace App\Jobs;
 use App\Jobs\Concerns\WritesConsoleAction;
 use App\Jobs\Middleware\SerializeServerSsh;
 use App\Models\Site;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Sites\ReleaseEnvLinkChecker;
 use App\Services\Sites\SiteEnvPusher;
+use App\Services\Sites\SiteEnvPushScheduler;
 use App\Services\Sites\SiteEnvRuntimeApplier;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -15,6 +17,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -49,7 +52,7 @@ class PushSiteEnvJob implements ShouldBeUnique, ShouldQueue
 
     /**
      * Safety TTL on the per-site uniqueness lock. With the debounced dispatch
-     * ({@see \App\Services\Sites\SiteEnvPushScheduler}) plus the SSH-slot wait,
+     * ({@see SiteEnvPushScheduler}) plus the SSH-slot wait,
      * the unique lock is held a while; keep this larger than {@see retryUntil}
      * so a long wait can't expire the lock and let a duplicate push slip in.
      */
@@ -57,9 +60,9 @@ class PushSiteEnvJob implements ShouldBeUnique, ShouldQueue
 
     /**
      * @param  string|null  $ephemeralIdentityToken  a cache key (NOT the secret)
-     *   under which a customer-held org age identity was stashed for this single
-     *   apply. The raw identity is never serialized into the job payload; handle()
-     *   pulls-and-forgets it from the cache and passes it to the pusher.
+     *                                               under which a customer-held org age identity was stashed for this single
+     *                                               apply. The raw identity is never serialized into the job payload; handle()
+     *                                               pulls-and-forgets it from the cache and passes it to the pusher.
      */
     public function __construct(
         public string $siteId,
@@ -133,7 +136,7 @@ class PushSiteEnvJob implements ShouldBeUnique, ShouldQueue
             // It lives in the cache (transient) keyed by a token carried in the
             // payload — never the raw key — and is dropped the instant it is read.
             $ephemeralIdentity = $this->ephemeralIdentityToken !== null
-                ? \Illuminate\Support\Facades\Cache::pull(self::EPHEMERAL_IDENTITY_CACHE_PREFIX.$this->ephemeralIdentityToken)
+                ? Cache::pull(self::EPHEMERAL_IDENTITY_CACHE_PREFIX.$this->ephemeralIdentityToken)
                 : null;
 
             $path = $pusher->push($site, null, $ephemeralIdentity);
@@ -191,7 +194,7 @@ class PushSiteEnvJob implements ShouldBeUnique, ShouldQueue
      * .env has drifted off the shared canonical file. No-op for layouts where
      * each release legitimately owns its .env (see {@see ReleaseEnvLinkChecker}).
      */
-    private function warnOnReleaseEnvDrift(Site $site, \App\Services\ConsoleActions\ConsoleEmitter $emit): void
+    private function warnOnReleaseEnvDrift(Site $site, ConsoleEmitter $emit): void
     {
         $result = app(ReleaseEnvLinkChecker::class)->check($site);
         if (! $result['applicable'] || $result['drifted'] === []) {

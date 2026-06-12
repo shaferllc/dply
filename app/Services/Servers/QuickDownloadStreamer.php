@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
+use App\Http\Controllers\QuickDownloadController;
 use App\Models\QuickDownload;
 use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\Site;
+use App\Services\Backups\BackupDownloadStager;
 use Illuminate\Support\Str;
 
 /**
@@ -19,8 +21,8 @@ use Illuminate\Support\Str;
  *
  * The two-phase (build -> stat -> upload) shape lets us reject an over-cap
  * artifact before a single byte leaves the server. Consumed by
- * {@see \App\Services\Servers\QuickDownloadBuildStager}; the staged object is
- * later streamed to the browser by {@see \App\Http\Controllers\QuickDownloadController}.
+ * {@see QuickDownloadBuildStager}; the staged object is
+ * later streamed to the browser by {@see QuickDownloadController}.
  */
 final class QuickDownloadStreamer
 {
@@ -225,7 +227,7 @@ final class QuickDownloadStreamer
     /**
      * Upload a prepared artifact from the server straight into the download
      * bucket via a presigned PUT (the control plane never holds the bytes —
-     * mirrors {@see \App\Services\Backups\BackupDownloadStager::uploadFromServer}),
+     * mirrors {@see BackupDownloadStager::uploadFromServer}),
      * then delete the temp file. Runs as the same login that built/owns the file
      * so root-owned (vhost) and deploy-owned (.env) artifacts both upload.
      *

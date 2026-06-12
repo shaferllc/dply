@@ -6,6 +6,7 @@ namespace App\Livewire\Servers;
 
 use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Sites\Settings;
 use App\Models\NotificationChannel;
 use App\Models\NotificationWebhookDestination;
 use App\Models\Server;
@@ -22,7 +23,7 @@ use Livewire\Component;
 /**
  * The server's central "Notifications" workspace — one place to route notification
  * channels to every server.* event, grouped by category. The site analogue is the
- * Settings → Notifications page ({@see \App\Livewire\Sites\Settings}); this is its
+ * Settings → Notifications page ({@see Settings}); this is its
  * server-scoped sibling.
  *
  * Two doors, one data model: the per-feature workspace tabs (Errors → Notifications,

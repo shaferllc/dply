@@ -15,7 +15,7 @@ use Livewire\Component;
  * Legacy standalone progress page for an in-flight scaffold pipeline.
  *
  * The product flow now renders the same pipeline inside the site workspace
- * shell via {@see \App\Livewire\Sites\Show} (the scaffold-install partial),
+ * shell via {@see Show} (the scaffold-install partial),
  * so create/choose-app land on `sites.show`. This route is kept for
  * back-compat / deep links. All behaviour lives in
  * {@see InteractsWithScaffoldJourney}; this class only adds the page chrome.

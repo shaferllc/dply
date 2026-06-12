@@ -6,6 +6,7 @@ namespace App\Livewire\Servers;
 
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\AuditLog;
 use App\Models\OrganizationInvitation;
 use App\Models\Server;
@@ -20,10 +21,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 use Livewire\WithPagination;
 
 #[Layout('layouts.app')]

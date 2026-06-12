@@ -11,8 +11,8 @@ use App\Models\ConsoleAction;
 use App\Models\Organization;
 use App\Models\ServerDatabase;
 use App\Models\Site;
+use App\Services\Servers\DatabaseEngineReadinessGuard;
 use App\Support\Servers\DatabaseWorkspaceEngines;
-use App\Support\Servers\ServerDatabaseHostCapabilities;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -77,7 +77,7 @@ class CreateSiteDatabase extends AbstractDplyTool
             throw new DplyMcpException('Specify an engine (the site has no default database engine configured).');
         }
 
-        $readiness = app(\App\Services\Servers\DatabaseEngineReadinessGuard::class)->check($server, $engine);
+        $readiness = app(DatabaseEngineReadinessGuard::class)->check($server, $engine);
         if (! $readiness['ok']) {
             throw new DplyMcpException((string) $readiness['reason']);
         }

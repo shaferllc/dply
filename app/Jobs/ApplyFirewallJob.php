@@ -7,6 +7,7 @@ namespace App\Jobs;
 use App\Models\Server;
 use App\Models\ServerFirewallAuditEvent;
 use App\Models\User;
+use App\Services\Notifications\ServerFirewallNotificationDispatcher;
 use App\Services\Servers\ServerFirewallApplyRecorder;
 use App\Services\Servers\ServerFirewallAuditLogger;
 use App\Services\Servers\ServerFirewallProvisioner;
@@ -45,7 +46,7 @@ class ApplyFirewallJob implements ShouldQueue
         ServerFirewallProvisioner $firewall,
         ServerFirewallAuditLogger $audit,
         ServerFirewallApplyRecorder $recorder,
-        \App\Services\Notifications\ServerFirewallNotificationDispatcher $notifications,
+        ServerFirewallNotificationDispatcher $notifications,
     ): void {
         $server = Server::query()->find($this->serverId);
         if ($server === null) {

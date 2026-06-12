@@ -9,6 +9,7 @@ use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteBackend;
 use App\Services\Servers\ServerProvisioningDispatcher;
+use App\Services\WorkerPools\WorkerCloneProvisioner;
 use RuntimeException;
 
 /**
@@ -16,7 +17,7 @@ use RuntimeException;
  * multi-backend site, by cloning the site's primary server's placement and
  * intent (provider, credential, region, size, private network, install profile)
  * and dispatching the provider's normal provisioning job. Mirrors
- * {@see \App\Services\WorkerPools\WorkerCloneProvisioner} but tags the box as a
+ * {@see WorkerCloneProvisioner} but tags the box as a
  * WEB backend (meta['site_backend']) rather than a worker-pool member, and
  * records a {@see SiteBackend} row instead of a pool membership.
  *

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Actions\Tests;
 
-use App\Actions\Actions;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\Validator;
 use Tests\TestCase;

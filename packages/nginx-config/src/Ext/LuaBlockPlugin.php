@@ -33,8 +33,6 @@ class LuaBlockPlugin implements CrossplaneExtension
     ];
 
     /**
-     * @param Crossplane $crossplane
-     *
      * @return mixed
      */
     public function registerExtension(Crossplane $crossplane): void
@@ -44,12 +42,7 @@ class LuaBlockPlugin implements CrossplaneExtension
     }
 
     /**
-     * @param \Iterator $charIterator
-     * @param string    $directive
-     *
      * @throws LuaBlockParserSyntaxException
-     *
-     * @return \Generator|null
      */
     public function lex(\Iterator $charIterator, string $directive): ?\Generator
     {
@@ -66,7 +59,7 @@ class LuaBlockPlugin implements CrossplaneExtension
                     }
                     while (StringUtil::isSpace($char)) {
                         $charIterator->next();
-                        [$char,] = $charIterator->current();
+                        [$char] = $charIterator->current();
                     }
                 }
                 $arg .= $char;
@@ -78,12 +71,12 @@ class LuaBlockPlugin implements CrossplaneExtension
 
         // check that Lua block starts correctly
         while (true) {
-            if (!$charIterator->valid()) {
+            if (! $charIterator->valid()) {
                 return;
             }
             $charIterator->next();
             [$char, $line] = $charIterator->current();
-            if (!StringUtil::isSpace($char)) {
+            if (! StringUtil::isSpace($char)) {
                 break;
             }
         }
@@ -118,9 +111,9 @@ class LuaBlockPlugin implements CrossplaneExtension
                     [$char, $line] = [$prevChar, $prevLine];
                 }
             } elseif ($char === '{') {
-                ++$depth;
+                $depth++;
             } elseif ($char === '}') {
-                --$depth;
+                $depth--;
             } elseif (\in_array($char, ['"', "'"], true)) {
                 $quote = $char;
                 $token .= $quote;
@@ -158,6 +151,6 @@ class LuaBlockPlugin implements CrossplaneExtension
             $block = $stmt['args'][0];
         }
 
-        return $built . ' {' . $block . '}';
+        return $built.' {'.$block.'}';
     }
 }

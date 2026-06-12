@@ -8,15 +8,15 @@ use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesHealthNotifications;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\Server;
 use App\Services\Servers\ServerHealthCockpit;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 
 /**
  * VM server health & capacity cockpit — rolls up metrics, release pressure,
@@ -26,11 +26,11 @@ use Livewire\Attributes\Lazy;
 #[Lazy]
 class WorkspaceHealth extends Component
 {
-    use RendersWorkspacePlaceholder;
-    use InteractsWithServerWorkspace;
-    use RequiresFeature;
     use CreatesNotificationChannelInline;
+    use InteractsWithServerWorkspace;
     use ManagesHealthNotifications;
+    use RendersWorkspacePlaceholder;
+    use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.health';
 

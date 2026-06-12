@@ -3,6 +3,7 @@
 namespace App\Livewire\Concerns;
 
 use App\Jobs\SendSiteLogTestJob;
+use App\Models\Site;
 use App\Models\SiteBinding;
 use App\Services\Deploy\SiteBindingManager;
 use App\Services\Logging\LoggingChannelCatalog;
@@ -19,7 +20,7 @@ use Illuminate\Support\Facades\Gate;
  * {@see $loggingSecrets} (never hydrated back from storage) and handed to
  * {@see SiteBindingManager::saveLoggingSpec()} on save.
  *
- * @property \App\Models\Site $site
+ * @property Site $site
  */
 trait ManagesSiteLogging
 {

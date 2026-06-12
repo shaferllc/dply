@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
+use App\Jobs\PreflightSiteSetupJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
 use App\Livewire\Concerns\Sites\ConfiguresGitRepository;
@@ -555,7 +556,7 @@ class Repository extends Component
         $meta['setup'] = ['state' => 'scanning', 'started_at' => now()->toIso8601String()];
         $site->forceFill(['meta' => $meta])->save();
 
-        \App\Jobs\PreflightSiteSetupJob::dispatch($site->id, (string) auth()->id());
+        PreflightSiteSetupJob::dispatch($site->id, (string) auth()->id());
 
         $this->redirect(route('sites.repository', [$this->server, $site, 'repo_tab' => 'setup']), navigate: true);
 

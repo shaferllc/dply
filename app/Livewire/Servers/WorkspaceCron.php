@@ -7,6 +7,7 @@ use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\EmitsPanelEvent;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\OrganizationCronJobTemplate;
 use App\Models\Server;
 use App\Models\ServerCronJob;
@@ -25,23 +26,22 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
 #[Lazy]
 class WorkspaceCron extends Component
 {
-    use RendersWorkspacePlaceholder;
     use ConfirmsActionWithModal;
     use EmitsPanelEvent;
-    use WithPagination;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use RendersWorkspacePlaceholder;
+    use WithPagination;
 
     public ?string $editing_job_id = null;
 

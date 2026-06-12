@@ -7,6 +7,7 @@ use App\Models\BackupDownloadStaging;
 use App\Services\Backups\BackupDownloadStager;
 use App\Services\Backups\BackupStagingS3ClientFactory;
 use Illuminate\Database\Eloquent\Model;
+use Livewire\Component;
 
 /**
  * Shared "stage a backup to the Hetzner download bucket, then redirect" flow for
@@ -16,7 +17,7 @@ use Illuminate\Database\Eloquent\Model;
  * to a presigned GET. The host component supplies authorization/scoping via
  * {@see resolveDownloadableBackup()}.
  *
- * @phpstan-require-extends \Livewire\Component
+ * @phpstan-require-extends Component
  */
 trait StagesBackupDownloads
 {

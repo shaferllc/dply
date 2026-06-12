@@ -266,7 +266,7 @@ final class SiteManifestCodeShapeSync
         $meta['manifest']['removed_pending_confirm'] = true;
         $site->forceFill(['meta' => $meta])->save();
 
-        return "[dply] NOTE: no dply manifest in the repo, but steps/processes from the last manifest are still applied. "
+        return '[dply] NOTE: no dply manifest in the repo, but steps/processes from the last manifest are still applied. '
             ."Choose 'Revert to dashboard' in Settings to clear them, or restore the file.\n";
     }
 

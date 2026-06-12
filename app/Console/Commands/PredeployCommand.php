@@ -171,7 +171,7 @@ class PredeployCommand extends Command
             ."                    'title'   => '".$this->phpEscape($title)."',\n"
             ."                    'summary' => '".$this->phpEscape($entry)."',\n"
             ."                    'items'   => [],\n"
-            ."                ],";
+            .'                ],';
 
         $blade = (string) file_get_contents($path);
         $marker = '$entries = [';
@@ -266,7 +266,7 @@ class PredeployCommand extends Command
 
     private function phpEscape(string $s): string
     {
-        return str_replace(["\\", "'"], ["\\\\", "\\'"], trim($s));
+        return str_replace(['\\', "'"], ['\\\\', "\\'"], trim($s));
     }
 
     /** Run `claude -p <prompt>` with a hard wall-clock cap; null on failure/timeout. */

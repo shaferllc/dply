@@ -51,14 +51,14 @@ return new class extends Migration
             if (! isset($networksByOrgAndId[$key])) {
                 $networkId = Str::ulid()->toString();
                 DB::table('private_networks')->insert([
-                    'id'                    => $networkId,
-                    'organization_id'       => $server->organization_id,
+                    'id' => $networkId,
+                    'organization_id' => $server->organization_id,
                     'provider_credential_id' => $server->provider_credential_id,
-                    'provider_id'           => $server->hetzner_network_id,
-                    'name'                  => 'hetzner-network-'.$server->hetzner_network_id,
-                    'provider'              => 'hetzner',
-                    'created_at'            => now(),
-                    'updated_at'            => now(),
+                    'provider_id' => $server->hetzner_network_id,
+                    'name' => 'hetzner-network-'.$server->hetzner_network_id,
+                    'provider' => 'hetzner',
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ]);
                 $networksByOrgAndId[$key] = $networkId;
             }

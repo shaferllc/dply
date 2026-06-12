@@ -6,10 +6,13 @@ use App\Livewire\Concerns\AuthorsBackupDestinations;
 use App\Models\BackupConfiguration;
 use App\Models\ObjectStorageCredential;
 use App\Models\ProviderCredential;
+use App\Models\Server;
 use App\Services\DigitalOceanService;
 use App\Services\Storage\ObjectStorageBucketProvisioner;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use Livewire\Component;
 
 /**
  * Reusable "Add backup destination" modal for any server workspace component.
@@ -21,14 +24,14 @@ use Illuminate\Validation\Rule;
  *
  * Pairs with `livewire.servers.partials.backups._add-destination-modal`.
  *
- * Hosts must extend {@see \Livewire\Component}, expose `$this->server`
+ * Hosts must extend {@see Component}, expose `$this->server`
  * (via {@see InteractsWithServerWorkspace}), and provide `toastSuccess`/
  * `toastError`. Override {@see onBackupDestinationCreated()} to react to a
  * freshly-created destination (e.g. auto-select it on a form).
  *
- * @phpstan-require-extends \Livewire\Component
+ * @phpstan-require-extends Component
  *
- * @property \App\Models\Server $server
+ * @property Server $server
  */
 trait ManagesBackupDestinationModal
 {
@@ -149,9 +152,9 @@ trait ManagesBackupDestinationModal
      * Saved object-storage credentials for the selected provider, offered as a
      * "reuse keys" picker for manual-key providers (e.g. Hetzner).
      *
-     * @return \Illuminate\Support\Collection<int, ObjectStorageCredential>
+     * @return Collection<int, ObjectStorageCredential>
      */
-    public function savedObjectStorageCredentials(): \Illuminate\Support\Collection
+    public function savedObjectStorageCredentials(): Collection
     {
         if ($this->server->organization_id === null) {
             return collect();

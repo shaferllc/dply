@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Servers\Concerns;
 
+use App\Jobs\RunSiteDeploymentJob;
+use App\Livewire\Servers\WorkspaceDeployPolicy;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
@@ -16,8 +18,8 @@ use Illuminate\Support\Facades\Gate;
  * notification channels to this server's server.deploy_window.* events without
  * leaving the page.
  *
- * Deploy-window events fire from {@see \App\Jobs\RunSiteDeploymentJob} (blocked
- * deploys) and {@see \App\Livewire\Servers\WorkspaceDeployPolicy} (policy
+ * Deploy-window events fire from {@see RunSiteDeploymentJob} (blocked
+ * deploys) and {@see WorkspaceDeployPolicy} (policy
  * toggled), so this trait is subscription management only. Mirrors
  * {@see ManagesCertInventoryNotifications}.
  */

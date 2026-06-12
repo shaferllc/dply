@@ -6,6 +6,7 @@ use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\Site;
 use App\Services\Notifications\AssignableNotificationChannels;
+use App\Support\Errors\ErrorEventSyncer;
 use App\Support\SiteErrorsNotificationKeys;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -16,7 +17,7 @@ use Illuminate\Support\Facades\Gate;
  * notification channels to this site's site.errors.* events without leaving the
  * page. The site mirror of {@see \App\Livewire\Servers\Concerns\ManagesErrorsNotifications}.
  *
- * Error events fire per newly-captured row from {@see \App\Support\Errors\ErrorEventSyncer}
+ * Error events fire per newly-captured row from {@see ErrorEventSyncer}
  * (the per-minute sweep), so this trait is subscription management only. The same
  * failure also surfaces in the owning server's roll-up; the dispatcher dedupes the
  * two so subscribing here doesn't double up with a server.errors.* subscription.

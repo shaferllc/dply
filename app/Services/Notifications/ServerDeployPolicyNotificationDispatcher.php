@@ -2,14 +2,16 @@
 
 namespace App\Services\Notifications;
 
+use App\Jobs\RunSiteDeploymentJob;
+use App\Livewire\Servers\WorkspaceDeployPolicy;
 use App\Models\Server;
 use App\Models\User;
 use App\Support\ServerDeployPolicyNotificationKeys;
 
 /**
  * Publishes notifications for the server-wide deploy window policy — a deploy
- * blocked by a deny window ({@see \App\Jobs\RunSiteDeploymentJob}) and enforcement
- * toggled on / off ({@see \App\Livewire\Servers\WorkspaceDeployPolicy}).
+ * blocked by a deny window ({@see RunSiteDeploymentJob}) and enforcement
+ * toggled on / off ({@see WorkspaceDeployPolicy}).
  *
  * Mirrors {@see ServerCertInventoryNotificationDispatcher}. Subject is the
  * {@see Server} the policy belongs to; the per-kind title is the config label.

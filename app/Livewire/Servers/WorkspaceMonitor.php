@@ -9,6 +9,7 @@ use App\Jobs\UpgradeGuestMetricsScriptJob;
 use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Servers\Concerns\ConfirmsServerMonitoringInstall;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Livewire\Servers\Concerns\RunsServerPackageInstalls;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
@@ -35,19 +36,18 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
 #[Lazy]
 class WorkspaceMonitor extends Component
 {
-    use RendersWorkspacePlaceholder;
     use ConfirmsServerMonitoringInstall;
     use CreatesNotificationChannelInline;
     use InteractsWithServerWorkspace;
+    use RendersWorkspacePlaceholder;
     use RunsServerPackageInstalls;
 
     public ?string $metrics_error = null;

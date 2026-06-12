@@ -11,6 +11,7 @@ use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesServerConfigRevisions;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Services\Servers\RemoteServerConfigService;
@@ -23,10 +24,9 @@ use App\Support\Servers\WebserverWorkspaceViewData;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 
 /**
  * Unified server configuration editor — allowlisted paths across webserver,
@@ -36,13 +36,13 @@ use Livewire\Attributes\Lazy;
 #[Lazy]
 class WorkspaceConfiguration extends Component
 {
-    use RendersWorkspacePlaceholder;
     use ClonesServer;
     use ConfirmsActionWithModal;
     use DismissesServerConsoleActionRun;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use ManagesServerConfigRevisions;
+    use RendersWorkspacePlaceholder;
 
     #[Url(as: 'file', except: null, history: true)]
     public ?string $config_selected_path = null;

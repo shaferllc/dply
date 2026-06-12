@@ -8,6 +8,7 @@ use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\User;
 use App\Services\ConsoleActions\ConsoleEmitter;
+use App\Services\Notifications\ServerWebserverNotificationDispatcher;
 use App\Services\Servers\RemoteWebserverConfigService;
 use App\Services\Servers\ServerWebserverConfigEditor;
 use Illuminate\Bus\Queueable;
@@ -53,7 +54,7 @@ class RunWebserverConfigOpJob implements ShouldQueue
         public ?string $revisionSummary = null,
     ) {}
 
-    public function handle(RemoteWebserverConfigService $service, \App\Services\Notifications\ServerWebserverNotificationDispatcher $notifications): void
+    public function handle(RemoteWebserverConfigService $service, ServerWebserverNotificationDispatcher $notifications): void
     {
         $server = Server::query()->find($this->serverId);
         if ($server === null) {

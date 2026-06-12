@@ -2,10 +2,12 @@
 
 namespace App\Services\Deploy;
 
+use App\Jobs\RunSiteDeploymentJob;
+
 /**
  * Instructs the atomic deployer to re-attach to an already-staged release
  * directory and continue from a given phase, instead of minting a fresh
- * release and running the full pipeline. Built by {@see \App\Jobs\RunSiteDeploymentJob}
+ * release and running the full pipeline. Built by {@see RunSiteDeploymentJob}
  * from a prior failed deployment when the operator chooses "Retry from {phase}".
  *
  * Only failures BEFORE the cutover (build / release phases) are resumable: the

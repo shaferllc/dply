@@ -2,6 +2,7 @@
 
 namespace App\Services\Notifications;
 
+use App\Jobs\ServerManageRemoteSshJob;
 use App\Models\Server;
 use App\Models\User;
 use App\Support\ServerPatchNotificationKeys;
@@ -9,7 +10,7 @@ use App\Support\ServerPatchNotificationKeys;
 /**
  * Publishes notifications for server-scoped OS patch / update actions (apt upgrade,
  * dist-upgrade, reboot, unattended-upgrades toggle), fired from the shared
- * manage-action job ({@see \App\Jobs\ServerManageRemoteSshJob}) for patch task names.
+ * manage-action job ({@see ServerManageRemoteSshJob}) for patch task names.
  *
  * Mirrors {@see ServerWebserverNotificationDispatcher}. Subject is the {@see Server};
  * the per-kind title is pulled from the config label.

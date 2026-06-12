@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Services\DigitalOceanService;
+use App\Support\Servers\SnapshotBakeScript;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 use phpseclib3\Crypt\PublicKeyLoader;
@@ -362,6 +363,6 @@ class SnapshotBakeDigitalOceanCommand extends Command
      */
     private function defaultBakeScript(): string
     {
-        return \App\Support\Servers\SnapshotBakeScript::default();
+        return SnapshotBakeScript::default();
     }
 }

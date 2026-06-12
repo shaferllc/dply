@@ -11,6 +11,7 @@ use App\Jobs\WaitForServerSshReadyJob;
 use App\Livewire\Servers\Concerns\BuildsContainerLaunchSummary;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\InsightFinding;
 use App\Models\Server;
 use App\Models\ServerBackupSchedule;
@@ -35,9 +36,8 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
-use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use Livewire\Attributes\Lazy;
+use Livewire\Component;
 
 /**
  * Server workspace landing page — at-a-glance dashboard.
@@ -54,10 +54,10 @@ use Livewire\Attributes\Lazy;
 #[Lazy]
 class WorkspaceOverview extends Component
 {
-    use RendersWorkspacePlaceholder;
     use BuildsContainerLaunchSummary;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use RendersWorkspacePlaceholder;
 
     public function mount(Server $server): mixed
     {

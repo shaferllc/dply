@@ -11,12 +11,13 @@ use App\Models\SiteBinding;
 use App\Models\SiteDeployment;
 use App\Models\SiteProcess;
 use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Services\WorkerPools\WorkerWorkloadReplayer;
 use Illuminate\Support\Str;
 
 /**
  * Materialises the logical site's code onto a backend server as a derived child
  * Site (linked via `parent_site_id`), then provisions it. The WEB counterpart to
- * {@see \App\Services\WorkerPools\WorkerWorkloadReplayer} — same field-copy, but
+ * {@see WorkerWorkloadReplayer} — same field-copy, but
  * NONE of the worker transforms: the scheduler flag is preserved, there's no
  * DPLY_WORKER_ROLE demotion, and scheduler processes are kept (a backend serves
  * HTTP exactly like the primary; the balancer fans traffic across them).

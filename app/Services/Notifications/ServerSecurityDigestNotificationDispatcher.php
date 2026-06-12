@@ -4,11 +4,12 @@ namespace App\Services\Notifications;
 
 use App\Models\Server;
 use App\Models\User;
+use App\Services\Servers\ServerSecurityDigestScanner;
 use App\Support\ServerSecurityDigestNotificationKeys;
 
 /**
  * Publishes notifications for the server security digest — posture transitions
- * detected after a scan ({@see \App\Services\Servers\ServerSecurityDigestScanner}):
+ * detected after a scan ({@see ServerSecurityDigestScanner}):
  * a new critical / warning finding, or a recovery to a healthy posture.
  *
  * Mirrors {@see ServerDeployPolicyNotificationDispatcher}. Subject is the

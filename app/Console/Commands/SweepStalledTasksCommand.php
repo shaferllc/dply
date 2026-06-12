@@ -6,7 +6,9 @@ namespace App\Console\Commands;
 
 use App\Modules\TaskRunner\Enums\TaskStatus;
 use App\Modules\TaskRunner\Models\Task;
+use App\Observers\TaskRunnerTaskObserver;
 use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -23,7 +25,7 @@ use Illuminate\Support\Facades\Log;
  * This command is that net. It runs every minute and fails any `running` task
  * that has either blown past its own timeout or gone quiet (no output/heartbeat)
  * for longer than the configured window. Because it updates each task via
- * Eloquent (not a bulk query), {@see \App\Observers\TaskRunnerTaskObserver}
+ * Eloquent (not a bulk query), {@see TaskRunnerTaskObserver}
  * still fires on the status change and flips the owning server to
  * `setup_status=FAILED`, which surfaces the failure + Resume in the journey.
  */
@@ -100,7 +102,7 @@ class SweepStalledTasksCommand extends Command
     /**
      * Return a human-readable stall reason, or null if the task is healthy.
      */
-    private function stallReason(Task $task, \Illuminate\Support\Carbon $now, int $heartbeatSeconds, int $graceSeconds): ?string
+    private function stallReason(Task $task, Carbon $now, int $heartbeatSeconds, int $graceSeconds): ?string
     {
         $startedAt = $task->started_at;
         if ($startedAt === null) {

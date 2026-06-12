@@ -176,7 +176,7 @@ class HetznerService
      */
     /**
      * @param  list<string>  $zones  Network zones to add subnets for (e.g. ['eu-central', 'us-east']).
-     *                                At least one is required — Hetzner will not assign private IPs without a subnet.
+     *                               At least one is required — Hetzner will not assign private IPs without a subnet.
      */
     public function createNetwork(string $name, string $ipRange = '10.0.0.0/8', array $zones = ['eu-central']): int
     {
@@ -259,12 +259,12 @@ class HetznerService
         }
 
         return [
-            'id'       => (int) $network['id'],
-            'name'     => (string) ($network['name'] ?? ''),
+            'id' => (int) $network['id'],
+            'name' => (string) ($network['name'] ?? ''),
             'ip_range' => (string) ($network['ip_range'] ?? ''),
-            'routes'   => array_map(static fn ($r) => [
+            'routes' => array_map(static fn ($r) => [
                 'destination' => (string) ($r['destination'] ?? ''),
-                'gateway'     => (string) ($r['gateway'] ?? ''),
+                'gateway' => (string) ($r['gateway'] ?? ''),
             ], $network['routes'] ?? []),
         ];
     }
@@ -278,7 +278,7 @@ class HetznerService
     {
         $response = $this->request('post', "/networks/{$networkId}/actions/add_route", [
             'destination' => $destination,
-            'gateway'     => $gateway,
+            'gateway' => $gateway,
         ]);
         $this->assertSuccess($response, 'add network route');
     }
@@ -290,7 +290,7 @@ class HetznerService
     {
         $response = $this->request('post', "/networks/{$networkId}/actions/delete_route", [
             'destination' => $destination,
-            'gateway'     => $gateway,
+            'gateway' => $gateway,
         ]);
         $this->assertSuccess($response, 'delete network route');
     }

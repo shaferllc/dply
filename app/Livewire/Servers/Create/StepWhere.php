@@ -11,6 +11,7 @@ use App\Livewire\Concerns\ManagesProviderCredentials;
 use App\Livewire\Forms\ServerCreateForm;
 use App\Livewire\Servers\Concerns\InteractsWithServerCreateDraft;
 use App\Livewire\Servers\Concerns\ServerCreateActions;
+use App\Models\PrivateNetwork;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerCreateDraft;
@@ -430,9 +431,9 @@ class StepWhere extends Component
         // Private networks we already track for this account — let the user pick
         // one instead of hunting for the ID in the Hetzner console.
         $privateNetworks = ($org !== null && $this->form->type === 'hetzner' && $this->form->provider_credential_id !== '')
-            ? \App\Models\PrivateNetwork::query()
+            ? PrivateNetwork::query()
                 ->where('organization_id', $org->id)
-                ->where('provider', \App\Models\PrivateNetwork::PROVIDER_HETZNER)
+                ->where('provider', PrivateNetwork::PROVIDER_HETZNER)
                 ->where('provider_credential_id', $this->form->provider_credential_id)
                 ->whereNotNull('provider_id')
                 ->orderBy('name')

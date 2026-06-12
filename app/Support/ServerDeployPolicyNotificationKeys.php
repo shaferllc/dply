@@ -2,15 +2,18 @@
 
 namespace App\Support;
 
+use App\Jobs\RunSiteDeploymentJob;
+use App\Livewire\Servers\WorkspaceDeployPolicy;
+
 /**
  * Notification event keys for the server-wide deploy window policy, surfaced on
  * the /servers/{server}/deploy-policy workspace. The `server.` prefix maps these
  * to the Server subscribable in {@see NotificationSubscriptionRules::subscribableClassForEvent};
  * they are listed under the "deploy_window" category in config/notification_events.php.
  *
- * `deploy_blocked` fires from {@see \App\Jobs\RunSiteDeploymentJob} when a deploy is
+ * `deploy_blocked` fires from {@see RunSiteDeploymentJob} when a deploy is
  * skipped by an active deny window. `policy_enabled` / `policy_disabled` fire from
- * {@see \App\Livewire\Servers\WorkspaceDeployPolicy::savePolicy} when an operator
+ * {@see WorkspaceDeployPolicy::savePolicy} when an operator
  * flips enforcement. Mirrors {@see ServerCertInventoryNotificationKeys}.
  */
 final class ServerDeployPolicyNotificationKeys

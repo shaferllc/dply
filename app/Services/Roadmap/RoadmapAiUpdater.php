@@ -11,6 +11,7 @@ use App\Models\RoadmapSuggestion;
 use App\Services\Ai\AiPromptBuilder;
 use App\Services\Ai\LlmSynthesizer;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -116,7 +117,7 @@ final class RoadmapAiUpdater
 
     /**
      * @param  list<array{sha: string, subject: string, body: string, date: string}>  $commits
-     * @param  \Illuminate\Support\Collection<int, RoadmapSuggestion>  $suggestions
+     * @param  Collection<int, RoadmapSuggestion>  $suggestions
      * @return array<string, mixed>
      */
     private function buildContext(array $commits, $suggestions): array

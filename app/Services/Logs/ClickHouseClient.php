@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Services\Logs;
 
+use App\Console\Commands\SyncLogStoreSchemaCommand;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 
 /**
  * Thin client over ClickHouse's HTTP interface (port 8123) for the dply Logs
  * store. Laravel uses this ONLY for reads (the log explorer) and the one-time
- * DDL ({@see \App\Console\Commands\SyncLogStoreSchemaCommand}) — the high-volume
+ * DDL ({@see SyncLogStoreSchemaCommand}) — the high-volume
  * ingest path is the Vector aggregator inserting directly, never PHP.
  *
  * Reads bind parameters server-side via ClickHouse's `{name:Type}` placeholders

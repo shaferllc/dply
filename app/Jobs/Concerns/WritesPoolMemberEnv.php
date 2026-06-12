@@ -24,7 +24,7 @@ trait WritesPoolMemberEnv
 {
     /**
      * @param  array<string, string>  $envVars
-     * @return bool  true if the member's env changed (and was pushed + restarted)
+     * @return bool true if the member's env changed (and was pushed + restarted)
      */
     protected function applyEnvToMember(
         Site $site,

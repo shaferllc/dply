@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Sites;
 
+use App\Console\Commands\RunDueScheduledDeploysCommand;
 use App\Models\ScheduledDeploy;
 use App\Models\Site;
 use Illuminate\Support\Carbon;
@@ -11,7 +12,7 @@ use Illuminate\Support\Carbon;
 /**
  * Creates / cancels / reads a site's one-off DELAYED deploy. Shared by the
  * Deploy-tab panel and the persistent DeployControl so both schedule the same
- * way. The control-plane {@see \App\Console\Commands\RunDueScheduledDeploysCommand}
+ * way. The control-plane {@see RunDueScheduledDeploysCommand}
  * tick fires the deploy when it comes due.
  */
 class ScheduleSiteDeploy

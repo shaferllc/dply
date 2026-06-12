@@ -48,7 +48,7 @@ class DopplerDriver extends AbstractSecretStoreDriver
 
     /**
      * @param  array<string, mixed>  $cfg
-     * @return array{0: string, 1: string, 2: string}  [project, config, name]
+     * @return array{0: string, 1: string, 2: string} [project, config, name]
      */
     private function locate(string $path, array $cfg): array
     {

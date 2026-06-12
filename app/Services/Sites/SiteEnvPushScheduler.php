@@ -3,8 +3,10 @@
 namespace App\Services\Sites;
 
 use App\Jobs\PushSiteEnvJob;
+use App\Livewire\Sites\Concerns\ManagesSiteEnvironment;
 use App\Models\ConsoleAction;
 use App\Models\Site;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 
 /**
  * Coalesces env-file SSH pushes so a burst of edits never opens more SSH
@@ -18,7 +20,7 @@ use App\Models\Site;
  *      window in (1) so consecutive single edits coalesce instead of each
  *      firing its own push the instant the previous one finishes.
  *
- * {@see PushSiteEnvJob}'s per-site {@see \Illuminate\Contracts\Queue\ShouldBeUnique}
+ * {@see PushSiteEnvJob}'s per-site {@see ShouldBeUnique}
  * lock is the backstop against any double-dispatch race the checks above miss.
  *
  * Bulk operations (remove/add many at once) write the cache once and call this
@@ -36,7 +38,7 @@ class SiteEnvPushScheduler
      * Ensure exactly one env push is pending for the site.
      *
      * @return array{run: ConsoleAction, coalesced: bool} the console run the
-     *   caller should watch, and whether it joined an already-pending push
+     *                                                    caller should watch, and whether it joined an already-pending push
      */
     public function schedule(Site $site, ?string $userId): array
     {
@@ -63,7 +65,7 @@ class SiteEnvPushScheduler
     /**
      * Seed a queued env_push console run, clearing settled/stale runs first so
      * the banner tracks only the live push. Mirrors
-     * {@see \App\Livewire\Sites\Concerns\ManagesSiteEnvironment::seedQueuedConsoleAction}.
+     * {@see ManagesSiteEnvironment::seedQueuedConsoleAction}.
      */
     private function seedRun(Site $site, ?string $userId): ConsoleAction
     {

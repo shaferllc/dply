@@ -6,11 +6,12 @@ namespace App\Observers;
 
 use App\Jobs\SyncOrganizationBillingJob;
 use App\Models\RealtimeApp;
+use App\Services\Billing\OrganizationBillingStateComputer;
 
 /**
  * Dispatch a billing sync when a managed realtime app enters or leaves billable
  * status, or moves between connection tiers. Active apps are billed per-tier
- * (see {@see \App\Services\Billing\OrganizationBillingStateComputer}); without
+ * (see {@see OrganizationBillingStateComputer}); without
  * this the Stripe subscription only reconciled on the nightly sweep, so a brand
  * new app or a tier upgrade wouldn't bill until the next day.
  */

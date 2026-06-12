@@ -9,6 +9,7 @@ use App\Livewire\Servers\WorkspaceCron;
 use App\Livewire\Sites\Settings;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteBackend;
 use App\Models\SupervisorProgram;
 use App\Services\Deploy\DeploymentSecretInventory;
 use App\Services\Deploy\LaravelComposerPackageDetector;
@@ -456,7 +457,7 @@ trait ResolvesSiteRuntime
         }
 
         return $this->backends()
-            ->where('state', \App\Models\SiteBackend::STATE_ACTIVE)
+            ->where('state', SiteBackend::STATE_ACTIVE)
             ->count() >= 2;
     }
 

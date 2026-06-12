@@ -11,11 +11,11 @@ use App\Services\Sites\SitePhpFpmPoolConfigBuilder;
 
 function poolSite(array $poolMeta = [], string $sshUser = 'dply'): array
 {
-    $server = new Server();
+    $server = new Server;
     $server->ssh_user = $sshUser;
     $server->meta = ['php_inventory' => ['installed_versions' => ['8.4'], 'detected_default_version' => '8.4']];
 
-    $site = new Site();
+    $site = new Site;
     $site->type = SiteType::Php;
     $site->runtime = 'php';
     $site->runtime_version = '8.4';
@@ -28,7 +28,7 @@ function poolSite(array $poolMeta = [], string $sshUser = 'dply'): array
 test('builds a dynamic pool with derived spare servers', function () {
     [$site, $server] = poolSite(['pm' => 'dynamic', 'max_children' => 20, 'max_requests' => 1000, 'request_terminate_timeout' => 90]);
 
-    $conf = (new SitePhpFpmPoolConfigBuilder())->build($site, $server);
+    $conf = (new SitePhpFpmPoolConfigBuilder)->build($site, $server);
 
     expect($conf)->toContain('[dply-example.com-01ktabc]');
     expect($conf)->toContain('user = dply');
@@ -48,7 +48,7 @@ test('builds a dynamic pool with derived spare servers', function () {
 test('pool logs the per-request reference for error correlation', function () {
     [$site, $server] = poolSite(['pm' => 'dynamic', 'max_children' => 20, 'max_requests' => 1000, 'request_terminate_timeout' => 90]);
 
-    $conf = (new SitePhpFpmPoolConfigBuilder())->build($site, $server);
+    $conf = (new SitePhpFpmPoolConfigBuilder)->build($site, $server);
 
     // The access log carries the REQUEST_ID (set by nginx fastcgi_param) plus an
     // epoch, so a 5xx reference code resolves to the exact request.
@@ -60,7 +60,7 @@ test('pool logs the per-request reference for error correlation', function () {
 test('static pool omits spare-server tuning', function () {
     [$site, $server] = poolSite(['pm' => 'static', 'max_children' => 8]);
 
-    $conf = (new SitePhpFpmPoolConfigBuilder())->build($site, $server);
+    $conf = (new SitePhpFpmPoolConfigBuilder)->build($site, $server);
 
     expect($conf)->toContain('pm = static');
     expect($conf)->toContain('pm.max_children = 8');
@@ -71,7 +71,7 @@ test('static pool omits spare-server tuning', function () {
 test('ondemand pool sets a process idle timeout', function () {
     [$site, $server] = poolSite(['pm' => 'ondemand', 'max_children' => 5]);
 
-    $conf = (new SitePhpFpmPoolConfigBuilder())->build($site, $server);
+    $conf = (new SitePhpFpmPoolConfigBuilder)->build($site, $server);
 
     expect($conf)->toContain('pm = ondemand');
     expect($conf)->toContain('pm.process_idle_timeout = 10s');

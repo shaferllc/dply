@@ -8,16 +8,16 @@ use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesServerLogExplorer;
 use App\Livewire\Servers\Concerns\ManagesServerLogShipping;
 use App\Livewire\Servers\Concerns\ManagesServerSystemLogs;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\Server;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Services\Servers\ServerSystemLogsReport;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
 #[Lazy]

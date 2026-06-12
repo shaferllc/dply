@@ -9,6 +9,7 @@ use App\Models\ServerCronJob;
 use App\Models\Site;
 use App\Models\SiteProcess;
 use App\Models\SupervisorProgram;
+use Illuminate\Support\Collection;
 
 /**
  * The daemon/worker counterpart to {@see SitePipelineAdvisor}. That advisor
@@ -143,8 +144,8 @@ final class SiteDaemonAdvisor
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, SupervisorProgram>  $programs
-     * @param  \Illuminate\Support\Collection<int, SiteProcess>  $processes
+     * @param  Collection<int, SupervisorProgram>  $programs
+     * @param  Collection<int, SiteProcess>  $processes
      */
     private static function schedulerCovered(Site $site, Server $server, $programs, $processes): bool
     {

@@ -2,6 +2,9 @@
 
 namespace App\Support;
 
+use App\Models\ErrorEvent;
+use App\Services\Notifications\ServerErrorsNotificationDispatcher;
+
 /**
  * Notification event keys for a single site's error stream, surfaced on the
  * /servers/{server}/sites/{site}/errors workspace. The `site.` prefix maps these
@@ -9,10 +12,10 @@ namespace App\Support;
  * they are listed under the "site_errors" category in config/notification_events.php.
  *
  * The site mirror of {@see ServerErrorsNotificationKeys}: the same two discrete
- * kinds (one notification per newly-captured {@see \App\Models\ErrorEvent} row),
+ * kinds (one notification per newly-captured {@see ErrorEvent} row),
  * but scoped to the owning site rather than the whole box. A site error appears
  * in both the site stream and the server roll-up; routing is deduped per channel
- * and per in-app recipient in {@see \App\Services\Notifications\ServerErrorsNotificationDispatcher}
+ * and per in-app recipient in {@see ServerErrorsNotificationDispatcher}
  * so a subscriber wired to both surfaces is still notified once.
  */
 final class SiteErrorsNotificationKeys

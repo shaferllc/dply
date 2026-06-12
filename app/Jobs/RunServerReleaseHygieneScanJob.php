@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Console\Commands\DispatchReleaseHygieneScansCommand;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
 use App\Services\Servers\ServerReleaseHygieneScanner;
@@ -21,7 +22,7 @@ use Illuminate\Support\LazyCollection;
  * snapshot, and fires transition-aware `server.release_hygiene.*` notifications via
  * {@see ServerReleaseHygieneScanner}.
  *
- * Dispatched daily from {@see \App\Console\Commands\DispatchReleaseHygieneScansCommand}
+ * Dispatched daily from {@see DispatchReleaseHygieneScansCommand}
  * for servers that have at least one active `server.release_hygiene.*` subscription —
  * servers without a subscriber are skipped so we never pay the SSH cost when nothing
  * is listening. Mirrors {@see RunServerSecurityDigestScanJob}.

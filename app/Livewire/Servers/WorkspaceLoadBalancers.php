@@ -11,6 +11,7 @@ use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesLoadBalancerNotifications;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\LoadBalancer;
 use App\Models\LoadBalancerService;
 use App\Models\LoadBalancerTarget;
@@ -19,31 +20,35 @@ use App\Services\HetznerService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Str;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 
 #[Lazy]
 class WorkspaceLoadBalancers extends Component
 {
-    use RendersWorkspacePlaceholder;
     use AuthorizesRequests;
     use ConfirmsActionWithModal;
     use CreatesNotificationChannelInline;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use ManagesLoadBalancerNotifications;
+    use RendersWorkspacePlaceholder;
 
     public Server $server;
 
     // ── Create form ───────────────────────────────────────────────────────────
     public string $lb_name = '';
+
     public string $lb_type = 'lb11';
+
     public string $lb_algorithm = 'round_robin';
+
     public string $lb_network_id = '';
+
     /** @var list<string> Server IDs to add as targets */
     public array $lb_target_server_ids = [];
+
     /** @var list<array{protocol:string,listen_port:string,destination_port:string}> */
     public array $lb_services = [
         ['protocol' => 'http', 'listen_port' => '80', 'destination_port' => '80'],
@@ -54,6 +59,7 @@ class WorkspaceLoadBalancers extends Component
 
     // ── Manage: add target ────────────────────────────────────────────────────
     public string $add_target_lb_id = '';
+
     public string $add_target_server_id = '';
 
     public function mount(Server $server): void

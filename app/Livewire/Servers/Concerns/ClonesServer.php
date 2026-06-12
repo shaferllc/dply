@@ -16,7 +16,7 @@ use Illuminate\Validation\ValidationException;
  * validate, dispatch, redirect) and the toast helpers from the workspace
  * concern (toastError / toastSuccess).
  *
- * @property \App\Models\Server $server
+ * @property Server $server
  */
 trait ClonesServer
 {

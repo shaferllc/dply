@@ -6,11 +6,13 @@ namespace App\Jobs;
 
 use App\Jobs\Concerns\WritesConsoleAction;
 use App\Jobs\Concerns\WritesPoolMemberEnv;
+use App\Models\Concerns\Site\DerivesWorkerEnvironment;
 use App\Models\Site;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
 use App\Services\Sites\SiteEnvPusher;
 use App\Services\Sites\SiteSystemdProvisioner;
+use App\Services\WorkerPools\WorkerWorkloadReplayer;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -24,14 +26,14 @@ use Illuminate\Support\Facades\Log;
 /**
  * Opt-in propagation of a site's .env to its worker-pool replicas.
  *
- * Worker-pool replicas (created by {@see \App\Services\WorkerPools\WorkerWorkloadReplayer})
+ * Worker-pool replicas (created by {@see WorkerWorkloadReplayer})
  * are full COPIES of the primary site's env at scale-up time, not derived
  * workers — so a later edit to the primary's variables never reaches them and
  * they silently drift. The Environment tab's "Sync to workers" action dispatches
  * this job to project the primary's variables onto every replica.
  *
  * Each replica keeps the small set of keys it legitimately owns differently —
- * its queue wiring ({@see \App\Models\Concerns\Site\DerivesWorkerEnvironment::WORKER_OVERRIDE_KEYS}),
+ * its queue wiring ({@see DerivesWorkerEnvironment::WORKER_OVERRIDE_KEYS}),
  * its `HORIZON_*` tuning (owned by {@see PushWorkerPoolHorizonConfigJob}), and
  * `DPLY_WORKER_ROLE=replica`. Everything else is overwritten/added from the
  * primary. Replica-only extra keys are left intact (additive merge, never a
@@ -155,7 +157,7 @@ class SyncWorkerPoolEnvJob implements ShouldBeUnique, ShouldQueue
 
     /**
      * Every replica site cloned from this primary, found by the marker
-     * {@see \App\Services\WorkerPools\WorkerWorkloadReplayer} writes into meta.
+     * {@see WorkerWorkloadReplayer} writes into meta.
      *
      * @return Collection<int, Site>
      */
@@ -169,7 +171,7 @@ class SyncWorkerPoolEnvJob implements ShouldBeUnique, ShouldQueue
 
     /**
      * A key the replica is allowed to keep its own value for: its queue wiring +
-     * APP_URL ({@see \App\Models\Concerns\Site\DerivesWorkerEnvironment::WORKER_OVERRIDE_KEYS}),
+     * APP_URL ({@see DerivesWorkerEnvironment::WORKER_OVERRIDE_KEYS}),
      * its HORIZON_* tuning, and the role marker the replayer flips to `replica`.
      */
     private function isReplicaOwnedKey(string $key): bool

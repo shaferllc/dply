@@ -6,14 +6,16 @@ namespace App\Actions\Realtime;
 
 use App\Jobs\ProvisionRealtimeAppJob;
 use App\Models\RealtimeApp;
+use App\Services\Billing\OrganizationBillingStateComputer;
+use App\Services\Billing\StripeSubscriptionSyncer;
 use InvalidArgumentException;
 
 /**
  * Changes a managed realtime app's connection tier. Persists the new tier +
  * connection cap, then re-publishes the credential record so the relay enforces
  * the new {@see RealtimeApp::maxConnections()} cap. Billing reconciles on its
- * own: the org's per-tier app counts feed {@see \App\Services\Billing\OrganizationBillingStateComputer},
- * and {@see \App\Services\Billing\StripeSubscriptionSyncer} moves the Stripe line
+ * own: the org's per-tier app counts feed {@see OrganizationBillingStateComputer},
+ * and {@see StripeSubscriptionSyncer} moves the Stripe line
  * to the new tier on the next sync.
  */
 class UpdateRealtimeApp

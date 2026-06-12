@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Debug;
 
+use App\Services\SshConnection;
 use DebugBar\DataCollector\Renderable;
 use DebugBar\DataCollector\TimeDataCollector;
 use Illuminate\Support\Str;
@@ -19,7 +20,7 @@ use Illuminate\Support\Str;
  * lives in the `server_remote_access_events` table.
  *
  * Reads from {@see SshCallRecorder} at collect() time, keeping
- * {@see \App\Services\SshConnection} free of any Debugbar dependency.
+ * {@see SshConnection} free of any Debugbar dependency.
  */
 final class SshCallsCollector extends TimeDataCollector implements Renderable
 {

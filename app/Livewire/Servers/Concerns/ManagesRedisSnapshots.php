@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Livewire\Servers\Concerns;
 
 use App\Jobs\ExportRedisSnapshotJob;
+use App\Livewire\Servers\WorkspaceSnapshots;
 use App\Models\BackupConfiguration;
 use App\Models\RedisSnapshot;
 use App\Models\RedisSnapshotSchedule;
+use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Models\ServerCronJob;
 use Illuminate\Support\Collection;
@@ -21,9 +23,9 @@ use Illuminate\Support\Collection;
  * and the {@see ExportRedisSnapshotJob} pipeline.
  *
  * Method names are prefixed `redis*` so they don't collide with the site-database
- * and server-image actions that live alongside them on {@see \App\Livewire\Servers\WorkspaceSnapshots}.
+ * and server-image actions that live alongside them on {@see WorkspaceSnapshots}.
  *
- * @property \App\Models\Server $server  Set in mount() by InteractsWithServerWorkspace.
+ * @property Server $server Set in mount() by InteractsWithServerWorkspace.
  */
 trait ManagesRedisSnapshots
 {

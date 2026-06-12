@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Servers;
 
+use App\Jobs\RunSupervisorOperationJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\EmitsPanelEvent;
 use App\Livewire\Servers\Concerns\ChecksSupervisorInstallStatus;
@@ -9,10 +10,12 @@ use App\Livewire\Servers\Concerns\GuardsDisruptiveActions;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesSupervisorPrograms;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Livewire\Servers\Concerns\RunsServerSupervisorHealthScan;
 use App\Models\OrganizationSupervisorProgramTemplate;
 use App\Models\Server;
 use App\Models\Site;
+use App\Models\SiteProcess;
 use App\Models\SupervisorProgram;
 use App\Models\SupervisorProgramAuditLog;
 use App\Services\Servers\ServerDaemonSloPanel;
@@ -22,33 +25,31 @@ use App\Services\Servers\SupervisorProvisioner;
 use App\Support\Servers\DaemonWorkspaceViewData;
 use App\Support\SupervisorEnvFormatter;
 use Illuminate\Contracts\View\View;
-use App\Jobs\RunSupervisorOperationJob;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
 #[Lazy]
 class WorkspaceDaemons extends Component
 {
-    use RendersWorkspacePlaceholder;
     use ChecksSupervisorInstallStatus;
     use ConfirmsActionWithModal;
     use EmitsPanelEvent;
-    use WithPagination;
     use GuardsDisruptiveActions;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use ManagesSupervisorPrograms;
+    use RendersWorkspacePlaceholder;
     use RunsServerSupervisorHealthScan;
+    use WithPagination;
 
     /** @var 'site'|'all' Only when {@see} is set. */
     public string $programs_list_scope = 'all';
@@ -290,15 +291,15 @@ class WorkspaceDaemons extends Component
     protected function dispatchDaemonOperation(string $operation): void
     {
         $this->authorize('update', $this->server);
-        $runId = (string) \Illuminate\Support\Str::ulid();
+        $runId = (string) Str::ulid();
         $this->daemon_op_run_id = $runId;
         $this->daemon_op_busy = true;
 
         $label = match ($operation) {
-            'sync'        => __('Syncing Supervisor config…'),
-            'install'     => __('Installing Supervisor…'),
+            'sync' => __('Syncing Supervisor config…'),
+            'install' => __('Installing Supervisor…'),
             'restart_all' => __('Restarting all programs…'),
-            default       => __('Running operation…'),
+            default => __('Running operation…'),
         };
         $this->emitPanelEvent($label, [], 'running');
 
@@ -315,14 +316,14 @@ class WorkspaceDaemons extends Component
 
             // Infer state so Start/Stop buttons can be shown contextually.
             match ($action) {
-                'start'      => $this->supervisor_service_state = 'active',
-                'stop'       => $this->supervisor_service_state = 'inactive',
-                'is-active'  => $this->supervisor_service_state = (str_contains(strtolower(trim($out)), 'active') && ! str_contains(strtolower(trim($out)), 'inactive')) ? 'active' : 'inactive',
-                'status'     => $this->supervisor_service_state = str_contains($out, 'Active: active') ? 'active' : (str_contains($out, 'Active: inactive') || str_contains($out, 'Active: failed') ? 'inactive' : $this->supervisor_service_state),
-                'enable'     => $this->supervisor_boot_state = 'enabled',
-                'disable'    => $this->supervisor_boot_state = 'disabled',
+                'start' => $this->supervisor_service_state = 'active',
+                'stop' => $this->supervisor_service_state = 'inactive',
+                'is-active' => $this->supervisor_service_state = (str_contains(strtolower(trim($out)), 'active') && ! str_contains(strtolower(trim($out)), 'inactive')) ? 'active' : 'inactive',
+                'status' => $this->supervisor_service_state = str_contains($out, 'Active: active') ? 'active' : (str_contains($out, 'Active: inactive') || str_contains($out, 'Active: failed') ? 'inactive' : $this->supervisor_service_state),
+                'enable' => $this->supervisor_boot_state = 'enabled',
+                'disable' => $this->supervisor_boot_state = 'disabled',
                 'is-enabled' => $this->supervisor_boot_state = str_contains(strtolower(trim($out)), 'enabled') ? 'enabled' : 'disabled',
-                default      => null,
+                default => null,
             };
 
             if (! $readOnly) {
@@ -1105,7 +1106,7 @@ class WorkspaceDaemons extends Component
         $systemdWorkers = Site::query()
             ->where('server_id', $this->server->id)
             ->when($this->context_site_id !== null, fn ($q) => $q->whereKey($this->context_site_id))
-            ->with(['processes' => fn ($q) => $q->where('is_active', true)->where('type', '!=', \App\Models\SiteProcess::TYPE_WEB)])
+            ->with(['processes' => fn ($q) => $q->where('is_active', true)->where('type', '!=', SiteProcess::TYPE_WEB)])
             ->orderBy('name')
             ->get(['id', 'name', 'slug', 'server_id'])
             ->flatMap(fn (Site $site) => $site->processes->map(fn ($p) => [

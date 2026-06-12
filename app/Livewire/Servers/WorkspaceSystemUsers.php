@@ -13,6 +13,7 @@ use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesSystemUserNotifications;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Livewire\Sites\Show;
 use App\Models\ConsoleAction;
 use App\Models\Server;
@@ -21,10 +22,9 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
 #[Lazy]

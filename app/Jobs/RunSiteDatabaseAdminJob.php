@@ -15,7 +15,6 @@ use App\Services\Servers\ServerDatabaseProvisioner;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Support\Str;
 
 /**
  * Queued database-admin operations for the site Database tab — extra-user

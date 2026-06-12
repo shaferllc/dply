@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Servers\Concerns;
 
+use App\Jobs\ExecuteSiteCertificateJob;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
@@ -16,7 +17,7 @@ use Illuminate\Support\Facades\Gate;
  * notification channels to this server's server.cert.* events without leaving the
  * page.
  *
- * Certificate events fire from {@see \App\Jobs\ExecuteSiteCertificateJob}, so this
+ * Certificate events fire from {@see ExecuteSiteCertificateJob}, so this
  * trait is subscription management only. Mirrors {@see ManagesPatchNotifications}.
  */
 trait ManagesCertInventoryNotifications

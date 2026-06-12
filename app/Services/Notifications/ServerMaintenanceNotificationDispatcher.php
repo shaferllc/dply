@@ -4,11 +4,12 @@ namespace App\Services\Notifications;
 
 use App\Models\Server;
 use App\Models\User;
+use App\Services\Servers\ServerMaintenanceWindow;
 use App\Support\ServerMaintenanceNotificationKeys;
 
 /**
  * Publishes notifications for server-scoped visitor maintenance windows
- * (enabled / ended / auto-ended), fired from {@see \App\Services\Servers\ServerMaintenanceWindow}.
+ * (enabled / ended / auto-ended), fired from {@see ServerMaintenanceWindow}.
  *
  * Mirrors {@see ServerCertInventoryNotificationDispatcher}. Subject is the {@see Server}
  * the window applies to; the per-kind title is pulled from the config label.

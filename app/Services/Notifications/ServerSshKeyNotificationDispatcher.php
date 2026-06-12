@@ -2,13 +2,14 @@
 
 namespace App\Services\Notifications;
 
+use App\Livewire\Servers\WorkspaceSshKeys;
 use App\Models\Server;
 use App\Models\User;
 use App\Support\ServerSshKeyNotificationKeys;
 
 /**
  * Publishes notifications for server-scoped authorized-key CRUD. Called from the
- * SSH-keys workspace ({@see \App\Livewire\Servers\WorkspaceSshKeys}) once a key row
+ * SSH-keys workspace ({@see WorkspaceSshKeys}) once a key row
  * is added or removed, so operators can be alerted when the authorized set changes.
  *
  * Mirrors {@see ServerSystemUserNotificationDispatcher}. Subject is the {@see Server}

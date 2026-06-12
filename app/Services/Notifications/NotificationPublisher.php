@@ -24,15 +24,15 @@ class NotificationPublisher
      *                                           fan-out for provision failure) and the subscription
      *                                           pipe would otherwise produce a duplicate message.
      * @param  list<string>  $excludeRecipientUserIds  User ULIDs to skip when fanning out the
-     *                                           in-app inbox. Use when the caller has already
-     *                                           delivered this event to those users via a sibling
-     *                                           publish (e.g. a site error's site-scoped dispatch
-     *                                           covers stakeholders the server roll-up would repeat).
+     *                                                 in-app inbox. Use when the caller has already
+     *                                                 delivered this event to those users via a sibling
+     *                                                 publish (e.g. a site error's site-scoped dispatch
+     *                                                 covers stakeholders the server roll-up would repeat).
      * @param  list<User|string>  $additionalRecipientUsers  Users always added to the in-app
-     *                                           recipient set (unioned on top of the resolved
-     *                                           stakeholders), e.g. the operator who triggered the
-     *                                           action — so they get the bell entry regardless of
-     *                                           subscription / stakeholder status.
+     *                                                       recipient set (unioned on top of the resolved
+     *                                                       stakeholders), e.g. the operator who triggered the
+     *                                                       action — so they get the bell entry regardless of
+     *                                                       subscription / stakeholder status.
      */
     public function publish(
         string $eventKey,

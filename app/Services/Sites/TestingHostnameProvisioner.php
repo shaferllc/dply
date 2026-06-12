@@ -10,6 +10,7 @@ use App\Services\Cloudflare\CloudflareDnsService;
 use App\Services\Deploy\DeploymentContractBuilder;
 use App\Services\Deploy\DeploymentRevisionTracker;
 use App\Services\DigitalOceanService;
+use App\Services\Sites\Dns\DnsProvider;
 use App\Services\Sites\Dns\SiteDnsProviderFactory;
 use App\Support\Preview\UnifiedPreviewHostname;
 use Illuminate\Support\Str;
@@ -517,7 +518,7 @@ class TestingHostnameProvisioner
      *
      * Throws when DO fallback is also unavailable.
      *
-     * @return array{provider: string, dns_provider: \App\Services\Sites\Dns\DnsProvider, pool: list<string>, credential: ?ProviderCredential}
+     * @return array{provider: string, dns_provider: DnsProvider, pool: list<string>, credential: ?ProviderCredential}
      */
     private function resolveTestingProviderForSite(Site $site): array
     {
@@ -651,7 +652,7 @@ class TestingHostnameProvisioner
      * Returns null when no app-level token is configured — in that case we
      * let the original exception propagate so the caller still surfaces it.
      */
-    private function fallbackDigitalOceanProvider(): ?\App\Services\Sites\Dns\DnsProvider
+    private function fallbackDigitalOceanProvider(): ?DnsProvider
     {
         $token = trim((string) config('services.digitalocean.token'));
         if ($token === '') {

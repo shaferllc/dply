@@ -14,11 +14,13 @@ use App\Livewire\Concerns\DismissesConsoleActionRun;
 use App\Livewire\Servers\Concerns\ClonesServer;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Livewire\Servers\Concerns\RunsServerInventoryProbe;
 use App\Livewire\Sites\Show;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerManageAction;
+use App\Models\ServerSystemdServiceState;
 use App\Modules\TaskRunner\ProcessOutput;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\MiseInstallScriptBuilder;
@@ -39,20 +41,19 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
-use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use Livewire\Attributes\Lazy;
+use Livewire\Component;
 
 #[Layout('layouts.app')]
 #[Lazy]
 class WorkspaceManage extends Component
 {
-    use RendersWorkspacePlaceholder;
     use ClonesServer;
     use ConfirmsActionWithModal;
     use DismissesConsoleActionRun;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use RendersWorkspacePlaceholder;
     use RunsServerInventoryProbe;
 
     /** @var string Manage sub-page slug (see config server_manage.workspace_tabs). */
@@ -1781,7 +1782,7 @@ BASH;
             // 'apt_update' has no service prerequisite — always available on Debian/Ubuntu.
         ];
 
-        $installedUnits = \App\Models\ServerSystemdServiceState::query()
+        $installedUnits = ServerSystemdServiceState::query()
             ->where('server_id', $this->server->id)
             ->where(function ($q) {
                 $q->whereNull('unit_file_state')

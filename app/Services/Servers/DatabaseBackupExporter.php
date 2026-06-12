@@ -10,6 +10,7 @@ use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseBackup;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Support\Servers\DatabaseBackupSettings;
+use Aws\S3\Exception\S3Exception;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Number;
 use Illuminate\Support\Str;
@@ -32,8 +33,8 @@ final class DatabaseBackupExporter
 
     /**
      * @param  ConsoleEmitter|null  $emit  optional progress sink for on-demand
-     *   runs; null (scheduled backups) becomes a no-op emitter so the phase
-     *   lines below cost nothing and never touch a console row.
+     *                                     runs; null (scheduled backups) becomes a no-op emitter so the phase
+     *                                     lines below cost nothing and never touch a console row.
      */
     public function export(ServerDatabaseBackup $backup, ?ConsoleEmitter $emit = null): void
     {
@@ -485,7 +486,7 @@ final class DatabaseBackupExporter
                     'GlacierJobParameters' => ['Tier' => $tier],
                 ],
             ]);
-        } catch (\Aws\S3\Exception\S3Exception $e) {
+        } catch (S3Exception $e) {
             if ($e->getAwsErrorCode() === 'RestoreAlreadyInProgress') {
                 throw new \RuntimeException(__('This backup is in cold storage and is already being restored. Check back shortly, then download again.'));
             }

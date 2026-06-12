@@ -9,16 +9,16 @@ use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\SurfacesErrorStream;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesErrorsNotifications;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\ErrorEvent;
 use App\Models\Server;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 use Livewire\WithPagination;
 
 /**
@@ -32,12 +32,12 @@ use Livewire\WithPagination;
 #[Lazy]
 class WorkspaceErrors extends Component
 {
-    use RendersWorkspacePlaceholder;
     use ConfirmsActionWithModal;
-    use InteractsWithServerWorkspace;
-    use SurfacesErrorStream;
     use CreatesNotificationChannelInline;
+    use InteractsWithServerWorkspace;
     use ManagesErrorsNotifications;
+    use RendersWorkspacePlaceholder;
+    use SurfacesErrorStream;
     use WithPagination;
 
     /** @var list<string> */

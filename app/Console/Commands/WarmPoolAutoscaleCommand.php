@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Actions\Servers\CreateWarmPoolMember;
+use App\Actions\Servers\DeleteServerAction;
+use App\Jobs\PersonalizeClaimedServerJob;
 use App\Models\Server;
 use App\Models\ServerPoolMember;
-use App\Modules\TaskRunner\Enums\TaskStatus;
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -136,7 +138,7 @@ class WarmPoolAutoscaleCommand extends Command
 
             $this->line("  [re-personalize] member {$member->id} (server {$server->id}) — setup not done after {$grace}s");
             if (! $dry) {
-                \App\Jobs\PersonalizeClaimedServerJob::dispatch($server->id, $member->id, $member->tier);
+                PersonalizeClaimedServerJob::dispatch($server->id, $member->id, $member->tier);
             }
         }
     }
@@ -210,7 +212,7 @@ class WarmPoolAutoscaleCommand extends Command
      * Retire ready members older than max_member_age_seconds so the next refill
      * replaces them with fresh (security-patched) ones. Capped per tick.
      *
-     * @param  \Illuminate\Database\Eloquent\Builder  $base
+     * @param  Builder  $base
      */
     private function retireStale($base, bool $dry): void
     {
@@ -243,7 +245,7 @@ class WarmPoolAutoscaleCommand extends Command
             // Reuse the real removal action so the provider resource is actually
             // destroyed (not just the DB row).
             try {
-                app(\App\Actions\Servers\DeleteServerAction::class)
+                app(DeleteServerAction::class)
                     ->execute($server, null, ['reason' => 'warm_pool_retire']);
             } catch (\Throwable $e) {
                 Log::error('warm_pool.retire.failed', ['member' => $member->id, 'message' => $e->getMessage()]);

@@ -105,7 +105,7 @@ class BackfillPrivateNetworksCommand extends Command
 
             $network = $recorder->record($server, $provider, $vpcId, $ipRange, $name);
             if ($network !== null) {
-                $this->line("  · $label → ".$network->name." [".$network->id."]");
+                $this->line("  · $label → ".$network->name.' ['.$network->id.']');
                 $recorded++;
             } else {
                 $skipped++;
@@ -118,7 +118,7 @@ class BackfillPrivateNetworksCommand extends Command
     }
 
     /**
-     * @return array{0: string, 1: string, 2: ?string, 3: ?string}|null  [provider, vpcId, ipRange, name]
+     * @return array{0: string, 1: string, 2: ?string, 3: ?string}|null [provider, vpcId, ipRange, name]
      */
     private function resolveDigitalOcean($credential, int $dropletId): ?array
     {

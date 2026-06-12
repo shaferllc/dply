@@ -23,8 +23,8 @@ class ExportSiteFileBackupJob implements ShouldQueue
 
     /**
      * @param  string|null  $seededConsoleRunId  a ConsoleAction the dispatcher
-     *   (an on-demand run) pre-seeded so progress streams into the Backups-tab
-     *   banner. Null for scheduled runs — they stay silent.
+     *                                           (an on-demand run) pre-seeded so progress streams into the Backups-tab
+     *                                           banner. Null for scheduled runs — they stay silent.
      */
     public function __construct(
         public string $backupId,

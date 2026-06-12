@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+use App\Services\Remediations\Actions\RebuildWebserverConfigAction;
 
 /*
 |--------------------------------------------------------------------------
@@ -144,7 +145,7 @@ BASH,
                 'label' => 'Rebuild webserver config (re-apply the nginx vhost)',
                 'recommended' => true,
                 'auto_safe' => true,
-                'handler' => \App\Services\Remediations\Actions\RebuildWebserverConfigAction::class,
+                'handler' => RebuildWebserverConfigAction::class,
             ],
         ],
     ],

@@ -2,6 +2,7 @@
 
 namespace App\Jobs\Middleware;
 
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 
 /**
@@ -19,7 +20,7 @@ use Illuminate\Queue\Middleware\WithoutOverlapping;
  *   - `retryUntil()`: bound how long a job waits for the SSH slot. Releases from
  *     this middleware count as attempts, so a plain `tries` would exhaust during
  *     contention; a time bound is the right shape.
- *   - If the job is also {@see \Illuminate\Contracts\Queue\ShouldBeUnique},
+ *   - If the job is also {@see ShouldBeUnique},
  *     keep `uniqueFor` larger than the retryUntil window so the uniqueness lock
  *     outlives a long wait for the SSH slot.
  *

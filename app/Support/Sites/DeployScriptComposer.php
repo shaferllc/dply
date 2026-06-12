@@ -38,7 +38,7 @@ class DeployScriptComposer
      * a later save can never relocate — a command that must run before a
      * builder step. See {@see typedCutoff()} for the boundary.
      *
-     * @return array<string, string>  phase => script text
+     * @return array<string, string> phase => script text
      */
     public function render(Site $site): array
     {
@@ -70,7 +70,7 @@ class DeployScriptComposer
      * authored, e.g. a pre-migrate backup). Returned in true execution order.
      * Normally empty for purely text-authored pipelines.
      *
-     * @return array<string, list<SiteDeployStep>>  phase => locked steps
+     * @return array<string, list<SiteDeployStep>> phase => locked steps
      */
     public function lockedSteps(Site $site): array
     {
@@ -113,7 +113,7 @@ class DeployScriptComposer
      * from RuntimeAwareDeployStepDefaults so presets never drift from what the
      * structured pipeline would have run.
      *
-     * @return array<string, string>  phase => script text
+     * @return array<string, string> phase => script text
      */
     public function preset(string $runtime, ?string $framework = null): array
     {

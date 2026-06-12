@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Sites\Concerns;
 
+use App\Jobs\RunSiteUptimeMonitorCheckJob;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\Site;
@@ -16,7 +17,7 @@ use Illuminate\Support\Facades\Gate;
  * to this site's site.uptime.* / site.ssl.expiring events without leaving the
  * page. The uptime mirror of {@see ManagesErrorsNotifications}.
  *
- * Uptime events fire from {@see \App\Jobs\RunSiteUptimeMonitorCheckJob} at the
+ * Uptime events fire from {@see RunSiteUptimeMonitorCheckJob} at the
  * state edge (down/recovered/degraded/ssl-expiring); in-app delivery to org
  * members happens regardless of any subscription, so this card only governs the
  * external channels (email / Slack / webhook…).

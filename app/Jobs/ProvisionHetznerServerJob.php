@@ -6,6 +6,7 @@ use App\Actions\Servers\ApplyFakeCloudProvisionAsReady;
 use App\Models\Server;
 use App\Services\HetznerService;
 use App\Services\Servers\ServerProvisionSshKeyMaterial;
+use App\Support\Servers\BootHeadStartScript;
 use App\Support\Servers\FakeCloudProvision;
 use App\Support\Servers\HetznerCloudFirewallRules;
 use App\Support\Servers\ServerHostingPlatformContext;
@@ -124,8 +125,8 @@ class ProvisionHetznerServerJob implements ShouldQueue
                 image: $image,
                 sshKeyIds: [$sshKeyId],
                 // Boot head-start (apt warmup at boot) when enabled; '' when off.
-                userData: \App\Support\Servers\BootHeadStartScript::enabled()
-                    ? \App\Support\Servers\BootHeadStartScript::cloudInitUserData()
+                userData: BootHeadStartScript::enabled()
+                    ? BootHeadStartScript::cloudInitUserData()
                     : '',
                 firewallIds: $firewallId !== null ? [$firewallId] : [],
                 networkId: $networkId,

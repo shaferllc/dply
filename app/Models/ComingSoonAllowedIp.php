@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Http\Middleware\RedirectGuestsToComingSoon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 
 /**
  * An IP / CIDR allowed to see the full site while the coming-soon gate is on
- * (see {@see \App\Http\Middleware\RedirectGuestsToComingSoon}). The effective
+ * (see {@see RedirectGuestsToComingSoon}). The effective
  * allow-list is the union of these rows and the COMING_SOON_ALLOWED_IPS env
  * entries — cached, since the gate runs on every request.
  */

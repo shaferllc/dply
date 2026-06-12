@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * A warm server pool member — a pre-provisioned spare kept ready in a
@@ -22,9 +23,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $stack_signature
  * @property string|null $server_id
  * @property string $status
- * @property \Illuminate\Support\Carbon|null $health_checked_at
+ * @property Carbon|null $health_checked_at
  * @property string|null $claimed_org_id
- * @property \Illuminate\Support\Carbon|null $claimed_at
+ * @property Carbon|null $claimed_at
  * @property array|null $meta
  */
 class ServerPoolMember extends Model
@@ -97,4 +98,3 @@ class ServerPoolMember extends Model
         return implode('|', $parts);
     }
 }
-

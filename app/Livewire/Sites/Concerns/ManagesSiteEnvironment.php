@@ -20,7 +20,9 @@ use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
 use App\Services\Sites\SecretEscalator;
 use App\Services\Sites\SiteEnvPushScheduler;
+use App\Support\Sites\EnvImportSources;
 use App\Support\Sites\SiteFixers;
+use Illuminate\Support\Str;
 use Livewire\Component;
 
 /**
@@ -419,7 +421,7 @@ trait ManagesSiteEnvironment
         $incoming = $parser->parse((string) $source->env_file_content);
         $vars = $verbatim
             ? $incoming['variables']
-            : \App\Support\Sites\EnvImportSources::sanitize($incoming['variables']);
+            : EnvImportSources::sanitize($incoming['variables']);
 
         $existing = $parser->parse((string) ($this->site->env_file_content ?? ''));
         $merged = array_merge($vars, $existing['variables']);
@@ -493,7 +495,7 @@ trait ManagesSiteEnvironment
         }
 
         $parser = app(DotEnvFileParser::class);
-        $groups = \App\Support\Sites\EnvImportSources::candidatesFor($this->site);
+        $groups = EnvImportSources::candidatesFor($this->site);
         $all = collect($groups['workers'])->merge($groups['same_repo'])->merge($groups['org'])
             ->unique('id')->values();
 
@@ -504,7 +506,7 @@ trait ManagesSiteEnvironment
                 return null;
             }
 
-            return $c + ['masked' => \App\Support\Sites\EnvImportSources::isSecretKey($key) ? str_repeat('•', 6) : \Illuminate\Support\Str::limit($val, 40)];
+            return $c + ['masked' => EnvImportSources::isSecretKey($key) ? str_repeat('•', 6) : Str::limit($val, 40)];
         })->filter()->values()->all();
     }
 
@@ -535,7 +537,7 @@ trait ManagesSiteEnvironment
      */
     public function envImportCandidates(): array
     {
-        return \App\Support\Sites\EnvImportSources::candidatesFor($this->site);
+        return EnvImportSources::candidatesFor($this->site);
     }
 
     /**

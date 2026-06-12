@@ -28,17 +28,11 @@ class NgxParserException extends \Exception
         return sprintf('%s in %s', $this->message, $this->filename);
     }
 
-    /**
-     * @return string
-     */
     public function getFilename(): string
     {
         return $this->filename;
     }
 
-    /**
-     * @return int|null
-     */
     public function getLineNo(): ?int
     {
         return $this->lineNo;

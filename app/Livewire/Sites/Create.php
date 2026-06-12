@@ -24,6 +24,7 @@ use App\Services\Deploy\ServerlessTargetCapabilityResolver;
 use App\Services\Deploy\SiteDeployPipelineManager;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Sites\InternalPortAllocator;
+use App\Services\Sites\SiteFoundationProvisioner;
 use App\Services\Sites\SiteProvisioner;
 use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
@@ -1400,7 +1401,7 @@ class Create extends Component
         // Provision the foundation now (live PHP default-page site) so services
         // can be configured against a real site before any repo is connected,
         // then land in the workspace — not the forced app picker.
-        app(\App\Services\Sites\SiteFoundationProvisioner::class)->provision($site, 'php');
+        app(SiteFoundationProvisioner::class)->provision($site, 'php');
 
         return $this->redirect(route('sites.show', [
             'server' => $this->server,

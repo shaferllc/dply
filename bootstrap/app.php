@@ -14,6 +14,7 @@ use App\Http\Middleware\SetCurrentOrganization;
 use App\Http\Middleware\ValidateFleetOperatorToken;
 use App\Http\Middleware\ValidateMetricsIngestToken;
 use App\Support\DplyRuntime;
+use App\Support\MachineCallbackPaths;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -62,7 +63,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // health route in that list is a harmless extra here (GETs aren't CSRF
         // checked); webauthn is CSRF-specific so it's appended separately.
         $middleware->preventRequestForgery(except: array_merge(
-            \App\Support\MachineCallbackPaths::PATTERNS,
+            MachineCallbackPaths::PATTERNS,
             [
                 // Passkey ceremony endpoints (cross-origin, token-auth'd).
                 'webauthn/*',

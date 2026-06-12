@@ -283,7 +283,7 @@ class FixSiteBindingConnectivityJob implements ShouldQueue
     /**
      * Enable remote access on the backend resource + open the firewall /32.
      *
-     * @return array{0: int, 1: string}  [port, human label]
+     * @return array{0: int, 1: string} [port, human label]
      */
     private function exposeBackend(
         ServerDatabase|ServerCacheService $target,

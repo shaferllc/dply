@@ -6,6 +6,7 @@ use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
 use App\Services\Notifications\AssignableNotificationChannels;
+use App\Support\Errors\ErrorEventSyncer;
 use App\Support\ServerErrorsNotificationKeys;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -15,7 +16,7 @@ use Illuminate\Support\Facades\Gate;
  * Powers the "Notifications" sub-tab on the errors workspace: binds notification
  * channels to this server's server.errors.* events without leaving the page.
  *
- * Error events fire per newly-captured row from {@see \App\Support\Errors\ErrorEventSyncer}
+ * Error events fire per newly-captured row from {@see ErrorEventSyncer}
  * (the per-minute sweep), so this trait is subscription management only. Mirrors
  * {@see ManagesHealthNotifications}.
  */

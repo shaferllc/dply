@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\SiteSecretResidency;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -9,7 +10,7 @@ use Illuminate\Support\Facades\Schema;
 /**
  * A customer's OWN secret store (HashiCorp Vault / AWS Secrets Manager /
  * Doppler) that dply references but never copies values out of. A
- * {@see \App\Models\SiteSecretResidency} in external mode points at one of these
+ * {@see SiteSecretResidency} in external mode points at one of these
  * via store_id + a reference string; the value is fetched at deploy time.
  *
  *   resolution = dply  → dply fetches the value at push (it transiently sees it).

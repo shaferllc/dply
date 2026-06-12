@@ -67,29 +67,28 @@ class Parser
 
     public function __construct(?Lexer $lexer = null, ?Analyzer $analyzer = null)
     {
-        $this->analyzer = $analyzer ?? new Analyzer();
-        $this->lexer = $lexer ?? new Lexer();
+        $this->analyzer = $analyzer ?? new Analyzer;
+        $this->lexer = $lexer ?? new Lexer;
     }
 
     /**
      * Parses an nginx config file and returns a nested dict payload.
      *
-     * @param string $filename contianing the name of the config file to parse
-     * @param array  $options  = [
-     *                         'onError' => null,
-     *                         'catchErrors' => true,
-     *                         'ignore' => [],
-     *                         'singleFile' => false,
-     *                         'comments' => false,
-     *                         'strict' => false,
-     *                         'combine' => false,
-     *                         'checkCtx' => true,
-     *                         'checkArgs' => true,
-     *                         ] Parser options
+     * @param  string  $filename  contianing the name of the config file to parse
+     * @param  array  $options  = [
+     *                          'onError' => null,
+     *                          'catchErrors' => true,
+     *                          'ignore' => [],
+     *                          'singleFile' => false,
+     *                          'comments' => false,
+     *                          'strict' => false,
+     *                          'combine' => false,
+     *                          'checkCtx' => true,
+     *                          'checkArgs' => true,
+     *                          ] Parser options
+     * @return array a payload that describes the parsed nginx config
      *
      * @throws NgxParserException
-     *
-     * @return array a payload that describes the parsed nginx config
      */
     public function parse(
         string $filename,
@@ -158,7 +157,7 @@ class Parser
          */
         $prepareIfArgs = static function (array &$stmt) {
             if (
-                !empty($stmt['args'])
+                ! empty($stmt['args'])
                 && ($lastKey = array_key_last($stmt['args'])) !== null
                 && str_starts_with($stmt['args'][0], '(')
                 && str_ends_with($stmt['args'][$lastKey], ')')
@@ -187,14 +186,14 @@ class Parser
                 $commentsInArgs = [];
 
                 // we are parsing a block, so break if it's closing
-                if ($token === '}' && !$quoted) {
+                if ($token === '}' && ! $quoted) {
                     break;
                 }
 
                 // if we are consuming, then just continue until end of context
                 if ($consume) {
                     // if we find a block inside this context, consume it too
-                    if ($token === '{' && !$quoted) {
+                    if ($token === '{' && ! $quoted) {
                         $tokens->next();
                         $parse($parsing, $tokens, [], true);
                     }
@@ -221,7 +220,7 @@ class Parser
                 }
 
                 // if token is comment
-                if (!$quoted && str_starts_with($directive, '#')) {
+                if (! $quoted && str_starts_with($directive, '#')) {
                     if ($comments) {
                         $stmt['directive'] = '#';
                         $stmt['comment'] = mb_substr($token, 1);
@@ -235,8 +234,8 @@ class Parser
                 $tokens->next();
                 [$token, , $quoted] = $tokens->current(); // disregard line numbers of args
                 $chars = ['{', ';', '}'];
-                while (!\in_array($token, $chars, true) || $quoted) {
-                    if (!$quoted && str_starts_with($token, '#')) {
+                while (! \in_array($token, $chars, true) || $quoted) {
+                    if (! $quoted && str_starts_with($token, '#')) {
                         $commentsInArgs[] = mb_substr($token, 1);
                     } else {
                         $stmt['args'][] = $token;
@@ -249,7 +248,7 @@ class Parser
                 // consume the directive if it is ignored and move on
                 if (\in_array($stmt['directive'], $ignore, true)) {
                     // if this directive was a block consume it too
-                    if ($token === '{' && !$quoted) {
+                    if ($token === '{' && ! $quoted) {
                         $tokens->next();
                         $parse($parsing, $tokens, [], true);
                     }
@@ -281,7 +280,7 @@ class Parser
 
                         // if it was a block but shouldn't have been then consume
                         if (str_ends_with($e->getMessage(), ' is not terminated by ";"')) {
-                            if ($token !== '}' && !$quoted) {
+                            if ($token !== '}' && ! $quoted) {
                                 $tokens->next();
                                 $parse($parsing, $tokens, [], true);
                             } else {
@@ -297,10 +296,10 @@ class Parser
                 }
 
                 // add "includes" to the payload if this is an include statement
-                if (!$single && $stmt['directive'] === 'include') {
+                if (! $single && $stmt['directive'] === 'include') {
                     $pattern = $stmt['args'][0];
-                    if (!FileUtil::isAbsolute($stmt['args'][0])) {
-                        $pattern = $configDir . \DIRECTORY_SEPARATOR . $stmt['args'][0];
+                    if (! FileUtil::isAbsolute($stmt['args'][0])) {
+                        $pattern = $configDir.\DIRECTORY_SEPARATOR.$stmt['args'][0];
                     }
 
                     $stmt['includes'] = [];
@@ -326,7 +325,7 @@ class Parser
 
                     foreach ($fnames as $fname) {
                         // the included set keeps files from being parsed twice
-                        if (!isset($included[$fname])) {
+                        if (! isset($included[$fname])) {
                             $included[$fname] = \count($includes);
                             $includes[] = [$fname, $ctx];
                         }
@@ -336,7 +335,7 @@ class Parser
                 }
 
                 // if this statement terminated with '{' then it is a block
-                if ($token === '{' && !$quoted) {
+                if ($token === '{' && ! $quoted) {
                     $inner = $analyzer->enterBlockCtx($stmt, $ctx);  // get context for block
                     $tokens->next();
                     $stmt['block'] = $parse($parsing, $tokens, $inner);
@@ -388,8 +387,7 @@ class Parser
     /**
      * Combines config files into one by using include directives.
      *
-     * @param array $oldPayload payload that's normally returned by parse()
-     *
+     * @param  array  $oldPayload  payload that's normally returned by parse()
      * @return array the new combined payload
      */
     private function combineParsedConfigs(array $oldPayload): array
@@ -442,11 +440,11 @@ class Parser
 
     private function validateOptions(array $options): void
     {
-        if ($options[self::OPTION_ON_ERROR] !== null && !\is_callable(self::OPTION_ON_ERROR)) {
+        if ($options[self::OPTION_ON_ERROR] !== null && ! \is_callable(self::OPTION_ON_ERROR)) {
             throw new \InvalidArgumentException(sprintf('Parser option %s must be null or callable.', self::OPTION_ON_ERROR));
         }
 
-        if (!\is_array($options[self::OPTION_IGNORE])) {
+        if (! \is_array($options[self::OPTION_IGNORE])) {
             throw new \InvalidArgumentException(sprintf('Parser option %s must be array.', self::OPTION_IGNORE));
         }
 
@@ -459,7 +457,7 @@ class Parser
             self::OPTION_CHECK_CTX,
             self::OPTION_CHECK_ARGS,
         ] as $boolOption) {
-            if (!\is_bool($options[$boolOption])) {
+            if (! \is_bool($options[$boolOption])) {
                 throw new \InvalidArgumentException(sprintf('Parser option %s must be boolean.', $boolOption));
             }
         }

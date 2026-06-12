@@ -13,6 +13,7 @@ use App\Livewire\Concerns\SurfacesBindingConsumers;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesNetworkingNotifications;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\Server;
 use App\Models\ServerCacheService;
 use App\Models\ServerDatabase;
@@ -25,11 +26,10 @@ use App\Support\Servers\CacheServiceNetworkExposure;
 use App\Support\Servers\DatabaseEngineInstallScripts;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 
 /**
  * Server-level networking workspace: one place to see and manage every
@@ -43,13 +43,13 @@ use Livewire\Attributes\Lazy;
 #[Lazy]
 class WorkspaceNetworking extends Component
 {
-    use RendersWorkspacePlaceholder;
     use AuthorizesRequests;
     use ConfirmsActionWithModal;
     use CreatesNotificationChannelInline;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use ManagesNetworkingNotifications;
+    use RendersWorkspacePlaceholder;
     use SurfacesBindingConsumers;
 
     public Server $server;
@@ -617,23 +617,27 @@ class WorkspaceNetworking extends Component
 
         if (! $this->isValidRemoteCidr($destination)) {
             $this->addError('route_destination', __('Enter a valid CIDR (e.g. 192.168.1.0/24).'));
+
             return;
         }
 
         if (! filter_var($gateway, FILTER_VALIDATE_IP)) {
             $this->addError('route_gateway', __('Enter a valid IP address for the gateway.'));
+
             return;
         }
 
         $networkId = (int) ($this->server->hetzner_network_id ?? 0);
         if ($networkId === 0) {
             $this->toastError(__('This server is not attached to a Hetzner private network.'));
+
             return;
         }
 
         $credential = $this->server->providerCredential;
         if (! $credential) {
             $this->toastError(__('No Hetzner credential found.'));
+
             return;
         }
 

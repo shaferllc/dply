@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Jobs\CreateServerImageJob;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -11,7 +12,7 @@ use Illuminate\Support\Facades\Schema;
  * the "Server images" surface of the unified Snapshots workspace. Semantically
  * distinct from server_database_backups (logical SQL dumps) and redis_snapshots
  * (RDB files): this row tracks a provider-side image and its create→poll
- * lifecycle. See {@see App\Jobs\CreateServerImageJob}.
+ * lifecycle. See {@see CreateServerImageJob}.
  */
 return new class extends Migration
 {

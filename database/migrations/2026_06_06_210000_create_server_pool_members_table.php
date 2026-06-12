@@ -2,13 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Models\Server;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
  * Warm server pool members. A member is a pre-provisioned spare (a real
- * {@see \App\Models\Server} owned by the system pool org) kept ready in a
+ * {@see Server} owned by the system pool org) kept ready in a
  * provider×region×size×tier bucket, so a create can claim + personalize it
  * instead of cold-provisioning. See docs / the warm-pool plan.
  */

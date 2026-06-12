@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\SiteCronDaemonsRoutesTest;
 
-use App\Livewire\Servers\WorkspaceCron;
 use App\Livewire\Servers\WorkspaceDaemons;
 use App\Models\Organization;
 use App\Models\Server;

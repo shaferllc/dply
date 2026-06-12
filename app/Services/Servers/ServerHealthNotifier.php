@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
+use App\Jobs\CheckServerHealthJob;
 use App\Models\Server;
 use App\Models\User;
 use App\Services\Notifications\ServerHealthNotificationDispatcher;
@@ -17,7 +18,7 @@ use App\Support\ServerHealthNotificationKeys;
  *
  * The cockpit is a pure DB rollup (guest metrics, releases, deploys, certs,
  * daemons) — no SSH — so this is cheap to run on the fleet health cadence. Hooked
- * into {@see \App\Jobs\CheckServerHealthJob}. Mirrors the notify half of
+ * into {@see CheckServerHealthJob}. Mirrors the notify half of
  * {@see ServerSecurityDigestScanner}.
  */
 final class ServerHealthNotifier

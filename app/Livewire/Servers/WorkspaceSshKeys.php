@@ -10,13 +10,14 @@ use App\Livewire\Concerns\EmitsPanelEvent;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesSshKeyNotifications;
-use App\Services\Notifications\ServerSshKeyNotificationDispatcher;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\OrganizationSshKey;
 use App\Models\Server;
 use App\Models\ServerAuthorizedKey;
 use App\Models\ServerSshKeyAuditEvent;
 use App\Models\TeamSshKey;
 use App\Models\UserSshKey;
+use App\Services\Notifications\ServerSshKeyNotificationDispatcher;
 use App\Services\Servers\OrganizationTeamSshKeyServerDeployer;
 use App\Services\Servers\ServerAuthorizedKeysAuditLogger;
 use App\Services\Servers\ServerPasswdUserLister;
@@ -33,22 +34,21 @@ use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
 #[Lazy]
 class WorkspaceSshKeys extends Component
 {
-    use RendersWorkspacePlaceholder;
     use ConfirmsActionWithModal;
     use CreatesNotificationChannelInline;
     use EmitsPanelEvent;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use ManagesSshKeyNotifications;
+    use RendersWorkspacePlaceholder;
 
     /** @var 'keys'|'preview'|'advanced'|'activity'|'notifications' */
     public string $ssh_workspace_tab = 'keys';

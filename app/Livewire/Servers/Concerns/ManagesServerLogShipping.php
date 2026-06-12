@@ -6,6 +6,7 @@ namespace App\Livewire\Servers\Concerns;
 
 use App\Jobs\InstallLogAgentJob;
 use App\Jobs\UninstallLogAgentJob;
+use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\ServerLogAgent;
 
 /**
@@ -15,7 +16,7 @@ use App\Models\ServerLogAgent;
  * ({@see ManagesServerSystemLogs}) is separate; this is the persistent,
  * ClickHouse-backed shipping pipeline. See docs/SERVER_LOGS_ADDON.md.
  *
- * Requires the host component to also use {@see \App\Livewire\Concerns\DispatchesToastNotifications}
+ * Requires the host component to also use {@see DispatchesToastNotifications}
  * and {@see InteractsWithServerWorkspace} (provides $server + authorize()).
  */
 trait ManagesServerLogShipping

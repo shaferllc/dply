@@ -96,7 +96,7 @@ final class SiteEnvWriteGuard
      * still applies in those cases.
      *
      * @throws \RuntimeException if the app fails to boot/build config with the
-     *   candidate env (the captured artisan output is included).
+     *                           candidate env (the captured artisan output is included).
      */
     public function assertBootsOnServer(SshConnection $ssh, string $activeDir, string $stagedTmpPath): void
     {

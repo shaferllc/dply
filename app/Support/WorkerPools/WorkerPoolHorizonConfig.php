@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\WorkerPools;
 
+use App\Jobs\PushWorkerPoolHorizonConfigJob;
 use App\Models\WorkerPool;
 
 /**
@@ -13,7 +14,7 @@ use App\Models\WorkerPool;
  * the primary server's spec so a fresh pool is configured without user input.
  *
  * {@see config/horizon.php} reads the projected HORIZON_* env vars, and
- * {@see \App\Jobs\PushWorkerPoolHorizonConfigJob} writes them to each box.
+ * {@see PushWorkerPoolHorizonConfigJob} writes them to each box.
  */
 final class WorkerPoolHorizonConfig
 {

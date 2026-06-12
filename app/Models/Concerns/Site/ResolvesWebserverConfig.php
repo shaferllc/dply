@@ -10,6 +10,7 @@ use App\Jobs\ScanSiteEnvRequirementsJob;
 use App\Models\Server;
 use App\Services\Sites\SitePhpFpmPoolConfigBuilder;
 use App\Support\Servers\InstalledStack;
+use App\Support\Sites\SiteManagedErrorPageSupport;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -539,7 +540,7 @@ trait ResolvesWebserverConfig
 
     /**
      * Per-pool FPM access log. Its format carries the per-request reference id
-     * ({@see \App\Support\Sites\SiteManagedErrorPageSupport::REFERENCE_HEADER}),
+     * ({@see SiteManagedErrorPageSupport::REFERENCE_HEADER}),
      * so a 5xx reference resolves to the request's timestamp + URI here, which is
      * then time-correlated against {@see self::laravelLogPath()} for the trace.
      */

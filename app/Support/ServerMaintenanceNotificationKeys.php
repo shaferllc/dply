@@ -2,13 +2,15 @@
 
 namespace App\Support;
 
+use App\Services\Servers\ServerMaintenanceWindow;
+
 /**
  * Notification event keys for server-scoped visitor maintenance windows, surfaced
  * on the /servers/{server}/maintenance workspace. The `server.` prefix maps these
  * to the Server subscribable in {@see NotificationSubscriptionRules::subscribableClassForEvent};
  * they are listed under the "maintenance" category in config/notification_events.php.
  *
- * Fired from {@see \App\Services\Servers\ServerMaintenanceWindow} when a window is
+ * Fired from {@see ServerMaintenanceWindow} when a window is
  * enabled, ended manually, or auto-ended after its scheduled `until`. Mirrors
  * {@see ServerCertInventoryNotificationKeys}.
  */

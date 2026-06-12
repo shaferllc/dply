@@ -2,6 +2,8 @@
 
 namespace App\Services\Notifications;
 
+use App\Jobs\ApplyFirewallJob;
+use App\Livewire\Servers\WorkspaceFirewall;
 use App\Models\Server;
 use App\Models\User;
 use App\Support\ServerFirewallNotificationKeys;
@@ -9,7 +11,7 @@ use App\Support\ServerFirewallNotificationKeys;
 /**
  * Publishes notifications for server-scoped firewall changes (rule create/update/
  * delete and host apply), fired from the firewall workspace
- * ({@see \App\Livewire\Servers\WorkspaceFirewall}) and {@see \App\Jobs\ApplyFirewallJob}.
+ * ({@see WorkspaceFirewall}) and {@see ApplyFirewallJob}.
  *
  * Mirrors {@see ServerNetworkingNotificationDispatcher}. Subject is the {@see Server};
  * the per-kind title is pulled from the config label so it stays in sync with the

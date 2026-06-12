@@ -4,17 +4,21 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Concerns;
 
+use App\Actions\Sites\ScheduleSiteDeploy;
+use App\Jobs\PushSiteEnvJob;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
-use App\Actions\Sites\ScheduleSiteDeploy;
 use App\Models\ScheduledDeploy;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Models\SiteRelease;
+use App\Services\Deploy\DockerImageReleaseRollback;
+use App\Services\Sites\SecretResidencyResolver;
 use App\Services\Sites\SiteDeploySyncCoordinator;
 use App\Services\Sites\SiteReleaseRollback;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Component;
 
@@ -37,7 +41,7 @@ trait ManagesSiteDeployExecution
 
         // A site whose escrowed secrets sit under a CUSTOMER-held org key can't be
         // resolved by dply alone — prompt for the identity instead of deploying.
-        if (app(\App\Services\Sites\SecretResidencyResolver::class)->requiresEphemeralIdentity($this->site)) {
+        if (app(SecretResidencyResolver::class)->requiresEphemeralIdentity($this->site)) {
             $this->dispatch('open-modal', 'supply-deploy-identity');
 
             return;
@@ -64,7 +68,7 @@ trait ManagesSiteDeployExecution
 
         $token = bin2hex(random_bytes(16));
         Cache::put(
-            \App\Jobs\PushSiteEnvJob::EPHEMERAL_IDENTITY_CACHE_PREFIX.$token,
+            PushSiteEnvJob::EPHEMERAL_IDENTITY_CACHE_PREFIX.$token,
             $identity,
             now()->addMinutes(10),
         );
@@ -204,7 +208,7 @@ trait ManagesSiteDeployExecution
         }
 
         $lock = $this->deployLockInfo;
-        $startedAt = isset($lock['started_at']) ? \Illuminate\Support\Carbon::parse($lock['started_at']) : null;
+        $startedAt = isset($lock['started_at']) ? Carbon::parse($lock['started_at']) : null;
         if ($startedAt === null) {
             return false;
         }
@@ -315,7 +319,7 @@ trait ManagesSiteDeployExecution
             // Image-method (VM Docker) sites roll back by re-running the prior
             // tagged image, not by flipping the atomic `current` symlink.
             if ($this->site->usesVmDockerRuntime()) {
-                app(\App\Services\Deploy\DockerImageReleaseRollback::class)->rollbackTo($this->site, $release);
+                app(DockerImageReleaseRollback::class)->rollbackTo($this->site, $release);
                 $this->site->refresh();
                 $this->toastSuccess(__('Rolled back to the previous container image.'));
 

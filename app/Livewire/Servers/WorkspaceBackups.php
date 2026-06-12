@@ -14,6 +14,7 @@ use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesBackupDestinationModal;
 use App\Livewire\Servers\Concerns\ManagesBackupNotifications;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Livewire\Servers\Concerns\RunsServerConsoleActions;
 use App\Models\BackupConfiguration;
 use App\Models\ConsoleAction;
@@ -27,19 +28,22 @@ use App\Models\SiteBinding;
 use App\Models\SiteFileBackup;
 use App\Notifications\BackupFailureNotification;
 use App\Services\Servers\DatabaseBackupExporter;
+use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Services\Servers\ServerRemovalAdvisor;
+use App\Services\Servers\SiteFileBackupExporter;
 use App\Support\Servers\DatabaseBackupSettings;
+use App\Support\Servers\ServerDatabaseHostCapabilities;
 use Cron\CronExpression;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 
 /**
  * Backups workspace at {@see servers.backups} (server-wide) and {@see sites.backups}
@@ -54,7 +58,6 @@ use Livewire\Attributes\Lazy;
 #[Lazy]
 class WorkspaceBackups extends Component
 {
-    use RendersWorkspacePlaceholder;
     use ConfirmsActionWithModal;
     use CreatesNotificationChannelInline;
     use DismissesServerConsoleActionRun;
@@ -63,6 +66,7 @@ class WorkspaceBackups extends Component
     use ManagesBackupDestinationModal;
     use ManagesBackupNotifications;
     use QueuesQuickDownloads;
+    use RendersWorkspacePlaceholder;
     use RequiresFeature;
     use RunsServerConsoleActions;
     use StagesBackupDownloads;
@@ -642,8 +646,8 @@ class WorkspaceBackups extends Component
      * throws into the render path — engine probe failures degrade to an empty list.
      */
     public function detectLiveDatabases(
-        \App\Support\Servers\ServerDatabaseHostCapabilities $capabilities,
-        \App\Services\Servers\ServerDatabaseProvisioner $provisioner,
+        ServerDatabaseHostCapabilities $capabilities,
+        ServerDatabaseProvisioner $provisioner,
     ): void {
         $this->liveDbDetected = true;
 
@@ -684,7 +688,7 @@ class WorkspaceBackups extends Component
      * backups allow remote-attached databases (their dump runs on the home
      * server); site-file backups are scoped to this server's sites.
      */
-    protected function resolveDownloadableBackup(string $type, string $backupId): ?\Illuminate\Database\Eloquent\Model
+    protected function resolveDownloadableBackup(string $type, string $backupId): ?Model
     {
         $this->authorize('update', $this->server);
 
@@ -1056,7 +1060,7 @@ class WorkspaceBackups extends Component
             return;
         }
 
-        app(\App\Services\Servers\SiteFileBackupExporter::class)->deleteArtifact($backup);
+        app(SiteFileBackupExporter::class)->deleteArtifact($backup);
         $this->purgeBackupStagings($backup);
         $snapshot = [
             'backup_id' => (string) $backup->id,

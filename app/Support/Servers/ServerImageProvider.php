@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Support\Servers;
 
 use App\Enums\ServerProvider;
+use App\Jobs\CloneServerOnDigitalOceanJob;
+use App\Jobs\CreateServerImageJob;
+use App\Jobs\RefreshServerPrivateIpJob;
 use App\Models\Server;
 use App\Services\DigitalOceanService;
 use App\Services\HetznerService;
@@ -15,14 +18,14 @@ use Carbon\Carbon;
 /**
  * Thin capability + dispatch layer for full-disk server images, sitting in front
  * of the per-provider service classes (which share no common interface — see
- * {@see \App\Jobs\RefreshServerPrivateIpJob} for the same match-on-provider idiom).
+ * {@see RefreshServerPrivateIpJob} for the same match-on-provider idiom).
  *
  * DigitalOcean, Hetzner, Vultr, and Linode wrap the image API today; everything
  * else reports unsupported so the Snapshots workspace can render a "not
  * available" state rather than a broken button.
  *
  * `create()` blocks while it polls the provider action to completion — it MUST run
- * inside a queue job ({@see \App\Jobs\CreateServerImageJob}), never in a web request.
+ * inside a queue job ({@see CreateServerImageJob}), never in a web request.
  */
 class ServerImageProvider
 {
@@ -217,7 +220,7 @@ class ServerImageProvider
     /**
      * Locate the just-created DO snapshot: by exact name first, then the most
      * recent snapshot whose resource_id matches the source droplet (DO sometimes
-     * suffixes the name). Mirrors {@see \App\Jobs\CloneServerOnDigitalOceanJob}.
+     * suffixes the name). Mirrors {@see CloneServerOnDigitalOceanJob}.
      *
      * @return array<string, mixed>|null
      */

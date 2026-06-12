@@ -165,7 +165,7 @@ trait ResolvesSiteUrls
         // git@host:owner/repo(.git) → host + owner/repo
         if (preg_match('#^[\w.-]+@([^:]+):(.+?)(?:\.git)?/?$#', $remote, $m) === 1) {
             [$host, $path] = [$m[1], $m[2]];
-        // scheme://[user@]host/owner/repo(.git)
+            // scheme://[user@]host/owner/repo(.git)
         } elseif (preg_match('#^[a-z]+://(?:[^@/]+@)?([^/]+)/(.+?)(?:\.git)?/?$#i', $remote, $m) === 1) {
             [$host, $path] = [$m[1], $m[2]];
         } else {

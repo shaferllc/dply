@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\ServerProvider;
+use App\Jobs\CreateServerImageJob;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,7 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * A full-disk image (snapshot) of a server captured through its cloud provider's
  * API. Lifecycle:
  *
- *   pending → creating   when {@see \App\Jobs\CreateServerImageJob} fires the
+ *   pending → creating   when {@see CreateServerImageJob} fires the
  *                        provider create-image action and starts polling
  *   creating → completed when the action finishes and provider_image_id is known
  *   * → failed           when the provider errored / timed out (error_message set)
@@ -20,7 +22,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Distinct from {@see RedisSnapshot} (cache RDB) and {@see Snapshot} (site DB
  * dump) — this is the whole-machine image, the "images" surface of the unified
  * Snapshots workspace. Only providers whose service wraps the image API qualify
- * (see {@see \App\Enums\ServerProvider::supportsImageSnapshots()}).
+ * (see {@see ServerProvider::supportsImageSnapshots()}).
  */
 class ServerImage extends Model
 {

@@ -15,7 +15,7 @@ use RuntimeException;
  * Moves a single env var into — and back out of — escrow residency: the value
  * leaves the plaintext-in-DB `.env` blob and becomes an `age` blob under the
  * org's key ({@see SiteSecretResidency} escrow mode), with only a placeholder
- * left behind in the loose env. {@see \App\Services\Sites\SecretResidencyResolver}
+ * left behind in the loose env. {@see SecretResidencyResolver}
  * swaps the placeholder back for the real value at push/deploy.
  *
  * Escalation only changes WHERE the secret lives; the deployed app is unaffected
@@ -34,7 +34,7 @@ class SecretEscalator
      * records the residency, and replaces the loose-env value with a placeholder.
      *
      * @param  string|null  $value  the plaintext to escrow; when null, the key's
-     *   current value in the loose env is used (escalate an existing var).
+     *                              current value in the loose env is used (escalate an existing var).
      */
     public function escalate(Site $site, string $key, ?string $value = null): SiteSecretResidency
     {

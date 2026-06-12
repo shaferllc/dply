@@ -2,6 +2,7 @@
 
 namespace App\Services\Servers;
 
+use App\Jobs\ValidateBindingConnectivityJob;
 use App\Models\Server;
 use App\Models\ServerDatabaseAdminCredential;
 use App\Models\ServerDatabaseEngine;
@@ -489,7 +490,7 @@ BASH;
 
     /**
      * Whether the engine is actually accepting TCP connections on 127.0.0.1:<port>
-     * — the address the deployed app (and {@see \App\Jobs\ValidateBindingConnectivityJob})
+     * — the address the deployed app (and {@see ValidateBindingConnectivityJob})
      * dials. This is STRICTER than the socket/sudo-based capability probe: an
      * engine can be "installed" (e.g. `sudo -u postgres psql` over the unix socket
      * works) yet not be listening on TCP localhost, in which case the app can't

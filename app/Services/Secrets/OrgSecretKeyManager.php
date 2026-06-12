@@ -96,7 +96,7 @@ class OrgSecretKeyManager
      * Re-encrypts nothing: callers should run this on an org with no escrowed
      * secrets yet, or re-escalate afterwards under the new recipient.
      *
-     * @return array{key: OrgSecretKey, identity: string}  identity = show-once
+     * @return array{key: OrgSecretKey, identity: string} identity = show-once
      */
     public function promoteToCustomerHeld(string $organizationId): array
     {
@@ -116,7 +116,7 @@ class OrgSecretKeyManager
      * Decrypt ciphertext that was encrypted to this org's key.
      *
      * @param  string|null  $ephemeralIdentity  required when the customer holds
-     *   the identity (dply has none); ignored for dply-held keys. Never persisted.
+     *                                          the identity (dply has none); ignored for dply-held keys. Never persisted.
      */
     public function decrypt(OrgSecretKey $key, string $ciphertext, ?string $ephemeralIdentity = null): string
     {

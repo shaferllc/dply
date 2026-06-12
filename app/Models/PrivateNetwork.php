@@ -19,9 +19,12 @@ class PrivateNetwork extends Model
     use HasUlids;
 
     public const PROVIDER_HETZNER = 'hetzner';
-    public const PROVIDER_DO      = 'digitalocean';
-    public const PROVIDER_VULTR   = 'vultr';
-    public const PROVIDER_LINODE  = 'linode';
+
+    public const PROVIDER_DO = 'digitalocean';
+
+    public const PROVIDER_VULTR = 'vultr';
+
+    public const PROVIDER_LINODE = 'linode';
 
     protected $fillable = [
         'organization_id',
@@ -62,6 +65,7 @@ class PrivateNetwork extends Model
     public function hetznerNetworkId(): ?int
     {
         $id = (int) $this->provider_id;
+
         return $id > 0 ? $id : null;
     }
 }

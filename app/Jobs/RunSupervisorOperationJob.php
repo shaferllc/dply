@@ -37,6 +37,7 @@ class RunSupervisorOperationJob implements ShouldQueue
         $server = Server::query()->find($this->serverId);
         if ($server === null) {
             $this->store('failed', 'Server not found.');
+
             return;
         }
 
@@ -44,10 +45,10 @@ class RunSupervisorOperationJob implements ShouldQueue
 
         try {
             $out = match ($this->operation) {
-                'sync'        => $provisioner->sync($server->fresh()),
-                'install'     => $provisioner->installSupervisorPackage($server->fresh()),
+                'sync' => $provisioner->sync($server->fresh()),
+                'install' => $provisioner->installSupervisorPackage($server->fresh()),
                 'restart_all' => $provisioner->restartAllManagedPrograms($server->fresh()),
-                default       => throw new \InvalidArgumentException("Unknown operation: {$this->operation}"),
+                default => throw new \InvalidArgumentException("Unknown operation: {$this->operation}"),
             };
 
             // Mark package as installed after successful install/sync.

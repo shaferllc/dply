@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
+use App\Jobs\RunServerSecurityDigestScanJob;
+use App\Livewire\Servers\Concerns\RunsServerSecurityDigestScan;
 use App\Models\Server;
 use App\Models\User;
 use App\Services\Notifications\ServerSecurityDigestNotificationDispatcher;
@@ -16,8 +18,8 @@ use RuntimeException;
  * worsens into a warning / critical state or recovers to healthy.
  *
  * Shared by the interactive "Refresh digest" button
- * ({@see \App\Livewire\Servers\Concerns\RunsServerSecurityDigestScan}) and the daily
- * fleet sweep ({@see \App\Jobs\RunServerSecurityDigestScanJob}) so both run one code path.
+ * ({@see RunsServerSecurityDigestScan}) and the daily
+ * fleet sweep ({@see RunServerSecurityDigestScanJob}) so both run one code path.
  */
 final class ServerSecurityDigestScanner
 {

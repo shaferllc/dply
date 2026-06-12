@@ -30,7 +30,7 @@ final class SiteFileBackupExporter
      */
     /**
      * @param  ConsoleEmitter|null  $emit  optional progress sink for on-demand
-     *   runs; null (scheduled backups) becomes a no-op emitter.
+     *                                     runs; null (scheduled backups) becomes a no-op emitter.
      */
     public function export(SiteFileBackup $backup, ?ConsoleEmitter $emit = null): void
     {

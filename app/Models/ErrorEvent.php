@@ -4,16 +4,20 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Livewire\Servers\WorkspaceErrors;
+use App\Livewire\Sites\Errors;
+use App\Services\Remediations\RemediationCatalog;
+use App\Support\Errors\ErrorEventRecorder;
 use App\Support\Errors\ErrorRetryRegistry;
-use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
  * One row in the dedicated error stream surfaced on the site/server "Errors"
- * views. Written by {@see \App\Support\Errors\ErrorEventRecorder} from failed
+ * views. Written by {@see ErrorEventRecorder} from failed
  * ConsoleActions and SiteDeployments. Append-only; triage is a shared
  * {@see $dismissed_at}.
  */
@@ -90,7 +94,7 @@ class ErrorEvent extends Model
      * workspace nav badge ({@see server-workspace-shell}) and the Errors stream
      * both want this count; sharing it here keeps the same `count(*)` from
      * running twice on a page render. Primed by the stream's paginator when it's
-     * unfiltered (see {@see \App\Livewire\Servers\WorkspaceErrors::shareStreamTotal});
+     * unfiltered (see {@see WorkspaceErrors::shareStreamTotal});
      * otherwise computed on first read. Keyed per server, reset each request.
      *
      * @var array<string, int>
@@ -116,7 +120,7 @@ class ErrorEvent extends Model
      * mirror of {@see $undismissedServerCountMemo}. The site settings sidebar
      * "Errors" badge and the Errors stream both want this; sharing it keeps the
      * same `count(*)` from running twice on a render. Primed by the stream's
-     * paginator when unfiltered (see {@see \App\Livewire\Sites\Errors::shareStreamTotal}).
+     * paginator when unfiltered (see {@see Errors::shareStreamTotal}).
      *
      * @var array<string, int>
      */
@@ -155,7 +159,7 @@ class ErrorEvent extends Model
     public function remediation(): ?array
     {
         return $this->remediation_code
-            ? app(\App\Services\Remediations\RemediationCatalog::class)->find((string) $this->remediation_code)
+            ? app(RemediationCatalog::class)->find((string) $this->remediation_code)
             : null;
     }
 }

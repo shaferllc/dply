@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature\FleetSummaryCommandTest;
 
 use App\Enums\SiteType;
-use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\ServerDatabaseEngine;
 use App\Models\Site;

@@ -30,7 +30,7 @@ trait SurfacesBindingConsumers
      * each consumer can be flagged local (same server) or remote.
      *
      * @param  array<int, int|string>  $resourceIds
-     * @return array<string, array<int, array<string, mixed>>>  keyed by resource id
+     * @return array<string, array<int, array<string, mixed>>> keyed by resource id
      */
     protected function buildBindingConsumers(string $targetType, array $resourceIds, int|string $backendServerId): array
     {

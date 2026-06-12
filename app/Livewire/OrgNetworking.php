@@ -5,14 +5,19 @@ declare(strict_types=1);
 namespace App\Livewire;
 
 use App\Jobs\AttachServerToNetworkJob;
+use App\Jobs\ConfigureHAProxyLoadBalancerJob;
+use App\Jobs\CreateProviderNetworkJob;
+use App\Jobs\ProvisionHetznerLoadBalancerJob;
 use App\Models\LoadBalancer;
 use App\Models\LoadBalancerService;
 use App\Models\LoadBalancerTarget;
 use App\Models\PrivateNetwork;
+use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Services\HetznerService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
@@ -37,25 +42,35 @@ class OrgNetworking extends Component
     public string $tab = 'load-balancers';
 
     // ── Load balancer create form (shared with per-server) ────────────────────
-    public string $lb_name        = '';
-    public string $lb_type        = 'lb11';
-    public string $lb_algorithm   = 'round_robin';
-    public string $lb_network_id  = '';
+    public string $lb_name = '';
+
+    public string $lb_type = 'lb11';
+
+    public string $lb_algorithm = 'round_robin';
+
+    public string $lb_network_id = '';
+
     public string $haproxy_server_id = '';
-    public array  $lb_target_server_ids = [];
-    public array  $lb_services = [
+
+    public array $lb_target_server_ids = [];
+
+    public array $lb_services = [
         ['protocol' => 'http', 'listen_port' => '80', 'destination_port' => '80'],
     ];
 
     // ── Network create form ────────────────────────────────────────────────────
-    public string $net_name       = '';
-    public string $net_ip_range   = '10.0.0.0/8';
+    public string $net_name = '';
+
+    public string $net_ip_range = '10.0.0.0/8';
+
     public string $net_credential_id = '';
-    public array  $net_server_ids = [];
+
+    public array $net_server_ids = [];
 
     // ── Route form (keyed by network ID) ─────────────────────────────────────
-    public array $route_destination     = [];
-    public array $route_gateway_server  = [];
+    public array $route_destination = [];
+
+    public array $route_gateway_server = [];
 
     public function setTab(string $tab): void
     {
@@ -77,11 +92,11 @@ class OrgNetworking extends Component
     private function lbServiceRules(): array
     {
         return [
-            'lb_name'                        => 'required|string|max:255',
-            'lb_algorithm'                   => 'required|in:round_robin,least_connections',
-            'lb_services'                    => 'required|array|min:1',
-            'lb_services.*.protocol'         => 'required|in:http,https,tcp',
-            'lb_services.*.listen_port'      => 'required|integer|min:1|max:65535',
+            'lb_name' => 'required|string|max:255',
+            'lb_algorithm' => 'required|in:round_robin,least_connections',
+            'lb_services' => 'required|array|min:1',
+            'lb_services.*.protocol' => 'required|in:http,https,tcp',
+            'lb_services.*.listen_port' => 'required|integer|min:1|max:65535',
             'lb_services.*.destination_port' => 'required|integer|min:1|max:65535',
         ];
     }
@@ -90,11 +105,11 @@ class OrgNetworking extends Component
     {
         foreach ($this->lb_services as $svc) {
             LoadBalancerService::query()->create([
-                'load_balancer_id'      => $lb->id,
-                'protocol'              => $svc['protocol'],
-                'listen_port'           => (int) $svc['listen_port'],
-                'destination_port'      => (int) $svc['destination_port'],
-                'health_check_port'     => (int) $svc['destination_port'],
+                'load_balancer_id' => $lb->id,
+                'protocol' => $svc['protocol'],
+                'listen_port' => (int) $svc['listen_port'],
+                'destination_port' => (int) $svc['destination_port'],
+                'health_check_port' => (int) $svc['destination_port'],
                 'health_check_protocol' => in_array($svc['protocol'], ['http', 'https'], true) ? 'http' : 'tcp',
             ]);
         }
@@ -102,11 +117,11 @@ class OrgNetworking extends Component
 
     private function resetLbForm(): void
     {
-        $this->lb_name              = '';
-        $this->lb_network_id        = '';
-        $this->haproxy_server_id    = '';
+        $this->lb_name = '';
+        $this->lb_network_id = '';
+        $this->haproxy_server_id = '';
         $this->lb_target_server_ids = [];
-        $this->lb_services          = [['protocol' => 'http', 'listen_port' => '80', 'destination_port' => '80']];
+        $this->lb_services = [['protocol' => 'http', 'listen_port' => '80', 'destination_port' => '80']];
     }
 
     /**
@@ -127,18 +142,19 @@ class OrgNetworking extends Component
 
         if (! $haproxyServer) {
             $this->addError('haproxy_server_id', __('Server not found.'));
+
             return;
         }
 
         $lb = LoadBalancer::query()->create([
-            'organization_id'    => $org->id,
-            'server_id'          => $haproxyServer->id,
-            'name'               => trim($this->lb_name),
-            'provider'           => LoadBalancer::PROVIDER_HAPROXY,
-            'region'             => $haproxyServer->region,
+            'organization_id' => $org->id,
+            'server_id' => $haproxyServer->id,
+            'name' => trim($this->lb_name),
+            'provider' => LoadBalancer::PROVIDER_HAPROXY,
+            'region' => $haproxyServer->region,
             'load_balancer_type' => 'haproxy',
-            'algorithm'          => $this->lb_algorithm,
-            'status'             => LoadBalancer::STATUS_PROVISIONING,
+            'algorithm' => $this->lb_algorithm,
+            'status' => LoadBalancer::STATUS_PROVISIONING,
         ]);
 
         foreach (array_filter(array_unique($this->lb_target_server_ids)) as $serverId) {
@@ -146,18 +162,18 @@ class OrgNetworking extends Component
             if ($s) {
                 LoadBalancerTarget::query()->create([
                     'load_balancer_id' => $lb->id,
-                    'server_id'        => $s->id,
+                    'server_id' => $s->id,
                 ]);
             }
         }
 
         $this->seedLbServices($lb);
-        \App\Jobs\ConfigureHAProxyLoadBalancerJob::dispatch($lb->id);
+        ConfigureHAProxyLoadBalancerJob::dispatch($lb->id);
 
         $this->dispatch('close-modal', 'org-create-haproxy-lb-modal');
         $this->resetLbForm();
         $this->toastSuccess(__('Software load balancer ":name" being configured on :server.', [
-            'name'   => $lb->name,
+            'name' => $lb->name,
             'server' => $haproxyServer->name,
         ]));
     }
@@ -169,7 +185,7 @@ class OrgNetworking extends Component
     public function createHetznerLoadBalancer(): void
     {
         $this->validate($this->lbServiceRules() + [
-            'lb_type'              => 'required|in:'.implode(',', LoadBalancer::TYPES),
+            'lb_type' => 'required|in:'.implode(',', LoadBalancer::TYPES),
             'lb_target_server_ids' => 'required|array|min:1',
         ]);
 
@@ -183,31 +199,32 @@ class OrgNetworking extends Component
         $anchor = $targets->first(fn ($s) => $s->provider->value === 'hetzner');
         if (! $anchor || ! $anchor->providerCredential) {
             $this->addError('lb_target_server_ids', __('Select at least one Hetzner server — managed load balancers live in your Hetzner account.'));
+
             return;
         }
 
         $lb = LoadBalancer::query()->create([
-            'organization_id'        => $org->id,
+            'organization_id' => $org->id,
             'provider_credential_id' => $anchor->providerCredential->id,
-            'name'                   => trim($this->lb_name),
-            'provider'               => 'hetzner',
-            'region'                 => $anchor->region,
-            'load_balancer_type'     => $this->lb_type,
-            'algorithm'              => $this->lb_algorithm,
-            'status'                 => LoadBalancer::STATUS_PROVISIONING,
-            'hetzner_network_id'     => $this->lb_network_id !== '' ? $this->lb_network_id : $anchor->hetzner_network_id,
+            'name' => trim($this->lb_name),
+            'provider' => 'hetzner',
+            'region' => $anchor->region,
+            'load_balancer_type' => $this->lb_type,
+            'algorithm' => $this->lb_algorithm,
+            'status' => LoadBalancer::STATUS_PROVISIONING,
+            'hetzner_network_id' => $this->lb_network_id !== '' ? $this->lb_network_id : $anchor->hetzner_network_id,
         ]);
 
         foreach ($targets as $s) {
             LoadBalancerTarget::query()->create([
-                'load_balancer_id'   => $lb->id,
-                'server_id'          => $s->id,
+                'load_balancer_id' => $lb->id,
+                'server_id' => $s->id,
                 'provider_server_id' => $s->provider_id,
             ]);
         }
 
         $this->seedLbServices($lb);
-        \App\Jobs\ProvisionHetznerLoadBalancerJob::dispatch($lb->id);
+        ProvisionHetznerLoadBalancerJob::dispatch($lb->id);
 
         $this->dispatch('close-modal', 'org-create-hetzner-lb-modal');
         $this->resetLbForm();
@@ -220,15 +237,18 @@ class OrgNetworking extends Component
     {
         $org = Auth::user()->currentOrganization();
         $lb = LoadBalancer::query()->where('organization_id', $org->id)->find($lbId);
-        if (! $lb) { return; }
+        if (! $lb) {
+            return;
+        }
 
         if ($lb->isSoftware()) {
-            \App\Jobs\ConfigureHAProxyLoadBalancerJob::dispatch($lb->id, remove: true);
+            ConfigureHAProxyLoadBalancerJob::dispatch($lb->id, remove: true);
         } elseif ($lb->provider_id && $lb->providerCredential) {
             try {
                 (new HetznerService($lb->providerCredential))->deleteLoadBalancer((int) $lb->provider_id);
             } catch (\Throwable $e) {
                 $this->toastError(Str::limit($e->getMessage(), 200));
+
                 return;
             }
         }
@@ -242,32 +262,33 @@ class OrgNetworking extends Component
     public function createNetwork(): void
     {
         $this->validate([
-            'net_name'          => 'required|string|max:255',
-            'net_ip_range'      => 'required|string',
+            'net_name' => 'required|string|max:255',
+            'net_ip_range' => 'required|string',
             'net_credential_id' => 'required|string',
         ]);
 
         $org = Auth::user()->currentOrganization();
 
-        $credential = \App\Models\ProviderCredential::query()
+        $credential = ProviderCredential::query()
             ->where('organization_id', $org->id)
             ->where('provider', 'hetzner')
             ->find($this->net_credential_id);
 
         if (! $credential) {
             $this->addError('net_credential_id', __('Credential not found.'));
+
             return;
         }
 
         $network = PrivateNetwork::query()->create([
-            'organization_id'        => $org->id,
+            'organization_id' => $org->id,
             'provider_credential_id' => $credential->id,
-            'name'                   => trim($this->net_name),
-            'provider'               => PrivateNetwork::PROVIDER_HETZNER,
-            'ip_range'               => trim($this->net_ip_range),
+            'name' => trim($this->net_name),
+            'provider' => PrivateNetwork::PROVIDER_HETZNER,
+            'ip_range' => trim($this->net_ip_range),
         ]);
 
-        \App\Jobs\CreateProviderNetworkJob::dispatch(
+        CreateProviderNetworkJob::dispatch(
             $credential->id,
             $this->net_name,
             $this->net_ip_range,
@@ -286,7 +307,9 @@ class OrgNetworking extends Component
     {
         $org = Auth::user()->currentOrganization();
         $network = PrivateNetwork::query()->where('organization_id', $org->id)->with('servers')->find($networkId);
-        if (! $network) { return; }
+        if (! $network) {
+            return;
+        }
 
         // Detach all servers from this network first.
         foreach ($network->servers as $server) {
@@ -294,7 +317,8 @@ class OrgNetworking extends Component
                 try {
                     (new HetznerService($network->providerCredential))
                         ->attachServerToNetwork((int) $server->provider_id, $network->hetznerNetworkId());
-                } catch (\Throwable) {}
+                } catch (\Throwable) {
+                }
             }
             $server->update(['private_network_id' => null, 'private_ip_address' => null, 'hetzner_network_id' => null]);
         }
@@ -341,9 +365,9 @@ class OrgNetworking extends Component
     /**
      * Org Hetzner servers not yet on the given network (the attach candidates).
      *
-     * @return \Illuminate\Support\Collection<int, Server>
+     * @return Collection<int, Server>
      */
-    public function attachableServers(PrivateNetwork $network): \Illuminate\Support\Collection
+    public function attachableServers(PrivateNetwork $network): Collection
     {
         $org = Auth::user()->currentOrganization();
         $onNet = $network->servers->pluck('id');
@@ -362,18 +386,22 @@ class OrgNetworking extends Component
     {
         $org = Auth::user()->currentOrganization();
         $network = PrivateNetwork::query()->where('organization_id', $org->id)->with('servers')->find($networkId);
-        if (! $network || ! $network->hetznerNetworkId()) { return; }
+        if (! $network || ! $network->hetznerNetworkId()) {
+            return;
+        }
 
         $destination = trim($this->route_destination[$networkId] ?? '');
 
         if (! str_contains($destination, '/') || ! filter_var(explode('/', $destination)[0], FILTER_VALIDATE_IP)) {
             $this->addError("route_destination.$networkId", __("That doesn't look like a valid range — try 192.168.1.0/24."));
+
             return;
         }
 
         $server = $network->servers->firstWhere('id', $this->route_gateway_server[$networkId] ?? '');
         if (! $server || ! $server->private_ip_address) {
             $this->addError("route_gateway_server.$networkId", __('Choose a server on this network to act as the gateway.'));
+
             return;
         }
         $gateway = $server->private_ip_address;
@@ -382,7 +410,7 @@ class OrgNetworking extends Component
             (new HetznerService($network->providerCredential))
                 ->addNetworkRoute($network->hetznerNetworkId(), $destination, $gateway);
 
-            $this->route_destination[$networkId]    = '';
+            $this->route_destination[$networkId] = '';
             $this->route_gateway_server[$networkId] = '';
             $this->toastSuccess(__('Route :dest → :gw (:name) added.', ['dest' => $destination, 'gw' => $gateway, 'name' => $server->name]));
         } catch (\Throwable $e) {
@@ -394,7 +422,9 @@ class OrgNetworking extends Component
     {
         $org = Auth::user()->currentOrganization();
         $network = PrivateNetwork::query()->where('organization_id', $org->id)->find($networkId);
-        if (! $network || ! $network->hetznerNetworkId()) { return; }
+        if (! $network || ! $network->hetznerNetworkId()) {
+            return;
+        }
 
         try {
             (new HetznerService($network->providerCredential))
@@ -445,17 +475,17 @@ class OrgNetworking extends Component
             ->orderBy('name')
             ->get();
 
-        $hetznerCredentials = \App\Models\ProviderCredential::query()
+        $hetznerCredentials = ProviderCredential::query()
             ->where('organization_id', $org->id)
             ->where('provider', 'hetzner')
             ->orderBy('name')
             ->get();
 
         return view('livewire.org-networking', [
-            'loadBalancers'      => $loadBalancers,
-            'networks'           => $networks,
-            'routesByNetwork'    => $routesByNetwork,
-            'orgServers'         => $orgServers,
+            'loadBalancers' => $loadBalancers,
+            'networks' => $networks,
+            'routesByNetwork' => $routesByNetwork,
+            'orgServers' => $orgServers,
             'hetznerCredentials' => $hetznerCredentials,
         ]);
     }

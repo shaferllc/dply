@@ -9,8 +9,9 @@ use App\Jobs\ExportServerDatabaseBackupJob;
 use App\Jobs\RunSiteDatabaseAdminJob;
 use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\DispatchesToastNotifications;
-use App\Livewire\Servers\Concerns\ManagesDatabaseNotifications;
 use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
+use App\Livewire\Servers\Concerns\ManagesDatabaseNotifications;
+use App\Livewire\Servers\WorkspaceDatabases;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerDatabase;
@@ -22,21 +23,25 @@ use App\Models\Site;
 use App\Services\Notifications\ServerDatabaseNotificationDispatcher;
 use App\Services\Servers\DatabaseBackupDownloader;
 use App\Services\Servers\DatabaseBackupExporter;
+use App\Services\Servers\DatabaseEngineReadinessGuard;
 use App\Services\Servers\ServerDatabaseAuditLogger;
 use App\Support\Servers\DatabaseWorkspaceEngines;
 use App\Support\Servers\ServerDatabaseHostCapabilities;
 use Illuminate\Contracts\View\View;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
  * Site-scoped database tab (VM sites only).
  *
- * A focused complement to the server-level {@see \App\Livewire\Servers\WorkspaceDatabases}
+ * A focused complement to the server-level {@see WorkspaceDatabases}
  * manager: list the databases that belong to this site, create a new one
  * (auto-named after the site, with optional .env wiring), link an existing
  * unlinked server database, detach one, manage extra users, or drop it on the
@@ -148,7 +153,7 @@ class Database extends Component
     /**
      * Databases owned by this site.
      *
-     * @return \Illuminate\Support\Collection<int, ServerDatabase>
+     * @return Collection<int, ServerDatabase>
      */
     #[Computed]
     public function linkedDatabases()
@@ -164,7 +169,7 @@ class Database extends Component
     /**
      * Server databases not yet attached to any site — candidates for linking.
      *
-     * @return \Illuminate\Support\Collection<int, ServerDatabase>
+     * @return Collection<int, ServerDatabase>
      */
     #[Computed]
     public function linkableDatabases()
@@ -193,7 +198,7 @@ class Database extends Component
 
         $this->new_db_username = trim($this->new_db_username);
 
-        $readiness = app(\App\Services\Servers\DatabaseEngineReadinessGuard::class)->check($this->server, $this->new_db_engine);
+        $readiness = app(DatabaseEngineReadinessGuard::class)->check($this->server, $this->new_db_engine);
         if (! $readiness['ok']) {
             $this->addError('new_db_engine', (string) $readiness['reason']);
 
@@ -226,8 +231,8 @@ class Database extends Component
         // server-level create flow so the two surfaces behave identically.
         $username = $this->new_db_username;
         if (! $isSqlite && $username === '') {
-            $base = \Illuminate\Support\Str::slug($this->new_db_name, '_') ?: 'db';
-            $username = \Illuminate\Support\Str::limit($base, 28, '').'_'.\Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(4));
+            $base = Str::slug($this->new_db_name, '_') ?: 'db';
+            $username = Str::limit($base, 28, '').'_'.Str::lower(Str::random(4));
         }
 
         $password = $this->new_db_password;
@@ -637,7 +642,7 @@ class Database extends Component
      * Fired by {@see CreatesNotificationChannelInline} after the inline modal
      * creates a channel — jump to Notifications and preselect it.
      */
-    #[\Livewire\Attributes\On('notification-channel-created')]
+    #[On('notification-channel-created')]
     public function onNotificationChannelCreated(string $channelId): void
     {
         $this->dbTab = 'notifications';
@@ -663,7 +668,7 @@ class Database extends Component
             return;
         }
 
-        $token = \Illuminate\Support\Str::random(48);
+        $token = Str::random(48);
         ServerDatabaseCredentialShare::query()->create([
             'server_database_id' => $db->id,
             'user_id' => auth()->id(),
@@ -706,7 +711,7 @@ class Database extends Component
     /**
      * Seed a queued ConsoleAction on the site, superseding stale ones, so the
      * banner has a row to render before the worker picks the job up. Mirrors
-     * {@see \App\Livewire\Sites\Show::seedQueuedConsoleAction()}.
+     * {@see Show::seedQueuedConsoleAction()}.
      */
     private function seedConsoleRun(string $kind, ?string $label = null): ConsoleAction
     {
@@ -740,7 +745,7 @@ class Database extends Component
 
     private function suggestedName(): string
     {
-        $base = \Illuminate\Support\Str::slug((string) $this->site->name, '_') ?: 'app';
+        $base = Str::slug((string) $this->site->name, '_') ?: 'app';
 
         return substr($base, 0, 64);
     }

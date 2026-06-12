@@ -7,6 +7,7 @@ use App\Models\NotificationSubscription;
 use App\Models\Server;
 use App\Services\Notifications\AssignableNotificationChannels;
 use App\Services\Servers\SharedHostNotificationDispatcher;
+use App\Support\Servers\SharedHostBudgetMonitor;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
@@ -17,8 +18,8 @@ use Illuminate\Support\Facades\Gate;
  * page.
  *
  * Shared host alerts (budget breaches + critical contention events) already fire
- * via {@see \App\Services\Servers\SharedHostNotificationDispatcher}, driven by the
- * post-scan {@see \App\Support\Servers\SharedHostBudgetMonitor} and the scheduled
+ * via {@see SharedHostNotificationDispatcher}, driven by the
+ * post-scan {@see SharedHostBudgetMonitor} and the scheduled
  * EvaluateSharedHostBudgetsCommand. This trait only adds in-page subscription
  * management so operators can route those alerts to email/Slack/webhook without
  * detouring to Settings. Deliberately reuses the existing single event key.

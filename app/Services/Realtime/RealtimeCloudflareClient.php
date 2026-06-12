@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Realtime;
 
+use App\Services\Edge\EdgeCloudflareClient;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
@@ -13,7 +14,7 @@ use RuntimeException;
  * provisions a realtime app by writing its credential record into the APPS
  * KV namespace the realtime Worker reads from; it never re-deploys the Worker.
  *
- * Mirrors {@see \App\Services\Edge\EdgeCloudflareClient} but scoped to the KV
+ * Mirrors {@see EdgeCloudflareClient} but scoped to the KV
  * value read/write/delete endpoints the realtime backend needs.
  */
 class RealtimeCloudflareClient

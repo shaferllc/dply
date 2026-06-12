@@ -252,8 +252,8 @@ final class ServerCertificateInventory
      * No SSH happens here: the caller passes the cached scan rows so the SSH
      * probe stays in the queue job, never the request.
      *
-     * @param  list<array<string, mixed>>  $items       items from {@see forServer()}
-     * @param  list<array<string, mixed>>  $liveCerts   `certs` from {@see WebserverCertsAggregator::cached()}
+     * @param  list<array<string, mixed>>  $items  items from {@see forServer()}
+     * @param  list<array<string, mixed>>  $liveCerts  `certs` from {@see WebserverCertsAggregator::cached()}
      * @return list<array<string, mixed>>
      */
     public function withLiveExpiry(array $items, array $liveCerts): array

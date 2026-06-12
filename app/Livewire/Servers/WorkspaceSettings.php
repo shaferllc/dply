@@ -7,6 +7,7 @@ use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesExtendedServerSettings;
 use App\Livewire\Servers\Concerns\ManagesWorkspaceSettingsForm;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\NotificationSubscription;
 use App\Models\OutboundWebhookDelivery;
 use App\Models\Server;
@@ -19,21 +20,20 @@ use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
 #[Lazy]
 class WorkspaceSettings extends Component
 {
-    use RendersWorkspacePlaceholder;
     use CreatesNotificationChannelInline;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use ManagesExtendedServerSettings;
     use ManagesWorkspaceSettingsForm;
+    use RendersWorkspacePlaceholder;
 
     /** @var string Settings sub-page slug (see config server_settings.workspace_tabs). */
     public string $section = 'connection';

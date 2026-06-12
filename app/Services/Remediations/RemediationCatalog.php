@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Remediations;
 
+use App\Jobs\ApplyRemediationJob;
+
 /**
  * Matches failure text against the {@see config('remediations')} catalog and
  * resolves remediations / actions by code. Shared by every surface that wants
@@ -50,7 +52,7 @@ class RemediationCatalog
 
     /**
      * The allow-list of class-backed handlers: every `handler` declared by any
-     * action in the catalog. {@see \App\Jobs\ApplyRemediationJob} checks a
+     * action in the catalog. {@see ApplyRemediationJob} checks a
      * resolved handler against this set before instantiating it, so only a class
      * explicitly wired into the static config can ever be constructed — the trust
      * boundary is the catalog, not "any class implementing the interface."

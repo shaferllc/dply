@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Certificates\WildcardCertificateIssuer;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * A wildcard TLS certificate (e.g. *.on-dply.com) issued via DNS-01 and
  * installed on a single server, shared by every testing-hostname site on that
  * server/zone. See the create_server_wildcard_certificates migration and
- * {@see \App\Services\Certificates\WildcardCertificateIssuer}.
+ * {@see WildcardCertificateIssuer}.
  */
 class ServerWildcardCertificate extends Model
 {

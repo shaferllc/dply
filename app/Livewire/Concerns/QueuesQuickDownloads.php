@@ -11,6 +11,7 @@ use App\Services\Backups\BackupStagingS3ClientFactory;
 use App\Services\Servers\QuickDownloadNotifier;
 use App\Services\Servers\QuickDownloadStreamer;
 use Illuminate\Support\Facades\Gate;
+use Livewire\Component;
 
 /**
  * Shared "queue a quick download, then notify" flow for the backup surfaces. A
@@ -26,7 +27,7 @@ use Illuminate\Support\Facades\Gate;
  * and gates on `update` for its server, so a crafted id can't queue another org's
  * data.
  *
- * @phpstan-require-extends \Livewire\Component
+ * @phpstan-require-extends Component
  */
 trait QueuesQuickDownloads
 {

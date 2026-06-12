@@ -4,8 +4,8 @@ namespace App\Models;
 
 use App\Enums\TrialState;
 use App\Services\Billing\OrganizationBillingStateComputer;
-use App\Support\Beta\BetaProgram;
 use App\Services\Billing\SubscriptionPlanResolver;
+use App\Support\Beta\BetaProgram;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Database\Factories\OrganizationFactory;

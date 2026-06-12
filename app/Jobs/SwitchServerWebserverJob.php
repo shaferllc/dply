@@ -11,8 +11,10 @@ use App\Models\Server;
 use App\Models\ServerWebserverAuditEvent;
 use App\Models\Site;
 use App\Models\SiteCertificate;
+use App\Models\User;
 use App\Services\Certificates\CertificateRequestService;
 use App\Services\ConsoleActions\ConsoleEmitter;
+use App\Services\Notifications\ServerWebserverNotificationDispatcher;
 use App\Services\RemoteCli\RiskLevel;
 use App\Services\Servers\OpenLiteSpeedHttpdConfigBuilder;
 use App\Services\Servers\OpenLiteSpeedHttpdConfigPreserver;
@@ -117,14 +119,14 @@ class SwitchServerWebserverJob implements ShouldBeUnique, ShouldQueue
         return $this->userId;
     }
 
-    public function handle(\App\Services\Notifications\ServerWebserverNotificationDispatcher $notifications): void
+    public function handle(ServerWebserverNotificationDispatcher $notifications): void
     {
         $server = Server::query()->find($this->serverId);
         if ($server === null) {
             return;
         }
 
-        $actor = $this->userId !== null ? \App\Models\User::query()->find($this->userId) : null;
+        $actor = $this->userId !== null ? User::query()->find($this->userId) : null;
         $emitter = $this->beginConsoleAction();
         $startedAt = microtime(true);
         $from = strtolower(trim((string) ($server->meta['webserver'] ?? 'nginx')));

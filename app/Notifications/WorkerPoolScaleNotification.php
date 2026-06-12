@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\NotificationEvent;
+use App\Services\WorkerPools\WorkerPoolNotifier;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -10,7 +11,7 @@ use Illuminate\Notifications\Notification;
 
 /**
  * Email for a worker-pool scaling moment (started / scaled / failed). Driven by
- * the NotificationEvent the {@see \App\Services\WorkerPools\WorkerPoolNotifier}
+ * the NotificationEvent the {@see WorkerPoolNotifier}
  * publishes, so the in-app inbox, webhooks and this mail all read the same copy.
  */
 class WorkerPoolScaleNotification extends Notification implements ShouldQueue

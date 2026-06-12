@@ -3,6 +3,7 @@
 namespace App\Services\Sites;
 
 use App\Models\Site;
+use App\Services\Secrets\EphemeralSecretIdentityContext;
 use App\Services\SshConnection;
 use Illuminate\Support\Str;
 
@@ -33,10 +34,10 @@ class SiteEnvPusher
      */
     /**
      * @param  string|null  $overridePath  Absolute path to write the .env to,
-     *   instead of {@see Site::effectiveEnvFilePath()}. Used by the atomic
-     *   deployer to seed a fresh release directory's `.env` (the git checkout
-     *   has none) BEFORE build/release steps run — otherwise artisan reads
-     *   Laravel's defaults (pgsql 127.0.0.1:5432) and migrations fail.
+     *                                     instead of {@see Site::effectiveEnvFilePath()}. Used by the atomic
+     *                                     deployer to seed a fresh release directory's `.env` (the git checkout
+     *                                     has none) BEFORE build/release steps run — otherwise artisan reads
+     *                                     Laravel's defaults (pgsql 127.0.0.1:5432) and migrations fail.
      */
     public function push(Site $site, ?string $overridePath = null, ?string $ephemeralIdentity = null): string
     {
@@ -74,7 +75,7 @@ class SiteEnvPusher
         // Fall back to a job-scoped identity (set by the deploy job from a pulled
         // cache token) when the caller didn't pass one explicitly — this is how a
         // customer-held key is decrypted during a deploy, not just a manual push.
-        $ephemeralIdentity ??= app(\App\Services\Secrets\EphemeralSecretIdentityContext::class)->get();
+        $ephemeralIdentity ??= app(EphemeralSecretIdentityContext::class)->get();
 
         $mergedVars = $this->residency->resolve($site, $mergedVars, $ephemeralIdentity);
 

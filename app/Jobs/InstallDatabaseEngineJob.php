@@ -8,6 +8,8 @@ use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\ConsoleAction;
 use App\Models\ServerDatabaseEngine;
 use App\Models\ServerDatabaseEngineAuditEvent;
+use App\Models\User;
+use App\Services\Notifications\ServerDatabaseNotificationDispatcher;
 use App\Services\Servers\DatabaseEngineAuditLogger;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\ServerDatabaseRemoteExec;
@@ -65,7 +67,7 @@ class InstallDatabaseEngineJob implements ShouldQueue
         ServerDatabaseHostCapabilities $capabilities,
         DatabaseEngineAuditLogger $audit,
         ServerResourcePreflight $preflight,
-        \App\Services\Notifications\ServerDatabaseNotificationDispatcher $notifications,
+        ServerDatabaseNotificationDispatcher $notifications,
     ): void {
         /** @var ServerDatabaseEngine|null $row */
         $row = ServerDatabaseEngine::query()->with('server')->find($this->serverDatabaseEngineId);
@@ -159,7 +161,7 @@ class InstallDatabaseEngineJob implements ShouldQueue
                 $row->server,
                 'engine_installed',
                 [__('Engine: :engine :version', ['engine' => $row->engine, 'version' => (string) $version])],
-                $this->userId !== null ? \App\Models\User::query()->find($this->userId) : null,
+                $this->userId !== null ? User::query()->find($this->userId) : null,
                 ['engine' => $row->engine, 'version' => $version, 'port' => $row->port],
             );
 

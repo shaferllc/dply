@@ -2,6 +2,7 @@
 
 namespace App\Services\Notifications;
 
+use App\Livewire\Servers\WorkspaceSnapshots;
 use App\Models\Server;
 use App\Models\User;
 use App\Support\ServerSnapshotNotificationKeys;
@@ -9,7 +10,7 @@ use App\Support\ServerSnapshotNotificationKeys;
 /**
  * Publishes notifications for server-scoped snapshot changes (image/database/cache
  * snapshot create, database restore, and deletes), fired from the snapshots
- * workspace ({@see \App\Livewire\Servers\WorkspaceSnapshots}).
+ * workspace ({@see WorkspaceSnapshots}).
  *
  * Mirrors {@see ServerFirewallNotificationDispatcher}. Subject is the {@see Server};
  * the per-kind title is pulled from the config label, and the snapshot type travels

@@ -13,6 +13,7 @@ use App\Services\Deploy\DeploymentContractBuilder;
 use App\Services\Deploy\DeploymentPreflightValidator;
 use App\Services\Deploy\DeploymentRevisionTracker;
 use App\Services\Deploy\DeploymentValueRedactor;
+use Illuminate\Database\QueryException;
 
 class SiteProvisioner
 {
@@ -314,7 +315,7 @@ class SiteProvisioner
                     'live_directory' => $zone,
                 ],
             );
-        } catch (\Illuminate\Database\QueryException) {
+        } catch (QueryException) {
             // Lost the (server_id, zone) unique-index race to a sibling site
             // provisioning concurrently — the row now exists, so reuse it.
             $wildcard = ServerWildcardCertificate::query()

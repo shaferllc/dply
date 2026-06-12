@@ -7,12 +7,13 @@ use App\Jobs\DrainAndDestroyWorkerJob;
 use App\Jobs\PushWorkerPoolAgentConfigJob;
 use App\Jobs\PushWorkerPoolHorizonConfigJob;
 use App\Jobs\ReconcileWorkerPoolJob;
-use App\Support\WorkerPools\WorkerPoolHorizonConfig;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteProcess;
 use App\Models\User;
 use App\Models\WorkerPool;
+use App\Services\Sites\SiteSystemdProvisioner;
+use App\Support\WorkerPools\WorkerPoolHorizonConfig;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -240,7 +241,7 @@ class WorkerPoolManager
      * a plain `queue:work`) is defined and running on EVERY member of the pool.
      *
      * On VMs a worker runs as a {@see SiteProcess} that
-     * {@see \App\Services\Sites\SiteSystemdProvisioner} materialises into a
+     * {@see SiteSystemdProvisioner} materialises into a
      * systemd unit — NOT a SupervisorProgram. So we (1) make sure each member's
      * app site has an active worker SiteProcess with the right command, then
      * (2) dispatch {@see ProvisionSiteSystemdUnitsJob} for that site, which

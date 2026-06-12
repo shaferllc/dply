@@ -6,19 +6,19 @@ namespace App\Livewire\Servers;
 
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\Server;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
-use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use Livewire\Attributes\Lazy;
+use Livewire\Component;
 
 #[Layout('layouts.app')]
 #[Lazy]
 class WorkspaceCli extends Component
 {
-    use RendersWorkspacePlaceholder;
     use InteractsWithServerWorkspace;
+    use RendersWorkspacePlaceholder;
     use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.cli';

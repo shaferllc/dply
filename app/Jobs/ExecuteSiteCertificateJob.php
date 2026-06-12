@@ -7,6 +7,7 @@ use App\Models\Site;
 use App\Models\SiteCertificate;
 use App\Models\User;
 use App\Services\Certificates\CertificateRequestService;
+use App\Services\Notifications\ServerCertInventoryNotificationDispatcher;
 use App\Support\Sites\CertbotOutputParser;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -15,6 +16,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class ExecuteSiteCertificateJob implements ShouldQueue
 {
@@ -111,10 +113,10 @@ class ExecuteSiteCertificateJob implements ShouldQueue
             $details[] = __('Site: :name', ['name' => $certificate->site->name]);
         }
         if ($kind === 'renewal_failed' && $error) {
-            $details[] = __('Error: :error', ['error' => \Illuminate\Support\Str::limit($error, 300)]);
+            $details[] = __('Error: :error', ['error' => Str::limit($error, 300)]);
         }
 
-        app(\App\Services\Notifications\ServerCertInventoryNotificationDispatcher::class)->notify(
+        app(ServerCertInventoryNotificationDispatcher::class)->notify(
             $server,
             $kind,
             $details,

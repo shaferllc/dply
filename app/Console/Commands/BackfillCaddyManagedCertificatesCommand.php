@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Models\Site;
 use App\Models\SiteCertificate;
+use App\Services\Certificates\CaddyAutomaticHttpsCertificateEngine;
 use App\Services\Certificates\CertificateRequestService;
 use Illuminate\Console\Command;
 
@@ -24,7 +25,7 @@ use Illuminate\Console\Command;
  * This command brings those sites in line with how new sites behave now:
  *   1. Reconcile any existing Let's Encrypt HTTP rows by feeding them through
  *      CertificateRequestService::execute(), which — for a Caddy-fronted site —
- *      resolves to {@see \App\Services\Certificates\CaddyAutomaticHttpsCertificateEngine}
+ *      resolves to {@see CaddyAutomaticHttpsCertificateEngine}
  *      and marks them active/managed-by-Caddy with no SSH.
  *   2. Ensure a managed customer-domain cert exists (issueForCustomerDomains).
  *   3. Ensure the primary preview domain's auto-SSL cert exists.

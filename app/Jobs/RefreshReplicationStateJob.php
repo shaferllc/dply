@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Livewire\Servers\WorkspaceCaches;
 use App\Models\ServerCacheService;
 use App\Support\Servers\CacheServiceReplication;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -16,7 +17,7 @@ use Illuminate\Support\Facades\Cache;
  * SSH never runs inline so PHP's 30s max_execution_time can't bite the
  * Livewire update commit.
  *
- * @see \App\Livewire\Servers\WorkspaceCaches::loadReplicationState()
+ * @see WorkspaceCaches::loadReplicationState()
  */
 class RefreshReplicationStateJob implements ShouldQueue
 {
@@ -26,8 +27,7 @@ class RefreshReplicationStateJob implements ShouldQueue
 
     public function __construct(
         public string $cacheServiceId,
-    ) {
-    }
+    ) {}
 
     public static function resultCacheKey(string $serverId, string $engine): string
     {

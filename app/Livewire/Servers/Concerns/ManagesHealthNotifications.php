@@ -2,10 +2,12 @@
 
 namespace App\Livewire\Servers\Concerns;
 
+use App\Jobs\CheckServerHealthJob;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
 use App\Services\Notifications\AssignableNotificationChannels;
+use App\Services\Servers\ServerHealthNotifier;
 use App\Support\ServerHealthNotificationKeys;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -15,8 +17,8 @@ use Illuminate\Support\Facades\Gate;
  * Powers the "Notifications" sub-tab on the health workspace: binds notification
  * channels to this server's server.health.* events without leaving the page.
  *
- * Health events fire from {@see \App\Services\Servers\ServerHealthNotifier} (run on
- * the fleet health cadence via {@see \App\Jobs\CheckServerHealthJob}), so this trait
+ * Health events fire from {@see ServerHealthNotifier} (run on
+ * the fleet health cadence via {@see CheckServerHealthJob}), so this trait
  * is subscription management only. Mirrors {@see ManagesSecurityDigestNotifications}.
  */
 trait ManagesHealthNotifications

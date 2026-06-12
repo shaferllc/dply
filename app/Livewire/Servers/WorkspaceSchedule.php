@@ -3,30 +3,32 @@
 namespace App\Livewire\Servers;
 
 use App\Jobs\RunSchedulerNowJob;
+use App\Jobs\SetSchedulerOutputCaptureJob;
 use App\Livewire\Concerns\EmitsPanelEvent;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\AuditLog;
 use App\Models\Server;
 use App\Models\ServerCronJob;
 use App\Models\ServerSchedulerHeartbeat;
 use App\Models\Site;
-use App\Services\Servers\ExecuteRemoteTaskOnServer;
-use Illuminate\Support\Facades\Cache;
-use Livewire\WithPagination;
 use App\Services\Servers\CronExpressionValidator;
+use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Services\Servers\PreflightSchedulerOnSite;
 use App\Services\Servers\SchedulerCardsBuilder;
 use App\Services\Servers\SchedulerHealthEvaluator;
 use App\Services\Servers\ServerCronSynchronizer;
 use App\Services\Servers\ServerRemovalAdvisor;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
+use Livewire\WithPagination;
 
 /**
  * First-class scheduler control plane for a single server (per the
@@ -45,9 +47,9 @@ use Livewire\Attributes\Lazy;
 #[Lazy]
 class WorkspaceSchedule extends Component
 {
+    use EmitsPanelEvent;
     use RendersWorkspacePlaceholder;
     use RequiresFeature;
-    use EmitsPanelEvent;
     use WithPagination;
 
     protected string $requiredFeature = 'workspace.schedule';
@@ -604,7 +606,7 @@ class WorkspaceSchedule extends Component
             ],
         );
 
-        $runId = (string) \Illuminate\Support\Str::ulid();
+        $runId = (string) Str::ulid();
         $this->scheduler_run_id = $runId;
         $this->scheduler_run_busy = true;
         $this->scheduler_run_cache_key = RunSchedulerNowJob::cacheKey($runId);
@@ -679,12 +681,12 @@ class WorkspaceSchedule extends Component
         $enabled = ! $heartbeat->output_capture_enabled;
         $heartbeat->forceFill(['output_capture_enabled' => $enabled])->save();
 
-        $runId = (string) \Illuminate\Support\Str::ulid();
+        $runId = (string) Str::ulid();
         $this->scheduler_run_id = $runId;
         $this->scheduler_run_busy = true;
-        $this->scheduler_run_cache_key = \App\Jobs\SetSchedulerOutputCaptureJob::cacheKey($runId);
+        $this->scheduler_run_cache_key = SetSchedulerOutputCaptureJob::cacheKey($runId);
 
-        \App\Jobs\SetSchedulerOutputCaptureJob::dispatch($this->server->id, $heartbeat->id, $enabled, $runId);
+        SetSchedulerOutputCaptureJob::dispatch($this->server->id, $heartbeat->id, $enabled, $runId);
 
         audit_log(
             $this->server->organization,

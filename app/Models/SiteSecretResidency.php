@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Services\Sites\SecretResidencyResolver;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * The loose `env_file_content` carries only a {@see placeholder()} for the key;
  * the real value is resolved just-in-time at push/deploy by
- * {@see \App\Services\Sites\SecretResidencyResolver}. Two modes:
+ * {@see SecretResidencyResolver}. Two modes:
  *
  *   - {@see MODE_ESCROW}: `$ciphertext` is an `age` blob encrypted to the org's
  *     recipient. NOTE this is intentionally NOT an `encrypted` cast — the whole

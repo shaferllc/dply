@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Events\WorkerPools;
 
+use App\Http\Controllers\Api\WorkerPoolJobEventController;
+use App\Listeners\ForwardWorkerPoolJobEvent;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
@@ -13,8 +15,8 @@ use Illuminate\Foundation\Events\Dispatchable;
  * A single Horizon job lifecycle event forwarded from a worker pool box and
  * pushed over Reverb to the org's private channel, so the pool's Horizon
  * dashboard updates per-job in real time (no polling). Fired by the ingest
- * endpoint {@see \App\Http\Controllers\Api\WorkerPoolJobEventController} after a
- * box-side {@see \App\Listeners\ForwardWorkerPoolJobEvent} POSTs the event.
+ * endpoint {@see WorkerPoolJobEventController} after a
+ * box-side {@see ForwardWorkerPoolJobEvent} POSTs the event.
  *
  * NOT ShouldQueue: queueing the broadcast would route it through the very queue
  * we're observing and add latency — these are fire-and-forget UI pushes.

@@ -175,7 +175,7 @@ class ScheduleHeartbeatIngest
         ServerSchedulerHeartbeat $heartbeat,
         array $raw,
         ?int $exitCode,
-        ?\Carbon\Carbon $ranAt,
+        ?Carbon $ranAt,
     ): void {
         $stderr = $this->stringOrNull($raw['stderr_excerpt'] ?? null);
         $stdout = $this->stringOrNull($raw['stdout_excerpt'] ?? null);

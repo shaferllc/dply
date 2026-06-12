@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Console\Commands\LogDrainListen;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * One application log record received from a site via the dply Realtime drain
- * (Phase 5). Written by the drain receiver ({@see \App\Console\Commands\LogDrainListen})
+ * (Phase 5). Written by the drain receiver ({@see LogDrainListen})
  * and read by the App logs panel. Append-only — a row is written once.
  *
  * @property string $site_id

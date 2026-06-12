@@ -2,13 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Models\SiteSecretResidency;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
  * Per-organization `age` keypair used to encrypt that org's escrowed secrets
- * (the {@see \App\Models\SiteSecretResidency} escrow mode). One key per org.
+ * (the {@see SiteSecretResidency} escrow mode). One key per org.
  *
  * The `public_recipient` is the age recipient string — safe to store in the
  * clear, it's only used to ENCRYPT. The matching private identity decrypts:

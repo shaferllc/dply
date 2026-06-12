@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Secrets;
 
+use App\Models\OrgSecretKey;
 use Illuminate\Support\Facades\Process;
 use RuntimeException;
 
@@ -69,7 +70,7 @@ final class AgeEncryptor
     /**
      * Encrypt to one or more explicit recipient strings (`age1...`) rather than
      * the platform recipients file. Used for per-org keys, where the recipient
-     * lives in the DB ({@see \App\Models\OrgSecretKey::$public_recipient}), not
+     * lives in the DB ({@see OrgSecretKey::$public_recipient}), not
      * on the box. The platform DR path keeps using {@see encrypt()}.
      *
      * ASCII-armored (`-a`) so the ciphertext is text-safe for a DB column; the
@@ -141,9 +142,9 @@ final class AgeEncryptor
     /**
      * Generate a fresh age keypair via `age-keygen`.
      *
-     * @return array{identity: string, recipient: string}  identity = the full
-     *   `AGE-SECRET-KEY-...` material (with the `# public key:` comment line);
-     *   recipient = the `age1...` public string parsed from it.
+     * @return array{identity: string, recipient: string} identity = the full
+     *                                                    `AGE-SECRET-KEY-...` material (with the `# public key:` comment line);
+     *                                                    recipient = the `age1...` public string parsed from it.
      */
     public function generateKeypair(): array
     {

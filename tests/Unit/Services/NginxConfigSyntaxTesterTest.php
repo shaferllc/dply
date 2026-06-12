@@ -7,7 +7,6 @@ namespace Tests\Unit\Services\NginxConfigSyntaxTesterTest;
 use App\Services\Webserver\NginxConfigSyntaxTester;
 use ReflectionMethod;
 
-/** @return string */
 function neutralize(string $input): string
 {
     $method = new ReflectionMethod(NginxConfigSyntaxTester::class, 'neutralizeServerOnlyDirectives');

@@ -2,6 +2,9 @@
 
 namespace App\Services\Notifications;
 
+use App\Jobs\RevertServerWebserverSwitchJob;
+use App\Jobs\RunWebserverConfigOpJob;
+use App\Jobs\SwitchServerWebserverJob;
 use App\Models\Server;
 use App\Models\User;
 use App\Support\ServerWebserverNotificationKeys;
@@ -9,8 +12,8 @@ use App\Support\ServerWebserverNotificationKeys;
 /**
  * Publishes notifications for server-scoped webserver changes (engine switch,
  * rollback, config-file save), fired from the webserver jobs
- * ({@see \App\Jobs\SwitchServerWebserverJob}, {@see \App\Jobs\RevertServerWebserverSwitchJob},
- * {@see \App\Jobs\RunWebserverConfigOpJob}).
+ * ({@see SwitchServerWebserverJob}, {@see RevertServerWebserverSwitchJob},
+ * {@see RunWebserverConfigOpJob}).
  *
  * Mirrors {@see ServerFirewallNotificationDispatcher}. Subject is the {@see Server};
  * the per-kind title is pulled from the config label.

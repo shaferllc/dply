@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Concerns\Sites;
 
+use App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts;
 use App\Services\SourceControl\GitIdentityResolver;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
 use Illuminate\Support\Facades\Http;
@@ -24,7 +25,7 @@ use Illuminate\Support\Facades\Http;
  * body. The hooks let each host inject only its deltas (e.g. ChooseApp/Repository
  * persist the URL+account onto the Site so the ref picker can resolve refs).
  *
- * Designed to co-exist with {@see \App\Livewire\Concerns\RefreshesLinkedSourceControlAccounts}
+ * Designed to co-exist with {@see RefreshesLinkedSourceControlAccounts}
  * (which refreshes {@see $linkedSourceControlAccounts} when a provider is linked
  * mid-flow) and, on the Site-backed hosts, {@see PicksRepositoryRef}. Member
  * names are disjoint from both.

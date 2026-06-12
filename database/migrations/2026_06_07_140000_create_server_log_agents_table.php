@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Server;
+use App\Models\ServerLogAgent;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -14,7 +15,7 @@ use Illuminate\Support\Facades\Schema;
  * the workspace's streaming progress view.
  *
  * One agent per server (unique server_id) — the add-on is a per-server resource,
- * billed per-server. See docs/SERVER_LOGS_ADDON.md and {@see \App\Models\ServerLogAgent}.
+ * billed per-server. See docs/SERVER_LOGS_ADDON.md and {@see ServerLogAgent}.
  */
 return new class extends Migration
 {

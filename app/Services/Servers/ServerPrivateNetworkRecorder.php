@@ -6,6 +6,7 @@ namespace App\Services\Servers;
 
 use App\Models\PrivateNetwork;
 use App\Models\Server;
+use App\Services\Deploy\Concerns\ResolvesReachableResources;
 
 /**
  * Records the provider VPC / private network a server sits in as a
@@ -14,7 +15,7 @@ use App\Models\Server;
  * This is what makes cross-box private reachability work: two servers in the
  * SAME provider VPC resolve to the SAME PrivateNetwork row (keyed on
  * organization + provider + the provider's VPC id), so
- * {@see \App\Services\Deploy\Concerns\ResolvesReachableResources::sharePrivateNetwork()}
+ * {@see ResolvesReachableResources::sharePrivateNetwork()}
  * matches them by FK. The CIDR `ip_range` is a bonus (it powers the
  * range-membership fallback) — the VPC-id identity is the load-bearing part, so
  * recording works even when a provider doesn't hand back a clean CIDR.
@@ -43,8 +44,8 @@ final class ServerPrivateNetworkRecorder
         // index on (organization_id, provider, provider_id) is the proper backstop.
         $network = PrivateNetwork::query()->firstOrNew([
             'organization_id' => $server->organization_id,
-            'provider'        => $provider,
-            'provider_id'     => $vpcId,
+            'provider' => $provider,
+            'provider_id' => $vpcId,
         ]);
 
         if (! $network->exists) {

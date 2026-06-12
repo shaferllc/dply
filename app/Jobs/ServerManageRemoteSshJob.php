@@ -5,7 +5,9 @@ namespace App\Jobs;
 use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerManageAction;
+use App\Models\User;
 use App\Services\ConsoleActions\ConsoleEmitter;
+use App\Services\Notifications\ServerPatchNotificationDispatcher;
 use App\Services\Servers\ServerAptLockBash;
 use App\Services\Servers\ServerManageSshExecutor;
 use App\Services\Servers\ServerMetricsGuestPushService;
@@ -83,13 +85,13 @@ class ServerManageRemoteSshJob implements ShouldQueue
         if ($this->logId !== null) {
             $userId = ServerManageAction::query()->whereKey($this->logId)->value('user_id');
             if ($userId) {
-                $actor = \App\Models\User::query()->find($userId);
+                $actor = User::query()->find($userId);
             }
         }
 
         $details = (! $success && $error) ? [__('Error: :error', ['error' => $error])] : [];
 
-        app(\App\Services\Notifications\ServerPatchNotificationDispatcher::class)->notify(
+        app(ServerPatchNotificationDispatcher::class)->notify(
             $server,
             $kind,
             $details,

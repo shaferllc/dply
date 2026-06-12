@@ -14,24 +14,14 @@ class Formatter
     /** @var Builder */
     private $builder;
 
-    /**
-     * @param Parser|null  $parser
-     * @param Builder|null $builder
-     */
     public function __construct(?Parser $parser = null, ?Builder $builder = null)
     {
-        $this->parser = $parser ?? new Parser();
-        $this->builder = $builder ?? new Builder();
+        $this->parser = $parser ?? new Parser;
+        $this->builder = $builder ?? new Builder;
     }
 
     /**
-     * @param string $filename
-     * @param int    $indent
-     * @param bool   $tabs
-     *
      * @throws NgxParserException
-     *
-     * @return string
      */
     public function format(string $filename, int $indent = 4, bool $tabs = false): string
     {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers\Concerns;
 
+use App\Jobs\ScanServerLiveCertsJob;
 use App\Services\Servers\WebserverCertsAggregator;
 use Carbon\CarbonImmutable;
 
@@ -11,7 +12,7 @@ use Carbon\CarbonImmutable;
  * Shared "live on-disk TLS certificates" loader for the server surfaces that
  * render the cross-engine cert sweep (the webserver Health tab and the cert
  * inventory page). One mechanism: read the cached sweep, and when it's missing
- * or a rescan is requested, dispatch {@see \App\Jobs\ScanServerLiveCertsJob} and
+ * or a rescan is requested, dispatch {@see ScanServerLiveCertsJob} and
  * poll for the result — the SSH probe never runs in the request.
  *
  * Hosts must expose a public `Server $server`, the `serverOpsReady()` guard, and

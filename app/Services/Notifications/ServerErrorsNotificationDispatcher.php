@@ -7,13 +7,14 @@ use App\Models\NotificationSubscription;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\User;
+use App\Support\Errors\ErrorEventSyncer;
 use App\Support\ServerErrorsNotificationKeys;
 use App\Support\SiteErrorsNotificationKeys;
 use Illuminate\Support\Str;
 
 /**
  * Publishes a notification for a single newly-captured {@see ErrorEvent} — fired
- * from {@see \App\Support\Errors\ErrorEventSyncer} as the per-minute sweep promotes
+ * from {@see ErrorEventSyncer} as the per-minute sweep promotes
  * a failed ConsoleAction / SiteDeployment into the error stream. This is the entry
  * point the syncer calls; it coordinates BOTH notification scopes for one event.
  *

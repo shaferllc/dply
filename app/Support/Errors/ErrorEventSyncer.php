@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Errors;
 
+use App\Jobs\Concerns\WritesConsoleAction;
 use App\Models\ConsoleAction;
 use App\Models\ErrorEvent;
 use App\Models\SiteDeployment;
@@ -15,7 +16,7 @@ use Throwable;
 /**
  * Captures failed sources into {@see ErrorEvent} rows by scanning the source
  * tables. This is a sweeper, not an Eloquent observer, on purpose: most
- * failures are persisted via the query builder (e.g. {@see \App\Jobs\Concerns\WritesConsoleAction::failConsoleAction()}
+ * failures are persisted via the query builder (e.g. {@see WritesConsoleAction::failConsoleAction()}
  * does `DB::table('console_actions')->update(...)`), which bypasses model
  * events — an observer would silently miss them. Polling the source tables
  * captures every failure regardless of how it was written.
@@ -39,10 +40,10 @@ class ErrorEventSyncer
      * @param  bool  $refresh  Re-record sources that already have an event too
      *                         (updateOrCreate refreshes link/title/detail after
      *                         a recorder change). Default skips captured sources.
-     * @param  bool  $notify   Fire an error-stream notification for each newly
-     *                         captured event. The per-minute live sweep wants
-     *                         this; the historical backfill passes false so it
-     *                         doesn't blast alerts for old failures.
+     * @param  bool  $notify  Fire an error-stream notification for each newly
+     *                        captured event. The per-minute live sweep wants
+     *                        this; the historical backfill passes false so it
+     *                        doesn't blast alerts for old failures.
      */
     public function sync(CarbonInterface $since, bool $refresh = false, bool $notify = true): int
     {

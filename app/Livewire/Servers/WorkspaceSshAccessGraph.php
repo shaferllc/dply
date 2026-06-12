@@ -6,6 +6,7 @@ namespace App\Livewire\Servers;
 
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\Server;
 use App\Models\ServerRemoteAccessEvent;
 use App\Models\ServerSshKeyAuditEvent;
@@ -17,16 +18,15 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Carbon;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
-use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use Livewire\Attributes\Lazy;
+use Livewire\Component;
 
 #[Layout('layouts.app')]
 #[Lazy]
 class WorkspaceSshAccessGraph extends Component
 {
-    use RendersWorkspacePlaceholder;
     use InteractsWithServerWorkspace;
+    use RendersWorkspacePlaceholder;
     use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.ssh_access_graph';

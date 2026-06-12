@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Servers\Concerns;
 
+use App\Jobs\ServerManageRemoteSshJob;
 use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
@@ -15,7 +16,7 @@ use Illuminate\Support\Facades\Gate;
  * Powers the "Notifications" tab on the patches workspace: binds notification
  * channels to this server's server.patches.* events without leaving the page.
  *
- * Patch actions fire from the shared manage-action job ({@see \App\Jobs\ServerManageRemoteSshJob}),
+ * Patch actions fire from the shared manage-action job ({@see ServerManageRemoteSshJob}),
  * so this trait provides no inline dispatch helper — it's subscription management
  * only. Reuses the host's existing `$patchesTab` state. Mirrors
  * {@see ManagesWebserverNotifications}.

@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Support\Sites;
 
+use App\Jobs\ValidateSiteBindingsReachableJob;
 use App\Models\SiteBinding;
 
 /**
  * Resolves the reachable host:port for a site resource binding — the endpoint
  * the site's server must be able to open a TCP socket to at runtime. Used by
- * {@see \App\Jobs\ValidateSiteBindingsReachableJob} to probe every networked
+ * {@see ValidateSiteBindingsReachableJob} to probe every networked
  * binding from the box, and by the Resources map to decide which nodes can show
  * a reachability badge.
  *

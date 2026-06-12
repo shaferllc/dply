@@ -4,11 +4,12 @@ namespace App\Services\Notifications;
 
 use App\Models\Server;
 use App\Models\User;
+use App\Services\Servers\ServerHealthNotifier;
 use App\Support\ServerHealthNotificationKeys;
 
 /**
  * Publishes notifications for the server health cockpit — posture transitions
- * detected when the cockpit is evaluated ({@see \App\Services\Servers\ServerHealthNotifier}):
+ * detected when the cockpit is evaluated ({@see ServerHealthNotifier}):
  * a new critical / warning alert, or a recovery to a healthy posture.
  *
  * Mirrors {@see ServerSecurityDigestNotificationDispatcher}. Subject is the

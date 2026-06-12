@@ -222,7 +222,7 @@ final class SiteGitCommitsFetcher
 
     private function fetchGithub(array $remote, Site $site, User $user, string $branch, int $limit, int $page = 1): array
     {
-        $identity = $this->resolver->forSite($site, $user,'github');
+        $identity = $this->resolver->forSite($site, $user, 'github');
         if ($identity === null) {
             return [
                 'ok' => false,
@@ -371,7 +371,7 @@ final class SiteGitCommitsFetcher
 
     private function fetchGitlab(array $remote, Site $site, User $user, string $branch, int $limit, int $page = 1): array
     {
-        $identity = $this->resolver->forSite($site, $user,'gitlab');
+        $identity = $this->resolver->forSite($site, $user, 'gitlab');
         if ($identity === null) {
             return [
                 'ok' => false,
@@ -502,7 +502,7 @@ final class SiteGitCommitsFetcher
 
     private function fetchBitbucket(array $remote, Site $site, User $user, string $branch, int $limit, int $page = 1): array
     {
-        $identity = $this->resolver->forSite($site, $user,'bitbucket');
+        $identity = $this->resolver->forSite($site, $user, 'bitbucket');
         if ($identity === null) {
             return [
                 'ok' => false,

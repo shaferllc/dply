@@ -9,6 +9,7 @@ use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesInsightsNotifications;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\InsightFinding;
 use App\Models\Organization;
 use App\Models\Server;
@@ -24,10 +25,9 @@ use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
 #[Lazy]
@@ -38,8 +38,8 @@ class WorkspaceInsights extends Component
 
     protected string $requiredFeature = 'workspace.insights';
 
-    use InteractsWithServerWorkspace;
     use CreatesNotificationChannelInline;
+    use InteractsWithServerWorkspace;
     use ManagesInsightsNotifications;
 
     /** When true, render the coming-soon teaser instead of the full workspace. */

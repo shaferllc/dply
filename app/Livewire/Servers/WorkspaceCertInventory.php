@@ -9,27 +9,27 @@ use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\LoadsLiveServerCerts;
 use App\Livewire\Servers\Concerns\ManagesCertInventoryNotifications;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\Server;
 use App\Models\SiteCertificate;
 use App\Services\Servers\ServerCertificateInventory;
 use App\Services\Servers\WebserverCertsAggregator;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 
 #[Layout('layouts.app')]
 #[Lazy]
 class WorkspaceCertInventory extends Component
 {
-    use RendersWorkspacePlaceholder;
+    use CreatesNotificationChannelInline;
     use InteractsWithServerWorkspace;
     use LoadsLiveServerCerts;
-    use RequiresFeature;
-    use CreatesNotificationChannelInline;
     use ManagesCertInventoryNotifications;
+    use RendersWorkspacePlaceholder;
+    use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.cert_inventory';
 

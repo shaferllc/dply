@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Admin;
 
+use App\Http\Middleware\RedirectGuestsToComingSoon;
 use App\Livewire\Admin\Concerns\AuthorizesPlatformAdmin;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\ComingSoonAllowedIp;
@@ -15,7 +16,7 @@ use Livewire\Component;
  * Platform-admin management of the coming-soon IP allow-list: addresses (and
  * CIDR ranges) that see the full site while the gate is on. The effective list
  * is these managed rows ∪ the COMING_SOON_ALLOWED_IPS env entries (shown here
- * read-only). See {@see \App\Http\Middleware\RedirectGuestsToComingSoon}.
+ * read-only). See {@see RedirectGuestsToComingSoon}.
  */
 #[Layout('layouts.admin')]
 class ComingSoonAccess extends Component

@@ -8,6 +8,7 @@ use App\Livewire\Organizations\Realtime;
 use App\Models\Organization;
 use App\Models\RealtimeApp;
 use App\Models\User;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
@@ -159,4 +160,4 @@ test('apps from another org are not visible or reachable', function () {
         ->assertDontSee('Foreign relay')
         ->call('startTierChange', $foreign->id)
         ->assertStatus(404);
-})->throws(\Illuminate\Database\Eloquent\ModelNotFoundException::class);
+})->throws(ModelNotFoundException::class);

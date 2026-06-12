@@ -9,6 +9,7 @@ use App\Jobs\ProvisionHetznerServerJob;
 use App\Models\Organization;
 use App\Models\Server;
 use App\Models\ServerPoolMember;
+use App\Models\User;
 use App\Support\Servers\ServerHostingPlatformContext;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -59,7 +60,7 @@ class CreateWarmPoolMember
             return null;
         }
 
-        /** @var \App\Models\User|null $user */
+        /** @var User|null $user */
         $user = $org->users()->first();
         if (! $user) {
             Log::warning('warm_pool.create.no_user', ['org' => $org->id]);

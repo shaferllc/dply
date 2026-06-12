@@ -9,6 +9,8 @@ use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerWebserverAuditEvent;
 use App\Models\Site;
+use App\Models\User;
+use App\Services\Notifications\ServerWebserverNotificationDispatcher;
 use App\Services\RemoteCli\RiskLevel;
 use App\Services\SshConnection;
 use App\Support\Servers\CaddyRuntimeOwnership;
@@ -88,14 +90,14 @@ class RevertServerWebserverSwitchJob implements ShouldBeUnique, ShouldQueue
         return $this->userId;
     }
 
-    public function handle(\App\Services\Notifications\ServerWebserverNotificationDispatcher $notifications): void
+    public function handle(ServerWebserverNotificationDispatcher $notifications): void
     {
         $server = Server::query()->find($this->serverId);
         if ($server === null) {
             return;
         }
 
-        $actor = $this->userId !== null ? \App\Models\User::query()->find($this->userId) : null;
+        $actor = $this->userId !== null ? User::query()->find($this->userId) : null;
         $emitter = $this->beginConsoleAction();
         $startedAt = microtime(true);
         $ssh = new SshConnection($server);

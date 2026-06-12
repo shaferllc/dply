@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace App\Models\Concerns\Site;
 
 use App\Enums\SiteType;
+use App\Jobs\PreflightSiteSetupJob;
 use App\Models\Site;
 use App\Models\SiteCertificate;
 use App\Services\Sites\CaddySiteConfigBuilder;
+use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\SiteWorkerPageBuilder;
+use App\Support\Sites\BootCriticalEnv;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\URL;
 
 /**
@@ -381,7 +385,7 @@ trait TracksProvisioningStatus
 
     /**
      * Lifecycle state of the post-repo-connect setup wizard (import/preset
-     * sites), written by {@see \App\Jobs\PreflightSiteSetupJob} into
+     * sites), written by {@see PreflightSiteSetupJob} into
      * meta.setup.state: 'scanning' | 'deploying' | 'needs_setup' |
      * 'scan_failed'. Null once the site has deployed at least once, or for
      * sites that never entered the flow.
@@ -424,7 +428,7 @@ trait TracksProvisioningStatus
         }
 
         try {
-            return \Illuminate\Support\Carbon::parse($at)->lt(now()->subSeconds($seconds));
+            return Carbon::parse($at)->lt(now()->subSeconds($seconds));
         } catch (\Throwable) {
             return true;
         }
@@ -450,7 +454,7 @@ trait TracksProvisioningStatus
      * The site has connected a repo but is being held before its first deploy
      * pending setup (missing required env, or a failed scan to fix). Drives the
      * setup wizard and the Overview "finish setting up" card. The site stays
-     * live (no status change) throughout — see {@see \App\Jobs\PreflightSiteSetupJob}.
+     * live (no status change) throughout — see {@see PreflightSiteSetupJob}.
      */
     public function needsFirstDeploySetup(): bool
     {
@@ -485,7 +489,7 @@ trait TracksProvisioningStatus
 
         $current = [];
         if (filled($this->env_file_content)) {
-            $parsed = app(\App\Services\Sites\DotEnvFileParser::class)->parse((string) $this->env_file_content);
+            $parsed = app(DotEnvFileParser::class)->parse((string) $this->env_file_content);
             $current = is_array($parsed['variables'] ?? null) ? $parsed['variables'] : [];
         }
 
@@ -513,7 +517,7 @@ trait TracksProvisioningStatus
      * hundreds of keys "required"; only the boot-critical ones (framework URL +
      * database connection) should hold the deploy. Everything else is optional
      * and the operator can fill it from the Environment tab any time.
-     * See {@see \App\Support\Sites\BootCriticalEnv}.
+     * See {@see BootCriticalEnv}.
      *
      * @return list<string>
      */
@@ -521,7 +525,7 @@ trait TracksProvisioningStatus
     {
         return array_values(array_filter(
             $this->unsatisfiedRequiredEnvKeys(),
-            static fn (string $key): bool => \App\Support\Sites\BootCriticalEnv::isBootCritical($key),
+            static fn (string $key): bool => BootCriticalEnv::isBootCritical($key),
         ));
     }
 

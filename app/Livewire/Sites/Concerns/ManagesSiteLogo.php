@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Concerns;
 
+use App\Models\Site;
 use App\Services\Sites\SiteFaviconFetcher;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -12,7 +13,7 @@ use Livewire\Features\SupportFileUploads\WithFileUploads;
 /**
  * Custom site logo management for the settings workspace: upload an image,
  * pull the live site's favicon, or remove it. Logos live on the `public` disk
- * under site-logos/; the model exposes them via {@see \App\Models\Site::logoUrl()}.
+ * under site-logos/; the model exposes them via {@see Site::logoUrl()}.
  *
  * Raster formats only (png/jpg/webp/gif/ico) — SVG is rejected to avoid serving
  * script-bearing SVGs from our own origin.

@@ -16,9 +16,11 @@ use App\Livewire\Servers\Concerns\ManagesSnapshotsNotifications;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\Server;
 use App\Models\ServerImage;
+use App\Models\Site;
 use App\Models\Snapshot;
 use App\Support\Servers\ServerImageProvider;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Lazy;
@@ -255,14 +257,14 @@ class WorkspaceSnapshots extends Component
         $this->toastSuccess(__('Snapshot record deleted.'));
     }
 
-    /** @return Collection<int, \App\Models\Site> */
+    /** @return Collection<int, Site> */
     protected function serverSites(): Collection
     {
         return $this->server->sites()->orderBy('name')->get();
     }
 
     /** Base query for this server's site DB snapshots (scoped via the server's sites). */
-    protected function siteSnapshotsQuery(): \Illuminate\Database\Eloquent\Builder
+    protected function siteSnapshotsQuery(): Builder
     {
         return Snapshot::query()
             ->whereIn('site_id', $this->server->sites()->pluck('id'));

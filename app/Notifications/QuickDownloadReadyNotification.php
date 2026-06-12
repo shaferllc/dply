@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Notifications;
 
 use App\Models\QuickDownload;
+use App\Services\Servers\QuickDownloadNotifier;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -49,7 +50,7 @@ class QuickDownloadReadyNotification extends Notification implements ShouldQueue
             $mail->line(__('Size: :size', ['size' => $size]));
         }
 
-        $window = \App\Services\Servers\QuickDownloadNotifier::retentionWindowLabel();
+        $window = QuickDownloadNotifier::retentionWindowLabel();
 
         return $mail
             ->action(__('Download now'), $this->downloadUrl)

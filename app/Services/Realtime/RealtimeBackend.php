@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace App\Services\Realtime;
 
 use App\Models\RealtimeApp;
+use App\Services\Edge\EdgeBackend;
 
 /**
  * Common interface for realtime backends. The realtime layer talks to backends
  * through this and never imports the Cloudflare SDK directly — mirroring the
- * {@see \App\Services\Edge\EdgeBackend} pattern.
+ * {@see EdgeBackend} pattern.
  */
 interface RealtimeBackend
 {

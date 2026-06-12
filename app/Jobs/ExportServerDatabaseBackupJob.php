@@ -26,8 +26,8 @@ class ExportServerDatabaseBackupJob implements ShouldQueue
 
     /**
      * @param  string|null  $seededConsoleRunId  a ConsoleAction the dispatcher
-     *   (an on-demand run) pre-seeded so progress streams into the Backups-tab
-     *   banner. Null for scheduled runs — they stay silent (no console row).
+     *                                           (an on-demand run) pre-seeded so progress streams into the Backups-tab
+     *                                           banner. Null for scheduled runs — they stay silent (no console row).
      */
     public function __construct(
         public string $backupId,

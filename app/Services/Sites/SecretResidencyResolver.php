@@ -39,7 +39,7 @@ class SecretResidencyResolver
     /**
      * @param  array<string, string>  $vars  the merged env map (loose + bindings)
      * @param  string|null  $ephemeralIdentity  a customer-held age identity supplied
-     *   for THIS push only and never persisted (Tier 2b). Null for every other tier.
+     *                                          for THIS push only and never persisted (Tier 2b). Null for every other tier.
      * @return array<string, string>
      */
     public function resolve(Site $site, array $vars, ?string $ephemeralIdentity = null): array

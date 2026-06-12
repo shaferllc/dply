@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
+use App\Jobs\RunServerReleaseHygieneScanJob;
+use App\Livewire\Servers\Concerns\RunsServerReleaseHygieneScan;
 use App\Models\Server;
 use App\Models\User;
 use App\Services\Notifications\ServerReleaseHygieneNotificationDispatcher;
@@ -17,8 +19,8 @@ use RuntimeException;
  * critical state or recovers to healthy.
  *
  * Shared by the interactive "Scan disk" button
- * ({@see \App\Livewire\Servers\Concerns\RunsServerReleaseHygieneScan}) and the daily
- * fleet sweep ({@see \App\Jobs\RunServerReleaseHygieneScanJob}) so both run one code path.
+ * ({@see RunsServerReleaseHygieneScan}) and the daily
+ * fleet sweep ({@see RunServerReleaseHygieneScanJob}) so both run one code path.
  * Mirrors {@see ServerSecurityDigestScanner}.
  */
 final class ServerReleaseHygieneScanner

@@ -7,6 +7,7 @@ namespace App\Livewire\Servers;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\Server;
 use App\Services\Servers\ServerFileBrowserAuditLogger;
 use App\Services\Servers\ServerFileBrowserRemoteReader;
@@ -16,10 +17,9 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 
 /**
  * Server file browser (read-only + download in v1).

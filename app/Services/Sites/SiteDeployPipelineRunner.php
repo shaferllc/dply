@@ -4,18 +4,20 @@ namespace App\Services\Sites;
 
 use App\Contracts\RemoteShell;
 use App\Models\Site;
+use App\Models\SiteDeployment;
 use App\Models\SiteDeployStep;
+use App\Services\Deploy\DeployPhaseRunner;
 
 /**
  * Runs ordered {@see SiteDeployStep} records over SSH in the deploy working directory.
  *
  * Each phase method returns a structured result so callers can both append
  * the human-readable log AND record per-step status/timing onto the
- * {@see \App\Models\SiteDeployment} (powering the live phase timeline):
+ * {@see SiteDeployment} (powering the live phase timeline):
  *
  *   ['log' => string, 'steps' => list<step>, 'ok' => bool]
  *
- * where each step matches the shape {@see \App\Services\Deploy\DeployPhaseRunner}
+ * where each step matches the shape {@see DeployPhaseRunner}
  * records: {step_id, step_type, command, ok, output, duration_ms, skipped}.
  * The runner does NOT throw on a failed step — it sets ok=false and stops the
  * phase so the caller can record the partial results before failing the deploy.
@@ -43,9 +45,9 @@ class SiteDeployPipelineRunner
 
     /**
      * @param  ?callable(list<array<string, mixed>>): void  $onProgress  Fired
-     *   before each step with the full ordered step list (completed steps carry
-     *   their output; the current one is flagged `running`; the rest `pending`),
-     *   so the caller can persist live progress for the phase timeline.
+     *                                                                   before each step with the full ordered step list (completed steps carry
+     *                                                                   their output; the current one is flagged `running`; the rest `pending`),
+     *                                                                   so the caller can persist live progress for the phase timeline.
      * @return array{log: string, steps: list<array<string, mixed>>, ok: bool}
      */
     public function runBuild(RemoteShell $ssh, Site $site, string $workingDirectory, ?callable $onProgress = null): array

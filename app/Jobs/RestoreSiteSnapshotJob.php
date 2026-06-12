@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Console\Commands\SnapshotRestoreCommand;
 use App\Models\Snapshot;
 use App\Services\Snapshots\SnapshotDestinationFactory;
 use App\Services\Snapshots\SnapshotService;
@@ -16,7 +17,7 @@ use Illuminate\Foundation\Queue\Queueable;
  * SSH (long-running) so it cannot run in the web request.
  *
  * Picks the destination matching the snapshot's storage so the restore pipeline
- * knows where to fetch bytes from — mirrors {@see \App\Console\Commands\SnapshotRestoreCommand}.
+ * knows where to fetch bytes from — mirrors {@see SnapshotRestoreCommand}.
  */
 class RestoreSiteSnapshotJob implements ShouldQueue
 {

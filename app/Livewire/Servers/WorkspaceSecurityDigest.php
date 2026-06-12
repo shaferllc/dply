@@ -8,6 +8,7 @@ use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesSecurityDigestNotifications;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Livewire\Servers\Concerns\RunsServerSecurityDigestScan;
 use App\Models\Server;
 use App\Services\Servers\ServerSecurityDigest;
@@ -15,11 +16,10 @@ use App\Services\Servers\ServerSshAccessGraph;
 use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 
 /**
  * SSH auth failure volume, fail2ban jails, host firewall posture, and sshd
@@ -34,12 +34,12 @@ use Livewire\Attributes\Lazy;
 #[Lazy]
 class WorkspaceSecurityDigest extends Component
 {
-    use RendersWorkspacePlaceholder;
+    use CreatesNotificationChannelInline;
     use InteractsWithServerWorkspace;
+    use ManagesSecurityDigestNotifications;
+    use RendersWorkspacePlaceholder;
     use RequiresFeature;
     use RunsServerSecurityDigestScan;
-    use CreatesNotificationChannelInline;
-    use ManagesSecurityDigestNotifications;
 
     protected string $requiredFeature = 'workspace.security_digest';
 

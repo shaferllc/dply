@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use App\Models\NotificationChannel;
 use App\Models\NotificationSubscription;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
@@ -31,7 +32,7 @@ final class NotificationSubscriptionMatrix
      * and the assignable channels.
      *
      * @param  list<string>  $managedKeys
-     * @param  Collection<int, \App\Models\NotificationChannel>  $assignableChannels
+     * @param  Collection<int, NotificationChannel>  $assignableChannels
      * @return array<string, list<string>>
      */
     public static function load(string $subjectType, string $subjectId, array $managedKeys, Collection $assignableChannels): array
@@ -68,7 +69,7 @@ final class NotificationSubscriptionMatrix
      * in $assignableChannels; unknown channels are skipped.
      *
      * @param  list<string>  $managedKeys
-     * @param  Collection<int, \App\Models\NotificationChannel>  $assignableChannels
+     * @param  Collection<int, NotificationChannel>  $assignableChannels
      * @param  array<string, mixed>  $selections  channelId => list<eventKey>
      * @return array{changed: int, added: int, removed: int}
      */

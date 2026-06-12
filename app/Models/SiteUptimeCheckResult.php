@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Status\MonitorOperationalState;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * One recorded uptime check. Append-only history behind a monitor's last_*
  * snapshot; powers uptime %, latency trends and incident stitching. `state`
- * mirrors {@see \App\Services\Status\MonitorOperationalState} values.
+ * mirrors {@see MonitorOperationalState} values.
  */
 class SiteUptimeCheckResult extends Model
 {

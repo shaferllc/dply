@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Livewire\Servers\WorkspaceCaches;
 use App\Models\ServerCacheService;
 use App\Support\Servers\CacheServiceKeyspaceSampler;
 use App\Support\Servers\CacheServiceStats;
@@ -21,7 +22,7 @@ use Illuminate\Support\Facades\Cache;
  * hit-rate window deltas without the Livewire component needing to look at
  * its own buffer (it would be stale across the dispatch boundary anyway).
  *
- * @see \App\Livewire\Servers\WorkspaceCaches::loadKeyspaceDashboard()
+ * @see WorkspaceCaches::loadKeyspaceDashboard()
  */
 class RefreshKeyspaceSampleJob implements ShouldQueue
 {
@@ -35,8 +36,7 @@ class RefreshKeyspaceSampleJob implements ShouldQueue
     public function __construct(
         public string $cacheServiceId,
         public ?array $previousSample = null,
-    ) {
-    }
+    ) {}
 
     public static function resultCacheKey(string $serverId, string $engine): string
     {

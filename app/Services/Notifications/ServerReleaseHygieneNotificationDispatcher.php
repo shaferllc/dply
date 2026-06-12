@@ -4,11 +4,12 @@ namespace App\Services\Notifications;
 
 use App\Models\Server;
 use App\Models\User;
+use App\Services\Servers\ServerReleaseHygieneScanner;
 use App\Support\ServerReleaseHygieneNotificationKeys;
 
 /**
  * Publishes notifications for the server release hygiene workspace — pressure
- * transitions detected after a scan ({@see \App\Services\Servers\ServerReleaseHygieneScanner}):
+ * transitions detected after a scan ({@see ServerReleaseHygieneScanner}):
  * a new critical / warning finding (disk, release folders, log sizes, failed jobs),
  * or a recovery to a healthy posture.
  *

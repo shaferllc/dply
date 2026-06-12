@@ -8,19 +8,18 @@ use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesDeployPolicyNotifications;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\Server;
-use App\Models\User;
 use App\Services\Notifications\ServerDeployPolicyNotificationDispatcher;
 use App\Services\Servers\ServerDeployPolicyGuard;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 
 /**
  * Server-wide deploy deny windows, live status, and per-site coverage.
@@ -33,11 +32,11 @@ use Livewire\Attributes\Lazy;
 #[Lazy]
 class WorkspaceDeployPolicy extends Component
 {
-    use RendersWorkspacePlaceholder;
-    use InteractsWithServerWorkspace;
-    use RequiresFeature;
     use CreatesNotificationChannelInline;
+    use InteractsWithServerWorkspace;
     use ManagesDeployPolicyNotifications;
+    use RendersWorkspacePlaceholder;
+    use RequiresFeature;
 
     protected string $requiredFeature = 'workspace.deploy_windows';
 

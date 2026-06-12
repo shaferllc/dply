@@ -7,6 +7,7 @@ use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Concerns\StreamsRemoteSshLivewire;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\Script;
 use App\Models\Server;
 use App\Models\ServerRecipe;
@@ -17,10 +18,9 @@ use App\Support\Servers\ServerDockerRemoteInspector;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Url;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 
 /**
  * Run page — the merged surface for executing things on a server.

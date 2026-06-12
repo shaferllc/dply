@@ -2,13 +2,15 @@
 
 namespace App\Support;
 
+use App\Jobs\ExecuteSiteCertificateJob;
+
 /**
  * Notification event keys for server-scoped TLS certificate lifecycle, surfaced on
  * the /servers/{server}/cert-inventory workspace. The `server.` prefix maps these to
  * the Server subscribable in {@see NotificationSubscriptionRules::subscribableClassForEvent};
  * they are listed under the "cert_inventory" category in config/notification_events.php.
  *
- * Fired from the certificate request job ({@see \App\Jobs\ExecuteSiteCertificateJob}),
+ * Fired from the certificate request job ({@see ExecuteSiteCertificateJob}),
  * which handles both first-issue and renewal of a site's certificate. Mirrors
  * {@see ServerWebserverNotificationKeys}.
  */

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Console\Commands\RunDueScheduledDeploysCommand;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,7 +14,7 @@ use Illuminate\Support\Carbon;
 
 /**
  * A single-shot delayed deploy: a deploy queued to fire at {@see $run_at}. The
- * control-plane {@see \App\Console\Commands\RunDueScheduledDeploysCommand} tick
+ * control-plane {@see RunDueScheduledDeploysCommand} tick
  * dispatches it once due, then marks it dispatched. Cancelable while pending.
  *
  * @property string $id

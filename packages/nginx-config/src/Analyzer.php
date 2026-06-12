@@ -2164,15 +2164,12 @@ class Analyzer
     ];
 
     /**
-     * @param string $filename
-     * @param array  $stmt
-     * @param string $term
-     * @param array  $options  = [
-     *                         'ctx' => [],
-     *                         'strict' => false,
-     *                         'checkCtx' => true,
-     *                         'checkArgs' => true,
-     *                         ] Analyzer options
+     * @param  array  $options  = [
+     *                          'ctx' => [],
+     *                          'strict' => false,
+     *                          'checkCtx' => true,
+     *                          'checkArgs' => true,
+     *                          ] Analyzer options
      *
      * @throws NgxParserDirectiveArgumentsException
      * @throws NgxParserDirectiveContextException
@@ -2198,7 +2195,7 @@ class Analyzer
         $line = $stmt['line'];
 
         // if strict and directive isn't recognized then throw error
-        if ($strict && !isset($this->directives[$directive])) {
+        if ($strict && ! isset($this->directives[$directive])) {
             $reason = sprintf('unknown directive "%s"', $directive);
 
             throw new NgxParserDirectiveUnknownException($reason, $filename, $line);
@@ -2207,7 +2204,7 @@ class Analyzer
         // if we don't know where this directive is allowed and how
         // many arguments it can take then don't bother analyzing it
         $ctxMask = array_search($ctx, self::CONTEXTS, true);
-        if ($ctxMask === false || !isset($this->directives[$directive])) {
+        if ($ctxMask === false || ! isset($this->directives[$directive])) {
             return;
         }
 
@@ -2228,7 +2225,7 @@ class Analyzer
             }
         }
 
-        if (!$checkArgs) {
+        if (! $checkArgs) {
             return;
         }
 
@@ -2249,7 +2246,7 @@ class Analyzer
             }
 
             // if the directive is a block but shouldn't be according to the mask
-            if (!($mask & self::NGX_CONF_BLOCK) && $term !== ';') {
+            if (! ($mask & self::NGX_CONF_BLOCK) && $term !== ';') {
                 $reason = 'directive "%s" is not terminated by ";"';
 
                 continue;
@@ -2264,7 +2261,7 @@ class Analyzer
                 return;
             }
 
-            if (($mask & self::NGX_CONF_FLAG) && $nArgs === 1 && !$validFlag($args[0])) {
+            if (($mask & self::NGX_CONF_FLAG) && $nArgs === 1 && ! $validFlag($args[0])) {
                 $reason = sprintf('invalid value "%s" in "%%s" directive, it must be "on" or "off"', $args[0]);
             } else {
                 $reason = 'invalid number of arguments in "%s" directive';
@@ -2277,7 +2274,7 @@ class Analyzer
     public function enterBlockCtx(array $stmt, array $ctx): array
     {
         // don't nest because NGX_HTTP_LOC_CONF just means "location block in http"
-        if (!empty($ctx) && $ctx[0] === 'http' && $stmt['directive'] === 'location') {
+        if (! empty($ctx) && $ctx[0] === 'http' && $stmt['directive'] === 'location') {
             return ['http', 'location'];
         }
 
@@ -2298,15 +2295,15 @@ class Analyzer
 
     private function validateOptions(array $options): void
     {
-        if (!\is_array($options[self::OPTION_CTX])) {
+        if (! \is_array($options[self::OPTION_CTX])) {
             throw new \InvalidArgumentException(sprintf('Parser option %s must be array.', self::OPTION_CTX));
         }
 
-        if (!\is_bool($options[self::OPTION_CHECK_CTX])) {
+        if (! \is_bool($options[self::OPTION_CHECK_CTX])) {
             throw new \InvalidArgumentException(sprintf('Parser option %s must be boolean.', self::OPTION_CHECK_CTX));
         }
 
-        if (!\is_bool($options[self::OPTION_CHECK_ARGS])) {
+        if (! \is_bool($options[self::OPTION_CHECK_ARGS])) {
             throw new \InvalidArgumentException(sprintf('Parser option %s must be boolean.', self::OPTION_CHECK_ARGS));
         }
     }

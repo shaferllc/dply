@@ -9,21 +9,21 @@ use App\Services\Sites\SitePhpRuntimeDirectivesBuilder;
 
 function siteWithPhpRuntime(?array $runtime): Site
 {
-    $site = new Site();
+    $site = new Site;
     $site->meta = $runtime === null ? [] : ['php_runtime' => $runtime];
 
     return $site;
 }
 
 test('emits nothing when no php runtime is configured', function () {
-    $builder = new SitePhpRuntimeDirectivesBuilder();
+    $builder = new SitePhpRuntimeDirectivesBuilder;
 
     expect($builder->nginxDirectives(siteWithPhpRuntime(null)))->toBe('');
     expect($builder->caddyEnvDirective(siteWithPhpRuntime([])))->toBe('');
 });
 
 test('nginx emits a single PHP_VALUE param with newline-joined directives', function () {
-    $out = (new SitePhpRuntimeDirectivesBuilder())->nginxDirectives(siteWithPhpRuntime([
+    $out = (new SitePhpRuntimeDirectivesBuilder)->nginxDirectives(siteWithPhpRuntime([
         'memory_limit' => '512M',
         'upload_max_filesize' => '100M',
         'post_max_size' => '100M',
@@ -39,7 +39,7 @@ test('nginx emits a single PHP_VALUE param with newline-joined directives', func
 });
 
 test('caddy wraps directives in a backtick env token', function () {
-    $out = (new SitePhpRuntimeDirectivesBuilder())->caddyEnvDirective(siteWithPhpRuntime([
+    $out = (new SitePhpRuntimeDirectivesBuilder)->caddyEnvDirective(siteWithPhpRuntime([
         'memory_limit' => '256M',
         'max_input_vars' => '5000',
     ]));
@@ -50,11 +50,11 @@ test('caddy wraps directives in a backtick env token', function () {
 });
 
 test('skips empty, null, and unsafe values', function () {
-    $out = (new SitePhpRuntimeDirectivesBuilder())->nginxDirectives(siteWithPhpRuntime([
+    $out = (new SitePhpRuntimeDirectivesBuilder)->nginxDirectives(siteWithPhpRuntime([
         'memory_limit' => '512M',
         'upload_max_filesize' => '',
         'post_max_size' => null,
-        'max_input_vars' => "5000\"; evil",
+        'max_input_vars' => '5000"; evil',
         'timezone' => 'UTC',
     ]));
 

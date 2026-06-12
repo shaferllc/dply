@@ -9,6 +9,7 @@ use App\Livewire\Concerns\EnforcesSiteQuota;
 use App\Livewire\Forms\SiteCreateForm;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDomain;
@@ -25,19 +26,18 @@ use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
-use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use Livewire\Attributes\Lazy;
+use Livewire\Component;
 
 #[Layout('layouts.app')]
 #[Lazy]
 class WorkspaceSites extends Component
 {
-    use RendersWorkspacePlaceholder;
     use DispatchesToastNotifications;
     use EnforcesSiteQuota;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
+    use RendersWorkspacePlaceholder;
 
     public SiteCreateForm $form;
 

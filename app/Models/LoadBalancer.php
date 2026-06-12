@@ -14,14 +14,19 @@ class LoadBalancer extends Model
     use HasUlids;
 
     public const STATUS_PROVISIONING = 'provisioning';
+
     public const STATUS_RUNNING = 'running';
+
     public const STATUS_ERROR = 'error';
+
     public const STATUS_DELETING = 'deleting';
 
     public const ALGORITHM_ROUND_ROBIN = 'round_robin';
+
     public const ALGORITHM_LEAST_CONNECTIONS = 'least_connections';
 
     public const PROVIDER_HETZNER = 'hetzner';
+
     public const PROVIDER_HAPROXY = 'haproxy';
 
     public const TYPES = ['lb11', 'lb21', 'lb31'];
@@ -61,7 +66,7 @@ class LoadBalancer extends Model
     /** The HAProxy server (software LBs only). */
     public function server(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Server::class);
+        return $this->belongsTo(Server::class);
     }
 
     public function isSoftware(): bool

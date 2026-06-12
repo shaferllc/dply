@@ -23,7 +23,7 @@ use Illuminate\Support\Facades\Log;
  *
  * Unlike {@see ProvisionSiteSystemdUnitsJob} (which short-circuits for php/static
  * web sites because FPM is implicit), this drives the WORKER daemons directly via
- * {@see \App\Services\WorkerPools\WorkerDaemonBackend}, so a Laravel (php) site's
+ * {@see WorkerDaemonBackend}, so a Laravel (php) site's
  * Horizon daemon is managed even though its web tier is FPM. The backend runs the
  * daemons under the pool's chosen process manager (systemd or supervisor) and
  * tears down the other. Streams to the site's `systemd` console banner.

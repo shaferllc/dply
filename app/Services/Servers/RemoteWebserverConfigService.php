@@ -7,8 +7,8 @@ namespace App\Services\Servers;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\ConsoleActions\ConsoleEmitter;
-use App\Services\SshConnection;
 use App\Services\Sites\OpenLiteSpeedSiteConfigBuilder;
+use App\Services\SshConnection;
 
 /**
  * Read / write / backup / restore for webserver config files on a server.

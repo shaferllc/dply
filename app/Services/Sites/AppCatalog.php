@@ -8,6 +8,7 @@ use App\Jobs\RunLaravelScaffoldJob;
 use App\Jobs\RunWordPressScaffoldJob;
 use App\Livewire\Sites\ChooseApp;
 use App\Models\Server;
+use App\Support\Servers\DatabaseWorkspaceEngines;
 
 /**
  * Data-driven registry of applications the choose-app flow can install on a
@@ -91,7 +92,7 @@ class AppCatalog
     {
         return $server->databaseEngines()
             ->get(['engine'])
-            ->map(fn ($e) => \App\Support\Servers\DatabaseWorkspaceEngines::family((string) $e->engine))
+            ->map(fn ($e) => DatabaseWorkspaceEngines::family((string) $e->engine))
             ->unique()
             ->values()
             ->all();

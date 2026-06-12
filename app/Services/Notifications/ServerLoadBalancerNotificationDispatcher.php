@@ -2,6 +2,7 @@
 
 namespace App\Services\Notifications;
 
+use App\Livewire\Servers\WorkspaceLoadBalancers;
 use App\Models\Server;
 use App\Models\User;
 use App\Support\ServerLoadBalancerNotificationKeys;
@@ -9,7 +10,7 @@ use App\Support\ServerLoadBalancerNotificationKeys;
 /**
  * Publishes notifications for server-scoped load-balancer changes (create/delete,
  * target add/remove), fired from the load-balancers workspace
- * ({@see \App\Livewire\Servers\WorkspaceLoadBalancers}).
+ * ({@see WorkspaceLoadBalancers}).
  *
  * Mirrors {@see ServerFirewallNotificationDispatcher}. Subject is the {@see Server}
  * whose workspace triggered the change; the per-kind title is pulled from the config

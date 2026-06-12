@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Support\Servers;
 
+use App\Jobs\InstallLogAgentJob;
 use App\Models\ServerLogAgent;
 
 /**
  * Builds the bash that installs/uninstalls the dply Logs edge agent (Vector) on a
  * managed box, plus the rendered vector.toml. Mirrors the shape of
  * {@see HttpCacheDaemonInstallScripts} / {@see CacheServiceInstallScripts}: pure
- * string builders, no SSH — {@see \App\Jobs\InstallLogAgentJob} runs the output.
+ * string builders, no SSH — {@see InstallLogAgentJob} runs the output.
  *
  * Install strategy: Vector ships a single static binary, so we fetch the pinned
  * release tarball, verify its SHA-256, and drop the binary at /usr/local/bin/
@@ -270,20 +271,20 @@ class VectorLogAgentInstallScripts
         $siteRoot = '/home/'.$deployUser;
 
         return match ($key) {
-            'journald' => ['journald', <<<TOML
+            'journald' => ['journald', <<<'TOML'
             [sources.journald]
             type = "journald"
             current_boot_only = false
             TOML],
 
-            'web' => ['web', <<<TOML
+            'web' => ['web', <<<'TOML'
             [sources.web]
             type = "file"
             include = ["/var/log/nginx/*.log", "/var/log/caddy/*.log"]
             ignore_older_secs = 600
             TOML],
 
-            'php_fpm' => ['php_fpm', <<<TOML
+            'php_fpm' => ['php_fpm', <<<'TOML'
             [sources.php_fpm]
             type = "file"
             include = ["/var/log/php*-fpm.log", "/var/log/php/*.log"]
@@ -297,7 +298,7 @@ class VectorLogAgentInstallScripts
             ignore_older_secs = 600
             TOML],
 
-            'auth' => ['auth', <<<TOML
+            'auth' => ['auth', <<<'TOML'
             [sources.auth]
             type = "file"
             include = ["/var/log/auth.log"]

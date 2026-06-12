@@ -13,8 +13,8 @@ final class DockerComposeArtifactBuilder
 
     /**
      * @param  string|null  $imageTag  When set, the service is tagged with this
-     *                                  image name so each release is a pinnable
-     *                                  artifact (enables image rollback).
+     *                                 image name so each release is a pinnable
+     *                                 artifact (enables image rollback).
      * @param  bool  $withBuild  When false, the `build:` block is omitted so
      *                           compose RUNS an already-built $imageTag instead of
      *                           rebuilding — the rollback path.

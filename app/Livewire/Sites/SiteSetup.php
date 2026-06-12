@@ -13,8 +13,11 @@ use App\Livewire\Sites\Concerns\ManagesSiteEnvironment;
 use App\Models\Server;
 use App\Models\Site;
 use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Services\Sites\DotEnvFileParser;
+use App\Services\Sites\DotEnvFileWriter;
 use App\Services\Sites\SiteDeploySyncCoordinator;
 use App\Support\SiteSettingsSidebar;
+use Illuminate\Bus\UniqueLock;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
@@ -164,7 +167,7 @@ class SiteSetup extends Component
         // A crashed pre-flight job can leave its ShouldBeUnique lock held, which
         // would silently swallow this re-dispatch. Force-release it first so the
         // re-scan always actually enqueues.
-        (new \Illuminate\Bus\UniqueLock(app(\Illuminate\Contracts\Cache\Repository::class)))
+        (new UniqueLock(app(\Illuminate\Contracts\Cache\Repository::class)))
             ->release(new PreflightSiteSetupJob($this->site->id, (string) auth()->id()));
 
         PreflightSiteSetupJob::dispatch($this->site->id, (string) auth()->id());
@@ -222,7 +225,7 @@ class SiteSetup extends Component
      */
     private function ensureLaravelAppKey(): void
     {
-        $parser = app(\App\Services\Sites\DotEnvFileParser::class);
+        $parser = app(DotEnvFileParser::class);
         $parsed = $parser->parse((string) ($this->site->env_file_content ?? ''));
         $vars = is_array($parsed['variables'] ?? null) ? $parsed['variables'] : [];
 
@@ -236,7 +239,7 @@ class SiteSetup extends Component
 
         $vars['APP_KEY'] = $this->freshAppKey();
         $this->site->forceFill([
-            'env_file_content' => app(\App\Services\Sites\DotEnvFileWriter::class)->render($vars, $parsed['comments'] ?? []),
+            'env_file_content' => app(DotEnvFileWriter::class)->render($vars, $parsed['comments'] ?? []),
             'env_cache_origin' => 'local-edit',
         ])->save();
     }

@@ -37,7 +37,7 @@ class SiteUptimeHistorySummary
             ->where('site_uptime_monitor_id', $monitor->id)
             ->where('checked_at', '>=', $d30)
             ->selectRaw('count(*) as total_30d')
-            ->selectRaw("sum(case when state = ? then 1 else 0 end) as down_30d", [MonitorOperationalState::OUTAGE])
+            ->selectRaw('sum(case when state = ? then 1 else 0 end) as down_30d', [MonitorOperationalState::OUTAGE])
             ->selectRaw('sum(case when checked_at >= ? then 1 else 0 end) as total_7d', [$d7])
             ->selectRaw('sum(case when checked_at >= ? and state = ? then 1 else 0 end) as down_7d', [$d7, MonitorOperationalState::OUTAGE])
             ->selectRaw('sum(case when checked_at >= ? then 1 else 0 end) as total_24h', [$d1])

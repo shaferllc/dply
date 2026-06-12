@@ -46,6 +46,7 @@ use App\Models\User;
 use App\Models\WebhookDeliveryLog;
 use App\Models\WorkerPool;
 use App\Models\Workspace;
+use App\Services\Sites\SecretResidencyResolver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -368,7 +369,7 @@ trait HasSiteRelationships
      * Per-key secret residency records — the env vars this site keeps OUT of the
      * loose plaintext-in-DB `.env` blob (escrowed under an org key, or referenced
      * from an external store). The blob carries only placeholders for these keys;
-     * {@see \App\Services\Sites\SecretResidencyResolver} resolves them at push.
+     * {@see SecretResidencyResolver} resolves them at push.
      */
     public function secretResidencies(): HasMany
     {

@@ -2,6 +2,8 @@
 
 namespace App\Services\Notifications;
 
+use App\Jobs\ToggleDatabaseNetworkingJob;
+use App\Livewire\Servers\WorkspaceNetworking;
 use App\Models\Server;
 use App\Models\User;
 use App\Support\ServerNetworkingNotificationKeys;
@@ -9,8 +11,8 @@ use App\Support\ServerNetworkingNotificationKeys;
 /**
  * Publishes notifications for server-scoped networking changes (database/cache
  * exposure, private-network attach/detach, route changes), fired from the
- * networking workspace ({@see \App\Livewire\Servers\WorkspaceNetworking}) and the
- * {@see \App\Jobs\ToggleDatabaseNetworkingJob}.
+ * networking workspace ({@see WorkspaceNetworking}) and the
+ * {@see ToggleDatabaseNetworkingJob}.
  *
  * Mirrors {@see ServerSshKeyNotificationDispatcher}. Subject is the {@see Server}
  * whose networking changed; the per-kind title is pulled from the config label so

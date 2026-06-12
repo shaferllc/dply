@@ -1,8 +1,11 @@
 <?php
 
+use App\Http\Controllers\DocsController;
+use App\Services\Docs\DocsManifest;
+
 /**
  * User-facing docs are now driven by YAML front-matter in the docs/ markdown
- * files — see {@see \App\Services\Docs\DocsManifest}. To publish a page, add a
+ * files — see {@see DocsManifest}. To publish a page, add a
  * doc with front-matter (title/slug/category/order/description/group) and run
  * `php artisan docs:flush`. The legacy `markdown`/`groups` registries (and
  * docs-vm-guides*.php) were retired in favour of the manifest.
@@ -10,7 +13,7 @@
  * Only route-backed "virtual" pages live here: pages with a dedicated route
  * and/or a markdown alias that the manifest folds into the published set.
  *
- * @see \App\Http\Controllers\DocsController
+ * @see DocsController
  */
 
 return [

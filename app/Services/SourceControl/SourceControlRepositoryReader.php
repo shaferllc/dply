@@ -112,7 +112,7 @@ final class SourceControlRepositoryReader
 
     private function githubBranches(array $remote, Site $site, User $user): array
     {
-        $identity = $this->resolver->forSite($site, $user,'github');
+        $identity = $this->resolver->forSite($site, $user, 'github');
         if ($identity === null) {
             return ['ok' => false, 'branches' => [], 'error' => __('Link a GitHub account or add a personal access token to browse this repo.'), 'provider' => 'github'];
         }
@@ -153,7 +153,7 @@ final class SourceControlRepositoryReader
 
     private function gitlabBranches(array $remote, Site $site, User $user): array
     {
-        $identity = $this->resolver->forSite($site, $user,'gitlab');
+        $identity = $this->resolver->forSite($site, $user, 'gitlab');
         if ($identity === null) {
             return ['ok' => false, 'branches' => [], 'error' => __('Link a GitLab account or add a personal access token to browse this repo.'), 'provider' => 'gitlab'];
         }
@@ -193,7 +193,7 @@ final class SourceControlRepositoryReader
 
     private function bitbucketBranches(array $remote, Site $site, User $user): array
     {
-        $identity = $this->resolver->forSite($site, $user,'bitbucket');
+        $identity = $this->resolver->forSite($site, $user, 'bitbucket');
         if ($identity === null) {
             return ['ok' => false, 'branches' => [], 'error' => __('Link a Bitbucket account or add a personal access token to browse this repo.'), 'provider' => 'bitbucket'];
         }
@@ -246,7 +246,7 @@ final class SourceControlRepositoryReader
 
     private function githubTags(array $remote, Site $site, User $user): array
     {
-        $identity = $this->resolver->forSite($site, $user,'github');
+        $identity = $this->resolver->forSite($site, $user, 'github');
         if ($identity === null) {
             return ['ok' => false, 'tags' => [], 'error' => __('Link a GitHub account or add a personal access token to browse this repo.'), 'provider' => 'github'];
         }
@@ -281,7 +281,7 @@ final class SourceControlRepositoryReader
 
     private function gitlabTags(array $remote, Site $site, User $user): array
     {
-        $identity = $this->resolver->forSite($site, $user,'gitlab');
+        $identity = $this->resolver->forSite($site, $user, 'gitlab');
         if ($identity === null) {
             return ['ok' => false, 'tags' => [], 'error' => __('Link a GitLab account or add a personal access token to browse this repo.'), 'provider' => 'gitlab'];
         }
@@ -315,7 +315,7 @@ final class SourceControlRepositoryReader
 
     private function bitbucketTags(array $remote, Site $site, User $user): array
     {
-        $identity = $this->resolver->forSite($site, $user,'bitbucket');
+        $identity = $this->resolver->forSite($site, $user, 'bitbucket');
         if ($identity === null) {
             return ['ok' => false, 'tags' => [], 'error' => __('Link a Bitbucket account or add a personal access token to browse this repo.'), 'provider' => 'bitbucket'];
         }
@@ -368,7 +368,7 @@ final class SourceControlRepositoryReader
 
     private function githubTree(array $remote, Site $site, User $user, string $branch, string $path): array
     {
-        $identity = $this->resolver->forSite($site, $user,'github');
+        $identity = $this->resolver->forSite($site, $user, 'github');
         if ($identity === null) {
             return ['ok' => false, 'entries' => [], 'error' => __('Link a GitHub account or add a personal access token.'), 'provider' => 'github'];
         }
@@ -403,7 +403,7 @@ final class SourceControlRepositoryReader
 
     private function gitlabTree(array $remote, Site $site, User $user, string $branch, string $path): array
     {
-        $identity = $this->resolver->forSite($site, $user,'gitlab');
+        $identity = $this->resolver->forSite($site, $user, 'gitlab');
         if ($identity === null) {
             return ['ok' => false, 'entries' => [], 'error' => __('Link a GitLab account or add a personal access token.'), 'provider' => 'gitlab'];
         }
@@ -440,7 +440,7 @@ final class SourceControlRepositoryReader
 
     private function bitbucketTree(array $remote, Site $site, User $user, string $branch, string $path): array
     {
-        $identity = $this->resolver->forSite($site, $user,'bitbucket');
+        $identity = $this->resolver->forSite($site, $user, 'bitbucket');
         if ($identity === null) {
             return ['ok' => false, 'entries' => [], 'error' => __('Link a Bitbucket account or add a personal access token.'), 'provider' => 'bitbucket'];
         }
@@ -501,7 +501,7 @@ final class SourceControlRepositoryReader
 
     private function githubFile(array $remote, Site $site, User $user, string $branch, string $path): array
     {
-        $identity = $this->resolver->forSite($site, $user,'github');
+        $identity = $this->resolver->forSite($site, $user, 'github');
         if ($identity === null) {
             return ['ok' => false, 'content' => '', 'size' => 0, 'too_large' => false, 'binary' => false, 'html_url' => null, 'error' => __('Link a GitHub account or add a personal access token.'), 'provider' => 'github'];
         }
@@ -531,7 +531,7 @@ final class SourceControlRepositoryReader
 
     private function gitlabFile(array $remote, Site $site, User $user, string $branch, string $path): array
     {
-        $identity = $this->resolver->forSite($site, $user,'gitlab');
+        $identity = $this->resolver->forSite($site, $user, 'gitlab');
         if ($identity === null) {
             return ['ok' => false, 'content' => '', 'size' => 0, 'too_large' => false, 'binary' => false, 'html_url' => null, 'error' => __('Link a GitLab account or add a personal access token.'), 'provider' => 'gitlab'];
         }
@@ -563,7 +563,7 @@ final class SourceControlRepositoryReader
 
     private function bitbucketFile(array $remote, Site $site, User $user, string $branch, string $path): array
     {
-        $identity = $this->resolver->forSite($site, $user,'bitbucket');
+        $identity = $this->resolver->forSite($site, $user, 'bitbucket');
         if ($identity === null) {
             return ['ok' => false, 'content' => '', 'size' => 0, 'too_large' => false, 'binary' => false, 'html_url' => null, 'error' => __('Link a Bitbucket account or add a personal access token.'), 'provider' => 'bitbucket'];
         }
@@ -623,7 +623,7 @@ final class SourceControlRepositoryReader
 
     private function githubReadme(array $remote, Site $site, User $user, string $branch): array
     {
-        $identity = $this->resolver->forSite($site, $user,'github');
+        $identity = $this->resolver->forSite($site, $user, 'github');
         if ($identity === null) {
             return ['ok' => false, 'name' => null, 'content_html' => '', 'content_raw' => '', 'error' => __('Link a GitHub account or add a personal access token.'), 'provider' => 'github'];
         }

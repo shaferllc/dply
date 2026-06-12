@@ -7,10 +7,10 @@ use App\Enums\SiteType;
 use App\Models\Site;
 use App\Models\SiteBasicAuthUser;
 use App\Models\SiteWebserverConfigProfile;
+use App\Support\Servers\InstalledStack;
 use App\Support\SiteRedirectConfigSupport;
 use App\Support\Sites\OpenLiteSpeedTlsPaths;
 use App\Support\Sites\SiteAccessGateConfigSupport;
-use App\Support\Servers\InstalledStack;
 use App\Support\Sites\SiteManagedErrorPageSupport;
 use App\Support\Sites\VmDockerSiteConfigSupport;
 
@@ -65,6 +65,7 @@ class NginxSiteConfigBuilder
 
         return $versions;
     }
+
     /**
      * Full vhost config. Pass a profile for layered includes and main snippet; omit for legacy nginx_extra_raw-only behavior.
      *

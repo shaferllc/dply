@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Servers\Concerns;
 
+use App\Models\Server;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 
@@ -16,7 +17,7 @@ use Illuminate\Support\Str;
  * no per-component metadata. Falls back to deriving the tab key from the
  * route name (servers.settings -> "settings") for routes absent from the nav.
  *
- * @property \App\Models\Server $server  Set in mount() by InteractsWithServerWorkspace.
+ * @property Server $server Set in mount() by InteractsWithServerWorkspace.
  */
 trait RendersWorkspacePlaceholder
 {

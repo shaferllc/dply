@@ -6,8 +6,10 @@ use App\Enums\ServerProvider;
 use App\Enums\ServerTier;
 use App\Modules\TaskRunner\Connection as TaskRunnerConnection;
 use App\Services\Billing\ServerTierClassifier;
+use App\Services\Certificates\WildcardCertificateIssuer;
 use App\Support\Hosts\HostCapabilities;
 use App\Support\Servers\FakeCloudProvision;
+use App\Support\Servers\ServerTags;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -187,7 +189,7 @@ class Server extends Model
      */
     public function isDeletionProtected(): bool
     {
-        if (\App\Support\Servers\ServerTags::hasTag($this, self::PROTECTED_TAG)) {
+        if (ServerTags::hasTag($this, self::PROTECTED_TAG)) {
             return true;
         }
 
@@ -244,7 +246,7 @@ class Server extends Model
     /**
      * Per-zone wildcard TLS certificates (e.g. *.on-dply.com) installed on this
      * server, shared by every testing-hostname site on the matching zone. See
-     * {@see \App\Services\Certificates\WildcardCertificateIssuer}.
+     * {@see WildcardCertificateIssuer}.
      */
     public function wildcardCertificates(): HasMany
     {

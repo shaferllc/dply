@@ -12,6 +12,7 @@ use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesFirewallNotifications;
 use App\Livewire\Servers\Concerns\ManagesFirewallWorkspaceAdvanced;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\FirewallRuleTemplate;
 use App\Models\Server;
 use App\Models\ServerFirewallApplyLog;
@@ -31,25 +32,24 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use Livewire\Attributes\Lazy;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 #[Layout('layouts.app')]
 #[Lazy]
 class WorkspaceFirewall extends Component
 {
-    use RendersWorkspacePlaceholder;
     use ConfirmsActionWithModal;
-    use EmitsPanelEvent;
     use CreatesNotificationChannelInline;
+    use EmitsPanelEvent;
     use GuardsDisruptiveActions;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use ManagesFirewallNotifications;
     use ManagesFirewallWorkspaceAdvanced;
+    use RendersWorkspacePlaceholder;
 
     public FirewallRuleForm $form;
 

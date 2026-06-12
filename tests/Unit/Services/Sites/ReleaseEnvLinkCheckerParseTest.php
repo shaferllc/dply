@@ -3,12 +3,13 @@
 namespace Tests\Unit\Services\Sites\ReleaseEnvLinkCheckerParseTest;
 
 use App\Services\Sites\ReleaseEnvLinkChecker;
+use App\Services\SshConnectionFactory;
 
 function checker(): ReleaseEnvLinkChecker
 {
     // parse() is pure; the SSH factory is never touched.
     return new ReleaseEnvLinkChecker(
-        app(\App\Services\SshConnectionFactory::class),
+        app(SshConnectionFactory::class),
     );
 }
 

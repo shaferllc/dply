@@ -5,16 +5,20 @@ declare(strict_types=1);
 namespace App\Livewire\Sites;
 
 use App\Enums\SiteType;
+use App\Jobs\PreflightSiteSetupJob;
 use App\Jobs\RunComposerScaffoldJob;
 use App\Livewire\Concerns\Sites\ConfiguresGitRepository;
 use App\Livewire\Concerns\Sites\PicksRepositoryRef;
 use App\Models\Server;
 use App\Models\Site;
+use App\Services\Deploy\SiteDeployPipelineManager;
 use App\Services\Servers\ServerPhpManager;
 use App\Services\Sites\AppCatalog;
+use App\Services\Sites\SiteDeploySyncCoordinator;
 use App\Services\Sites\SiteFoundationProvisioner;
 use App\Services\Sites\SiteProvisioner;
 use App\Services\SourceControl\SourceControlRepositoryBrowser;
+use App\Support\SiteSettingsSidebar;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
@@ -407,7 +411,7 @@ class ChooseApp extends Component
         $this->auditChosen($tile, (string) $tile['kind']);
 
         if ($useSetupWizard) {
-            \App\Jobs\PreflightSiteSetupJob::dispatch($this->site->id, (string) auth()->id());
+            PreflightSiteSetupJob::dispatch($this->site->id, (string) auth()->id());
 
             return $this->redirect(route('sites.repository', [$this->server, $this->site, 'repo_tab' => 'setup']), navigate: true);
         }
@@ -459,9 +463,9 @@ class ChooseApp extends Component
         // choice needs no deploy at all: the splash page already serves.
         if ($this->siteWasProvisioned) {
             if ($hasRepo) {
-                app(\App\Services\Deploy\SiteDeployPipelineManager::class)
+                app(SiteDeployPipelineManager::class)
                     ->seedRuntimeDefaults($site, $runtime, $framework !== '' ? $framework : null);
-                app(\App\Services\Sites\SiteDeploySyncCoordinator::class)
+                app(SiteDeploySyncCoordinator::class)
                     ->dispatchManualForGroup($site->fresh());
             }
 
@@ -549,7 +553,7 @@ class ChooseApp extends Component
         $runtimeMode = $this->site->runtimeTargetMode();
 
         return view('livewire.sites.choose-app', [
-            'settingsSidebarItems' => \App\Support\SiteSettingsSidebar::items($this->site, $this->server),
+            'settingsSidebarItems' => SiteSettingsSidebar::items($this->site, $this->server),
             'resourceNoun' => $runtimeMode === 'vm' ? __('Site') : __('App'),
             'resourcePlural' => $runtimeMode === 'vm' ? __('sites') : __('apps'),
             'routingTab' => 'domains',

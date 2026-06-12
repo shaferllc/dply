@@ -7,6 +7,7 @@ namespace App\Services\Servers;
 use App\Models\QuickDownload;
 use App\Services\Backups\BackupStagingS3ClientFactory;
 use Illuminate\Support\Str;
+use Psr\Http\Message\StreamInterface;
 
 /**
  * Drives a queued {@see QuickDownload} from `building` to `ready` (or `failed`):
@@ -101,7 +102,7 @@ final class QuickDownloadBuildStager
      * Open a read stream onto the staged object so the proxy route can pipe it to
      * the browser without the control plane buffering the whole file.
      */
-    public function openReadStream(QuickDownload $row): \Psr\Http\Message\StreamInterface
+    public function openReadStream(QuickDownload $row): StreamInterface
     {
         if (! $row->hasStagedObject()) {
             throw new \RuntimeException(__('This download is no longer available.'));

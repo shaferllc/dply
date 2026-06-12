@@ -2,14 +2,17 @@
 
 namespace App\Support;
 
+use App\Jobs\RunServerSecurityDigestScanJob;
+use App\Services\Servers\ServerSecurityDigestScanner;
+
 /**
  * Notification event keys for the server security digest, surfaced on the
  * /servers/{server}/security-digest workspace. The `server.` prefix maps these to
  * the Server subscribable in {@see NotificationSubscriptionRules::subscribableClassForEvent};
  * they are listed under the "security_digest" category in config/notification_events.php.
  *
- * Fired transition-aware from {@see \App\Services\Servers\ServerSecurityDigestScanner}
- * after a scan (manual refresh or the daily {@see \App\Jobs\RunServerSecurityDigestScanJob}):
+ * Fired transition-aware from {@see ServerSecurityDigestScanner}
+ * after a scan (manual refresh or the daily {@see RunServerSecurityDigestScanJob}):
  * `critical_finding` / `warning_finding` when posture worsens into that level, and
  * `posture_cleared` when it recovers to healthy. Mirrors {@see ServerCertInventoryNotificationKeys}.
  */

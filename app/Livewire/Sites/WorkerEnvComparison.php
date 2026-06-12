@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites;
 
+use App\Jobs\Concerns\WritesPoolMemberEnv;
 use App\Jobs\SyncEnvFromServerJob;
 use App\Models\ConsoleAction;
 use App\Models\Server;
@@ -230,7 +231,7 @@ class WorkerEnvComparison extends Component
 
     /**
      * The application site on a pool member — the Laravel app if detected,
-     * otherwise the first site. Mirrors {@see \App\Jobs\Concerns\WritesPoolMemberEnv::appSite}.
+     * otherwise the first site. Mirrors {@see WritesPoolMemberEnv::appSite}.
      */
     private function appSite(Server $member): ?Site
     {

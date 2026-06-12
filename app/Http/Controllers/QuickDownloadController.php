@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Sites\SiteFileDownloadController;
 use App\Models\QuickDownload;
 use App\Services\Servers\QuickDownloadBuildStager;
 use Illuminate\Http\Response;
@@ -23,7 +24,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  *
  * Plain signed GET route on purpose: returning a StreamedResponse from a Livewire
  * action corrupts the page with raw bytes (same reason as
- * {@see \App\Http\Controllers\Sites\SiteFileDownloadController}). The bytes flow
+ * {@see SiteFileDownloadController}). The bytes flow
  * control-plane → browser; the 250MB quick-download cap keeps that tolerable.
  */
 final class QuickDownloadController extends Controller

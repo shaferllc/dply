@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Servers;
 
+use App\Enums\ServerProvider;
 use App\Jobs\ProvisionAwsEc2ServerJob;
 use App\Jobs\ProvisionAzureServerJob;
 use App\Jobs\ProvisionDigitalOceanDropletJob;
@@ -17,7 +18,6 @@ use App\Jobs\RunSetupScriptJob;
 use App\Jobs\WaitForServerSshReadyJob;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
-use App\Enums\ServerProvider;
 use App\Models\Server;
 use App\Models\ServerCreateDraft;
 use App\Models\ServerProvisionArtifact;
@@ -35,6 +35,7 @@ use App\Support\Servers\ProvisionStepDurations;
 use App\Support\Servers\ProvisionStepSnapshots;
 use App\Support\Servers\ProvisionVerificationSummary;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -608,7 +609,7 @@ class ProvisionJourney extends Component
         // skip this while an auto-retry is still pending — that state owns its
         // own "Retrying" UI — and once the server is genuinely done.
         $autoRetryAt = isset($server->meta['auto_retry_at'])
-            ? \Illuminate\Support\Carbon::parse((string) $server->meta['auto_retry_at'])
+            ? Carbon::parse((string) $server->meta['auto_retry_at'])
             : null;
         $autoRetryPending = $autoRetryAt !== null && $autoRetryAt->isFuture();
         $serverReady = $server->status === Server::STATUS_READY

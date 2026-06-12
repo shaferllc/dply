@@ -9,6 +9,7 @@ use App\Models\ConsoleAction;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseAuditEvent;
 use App\Models\Site;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Servers\ServerDatabaseAuditLogger;
 use App\Services\Servers\ServerDatabaseProvisioner;
 use App\Services\Sites\DotEnvFileParser;
@@ -141,7 +142,7 @@ class CreateSiteDatabaseJob implements ShouldQueue
      * mysql-shaped block.
      */
     private function injectEnv(
-        \App\Services\ConsoleActions\ConsoleEmitter $emit,
+        ConsoleEmitter $emit,
         Site $site,
         ServerDatabase $db,
         DotEnvFileParser $parser,
@@ -201,7 +202,7 @@ class CreateSiteDatabaseJob implements ShouldQueue
      * driver job doesn't recognize (it self-filters).
      */
     private function maybeEnsurePhpDriver(
-        \App\Services\ConsoleActions\ConsoleEmitter $emit,
+        ConsoleEmitter $emit,
         Site $site,
         ServerDatabase $db,
     ): void {

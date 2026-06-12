@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Livewire\Servers;
 
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use App\Models\Server;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
-use Livewire\Component;
-use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
 use Livewire\Attributes\Lazy;
+use Livewire\Component;
 
 /**
  * Coming-soon placeholder for the browser SSH console when
@@ -20,8 +20,8 @@ use Livewire\Attributes\Lazy;
 #[Lazy]
 class WorkspaceConsolePreview extends Component
 {
-    use RendersWorkspacePlaceholder;
     use InteractsWithServerWorkspace;
+    use RendersWorkspacePlaceholder;
 
     public Server $server;
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Console\Commands\DispatchSecurityDigestScansCommand;
 use App\Models\NotificationSubscription;
 use App\Models\Server;
 use App\Services\Servers\ServerSecurityDigestScanner;
@@ -21,7 +22,7 @@ use Illuminate\Support\LazyCollection;
  * snapshot, and fires transition-aware `server.security_digest.*` notifications via
  * {@see ServerSecurityDigestScanner}.
  *
- * Dispatched daily from {@see \App\Console\Commands\DispatchSecurityDigestScansCommand}
+ * Dispatched daily from {@see DispatchSecurityDigestScansCommand}
  * for servers that have at least one active `server.security_digest.*` subscription —
  * servers without a subscriber are skipped so we never pay the SSH cost when nothing
  * is listening. Mirrors {@see ScanServerSshLoginsJob}.

@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Events\WorkerPools\WorkerPoolJobEvent;
 use App\Jobs\CollectWorkerPoolHorizonSnapshotJob;
+use App\Listeners\ForwardWorkerPoolJobEvent;
 use App\Models\WorkerPool;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,7 +14,7 @@ use Illuminate\Support\Facades\Cache;
 
 /**
  * Ingest for per-job Horizon events forwarded (batched) from worker pool boxes
- * (see {@see \App\Listeners\ForwardWorkerPoolJobEvent}). Authenticated by the
+ * (see {@see ForwardWorkerPoolJobEvent}). Authenticated by the
  * pool's `event_token` (Bearer), then re-broadcast over Reverb to the org
  * channel for the live dashboard.
  *
