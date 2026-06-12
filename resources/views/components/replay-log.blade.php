@@ -31,7 +31,6 @@
         done: false,
         init() {
             if (this.frames.length === 0) { this.done = true; return; }
-            // Total replay ~1.1s, clamped per-frame so it reads as live without dragging.
             const per = Math.max(70, Math.min(170, Math.floor(1100 / this.frames.length)));
             const step = () => {
                 if (this.shown.length >= this.frames.length) { this.done = true; return; }
@@ -51,7 +50,10 @@
             </div>
         </template>
     </div>
-    <div x-show="done" x-cloak x-transition.opacity.duration.300ms class="{{ $resultClass }}">
+    {{-- No x-cloak here on purpose: if Alpine ever fails to init, the result must
+         still render rather than leaving an empty panel. Alpine processes x-show
+         on load before paint, so there's no flash in the normal case. --}}
+    <div x-show="done" x-transition.opacity.duration.300ms class="{{ $resultClass }}">
         {{ $slot }}
     </div>
 </div>

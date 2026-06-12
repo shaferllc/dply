@@ -20,7 +20,7 @@ final class BackupStagingS3ClientFactory
      */
     public function enabled(): bool
     {
-        $c = (array) config('backup_staging.hetzner', []);
+        $c = (array) config('backup_staging.connection', []);
 
         return (bool) ($c['enabled'] ?? false)
             && filled($c['bucket'] ?? null)
@@ -37,9 +37,9 @@ final class BackupStagingS3ClientFactory
             throw new RuntimeException(__('The download-staging bucket is not configured.'));
         }
 
-        $c = (array) config('backup_staging.hetzner', []);
+        $c = (array) config('backup_staging.connection', []);
 
-        $region = trim((string) ($c['region'] ?? '')) ?: 'fsn1';
+        $region = trim((string) ($c['region'] ?? '')) ?: 'nyc3';
 
         $args = [
             'version' => 'latest',
@@ -64,8 +64,8 @@ final class BackupStagingS3ClientFactory
     }
 
     /**
-     * Explicit endpoint override, else the Hetzner provider template with {region}
-     * substituted (config/object_storage.php → providers.hetzner.endpoint_template).
+     * Explicit endpoint override, else the configured provider's template with
+     * {region} substituted (config/object_storage.php → providers.<provider>.endpoint_template).
      *
      * @param  array<string, mixed>  $config
      */
@@ -76,7 +76,12 @@ final class BackupStagingS3ClientFactory
             return $explicit;
         }
 
-        $template = (string) config('object_storage.providers.hetzner.endpoint_template', 'https://{region}.your-objectstorage.com');
+        $provider = trim((string) ($config['provider'] ?? '')) ?: 'digitalocean_spaces';
+
+        $template = (string) config(
+            "object_storage.providers.{$provider}.endpoint_template",
+            'https://{region}.digitaloceanspaces.com',
+        );
 
         return str_replace('{region}', $region, $template);
     }

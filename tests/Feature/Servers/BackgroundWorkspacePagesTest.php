@@ -318,10 +318,10 @@ test('requesting a database backup download stages it and dispatches the upload 
     Queue::fake();
     config([
         'server_database.allow_control_plane_storage' => true,
-        'backup_staging.hetzner.enabled' => true,
-        'backup_staging.hetzner.bucket' => 'dply-downloads',
-        'backup_staging.hetzner.access_key' => 'key',
-        'backup_staging.hetzner.secret' => 'secret',
+        'backup_staging.connection.enabled' => true,
+        'backup_staging.connection.bucket' => 'dply-downloads',
+        'backup_staging.connection.access_key' => 'key',
+        'backup_staging.connection.secret' => 'secret',
     ]);
 
     $user = actingOrgUser();
@@ -357,7 +357,7 @@ test('requesting a download without a configured staging bucket does not stage',
     Storage::fake('local');
     config([
         'server_database.allow_control_plane_storage' => true,
-        'backup_staging.hetzner.enabled' => false,
+        'backup_staging.connection.enabled' => false,
     ]);
 
     $user = actingOrgUser();
