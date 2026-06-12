@@ -8,6 +8,7 @@ use App\Jobs\PushSiteEnvJob;
 use App\Jobs\RunSiteFixerJob;
 use App\Jobs\ScanSiteEnvRequirementsJob;
 use App\Jobs\SyncEnvFromServerJob;
+use App\Jobs\SyncWorkerPoolEnvJob;
 use App\Jobs\TestSiteHealthJob;
 use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
 use App\Livewire\Sites\Show;
@@ -124,6 +125,46 @@ trait ManagesSiteEnvironment
 
         $this->dispatch('dply-console-action-focus');
         $this->watchConsoleAction($run, __('Environment file pushed to server.'), __('Environment push did not finish.'));
+        $this->toastConsoleActionQueued();
+    }
+
+    /**
+     * True when this site has worker-pool replicas cloned from it. Drives the
+     * "Sync to workers" action — those replicas are env copies that drift from
+     * the primary once its variables are edited. {@see SyncWorkerPoolEnvJob}.
+     */
+    public function hasWorkerReplicas(): bool
+    {
+        return Site::query()
+            ->where('meta->replicated_from_site_id', (string) $this->site->id)
+            ->exists();
+    }
+
+    /**
+     * Opt-in: project the primary site's variables onto every worker-pool
+     * replica (preserving each replica's queue, HORIZON, and worker-role keys),
+     * then push + restart only the replicas that actually changed.
+     */
+    public function applyEnvToWorkers(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->hasWorkerReplicas()) {
+            $this->toastError(__('This site has no worker replicas to sync.'));
+
+            return;
+        }
+
+        $run = $this->seedQueuedConsoleAction('env_push_workers');
+
+        SyncWorkerPoolEnvJob::dispatch(
+            $this->site->id,
+            (string) (auth()->id() ?? ''),
+            (string) $run->id,
+        );
+
+        $this->dispatch('dply-console-action-focus');
+        $this->watchConsoleAction($run, __('Environment synced to worker replicas.'), __('Worker env sync did not finish.'));
         $this->toastConsoleActionQueued();
     }
 
