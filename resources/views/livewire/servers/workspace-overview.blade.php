@@ -450,7 +450,7 @@
             {{-- First site / container app CTA. Shown on hosts that run site code
                  (container hosts + VM app/worker hosts) — not dedicated cache/db boxes. --}}
             @if ($siteCount === 0 && ! $containerLaunch && ! $isDedicatedServiceRoleHost)
-                <section data-testid="add-first-site-cta" class="dply-card overflow-hidden">
+                <section data-testid="{{ $isContainerHost ? 'add-first-container-cta' : 'add-first-site-cta' }}" class="dply-card overflow-hidden">
                     <div class="px-6 pt-5 pb-4 sm:px-7">
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                             <div class="flex items-start gap-3">

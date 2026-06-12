@@ -33,3 +33,5 @@ Thumbs.db
 .env.prod
 .env.worker
 .env.*.local
+
+storage/blaze/traces/

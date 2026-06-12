@@ -25,9 +25,7 @@ class OrganizationInsightsMetricsService
             return null;
         }
 
-        $serverIds = Server::query()
-            ->where('organization_id', $org->id)
-            ->pluck('id');
+        $serverIds = $org->serverIds();
 
         if ($serverIds->isEmpty()) {
             return [

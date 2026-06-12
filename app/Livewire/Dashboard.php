@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Models\Organization;
 use App\Models\ProviderCredential;
 use App\Models\Server;
 use App\Models\Site;
@@ -26,7 +27,7 @@ class Dashboard extends Component
             ? ProviderCredential::query()->where('organization_id', $org->id)->exists()
             : false;
 
-        $fleetAlert = $org ? $this->computeFleetAlert($org->id) : null;
+        $fleetAlert = $org ? $this->computeFleetAlert($org) : null;
 
         return view('livewire.dashboard', [
             'organization' => $org,
@@ -49,11 +50,9 @@ class Dashboard extends Component
      *     drift_servers: int
      * }|null
      */
-    private function computeFleetAlert(string $organizationId): ?array
+    private function computeFleetAlert(Organization $organization): ?array
     {
-        $serverIds = Server::query()
-            ->where('organization_id', $organizationId)
-            ->pluck('id');
+        $serverIds = $organization->serverIds();
         if ($serverIds->isEmpty()) {
             return null;
         }

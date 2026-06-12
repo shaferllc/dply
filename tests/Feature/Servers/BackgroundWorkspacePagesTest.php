@@ -795,6 +795,7 @@ test('daemons stop action calls stop program group', function () {
 
     $provisioner = \Mockery::mock(SupervisorProvisioner::class);
     $provisioner->shouldReceive('stopProgramGroup')->once()->andReturn('ok');
+    $provisioner->shouldReceive('indicatesUnregisteredProgram')->andReturn(false);
     app()->instance(SupervisorProvisioner::class, $provisioner);
 
     Livewire::actingAs($user)
@@ -824,6 +825,7 @@ test('daemons start action calls start program group', function () {
 
     $provisioner = \Mockery::mock(SupervisorProvisioner::class);
     $provisioner->shouldReceive('startProgramGroup')->once()->andReturn('ok');
+    $provisioner->shouldReceive('indicatesUnregisteredProgram')->andReturn(false);
     app()->instance(SupervisorProvisioner::class, $provisioner);
 
     Livewire::actingAs($user)
@@ -1380,6 +1382,7 @@ test('site daemons stop dispatches for site scoped program', function () {
 
     $provisioner = \Mockery::mock(SupervisorProvisioner::class);
     $provisioner->shouldReceive('stopProgramGroup')->once()->andReturn('ok');
+    $provisioner->shouldReceive('indicatesUnregisteredProgram')->andReturn(false);
     app()->instance(SupervisorProvisioner::class, $provisioner);
 
     Livewire::actingAs($user)
@@ -1521,7 +1524,12 @@ test('site daemons can import programs from another site on the same server', fu
     expect($imported->command)->toBe('php /var/www/target-app/current/artisan queue:work');
     expect($imported->numprocs)->toBe(2);
 });
-test('site daemons preset list is filtered by detected framework', function () {
+// Split per framework: mounting WorkspaceDaemons twice in one test method hits a
+// Livewire test-harness quirk where, if an earlier test issued a Livewire update
+// request (->call), the SECOND fresh mount in a later method is silently skipped —
+// leaving context_site_id unset so the preset list falls back to "show everything".
+// One mount per test keeps the framework gating assertion isolation-proof.
+test('site daemons preset list is filtered to laravel for a laravel site', function () {
     $user = actingOrgUser();
     $server = readyServer($user);
     $laravelSite = Site::factory()->create([
@@ -1534,6 +1542,18 @@ test('site daemons preset list is filtered by detected framework', function () {
             ],
         ],
     ]);
+
+    $laravelPresets = Livewire::actingAs($user)
+        ->test(WorkspaceDaemons::class, ['server' => $server, 'site' => $laravelSite])
+        ->instance()
+        ->supervisorPresetOptionsForForm();
+    $laravelValues = array_column($laravelPresets, 'value');
+    expect($laravelValues)->toContain('laravel-queue');
+    expect($laravelValues)->not->toContain('sidekiq');
+});
+test('site daemons preset list is filtered to rails for a rails site', function () {
+    $user = actingOrgUser();
+    $server = readyServer($user);
     $railsSite = Site::factory()->create([
         'server_id' => $server->id,
         'user_id' => $user->id,
@@ -1544,14 +1564,6 @@ test('site daemons preset list is filtered by detected framework', function () {
             ],
         ],
     ]);
-
-    $laravelPresets = Livewire::actingAs($user)
-        ->test(WorkspaceDaemons::class, ['server' => $server, 'site' => $laravelSite])
-        ->instance()
-        ->supervisorPresetOptionsForForm();
-    $laravelValues = array_column($laravelPresets, 'value');
-    expect($laravelValues)->toContain('laravel-queue');
-    expect($laravelValues)->not->toContain('sidekiq');
 
     $railsPresets = Livewire::actingAs($user)
         ->test(WorkspaceDaemons::class, ['server' => $server, 'site' => $railsSite])

@@ -4,9 +4,12 @@
 ])
 
 @php
+    $authed = auth()->check();
+    $req = request();
+
     // Resolve every nav surface flag in one query. Without this each
     // @feature directive below issues its own SELECT against `features`.
-    if (auth()->check() && auth()->user()->currentOrganization()) {
+    if ($authed && auth()->user()->currentOrganization()) {
         \Laravel\Pennant\Feature::loadMissing([
             'surface.cloud',
             'surface.edge',
@@ -19,30 +22,25 @@
         ]);
     }
 
-    $featuresActive = $active === 'features' || request()->routeIs('features');
-    $changelogActive = $active === 'changelog' || request()->routeIs('changelog');
-    $pricingActive = $active === 'pricing' || request()->routeIs('pricing');
-    $roadmapActive = $active === 'roadmap' || request()->routeIs('roadmap');
-    $homeActive = $active === 'home' || (request()->is('/') && ! request()->routeIs('dashboard'));
-    $hi = 'h-5 w-5 shrink-0';
+    $featuresActive  = $active === 'features'  || $req->routeIs('features');
+    $changelogActive = $active === 'changelog' || $req->routeIs('changelog');
+    $pricingActive   = $active === 'pricing'   || $req->routeIs('pricing');
+    $roadmapActive   = $active === 'roadmap'   || $req->routeIs('roadmap');
+    $homeActive      = $active === 'home'      || ($req->is('/') && ! $req->routeIs('dashboard'));
+    $hi      = 'h-5 w-5 shrink-0';
     $hiGuest = 'h-4 w-4 shrink-0 opacity-90';
-    $browseActive = request()->routeIs('infrastructure.*', 'servers.*', 'cloud.*', 'serverless.*', 'edge.*', 'realtime.*', 'sites.*', 'projects.*', 'organizations.*', 'fleet.*', 'backups.*');
-    $moreMenuActive = request()->routeIs('status-pages.*')
-        || request()->routeIs('marketplace.index')
-        || request()->routeIs('scripts.*')
-        || $featuresActive
+    $browseActive = $req->routeIs(
+        'infrastructure.*', 'servers.*', 'cloud.*', 'serverless.*', 'edge.*',
+        'realtime.*', 'sites.*', 'projects.*', 'organizations.*', 'fleet.*', 'backups.*',
+    );
+    $moreMenuActive = $featuresActive
         || $changelogActive
         || $pricingActive
         || $roadmapActive
-        || request()->routeIs('docs.*');
-    $adminMenuActive = auth()->check()
-        && \Illuminate\Support\Facades\Gate::check('viewPlatformAdmin')
-        && (
-            request()->routeIs('admin.*')
-            || request()->is('horizon*')
-            || request()->is('pulse*')
-        );
-    $moreMenuActive = $moreMenuActive || $adminMenuActive;
+        || $req->routeIs('status-pages.*', 'marketplace.index', 'scripts.*', 'docs.*')
+        || ($authed
+            && \Illuminate\Support\Facades\Gate::check('viewPlatformAdmin')
+            && ($req->routeIs('admin.*') || $req->is('horizon*', 'pulse*')));
 @endphp
 
 <header x-data="{ open: false }" class="border-b border-brand-ink/10 bg-brand-cream/85 backdrop-blur-xl sticky top-0 z-30">

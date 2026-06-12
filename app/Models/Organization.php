@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Cashier\Billable;
@@ -566,6 +567,27 @@ class Organization extends Model
     public function servers(): HasMany
     {
         return $this->hasMany(Server::class);
+    }
+
+    /**
+     * Per-request memo of this org's server IDs. A single dashboard render
+     * plucked them three times over (fleet summary, fleet-alert banner,
+     * command palette) — the debug bar flagged the identical
+     * `select id from servers where organization_id = ?` as a duplicate.
+     * Cached on the instance so one render reuses a single query.
+     *
+     * @var Collection<int, string>|null
+     */
+    private ?Collection $serverIdsMemo = null;
+
+    /**
+     * IDs of every server owned by this org, memoized for the request.
+     *
+     * @return Collection<int, string>
+     */
+    public function serverIds(): Collection
+    {
+        return $this->serverIdsMemo ??= $this->servers()->pluck('id');
     }
 
     public function organizationSshKeys(): HasMany

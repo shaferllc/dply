@@ -588,7 +588,7 @@ class CommandPalette extends Component
     private function searchGroups(Organization $org, string $query): array
     {
         $like = $this->like($query);
-        $serverIds = $org->servers()->pluck('id');
+        $serverIds = $org->serverIds();
         $groups = [];
 
         $siteModels = Site::query()
@@ -720,7 +720,7 @@ class CommandPalette extends Component
         }
         $items = $this->maybeIndexLink($query, 'all sites index', __('All sites'), __('Open the sites index'), 'sites.index', 'globe-alt');
 
-        $serverIds = $org->servers()->pluck('id');
+        $serverIds = $org->serverIds();
         foreach (
             Site::query()
                 ->whereIn('server_id', $serverIds)
@@ -1295,7 +1295,7 @@ class CommandPalette extends Component
         }
 
         return Site::query()
-            ->whereIn('server_id', $org->servers()->pluck('id'))
+            ->whereIn('server_id', $org->serverIds())
             ->with('server')
             ->find($id);
     }

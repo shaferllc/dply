@@ -9,6 +9,7 @@
     row's flat index ({{ $i }}) straight into the markup so `active === N` stays
     correct across every Livewire re-render.
 --}}
+
 <div
     x-data="{
         open: false,
