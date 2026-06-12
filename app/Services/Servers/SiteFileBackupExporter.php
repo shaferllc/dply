@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Services\Servers;
 
 use App\Models\SiteFileBackup;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 
 /**
@@ -26,8 +28,14 @@ final class SiteFileBackupExporter
      * row (status=completed), and prune the per-server archive tree. Throws on
      * any failure (the caller marks the row failed + notifies).
      */
-    public function export(SiteFileBackup $backup): void
+    /**
+     * @param  ConsoleEmitter|null  $emit  optional progress sink for on-demand
+     *   runs; null (scheduled backups) becomes a no-op emitter.
+     */
+    public function export(SiteFileBackup $backup, ?ConsoleEmitter $emit = null): void
     {
+        $emit ??= new ConsoleEmitter(null);
+
         $backup->loadMissing('site.server');
         $site = $backup->site;
         $server = $site?->server;
@@ -44,6 +52,8 @@ final class SiteFileBackupExporter
         $remotePath = $this->remotePath($backup);
         $timeout = (int) config('site_file_backup.timeout_seconds', 7200);
         $maxBytes = (int) config('site_file_backup.max_bytes', 5368709120);
+
+        $emit->step('files', __('Archiving :name files …', ['name' => $site->name]));
 
         $script = $this->buildTarScript($rawRoot, $remotePath);
         [$out, $exit] = $this->remoteExec->shellRunWithExit($server, $script, $timeout);
@@ -64,6 +74,8 @@ final class SiteFileBackupExporter
 
             throw new \RuntimeException(__('Archive exceeded the configured maximum size.'));
         }
+
+        $emit->step('files', __('Archived :size — pruning old backups on the server …', ['size' => Number::fileSize($bytes)]));
 
         $this->remoteExec->pruneRemoteBackupTree(
             $server,

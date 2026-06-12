@@ -8,8 +8,10 @@ use App\Models\BackupConfiguration;
 use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseBackup;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Support\Servers\DatabaseBackupSettings;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 
 /**
@@ -28,8 +30,15 @@ final class DatabaseBackupExporter
         private readonly DatabaseBackupS3ClientFactory $s3Factory,
     ) {}
 
-    public function export(ServerDatabaseBackup $backup): void
+    /**
+     * @param  ConsoleEmitter|null  $emit  optional progress sink for on-demand
+     *   runs; null (scheduled backups) becomes a no-op emitter so the phase
+     *   lines below cost nothing and never touch a console row.
+     */
+    public function export(ServerDatabaseBackup $backup, ?ConsoleEmitter $emit = null): void
     {
+        $emit ??= new ConsoleEmitter(null);
+
         $backup->loadMissing(['serverDatabase.server.organization']);
         $db = $backup->serverDatabase;
         if ($db === null) {
@@ -41,10 +50,26 @@ final class DatabaseBackupExporter
         $kind = $backup->storage_kind ?: $settings->resolveKind($backup->backup_configuration_id);
         $extension = $db->engine === 'sqlite' ? 'db' : 'sql';
 
+        $emit->step('db', __('Backing up :name (:engine) → :dest', [
+            'name' => $db->name,
+            'engine' => $db->engine,
+            'dest' => $this->destinationLabel($kind),
+        ]));
+
         match ($kind) {
-            DatabaseBackupSettings::KIND_DESTINATION => $this->exportToDestination($backup, $db, $server, $extension),
-            DatabaseBackupSettings::KIND_CONTROL_PLANE => $this->exportToControlPlane($backup, $db, $server, $extension),
-            default => $this->exportToRemoteServer($backup, $db, $server, $extension, $settings),
+            DatabaseBackupSettings::KIND_DESTINATION => $this->exportToDestination($backup, $db, $server, $extension, $emit),
+            DatabaseBackupSettings::KIND_CONTROL_PLANE => $this->exportToControlPlane($backup, $db, $server, $extension, $emit),
+            default => $this->exportToRemoteServer($backup, $db, $server, $extension, $settings, $emit),
+        };
+    }
+
+    /** Human-readable label for the resolved storage kind, used in phase lines. */
+    private function destinationLabel(string $kind): string
+    {
+        return match ($kind) {
+            DatabaseBackupSettings::KIND_DESTINATION => __('S3 destination'),
+            DatabaseBackupSettings::KIND_CONTROL_PLANE => __('control plane'),
+            default => __('the server'),
         };
     }
 
@@ -122,13 +147,17 @@ final class DatabaseBackupExporter
         Server $server,
         string $extension,
         DatabaseBackupSettings $settings,
+        ConsoleEmitter $emit,
     ): void {
         $remotePath = $this->remotePath($server, $db, $backup, $extension);
+        $emit->step('db', __('Dumping :name …', ['name' => $db->name]));
         $bytes = $this->writeDumpToRemotePath($db, $server, $remotePath, $extension);
 
         if ($bytes <= 0) {
             throw new \RuntimeException('Backup produced an empty file.');
         }
+
+        $emit->step('db', __('Dumped :size — pruning old backups on the server …', ['size' => Number::fileSize($bytes)]));
 
         $serverTree = rtrim((string) config('server_database.remote_backup_root', '/var/lib/dply/database-backups'), '/')
             .'/'.$server->id;
@@ -150,11 +179,13 @@ final class DatabaseBackupExporter
         ServerDatabase $db,
         Server $server,
         string $extension,
+        ConsoleEmitter $emit,
     ): void {
         $configuration = $this->resolveDestinationConfiguration($backup, $server);
         $s3 = $this->s3Factory->forConfiguration($configuration);
 
         $tempPath = '/tmp/dply-db-export-'.$backup->id.'.'.$extension;
+        $emit->step('db', __('Dumping :name …', ['name' => $db->name]));
         $bytes = $this->writeDumpToRemotePath($db, $server, $tempPath, $extension);
 
         if ($bytes <= 0) {
@@ -162,6 +193,11 @@ final class DatabaseBackupExporter
 
             throw new \RuntimeException('Backup produced an empty file.');
         }
+
+        $emit->step('db', __('Dumped :size — uploading to :bucket …', [
+            'size' => Number::fileSize($bytes),
+            'bucket' => $s3['bucket'],
+        ]));
 
         $key = $this->buildObjectKey($s3['key_prefix'], $server, $db, $backup, $extension);
         $contentType = $extension === 'db' ? 'application/x-sqlite3' : 'application/sql';
@@ -209,6 +245,8 @@ final class DatabaseBackupExporter
             throw new \RuntimeException('S3 upload failed: '.Str::limit(trim($out), 800));
         }
 
+        $emit->step('db', __('Uploaded to :bucket — finalizing …', ['bucket' => $s3['bucket']]));
+
         $backup->update([
             'status' => ServerDatabaseBackup::STATUS_COMPLETED,
             'storage_kind' => DatabaseBackupSettings::KIND_DESTINATION,
@@ -225,11 +263,13 @@ final class DatabaseBackupExporter
         ServerDatabase $db,
         Server $server,
         string $extension,
+        ConsoleEmitter $emit,
     ): void {
         if (! config('server_database.allow_control_plane_storage', false)) {
             throw new \RuntimeException('Control-plane database backup storage is disabled.');
         }
 
+        $emit->step('db', __('Dumping :name …', ['name' => $db->name]));
         $contents = $this->dumpToString($db, $server, $extension);
         $diskName = (string) config('server_database.backup_disk', 'local');
         $relative = 'database-backups/'.$server->id.'/'.$backup->id.'.'.$extension;

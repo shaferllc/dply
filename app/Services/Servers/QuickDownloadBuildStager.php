@@ -90,12 +90,11 @@ final class QuickDownloadBuildStager
 
         $row = $row->fresh() ?? $row;
 
-        // Small artifacts auto-download from the page poll within a second or two,
-        // so they skip the notification. Large ones notify in-app + email and let
-        // the user grab them from the link (they shouldn't auto-yank a big file).
-        if ($row->isLarge()) {
-            $this->notifier->ready($row);
-        }
+        // Always drop an in-app inbox notification so it shows in the bell. The
+        // notifier decides email by size (large only). Small artifacts also
+        // auto-download from the page poll, but the inbox entry stays as a record
+        // + re-download link.
+        $this->notifier->ready($row);
     }
 
     /**

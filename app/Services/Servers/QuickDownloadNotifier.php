@@ -30,6 +30,7 @@ final class QuickDownloadNotifier
         $label = self::label($row);
         $url = $this->signedUrl($row);
 
+        // Always in-app (the bell), every size — so the user always "sees it here".
         $this->publishInApp(
             $row,
             'quick_download.ready',
@@ -38,8 +39,10 @@ final class QuickDownloadNotifier
             $url,
         );
 
+        // Email only for large artifacts (the ones that don't auto-download), so a
+        // 1KB .env that auto-downloads doesn't also send an email.
         $user = $row->requestedBy;
-        if ($user instanceof User) {
+        if ($user instanceof User && $row->isLarge()) {
             Notification::send($user, new QuickDownloadReadyNotification($row, $label, $url));
         }
     }

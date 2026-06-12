@@ -235,7 +235,7 @@
                                         <td class="px-4 py-3 text-brand-moss">{{ $database->server?->name ?? '—' }}</td>
                                         <td class="px-4 py-3 text-brand-moss">{{ \Illuminate\Support\Str::title($database->engine) }}</td>
                                         <td class="px-4 py-3 text-right">
-                                            <x-quick-download.database-link :server="$database->server" :database="$database" />
+                                            <x-quick-download.database-link :server="$database->server" :database="$database" :active-key="$qdTargetKey" />
                                         </td>
                                     </tr>
                                 @endforeach

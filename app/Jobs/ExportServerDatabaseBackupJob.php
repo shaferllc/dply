@@ -2,28 +2,74 @@
 
 namespace App\Jobs;
 
+use App\Jobs\Concerns\WritesConsoleAction;
+use App\Models\ConsoleAction;
 use App\Models\ServerDatabase;
 use App\Models\ServerDatabaseAuditEvent;
 use App\Models\ServerDatabaseBackup;
+use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Notifications\ServerBackupNotificationDispatcher;
 use App\Services\Servers\DatabaseBackupExporter;
 use App\Services\Servers\ServerDatabaseAuditLogger;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Number;
 
 class ExportServerDatabaseBackupJob implements ShouldQueue
 {
-    use Queueable;
+    use Queueable, WritesConsoleAction;
 
     public int $timeout = 3600;
 
+    private ?Model $consoleSubjectCache = null;
+
+    /**
+     * @param  string|null  $seededConsoleRunId  a ConsoleAction the dispatcher
+     *   (an on-demand run) pre-seeded so progress streams into the Backups-tab
+     *   banner. Null for scheduled runs — they stay silent (no console row).
+     */
     public function __construct(
-        public string $backupId
+        public string $backupId,
+        public ?string $seededConsoleRunId = null,
     ) {
         $q = config('server_database.export_queue');
         if (is_string($q) && $q !== '') {
             $this->onQueue($q);
         }
+    }
+
+    /**
+     * Resolve the banner's subject from the SEEDED row, not from the database's
+     * home server — an on-demand backup of a remote-attached database is seeded
+     * against the workspace server the operator is viewing, which may differ
+     * from where the dump runs. Falling back to the home server only matters if
+     * the row vanished (then the update no-ops anyway).
+     */
+    protected function consoleSubject(): Model
+    {
+        if ($this->consoleSubjectCache !== null) {
+            return $this->consoleSubjectCache;
+        }
+
+        if ($this->seededConsoleRunId !== null) {
+            $subject = ConsoleAction::query()->whereKey($this->seededConsoleRunId)->first()?->subject;
+            if ($subject instanceof Model) {
+                return $this->consoleSubjectCache = $subject;
+            }
+        }
+
+        $server = ServerDatabaseBackup::query()->with('serverDatabase.server')->find($this->backupId)?->serverDatabase?->server;
+        if ($server === null) {
+            throw new \RuntimeException('Console subject server not found for database backup.');
+        }
+
+        return $this->consoleSubjectCache = $server;
+    }
+
+    protected function consoleKind(): string
+    {
+        return 'backup_database';
     }
 
     public function handle(DatabaseBackupExporter $exporter, ServerDatabaseAuditLogger $auditLogger, ServerBackupNotificationDispatcher $notifications): void
@@ -40,18 +86,29 @@ class ExportServerDatabaseBackupJob implements ShouldQueue
 
         $server = $db->server;
 
+        // On-demand runs seed a row before dispatch; bind + flip to running so
+        // the banner streams. Scheduled runs pass no id → a no-op emitter, and
+        // the complete/fail console transitions below are no-ops too.
+        $emit = new ConsoleEmitter(null);
+        if ($this->seededConsoleRunId !== null) {
+            $this->bindConsoleRunId($this->seededConsoleRunId);
+            $emit = $this->beginConsoleAction();
+        }
+
         try {
-            $exporter->export($backup);
+            $exporter->export($backup, $emit);
 
             $this->pruneOlderBackups($db, $exporter);
+
+            $fresh = $backup->fresh();
 
             $user = $backup->user;
             if ($user) {
                 $auditLogger->record($server, ServerDatabaseAuditEvent::EVENT_BACKUP_EXPORTED, [
                     'server_database_id' => $db->id,
                     'backup_id' => $backup->id,
-                    'bytes' => $backup->fresh()?->bytes,
-                    'storage_kind' => $backup->fresh()?->storage_kind,
+                    'bytes' => $fresh?->bytes,
+                    'storage_kind' => $fresh?->storage_kind,
                 ], $user);
             }
 
@@ -60,9 +117,12 @@ class ExportServerDatabaseBackupJob implements ShouldQueue
                     'backup_type' => 'database',
                     'backup_id' => (string) $backup->id,
                     'database_id' => (string) $db->id,
-                    'bytes' => $backup->fresh()?->bytes,
+                    'bytes' => $fresh?->bytes,
                 ]);
             }
+
+            $emit->success(__('Database backup complete — :size', ['size' => Number::fileSize((int) ($fresh?->bytes ?? 0))]), 'db');
+            $this->completeConsoleAction();
         } catch (\Throwable $e) {
             $backup->update([
                 'status' => ServerDatabaseBackup::STATUS_FAILED,
@@ -77,6 +137,12 @@ class ExportServerDatabaseBackupJob implements ShouldQueue
                     'error' => $e->getMessage(),
                 ]);
             }
+
+            // Keep the historical no-retry behavior: surface the failure on the
+            // row + banner, but do NOT re-throw (no queue retry, no duplicate
+            // artifacts), matching what scheduled backups have always done.
+            $emit->error($e->getMessage(), 'db');
+            $this->failConsoleAction($e->getMessage());
         }
     }
 

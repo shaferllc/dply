@@ -292,6 +292,24 @@ return [
             'failed' => 'Worker stats collection failed.',
             'stale' => 'Worker stats collection did not finish.',
         ],
+        // On-demand database export (Overview "Run database backup now" + a
+        // schedule's "Run now"). The export job streams dump/ship phases; the
+        // banner mounts on the server's Backups tab. Scheduled runs are silent
+        // (no run id → no row).
+        'backup_database' => [
+            'running' => 'Backing up the database on :host …',
+            'completed' => 'Database backup complete.',
+            'failed' => 'Database backup failed.',
+            'stale' => 'Database backup did not finish.',
+        ],
+        // On-demand site-files export (Overview "Run files backup now" + a
+        // schedule's "Run now"). Streams archive/ship phases.
+        'backup_site_files' => [
+            'running' => 'Backing up site files on :host …',
+            'completed' => 'Site files backup complete.',
+            'failed' => 'Site files backup failed.',
+            'stale' => 'Site files backup did not finish.',
+        ],
     ],
 
     /*

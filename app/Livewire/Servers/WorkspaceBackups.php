@@ -9,11 +9,14 @@ use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Concerns\QueuesQuickDownloads;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Concerns\StagesBackupDownloads;
+use App\Livewire\Servers\Concerns\DismissesServerConsoleActionRun;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesBackupDestinationModal;
 use App\Livewire\Servers\Concerns\ManagesBackupNotifications;
+use App\Livewire\Servers\Concerns\RunsServerConsoleActions;
 use App\Models\BackupConfiguration;
+use App\Models\ConsoleAction;
 use App\Models\Server;
 use App\Models\ServerBackupSchedule;
 use App\Models\ServerCronJob;
@@ -54,12 +57,14 @@ class WorkspaceBackups extends Component
     use RendersWorkspacePlaceholder;
     use ConfirmsActionWithModal;
     use CreatesNotificationChannelInline;
+    use DismissesServerConsoleActionRun;
     use HandlesServerRemovalFlow;
     use InteractsWithServerWorkspace;
     use ManagesBackupDestinationModal;
     use ManagesBackupNotifications;
     use QueuesQuickDownloads;
     use RequiresFeature;
+    use RunsServerConsoleActions;
     use StagesBackupDownloads;
 
     protected string $requiredFeature = 'workspace.backups';
@@ -103,6 +108,29 @@ class WorkspaceBackups extends Component
     public string $backups_workspace_tab = 'overview';
 
     /**
+     * Session-scoped, one-shot tracking for an on-demand backup the operator
+     * just launched, so the banner-driven completion can guard-jump them to
+     * History. These are deliberately NOT rehydrated on mount — the banner +
+     * button "Running…" state derive from the DB, but the jump only arms for a
+     * run started in THIS session (see {@see pollBackupRun()}).
+     */
+    public ?string $watchedBackupRunId = null;
+
+    /** The backup row to highlight in History when the watched run completes. */
+    public ?string $watchedBackupId = null;
+
+    /** 'database' | 'site_files' — which History list the watched row lives in. */
+    public ?string $watchedBackupType = null;
+
+    /** The tab the run was launched from; the jump only fires if still here. */
+    public ?string $originatingBackupTab = null;
+
+    /** Set on a successful watched run → flashes + scrolls the History row. */
+    public ?string $highlightBackupId = null;
+
+    public ?string $highlightBackupType = null;
+
+    /**
      * Live databases discovered ON THE BOX for the Quick-download card — including
      * ones dply never catalogued as a {@see ServerDatabase} row. Populated off the
      * render path via {@see detectLiveDatabases()} (wire:init), so a server whose
@@ -119,6 +147,84 @@ class WorkspaceBackups extends Component
     public function setBackupsWorkspaceTab(string $tab): void
     {
         $this->backups_workspace_tab = in_array($tab, ['overview', 'schedules', 'history', 'notifications'], true) ? $tab : 'overview';
+    }
+
+    /**
+     * Seed a console-action row for an on-demand backup run and arm the
+     * session-scoped, one-shot completion watch. Subject is THIS server (where
+     * the banner renders), the originating tab is whatever the operator clicked
+     * from. Returns the run id to hand to the export job.
+     */
+    private function startBackupConsoleRun(string $kind, string $label, string $backupId, string $type): string
+    {
+        $runId = $this->seedConsoleActionRun($this->server, $kind, $label);
+
+        $this->watchedBackupRunId = $runId;
+        $this->watchedBackupId = $backupId;
+        $this->watchedBackupType = $type;
+        $this->originatingBackupTab = $this->backups_workspace_tab;
+
+        // A fresh run supersedes any prior highlight so an old flash doesn't
+        // linger over the wrong row.
+        $this->highlightBackupId = null;
+        $this->highlightBackupType = null;
+
+        return $runId;
+    }
+
+    /**
+     * Poll hook (active only while {@see $watchedBackupRunId} is set) for the
+     * one-shot guard-jump. On success → jump to History + flash the row, but
+     * only if still on the originating tab (no focus hijack). On failure → an
+     * error toast; the banner already streams the error, so no jump. A vanished
+     * or dismissed run just disarms the watch.
+     */
+    public function pollBackupRun(): void
+    {
+        if ($this->watchedBackupRunId === null) {
+            return;
+        }
+
+        $run = ConsoleAction::query()
+            ->whereKey($this->watchedBackupRunId)
+            ->first(['id', 'status', 'dismissed_at']);
+
+        // Dismissed mid-run (operator said "done watching") or gone → disarm.
+        if ($run === null || $run->dismissed_at !== null) {
+            $this->disarmBackupWatch();
+
+            return;
+        }
+
+        if (! in_array($run->status, [ConsoleAction::STATUS_COMPLETED, ConsoleAction::STATUS_FAILED], true)) {
+            return; // still queued/running
+        }
+
+        $stillOnOriginatingTab = $this->backups_workspace_tab === $this->originatingBackupTab;
+
+        if ($run->status === ConsoleAction::STATUS_COMPLETED) {
+            if ($stillOnOriginatingTab) {
+                // Jump + flash; the History row's x-init scrolls itself into view.
+                $this->highlightBackupId = $this->watchedBackupId;
+                $this->highlightBackupType = $this->watchedBackupType;
+                $this->backups_workspace_tab = 'history';
+            } else {
+                // They navigated away — don't yank them; just confirm.
+                $this->toastSuccess(__('Backup complete — it’s in History.'));
+            }
+        } else { // failed
+            $this->toastError(__('Backup failed — see the console banner for details.'));
+        }
+
+        $this->disarmBackupWatch();
+    }
+
+    private function disarmBackupWatch(): void
+    {
+        $this->watchedBackupRunId = null;
+        $this->watchedBackupId = null;
+        $this->watchedBackupType = null;
+        $this->originatingBackupTab = null;
     }
 
     /**
@@ -292,7 +398,14 @@ class WorkspaceBackups extends Component
             $this->run_database_backup_configuration_id !== '' ? $this->run_database_backup_configuration_id : null,
         );
 
-        ExportServerDatabaseBackupJob::dispatch($backup->id);
+        $runId = $this->startBackupConsoleRun(
+            'backup_database',
+            __('Database — :name', ['name' => $database->name]),
+            (string) $backup->id,
+            'database',
+        );
+
+        ExportServerDatabaseBackupJob::dispatch($backup->id, $runId);
 
         if ($this->server->organization) {
             audit_log($this->server->organization, auth()->user(), 'backup.database.run_dispatched', $this->server, null, [
@@ -309,7 +422,8 @@ class WorkspaceBackups extends Component
         ]);
 
         $this->run_database_id = '';
-        $this->toastSuccess(__('Database backup queued for :name.', ['name' => $database->name]));
+        // No "queued" toast — the console banner now streams queued → running.
+        $this->dispatch('dply-console-action-focus');
     }
 
     /**
@@ -400,7 +514,14 @@ class WorkspaceBackups extends Component
             'status' => SiteFileBackup::STATUS_PENDING,
         ]);
 
-        ExportSiteFileBackupJob::dispatch($backup->id);
+        $runId = $this->startBackupConsoleRun(
+            'backup_site_files',
+            __('Site files — :name', ['name' => $site->name]),
+            (string) $backup->id,
+            'site_files',
+        );
+
+        ExportSiteFileBackupJob::dispatch($backup->id, $runId);
 
         if ($this->server->organization) {
             audit_log($this->server->organization, auth()->user(), 'backup.site_files.run_dispatched', $site, null, [
@@ -417,7 +538,8 @@ class WorkspaceBackups extends Component
         ]);
 
         $this->run_site_id = '';
-        $this->toastSuccess(__('Site files backup queued for :name.', ['name' => $site->name]));
+        // No "queued" toast — the console banner now streams queued → running.
+        $this->dispatch('dply-console-action-focus');
     }
 
     public function addSchedule(): void
@@ -788,14 +910,21 @@ class WorkspaceBackups extends Component
             $schedule->backup_configuration_id,
         );
 
-        ExportServerDatabaseBackupJob::dispatch($backup->id);
+        $runId = $this->startBackupConsoleRun(
+            'backup_database',
+            __('Database — :name', ['name' => $database->name]),
+            (string) $backup->id,
+            'database',
+        );
+
+        ExportServerDatabaseBackupJob::dispatch($backup->id, $runId);
         $this->dispatchBackupNotification('run_started', [__('Database — :name', ['name' => $database->name])], [
             'backup_type' => 'database',
             'backup_id' => (string) $backup->id,
             'database_id' => (string) $database->id,
             'scheduled' => true,
         ]);
-        $this->toastSuccess(__('Backup queued for :name.', ['name' => $database->name]));
+        $this->dispatch('dply-console-action-focus');
     }
 
     private function dispatchScheduleSiteFiles(ServerBackupSchedule $schedule): void
@@ -815,14 +944,21 @@ class WorkspaceBackups extends Component
             'user_id' => auth()->id(),
             'status' => SiteFileBackup::STATUS_PENDING,
         ]);
-        ExportSiteFileBackupJob::dispatch($backup->id);
+        $runId = $this->startBackupConsoleRun(
+            'backup_site_files',
+            __('Site files — :name', ['name' => $site->name]),
+            (string) $backup->id,
+            'site_files',
+        );
+
+        ExportSiteFileBackupJob::dispatch($backup->id, $runId);
         $this->dispatchBackupNotification('run_started', [__('Site files — :name', ['name' => $site->name])], [
             'backup_type' => 'site_files',
             'backup_id' => (string) $backup->id,
             'site_id' => (string) $site->id,
             'scheduled' => true,
         ]);
-        $this->toastSuccess(__('Backup queued for :name.', ['name' => $site->name]));
+        $this->dispatch('dply-console-action-focus');
     }
 
     /**
@@ -1111,7 +1247,22 @@ class WorkspaceBackups extends Component
             ? $sites->firstWhere('id', $this->context_site_id)
             : null;
 
+        // Banner + "Running…" button state derive from the DB so they rehydrate
+        // for free across reload and show to any operator viewing this server.
+        $backupConsoleRun = $this->latestConsoleActionFor($this->server, 'backup_');
+
+        $inFlightKinds = ConsoleAction::query()
+            ->forSubject($this->server)
+            ->whereIn('kind', ['backup_database', 'backup_site_files'])
+            ->notDismissed()
+            ->inFlight()
+            ->pluck('kind')
+            ->all();
+
         return view('livewire.servers.workspace-backups', [
+            'backupConsoleRun' => $backupConsoleRun,
+            'dbBackupRunning' => in_array('backup_database', $inFlightKinds, true),
+            'filesBackupRunning' => in_array('backup_site_files', $inFlightKinds, true),
             'opsReady' => $this->serverOpsReady(),
             'contextSite' => $contextSite,
             'siteDedicatedContext' => $this->siteDedicatedContext,
