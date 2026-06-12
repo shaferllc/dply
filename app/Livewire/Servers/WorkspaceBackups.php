@@ -6,6 +6,7 @@ use App\Jobs\ExportServerDatabaseBackupJob;
 use App\Jobs\ExportSiteFileBackupJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\CreatesNotificationChannelInline;
+use App\Livewire\Concerns\QueuesQuickDownloads;
 use App\Livewire\Concerns\RequiresFeature;
 use App\Livewire\Concerns\StagesBackupDownloads;
 use App\Livewire\Servers\Concerns\HandlesServerRemovalFlow;
@@ -57,6 +58,7 @@ class WorkspaceBackups extends Component
     use InteractsWithServerWorkspace;
     use ManagesBackupDestinationModal;
     use ManagesBackupNotifications;
+    use QueuesQuickDownloads;
     use RequiresFeature;
     use StagesBackupDownloads;
 

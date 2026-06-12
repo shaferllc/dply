@@ -153,8 +153,12 @@
 
     @if ($backups_workspace_tab === 'overview')
     <x-server-workspace-tab-panel id="backups-panel-overview" labelled-by="backups-tab-overview" panel-class="space-y-6">
-    {{-- Quick download: live-stream a fresh dump/archive straight off the box (no S3).
+    {{-- Quick download: queue a fresh dump/archive built on the box, staged to our
+         download bucket for 4h, and grabbed once when ready (notify in-app + email).
          detectLiveDatabases() (wire:init) surfaces databases dply never catalogued. --}}
+    @if ($qdId)
+        <div wire:poll.1500ms="pollQuickDownload" class="hidden"></div>
+    @endif
     @php
         $registeredDbNames = $databases->pluck('name')->all();
         $adHocDbTargets = collect($liveDbDumpTargets)->reject(fn ($t) => in_array($t['name'], $registeredDbNames, true))->values();
@@ -168,7 +172,7 @@
                 <div class="min-w-0 flex-1">
                     <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Instant') }}</p>
                     <h3 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Quick download') }}</h3>
-                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Stream a fresh dump or archive straight from the server — no schedule, no S3. Capped at :cap; larger payloads should use a scheduled backup.', ['cap' => \Illuminate\Support\Number::fileSize((int) config('quick_download.max_bytes', 262_144_000))]) }}</p>
+                    <p class="mt-1 text-sm leading-relaxed text-brand-moss">{{ __('Build a fresh dump or archive on the server and download it when it’s ready — we’ll notify you in-app and by email. Held for 4 hours, then auto-deleted. Capped at :cap; larger payloads should use a scheduled backup.', ['cap' => \Illuminate\Support\Number::fileSize((int) config('quick_download.max_bytes', 262_144_000))]) }}</p>
                 </div>
             </div>
         </div>
@@ -191,13 +195,14 @@
                         <p class="truncate text-sm font-medium text-brand-ink">{{ $target['name'] }}</p>
                         <p class="text-xs text-brand-moss">{{ \Illuminate\Support\Str::title($target['engine']) }} · {{ __('detected on server (not yet managed)') }}</p>
                     </div>
-                    <a
-                        href="{{ route('servers.quick-dump', $server) }}?engine={{ $target['engine'] }}&name={{ urlencode($target['name']) }}"
+                    <button
+                        type="button"
+                        wire:click="requestAdhocQuickDownload('{{ $server->id }}', '{{ $target['engine'] }}', @js($target['name']))"
                         class="inline-flex items-center gap-1 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-medium text-brand-ink shadow-sm transition hover:bg-brand-sand/40"
                     >
                         <x-heroicon-m-arrow-down-tray class="h-4 w-4" aria-hidden="true" />
                         {{ __('Download dump') }}
-                    </a>
+                    </button>
                 </div>
             @endforeach
 

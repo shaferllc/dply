@@ -36,6 +36,7 @@ use App\Console\Commands\PruneAuditLogsCommand;
 use App\Console\Commands\PruneErrorEventsCommand;
 use App\Console\Commands\PruneFunctionInvocationsCommand;
 use App\Console\Commands\PruneBackupDownloadStagingsCommand;
+use App\Console\Commands\PruneQuickDownloadsCommand;
 use App\Console\Commands\PruneLocalWorkspaceArtifactsCommand;
 use App\Console\Commands\PruneRemoteTaskRunnerCommand;
 use App\Console\Commands\PruneServerCreateDraftsCommand;
@@ -213,6 +214,10 @@ final class DplySchedule
             ->everyFifteenMinutes()
             ->withoutOverlapping()
             ->name('prune-backup-download-stagings');
+        $schedule->command(PruneQuickDownloadsCommand::class)
+            ->everyFifteenMinutes()
+            ->withoutOverlapping()
+            ->name('prune-quick-downloads');
         $schedule->command(PruneFunctionInvocationsCommand::class)->dailyAt('03:50');
         $schedule->command(PruneSiteUptimeCheckResultsCommand::class)->dailyAt('03:55');
         $schedule->command(PruneAppLogsCommand::class)->dailyAt('04:05');

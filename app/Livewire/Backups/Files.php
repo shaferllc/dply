@@ -4,6 +4,7 @@ namespace App\Livewire\Backups;
 
 use App\Jobs\ExportSiteFileBackupJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\QueuesQuickDownloads;
 use App\Livewire\Concerns\StagesBackupDownloads;
 use App\Models\BackupConfiguration;
 use App\Models\Site;
@@ -18,6 +19,7 @@ use Livewire\Component;
 class Files extends Component
 {
     use DispatchesToastNotifications;
+    use QueuesQuickDownloads;
     use StagesBackupDownloads;
 
     public function queueFullBackup(string $siteId): void

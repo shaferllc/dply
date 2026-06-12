@@ -1,4 +1,7 @@
 <div>
+    @if ($qdId)
+        <div wire:poll.1500ms="pollQuickDownload" class="hidden"></div>
+    @endif
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <nav class="text-sm text-brand-moss mb-6" aria-label="Breadcrumb">
             <ol class="flex flex-wrap items-center gap-2">

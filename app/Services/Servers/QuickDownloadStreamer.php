@@ -4,21 +4,23 @@ declare(strict_types=1);
 
 namespace App\Services\Servers;
 
+use App\Models\QuickDownload;
 use App\Models\Server;
 use App\Models\ServerDatabase;
 use App\Models\Site;
 use Illuminate\Support\Str;
 
 /**
- * Live "quick download": stage a fresh artifact (DB dump, files tar, .env,
- * vhost, logs, full home dir, or a combined bundle) into a temp file on the
- * server, stat it so we can enforce the size cap BEFORE a single byte is sent,
- * then stream it straight to the browser over SSH and clean the temp file up.
+ * Builds a fresh quick-download artifact (DB dump, files tar, .env, vhost, logs,
+ * full home dir, or a combined bundle) into a temp file on the server, stats it
+ * so the size cap is enforced BEFORE anything moves, then uploads it from the box
+ * straight into the operator-managed download bucket (the control plane never
+ * holds the bytes).
  *
- * Nothing is persisted to S3 or the control-plane disk — the bytes are proxied
- * through one held-open HTTP connection. The two-phase (build -> stat -> stream)
- * shape mirrors {@see \App\Http\Controllers\Sites\SiteFileDownloadController}:
- * the stat lets us return a clean 413 instead of streaming a truncated payload.
+ * The two-phase (build -> stat -> upload) shape lets us reject an over-cap
+ * artifact before a single byte leaves the server. Consumed by
+ * {@see \App\Services\Servers\QuickDownloadBuildStager}; the staged object is
+ * later streamed to the browser by {@see \App\Http\Controllers\QuickDownloadController}.
  */
 final class QuickDownloadStreamer
 {
@@ -157,6 +159,31 @@ final class QuickDownloadStreamer
     }
 
     /**
+     * Build the artifact described by a queued {@see QuickDownload} row, returning
+     * the staged temp file (or, for env/vhost, the existing file) ready to upload.
+     * Throws {@see QuickDownloadTooLargeException} / RuntimeException on failure —
+     * the build stager turns those into a `failed` row + notification.
+     */
+    public function prepareFor(QuickDownload $row): PreparedQuickDownload
+    {
+        return match ($row->kind) {
+            QuickDownload::KIND_DATABASE => $this->prepareDatabaseDump(
+                $row->serverDatabase ?? throw new \RuntimeException(__('The database is no longer available.')),
+            ),
+            QuickDownload::KIND_ADHOC_DATABASE => $this->prepareAdHocDatabaseDump(
+                $row->server ?? throw new \RuntimeException(__('The server is no longer available.')),
+                (string) ($row->meta['engine'] ?? ''),
+                (string) ($row->meta['name'] ?? ''),
+            ),
+            QuickDownload::KIND_SITE => $this->prepareSiteArtifact(
+                $row->site ?? throw new \RuntimeException(__('The site is no longer available.')),
+                (string) $row->artifact,
+            ),
+            default => throw new \RuntimeException(__('Unknown quick-download kind.')),
+        };
+    }
+
+    /**
      * Build one of the per-site artifacts into a server temp file (or, for
      * single small files like .env / the vhost, point straight at the file).
      */
@@ -196,29 +223,42 @@ final class QuickDownloadStreamer
     }
 
     /**
-     * Stream a prepared artifact to the browser, then delete its temp file.
-     * Called from inside a StreamedResponse callback.
+     * Upload a prepared artifact from the server straight into the download
+     * bucket via a presigned PUT (the control plane never holds the bytes —
+     * mirrors {@see \App\Services\Backups\BackupDownloadStager::uploadFromServer}),
+     * then delete the temp file. Runs as the same login that built/owns the file
+     * so root-owned (vhost) and deploy-owned (.env) artifacts both upload.
+     *
+     * @throws \RuntimeException on a non-zero upload exit.
      */
-    public function stream(PreparedQuickDownload $prepared): void
+    public function uploadToPresignedPut(PreparedQuickDownload $prepared, string $presignedUrl): void
     {
-        $inner = 'cat -- '.escapeshellarg($prepared->remotePath);
-        if ($prepared->cleanup) {
-            $inner .= '; rm -f -- '.escapeshellarg($prepared->remotePath);
-        }
-        $command = 'bash -lc '.escapeshellarg($inner);
+        $upload = sprintf(
+            'curl --silent --show-error --fail-with-body --request PUT --upload-file %s --header %s %s',
+            escapeshellarg($prepared->remotePath),
+            escapeshellarg('Content-Type: '.$prepared->mime),
+            escapeshellarg($presignedUrl),
+        );
 
-        $this->runner->run(
+        $inner = $upload;
+        if ($prepared->cleanup) {
+            // Always clean the staged temp file, even if the PUT failed; never rm
+            // the env/vhost source files (cleanup=false for those).
+            $inner = $upload.'; rc=$?; rm -f -- '.escapeshellarg($prepared->remotePath).'; exit $rc';
+        }
+
+        [$output, $exit] = $this->runner->run(
             $prepared->server,
-            function ($ssh) use ($command): void {
-                $ssh->execWithCallback($command, function (string $chunk): void {
-                    echo $chunk;
-                    @ob_flush();
-                    @flush();
-                }, $this->timeout());
-            },
+            fn ($ssh): array => [$ssh->exec('bash -lc '.escapeshellarg($inner), $this->timeout()), $ssh->lastExecExitCode()],
             $prepared->useRoot,
             true,
         );
+
+        if ($exit !== null && $exit !== 0) {
+            throw new \RuntimeException(__('Upload to download storage failed: :err', [
+                'err' => Str::limit(trim($output), 600),
+            ]));
+        }
     }
 
     // --- artifact builders --------------------------------------------------

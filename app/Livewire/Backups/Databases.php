@@ -5,6 +5,7 @@ namespace App\Livewire\Backups;
 use App\Jobs\ExportServerDatabaseBackupJob;
 use App\Jobs\ExportSiteFileBackupJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\QueuesQuickDownloads;
 use App\Models\BackupConfiguration;
 use App\Models\ServerBackupSchedule;
 use App\Models\ServerCronJob;
@@ -24,6 +25,7 @@ use Livewire\Component;
 class Databases extends Component
 {
     use DispatchesToastNotifications;
+    use QueuesQuickDownloads;
 
     public function render(): View
     {
