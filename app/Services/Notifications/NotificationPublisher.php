@@ -28,6 +28,11 @@ class NotificationPublisher
      *                                           delivered this event to those users via a sibling
      *                                           publish (e.g. a site error's site-scoped dispatch
      *                                           covers stakeholders the server roll-up would repeat).
+     * @param  list<User|string>  $additionalRecipientUsers  Users always added to the in-app
+     *                                           recipient set (unioned on top of the resolved
+     *                                           stakeholders), e.g. the operator who triggered the
+     *                                           action — so they get the bell entry regardless of
+     *                                           subscription / stakeholder status.
      */
     public function publish(
         string $eventKey,
@@ -41,12 +46,23 @@ class NotificationPublisher
         ?array $recipientUsers = null,
         array $excludeChannelIds = [],
         array $excludeRecipientUserIds = [],
+        array $additionalRecipientUsers = [],
     ): NotificationEvent {
         $definition = $this->registry->definition($eventKey);
         $context = array_replace($this->contextResolver->resolve($subject), $contextOverrides);
         $recipientUserIds = $recipientUsers !== null && $recipientUsers !== []
             ? $this->normalizeRecipientIds($recipientUsers)
             : $context['stakeholder_user_ids'];
+
+        // Always-include recipients (e.g. the operator who triggered the action),
+        // unioned on top of the resolved set so they get the in-app inbox item
+        // regardless of subscription / stakeholder status.
+        if ($additionalRecipientUsers !== []) {
+            $recipientUserIds = array_values(array_unique(array_merge(
+                $recipientUserIds,
+                $this->normalizeRecipientIds($additionalRecipientUsers),
+            )));
+        }
 
         $event = NotificationEvent::query()->create([
             'event_key' => $eventKey,

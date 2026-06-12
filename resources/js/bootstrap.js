@@ -18,6 +18,9 @@ function bindDplyOrganizationServerChannel() {
 
     const el = document.getElementById('dply-broadcast-context');
     const orgId = el?.dataset?.organizationId?.trim() ?? '';
+    // Keep the current user id current even when the channel sub is reused below,
+    // so the backup toast filter always compares against the logged-in operator.
+    window.__dplyCurrentUserId = el?.dataset?.userId?.trim() ?? '';
 
     if (!orgId) {
         if (window.__dplyOrgEchoSub) {
@@ -54,6 +57,21 @@ function bindDplyOrganizationServerChannel() {
             poolId: payload.pool_id,
             job: payload.job,
         });
+    });
+
+    // Backup finished (success/failure) → transient app-wide toast for the
+    // operator who triggered it, no matter which page they're on. Filtered to
+    // the triggering user so other org admins on the same channel aren't spammed.
+    orgChannel.listen('.backup.status', (payload) => {
+        if (!payload || String(payload.user_id) !== String(window.__dplyCurrentUserId ?? '')) {
+            return;
+        }
+        window.dispatchEvent(new CustomEvent('toast', {
+            detail: {
+                message: payload.message ?? 'Backup finished',
+                type: payload.type ?? 'success',
+            },
+        }));
     });
 }
 

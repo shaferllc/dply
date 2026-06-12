@@ -48,6 +48,7 @@
                     class="hidden"
                     aria-hidden="true"
                     data-organization-id="{{ auth()->user()->currentOrganization()?->id }}"
+                    data-user-id="{{ auth()->id() }}"
                 ></div>
             @endauth
 

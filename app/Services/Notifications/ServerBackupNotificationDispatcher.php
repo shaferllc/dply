@@ -2,6 +2,7 @@
 
 namespace App\Services\Notifications;
 
+use App\Events\Servers\BackupStatusBroadcast;
 use App\Models\Server;
 use App\Models\User;
 use App\Support\ServerBackupNotificationKeys;
@@ -45,6 +46,10 @@ final class ServerBackupNotificationDispatcher
         $eventKey = ServerBackupNotificationKeys::eventKey($kind);
         $label = $this->label($eventKey, $kind);
 
+        // The operator who triggered a finished run (success/failure) always gets
+        // the in-app bell entry, regardless of subscription / stakeholder status.
+        $alwaysNotify = $actor !== null && in_array($kind, ['completed', 'failed'], true);
+
         $title = '['.config('app.name').'] '.$server->name.' — '.$label;
 
         $lines = [__('Server: :name', ['name' => $server->name])];
@@ -72,7 +77,25 @@ final class ServerBackupNotificationDispatcher
                 'kind' => $kind,
             ], $extraMetadata),
             actor: $actor,
+            additionalRecipientUsers: $alwaysNotify ? [$actor] : [],
         );
+
+        // Transient, app-wide toast for the triggering operator on a finished run
+        // (success or failure) — even while they're on another page.
+        if ($actor !== null && in_array($kind, ['completed', 'failed'], true) && filled($server->organization_id)) {
+            $resourceLabel = $resourceLabels[0] ?? $label;
+            $message = $kind === 'completed'
+                ? __(':server — :label complete', ['server' => $server->name, 'label' => $resourceLabel])
+                : __(':server — :label failed', ['server' => $server->name, 'label' => $resourceLabel]);
+
+            BackupStatusBroadcast::dispatch(
+                (string) $server->organization_id,
+                (string) $actor->id,
+                $message,
+                $kind === 'completed' ? 'success' : 'error',
+                (string) $server->id,
+            );
+        }
     }
 
     private function label(string $eventKey, string $kind): string
