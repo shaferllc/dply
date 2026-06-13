@@ -32,7 +32,7 @@ class SshKeys extends Component
     /** @var array<int, string> */
     public array $new_server_ids = [];
 
-    public ?int $editing_id = null;
+    public ?string $editing_id = null;
 
     public string $edit_name = '';
 
@@ -40,7 +40,7 @@ class SshKeys extends Component
 
     public bool $edit_provision_on_new_servers = false;
 
-    public ?int $deploying_id = null;
+    public ?string $deploying_id = null;
 
     /** @var array<int, string> */
     public array $deploy_server_ids = [];
@@ -132,7 +132,7 @@ class SshKeys extends Component
         $this->toastSuccess(__('SSH key saved.'));
     }
 
-    public function startEdit(int $id): void
+    public function startEdit(string $id): void
     {
         $key = UserSshKey::query()->where('user_id', Auth::id())->findOrFail($id);
         $this->authorize('update', $key);
@@ -204,7 +204,7 @@ class SshKeys extends Component
         $this->toastSuccess(__('SSH key updated.'));
     }
 
-    public function startDeploy(int $id): void
+    public function startDeploy(string $id): void
     {
         $key = UserSshKey::query()->where('user_id', Auth::id())->findOrFail($id);
         $this->authorize('update', $key);
@@ -250,7 +250,7 @@ class SshKeys extends Component
         $this->toastSuccess($result['message']);
     }
 
-    public function deleteKey(int $id): void
+    public function deleteKey(string $id): void
     {
         $key = UserSshKey::query()->where('user_id', Auth::id())->findOrFail($id);
         $this->authorize('delete', $key);

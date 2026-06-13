@@ -43,10 +43,6 @@
                                 <x-heroicon-o-chart-bar class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                                 {{ __('Analytics') }}
                             </x-outline-link>
-                            <x-docs-link doc-route="docs.markdown" doc-slug="billing-and-plans">
-                                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                {{ __('Docs') }}
-                            </x-docs-link>
                         </div>
                     </div>
                     <dl class="grid grid-cols-3 gap-2 lg:col-span-5">

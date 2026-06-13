@@ -52,13 +52,11 @@
         @include('livewire.sites.settings.partials.sidebar')
 
         <main class="min-w-0 space-y-6 lg:col-span-9">
-            <x-page-header
-                :eyebrow="__('Caching')"
-                :title="__('Site cache layers')"
+            <x-hero-card
+                :eyebrow="__('Site')"
+                :title="__('Caching')"
                 :description="__('Per-site HTTP cache directives, opcode caches, and Varnish toggles. Availability depends on the site runtime and the active webserver.')"
-                :show-documentation="false"
-                flush
-                compact
+                icon="bolt"
             />
 
             @if (empty($available))

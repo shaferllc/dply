@@ -6,22 +6,19 @@
         'currentIcon' => 'light-bulb',
     ])
 
-    <div class="mb-8 border-b border-brand-ink/10 pb-6">
-        <x-page-header
-            :title="__('Insights')"
-            :description="__('Monitoring and recommendations for this site.')"
-            :show-documentation="false"
-            flush
-            compact
-        >
-            <x-slot name="actions">
-                <x-primary-button size="sm" type="button" wire:click="runChecksNow" wire:loading.attr="disabled">
-                    <span wire:loading.remove wire:target="runChecksNow">{{ __('Refresh') }}</span>
-                    <span wire:loading wire:target="runChecksNow">{{ __('Queueing…') }}</span>
-                </x-primary-button>
-            </x-slot>
-        </x-page-header>
-    </div>
+    <x-hero-card
+        :eyebrow="__('Site')"
+        :title="__('Insights')"
+        :description="__('Monitoring and recommendations for this site.')"
+        icon="light-bulb"
+    >
+        <x-slot:topAction>
+            <x-primary-button size="sm" type="button" wire:click="runChecksNow" wire:loading.attr="disabled">
+                <span wire:loading.remove wire:target="runChecksNow">{{ __('Refresh') }}</span>
+                <span wire:loading wire:target="runChecksNow">{{ __('Queueing…') }}</span>
+            </x-primary-button>
+        </x-slot:topAction>
+    </x-hero-card>
 
     @if (session('success'))
         <div class="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">{{ session('success') }}</div>

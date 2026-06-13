@@ -116,10 +116,6 @@
                             </div>
                         </div>
                         <div class="mt-4 flex flex-wrap items-center gap-2">
-                            <x-docs-link doc-route="docs.markdown" doc-slug="billing-and-plans">
-                                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                {{ __('Billing docs') }}
-                            </x-docs-link>
                             <x-outline-link href="{{ route('billing.analytics', $organization) }}" wire:navigate>
                                 <x-heroicon-o-chart-bar class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                                 {{ __('Analytics') }}

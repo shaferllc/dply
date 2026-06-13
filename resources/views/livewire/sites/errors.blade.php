@@ -32,12 +32,11 @@
                     ]"
                 />
             @else
-                <x-page-header
+                <x-hero-card
+                    :eyebrow="__('Site')"
                     :title="__('Errors')"
                     :description="__('Every failure for this site — deploys, SSL, connectivity, and more. Newest first. Dismiss what you’ve handled; retry where supported.')"
-                    :show-documentation="false"
-                    flush
-                    compact
+                    icon="exclamation-triangle"
                 />
 
                 <x-explainer tone="info">

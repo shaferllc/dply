@@ -36,10 +36,6 @@
                             </div>
                         </div>
                         <div class="mt-4 flex flex-wrap items-center gap-2">
-                            <x-docs-link slug="org-teams">
-                                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                {{ __('Teams guide') }}
-                            </x-docs-link>
                             <x-docs-link slug="org-roles-and-limits">
                                 <x-heroicon-o-queue-list class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                                 {{ __('Roles & limits') }}
@@ -202,7 +198,7 @@
                                                                 <option value="{{ $u->id }}">{{ $u->name }}</option>
                                                             @endforeach
                                                         </select>
-                                                        <button type="button" wire:click='addTeamMember(@js($team->id))' class="inline-flex items-center gap-1 text-xs font-semibold text-brand-sage hover:text-brand-ink">
+                                                        <button type="button" wire:click='addTeamMember(@js($team->id))' class="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/50 disabled:cursor-not-allowed disabled:opacity-50">
                                                             <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
                                                             {{ __('Add') }}
                                                         </button>

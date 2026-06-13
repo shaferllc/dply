@@ -5,7 +5,7 @@
 
 <div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <x-dashboard-breadcrumb :current="__('Projects')" current-icon="rectangle-group" />
+        <x-dashboard-breadcrumb :current="__('Projects')" current-icon="rectangle-group" doc-route="docs.markdown" doc-slug="projects-overview" />
 
         @if (! $hasOrganization)
             {{-- Hero (no-org variant) — same shell so the page never collapses to a bare card. --}}
@@ -23,12 +23,6 @@
                                     {{ __('Select an organization from the header to group servers, sites, and member access into projects.') }}
                                 </p>
                             </div>
-                        </div>
-                        <div class="mt-4 flex flex-wrap items-center gap-2">
-                            <x-docs-link doc-route="docs.markdown" doc-slug="projects-overview">
-                                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                {{ __('Documentation') }}
-                            </x-docs-link>
                         </div>
                     </div>
                 </div>
@@ -51,10 +45,6 @@
                             </div>
                         </div>
                         <div class="mt-4 flex flex-wrap items-center gap-2">
-                            <x-docs-link doc-route="docs.markdown" doc-slug="projects-overview">
-                                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                {{ __('Documentation') }}
-                            </x-docs-link>
                             @can('create', App\Models\Workspace::class)
                                 <button
                                     type="button"

@@ -18,7 +18,7 @@
     <x-livewire-validation-errors />
 
     @push('breadcrumbs')
-        <x-breadcrumb-trail :items="[
+        <x-breadcrumb-trail doc-route="docs.api" :items="[
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => __('Profile'), 'href' => route('settings.profile'), 'icon' => 'user-circle'],
             ['label' => __('API keys'), 'icon' => 'bolt'],
@@ -46,10 +46,6 @@
                         <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                         {{ __('Back to profile') }}
                     </x-outline-link>
-                    <x-docs-link doc-route="docs.api">
-                        <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                        {{ __('HTTP API guide') }}
-                    </x-docs-link>
                     @if ($adminOrganizations->isNotEmpty())
                         <button
                             type="button"
@@ -296,7 +292,7 @@
                                 <button
                                     type="button"
                                     wire:click="openConfirmActionModal('revokeToken', [{{ $t->id }}], @js(__('Revoke token')), @js(__('Revoke this token? It will stop working immediately.')), @js(__('Revoke')), true)"
-                                    class="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700 hover:underline"
+                                    class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
                                 >
                                     <x-heroicon-o-no-symbol class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     {{ __('Revoke') }}

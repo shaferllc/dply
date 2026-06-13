@@ -12,20 +12,13 @@
             <x-alert tone="success">{{ session('success') }}</x-alert>
         @endif
 
-        <x-page-header
+        <x-hero-card
+            :eyebrow="__('Site')"
             :title="__('Sites')"
             :description="__('Every hostname routes through a server—search, filter, and drill into any site from one view.')"
-            :show-documentation="false"
-            flush
-            compact
-            toolbar
+            icon="globe-alt"
         >
-            <x-slot name="leading">
-                <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
-                    <x-heroicon-o-globe-alt class="h-7 w-7 text-brand-ink" aria-hidden="true" />
-                </span>
-            </x-slot>
-            <x-slot name="actions">
+            <x-slot:topAction>
                 <a
                     href="{{ route('servers.index') }}"
                     wire:navigate
@@ -35,8 +28,8 @@
                     {{ __('Servers') }}
                     <span aria-hidden="true">→</span>
                 </a>
-            </x-slot>
-        </x-page-header>
+            </x-slot:topAction>
+        </x-hero-card>
 
         @if ($hasSitesInScope)
             @php

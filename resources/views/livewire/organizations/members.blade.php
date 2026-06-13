@@ -50,10 +50,6 @@
                             </div>
                         </div>
                         <div class="mt-4 flex flex-wrap items-center gap-2">
-                            <x-docs-link slug="org-members">
-                                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                {{ __('Members guide') }}
-                            </x-docs-link>
                             <x-docs-link slug="org-roles-and-limits">
                                 <x-heroicon-o-queue-list class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                                 {{ __('Roles & limits') }}
@@ -144,7 +140,7 @@
                                         <button
                                             type="button"
                                             wire:click="promptCancelInvitation('{{ $inv->id }}')"
-                                            class="inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700 hover:underline"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
                                         >
                                             <x-heroicon-o-x-mark class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Cancel') }}

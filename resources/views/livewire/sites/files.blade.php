@@ -64,12 +64,11 @@
                     ]"
                 />
             @else
-            <x-page-header
+            <x-hero-card
+                :eyebrow="__('Site')"
                 :title="__('Files')"
                 :description="__('Browse the site tree over SSH as :user. Edit text files (≤:edit MB), download anything (≤:dl MB).', ['user' => $effectiveLoginUser, 'edit' => (int) ($editMaxBytes / 1024 / 1024), 'dl' => (int) ($downloadMaxBytes / 1024 / 1024)])"
-                :show-documentation="false"
-                flush
-                compact
+                icon="folder"
             />
 
     <div class="{{ $card }} p-4 sm:p-6">

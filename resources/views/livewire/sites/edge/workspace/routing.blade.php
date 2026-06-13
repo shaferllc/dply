@@ -112,7 +112,7 @@ headers:
                                     <td class="px-3 py-2 font-mono break-all">{{ $rule['from'] }}</td>
                                     <td class="px-3 py-2 font-mono break-all">{{ $rule['to'] }}</td>
                                     <td class="px-3 py-2 text-right font-mono">{{ $rule['status'] }}</td>
-                                    <td class="px-3 py-2 text-right"><button type="button" wire:click="removeRedirect({{ $index }})" wire:confirm="{{ __('Remove this redirect?') }}" class="text-xs font-semibold text-rose-600 hover:text-rose-700">{{ __('Remove') }}</button></td>
+                                    <td class="px-3 py-2 text-right"><button type="button" wire:click="removeRedirect({{ $index }})" wire:confirm="{{ __('Remove this redirect?') }}" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50">{{ __('Remove') }}</button></td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -164,7 +164,7 @@ headers:
                                 <tr wire:key="dash-rewrite-{{ $index }}">
                                     <td class="px-3 py-2 font-mono break-all">{{ $rule['from'] }}</td>
                                     <td class="px-3 py-2 font-mono break-all">{{ $rule['to'] }}</td>
-                                    <td class="px-3 py-2 text-right"><button type="button" wire:click="removeRewrite({{ $index }})" wire:confirm="{{ __('Remove this rewrite?') }}" class="text-xs font-semibold text-rose-600 hover:text-rose-700">{{ __('Remove') }}</button></td>
+                                    <td class="px-3 py-2 text-right"><button type="button" wire:click="removeRewrite({{ $index }})" wire:confirm="{{ __('Remove this rewrite?') }}" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50">{{ __('Remove') }}</button></td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -206,7 +206,7 @@ headers:
                                         @endforeach
                                     </dl>
                                 </div>
-                                <button type="button" wire:click="removeHeaderRule({{ $index }})" wire:confirm="{{ __('Remove this header rule?') }}" class="text-xs font-semibold text-rose-600 hover:text-rose-700">{{ __('Remove') }}</button>
+                                <button type="button" wire:click="removeHeaderRule({{ $index }})" wire:confirm="{{ __('Remove this header rule?') }}" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50">{{ __('Remove') }}</button>
                             </div>
                         </li>
                     @endforeach

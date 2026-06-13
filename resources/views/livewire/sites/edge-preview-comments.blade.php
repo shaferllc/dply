@@ -7,18 +7,14 @@
         ['label' => __('Review hub'), 'icon' => 'chat-bubble-left-right'],
     ]" />
 
-    <x-page-header
-        title="{{ __('Preview review hub') }}"
+    <x-hero-card
+        :eyebrow="__('Edge')"
+        :title="__('Preview review hub')"
         :description="__('PR-linked design review — threaded comments, approvals, and promote when ready.')"
-        flush
+        icon="chat-bubble-left-right"
         class="mt-5"
     >
-        <x-slot name="leading">
-            <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
-                <x-heroicon-o-chat-bubble-left-right class="h-7 w-7 text-brand-ink" />
-            </span>
-        </x-slot>
-        <x-slot name="actions">
+        <x-slot:topAction>
             @if (! empty($review['pr_url']))
                 <a href="{{ $review['pr_url'] }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-2 text-xs font-semibold text-brand-ink shadow-sm hover:bg-brand-sand/40">
                     <x-heroicon-o-code-bracket-square class="h-4 w-4" aria-hidden="true" />
@@ -31,8 +27,8 @@
                     {{ __('Open preview') }}
                 </a>
             @endif
-        </x-slot>
-    </x-page-header>
+        </x-slot:topAction>
+    </x-hero-card>
 
     @php
         $reviewReady = ! empty($review['ready_to_promote']);

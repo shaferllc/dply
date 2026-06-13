@@ -2,7 +2,7 @@
     <x-livewire-validation-errors />
 
     @push('breadcrumbs')
-        <x-breadcrumb-trail :items="[
+        <x-breadcrumb-trail doc-route="docs.index" :items="[
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => __('Profile'), 'href' => route('settings.profile'), 'icon' => 'user-circle'],
             ['label' => __('CLI'), 'icon' => 'command-line'],
@@ -31,12 +31,6 @@
                             {{ __('Install the dply CLI, sign in once with device-flow login, and manage every CLI session tied to your organizations from here.') }}
                         </p>
                     </div>
-                </div>
-                <div class="mt-4 flex flex-wrap items-center gap-2">
-                    <x-outline-link href="{{ route('docs.index') }}" wire:navigate>
-                        <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                        {{ __('Documentation') }}
-                    </x-outline-link>
                 </div>
             </div>
             <dl class="grid grid-cols-3 gap-2 lg:col-span-5">

@@ -40,10 +40,6 @@
                             </div>
                         </div>
                         <div class="mt-4 flex flex-wrap items-center gap-2">
-                            <x-docs-link slug="org-activity">
-                                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                {{ __('Activity guide') }}
-                            </x-docs-link>
                             <x-outline-link href="{{ route('organizations.compliance-export', $organization) }}">
                                 <x-heroicon-o-archive-box-arrow-down class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                                 {{ __('Compliance export') }}

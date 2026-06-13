@@ -199,7 +199,7 @@ trait ManagesNotificationChannels
         $this->new_webhook_url = '';
     }
 
-    public function startEdit(int $id): void
+    public function startEdit(string|int $id): void
     {
         $channel = $this->owner()->notificationChannels()->findOrFail($id);
         Gate::authorize('update', $channel);

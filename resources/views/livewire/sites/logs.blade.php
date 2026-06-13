@@ -23,12 +23,11 @@
         @include('livewire.sites.settings.partials.sidebar')
 
         <main class="min-w-0 space-y-6 lg:col-span-9">
-            <x-page-header
+            <x-hero-card
+                :eyebrow="__('Site')"
                 :title="__('Logs')"
                 :description="__('Dply activity and system log tailing for this site — live SSH reads with real-time streaming.')"
-                :show-documentation="false"
-                flush
-                compact
+                icon="document-text"
             />
 
             <x-explainer>

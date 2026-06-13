@@ -35,10 +35,6 @@
                             </div>
                         </div>
                         <div class="mt-4 flex flex-wrap items-center gap-2">
-                            <x-docs-link slug="org-automation">
-                                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                {{ __('Automation guide') }}
-                            </x-docs-link>
                             @can('viewNotificationChannels', $organization)
                                 <x-outline-link href="{{ route('organizations.notification-channels', $organization) }}" wire:navigate>
                                     <x-heroicon-o-bell class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />

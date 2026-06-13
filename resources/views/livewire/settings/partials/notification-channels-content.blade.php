@@ -19,7 +19,7 @@
      stack; in the org shell it's passed to x-organization-shell's :breadcrumb. --}}
 @if (! empty($breadcrumbs) && empty($useOrgShell))
     @push('breadcrumbs')
-        <x-breadcrumb-trail :items="$breadcrumbs" />
+        <x-breadcrumb-trail doc-route="docs.index" :items="$breadcrumbs" />
     @endpush
 @endif
 
@@ -47,10 +47,6 @@
                 </div>
             </div>
             <div class="mt-4 flex flex-wrap items-center gap-2">
-                <x-outline-link href="{{ route('docs.index') }}" wire:navigate>
-                    <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                    {{ __('Documentation') }}
-                </x-outline-link>
                 @if (! empty($showBulkAssign ?? false))
                     <a
                         href="{{ route('profile.notification-channels.bulk-assign') }}"
@@ -99,7 +95,7 @@
                 <p class="mt-1 text-[11px] text-brand-mist">{{ trans_choice(':n team|:n teams', ($teamChannelGroups ?? collect())->count(), ['n' => ($teamChannelGroups ?? collect())->count()]) }}</p>
             </div>
         </dl>
-    </div>
+        </div>
 </section>
 
 <div class="mt-6 space-y-6">
@@ -333,31 +329,31 @@
                                     <td class="px-4 py-3 text-right font-mono tabular-nums text-brand-moss">{{ $channel->subscriptions_count }}</td>
                                     <td class="px-6 py-3 text-right sm:px-7">
                                         @if ($canManage)
-                                            <div class="flex flex-wrap items-center justify-end gap-3">
-                                                <button
+                                            <div class="flex flex-wrap items-center justify-end gap-2">
+                                                <x-secondary-button
+                                                    size="xs"
                                                     type="button"
-                                                    wire:click="sendTest({{ $channel->id }})"
+                                                    wire:click="sendTest('{{ $channel->id }}')"
                                                     wire:loading.attr="disabled"
                                                     wire:target="sendTest"
-                                                    class="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-sage hover:text-brand-ink disabled:opacity-50"
                                                 >
-                                                    <span wire:loading.remove wire:target="sendTest" class="inline-flex items-center gap-1.5">
+                                                    <span wire:loading.remove wire:target="sendTest" class="inline-flex items-center gap-2">
                                                         <x-heroicon-o-paper-airplane class="h-4 w-4 shrink-0" aria-hidden="true" />
                                                         {{ __('Test') }}
                                                     </span>
-                                                    <span wire:loading wire:target="sendTest" class="inline-flex items-center gap-1.5">
+                                                    <span wire:loading wire:target="sendTest" class="inline-flex items-center gap-2">
                                                         <x-spinner variant="forest" size="sm" />
                                                         {{ __('Sending…') }}
                                                     </span>
-                                                </button>
-                                                <button type="button" wire:click="startEdit('{{ $channel->id }}')" class="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-ink hover:text-brand-sage">
+                                                </x-secondary-button>
+                                                <x-secondary-button size="xs" type="button" wire:click="startEdit('{{ $channel->id }}')">
                                                     <x-heroicon-o-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
                                                     {{ __('Edit') }}
-                                                </button>
+                                                </x-secondary-button>
                                                 <button
                                                     type="button"
                                                     wire:click="openConfirmActionModal('deleteChannel', ['{{ $channel->id }}'], @js(__('Delete notification channel')), @js(__('Remove this channel?')), @js(__('Delete')), true)"
-                                                    class="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700"
+                                                    class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
                                                 >
                                                     <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                                     {{ __('Delete') }}

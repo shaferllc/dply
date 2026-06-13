@@ -27,12 +27,11 @@
         @include('livewire.sites.settings.partials.sidebar')
 
         <main class="min-w-0 space-y-6 lg:col-span-9">
-            <x-page-header
+            <x-hero-card
+                :eyebrow="__('Site')"
                 :title="__('Repository')"
-                :description="__('Browse the connected repository, switch branches, and manage the source-control connection. Reads are cached for five minutes — use the per-tab refresh to bypass.')"
-                :show-documentation="false"
-                flush
-                compact
+                :description="__('Browse the connected repository, switch branches, and manage the source-control connection.')"
+                icon="folder-open"
             />
 @else
 <div class="space-y-6">

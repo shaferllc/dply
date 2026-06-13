@@ -44,12 +44,6 @@
                                 </p>
                             </div>
                         </div>
-                        <div class="mt-4 flex flex-wrap items-center gap-2">
-                            <x-outline-link href="{{ route('docs.index') }}" wire:navigate>
-                                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                {{ __('Documentation') }}
-                            </x-outline-link>
-                        </div>
                     </div>
                     <dl class="grid grid-cols-3 gap-2 lg:col-span-5">
                         <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">

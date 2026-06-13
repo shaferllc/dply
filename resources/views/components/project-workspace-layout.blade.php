@@ -61,16 +61,15 @@
         </select>
     </div>
 
-    <x-page-header
+    <x-hero-card
         :title="$current['label']"
         :description="$current['description']"
-        :show-documentation="false"
-        flush
+        icon="rectangle-group"
     >
         @isset($actions)
-            <x-slot name="actions">{{ $actions }}</x-slot>
+            <x-slot:topAction>{{ $actions }}</x-slot:topAction>
         @endisset
-    </x-page-header>
+    </x-hero-card>
 
     <div class="mt-6 space-y-8 sm:mt-8">
         {{ $slot }}

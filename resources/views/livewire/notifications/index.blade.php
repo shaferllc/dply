@@ -1,6 +1,6 @@
 <div class="py-8">
     <div class="dply-page-shell space-y-6">
-        <x-breadcrumb-trail :items="[
+        <x-breadcrumb-trail doc-route="docs.index" :items="[
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => __('Notifications'), 'icon' => 'bell-alert'],
         ]" />
@@ -24,10 +24,6 @@
                         </div>
                     </div>
                     <div class="mt-4 flex flex-wrap items-center gap-2">
-                        <x-docs-link doc-route="docs.index">
-                            <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                            {{ __('Documentation') }}
-                        </x-docs-link>
                         @if ($notificationsReady && $unreadCount > 0)
                             <button
                                 type="button"

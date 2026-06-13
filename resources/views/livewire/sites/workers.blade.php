@@ -10,12 +10,11 @@
         @include('livewire.sites.settings.partials.sidebar')
 
         <main class="min-w-0 space-y-6 lg:col-span-9" wire:poll.15s>
-            <x-page-header
+            <x-hero-card
+                :eyebrow="__('Site')"
                 :title="__('Workers')"
                 :description="__('Long-running engine processes — queue consumers and background workers tied to this app.')"
-                :show-documentation="false"
-                flush
-                compact
+                icon="cpu-chip"
             />
 
             @if ($secretMismatchDetected)

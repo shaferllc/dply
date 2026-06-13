@@ -10,12 +10,11 @@
         @include('livewire.sites.settings.partials.sidebar')
 
         <main class="min-w-0 space-y-6 lg:col-span-9">
-            <x-page-header
+            <x-hero-card
+                :eyebrow="__('Site')"
                 :title="__('Routing')"
                 :description="__('Hostname, custom domains, redirects, headers, CORS, and invocation URLs — everything the dply edge proxy does between the public internet and your serverless function.')"
-                :show-documentation="false"
-                flush
-                compact
+                icon="share"
             />
 
             @php

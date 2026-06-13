@@ -19,7 +19,7 @@
 
 <div>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <x-dashboard-breadcrumb :current="__('Organizations')" current-icon="building-office-2" />
+        <x-dashboard-breadcrumb doc-route="docs.markdown" doc-slug="org-roles-and-limits" :current="__('Organizations')" current-icon="building-office-2" />
 
         @if (session('success'))
             <div class="mb-4">
@@ -45,10 +45,6 @@
                             </div>
                         </div>
                         <div class="mt-4 flex flex-wrap items-center gap-2">
-                            <x-docs-link doc-route="docs.markdown" doc-slug="org-roles-and-limits">
-                                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                {{ __('Roles & limits') }}
-                            </x-docs-link>
                             <a
                                 href="{{ route('organizations.create') }}"
                                 wire:navigate
@@ -79,10 +75,6 @@
                             </div>
                         </div>
                         <div class="mt-4 flex flex-wrap items-center gap-2">
-                            <x-docs-link doc-route="docs.markdown" doc-slug="org-roles-and-limits">
-                                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                {{ __('Roles & limits') }}
-                            </x-docs-link>
                             <a
                                 href="{{ route('organizations.create') }}"
                                 wire:navigate

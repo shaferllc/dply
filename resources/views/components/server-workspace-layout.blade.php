@@ -111,20 +111,34 @@
         </x-breadcrumb-trail>
     </x-slot:breadcrumb>
 
-    <x-page-header
+    <x-hero-card
         :title="$contextSite ? $title.' — '.$contextSite->name : $title"
         :description="$description"
-        :show-documentation="false"
-        :toolbar="(bool) $pageHeaderToolbar"
-        :compact="(bool) $pageHeaderCompact"
-        flush
+        icon="server-stack"
     >
         @isset($headerLeading)
-            <x-slot name="leading">
+            <x-slot:leading>
                 {{ $headerLeading }}
-            </x-slot>
+            </x-slot:leading>
         @endisset
-    </x-page-header>
+
+        <x-slot:stats>
+            <dl class="grid grid-cols-3 gap-2">
+                <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
+                    <dd class="mt-1 text-sm font-semibold text-brand-ink">{{ ucfirst(str_replace('_', ' ', (string) ($server->status ?? '—'))) }}</dd>
+                </div>
+                <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Region') }}</dt>
+                    <dd class="mt-1 text-sm font-semibold text-brand-ink">{{ $server->region ?? '—' }}</dd>
+                </div>
+                <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
+                    <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('IP') }}</dt>
+                    <dd class="mt-1 text-sm font-semibold text-brand-ink">{{ $server->public_ip_address ?? $server->ip_address ?? '—' }}</dd>
+                </div>
+            </dl>
+        </x-slot:stats>
+    </x-hero-card>
 
     <div class="mt-6 space-y-8 sm:mt-8">
         {{ $slot }}

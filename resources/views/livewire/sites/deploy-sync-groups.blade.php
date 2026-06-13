@@ -1,10 +1,11 @@
 <div class="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-    <div class="mb-6">
-        <h1 class="text-2xl font-bold text-brand-ink">{{ __('Deploy sync groups') }}</h1>
-        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-            {{ __('Group sites across servers and projects so they deploy together. A manual deploy fans out to every member; a push webhook to the group leader deploys the rest. Manage a single site’s membership from its Settings → Repository.') }}
-        </p>
-    </div>
+    <x-hero-card
+        class="mb-6"
+        :eyebrow="__('Deployments')"
+        :title="__('Deploy sync groups')"
+        :description="__('Group sites across servers and projects so they deploy together. A manual deploy fans out to every member; a push webhook to the group leader deploys the rest. Manage a single site’s membership from its Settings → Repository.')"
+        icon="rocket-launch"
+    />
 
     @if ($canManage)
         {{-- Create a new group --}}

@@ -25,6 +25,7 @@
 <div>
     @push('breadcrumbs')
         <x-breadcrumb-trail
+            doc-route="docs.index"
             :items="[
                 ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
                 ['label' => __('Settings'), 'href' => route('settings.profile'), 'icon' => 'cog-6-tooth'],
@@ -51,10 +52,6 @@
                     </div>
                 </div>
                 <div class="mt-4 flex flex-wrap items-center gap-2">
-                    <x-outline-link href="{{ route('docs.index') }}" wire:navigate>
-                        <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                        {{ __('Documentation') }}
-                    </x-outline-link>
                     <x-outline-link href="{{ route('settings.profile') }}" wire:navigate>
                         <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
                         {{ __('Profile') }}
@@ -419,7 +416,7 @@
                                         <button
                                             type="button"
                                             wire:click="openConfirmActionModal('revokeSession', ['{{ $session['id'] }}'], @js(__('Revoke session')), @js(__('Revoke this session? That device will be logged out on its next request.')), @js(__('Revoke')), true)"
-                                            class="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700 hover:underline"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
                                         >
                                             <x-heroicon-o-x-mark class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Revoke') }}

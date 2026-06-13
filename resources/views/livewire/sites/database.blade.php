@@ -32,12 +32,11 @@
         @include('livewire.sites.settings.partials.sidebar')
 
         <main class="min-w-0 space-y-6 lg:col-span-9">
-            <x-page-header
-                :eyebrow="__('Database')"
-                :title="__('Site databases')"
-                :description="__('Create a database for this site and wire it into the .env, attach one already on this server, manage users, rotate the password, back it up, or drop it. Backup destinations are configured on the server-level database manager.')"
-                :show-documentation="false"
-                flush
+            <x-hero-card
+                :eyebrow="__('Site')"
+                :title="__('Database')"
+                :description="__('Create a database for this site and wire it into the .env, attach one already on this server, manage users, rotate the password, back it up, or drop it.')"
+                icon="circle-stack"
             />
 
             @if ($watchedConsoleRunId)

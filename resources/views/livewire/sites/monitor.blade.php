@@ -31,6 +31,14 @@
         'contextualDocSlug' => 'vm-site-monitor',
     ])
 
+    <x-hero-card
+        :eyebrow="__('Site')"
+        :title="__('Monitor')"
+        :description="__('Uptime, SSL, and response-time monitors for this site, each running checks from dply infrastructure on demand or on a schedule.')"
+        icon="chart-bar"
+        class="mb-6"
+    />
+
     @if (session('success'))
         <div class="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{{ session('success') }}</div>
     @endif
@@ -39,14 +47,6 @@
         @include('livewire.sites.settings.partials.sidebar')
 
         <main class="min-w-0 space-y-6 lg:col-span-9">
-            <x-page-header
-                :title="__('Monitor')"
-                :description="__('Uptime, SSL, and response-time monitors for this site. Each entry tracks a check that runs from dply infrastructure on demand or on a schedule.')"
-                :show-documentation="false"
-                flush
-                compact
-            />
-
             <x-explainer tone="info">
                 <p>{{ __('Monitors live on the site and reflect their last check on this page and on any public status page that includes them. Adding or editing a monitor immediately runs a check; "Check now" reruns it on demand.') }}</p>
                 <p>{{ __('HTTP monitors can assert an expected status code, required (or forbidden) body text, and a response-time threshold above which the site reads as degraded. SSL monitors warn before a certificate expires.') }}</p>

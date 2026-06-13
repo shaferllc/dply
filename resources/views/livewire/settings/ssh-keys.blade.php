@@ -17,7 +17,7 @@
     <x-livewire-validation-errors />
 
     @push('breadcrumbs')
-        <x-breadcrumb-trail :items="[
+        <x-breadcrumb-trail doc-route="docs.index" :items="[
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => __('Profile'), 'href' => route('settings.profile'), 'icon' => 'user-circle'],
             ['label' => __('SSH keys'), 'icon' => 'key'],
@@ -220,18 +220,22 @@
                                         : __('Manual deploy only — push to specific servers when needed.') }}
                                 </p>
                             </div>
-                            <div class="flex flex-wrap items-center justify-end gap-3">
+                            <div class="flex flex-wrap items-center justify-end gap-2">
                                 @if ($reachableServers > 0)
-                                    <button type="button" wire:click="startDeploy({{ $key->id }})" class="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-sage hover:text-brand-ink">
+                                    <x-secondary-button size="xs" type="button" wire:click="startDeploy('{{ $key->id }}')">
                                         <x-heroicon-o-paper-airplane class="h-4 w-4 shrink-0" aria-hidden="true" />
                                         {{ __('Deploy') }}
-                                    </button>
+                                    </x-secondary-button>
                                 @endif
-                                <button type="button" wire:click="startEdit({{ $key->id }})" class="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-ink hover:text-brand-sage">
+                                <x-secondary-button size="xs" type="button" wire:click="startEdit('{{ $key->id }}')">
                                     <x-heroicon-o-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     {{ __('Edit') }}
-                                </button>
-                                <button type="button" wire:click="openConfirmActionModal('deleteKey', [{{ $key->id }}], @js(__('Delete SSH key')), @js(__('Remove this key from your account? Linked copies on servers will be removed on the next sync.')), @js(__('Delete')), true)" class="inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700 hover:underline">
+                                </x-secondary-button>
+                                <button
+                                    type="button"
+                                    wire:click="openConfirmActionModal('deleteKey', ['{{ $key->id }}'], @js(__('Delete SSH key')), @js(__('Remove this key from your account? Linked copies on servers will be removed on the next sync.')), @js(__('Delete')), true)"
+                                    class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
+                                >
                                     <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     {{ __('Delete') }}
                                 </button>

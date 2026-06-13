@@ -5,10 +5,14 @@
         <span class="text-slate-700">{{ __('Env diff') }}</span>
     </nav>
 
-    <header class="mb-6 border-b border-slate-200 pb-4">
-        <h1 class="text-2xl font-semibold text-slate-900">{{ __('Cache vs server .env') }}</h1>
-        <p class="mt-1 text-sm text-slate-600">{{ __('Compare Dply\'s encrypted cache for this site to the live .env on the server. Drift here is a sign the file has been edited out-of-band.') }}</p>
-    </header>
+    <x-hero-card
+        class="mb-6"
+        :eyebrow="__('Environment')"
+        :title="__('Cache vs server .env')"
+        :description="__('Compare Dply\'s encrypted cache for this site to the live .env on the server. Drift here is a sign the file has been edited out-of-band.')"
+        icon="document-magnifying-glass"
+    />
+
 
     <div class="mb-6 flex flex-wrap items-center gap-3">
         <button type="button" wire:click="toggleReveal" class="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
