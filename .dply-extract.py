@@ -8,6 +8,7 @@ Usage: extract.py <src_php> <ConcernsNamespace> <TraitName> <method_spec> <prop_
   method_spec: comma list of exact method names, OR a single substring token
   prop_spec:   comma list of property-name prefixes (may be empty "")
 """
+import os
 import re
 import sys
 
@@ -104,7 +105,27 @@ for ln in lines:
     um = re.match(r"^use\s+([A-Za-z0-9_\\]+\\(\w+))(\s+as\s+\w+)?;", ln)
     if um:
         use_map[um.group(2)] = ln
-needed = sorted({use_map[i] for i in re.findall(r"\b([A-Z]\w+)\b", body) if i in use_map})
+referenced = set(re.findall(r"\b([A-Z]\w+)\b", body))
+needed_set = {use_map[i] for i in referenced if i in use_map}
+# Same-namespace siblings: the source could reference classes in its own
+# namespace by short name (no `use` needed there). Once moved to a sub-namespace
+# those short names resolve wrong, so add explicit imports for any referenced
+# identifier that matches a sibling .php file in the source directory.
+src_ns = None
+for ln in lines:
+    nm = re.match(r"^namespace\s+([A-Za-z0-9_\\]+);", ln)
+    if nm:
+        src_ns = nm.group(1)
+        break
+src_dir = os.path.dirname(src) or "."
+src_base = os.path.splitext(os.path.basename(src))[0]
+if src_ns:
+    for ident in referenced:
+        if ident in use_map or ident == src_base:
+            continue
+        if os.path.exists(os.path.join(src_dir, ident + ".php")):
+            needed_set.add(f"use {src_ns}\\{ident};")
+needed = sorted(needed_set)
 
 header = f"""<?php
 
