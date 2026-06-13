@@ -35,3 +35,6 @@ Thumbs.db
 .env.*.local
 
 storage/blaze/traces/
+
+# refactor helper (local only)
+.dply-extract.py
