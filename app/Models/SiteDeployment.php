@@ -33,12 +33,25 @@ class SiteDeployment extends Model
 
     public const STATUS_SKIPPED = 'skipped';
 
+    /** Skipped because the owning org is pause-blocked from billed deploys. */
+    public const SKIP_REASON_BILLING_PAUSED = 'billing_paused';
+
+    /** Skipped by a platform-wide kill switch (product line disabled). */
+    public const SKIP_REASON_PLATFORM_DISABLED = 'platform_disabled';
+
+    /** Skipped by a server deploy-window policy. */
+    public const SKIP_REASON_DEPLOY_WINDOW = 'deploy_window';
+
+    /** Skipped because another deployment for the site was already running. */
+    public const SKIP_REASON_ALREADY_RUNNING = 'already_running';
+
     protected $fillable = [
         'site_id',
         'project_id',
         'idempotency_key',
         'trigger',
         'status',
+        'skip_reason',
         'git_sha',
         'release_folder',
         'resume_of_deployment_id',
@@ -56,6 +69,18 @@ class SiteDeployment extends Model
             'finished_at' => 'datetime',
             'phase_results' => 'array',
         ];
+    }
+
+    /**
+     * True when this deployment was skipped specifically because the owning
+     * org is pause-blocked from billed deploys — drives the distinct
+     * "Blocked — billing" chip instead of a neutral "skipped" that reads as
+     * a mysteriously stuck deploy.
+     */
+    public function isBillingBlocked(): bool
+    {
+        return $this->status === self::STATUS_SKIPPED
+            && $this->skip_reason === self::SKIP_REASON_BILLING_PAUSED;
     }
 
     /**

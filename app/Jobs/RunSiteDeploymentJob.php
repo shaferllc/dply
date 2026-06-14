@@ -87,6 +87,7 @@ class RunSiteDeploymentJob implements ShouldQueue
                 'project_id' => $this->site->project_id,
                 'trigger' => $this->trigger,
                 'status' => SiteDeployment::STATUS_SKIPPED,
+                'skip_reason' => SiteDeployment::SKIP_REASON_PLATFORM_DISABLED,
                 'exit_code' => null,
                 'log_output' => 'VM deploys are temporarily disabled by platform administrators.',
                 'started_at' => now(),
@@ -100,11 +101,24 @@ class RunSiteDeploymentJob implements ShouldQueue
         }
 
         if ($organization !== null && ! $organization->canDeploy()) {
+            // Interactive clicks are pre-gated in the UI with a billing prompt,
+            // so don't persist a phantom "skipped" row that reads as a stuck
+            // deploy. Machine triggers (webhook/API/schedule/sync) still leave an
+            // audited, clearly-labelled record so there's a trail of "a deploy
+            // was requested while paused".
+            if ($this->isInteractiveTrigger()) {
+                Cache::forget('site-deploy-active:'.$this->site->id);
+                $this->clearIdempotencyInflight();
+
+                return;
+            }
+
             $deployment = SiteDeployment::query()->create([
                 'site_id' => $this->site->id,
                 'project_id' => $this->site->project_id,
                 'trigger' => $this->trigger,
                 'status' => SiteDeployment::STATUS_SKIPPED,
+                'skip_reason' => SiteDeployment::SKIP_REASON_BILLING_PAUSED,
                 'exit_code' => null,
                 'log_output' => 'Deploys are paused while this organization\'s trial is expired. Add a payment method on the billing page to resume.',
                 'started_at' => now(),
@@ -126,6 +140,7 @@ class RunSiteDeploymentJob implements ShouldQueue
                     'project_id' => $this->site->project_id,
                     'trigger' => $this->trigger,
                     'status' => SiteDeployment::STATUS_SKIPPED,
+                    'skip_reason' => SiteDeployment::SKIP_REASON_DEPLOY_WINDOW,
                     'exit_code' => null,
                     'log_output' => (string) ($policyDecision['reason'] ?? 'Deploy blocked by server deploy window policy.'),
                     'started_at' => now(),
@@ -150,6 +165,7 @@ class RunSiteDeploymentJob implements ShouldQueue
                 'project_id' => $this->site->project_id,
                 'trigger' => $this->trigger,
                 'status' => SiteDeployment::STATUS_SKIPPED,
+                'skip_reason' => SiteDeployment::SKIP_REASON_ALREADY_RUNNING,
                 'exit_code' => null,
                 'log_output' => 'Another deployment is already running for this site.',
                 'started_at' => now(),
@@ -458,6 +474,21 @@ class RunSiteDeploymentJob implements ShouldQueue
         if ($this->apiIdempotencyHash) {
             Cache::forget('api-deploy-inflight:'.$this->apiIdempotencyHash);
         }
+    }
+
+    /**
+     * True when a human kicked off this deploy from the UI (manual click or a
+     * resume click) — as opposed to a webhook/API/schedule/sync trigger with no
+     * human watching. Interactive deploys that hit the billing pause are dropped
+     * silently (the UI already prompts for payment) rather than leaving a
+     * phantom "skipped" row; machine triggers leave an audited record.
+     */
+    protected function isInteractiveTrigger(): bool
+    {
+        return in_array($this->trigger, [
+            SiteDeployment::TRIGGER_MANUAL,
+            SiteDeployment::TRIGGER_RESUME,
+        ], true);
     }
 
     protected function cacheIdempotencySuccess(SiteDeployment $deployment): void

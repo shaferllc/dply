@@ -73,6 +73,7 @@ class Organization extends Model
         return [
             'trial_ends_at' => 'datetime',
             'beta_joined_at' => 'datetime',
+            'is_internal' => 'boolean',
             'deploy_email_notifications_enabled' => 'boolean',
             'email_server_credentials_enabled' => 'boolean',
             'email_database_credentials_enabled' => 'boolean',
