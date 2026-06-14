@@ -16,7 +16,9 @@ namespace App\Enums;
  * - {@see Subscribed}: any active paid plan (Standard, Enterprise, legacy Pro).
  *   Full access.
  * - {@see NoTrial}: no trial_ends_at recorded — legacy orgs from before the
- *   pricing redesign, or orgs explicitly excluded from trial tracking.
+ *   pricing redesign, free-tier orgs that owe nothing this cycle, or orgs
+ *   permanently exempt from the pause ladder (beta participants and
+ *   internal/operator-owned orgs via Organization::isInternal()).
  */
 enum TrialState: string
 {

@@ -27,17 +27,21 @@
         @foreach ($deployments as $deployment)
             @php
                 $status = (string) $deployment->status;
-                [$dotClasses, $glyph] = match ($status) {
-                    'success' => ['bg-emerald-100 text-emerald-700', '✓'],
-                    'failed' => ['bg-rose-100 text-rose-700', '✕'],
-                    'running' => ['bg-amber-100 text-amber-700', '○'],
-                    'skipped' => ['bg-slate-100 text-slate-500', '·'],
+                $billingBlocked = $deployment->isBillingBlocked();
+                $statusLabel = $billingBlocked ? __('blocked — billing') : $status;
+                [$dotClasses, $glyph] = match (true) {
+                    $billingBlocked => ['bg-amber-100 text-amber-700', '$'],
+                    $status === 'success' => ['bg-emerald-100 text-emerald-700', '✓'],
+                    $status === 'failed' => ['bg-rose-100 text-rose-700', '✕'],
+                    $status === 'running' => ['bg-amber-100 text-amber-700', '○'],
+                    $status === 'skipped' => ['bg-slate-100 text-slate-500', '·'],
                     default => ['bg-brand-sand/60 text-brand-moss', '•'],
                 };
-                $statusLabelClasses = match ($status) {
-                    'success' => 'text-emerald-700',
-                    'failed' => 'text-rose-700',
-                    'running' => 'text-amber-700',
+                $statusLabelClasses = match (true) {
+                    $billingBlocked => 'text-amber-700',
+                    $status === 'success' => 'text-emerald-700',
+                    $status === 'failed' => 'text-rose-700',
+                    $status === 'running' => 'text-amber-700',
                     default => 'text-brand-moss',
                 };
                 $durationMs = $deployment->phaseTotalDurationMs();
@@ -58,7 +62,7 @@
 
                         <div class="min-w-0 flex-1">
                             <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
-                                <span class="text-[11px] font-semibold uppercase tracking-[0.14em] {{ $statusLabelClasses }}">{{ $status }}</span>
+                                <span class="text-[11px] font-semibold uppercase tracking-[0.14em] {{ $statusLabelClasses }}">{{ $statusLabel }}</span>
                                 <span class="text-brand-moss">{{ $deployment->started_at?->diffForHumans() ?? '—' }}</span>
                                 @if ($deployment->trigger)
                                     <span class="text-brand-mist">·</span>

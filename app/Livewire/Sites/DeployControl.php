@@ -8,6 +8,7 @@ use App\Actions\Sites\ScheduleSiteDeploy;
 use App\Jobs\RunSiteDeploymentJob;
 use App\Jobs\RunSiteFixerJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\GuardsBilledDeploys;
 use App\Models\ConsoleAction;
 use App\Models\ScheduledDeploy;
 use App\Models\Server;
@@ -36,6 +37,7 @@ use Livewire\Component;
 class DeployControl extends Component
 {
     use DispatchesToastNotifications;
+    use GuardsBilledDeploys;
 
     public ?Site $site = null;
 
@@ -377,6 +379,10 @@ class DeployControl extends Component
             return;
         }
 
+        if ($this->blockedByDeployPause($this->site)) {
+            return;
+        }
+
         Gate::authorize('update', $this->site);
 
         Cache::put('site-deploy-active:'.$this->site->id, [
@@ -403,6 +409,9 @@ class DeployControl extends Component
     public function scheduleDeploy(string $when): void
     {
         if (! $this->canDeploy()) {
+            return;
+        }
+        if ($this->blockedByDeployPause($this->site)) {
             return;
         }
         Gate::authorize('update', $this->site);

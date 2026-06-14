@@ -29,12 +29,31 @@ trait ManagesOrganizationTrialState
     }
 
     /**
+     * True when this org is operator-owned and permanently exempt from the
+     * trial/soft/hard-pause ladder: dply's own dogfood control plane,
+     * self-managed/self-adopted orgs, staff orgs. Drives {@see trialState}'s
+     * top-priority short-circuit so the platform can never bill-pause itself.
+     */
+    public function isInternal(): bool
+    {
+        return (bool) ($this->is_internal ?? false);
+    }
+
+    /**
      * Resolve the org's current subscription-lifecycle state. The single
      * source of truth for "what can this org do right now?" — see
      * App\Enums\TrialState for the full state machine.
      */
     public function trialState(): TrialState
     {
+        // Internal/operator-owned orgs (dply's own dogfood control plane,
+        // self-managed/self-adopted orgs, staff orgs) are permanently exempt
+        // from the pause ladder so the platform can never bill-pause itself —
+        // the incident that motivated this flag. Wins over every other branch.
+        if ($this->isInternal()) {
+            return TrialState::NoTrial;
+        }
+
         // Includes the cancel grace period — Cashier's valid() stays true
         // until ends_at, so a just-canceled org keeps full access.
         if ($this->onAnyPaidPlan()) {
@@ -184,14 +203,26 @@ trait ManagesOrganizationTrialState
     }
 
     /**
-     * Gate for incoming agent metrics. Day-45 hard-pause behavior — dply
-     * stops accepting telemetry from the org's servers, which is where the
-     * ongoing cost lives. Soft-paused orgs keep reporting so dashboards and
-     * the billing page stay accurate while the customer is being prompted
-     * to add a card.
+     * Gate for standing background automation dply runs on the org's behalf —
+     * metrics ingestion, scheduled backups, log drains. Hard pause stops these
+     * to cap dply's running cost on a non-paying org. On-demand actions (manual
+     * backup, data export, SSH, read-only dashboard) deliberately stay available
+     * indefinitely as the exit ramp, so they are NOT gated here. Soft-paused orgs
+     * keep all standing automation so dashboards/billing stay accurate while the
+     * customer is being prompted to add a card.
+     */
+    public function permitsStandingAutomation(): bool
+    {
+        return $this->trialState() !== TrialState::ExpiredHard;
+    }
+
+    /**
+     * Gate for incoming agent metrics — one facet of standing automation. Soft-
+     * paused orgs keep reporting so dashboards and the billing page stay
+     * accurate; hard-paused orgs stop, which is where the ongoing cost lives.
      */
     public function acceptsMetrics(): bool
     {
-        return $this->trialState() !== TrialState::ExpiredHard;
+        return $this->permitsStandingAutomation();
     }
 }

@@ -32,8 +32,9 @@
                                     'bg-emerald-50 text-emerald-800 ring-emerald-200' => $deployment->status === 'success',
                                     'bg-rose-50 text-rose-800 ring-rose-200' => $deployment->status === 'failed',
                                     'bg-amber-50 text-amber-900 ring-amber-200' => $deployment->status === 'running',
-                                    'bg-brand-sand/60 text-brand-ink ring-brand-ink/10' => ! in_array($deployment->status, ['success', 'failed', 'running']),
-                                ])>{{ $deployment->status }}</span>
+                                    'bg-amber-100 text-amber-950 ring-amber-300' => $deployment->isBillingBlocked(),
+                                    'bg-brand-sand/60 text-brand-ink ring-brand-ink/10' => ! in_array($deployment->status, ['success', 'failed', 'running']) && ! $deployment->isBillingBlocked(),
+                                ])>{{ $deployment->isBillingBlocked() ? __('blocked — billing') : $deployment->status }}</span>
                             </h1>
                             <p class="mt-1 text-sm leading-relaxed text-brand-moss">
                                 <a href="{{ route('sites.deployments.index', ['server' => $server, 'site' => $site, 'tab' => 'history']) }}" wire:navigate class="font-medium text-brand-forest hover:underline">{{ __('Back to all deployments') }}</a>

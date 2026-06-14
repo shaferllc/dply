@@ -10,6 +10,7 @@ use App\Jobs\RunSiteDeploymentJob;
 use App\Jobs\ViewServerEnvJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
+use App\Livewire\Concerns\GuardsBilledDeploys;
 use App\Livewire\Concerns\ManagesSiteBindings;
 use App\Livewire\Concerns\OptimizesPipeline;
 use App\Livewire\Concerns\WatchesConsoleActionOutcomes;
@@ -44,6 +45,7 @@ class DeploymentsList extends Component
 {
     use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
+    use GuardsBilledDeploys;
     use ManagesSiteBindings;
     use ManagesSiteDeployExecution;
     use ManagesSiteDeploymentSchedules;
@@ -267,6 +269,12 @@ class DeploymentsList extends Component
             return;
         }
 
+        // All sync candidates share this org (scoped by organization_id), so a
+        // single pause check gates the whole fan-out before any job dispatch.
+        if ($this->blockedByDeployPause($this->site)) {
+            return;
+        }
+
         $candidates = $this->syncCandidates->keyBy(fn ($s): string => (string) $s->id);
         $queued = 0;
         $skipped = 0;
@@ -326,6 +334,10 @@ class DeploymentsList extends Component
     public function redeploy(): void
     {
         Gate::authorize('update', $this->site);
+
+        if ($this->blockedByDeployPause($this->site)) {
+            return;
+        }
 
         RunSiteDeploymentJob::dispatch($this->site, SiteDeployment::TRIGGER_MANUAL);
         $this->toastSuccess(__('Deployment queued.'));

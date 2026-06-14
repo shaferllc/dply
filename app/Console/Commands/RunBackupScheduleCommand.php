@@ -43,6 +43,18 @@ class RunBackupScheduleCommand extends Command
             return self::SUCCESS;
         }
 
+        // Standing automation (scheduled backups) stops at hard pause to cap
+        // dply's running cost on a non-paying org. The schedule stays active —
+        // it resumes on its own next tick once the org pays — and manual backups
+        // (dispatched directly from the UI) remain available throughout.
+        $schedule->loadMissing('server.organization');
+        $organization = $schedule->server?->organization;
+        if ($organization !== null && ! $organization->permitsStandingAutomation()) {
+            $this->info('Owning organization is hard-paused — skipping scheduled backup (manual backups remain available).');
+
+            return self::SUCCESS;
+        }
+
         if ($this->shouldAutoPause($schedule)) {
             $schedule->update(['is_active' => false]);
             if ($schedule->server_cron_job_id) {

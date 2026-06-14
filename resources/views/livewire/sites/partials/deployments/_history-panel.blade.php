@@ -59,6 +59,7 @@
                     $isSuccess = $deployment->status === 'success';
                     $isFailed = $deployment->status === 'failed';
                     $isRunning = $deployment->status === 'running';
+                    $isBillingBlocked = $deployment->isBillingBlocked();
                     $duration = $deployment->phaseTotalDurationMs() > 0
                         ? number_format($deployment->phaseTotalDurationMs() / 1000, 1).'s'
                         : (($deployment->started_at && $deployment->finished_at)
@@ -80,7 +81,8 @@
                             'bg-emerald-500 ring-emerald-100' => $isSuccess,
                             'bg-rose-500 ring-rose-100' => $isFailed,
                             'bg-amber-500 ring-amber-100 animate-pulse' => $isRunning,
-                            'bg-brand-mist ring-brand-sand/50' => ! $isSuccess && ! $isFailed && ! $isRunning,
+                            'bg-amber-400 ring-amber-100' => $isBillingBlocked,
+                            'bg-brand-mist ring-brand-sand/50' => ! $isSuccess && ! $isFailed && ! $isRunning && ! $isBillingBlocked,
                         ])></span>
 
                         <div class="min-w-0 flex-1">
@@ -91,8 +93,9 @@
                                     'bg-emerald-50 text-emerald-800 ring-emerald-200' => $isSuccess,
                                     'bg-rose-50 text-rose-800 ring-rose-200' => $isFailed,
                                     'bg-amber-50 text-amber-900 ring-amber-200' => $isRunning,
-                                    'bg-brand-sand/60 text-brand-ink ring-brand-ink/10' => ! $isSuccess && ! $isFailed && ! $isRunning,
-                                ])>{{ $deployment->status }}</span>
+                                    'bg-amber-100 text-amber-950 ring-amber-300' => $isBillingBlocked,
+                                    'bg-brand-sand/60 text-brand-ink ring-brand-ink/10' => ! $isSuccess && ! $isFailed && ! $isRunning && ! $isBillingBlocked,
+                                ])>{{ $isBillingBlocked ? __('blocked — billing') : $deployment->status }}</span>
 
                                 @if ($deployment->started_at)
                                     <span class="text-xs text-brand-moss" title="{{ $deployment->started_at->toIso8601String() }}">{{ $deployment->started_at->diffForHumans() }}</span>
