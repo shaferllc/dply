@@ -44,6 +44,8 @@ final class SiteWorkspaceBreadcrumbs
             'label' => $server->name,
             'href' => route('servers.overview', $server),
             'icon' => 'server-stack',
+            'avatar' => $server->name ?: (string) $server->id,
+            'avatar_image' => $server->logoUrl(),
         ];
         $items[] = [
             'label' => __('Sites'),
@@ -54,6 +56,8 @@ final class SiteWorkspaceBreadcrumbs
             'label' => $site->name,
             'href' => route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']),
             'icon' => 'globe-alt',
+            'avatar' => $site->name ?: (string) $site->id,
+            'avatar_image' => $site->logoUrl(),
         ];
         $items[] = [
             'label' => $currentLabel,
@@ -80,6 +84,8 @@ final class SiteWorkspaceBreadcrumbs
                 'label' => $site->name,
                 'href' => route('sites.show', ['server' => $server, 'site' => $site, 'section' => 'general']),
                 'icon' => 'globe-alt',
+                'avatar' => $site->name ?: (string) $site->id,
+                'avatar_image' => $site->logoUrl(),
             ],
             [
                 'label' => $currentLabel,

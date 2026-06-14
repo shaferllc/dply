@@ -11,6 +11,7 @@ use App\Livewire\Servers\Concerns\ManagesServerConfigPreview;
 use App\Livewire\Servers\Concerns\ManagesServerEdgeProxy;
 use App\Livewire\Servers\Concerns\ManagesServerGitIdentity;
 use App\Livewire\Servers\Concerns\ManagesServerInventoryProbe;
+use App\Livewire\Servers\Concerns\ManagesServerLogo;
 use App\Livewire\Servers\Concerns\ManagesServerMiseRuntimes;
 use App\Livewire\Servers\Concerns\ManagesServerRemoteTask;
 use App\Livewire\Servers\Concerns\ManagesServerToolActions;
@@ -42,6 +43,7 @@ class WorkspaceManage extends Component
     use ManagesServerEdgeProxy;
     use ManagesServerGitIdentity;
     use ManagesServerInventoryProbe;
+    use ManagesServerLogo;
     use ManagesServerMiseRuntimes;
     use ManagesServerRemoteTask;
     use ManagesServerToolActions;

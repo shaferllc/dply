@@ -124,7 +124,10 @@
                         <li>
                             <a href="{{ route('sites.show', [$server, $site]) }}" wire:navigate class="block px-3 py-2.5 transition hover:bg-brand-sand/30">
                                 <div class="flex items-center justify-between gap-3">
-                                    <span class="min-w-0 truncate text-xs font-semibold text-brand-ink">{{ $site->name }}</span>
+                                    <span class="inline-flex min-w-0 items-center gap-2 text-xs font-semibold text-brand-ink">
+                                        <x-entity-avatar :seed="$site->name" :image="$site->logoUrl()" rounded="rounded-md" class="h-6 w-6 text-[10px]" />
+                                        <span class="truncate">{{ $site->name }}</span>
+                                    </span>
                                     <span class="flex shrink-0 items-center gap-1">
                                         <x-badge size="sm" :tone="$siteStatusTone">{{ $site->statusLabel() }}</x-badge>
                                         @if ($siteSslTone !== null)

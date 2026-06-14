@@ -80,24 +80,11 @@
         'lg:grid-cols-12' => $showNavigation,
     ])>
         @if ($showNavigation)
-        @php
-            // Deterministic gradient + initials avatar from the server name. Two hue stops
-            // pulled from a stable hash so the same name always renders the same swatch —
-            // no external service, no network roundtrip.
-            $avatarSeed = (string) ($server->name ?: $server->id);
-            $avatarHash = hexdec(substr(sha1($avatarSeed), 0, 12));
-            $avatarHueA = $avatarHash % 360;
-            $avatarHueB = ($avatarHueA + 60 + ((int) (($avatarHash >> 4) % 120))) % 360;
-            $avatarInitials = mb_strtoupper(mb_substr(preg_replace('/[^A-Za-z0-9]/', '', $avatarSeed) ?: 'S', 0, 2));
-            $avatarStyle = "background-image: linear-gradient(135deg, hsl({$avatarHueA}deg 65% 56%) 0%, hsl({$avatarHueB}deg 65% 42%) 100%);";
-        @endphp
         <aside class="sm:col-span-3 mb-8 lg:mb-0">
             <div class="{{ $card }}">
                 <div class="border-b border-brand-ink/10 p-4 sm:p-5">
                     <div class="flex items-center gap-3">
-                        <span class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white font-semibold text-base shadow-sm ring-1 ring-brand-ink/10" style="{{ $avatarStyle }}">
-                            {{ $avatarInitials }}
-                        </span>
+                        <x-entity-avatar :seed="$server->name ?: $server->id" :image="$server->logoUrl()" class="h-12 w-12 text-base" />
                         <div class="min-w-0 flex-1 leading-tight">
                             <p class="truncate text-base font-semibold text-brand-ink">{{ $server->name }}</p>
                             @if ($server->workspace)

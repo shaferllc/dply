@@ -65,17 +65,23 @@
                 'label' => $server->name,
                 'href' => route('servers.overview', $server),
                 'icon' => 'server-stack',
+                'avatar' => $server->name ?: (string) $server->id,
+                'avatar_image' => $server->logoUrl(),
             ];
             $workspaceBreadcrumbs[] = [
                 'label' => $contextSite->name,
                 'href' => $activePageItem ? route('sites.show', ['server' => $server, 'site' => $contextSite]) : null,
                 'icon' => 'globe-alt',
+                'avatar' => $contextSite->name ?: (string) $contextSite->id,
+                'avatar_image' => $contextSite->logoUrl(),
             ];
         } else {
             $workspaceBreadcrumbs[] = [
                 'label' => $server->name,
                 'href' => $activePageItem ? route('servers.overview', $server) : null,
                 'icon' => 'server-stack',
+                'avatar' => $server->name ?: (string) $server->id,
+                'avatar_image' => $server->logoUrl(),
             ];
         }
 

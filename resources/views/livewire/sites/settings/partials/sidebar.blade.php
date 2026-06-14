@@ -7,11 +7,6 @@
         ?? $site->name;
     $sidebarVisitUrl = $site->visitUrl();
     $sidebarUrlSeed = (string) ($sidebarPrimaryHostname ?: $site->name ?: $site->id);
-    $sidebarHash = hexdec(substr(sha1($sidebarUrlSeed), 0, 12));
-    $sidebarHueA = $sidebarHash % 360;
-    $sidebarHueB = ($sidebarHueA + 60 + ((int) (($sidebarHash >> 4) % 120))) % 360;
-    $sidebarInitials = mb_strtoupper(mb_substr(preg_replace('/[^A-Za-z0-9]/', '', $sidebarUrlSeed) ?: 'S', 0, 2));
-    $sidebarAvatarStyle = "background-image: linear-gradient(135deg, hsl({$sidebarHueA}deg 65% 56%) 0%, hsl({$sidebarHueB}deg 65% 42%) 100%);";
 @endphp
 
 <aside class="sm:col-span-3 mb-8 lg:mb-0"
@@ -27,13 +22,7 @@
                 {{ __('Back to sites') }}
             </a>
             <div class="flex items-start gap-3">
-                @if ($site->logoUrl())
-                    <img src="{{ $site->logoUrl() }}" alt="{{ $site->name }}" class="h-12 w-12 shrink-0 rounded-2xl object-cover bg-white shadow-sm ring-1 ring-brand-ink/10" />
-                @else
-                    <span class="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white font-semibold text-base shadow-sm ring-1 ring-brand-ink/10" style="{{ $sidebarAvatarStyle }}">
-                        {{ $sidebarInitials }}
-                    </span>
-                @endif
+                <x-entity-avatar :seed="$sidebarUrlSeed" :image="$site->logoUrl()" class="h-12 w-12 text-base" />
                 <div class="min-w-0 flex-1">
                     <p class="truncate text-base font-semibold text-brand-ink">{{ $sidebarPrimaryHostname }}</p>
                     @if ($server->workspace)

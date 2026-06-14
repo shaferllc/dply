@@ -138,6 +138,18 @@
                             $iconKey = isset($item['icon']) && is_string($item['icon']) ? $item['icon'] : null;
                             $resolvedIcon = $resolveIcon($iconKey, $isLast, $loop->first, count($crumbs));
                         }
+
+                        // A crumb may carry an `avatar` seed (e.g. a server/site
+                        // name) to render the gradient initials avatar in place of
+                        // the heroicon — matching the list rows + workspace header.
+                        // An optional `avatar_image` URL (e.g. a site's uploaded
+                        // logo) shows the image, falling back to the gradient.
+                        $crumbAvatar = isset($item['avatar']) && is_string($item['avatar']) && $item['avatar'] !== ''
+                            ? $item['avatar']
+                            : null;
+                        $crumbAvatarImage = isset($item['avatar_image']) && is_string($item['avatar_image']) && $item['avatar_image'] !== ''
+                            ? $item['avatar_image']
+                            : null;
                     @endphp
                     @if (! $loop->first)
                         <li class="select-none text-brand-mist" aria-hidden="true">/</li>
@@ -149,7 +161,9 @@
                                 class="group inline-flex max-w-full min-w-0 items-center gap-1.5 text-brand-moss transition-colors hover:text-brand-ink"
                                 wire:navigate
                             >
-                                @if ($resolvedIcon)
+                                @if ($crumbAvatar)
+                                    <x-entity-avatar :seed="$crumbAvatar" :image="$crumbAvatarImage" rounded="rounded-md" class="h-5 w-5 text-[9px]" />
+                                @elseif ($resolvedIcon)
                                     <x-dynamic-component
                                         :component="$resolvedIcon"
                                         @class([
@@ -163,7 +177,9 @@
                             </a>
                         @elseif ($isLast)
                             <span class="inline-flex max-w-full min-w-0 items-center gap-1.5 font-semibold text-brand-ink" aria-current="page">
-                                @if ($resolvedIcon)
+                                @if ($crumbAvatar)
+                                    <x-entity-avatar :seed="$crumbAvatar" :image="$crumbAvatarImage" rounded="rounded-md" class="h-5 w-5 text-[9px]" />
+                                @elseif ($resolvedIcon)
                                     <x-dynamic-component
                                         :component="$resolvedIcon"
                                         class="h-4 w-4 shrink-0 text-brand-ink opacity-90"
@@ -174,7 +190,9 @@
                             </span>
                         @else
                             <span class="inline-flex max-w-full min-w-0 items-center gap-1.5 font-medium text-brand-ink">
-                                @if ($resolvedIcon)
+                                @if ($crumbAvatar)
+                                    <x-entity-avatar :seed="$crumbAvatar" :image="$crumbAvatarImage" rounded="rounded-md" class="h-5 w-5 text-[9px]" />
+                                @elseif ($resolvedIcon)
                                     <x-dynamic-component
                                         :component="$resolvedIcon"
                                         class="h-4 w-4 shrink-0 text-brand-ink opacity-90"

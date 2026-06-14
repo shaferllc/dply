@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
+use Illuminate\Support\Facades\Storage;
 use phpseclib3\Crypt\Common\PrivateKey;
 use phpseclib3\Crypt\PublicKeyLoader;
 
@@ -91,6 +92,7 @@ class Server extends Model
         'pool_role',
         'provider_credential_id',
         'name',
+        'logo_path',
         'provider',
         'hosting_backend',
         'provider_id',
@@ -127,6 +129,26 @@ class Server extends Model
             'scheduled_deletion_at' => 'datetime',
             'comped_until' => 'datetime',
         ];
+    }
+
+    /**
+     * Public URL of the server's custom logo, or null when none is set —
+     * callers fall back to the generated gradient + initials avatar. Stored on
+     * the `public` disk. Mirrors {@see Site::logoUrl()}.
+     */
+    public function logoUrl(): ?string
+    {
+        $path = $this->logo_path;
+        if (! is_string($path) || $path === '') {
+            return null;
+        }
+
+        return Storage::disk('public')->url($path);
+    }
+
+    public function hasLogo(): bool
+    {
+        return is_string($this->logo_path) && $this->logo_path !== '';
     }
 
     public function user(): BelongsTo

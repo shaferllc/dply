@@ -1,12 +1,7 @@
 @php
-    // Gradient + initials fallback (mirrors the sidebar avatar) so the preview
-    // matches what renders when no custom logo is set.
+    // Seed for the gradient + initials fallback (mirrors the sidebar avatar) so
+    // the preview matches what renders when no custom logo is set.
     $logoSeed = (string) (optional($site->primaryDomain())->hostname ?: $site->name ?: $site->id);
-    $logoHash = hexdec(substr(sha1($logoSeed), 0, 12));
-    $logoHueA = $logoHash % 360;
-    $logoHueB = ($logoHueA + 60 + ((int) (($logoHash >> 4) % 120))) % 360;
-    $logoInitials = mb_strtoupper(mb_substr(preg_replace('/[^A-Za-z0-9]/', '', $logoSeed) ?: 'S', 0, 2));
-    $logoFallbackStyle = "background-image: linear-gradient(135deg, hsl({$logoHueA}deg 65% 56%) 0%, hsl({$logoHueB}deg 65% 42%) 100%);";
     $canEditLogo = auth()->user()?->can('update', $site);
 @endphp
 
@@ -35,13 +30,7 @@
         <div class="flex flex-col gap-5 sm:flex-row sm:items-center">
             {{-- Preview --}}
             <div class="shrink-0">
-                @if ($site->logoUrl())
-                    <img src="{{ $site->logoUrl() }}" alt="{{ $site->name }}" class="h-16 w-16 rounded-2xl object-cover ring-1 ring-brand-ink/10 shadow-sm bg-white" />
-                @else
-                    <span class="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl text-white text-lg font-semibold shadow-sm ring-1 ring-brand-ink/10" style="{{ $logoFallbackStyle }}">
-                        {{ $logoInitials }}
-                    </span>
-                @endif
+                <x-entity-avatar :seed="$logoSeed" :image="$site->logoUrl()" class="h-16 w-16 text-lg" />
             </div>
 
             @if ($canEditLogo)
