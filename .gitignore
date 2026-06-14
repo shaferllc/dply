@@ -38,3 +38,4 @@ storage/blaze/traces/
 
 # refactor helper (local only)
 .dply-extract.py
+.defract-worktrees

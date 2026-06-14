@@ -1,8 +1,149 @@
 {
-  "colors": {},
-  "typography": {},
+  "meta": {
+    "generator": "defract-design-system-extractor",
+    "source": "resources/css/dply-theme.css, resources/css/app.css, resources/views/components/",
+    "extractedAt": "2026-06-14T00:00:00Z"
+  },
+  "colors": {
+    "brand-ink": {
+      "value": "#171a0e",
+      "valueDark": "#eef0e8",
+      "type": "color",
+      "role": "Primary text, primary button fill"
+    },
+    "brand-forest": {
+      "value": "#32482c",
+      "valueDark": "#9cbc92",
+      "type": "color",
+      "role": "Hover state for primary actions"
+    },
+    "brand-moss": {
+      "value": "#5d6259",
+      "valueDark": "#b9bcb4",
+      "type": "color",
+      "role": "Secondary / muted text"
+    },
+    "brand-sage": {
+      "value": "#688479",
+      "valueDark": "#9fb5ae",
+      "type": "color",
+      "role": "Focus rings, accent borders"
+    },
+    "brand-olive": {
+      "value": "#5d5622",
+      "valueDark": "#c9b86a",
+      "type": "color",
+      "role": "Warm accent"
+    },
+    "brand-rust": {
+      "value": "#9a6215",
+      "valueDark": "#d4a574",
+      "type": "color",
+      "role": "Warning / amber tone"
+    },
+    "brand-copper": {
+      "value": "#ac6e22",
+      "valueDark": "#d9b07a",
+      "type": "color",
+      "role": "Copper accent"
+    },
+    "brand-gold": {
+      "value": "#cda942",
+      "valueDark": "#e6d18f",
+      "type": "color",
+      "role": "Gold highlight"
+    },
+    "brand-sand": {
+      "value": "#e1d8ac",
+      "valueDark": "#2f352c",
+      "type": "color",
+      "role": "Muted fill, badge background"
+    },
+    "brand-cream": {
+      "value": "#fdfcf9",
+      "valueDark": "#141612",
+      "type": "color",
+      "role": "Page background"
+    },
+    "brand-mist": {
+      "value": "#a7a69a",
+      "valueDark": "#7a7d76",
+      "type": "color",
+      "role": "Placeholders, disabled text"
+    }
+  },
+  "typography": {
+    "fontFamilies": {
+      "sans": "'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji'"
+    },
+    "fontSizes": {
+      "label-xs": {
+        "value": "10px",
+        "type": "fontSize"
+      },
+      "badge-sm": {
+        "value": "11px",
+        "type": "fontSize"
+      },
+      "xs": {
+        "value": "12px",
+        "type": "fontSize"
+      },
+      "sm": {
+        "value": "14px",
+        "type": "fontSize"
+      }
+    },
+    "fontWeights": {
+      "semibold": {
+        "value": "600",
+        "type": "fontWeight"
+      }
+    },
+    "letterSpacing": {
+      "wide": {
+        "value": "0.025em",
+        "type": "letterSpacing"
+      },
+      "label": {
+        "value": "0.14em",
+        "type": "letterSpacing"
+      }
+    }
+  },
   "spacing": {},
   "breakpoints": {},
   "shadows": {},
-  "borders": {}
+  "borders": {
+    "radii": {
+      "sm": {
+        "value": "8px",
+        "type": "borderRadius",
+        "tailwindClass": "rounded-lg"
+      },
+      "md": {
+        "value": "12px",
+        "type": "borderRadius",
+        "tailwindClass": "rounded-xl"
+      },
+      "lg": {
+        "value": "16px",
+        "type": "borderRadius",
+        "tailwindClass": "rounded-2xl"
+      },
+      "full": {
+        "value": "9999px",
+        "type": "borderRadius",
+        "tailwindClass": "rounded-full"
+      }
+    }
+  },
+  "layout": {
+    "pageMaxWidth": {
+      "value": "1280px",
+      "type": "dimension",
+      "tailwindClass": "max-w-7xl"
+    }
+  },
+  "zIndex": {}
 }

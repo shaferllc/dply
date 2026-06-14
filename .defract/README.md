@@ -4,7 +4,10 @@ This project uses [defract](https://defract.dev) for structured AI-assisted deve
 
 ## Tasks
 
-No tasks yet.
+| Task | Stage | Status |
+|------|-------|--------|
+| Extend remediation panel to cover additional deploy failure types | scope | active |
+
 
 ## Reading without defract
 

@@ -14,9 +14,14 @@ defract:
     mode: human-in-the-loop
     branch_strategy: worktree
     design_tool: pencil
+    base_branch: main
     auto_push_enabled: false
     offline_override: false
     completion_mode: merge
+    worktree_assets:
+    - .env
+    - .env.prod
+    - .env.worker
   agents: null
   concurrency: null
   context_monitor:
