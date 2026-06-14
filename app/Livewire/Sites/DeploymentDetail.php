@@ -68,7 +68,7 @@ class DeploymentDetail extends Component
         // use build/swap/release/restart; serverless deploys record a single
         // "serverless" phase. Known phases come first in their canonical order,
         // then any others fall in afterwards so nothing is silently dropped.
-        $canonicalOrder = ['clone', 'build', 'swap', 'activate', 'release', 'restart', 'serverless'];
+        $canonicalOrder = ['clone', 'build', 'resources', 'swap', 'activate', 'release', 'restart', 'serverless'];
         $phases = array_values(array_unique([
             ...array_filter($canonicalOrder, static fn (string $p): bool => isset($phaseResults[$p])),
             ...array_keys($phaseResults),

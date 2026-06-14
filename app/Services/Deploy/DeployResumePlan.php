@@ -23,7 +23,7 @@ final class DeployResumePlan
      *
      * @var list<string>
      */
-    public const PHASE_ORDER = ['clone', 'env', 'manifest', 'build', 'logging', 'release', 'activate', 'restart'];
+    public const PHASE_ORDER = ['clone', 'env', 'manifest', 'build', 'logging', 'resources', 'release', 'activate', 'restart'];
 
     /**
      * Phases a deploy may be resumed FROM:

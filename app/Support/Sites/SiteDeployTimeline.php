@@ -32,6 +32,7 @@ final class SiteDeployTimeline
     private const PHASES = [
         'clone' => 'Clone & fetch',
         'build' => 'Build',
+        'resources' => 'Verify resources',
         'release' => 'Release',
         'activate' => 'Activate',
     ];
@@ -48,12 +49,23 @@ final class SiteDeployTimeline
         // $site instance — share one query instead of each hitting the DB.
         $site->loadMissing('deploySteps');
 
+        $phaseDefs = self::PHASES;
+        // The pre-cutover RESOURCES gate only exists for sites that have a
+        // networked resource binding to probe (or a deploy that recorded it).
+        // Drop the row otherwise so static/binding-less sites don't show an
+        // always-empty "Verify resources" phase.
+        $site->loadMissing('bindings');
+        $hasResources = ($latest !== null && $latest->hasPhase('resources'))
+            || $site->bindings->contains(static fn ($b): bool => BindingReachability::isNetworked((string) $b->type));
+        if (! $hasResources) {
+            unset($phaseDefs['resources']);
+        }
+
         // Canonical phases, plus a POST-CUTOVER Restart phase when the site has
         // restart-phase steps (queue:restart / horizon:terminate / custom worker
         // restarts) or this deploy recorded one (dply's managed reload also lands
         // under 'restart'). Omitted otherwise so static sites don't show an empty
         // pending Restart row.
-        $phaseDefs = self::PHASES;
         $hasRestart = ($latest !== null && $latest->hasPhase('restart'))
             || $site->deploySteps->contains(static fn ($s): bool => (string) $s->phase === SiteDeployStep::PHASE_RESTART);
         if ($hasRestart) {
@@ -312,6 +324,7 @@ final class SiteDeployTimeline
             'activate' => __('Activate'),
             'swap' => __('Swap'),
             'restart' => __('Restart'),
+            'resource' => $command !== '' ? $command : __('Resource reachability'),
             'post_deploy' => __('Post-deploy command'),
             'custom' => $command !== '' ? Str::limit($command, 60) : __('Custom command'),
             '' => __('Step'),

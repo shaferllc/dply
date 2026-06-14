@@ -354,6 +354,18 @@ class AtomicSiteDeployer
             $log .= app(SiteLoggingConfigPusher::class)->apply($site, $ssh, $newRelease)['log'];
         }
 
+        // ── RESOURCES ── verify every networked resource binding (database,
+        // redis, storage, mail, …) is reachable from the box BEFORE the cutover.
+        // A critical binding the server can't dial fails the deploy HERE — the
+        // symlink never flips, so the prior release keeps serving and the new
+        // one (which would immediately 500 on a dead DB/cache/store) never goes
+        // live. Auxiliary bindings (broadcasting/logging) are probed but only
+        // warn. Skipped on a post-cutover (restart) resume: the release is
+        // already live, and re-gating it could fail a deploy that's serving.
+        if ($shouldRun('resources')) {
+            $log .= app(DeployResourceVerifier::class)->verify($site, $ssh, $deployment);
+        }
+
         // ── RELEASE ── run release-phase steps (migrations, optimize, custom
         // commands) in the freshly-built RELEASE dir — the real checkout, never
         // the `current` symlink, so they do NOT depend on the flip resolving.
