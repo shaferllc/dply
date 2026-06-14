@@ -343,8 +343,8 @@ class WorkspaceNetworking extends Component
             return;
         }
 
-        if (! DatabaseEngineInstallScripts::supportsRemoteAccess($db->engine)) {
-            $this->toastError(__('Remote access is not supported for :engine.', ['engine' => $db->engine]));
+        if (! DatabaseEngineInstallScripts::supportsPerDatabaseRemoteAccess($db->engine)) {
+            $this->toastError(__('Per-database remote access is not supported for :engine.', ['engine' => $db->engine]));
 
             return;
         }

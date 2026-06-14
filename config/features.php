@@ -117,9 +117,13 @@ return [
     'database' => [
         // exit: ship once MariaDB install + MySQL-family workspace validated on three OSes
         'mariadb' => env('FEATURE_DATABASE_MARIADB', false),
-        // exit: ship once MongoDB install + document DB workspace validated on three OSes
+        // MongoDB install path is now wired into the server-create picker +
+        // provision stack, but stays default-off until validated on three OSes.
+        // Flip FEATURE_DATABASE_MONGODB=true per deployment to offer it.
         'mongodb' => env('FEATURE_DATABASE_MONGODB', false),
-        // exit: ship once ClickHouse install + OLAP workspace validated on three OSes
+        // ClickHouse install path wired in (primary driver: self-hosting the dply
+        // logs store). Default-off pending three-OS validation; set
+        // FEATURE_DATABASE_CLICKHOUSE=true per deployment to offer it.
         'clickhouse' => env('FEATURE_DATABASE_CLICKHOUSE', false),
     ],
 

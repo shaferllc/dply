@@ -15,6 +15,7 @@
     $globalFlagsActive = request()->routeIs('admin.flags.global');
     $productLineActive = request()->routeIs('admin.flags.*') && ! $globalFlagsActive;
     $organizationsActive = request()->routeIs('admin.organizations.*');
+    $usersActive = request()->routeIs('admin.users.*');
     $betaInvitesActive = request()->routeIs('admin.beta-invites');
     $comingSoonAccessActive = request()->routeIs('admin.coming-soon-access');
 
@@ -98,6 +99,10 @@
     <a href="{{ route('admin.organizations.index') }}" wire:navigate @class([$navBase, $organizationsActive ? $navOn : $navOff])>
         <x-heroicon-o-building-office-2 class="{{ $navIcon }}" />
         {{ __('Organizations') }}
+    </a>
+    <a href="{{ route('admin.users.index') }}" wire:navigate @class([$navBase, $usersActive ? $navOn : $navOff])>
+        <x-heroicon-o-users class="{{ $navIcon }}" />
+        {{ __('Users') }}
     </a>
     <a href="{{ route('admin.beta-invites') }}" wire:navigate @class([$navBase, $betaInvitesActive ? $navOn : $navOff])>
         <x-heroicon-o-sparkles class="{{ $navIcon }}" />

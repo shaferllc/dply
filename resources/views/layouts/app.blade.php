@@ -39,6 +39,7 @@
         @endphp
     </head>
     <body class="font-sans antialiased bg-brand-cream text-brand-ink min-h-screen flex flex-col" style="font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;" x-data="toastStore({ position: @js($toastPosition) })">
+        <x-impersonation-banner />
         <div class="flex flex-col flex-1 min-h-0">
             <x-site-header />
 
@@ -136,6 +137,15 @@
                                     this.toggle();
                                 } else if (e.key === 'Escape' && this.open) {
                                     this.close();
+                                }
+                            });
+                            // Programmatic open — e.g. a one-click "Suggested fix"
+                            // streams its live output into the drawer.
+                            window.addEventListener('dply-open-console-drawer', () => {
+                                if (!this.open) {
+                                    this.open = true;
+                                    localStorage.setItem('dply.consoleDrawer.open', '1');
+                                    this.$nextTick(() => window.dispatchEvent(new CustomEvent('dply-console-drawer-opened')));
                                 }
                             });
                         },

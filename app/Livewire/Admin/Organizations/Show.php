@@ -78,6 +78,7 @@ class Show extends Component
             'lineTitle' => AdminFeatureFlags::productLineTitle($this->tab),
             'groups' => $groups,
             'overrideCount' => AdminFeatureFlags::orgOverrideCount($this->organization),
+            'members' => $this->organization->users()->orderBy('name')->get(),
         ]);
     }
 }

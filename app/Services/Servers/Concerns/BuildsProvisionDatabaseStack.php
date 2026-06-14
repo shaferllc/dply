@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Servers\Concerns;
 
-
+use App\Support\Servers\DatabaseEngineInstallScripts;
 
 /**
  * Concern extracted from the host Livewire component to keep it under control.
@@ -67,6 +67,20 @@ trait BuildsProvisionDatabaseStack
             ]);
         }
 
+        // MongoDB + ClickHouse: reuse the single source of truth install bash
+        // (upstream repo + GPG + service start) from DatabaseEngineInstallScripts
+        // so provision and the on-demand add-engine flow stay identical. Both
+        // install localhost-bound; ClickHouse remote access (for a central logs
+        // store) is applied separately via enableRemoteAccessScript.
+        if ($database === 'mongodb' || $database === 'clickhouse') {
+            $label = $database === 'mongodb' ? 'Installing MongoDB' : 'Installing ClickHouse';
+
+            return $this->withStep($label, [
+                DatabaseEngineInstallScripts::installScript($database),
+                'export DPLY_INSTALLED_DATABASE='.escapeshellarg($database),
+            ]);
+        }
+
         return [];
     }
 
@@ -112,6 +126,12 @@ trait BuildsProvisionDatabaseStack
                 '    ;;',
                 '  sqlite*)',
                 '    DPLY_INSTALLED_DATABASE_VERSION=$(sqlite3 --version 2>/dev/null | awk \'{print $1}\')',
+                '    ;;',
+                '  mongodb*)',
+                '    DPLY_INSTALLED_DATABASE_VERSION=$(mongod --version 2>/dev/null | sed -n \'s/.*version v\([0-9.]*\).*/\1/p\' | head -n1)',
+                '    ;;',
+                '  clickhouse*)',
+                '    DPLY_INSTALLED_DATABASE_VERSION=$(clickhouse-client --version 2>/dev/null | sed -n \'s/.*version \([0-9.]*\).*/\1/p\' | head -n1)',
                 '    ;;',
                 'esac',
                 // Sum active swap (in MB).
