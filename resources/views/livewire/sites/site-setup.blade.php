@@ -141,10 +141,20 @@
                         // env editing itself is the real Environment tab (the partial).
                         $missing = $this->missingRequired();
                         $envComplete = empty($missing);
-                        $steps = [
-                            ['id' => 'environment', 'n' => 1, 'label' => __('Environment & resources'), 'done' => $envComplete],
-                            ['id' => 'review', 'n' => 2, 'label' => __('Review & deploy'), 'done' => false],
-                        ];
+
+                        // The Resources step is conditional: only present when the
+                        // scan suggested resources to connect. When it's absent the
+                        // Environment step still carries inline "Connect resource".
+                        $hasResources = $this->hasResourceStep();
+                        $unsatisfiedResources = $hasResources ? $this->unsatisfiedResources() : [];
+
+                        $steps = [];
+                        $n = 1;
+                        if ($hasResources) {
+                            $steps[] = ['id' => 'resources', 'n' => $n++, 'label' => __('Resources'), 'done' => empty($unsatisfiedResources)];
+                        }
+                        $steps[] = ['id' => 'environment', 'n' => $n++, 'label' => $hasResources ? __('Environment') : __('Environment & resources'), 'done' => $envComplete];
+                        $steps[] = ['id' => 'review', 'n' => $n++, 'label' => __('Review & deploy'), 'done' => false];
                     @endphp
 
                     @if ($site->setupScanFailed())
@@ -234,7 +244,12 @@
                     </nav>
 
                     {{-- Step body --}}
-                    @if ($step === 'environment')
+                    @if ($step === 'resources')
+                        {{-- Detection-driven resource suggestions, ordered BEFORE
+                             the variables editor so each connected binding adopts
+                             (and strips) its own keys before they'd be hand-typed. --}}
+                        @include('livewire.sites.settings.partials.environment.resources-step')
+                    @elseif ($step === 'environment')
                         {{-- The Environment step IS the real Environment tab: variables
                              (masked Show/Edit rows, filter chips, import) AND
                              "Connect resource" (attach/provision databases, cache,
@@ -283,6 +298,18 @@
                                     <p class="mt-1 font-mono text-xs text-brand-moss">{{ implode(', ', $missing) }}</p>
                                     <p class="mt-2 text-xs text-brand-moss">{{ __('You can deploy without them — the deploy will surface the failure if the app needs them.') }}</p>
                                     <button type="button" wire:click="goToStep('environment')" class="mt-2 text-xs font-medium text-brand-rust hover:underline">{{ __('← Set them first') }}</button>
+                                </div>
+                            @endif
+
+                            @if (! empty($unsatisfiedResources))
+                                {{-- Soft warn (dual-path): a detected resource is fine
+                                     to leave unconnected — its keys can be set by hand
+                                     or the resource added later. Never blocks deploy. --}}
+                                <div class="mt-4 rounded-xl border border-brand-gold/40 bg-brand-gold/10 p-4">
+                                    <p class="text-sm font-semibold text-brand-ink">{{ __(':count detected resource(s) not connected', ['count' => count($unsatisfiedResources)]) }}</p>
+                                    <p class="mt-1 text-xs text-brand-moss">{{ implode(', ', array_map(fn ($r) => $r['label'], $unsatisfiedResources)) }}</p>
+                                    <p class="mt-2 text-xs text-brand-moss">{{ __('You can deploy without them — set their variables by hand, or connect the resource now.') }}</p>
+                                    <button type="button" wire:click="goToStep('resources')" class="mt-2 text-xs font-medium text-brand-rust hover:underline">{{ __('← Connect resources') }}</button>
                                 </div>
                             @endif
 

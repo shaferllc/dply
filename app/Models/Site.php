@@ -288,6 +288,19 @@ class Site extends Model
         });
 
         static::deleting(function (Site $site): void {
+            // Purge relations the DB FK cascade can't reach — denormalised
+            // site_id columns (error_events / app_logs / …) and polymorphic
+            // links (console_actions, notification_subscriptions, …) — so a
+            // deleted site leaves no orphaned rows (esp. its Errors stream).
+            try {
+                app(\App\Support\Sites\SiteRelationPurger::class)->purge($site);
+            } catch (\Throwable $e) {
+                Log::warning('Site::deleting relation purge failed', [
+                    'site_id' => $site->getKey(),
+                    'error' => $e->getMessage(),
+                ]);
+            }
+
             // Dispatch on-server cleanup for Custom (headless) sites
             // before the row vanishes. We capture the resolved values
             // here because effectiveSystemUser() needs the server, and

@@ -15,6 +15,7 @@ use App\Models\Site;
 use App\Services\Deploy\SiteDeployPipelineManager;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
+use App\Services\Sites\ResourceSuggestionMapper;
 use App\Services\Sites\SiteDeploySyncCoordinator;
 use App\Support\SiteSettingsSidebar;
 use Illuminate\Bus\UniqueLock;
@@ -69,7 +70,7 @@ class SiteSetup extends Component
      */
     public bool $embedded = false;
 
-    /** Active step: 'environment' | 'review'. */
+    /** Active step: 'resources' | 'environment' | 'review'. */
     #[Url(as: 'step', except: '')]
     public string $step = '';
 
@@ -102,8 +103,8 @@ class SiteSetup extends Component
             return;
         }
 
-        if (! in_array($this->step, ['environment', 'review'], true)) {
-            $this->step = 'environment';
+        if (! in_array($this->step, $this->availableStepIds(), true)) {
+            $this->step = $this->defaultStep();
         }
     }
 
@@ -135,12 +136,17 @@ class SiteSetup extends Component
             return;
         }
 
-        // Scan just finished — drop into environment configuration immediately.
+        // Scan just finished — drop into the first relevant step. When the scan
+        // detected resources to connect (database/Redis/storage/…), land on the
+        // Resources step first so those keys get adopted before the env editor
+        // shows them; otherwise go straight to the variables.
         if ($wasScanning && ! $this->site->isPreflightScanning()) {
-            $this->step = 'environment';
+            $this->step = $this->defaultStep();
 
             if (! $this->site->setupScanFailed()) {
-                $this->toastSuccess(__('Repository analyzed — fill in the required variables below to deploy.'));
+                $this->toastSuccess($this->step === 'resources'
+                    ? __('Repository analyzed — connect the resources it needs, then fill in any remaining variables.')
+                    : __('Repository analyzed — fill in the required variables below to deploy.'));
             }
         }
     }
@@ -181,9 +187,92 @@ class SiteSetup extends Component
 
     public function goToStep(string $step): void
     {
-        if (in_array($step, ['environment', 'review'], true)) {
+        if (in_array($step, $this->availableStepIds(), true)) {
             $this->step = $step;
         }
+    }
+
+    /**
+     * The wizard steps in order. The Resources step is conditional — it appears
+     * only when the env scan suggests at least one managed resource to connect
+     * (database, Redis, object storage, mail, broadcasting); simple apps with no
+     * detected resources skip straight to Environment.
+     *
+     * @return list<string>
+     */
+    public function availableStepIds(): array
+    {
+        return $this->hasResourceStep()
+            ? ['resources', 'environment', 'review']
+            : ['environment', 'review'];
+    }
+
+    /** Where to land after a scan: Resources first when any is unsatisfied. */
+    private function defaultStep(): string
+    {
+        return $this->unsatisfiedResources() !== [] ? 'resources' : 'environment';
+    }
+
+    public function hasResourceStep(): bool
+    {
+        return $this->resourceSuggestions() !== [];
+    }
+
+    /**
+     * Resources the scan suggests connecting, each annotated with dual-path
+     * SATISFACTION: a resource is satisfied when a matching binding is connected
+     * OR every env key it owns is already set (the operator wired it by hand).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function resourceSuggestions(): array
+    {
+        $suggestions = app(ResourceSuggestionMapper::class)->forSite($this->site);
+        if ($suggestions === []) {
+            return [];
+        }
+
+        $present = array_flip($this->presentNonEmptyEnvKeys());
+        $bindingTypes = $this->site->bindings->pluck('type')->map(fn ($t): string => (string) $t)->all();
+
+        return array_map(function (array $s) use ($present, $bindingTypes): array {
+            $hasBinding = array_intersect($s['satisfying_types'], $bindingTypes) !== [];
+            $keysSatisfied = $s['matched_keys'] !== []
+                && ! collect($s['matched_keys'])->contains(fn ($k): bool => ! isset($present[$k]));
+
+            $s['has_binding'] = $hasBinding;
+            $s['keys_satisfied'] = $keysSatisfied;
+            $s['satisfied'] = $hasBinding || $keysSatisfied;
+
+            return $s;
+        }, $suggestions);
+    }
+
+    /**
+     * Suggested resources that are neither connected nor satisfied by hand —
+     * the soft-warn list shown on Review.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function unsatisfiedResources(): array
+    {
+        return array_values(array_filter(
+            $this->resourceSuggestions(),
+            static fn (array $s): bool => ($s['satisfied'] ?? false) !== true,
+        ));
+    }
+
+    /**
+     * Open the shared binding modal for a suggested resource, pre-set to that
+     * resource's recommended attach/provision mode (provision-new for
+     * database/storage, attach for Redis/mail/broadcasting).
+     */
+    public function connectSuggestedResource(string $type): void
+    {
+        $suggestion = collect($this->resourceSuggestions())->firstWhere('type', $type);
+        $mode = is_array($suggestion) ? (string) ($suggestion['default_mode'] ?? 'attach') : 'attach';
+
+        $this->openBindingModal($type, $mode);
     }
 
     /** Final action: dispatch the first deploy (which composes .env from the cache). */

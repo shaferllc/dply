@@ -39,6 +39,7 @@ use App\Console\Commands\PruneFeedbackAttachmentsCommand;
 use App\Console\Commands\PruneFunctionInvocationsCommand;
 use App\Console\Commands\PruneLocalWorkspaceArtifactsCommand;
 use App\Console\Commands\PruneNotificationInboxItemsCommand;
+use App\Console\Commands\PruneOrphanedSiteDataCommand;
 use App\Console\Commands\PruneQuickDownloadsCommand;
 use App\Console\Commands\PruneRemoteTaskRunnerCommand;
 use App\Console\Commands\PruneServerCreateDraftsCommand;
@@ -231,6 +232,10 @@ final class DplySchedule
             ->name('prune-quick-downloads');
         $schedule->command(PruneFunctionInvocationsCommand::class)->dailyAt('03:50');
         $schedule->command(PruneFeedbackAttachmentsCommand::class)->dailyAt('04:25');
+
+        // Safety net for orphaned site relations (errors/logs/polymorphic links)
+        // left by any delete that bypassed Site::deleting + SiteRelationPurger.
+        $schedule->command(PruneOrphanedSiteDataCommand::class)->weeklyOn(1, '04:40');
         $schedule->command(PruneSiteUptimeCheckResultsCommand::class)->dailyAt('03:55');
         $schedule->command(PruneAppLogsCommand::class)->dailyAt('04:05');
         $schedule->command(ExpirePausedImportMigrationsCommand::class)->hourly();
