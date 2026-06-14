@@ -1,6 +1,7 @@
 # Server Error Reference Codes
 
-Status: **in progress** (PR1 landing). Goal: when a managed site returns a 5xx,
+Status: **PR1–PR3 done** (header + visible reference, Tier-1 manual lookup, Tier-2
+auto-capture sweeper). Goal: when a managed site returns a 5xx,
 the visitor sees a short **reference code**, and the operator can paste/click that
 code in dply to see *what actually happened* — turning the branded "dply hit a
 server error" splash from a dead-end into a debuggable event.
@@ -81,9 +82,27 @@ leaks to a visitor.
   webserver error log. Driven by a queued `LookupSiteErrorReferenceJob`
   (`WritesConsoleAction`) so it streams into the existing console-action banner;
   result panel polls until terminal.
-- **PR3 — Tier 2 auto-capture (next).** Scheduled sweeper → new `http_5xx`
-  ErrorEvent source + `reference` column (migration) → reuses Errors view +
-  RemediationCatalog + notifications. Page code becomes a clickable deep-link.
+- **PR3 — Tier 2 auto-capture (done).** Scheduled sweeper turns 5xx responses
+  into `http_5xx` ErrorEvents on their own — no longer only resolvable by hand.
+  - Migration adds a `reference` column to `error_events` (indexed; dedupe key).
+  - `SiteHttp5xxLogScanner` runs one capped, read-only bash script per site:
+    tail the per-pool FPM access log (current + one rotation), `grep ' status=5xx$'`,
+    cap to the most recent N. The fixed access format (`ref=… t=… at=… <method> <uri>
+    dur=… status=…`) means no app-side log parsing on the box.
+  - `ErrorEventRecorder::recordHttp5xx()` upserts idempotently on the reference;
+    the row's link deep-links the Errors tab to the Tier-1 resolver
+    (`?reference=…`, URL-bound on `Errors::$referenceQuery`) so the operator pulls
+    the actual trace on demand. No remediation is matched here (the access log has
+    the request, not the exception text).
+  - `SweepSiteHttpErrorsJob` (per site, `SerializeServerSsh` + `ShouldBeUnique`)
+    records hits and **folds notifications**: only the first 5xx of a fresh streak
+    alerts — a crash loop won't blast one notification per request reference.
+  - `SweepSiteHttpErrorsCommand` (scheduled every 10 min) dispatches for eligible
+    sites only: PHP-FPM (`usesDedicatedPhpFpmPool()`), SSH-managed, ready server —
+    container/serverless/worker/Apache/OLS are skipped.
+  - Config: `config/server_error_codes.php` (`sweep_enabled`, `sweep_lookback_minutes`,
+    `sweep_max_per_site`). Eligible categories render generically in the stream
+    (`http_5xx` → "Http 5xx" chip) with the per-event title `HTTP <code> — <method> <uri>`.
 
 ## Interactions / notes
 

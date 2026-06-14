@@ -33,6 +33,7 @@ class ErrorEvent extends Model
         'source_id',
         'category',
         'remediation_code',
+        'reference',
         'title',
         'detail',
         'link_url',

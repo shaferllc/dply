@@ -97,6 +97,54 @@ class ErrorEventRecorder
     }
 
     /**
+     * Record one HTTP 5xx hit swept from a site's PHP-FPM access log (Tier-2 of
+     * the server-error-reference feature). Idempotent on the reference: a later
+     * sweep that re-sees the same 5xx line refreshes the row rather than
+     * duplicating, so an overlapping lookback window is safe.
+     *
+     * No remediation is matched here — the access log carries the request, not
+     * the exception text. The row's link deep-links into the Tier-1 reference
+     * resolver, where the operator pulls the actual trace on demand.
+     *
+     * @param  array{reference: string, status: int, method: string, uri: string, occurred_at: \DateTimeInterface}  $hit
+     */
+    public function recordHttp5xx(Site $site, array $hit): ?ErrorEvent
+    {
+        $reference = trim((string) $hit['reference']);
+        if ($reference === '' || $site->server_id === null) {
+            return null;
+        }
+
+        $status = (int) $hit['status'];
+        $request = trim($hit['method'].' '.$hit['uri']);
+        $link = route('sites.errors', [
+            'server' => $site->server_id,
+            'site' => $site->id,
+            'reference' => $reference,
+        ]);
+
+        return ErrorEvent::query()->updateOrCreate(
+            [
+                'site_id' => $site->id,
+                'category' => 'http_5xx',
+                'reference' => $reference,
+            ],
+            [
+                'organization_id' => $site->organization_id,
+                'server_id' => $site->server_id,
+                'title' => __('HTTP :status — :request', ['status' => $status, 'request' => Str::limit($request, 120, '')]),
+                'detail' => __(':request returned HTTP :status. Reference :ref — resolve it for the trace.', [
+                    'request' => Str::limit($request, 300, ''),
+                    'status' => $status,
+                    'ref' => $reference,
+                ]),
+                'link_url' => $link,
+                'occurred_at' => $hit['occurred_at'],
+            ],
+        );
+    }
+
+    /**
      * Resolve [organization_id, server_id, site_id, link_url] from a
      * ConsoleAction subject. Site-owned subjects carry both site_id and the
      * site's server_id (so they roll up to the server view); infra subjects

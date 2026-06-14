@@ -56,6 +56,7 @@ use App\Console\Commands\SecretsRestoreDrillCommand;
 use App\Console\Commands\ServerlessTickCommand;
 use App\Console\Commands\SnapshotOrganizationBillingCommand;
 use App\Console\Commands\SweepExpiredMaintenanceWindowsCommand;
+use App\Console\Commands\SweepSiteHttpErrorsCommand;
 use App\Console\Commands\SweepStalledTasksCommand;
 use App\Console\Commands\SyncAllOrganizationBillingCommand;
 use App\Console\Commands\SyncErrorEventsCommand;
@@ -82,6 +83,13 @@ final class DplySchedule
         $schedule->command(DispatchSiteUptimeChecksCommand::class)
             ->everyFiveMinutes()
             ->name('dispatch-site-uptime-checks');
+
+        // Tier-2 of the server-error-reference feature: sweep PHP-FPM access logs
+        // for 5xx responses into the Errors stream. Cadence sits under the
+        // sweep_lookback_minutes window so a missed cycle still gets covered.
+        $schedule->command(SweepSiteHttpErrorsCommand::class)
+            ->everyTenMinutes()
+            ->name('sweep-site-http-errors');
 
         $schedule->command(DispatchSshLoginScansCommand::class)
             ->everyFiveMinutes()
