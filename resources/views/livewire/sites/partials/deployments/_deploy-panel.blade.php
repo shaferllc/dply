@@ -588,7 +588,19 @@
                     </a>
                 </div>
 
-                @include('livewire.sites.partials.deployments._phase-timeline', ['timelinePhases' => $timelinePhases, 'deployment' => $latest])
+                @php
+                    // Inline database-connection fix under the failed step (Q8/Q10).
+                    // On the deploy hub $latest IS the site's latest deployment, so
+                    // we only gate on "failed + matched the guided DB remediation".
+                    $dbFix = null;
+                    if ($latest && $latest->status === 'failed' && method_exists($this, 'remediationForDeployment')) {
+                        $rem = $this->remediationForDeployment($latest);
+                        if (is_array($rem) && ($rem['code'] ?? null) === 'database_connection_failed') {
+                            $dbFix = ['server' => $server, 'site' => $site];
+                        }
+                    }
+                @endphp
+                @include('livewire.sites.partials.deployments._phase-timeline', ['timelinePhases' => $timelinePhases, 'deployment' => $latest, 'dbFix' => $dbFix])
             @endif
             </div>
         </div>

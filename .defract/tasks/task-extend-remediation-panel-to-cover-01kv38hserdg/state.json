@@ -1,11 +1,11 @@
 {
   "id": "task-extend-remediation-panel-to-cover-01kv38hserdg",
   "status": "active",
-  "stage": "scope",
+  "stage": "implementation",
   "phase": 0,
   "totalPhases": 1,
   "createdAt": "2026-06-14T14:28:41Z",
-  "updatedAt": "2026-06-14T14:29:07Z",
+  "updatedAt": "2026-06-14T14:32:14Z",
   "events": [
     {
       "base_branch": "main",
@@ -54,30 +54,146 @@
       "timed_out": false,
       "timestamp": "2026-06-14T14:29:07Z",
       "type": "agent_exited"
+    },
+    {
+      "note": "Writing full scope (revision 2) for the remediation-panel extension.",
+      "phase": 0,
+      "stage": "scope",
+      "timestamp": "2026-06-14T14:30:26Z",
+      "type": "work_resumed"
+    },
+    {
+      "change_summary": "Full scope: add composer-install failure recognition + guided recovery to the deploy remediation catalog and panel. Single phase, no architecture/design.",
+      "revision": 2,
+      "timestamp": "2026-06-14T14:31:25Z",
+      "type": "scope_update"
+    },
+    {
+      "rationale": "Adds one new failure-recognition entry to the deploy remediation catalog plus tests. No new UI components or visual decisions, so skip design. Well-contained to config/remediations.php and a test file (1-2 files, builds entirely on the existing catalog/panel pattern), so skip architecture. Review is kept because the new fix runs a script as root over SSH and the matching regex must be verified against false positives.",
+      "stages": [
+        "scope",
+        "implementation",
+        "review",
+        "release"
+      ],
+      "template": "bug-fix",
+      "tier": "trivial",
+      "timestamp": "2026-06-14T14:31:31Z",
+      "type": "workflow_classified"
+    },
+    {
+      "alternatives_considered": [],
+      "decision": "Cover composer (dependency) install failure as the new remediation type, served through the existing one-click `script` action path rather than a new bespoke inline \"guided\" component.",
+      "rationale": "The catalog already covers redis/PDO/vhost/disk beyond the database case, and the panel is already generic over script/handler actions — so the genuinely-missing, common failure is a failed dependency install. Using a script action (like disk_full/phpredis) keeps the change to config + tests with no new UI, matching the starter scope. The out-of-memory case gets the actionable swap-ensuring fix; unresolvable-requirements is recognized for explanation only since swap won't fix a code/lockfile problem.",
+      "timestamp": "2026-06-14T14:31:37Z",
+      "type": "decision"
+    },
+    {
+      "stage": "scope",
+      "summary": "Full scope (revision 2) is ready. It extends the deploy remediation catalog and panel to recognize composer (dependency) install failures — the genuinely-uncovered common case, since the catalog already handles redis/PDO/vhost/disk beyond the database failure. The new entry is served through the existing one-click script-action path (like disk_full/phpredis), so the change is config + tests with no new UI: an out-of-memory composer failure gets a recommended, idempotent swap-ensuring fix, while unresolvable-requirements is recognized for explanation only. Single phase, no architecture/design. 5 requirements, 6 acceptance criteria. Workflow: bug-fix / trivial (scope → implementation → review → release); review kept because the fix runs a script as root over SSH and the matching regex must be verified against false positives.",
+      "timestamp": "2026-06-14T14:31:44Z",
+      "type": "stage_work_complete",
+      "worktree_head": "81453f897d33cb2a0e920327b9c37fc34d2b070e",
+      "worktree_status_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "base_branch": "main",
+      "merged_commits": 1,
+      "timestamp": "2026-06-14T14:32:14Z",
+      "type": "worktree_synced"
+    },
+    {
+      "actor": null,
+      "stage": "scope",
+      "timestamp": "2026-06-14T14:32:11Z",
+      "type": "stage_approved"
+    },
+    {
+      "current_worktree_head": "1f0a696a97d1e363ae7516f575148593be0df0ce",
+      "current_worktree_status_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stage": "scope",
+      "stale_worktree_head": "81453f897d33cb2a0e920327b9c37fc34d2b070e",
+      "stale_worktree_status_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "timestamp": "2026-06-14T14:32:14Z",
+      "type": "worktree_drift_detected",
+      "what_changed": "HEAD"
+    },
+    {
+      "action": "sweep",
+      "rationale": "Routine sync drift: HEAD fast-forwarded (stale HEAD is a strict ancestor of current) with a byte-identical dirty-status digest; swept forward automatically without waking an agent.",
+      "resolved_by": "auto",
+      "stage": "scope",
+      "timestamp": "2026-06-14T14:32:14Z",
+      "type": "worktree_drift_resolved"
+    },
+    {
+      "from": "scope",
+      "timestamp": "2026-06-14T14:32:14Z",
+      "to": "implementation",
+      "type": "stage_advanced"
+    },
+    {
+      "base_branch": "main",
+      "reason": "already_up_to_date",
+      "timestamp": "2026-06-14T14:32:14Z",
+      "type": "worktree_sync_skipped"
+    },
+    {
+      "mode": "start",
+      "session_id": "01kv38r9y1m7a4pwfav5sea0a4",
+      "stage": "implementation",
+      "timestamp": "2026-06-14T14:32:14Z",
+      "type": "stage_agent_started"
+    },
+    {
+      "exit_code": 143,
+      "session_id": "01kv38jk90x8xsmtj9d4pphsga",
+      "timed_out": false,
+      "timestamp": "2026-06-14T14:32:14Z",
+      "type": "agent_exited"
     }
   ],
+  "needsArchitecture": false,
+  "needsDesign": false,
+  "workflow": {
+    "tier": "trivial",
+    "template": "bug-fix",
+    "stages": [
+      "scope",
+      "implementation",
+      "review",
+      "release"
+    ],
+    "classifiedBy": "scope-agent",
+    "rationale": "Adds one new failure-recognition entry to the deploy remediation catalog plus tests. No new UI components or visual decisions, so skip design. Well-contained to config/remediations.php and a test file (1-2 files, builds entirely on the existing catalog/panel pattern), so skip architecture. Review is kept because the new fix runs a script as root over SSH and the matching regex must be verified against false positives."
+  },
+  "stageApprovals": {
+    "scope": "2026-06-14T14:32:11Z"
+  },
   "stages": {
-    "architecture": {
-      "status": "not_started"
-    },
-    "scope": {
-      "status": "in_progress",
-      "startedAt": "2026-06-14T14:29:07Z"
-    },
     "review": {
       "status": "not_started"
     },
-    "design": {
-      "status": "not_started"
+    "scope": {
+      "status": "approved",
+      "approvedAt": "2026-06-14T14:32:11Z",
+      "startedAt": "2026-06-14T14:29:07Z"
     },
-    "implementation": {
-      "status": "not_started"
+    "design": {
+      "status": "skipped"
+    },
+    "architecture": {
+      "status": "skipped"
     },
     "release": {
       "status": "not_started"
+    },
+    "implementation": {
+      "status": "in_progress",
+      "startedAt": "2026-06-14T14:32:14Z"
     }
   },
   "worktreePath": "/Users/tomshafer/Projects/Apps/dply/.defract-worktrees/task-extend-remediation-panel-to-cover-01kv38hserdg",
   "worktreeBaseBranch": "main",
-  "worktreeLastSyncedAt": "2026-06-14T14:29:07Z"
+  "worktreeLastSyncedAt": "2026-06-14T14:32:14Z"
 }
