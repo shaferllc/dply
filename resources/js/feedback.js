@@ -137,19 +137,54 @@ function shouldRedact(node) {
     }
 }
 
+function nextFrame() {
+    return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+}
+
 export async function captureFeedbackScreenshot() {
     try {
         const { domToWebp } = await loadScreenshotLib();
+
+        // Wait for fonts + a couple of frames. The #1 cause of a "blank /
+        // background-only" capture is firing before web fonts and the cloned
+        // <foreignObject> have settled.
+        if (document.fonts && document.fonts.ready) {
+            try {
+                await document.fonts.ready;
+            } catch (_) {
+                /* ignore */
+            }
+        }
+        await nextFrame();
+
         const width = document.documentElement.clientWidth || window.innerWidth;
         // Downscale wide viewports toward ~1600px to bound payload size.
         const scale = width > 1600 ? 1600 / width : 1;
 
-        return await domToWebp(document.body, {
+        const options = {
             quality: 0.82,
             scale,
-            backgroundColor: getComputedStyle(document.body).backgroundColor || '#ffffff',
+            width,
+            height: Math.min(
+                document.documentElement.scrollHeight || window.innerHeight,
+                window.innerHeight * 3,
+            ),
+            backgroundColor:
+                getComputedStyle(document.body).backgroundColor || '#ffffff',
             filter: (node) => !shouldRedact(node),
-        });
+            // Inline same-origin resources; don't let one failed asset blank the
+            // whole render or hang forever.
+            fetch: { bypassingCache: true },
+            timeout: 12000,
+        };
+
+        // Warm-up pass: modern-screenshot's first render can come back blank
+        // while it inlines images/fonts into the SVG. The second pass uses the
+        // now-primed cache and is the one we keep.
+        await domToWebp(document.body, options).catch(() => null);
+        await nextFrame();
+
+        return await domToWebp(document.body, options);
     } catch (e) {
         console.warn('Feedback screenshot capture failed (continuing without it):', e);
         return null;
