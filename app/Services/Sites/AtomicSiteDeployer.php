@@ -498,7 +498,7 @@ class AtomicSiteDeployer
             $log .= app(AtomicDeployHealthChecker::class)->verify($site, $ssh);
         } catch (\Throwable $e) {
             $meta = is_array($site->meta) ? $site->meta : [];
-            $autoRollback = (bool) ($meta['deploy_health_auto_rollback'] ?? false);
+            $autoRollback = (bool) ($meta['deploy_health_auto_rollback'] ?? config('deploy.health_check_auto_rollback', true));
             if ($autoRollback && $previousActiveRelease !== null) {
                 try {
                     $log .= "\n--- auto rollback ---\n";
