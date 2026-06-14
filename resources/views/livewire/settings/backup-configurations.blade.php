@@ -12,6 +12,10 @@
     $allProviders = count(\App\Models\BackupConfiguration::providers());
     $hasBackupSearch = trim($search ?? '') !== '';
 
+    $heroDescription = $organization
+        ? __('External storage shared by everyone in :org and reusable across every server. Add the bucket or remote here, then pick it when creating a schedule on a server.', ['org' => $organization->name])
+        : __('External storage shared by your organization and reusable across every server. Add the bucket or remote here, then pick it when creating a schedule on a server.');
+
     // Per-provider chip tone, mirroring the engine chips on webserver
     // templates so users get a quick visual read on storage type.
     $providerBadge = function (string $provider): string {
@@ -31,7 +35,7 @@
     <x-livewire-validation-errors />
 
     @push('breadcrumbs')
-        <x-breadcrumb-trail doc-route="docs.index" :items="[
+        <x-breadcrumb-trail doc-contextual :items="[
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => __('Profile'), 'href' => route('settings.profile'), 'icon' => 'user-circle'],
             ['label' => __('Backup destinations'), 'icon' => 'archive-box'],
@@ -39,41 +43,28 @@
     @endpush
 
     {{-- Hero: positioning + at-a-glance counts. --}}
-    <section class="dply-card overflow-hidden">
-        <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-            <div class="lg:col-span-7">
-                <div class="flex items-start gap-3">
-                    <x-icon-badge size="md">
-                        <x-heroicon-o-archive-box-arrow-down class="h-6 w-6" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Storage') }}</p>
-                        <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Backup destinations') }}</h2>
-                        <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
-                            @if ($organization)
-                                {{ __('External storage shared by everyone in :org and reusable across every server. Add the bucket or remote here, then pick it when creating a schedule on a server.', ['org' => $organization->name]) }}
-                            @else
-                                {{ __('External storage shared by your organization and reusable across every server. Add the bucket or remote here, then pick it when creating a schedule on a server.') }}
-                            @endif
-                        </p>
-                    </div>
-                </div>
-                <div class="mt-4 flex flex-wrap items-center gap-2">
-                    <x-outline-link href="{{ route('settings.profile') }}" wire:navigate>
-                        <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                        {{ __('Back to profile') }}
-                    </x-outline-link>
-                    <button
-                        type="button"
-                        wire:click="openCreateModal"
-                        class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
-                    >
-                        <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                        {{ __('Add destination') }}
-                    </button>
-                </div>
-            </div>
-            <dl class="grid grid-cols-3 gap-2 lg:col-span-5">
+    <x-hero-card
+        :eyebrow="__('Storage')"
+        :title="__('Backup destinations')"
+        :description="$heroDescription"
+        icon="archive-box-arrow-down"
+        iconSize="md"
+    >
+        <x-outline-link href="{{ route('settings.profile') }}" wire:navigate>
+            <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+            {{ __('Back to profile') }}
+        </x-outline-link>
+        <button
+            type="button"
+            wire:click="openCreateModal"
+            class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+        >
+            <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+            {{ __('Add destination') }}
+        </button>
+
+        <x-slot:stats>
+            <dl class="grid grid-cols-3 gap-2">
                 <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Destinations') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
@@ -100,8 +91,8 @@
                     <p class="mt-1 text-[11px] text-brand-mist">{{ $organization ? __('Shared in this org') : __('Just you') }}</p>
                 </div>
             </dl>
-        </div>
-    </section>
+        </x-slot:stats>
+    </x-hero-card>
 
     <div class="mt-6 space-y-6">
         {{-- Edit panel (inline section card, mirrors create) --}}
@@ -260,7 +251,7 @@
                                     <x-heroicon-o-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     {{ __('Edit') }}
                                 </button>
-                                <button type="button" wire:click="openConfirmActionModal('deleteConfiguration', ['{{ $row->id }}'], @js(__('Delete backup destination')), @js(__('Remove this backup destination? Schedules pointing at it stop firing until you pick a new one.')), @js(__('Delete')), true)" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50">
+                                <button type="button" wire:click="openConfirmActionModal('deleteConfiguration', ['{{ $row->id }}'], @js(__('Delete backup destination')), @js(__('Remove this backup destination? Schedules pointing at it stop firing until you pick a new one.')), @js(__('Delete')), true)" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50">
                                     <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     {{ __('Delete') }}
                                 </button>

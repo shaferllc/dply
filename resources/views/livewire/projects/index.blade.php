@@ -9,55 +9,33 @@
 
         @if (! $hasOrganization)
             {{-- Hero (no-org variant) — same shell so the page never collapses to a bare card. --}}
-            <section class="dply-card overflow-hidden">
-                <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-                    <div class="lg:col-span-7">
-                        <div class="flex items-start gap-3">
-                            <x-icon-badge size="md">
-                                <x-heroicon-o-rectangle-group class="h-6 w-6" aria-hidden="true" />
-                            </x-icon-badge>
-                            <div class="min-w-0">
-                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Workspaces') }}</p>
-                                <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Projects') }}</h2>
-                                <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
-                                    {{ __('Select an organization from the header to group servers, sites, and member access into projects.') }}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
+            <x-hero-card
+                :eyebrow="__('Workspaces')"
+                :title="__('Projects')"
+                :description="__('Select an organization from the header to group servers, sites, and member access into projects.')"
+                icon="rectangle-group"
+            />
         @else
             {{-- Hero: positioning + at-a-glance rollups across every project you can see. --}}
-            <section class="dply-card overflow-hidden">
-                <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-                    <div class="lg:col-span-7">
-                        <div class="flex items-start gap-3">
-                            <x-icon-badge size="md">
-                                <x-heroicon-o-rectangle-group class="h-6 w-6" aria-hidden="true" />
-                            </x-icon-badge>
-                            <div class="min-w-0">
-                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Workspaces') }}</p>
-                                <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Projects') }}</h2>
-                                <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
-                                    {{ __('Group servers, sites, and member access for each initiative your team is running.') }}
-                                </p>
-                            </div>
-                        </div>
-                        <div class="mt-4 flex flex-wrap items-center gap-2">
-                            @can('create', App\Models\Workspace::class)
-                                <button
-                                    type="button"
-                                    wire:click="openCreateProjectModal"
-                                    class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
-                                >
-                                    <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                    {{ __('New project') }}
-                                </button>
-                            @endcan
-                        </div>
-                    </div>
-                    <dl class="grid grid-cols-3 gap-2 lg:col-span-5">
+            <x-hero-card
+                :eyebrow="__('Workspaces')"
+                :title="__('Projects')"
+                :description="__('Group servers, sites, and member access for each initiative your team is running.')"
+                icon="rectangle-group"
+            >
+                @can('create', App\Models\Workspace::class)
+                    <button
+                        type="button"
+                        wire:click="openCreateProjectModal"
+                        class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                    >
+                        <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {{ __('New project') }}
+                    </button>
+                @endcan
+
+                <x-slot:stats>
+                    <dl class="grid grid-cols-3 gap-2">
                         <div @class([
                             'rounded-2xl border px-4 py-3 shadow-sm',
                             'border-brand-sage/30 bg-brand-sage/8' => $projectsTotal > 0,
@@ -87,8 +65,8 @@
                             <p class="mt-1 text-[11px] text-brand-mist">{{ __('Across all projects') }}</p>
                         </div>
                     </dl>
-                </div>
-            </section>
+                </x-slot:stats>
+            </x-hero-card>
 
             <div class="mt-6 space-y-6">
                 {{-- Project list --}}
@@ -157,37 +135,6 @@
                                 </button>
                             @endif
                         </div>
-                    </div>
-
-                    {{-- Saved views + save current filter set. --}}
-                    <div class="flex flex-col gap-3 border-b border-brand-ink/10 px-6 py-3 sm:px-7 lg:flex-row lg:items-center lg:justify-between">
-                        <div class="flex flex-wrap items-center gap-2">
-                            <span class="text-[11px] font-semibold uppercase tracking-wide text-brand-moss">{{ __('Saved views') }}</span>
-                            @forelse ($views as $view)
-                                <button
-                                    type="button"
-                                    wire:click="applySavedView('{{ $view->id }}')"
-                                    class="rounded-full border border-brand-mist bg-white px-3 py-1 text-xs font-medium text-brand-ink shadow-sm ring-1 ring-brand-ink/5 transition hover:bg-brand-sand/30"
-                                >
-                                    {{ $view->name }}
-                                </button>
-                            @empty
-                                <span class="text-xs text-brand-mist">{{ __('None yet — save a filter set to reuse it later.') }}</span>
-                            @endforelse
-                        </div>
-                        <form wire:submit.prevent="saveView" class="flex items-center gap-2">
-                            <label for="saved-view-name" class="sr-only">{{ __('Save this filter set') }}</label>
-                            <input
-                                id="saved-view-name"
-                                type="text"
-                                wire:model="savedViewName"
-                                placeholder="{{ __('Name this view…') }}"
-                                class="w-44 rounded-lg border-brand-ink/15 bg-white py-1.5 px-3 text-sm text-brand-ink placeholder:text-brand-mist shadow-sm focus:border-brand-sage focus:ring-brand-sage"
-                            />
-                            <button type="submit" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
-                                {{ __('Save view') }}
-                            </button>
-                        </form>
                     </div>
 
                     @if ($workspaces->isEmpty())

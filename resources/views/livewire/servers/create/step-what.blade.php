@@ -15,34 +15,33 @@
     <form wire:submit.prevent="next" class="mt-6 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
       <div class="space-y-6 min-w-0">
         {{-- Hero --}}
-        <section class="dply-card overflow-hidden">
-            <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-                <div class="lg:col-span-7">
-                    <div class="flex items-start gap-3">
-                        <x-icon-badge size="md">
-                            @if ($isKubernetes)
-                                <x-heroicon-o-server-stack class="h-6 w-6" aria-hidden="true" />
-                            @else
-                                <x-heroicon-o-puzzle-piece class="h-6 w-6" aria-hidden="true" />
-                            @endif
-                        </x-icon-badge>
-                        <div class="min-w-0">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Step :n of :total', ['n' => 3, 'total' => $totalSteps]) }}</p>
-                            @if ($isKubernetes)
-                                <h1 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Pick the cluster') }}</h1>
-                                <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">{{ __('Choose an existing managed cluster from your cloud account and the default namespace dply should target.') }}</p>
-                            @elseif ($isDedicatedServerPurpose ?? false)
-                                <h1 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Confirm the stack') }}</h1>
-                                <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">{{ __('You already chose a dedicated server purpose. Review what dply will install — no app templates needed.') }}</p>
-                            @else
-                                <h1 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('What it runs') }}</h1>
-                                <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">{{ __('Pick a stack template and dply fills in everything else. The underlying knobs are tucked below in case you want to override.') }}</p>
-                            @endif
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
+        @php
+            if ($isKubernetes) {
+                $heroTitle = __('Pick the cluster');
+                $heroDescription = __('Choose an existing managed cluster from your cloud account and the default namespace dply should target.');
+            } elseif ($isDedicatedServerPurpose ?? false) {
+                $heroTitle = __('Confirm the stack');
+                $heroDescription = __('You already chose a dedicated server purpose. Review what dply will install — no app templates needed.');
+            } else {
+                $heroTitle = __('What it runs');
+                $heroDescription = __('Pick a stack template and dply fills in everything else. The underlying knobs are tucked below in case you want to override.');
+            }
+        @endphp
+        <x-hero-card
+            :eyebrow="__('Step :n of :total', ['n' => 3, 'total' => $totalSteps])"
+            :title="$heroTitle"
+            :description="$heroDescription"
+        >
+            <x-slot:leading>
+                <x-icon-badge size="md">
+                    @if ($isKubernetes)
+                        <x-heroicon-o-server-stack class="h-6 w-6" aria-hidden="true" />
+                    @else
+                        <x-heroicon-o-puzzle-piece class="h-6 w-6" aria-hidden="true" />
+                    @endif
+                </x-icon-badge>
+            </x-slot:leading>
+        </x-hero-card>
 
         @if ($sizeRoleMismatch)
             <section class="dply-card overflow-hidden border-amber-200">

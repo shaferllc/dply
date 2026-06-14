@@ -7,7 +7,6 @@ use App\Livewire\Concerns\RequiresFeature;
 use App\Models\Workspace;
 use App\Models\WorkspaceLabel;
 use App\Models\WorkspaceMember;
-use App\Models\WorkspaceView;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
@@ -30,8 +29,6 @@ class Index extends Component
     public string $labelFilter = '';
 
     public string $roleFilter = '';
-
-    public string $savedViewName = '';
 
     public function openCreateProjectModal(): void
     {
@@ -79,52 +76,6 @@ class Index extends Component
         $this->dispatch('close-modal', 'create-project-modal');
     }
 
-    public function saveView(): void
-    {
-        $user = auth()->user();
-        $org = $user->currentOrganization();
-        if (! $org) {
-            return;
-        }
-
-        $this->validate([
-            'savedViewName' => 'required|string|max:120',
-        ]);
-
-        WorkspaceView::query()->create([
-            'organization_id' => $org->id,
-            'user_id' => $user->id,
-            'name' => $this->savedViewName,
-            'filters' => [
-                'search' => $this->search,
-                'label' => $this->labelFilter,
-                'role' => $this->roleFilter,
-            ],
-        ]);
-
-        $this->savedViewName = '';
-        $this->toastSuccess(__('Saved view created.'));
-    }
-
-    public function applySavedView(string $viewId): void
-    {
-        $user = auth()->user();
-        $org = $user->currentOrganization();
-        if (! $org) {
-            return;
-        }
-
-        $view = WorkspaceView::query()
-            ->where('organization_id', $org->id)
-            ->where('user_id', $user->id)
-            ->findOrFail($viewId);
-
-        $filters = $view->filters ?? [];
-        $this->search = (string) ($filters['search'] ?? '');
-        $this->labelFilter = (string) ($filters['label'] ?? '');
-        $this->roleFilter = (string) ($filters['role'] ?? '');
-    }
-
     public function clearFilters(): void
     {
         $this->reset('search', 'labelFilter', 'roleFilter');
@@ -136,7 +87,6 @@ class Index extends Component
         $org = $user->currentOrganization();
         $workspaces = collect();
         $labels = collect();
-        $views = collect();
         $projectsTotal = 0;
         $serversTotal = 0;
         $sitesTotal = 0;
@@ -184,18 +134,12 @@ class Index extends Component
                 ->where('organization_id', $org->id)
                 ->orderBy('name')
                 ->get();
-            $views = WorkspaceView::query()
-                ->where('organization_id', $org->id)
-                ->where('user_id', $user->id)
-                ->orderBy('name')
-                ->get();
         }
 
         return view('livewire.projects.index', [
             'workspaces' => $workspaces,
             'hasOrganization' => $org !== null,
             'labels' => $labels,
-            'views' => $views,
             'workspaceRoles' => WorkspaceMember::roles(),
             'projectsTotal' => $projectsTotal,
             'serversTotal' => $serversTotal,

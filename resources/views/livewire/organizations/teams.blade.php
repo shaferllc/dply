@@ -20,43 +20,33 @@
             <x-livewire-validation-errors />
 
             {{-- Hero: positioning + at-a-glance counts. --}}
-            <section class="dply-card overflow-hidden">
-                <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-                    <div class="lg:col-span-7">
-                        <div class="flex items-start gap-3">
-                            <x-icon-badge size="md">
-                                <x-heroicon-o-rectangle-group class="h-6 w-6" aria-hidden="true" />
-                            </x-icon-badge>
-                            <div class="min-w-0">
-                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Collaboration') }}</p>
-                                <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Teams') }}</h2>
-                                <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
-                                    {{ __('Group members to scope servers, sites, and notifications. Each member can belong to multiple teams.') }}
-                                </p>
-                            </div>
-                        </div>
-                        <div class="mt-4 flex flex-wrap items-center gap-2">
-                            <x-docs-link slug="org-roles-and-limits">
-                                <x-heroicon-o-queue-list class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                {{ __('Roles & limits') }}
-                            </x-docs-link>
-                            <x-outline-link href="{{ route('organizations.members', $organization) }}" wire:navigate>
-                                <x-heroicon-o-user-group class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                {{ __('Members') }}
-                            </x-outline-link>
-                            @if ($isAdmin)
-                                <button
-                                    type="button"
-                                    wire:click="openCreateTeamModal"
-                                    class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
-                                >
-                                    <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                    {{ __('Create team') }}
-                                </button>
-                            @endif
-                        </div>
-                    </div>
-                    <dl class="grid grid-cols-3 gap-2 lg:col-span-5">
+            <x-hero-card
+                :eyebrow="__('Collaboration')"
+                :title="__('Teams')"
+                :description="__('Group members to scope servers, sites, and notifications. Each member can belong to multiple teams.')"
+                icon="rectangle-group"
+            >
+                <x-docs-link slug="org-roles-and-limits">
+                    <x-heroicon-o-queue-list class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                    {{ __('Roles & limits') }}
+                </x-docs-link>
+                <x-outline-link href="{{ route('organizations.members', $organization) }}" wire:navigate>
+                    <x-heroicon-o-user-group class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                    {{ __('Members') }}
+                </x-outline-link>
+                @if ($isAdmin)
+                    <button
+                        type="button"
+                        wire:click="openCreateTeamModal"
+                        class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                    >
+                        <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {{ __('Create team') }}
+                    </button>
+                @endif
+
+                <x-slot:stats>
+                    <dl class="grid grid-cols-3 gap-2">
                         <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
                             <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Teams') }}</dt>
                             <dd class="mt-1 flex items-baseline gap-1.5">
@@ -82,8 +72,8 @@
                             <a href="{{ route('organizations.members', $organization) }}" wire:navigate class="mt-1 inline-flex text-[11px] font-semibold text-brand-sage hover:text-brand-ink">{{ __('Manage') }} →</a>
                         </div>
                     </dl>
-                </div>
-            </section>
+                </x-slot:stats>
+            </x-hero-card>
 
             <div class="mt-6 space-y-6">
                 <section class="dply-card overflow-hidden">

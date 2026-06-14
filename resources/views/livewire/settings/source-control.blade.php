@@ -27,35 +27,26 @@
     @endpush
 
     {{-- Hero: positioning + at-a-glance link counts. --}}
-    <section class="dply-card overflow-hidden">
-        <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-            <div class="lg:col-span-7">
-                <div class="flex items-start gap-3">
-                    <x-icon-badge size="md">
-                        <x-heroicon-o-code-bracket-square class="h-6 w-6" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Git') }}</p>
-                        <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Source control') }}</h2>
-                        <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Link GitHub, GitLab, or Bitbucket via OAuth, or paste a personal access token. Tokens unlock clone, browse, and webhook automation — and let you connect self-hosted hosts that OAuth can\'t cover.') }}
-                        </p>
-                    </div>
-                </div>
-                <div class="mt-4 flex flex-wrap items-center gap-2">
-                    <x-outline-link href="{{ route('settings.profile') }}" wire:navigate>
-                        <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                        {{ __('Back to profile') }}
-                    </x-outline-link>
-                    @if (auth()->user()->currentOrganization())
-                        <x-outline-link href="{{ route('credentials.index') }}" wire:navigate>
-                            <x-heroicon-o-key class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                            {{ __('Server providers') }}
-                        </x-outline-link>
-                    @endif
-                </div>
-            </div>
-            <dl class="grid grid-cols-3 gap-2 lg:col-span-5">
+    <x-hero-card
+        :eyebrow="__('Git')"
+        :title="__('Source control')"
+        :description="__('Link GitHub, GitLab, or Bitbucket via OAuth, or paste a personal access token. Tokens unlock clone, browse, and webhook automation — and let you connect self-hosted hosts that OAuth can\'t cover.')"
+        icon="code-bracket-square"
+        iconSize="md"
+    >
+        <x-outline-link href="{{ route('settings.profile') }}" wire:navigate>
+            <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+            {{ __('Back to profile') }}
+        </x-outline-link>
+        @if (auth()->user()->currentOrganization())
+            <x-outline-link href="{{ route('credentials.index') }}" wire:navigate>
+                <x-heroicon-o-key class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                {{ __('Server providers') }}
+            </x-outline-link>
+        @endif
+
+        <x-slot:stats>
+            <dl class="grid grid-cols-3 gap-2">
                 <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Hosts') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
@@ -89,8 +80,26 @@
                     <p class="mt-1 text-[11px] text-brand-mist">{{ __('Self-hosted + machine users') }}</p>
                 </div>
             </dl>
+        </x-slot:stats>
+    </x-hero-card>
+
+    {{-- Prefer the terminal? Point at the CLI install + sign-in steps on
+         /profile/cli instead of duplicating them here. --}}
+    <div class="mt-6 flex flex-col gap-3 rounded-2xl border border-brand-ink/10 bg-brand-sand/20 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex items-start gap-3">
+            <x-icon-badge>
+                <x-heroicon-o-command-line class="h-5 w-5" aria-hidden="true" />
+            </x-icon-badge>
+            <div class="min-w-0">
+                <p class="text-sm font-semibold text-brand-ink">{{ __('Prefer the command line?') }}</p>
+                <p class="mt-0.5 text-sm leading-relaxed text-brand-moss">{{ __('Install the dply CLI to link repositories and deploy straight from your terminal.') }}</p>
+            </div>
         </div>
-    </section>
+        <a href="{{ route('profile.cli') }}" wire:navigate class="inline-flex shrink-0 items-center gap-2 self-start whitespace-nowrap rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition-colors hover:bg-brand-sand/40 sm:self-auto">
+            <x-heroicon-o-arrow-down-tray class="h-4 w-4 shrink-0" aria-hidden="true" />
+            {{ __('Install the CLI') }}
+        </a>
+    </div>
 
     @error('unlink')
         <div class="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
@@ -247,7 +256,7 @@
                                             <x-heroicon-o-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Edit') }}
                                         </button>
-                                        <button type="button" wire:click="openConfirmActionModal('unlinkAccount', ['{{ $account->id }}'], @js(__('Unlink account')), @js(__('Unlink this account? Deploy keys and webhooks for sites using this identity are unchanged.')), @js(__('Unlink')), true)" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50">
+                                        <button type="button" wire:click="openConfirmActionModal('unlinkAccount', ['{{ $account->id }}'], @js(__('Unlink account')), @js(__('Unlink this account? Deploy keys and webhooks for sites using this identity are unchanged.')), @js(__('Unlink')), true)" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50">
                                             <x-heroicon-o-link-slash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Unlink') }}
                                         </button>
@@ -288,7 +297,7 @@
                                             <x-heroicon-o-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Edit') }}
                                         </button>
-                                        <button type="button" wire:click="openConfirmActionModal('unlinkPat', ['{{ $pat->id }}'], @js(__('Remove token')), @js(__('Remove this personal access token? Sites using this token will lose access until re-pointed.')), @js(__('Remove')), true)" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50">
+                                        <button type="button" wire:click="openConfirmActionModal('unlinkPat', ['{{ $pat->id }}'], @js(__('Remove token')), @js(__('Remove this personal access token? Sites using this token will lose access until re-pointed.')), @js(__('Remove')), true)" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50">
                                             <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Remove') }}
                                         </button>

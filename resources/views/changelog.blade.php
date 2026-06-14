@@ -37,6 +37,48 @@
         @php
             $entries = [
                 [
+                    'date'    => 'June 13, 2026',
+                    'tags'    => ['improved'],
+                    'title'   => 'Consistent Workspace Headers',
+                    'summary' => 'Page headers are now consistent across the server, project, and site workspaces, all rendered from a single shared hero card.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 12, 2026',
+                    'tags'    => ['new'],
+                    'title'   => 'One-Click Quick Downloads',
+                    'summary' => 'Backups and site files can now be pulled down with a one-click quick download: dply builds the artifact on the server, stages it to a short-lived download bucket, and notifies you in-app and by email when it\'s ready, then streams it once over a signed, authenticated link and deletes it.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 12, 2026',
+                    'tags'    => ['new'],
+                    'title'   => 'Sync Environment To Worker Pool',
+                    'summary' => 'Site environment variables can now be synced to the attached worker-pool members in one action, keeping app and worker boxes from drifting out of sync.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 11, 2026',
+                    'tags'    => ['new'],
+                    'title'   => 'Site Worker Fleet',
+                    'summary' => 'Sites can attach worker-pool servers as a dedicated worker fleet, managed from the site settings page.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 11, 2026',
+                    'tags'    => ['fixed'],
+                    'title'   => 'Reliable Live Server Metrics',
+                    'summary' => 'The server Monitor\'s live CPU, memory, and disk samples no longer go stale: the metrics agent now sends an explicit User-Agent so its uploads are no longer blocked by the edge firewall.',
+                    'items'   => [],
+                ],
+                [
+                    'date'    => 'June 11, 2026',
+                    'tags'    => ['improved'],
+                    'title'   => 'Richer Server Certificate Scan',
+                    'summary' => 'The live server certificate scan now reports richer per-site details and clearer status on the server overview.',
+                    'items'   => [],
+                ],
+                [
                     'date'    => 'June 10, 2026',
                     'tags'    => ['new'],
                     'title'   => 'Multi-Backend Sites With Rolling And Canary Deploys',

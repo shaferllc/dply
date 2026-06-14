@@ -75,13 +75,14 @@
             @include('livewire.sites.settings.partials.sidebar')
 
             <main class="min-w-0 space-y-6 lg:col-span-9">
-                <x-page-header
+                {{-- Shared hero header so this page matches the rest of the
+                     app. The 7-day health tiles live in the "Backups at a
+                     glance" strip below, so the hero stays lean. --}}
+                <x-hero-card
                     :eyebrow="__('Background')"
                     :title="__('Backups')"
                     :description="__('Database and site-files backup runs for this site, plus recurring schedules. Backups write to the destination configured in Settings → Backup configurations.')"
-                    :show-documentation="false"
-                    flush
-                    compact
+                    icon="archive-box"
                 />
 
                 @include('livewire.servers.partials.backups._workspace-content')

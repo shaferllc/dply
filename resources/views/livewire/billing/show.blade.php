@@ -100,35 +100,25 @@
             @endif
 
             {{-- Hero card: positioning + status / fleet / bill stat strip. --}}
-            <section class="dply-card overflow-hidden">
-                <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-                    <div class="lg:col-span-7">
-                        <div class="flex items-start gap-3">
-                            <x-icon-badge size="md">
-                                <x-heroicon-o-credit-card class="h-6 w-6" aria-hidden="true" />
-                            </x-icon-badge>
-                            <div class="min-w-0">
-                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Billing') }}</p>
-                                <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Billing & plan') }}</h2>
-                                <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
-                                    {{ __('Simple pricing for :org. One flat plan chosen by server count — your first server is free, any size on any cloud. Managed products bill per unit on top.', ['org' => $organization->name]) }}
-                                </p>
-                            </div>
-                        </div>
-                        <div class="mt-4 flex flex-wrap items-center gap-2">
-                            <x-outline-link href="{{ route('billing.analytics', $organization) }}" wire:navigate>
-                                <x-heroicon-o-chart-bar class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                {{ __('Analytics') }}
-                            </x-outline-link>
-                            @if ($this->canManageBilling)
-                                <x-outline-link href="{{ route('billing.invoices', $organization) }}" wire:navigate>
-                                    <x-heroicon-o-document class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                    {{ __('All invoices') }}
-                                </x-outline-link>
-                            @endif
-                        </div>
-                    </div>
-                    <dl class="grid grid-cols-3 gap-2 lg:col-span-5">
+            <x-hero-card
+                icon="credit-card"
+                :eyebrow="__('Billing')"
+                :title="__('Billing & plan')"
+                :description="__('Simple pricing for :org. One flat plan chosen by server count — your first server is free, any size on any cloud. Managed products bill per unit on top.', ['org' => $organization->name])"
+            >
+                <x-outline-link href="{{ route('billing.analytics', $organization) }}" wire:navigate>
+                    <x-heroicon-o-chart-bar class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                    {{ __('Analytics') }}
+                </x-outline-link>
+                @if ($this->canManageBilling)
+                    <x-outline-link href="{{ route('billing.invoices', $organization) }}" wire:navigate>
+                        <x-heroicon-o-document class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                        {{ __('All invoices') }}
+                    </x-outline-link>
+                @endif
+
+                <x-slot:stats>
+                    <dl class="grid grid-cols-3 gap-2">
                         <div class="rounded-2xl border px-4 py-3 shadow-sm {{ $statusTiles[$statusTone] }}">
                             <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
                             <dd class="mt-1 flex items-center gap-1.5">
@@ -158,8 +148,8 @@
                             @endif
                         </div>
                     </dl>
-                </div>
-            </section>
+                </x-slot:stats>
+            </x-hero-card>
 
             {{-- Inline alerts: Stripe Checkout, flash, errors. --}}
             <div class="mt-4 space-y-3">

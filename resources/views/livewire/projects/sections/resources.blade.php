@@ -1,8 +1,3 @@
-<x-section-card>
-    <h3 class="text-base font-semibold text-brand-ink">{{ __('How to use resources') }}</h3>
-    <p class="mt-2 text-sm leading-6 text-brand-moss">{{ __('Attach every server and site that belongs to this project. Use this tab when you want one shared home for a stack, customer account, product area, or environment cluster. Remove resources when they no longer belong operationally, not just because they are quiet.') }}</p>
-</x-section-card>
-
 <div class="grid gap-8 lg:grid-cols-2">
     <x-section-card>
         <div class="mb-4">

@@ -36,33 +36,23 @@
 
     {{-- Hero card. Stat tiles show the user's current theme / nav layout /
          timezone so a glance reveals what's set without opening each form. --}}
-    <section class="dply-card overflow-hidden">
-        <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-            <div class="lg:col-span-7">
-                <div class="flex items-start gap-3">
-                    <x-icon-badge size="md">
-                        <x-heroicon-o-cog-6-tooth class="h-6 w-6" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Settings') }}</p>
-                        <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Profile') }}</h2>
-                        <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Identity, preferences, sessions, and account on this page. Servers & Sites covers organization and team defaults — servers belong to teams.') }}
-                        </p>
-                    </div>
-                </div>
-                <div class="mt-4 flex flex-wrap items-center gap-2">
-                    <x-outline-link href="{{ route('settings.profile') }}" wire:navigate>
-                        <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                        {{ __('Profile') }}
-                    </x-outline-link>
-                    <x-outline-link href="{{ route('profile.security') }}" wire:navigate>
-                        <x-heroicon-o-shield-check class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                        {{ __('Security') }}
-                    </x-outline-link>
-                </div>
-            </div>
-            <dl class="grid grid-cols-3 gap-2 lg:col-span-5">
+    <x-hero-card
+        :eyebrow="__('Settings')"
+        :title="__('Profile')"
+        :description="__('Identity, preferences, sessions, and account on this page. Servers & Sites covers organization and team defaults — servers belong to teams.')"
+        icon="cog-6-tooth"
+    >
+        <x-outline-link href="{{ route('settings.profile') }}" wire:navigate>
+            <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+            {{ __('Profile') }}
+        </x-outline-link>
+        <x-outline-link href="{{ route('profile.security') }}" wire:navigate>
+            <x-heroicon-o-shield-check class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+            {{ __('Security') }}
+        </x-outline-link>
+
+        <x-slot:stats>
+            <dl class="grid grid-cols-3 gap-2">
                 <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Theme') }}</dt>
                     <dd class="mt-1 flex items-center gap-1.5">
@@ -96,8 +86,8 @@
                     <p class="mt-1 truncate text-[11px] text-brand-mist">{{ now($u?->timezone ?? config('app.timezone'))->format('g:i A') }} · {{ __('local time') }}</p>
                 </div>
             </dl>
-        </div>
-    </section>
+        </x-slot:stats>
+    </x-hero-card>
 
     {{-- Section tabs. Family's segmented control rather than the previous
          underlined nav — same affordance, lower visual weight. --}}
@@ -416,7 +406,7 @@
                                         <button
                                             type="button"
                                             wire:click="openConfirmActionModal('revokeSession', ['{{ $session['id'] }}'], @js(__('Revoke session')), @js(__('Revoke this session? That device will be logged out on its next request.')), @js(__('Revoke')), true)"
-                                            class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
                                         >
                                             <x-heroicon-o-x-mark class="h-4 w-4 shrink-0" aria-hidden="true" />
                                             {{ __('Revoke') }}

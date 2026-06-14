@@ -4,11 +4,6 @@
     'manageUrl' => route('profile.notification-channels'),
 ], key('resource-summary-project-'.$workspace->id))
 
-<x-section-card>
-    <h3 class="text-base font-semibold text-brand-ink">{{ __('How to use delivery') }}</h3>
-    <p class="mt-2 text-sm leading-6 text-brand-moss">{{ __('Use this tab when you want the project to coordinate releases across several sites. Save shared variables here before deploys, then queue one batch when multiple sites should move together.') }}</p>
-</x-section-card>
-
 <x-section-card tone="subtle">
     <h3 class="text-base font-semibold text-brand-ink">{{ __('Recovery and migration checklist') }}</h3>
     <div class="mt-4 grid gap-4 md:grid-cols-3">

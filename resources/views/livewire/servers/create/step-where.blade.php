@@ -21,31 +21,25 @@
     <form wire:submit.prevent="next" class="mt-6 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]">
         <div class="space-y-6 min-w-0">
             {{-- Hero --}}
-            <section class="dply-card overflow-hidden">
-                <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-                    <div class="lg:col-span-7">
-                        <div class="flex items-start gap-3">
-                            <x-icon-badge size="md">
-                                @if ($isProvider)
-                                    <x-heroicon-o-cloud-arrow-up class="h-6 w-6" aria-hidden="true" />
-                                @else
-                                    <x-heroicon-o-server-stack class="h-6 w-6" aria-hidden="true" />
-                                @endif
-                            </x-icon-badge>
-                            <div class="min-w-0">
-                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Step :n of :total', ['n' => 2, 'total' => $totalSteps]) }}</p>
-                                <h1 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">
-                                    {{ $isProvider ? __('Where it runs') : __('Connect your server') }}
-                                </h1>
-                                <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
-                                    {{ $isProvider
-                                        ? __('Pick the cloud provider, account, region, and size for the new VM.')
-                                        : __('Give dply SSH access to the server you already have. We connect read-only at first to verify before doing anything destructive.') }}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                    <dl class="grid grid-cols-2 gap-2 lg:col-span-5">
+            <x-hero-card
+                :eyebrow="__('Step :n of :total', ['n' => 2, 'total' => $totalSteps])"
+                :title="$isProvider ? __('Where it runs') : __('Connect your server')"
+                :description="$isProvider
+                    ? __('Pick the cloud provider, account, region, and size for the new VM.')
+                    : __('Give dply SSH access to the server you already have. We connect read-only at first to verify before doing anything destructive.')"
+            >
+                <x-slot:leading>
+                    <x-icon-badge size="md">
+                        @if ($isProvider)
+                            <x-heroicon-o-cloud-arrow-up class="h-6 w-6" aria-hidden="true" />
+                        @else
+                            <x-heroicon-o-server-stack class="h-6 w-6" aria-hidden="true" />
+                        @endif
+                    </x-icon-badge>
+                </x-slot:leading>
+
+                <x-slot:stats>
+                    <dl class="grid grid-cols-2 gap-2">
                         <div @class([
                             'rounded-2xl border px-4 py-3 shadow-sm',
                             'border-brand-sage/30 bg-brand-sage/8' => $isProvider ? filled($form->provider_host_kind) : filled($form->custom_host_kind),
@@ -79,8 +73,8 @@
                             </p>
                         </div>
                     </dl>
-                </div>
-            </section>
+                </x-slot:stats>
+            </x-hero-card>
 
             @if ($isProvider)
                 {{-- Provider host kind --}}

@@ -31,6 +31,22 @@ trait ManagesOrganizationQuotas
     }
 
     /**
+     * The org's current plan-tier server ceiling, or null when unlimited
+     * (Business). This is the per-tier ALLOTMENT shown in the UI — distinct from
+     * {@see maxServers()}, which is the creation gate and is intentionally
+     * uncapped because adding a server simply bumps the usage-based tier.
+     */
+    public function planServerLimit(): ?int
+    {
+        // Beta orgs are bounded by the BYO envelope, not the plan tier.
+        if ($this->isBeta()) {
+            return $this->betaByoServerLimit();
+        }
+
+        return $this->currentSubscriptionPlan()['max_servers'];
+    }
+
+    /**
      * Number of sites that count against the plan's site ceiling. Preview
      * deployments (Edge/Cloud) are scratch clones of a parent and never
      * consume quota.

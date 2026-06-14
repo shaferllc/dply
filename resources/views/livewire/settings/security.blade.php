@@ -55,7 +55,7 @@
     <x-livewire-validation-errors />
 
     @push('breadcrumbs')
-        <x-breadcrumb-trail doc-route="docs.index" :items="[
+        <x-breadcrumb-trail doc-contextual :items="[
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => __('Profile'), 'href' => route('settings.profile'), 'icon' => 'user-circle'],
             ['label' => __('Security'), 'icon' => 'shield-check'],
@@ -63,33 +63,24 @@
     @endpush
 
     {{-- Hero: posture + at-a-glance counts. --}}
-    <section class="dply-card overflow-hidden">
-        <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-            <div class="lg:col-span-7">
-                <div class="flex items-start gap-3">
-                    <x-icon-badge size="md">
-                        <x-heroicon-o-shield-check class="h-6 w-6" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Account') }}</p>
-                        <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Security') }}</h2>
-                        <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Password, passkeys, OAuth sign-in, and two-factor authentication. Layer at least two of these so a stolen credential alone can\'t reach your account.') }}
-                        </p>
-                    </div>
-                </div>
-                <div class="mt-4 flex flex-wrap items-center gap-2">
-                    <x-outline-link href="{{ route('settings.profile') }}" wire:navigate>
-                        <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                        {{ __('Back to profile') }}
-                    </x-outline-link>
-                    <x-outline-link href="{{ route('two-factor.setup') }}" wire:navigate>
-                        <x-heroicon-o-key class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                        {{ __('Two-factor') }}
-                    </x-outline-link>
-                </div>
-            </div>
-            <dl class="grid grid-cols-3 gap-2 lg:col-span-5">
+    <x-hero-card
+        :eyebrow="__('Account')"
+        :title="__('Security')"
+        :description="__('Password, passkeys, OAuth sign-in, and two-factor authentication. Layer at least two of these so a stolen credential alone can\'t reach your account.')"
+        icon="shield-check"
+        iconSize="md"
+    >
+        <x-outline-link href="{{ route('settings.profile') }}" wire:navigate>
+            <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+            {{ __('Back to profile') }}
+        </x-outline-link>
+        <x-outline-link href="{{ route('two-factor.setup') }}" wire:navigate>
+            <x-heroicon-o-key class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+            {{ __('Two-factor') }}
+        </x-outline-link>
+
+        <x-slot:stats>
+            <dl class="grid grid-cols-3 gap-2">
                 <div class="rounded-2xl border px-4 py-3 shadow-sm {{ $postureTile }}">
                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Posture') }}</dt>
                     <dd class="mt-1 flex items-center gap-1.5">
@@ -124,8 +115,8 @@
                     <p class="mt-1 text-[11px] text-brand-mist">{{ __('Authenticator code') }}</p>
                 </div>
             </dl>
-        </div>
-    </section>
+        </x-slot:stats>
+    </x-hero-card>
 
     <div class="mt-6 space-y-6">
 
@@ -220,7 +211,6 @@
                             autocomplete="off"
                             placeholder="{{ __('e.g. Work laptop') }}"
                         />
-                        <p class="mt-1.5 text-[11px] text-brand-mist">{{ __('Optional — helps you recognize this passkey in the list below.') }}</p>
                     </div>
                     <button
                         type="button"
@@ -231,6 +221,7 @@
                         {{ __('Add a passkey') }}
                     </button>
                 </div>
+                <p class="mt-1.5 text-[11px] text-brand-mist">{{ __('Optional — helps you recognize this passkey in the list below.') }}</p>
                 <p id="dply-passkey-register-error" class="mt-2 hidden text-sm text-red-700" role="alert"></p>
             </div>
 
@@ -269,7 +260,7 @@
                             <button
                                 type="button"
                                 wire:click="openConfirmActionModal('removePasskey', @js([(string) $cred->getKey()]), @js(__('Remove passkey')), @js(__('Remove this passkey? You\'ll need another way to sign in if it was your only method.')), @js(__('Remove')), true)"
-                                class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
+                                class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
                             >
                                 <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                 {{ __('Remove') }}
@@ -332,7 +323,7 @@
                                             <button
                                                 type="button"
                                                 wire:click="openConfirmActionModal('unlinkOAuthAccount', [{{ $account->id }}], @js(__('Unlink account')), @js(__('Unlink this account? You can link it again later from this page.')), @js(__('Unlink')), true)"
-                                                class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
+                                                class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
                                             >
                                                 <x-heroicon-o-link-slash class="h-4 w-4 shrink-0" aria-hidden="true" />
                                                 {{ __('Unlink') }}

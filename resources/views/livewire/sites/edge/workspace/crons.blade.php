@@ -92,7 +92,7 @@
                                             type="button"
                                             wire:click="removeCron({{ $index }})"
                                             wire:confirm="{{ __('Remove this cron?') }}"
-                                            class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
                                         >
                                             {{ __('Remove') }}
                                         </button>

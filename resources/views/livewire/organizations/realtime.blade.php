@@ -14,39 +14,28 @@
             <x-livewire-validation-errors />
 
             {{-- Hero + billing notice: what realtime is and what it costs this workspace. --}}
-            <section class="dply-card overflow-hidden">
-                <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-                    <div class="lg:col-span-7">
-                        <div class="flex items-start gap-3">
-                            <x-icon-badge size="md">
-                                <x-heroicon-o-signal class="h-6 w-6" aria-hidden="true" />
-                            </x-icon-badge>
-                            <div class="min-w-0">
-                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Broadcasting') }}</p>
-                                <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Realtime') }}</h2>
-                                <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
-                                    {{ __('Managed Pusher-compatible relay for your apps. Each active app is billed monthly by its connection tier and added to this workspace’s subscription.') }}
-                                </p>
-                            </div>
-                        </div>
+            <x-hero-card
+                icon="signal"
+                :eyebrow="__('Broadcasting')"
+                :title="__('Realtime')"
+                :description="__('Managed Pusher-compatible relay for your apps. Each active app is billed monthly by its connection tier and added to this workspace’s subscription.')"
+            >
+                <x-slot:stats>
+                    {{-- Billing notice: live total added to the bill. --}}
+                    <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/30 p-5">
+                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('On this workspace’s bill') }}</p>
+                        <p class="mt-1 text-2xl font-semibold text-brand-ink">{{ $money($monthlyCents) }}<span class="text-sm font-normal text-brand-moss">/{{ __('mo') }}</span></p>
+                        <p class="mt-1 text-xs text-brand-moss">
+                            {{ trans_choice('{0}No active apps yet.|{1}:count active app across your sites.|[2,*]:count active apps across your sites.', $activeCount, ['count' => $activeCount]) }}
+                        </p>
+                        @if ($featureActive && $canManage)
+                            <x-primary-button type="button" wire:click="startCreate" class="mt-4 w-full justify-center text-sm">
+                                <x-heroicon-o-plus class="-ml-0.5 mr-1.5 h-4 w-4" /> {{ __('New app') }}
+                            </x-primary-button>
+                        @endif
                     </div>
-                    <div class="lg:col-span-5">
-                        {{-- Billing notice: live total added to the bill. --}}
-                        <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/30 p-5">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-moss">{{ __('On this workspace’s bill') }}</p>
-                            <p class="mt-1 text-2xl font-semibold text-brand-ink">{{ $money($monthlyCents) }}<span class="text-sm font-normal text-brand-moss">/{{ __('mo') }}</span></p>
-                            <p class="mt-1 text-xs text-brand-moss">
-                                {{ trans_choice('{0}No active apps yet.|{1}:count active app across your sites.|[2,*]:count active apps across your sites.', $activeCount, ['count' => $activeCount]) }}
-                            </p>
-                            @if ($featureActive && $canManage)
-                                <x-primary-button type="button" wire:click="startCreate" class="mt-4 w-full justify-center text-sm">
-                                    <x-heroicon-o-plus class="-ml-0.5 mr-1.5 h-4 w-4" /> {{ __('New app') }}
-                                </x-primary-button>
-                            @endif
-                        </div>
-                    </div>
-                </div>
-            </section>
+                </x-slot:stats>
+            </x-hero-card>
 
             @if ($apps->isEmpty())
                 {{-- Empty state: apps are provisioned from a site's broadcasting binding. --}}
@@ -120,9 +109,11 @@
                                 @if ($canManage)
                                     <div class="ml-auto flex items-center gap-2 pointer-events-auto">
                                         <x-secondary-button type="button" wire:click="startTierChange('{{ $app->id }}')" class="text-xs">
+                                            <x-heroicon-o-arrows-up-down class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                             {{ __('Change tier') }}
                                         </x-secondary-button>
-                                        <button type="button" wire:click="confirmDelete('{{ $app->id }}')" class="text-xs font-medium text-red-600 hover:text-red-700">
+                                        <button type="button" wire:click="confirmDelete('{{ $app->id }}')" class="inline-flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-700">
+                                            <x-heroicon-o-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                             {{ __('Delete') }}
                                         </button>
                                     </div>

@@ -2,7 +2,7 @@
     <x-livewire-validation-errors />
 
     @push('breadcrumbs')
-        <x-breadcrumb-trail doc-route="docs.index" :items="[
+        <x-breadcrumb-trail doc-contextual :items="[
             ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
             ['label' => __('Profile'), 'href' => route('settings.profile'), 'icon' => 'user-circle'],
             ['label' => __('CLI'), 'icon' => 'command-line'],
@@ -17,23 +17,14 @@
 
     {{-- Hero card: positioning + at-a-glance counts (mirrors the
          notification-channels header). --}}
-    <section class="dply-card overflow-hidden">
-        <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-            <div class="lg:col-span-7">
-                <div class="flex items-start gap-3">
-                    <x-icon-badge size="md">
-                        <x-heroicon-o-command-line class="h-6 w-6" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Command line') }}</p>
-                        <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('CLI') }}</h2>
-                        <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Install the dply CLI, sign in once with device-flow login, and manage every CLI session tied to your organizations from here.') }}
-                        </p>
-                    </div>
-                </div>
-            </div>
-            <dl class="grid grid-cols-3 gap-2 lg:col-span-5">
+    <x-hero-card
+        :eyebrow="__('Command line')"
+        :title="__('CLI')"
+        :description="__('Install the dply CLI, sign in once with device-flow login, and manage every CLI session tied to your organizations from here.')"
+        icon="command-line"
+    >
+        <x-slot:stats>
+            <dl class="grid grid-cols-3 gap-2">
                 <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Sessions') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
@@ -58,8 +49,8 @@
                     <p class="mt-1 text-[11px] text-brand-mist">{{ __('Most recent sign-in') }}</p>
                 </div>
             </dl>
-        </div>
-    </section>
+        </x-slot:stats>
+    </x-hero-card>
 
     @if ($organizations->isEmpty())
         <section class="dply-card mt-6 overflow-hidden p-6 sm:p-8">
@@ -144,6 +135,112 @@ jobs:
                         <p class="mt-2 text-xs leading-relaxed text-brand-moss">
                             {{ __('Create an org API token with sites.deploy. Link the site once locally (`dply link --byo …`) and commit `.dply/site.json`, or pass `--site` in CI.') }}
                         </p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="dply-card overflow-hidden">
+                <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+                    <x-icon-badge>
+                        <x-heroicon-o-code-bracket-square class="h-5 w-5" aria-hidden="true" />
+                    </x-icon-badge>
+                    <div class="min-w-0">
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Configure') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Repo config: dply.yaml or dply.json') }}</h2>
+                        <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                            {{ __('Drop a `dply.yaml`, `dply.yml`, or `dply.json` at your repo root. dply reads it on every deploy — build overrides, redirects, rewrites, header rules, and env declarations. YAML and JSON are interchangeable; pick whichever your team prefers.') }}
+                        </p>
+                    </div>
+                </div>
+                <div class="space-y-4 px-6 py-5 sm:px-7">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('YAML — dply.yaml') }}</p>
+                        <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-4 py-3 text-sm text-brand-cream"><code>@verbatim build:
+  command: npm run build
+  output: dist
+  node: "20"
+
+redirects:
+  - from: /old/*
+    to: /new/:splat
+    status: 301
+
+headers:
+  - for: /assets/*
+    values:
+      Cache-Control: "public, max-age=31536000, immutable"
+
+env:
+  public:
+    NODE_VERSION: "20"
+  secret:
+    - DATABASE_URL@endverbatim</code></pre>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('JSON — dply.json (equivalent)') }}</p>
+                        <pre class="mt-2 overflow-x-auto rounded-xl border border-brand-ink/10 bg-brand-ink px-4 py-3 text-sm text-brand-cream"><code>@verbatim{
+  "build": { "command": "npm run build", "output": "dist", "node": "20" },
+  "redirects": [
+    { "from": "/old/*", "to": "/new/:splat", "status": 301 }
+  ],
+  "headers": [
+    { "for": "/assets/*", "values": { "Cache-Control": "public, max-age=31536000, immutable" } }
+  ],
+  "env": {
+    "public": { "NODE_VERSION": "20" },
+    "secret": ["DATABASE_URL"]
+  }
+}@endverbatim</code></pre>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('Validate before you push') }}</p>
+                        <x-cli-snippet class="mt-2" :commands="[
+                            ['label' => __('Lint cwd'),  'command' => 'dply lint'],
+                            ['label' => __('Lint file'), 'command' => 'dply lint --path dply.json'],
+                        ]" />
+                        <p class="mt-2 text-xs leading-relaxed text-brand-moss">
+                            {{ __('`dply lint` runs the same rules the build uses on deploy — fatal parse errors fail the build, and malformed rules are dropped with a warning. Secrets stay out of the file: list secret names under `env.secret` and set their values in the dashboard.') }}
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-brand-mist">{{ __('All supported keys') }}</p>
+                        <p class="mt-1 text-xs leading-relaxed text-brand-moss">
+                            {{ __('Every section is optional. Keys not listed here are ignored. The examples above use YAML, but each key works identically in JSON.') }}
+                        </p>
+                        <div class="mt-3 overflow-hidden rounded-xl border border-brand-ink/10">
+                            <table class="w-full text-left text-xs">
+                                <thead class="bg-brand-sand/30 text-brand-mist">
+                                    <tr>
+                                        <th class="px-3 py-2 font-semibold uppercase tracking-wide">{{ __('Key') }}</th>
+                                        <th class="px-3 py-2 font-semibold uppercase tracking-wide">{{ __('What it does') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-brand-ink/10">
+                                    @foreach ([
+                                        ['build', __('Build overrides: `command`, `output`, `root` (monorepo subdir), `node` version, and `env_files` (repo-relative .env paths merged into the build).')],
+                                        ['redirects', __('List of `{from, to, status}`. Status must be 301, 302, 303, 307, or 308 (defaults to 301).')],
+                                        ['rewrites', __('List of `{from, to}` — proxy a path pattern to another path or URL without changing the address bar.')],
+                                        ['headers', __('List of `{for, values}` — attach response header name/value pairs to paths matching the `for` glob.')],
+                                        ['env', __('`public:` map of safe-to-commit NAME: value pairs, plus `secret:` — a list of names only (values are set in the dashboard).')],
+                                        ['bindings', __('Cloudflare bindings: `kv`, `r2`, `d1`, `queues` maps of ALL_CAPS name → resource id or title. Co-equal with wrangler.toml.')],
+                                        ['origin', __('Origin proxy: `url`, `routes` (path patterns to proxy), and `failover_html` shown when the origin is unreachable.')],
+                                        ['domains', __('List of hostnames to attach on deploy. Attach-only — removing a name never detaches (detach via dashboard/API).')],
+                                        ['crons', __('List of `{schedule}` (5-field cron). Up to 5 per site; exports `scheduled` from your middleware module.')],
+                                        ['firewall', __('`country_mode` (off / allow / block) plus a `countries` list of ISO 3166 alpha-2 codes.')],
+                                        ['images', __('`allowed_hosts` — hostnames the image-resizing proxy may fetch from. (Signing secret is set in the dashboard.)')],
+                                        ['error_pages', __('Custom 404/500 HTML via `html_404`/`html_500` (inline) or `html_404_path`/`html_500_path` (repo-relative files).')],
+                                        ['maintenance', __('`enabled` (bool) plus `html` or `html_path` — serves 503 + your page on every request when on.')],
+                                        ['previews', __('Preview gating: `enabled`, `pr_only`, `branches`, `exclude_branches`, and `protection` (mode + allowed_emails).')],
+                                        ['comment_widget', __('`enabled` (bool) — toggle the preview-deploy comment widget. Token/api_base are generated server-side.')],
+                                    ] as [$key, $desc])
+                                        <tr>
+                                            <td class="whitespace-nowrap px-3 py-2 align-top font-mono text-brand-ink">{{ $key }}</td>
+                                            <td class="px-3 py-2 leading-relaxed text-brand-moss">{{ $desc }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </section>

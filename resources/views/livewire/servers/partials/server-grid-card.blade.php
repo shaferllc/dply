@@ -53,7 +53,7 @@
             @endfeature
         @endif
 
-        @include('livewire.servers.partials.server-sites-disclosure', ['server' => $server])
+        @include('livewire.servers.partials.server-resource-tabs', ['server' => $server])
 
         <div class="mt-auto flex items-center justify-end gap-2 pt-1">
             <a href="{{ route('servers.show', $server) }}" wire:navigate class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream transition hover:bg-brand-forest">

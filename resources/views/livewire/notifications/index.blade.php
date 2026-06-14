@@ -6,48 +6,37 @@
         ]" />
 
         {{-- Hero: positioning + at-a-glance rollups. --}}
-        <section class="dply-card overflow-hidden">
-            <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-                <div class="lg:col-span-7">
-                    <div class="flex items-start gap-3">
-                        <x-icon-badge size="md">
-                            <x-heroicon-o-bell class="h-6 w-6" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Inbox') }}</p>
-                            <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Notifications') }}</h2>
-                            <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
-                                {{ $notificationsReady
-                                    ? __('Deploys, monitoring alerts, SSL events, and security findings across everything you can access.')
-                                    : __('Run the latest database migrations to enable the shared inbox.') }}
-                            </p>
-                        </div>
-                    </div>
-                    <div class="mt-4 flex flex-wrap items-center gap-2">
-                        @if ($notificationsReady && $unreadCount > 0)
-                            <button
-                                type="button"
-                                wire:click="markAllAsRead"
-                                class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
-                            >
-                                <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ __('Mark all read') }}
-                            </button>
-                        @endif
-                        @if ($notificationsReady && $totalCount > 0)
-                            <button
-                                type="button"
-                                wire:click="deleteAllRead"
-                                wire:confirm="{{ __('Delete all read notifications? Saved (starred) items are kept. This cannot be undone.') }}"
-                                class="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-700 shadow-sm transition hover:bg-rose-50"
-                            >
-                                <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ __('Delete all read') }}
-                            </button>
-                        @endif
-                    </div>
-                </div>
-                <dl class="grid grid-cols-4 gap-2 lg:col-span-5">
+        <x-hero-card
+            icon="bell"
+            :eyebrow="__('Inbox')"
+            :title="__('Notifications')"
+            :description="$notificationsReady
+                ? __('Deploys, monitoring alerts, SSL events, and security findings across everything you can access.')
+                : __('Run the latest database migrations to enable the shared inbox.')"
+        >
+            @if ($notificationsReady && $unreadCount > 0)
+                <button
+                    type="button"
+                    wire:click="markAllAsRead"
+                    class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                >
+                    <x-heroicon-o-check class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {{ __('Mark all read') }}
+                </button>
+            @endif
+            @if ($notificationsReady && $totalCount > 0)
+                <button
+                    type="button"
+                    wire:click="openConfirmActionModal('deleteAllRead', [], @js(__('Delete all read notifications?')), @js(__('Saved (starred) items are kept. This cannot be undone.')), @js(__('Delete all read')), true)"
+                    class="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-semibold text-rose-700 shadow-sm transition hover:bg-rose-50"
+                >
+                    <x-heroicon-o-trash class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {{ __('Delete all read') }}
+                </button>
+            @endif
+
+            <x-slot:stats>
+                <dl class="grid grid-cols-4 gap-2">
                     <div @class([
                         'rounded-2xl border px-3 py-3 shadow-sm',
                         'border-brand-gold/40 bg-brand-gold/8' => $unreadCount > 0,
@@ -73,8 +62,8 @@
                         <dd class="mt-1 font-mono text-xl font-semibold tabular-nums text-brand-ink">{{ $totalCount }}</dd>
                     </div>
                 </dl>
-            </div>
-        </section>
+            </x-slot:stats>
+        </x-hero-card>
 
         @if ($notificationsReady)
             {{-- Toolbar: tabs + filters. --}}
@@ -138,7 +127,7 @@
                     <button type="button" wire:click="unsaveSelected" class="inline-flex items-center gap-1.5 rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-ink hover:bg-white/70">
                         <x-heroicon-o-star class="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> {{ __('Unsave') }}
                     </button>
-                    <button type="button" wire:click="deleteSelected" wire:confirm="{{ __('Delete the selected notifications? Saved (starred) ones are kept. This cannot be undone.') }}" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50">
+                    <button type="button" wire:click="openConfirmActionModal('deleteSelected', [], @js(__('Delete selected notifications?')), @js(__('Saved (starred) ones are kept. This cannot be undone.')), @js(__('Delete')), true)" class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-700 hover:bg-rose-50">
                         <x-heroicon-o-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> {{ __('Delete') }}
                     </button>
                     <button type="button" wire:click="$set('selected', [])" class="ml-auto text-xs font-semibold text-brand-moss hover:text-brand-ink">{{ __('Clear selection') }}</button>
@@ -207,8 +196,7 @@
                             @endif
                             <button
                                 type="button"
-                                wire:click="deleteItem('{{ $item->id }}')"
-                                wire:confirm="{{ $isSaved ? __('Delete this saved notification? This cannot be undone.') : __('Delete this notification? This cannot be undone.') }}"
+                                wire:click="openConfirmActionModal('deleteItem', [@js((string) $item->id)], @js($isSaved ? __('Delete this saved notification?') : __('Delete this notification?')), @js(__('This cannot be undone.')), @js(__('Delete')), true)"
                                 title="{{ __('Delete') }}"
                                 class="rounded-lg border border-rose-200 bg-white px-2 py-1.5 text-xs font-medium text-rose-700 hover:bg-rose-50"
                             >
@@ -240,4 +228,6 @@
             @endforelse
         </div>
     </div>
+
+    @include('livewire.partials.confirm-action-modal')
 </div>

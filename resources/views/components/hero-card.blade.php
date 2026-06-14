@@ -30,64 +30,73 @@
      right-hand stat tiles (`stats`) stay caller-owned because they're
      page-specific. Use the `leading` slot to supply a fully custom badge
      instead of the `icon` heroicon slug. --}}
+@php
+    $hasActions = trim((string) $slot) !== '';
+@endphp
+
 <section {{ $attributes->class(['dply-card overflow-hidden']) }}>
-    <div class="p-6 sm:p-8">
-        <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div class="flex min-w-0 items-start gap-3">
+    <div class="p-4 sm:p-5">
+        {{-- Top band: identity on the left, stat tiles (+ optional top action)
+             pulled up to the right so the header reads as one dense row instead
+             of leaving a gap between left actions and right stats. --}}
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
+            <div class="flex min-w-0 items-start gap-2.5">
                 @if ($hasLeading)
                     @isset($leading)
                         {{ $leading }}
                     @else
-                        <x-icon-badge :tone="$tone" :size="$iconSize">
-                            <x-dynamic-component :component="'heroicon-o-' . $icon" class="h-6 w-6" aria-hidden="true" />
+                        <x-icon-badge :tone="$tone" :size="$iconSize" class="!h-9 !w-9 !rounded-xl">
+                            <x-dynamic-component :component="'heroicon-o-' . $icon" class="h-5 w-5" aria-hidden="true" />
                         </x-icon-badge>
                     @endisset
                 @endif
 
                 <div class="min-w-0">
                     @if (filled($eyebrow))
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ $eyebrow }}</p>
+                        <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ $eyebrow }}</p>
                     @endif
                     <h2 @class([
-                        'text-xl font-semibold tracking-tight text-brand-ink',
-                        'mt-1' => filled($eyebrow),
+                        'text-base font-semibold tracking-tight text-brand-ink',
+                        'mt-0.5' => filled($eyebrow),
                     ])>{{ $title }}</h2>
                     @if (filled($description))
-                        <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">{{ $description }}</p>
+                        <p class="mt-1 max-w-xl text-[13px] leading-snug text-brand-moss">{{ $description }}</p>
                     @endif
                 </div>
             </div>
 
-            @if ($hasTopAction)
-                <div class="flex shrink-0 flex-wrap items-center gap-2">
-                    {{ $topAction }}
+            @if ($hasTopAction || $hasStats)
+                <div class="flex shrink-0 flex-col gap-3 lg:items-end">
+                    @if ($hasTopAction)
+                        <div class="flex flex-wrap items-center gap-2 lg:justify-end">
+                            {{ $topAction }}
+                        </div>
+                    @endif
+                    @if ($hasStats)
+                        <div class="w-full lg:w-auto">
+                            {{ $stats }}
+                        </div>
+                    @endif
                 </div>
             @endif
         </div>
 
-        @php
-            $hasActions = trim((string) $slot) !== '';
-        @endphp
-
-        @if ($hasActions || $hasStats)
-            <div @class([
-                'mt-6 grid gap-6',
-                'lg:grid-cols-12 lg:items-center lg:gap-8' => $hasStats,
-            ])>
-                @if ($hasActions)
-                    <div @class(['lg:col-span-7' => $hasStats])>
-                        <div class="flex flex-wrap items-center gap-2">
-                            {{ $slot }}
-                        </div>
-                    </div>
-                @endif
-
-                @if ($hasStats)
-                    <div @class(['lg:col-span-5' => $hasActions, 'lg:col-span-12' => ! $hasActions])>
-                        {{ $stats }}
-                    </div>
-                @endif
+        {{-- Action pills on their own full-width row so they always lay out
+             side-by-side (horizontal), consistent across pages regardless of
+             how wide the stat column is or how tall the description grows. --}}
+        @if ($hasActions)
+            <div class="mt-4 flex flex-wrap items-center gap-2">
+                {{ $slot }}
             </div>
         @endif
     </div>
+
+    {{-- Optional joined body: content rendered inside the same card, beneath the
+         header band with a divider (e.g. a "how to use this" explainer) so it
+         reads as one card instead of a detached second card below. --}}
+    @isset($footer)
+        <div class="border-t border-brand-ink/10 px-4 py-4 sm:px-5 sm:py-5">
+            {{ $footer }}
+        </div>
+    @endisset
 </section>

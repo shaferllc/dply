@@ -1,6 +1,18 @@
 # Changelog
 
 ## [Unreleased]
+### Changed
+- Page headers are now consistent across the server, project, and site workspaces, all rendered from a single shared hero card.
+### Added
+- Backups and site files can now be pulled down with a one-click quick download: dply builds the artifact on the server, stages it to a short-lived download bucket, and notifies you in-app and by email when it's ready, then streams it once over a signed, authenticated link and deletes it.
+### Added
+- Site environment variables can now be synced to the attached worker-pool members in one action, keeping app and worker boxes from drifting out of sync.
+### Added
+- Sites can attach worker-pool servers as a dedicated worker fleet, managed from the site settings page.
+### Fixed
+- The server Monitor's live CPU, memory, and disk samples no longer go stale: the metrics agent now sends an explicit User-Agent so its uploads are no longer blocked by the edge firewall.
+### Changed
+- The live server certificate scan now reports richer per-site details and clearer status on the server overview.
 ### Added
 - Sites can now run across multiple load-balanced web backends, unlocking rolling and canary deployment methods with per-target traffic weighting and draining.
 ### Changed

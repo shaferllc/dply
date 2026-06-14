@@ -26,40 +26,30 @@
     @endpush
 
     {{-- Hero: positioning + at-a-glance token counts. --}}
-    <section class="dply-card overflow-hidden">
-        <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-            <div class="lg:col-span-7">
-                <div class="flex items-start gap-3">
-                    <x-icon-badge size="md">
-                        <x-heroicon-o-bolt class="h-6 w-6" aria-hidden="true" />
-                    </x-icon-badge>
-                    <div class="min-w-0">
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Automation') }}</p>
-                        <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('API keys') }}</h2>
-                        <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
-                            {{ __('Personal access tokens for the dply HTTP API. Each token is scoped to an organization with explicit permissions and an optional IP allow-list.') }}
-                        </p>
-                    </div>
-                </div>
-                <div class="mt-4 flex flex-wrap items-center gap-2">
-                    <x-outline-link href="{{ route('settings.profile') }}" wire:navigate>
-                        <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                        {{ __('Back to profile') }}
-                    </x-outline-link>
-                    @if ($adminOrganizations->isNotEmpty())
-                        <button
-                            type="button"
-                            wire:click="openCreateApiTokenModal"
-                            @disabled($requiresPaidPlan && $organization && ! $orgHasProPlan)
-                            class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Add API token') }}
-                        </button>
-                    @endif
-                </div>
-            </div>
-            <dl class="grid grid-cols-3 gap-2 lg:col-span-5">
+    <x-hero-card
+        :eyebrow="__('Automation')"
+        :title="__('API keys')"
+        :description="__('Personal access tokens for the dply HTTP API. Each token is scoped to an organization with explicit permissions and an optional IP allow-list.')"
+        icon="bolt"
+    >
+        <x-outline-link href="{{ route('settings.profile') }}" wire:navigate>
+            <x-heroicon-o-user-circle class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+            {{ __('Back to profile') }}
+        </x-outline-link>
+        @if ($adminOrganizations->isNotEmpty())
+            <button
+                type="button"
+                wire:click="openCreateApiTokenModal"
+                @disabled($requiresPaidPlan && $organization && ! $orgHasProPlan)
+                class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest disabled:cursor-not-allowed disabled:opacity-60"
+            >
+                <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                {{ __('Add API token') }}
+            </button>
+        @endif
+
+        <x-slot:stats>
+            <dl class="grid grid-cols-3 gap-2">
                 <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
                     <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Tokens') }}</dt>
                     <dd class="mt-1 flex items-baseline gap-1.5">
@@ -95,8 +85,8 @@
                     <p class="mt-1 text-[11px] text-brand-mist">{{ __('You can issue against') }}</p>
                 </div>
             </dl>
-        </div>
-    </section>
+        </x-slot:stats>
+    </x-hero-card>
 
     @if ($adminOrganizations->isEmpty())
         <div class="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950" role="status">
@@ -292,7 +282,7 @@
                                 <button
                                     type="button"
                                     wire:click="openConfirmActionModal('revokeToken', [{{ $t->id }}], @js(__('Revoke token')), @js(__('Revoke this token? It will stop working immediately.')), @js(__('Revoke')), true)"
-                                    class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
+                                    class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700 shadow-sm hover:bg-rose-50"
                                 >
                                     <x-heroicon-o-no-symbol class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     {{ __('Revoke') }}

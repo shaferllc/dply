@@ -163,7 +163,7 @@
                                                 type="button"
                                                 wire:click="dropDatabase('{{ $db->id }}')"
                                                 wire:confirm="{{ __('Drop :name on the server? This permanently deletes the database and its data, and removes it from Dply. This cannot be undone.', ['name' => $db->name]) }}"
-                                                class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
+                                                class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
                                             >
                                                 <x-heroicon-o-trash class="h-4 w-4" />
                                                 {{ __('Drop') }}

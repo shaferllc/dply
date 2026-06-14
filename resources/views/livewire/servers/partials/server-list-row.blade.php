@@ -54,9 +54,7 @@
                 </div>
             @endif
 
-            <div class="mt-2">
-                @include('livewire.servers.partials.server-sites-disclosure', ['server' => $server])
-            </div>
+            @include('livewire.servers.partials.server-resource-tabs', ['server' => $server])
 
             {{-- Setup-failed detail: red chip + journey link. Shown instead of
                  the live progress block when applyProvisionOutcomeToServer

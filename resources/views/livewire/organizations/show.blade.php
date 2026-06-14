@@ -93,39 +93,29 @@
             {{-- Hero card. Stat strip on the right summarizes the four
                  numbers an admin scans for first — plan, fleet, people,
                  automation. Each tile keeps the family stat-tile look. --}}
-            <section class="dply-card overflow-hidden">
-                <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-                    <div class="lg:col-span-7">
-                        <div class="flex items-start gap-3">
-                            <x-icon-badge size="md">
-                                <x-heroicon-o-building-office-2 class="h-6 w-6" aria-hidden="true" />
-                            </x-icon-badge>
-                            <div class="min-w-0">
-                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Organization') }}</p>
-                                <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ $organization->name }}</h2>
-                                <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
-                                    {{ __('Plan, people, and the surface for everything dply automates on your behalf — pick a section below.') }}
-                                </p>
-                            </div>
-                        </div>
-                        <div class="mt-4 flex flex-wrap items-center gap-2">
-                            <x-docs-link slug="org-overview">
-                                <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                {{ __('Organization guide') }}
-                            </x-docs-link>
-                            <x-docs-link slug="org-roles-and-limits">
-                                <x-heroicon-o-queue-list class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                {{ __('Roles & limits') }}
-                            </x-docs-link>
-                            @if ($isAdmin)
-                                <a href="{{ route('billing.show', $organization) }}" wire:navigate class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest">
-                                    <x-heroicon-o-credit-card class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                    {{ __('Billing & plan') }}
-                                </a>
-                            @endif
-                        </div>
-                    </div>
-                    <dl class="grid grid-cols-2 gap-2 lg:col-span-5">
+            <x-hero-card
+                :eyebrow="__('Organization')"
+                :title="$organization->name"
+                :description="__('Plan, people, and the surface for everything dply automates on your behalf — pick a section below.')"
+                icon="building-office-2"
+            >
+                <x-docs-link slug="org-overview" size="md">
+                    <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                    {{ __('Organization guide') }}
+                </x-docs-link>
+                <x-docs-link slug="org-roles-and-limits" size="md">
+                    <x-heroicon-o-queue-list class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                    {{ __('Roles & limits') }}
+                </x-docs-link>
+                @if ($isAdmin)
+                    <a href="{{ route('billing.show', $organization) }}" wire:navigate class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest">
+                        <x-heroicon-o-credit-card class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {{ __('Billing & plan') }}
+                    </a>
+                @endif
+
+                <x-slot:stats>
+                    <dl class="grid grid-cols-2 gap-2 lg:grid-cols-4">
                         <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
                             <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Plan') }}</dt>
                             <dd class="mt-1 truncate text-sm font-semibold text-brand-ink" title="{{ $organization->planTierLabel() }}">{{ $organization->planTierLabel() }}</dd>
@@ -161,8 +151,8 @@
                             <p class="mt-1 text-[11px] text-brand-mist">{{ $organization->notificationWebhookDestinations->count() }} {{ trans_choice('webhook|webhooks', $organization->notificationWebhookDestinations->count()) }}</p>
                         </div>
                     </dl>
-                </div>
-            </section>
+                </x-slot:stats>
+            </x-hero-card>
 
             {{-- Section navigator. Mirrors the credentials provider grid:
                  icon tile + label + one-line description on each card, all

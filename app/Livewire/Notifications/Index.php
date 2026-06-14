@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Notifications;
 
+use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Models\NotificationInboxItem;
 use App\Support\NotificationTablesReady;
@@ -12,6 +13,7 @@ use Livewire\Component;
 #[Layout('layouts.app')]
 class Index extends Component
 {
+    use ConfirmsActionWithModal;
     use DispatchesToastNotifications;
 
     /** unread | all | saved */

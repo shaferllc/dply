@@ -19,30 +19,20 @@
 
             {{-- Hero card: positioning + at-a-glance stats. Replaces the
                  previous large "intro" card that only carried a doc link. --}}
-            <section class="dply-card overflow-hidden">
-                <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-                    <div class="lg:col-span-7">
-                        <div class="flex items-start gap-3">
-                            <x-icon-badge size="md">
-                                <x-heroicon-o-bolt class="h-6 w-6" aria-hidden="true" />
-                            </x-icon-badge>
-                            <div class="min-w-0">
-                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Organization') }}</p>
-                                <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Automation & API') }}</h2>
-                                <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
-                                    {{ __('Notifications, regional defaults, API tokens for CI, and outbound webhooks — everything that fires automatically on behalf of this organization.') }}
-                                </p>
-                            </div>
-                        </div>
-                        <div class="mt-4 flex flex-wrap items-center gap-2">
-                            @can('viewNotificationChannels', $organization)
-                                <x-outline-link href="{{ route('organizations.notification-channels', $organization) }}" wire:navigate>
-                                    <x-heroicon-o-bell class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                                    {{ __('Notification channels') }}
-                                </x-outline-link>
-                            @endcan
-                        </div>
-                    </div>
+            <x-hero-card
+                :eyebrow="__('Organization')"
+                :title="__('Automation & API')"
+                :description="__('Notifications, regional defaults, API tokens for CI, and outbound webhooks — everything that fires automatically on behalf of this organization.')"
+                icon="bolt"
+            >
+                @can('viewNotificationChannels', $organization)
+                    <x-outline-link href="{{ route('organizations.notification-channels', $organization) }}" wire:navigate>
+                        <x-heroicon-o-bell class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                        {{ __('Notification channels') }}
+                    </x-outline-link>
+                @endcan
+
+                <x-slot:stats>
                     <dl class="grid grid-cols-3 gap-2 lg:col-span-5">
                         <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
                             <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('API tokens') }}</dt>
@@ -75,8 +65,8 @@
                             </dd>
                         </div>
                     </dl>
-                </div>
-            </section>
+                </x-slot:stats>
+            </x-hero-card>
 
             {{-- Section header partial: icon tile + eyebrow + title + lead.
                  Inlined as a closure-component so all sections share one shape. --}}

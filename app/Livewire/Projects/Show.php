@@ -245,10 +245,19 @@ class Show extends Component
         $user = User::query()->findOrFail($this->memberUserId);
         abort_unless($this->workspace->organization->hasMember($user), 403);
 
-        $membership = $this->workspace->members()->updateOrCreate(
-            ['user_id' => $user->id],
-            ['role' => $this->memberRole]
-        );
+        // Guard the upsert: this action only ADDS new members. Re-adding an
+        // existing member (e.g. yourself) would silently overwrite their role —
+        // an owner could demote themselves to viewer. Block it.
+        if ($this->workspace->members()->where('user_id', $user->id)->exists()) {
+            $this->addError('memberUserId', __('That person is already a member of this project.'));
+
+            return;
+        }
+
+        $membership = $this->workspace->members()->create([
+            'user_id' => $user->id,
+            'role' => $this->memberRole,
+        ]);
 
         audit_log($this->workspace->organization, auth()->user(), 'project.member_updated', $this->workspace, null, [
             'member_id' => $user->id,
@@ -658,7 +667,15 @@ class Show extends Component
             $site->setRelation('workspace', $workspace)->setRelation('organization', $org);
         });
 
-        $orgUsers = $workspace->organization->users()->orderBy('name')->get();
+        // Only org members who aren't already on the project — excludes the
+        // current members (and therefore yourself/the owner) so the "Add member"
+        // picker can't re-add and silently re-role an existing member.
+        $existingMemberUserIds = $workspace->members->pluck('user_id')->all();
+        $orgUsers = $workspace->organization->users()
+            ->orderBy('name')
+            ->get()
+            ->reject(fn ($user) => in_array($user->id, $existingMemberUserIds, true))
+            ->values();
         $labels = WorkspaceLabel::query()
             ->where('organization_id', $orgId)
             ->orderBy('name')
@@ -713,11 +730,29 @@ class Show extends Component
             'servers_with_samples' => $serversWithSamples,
         ];
 
+        // Show the org's current plan-TIER ceilings (Free = 1 server / 1 site,
+        // Business = unlimited). These are the per-tier allotments — distinct from
+        // maxServers(), which is the creation gate and is intentionally uncapped
+        // (adding a server just bumps the usage-based tier). A null cap = unlimited
+        // and renders as "Unlimited" rather than the raw PHP_INT_MAX.
+        $serverCap = $workspace->organization->planServerLimit();
+        $siteCap = $workspace->organization->planSiteLimit();
+        $serversUnlimited = $serverCap === null;
+        $sitesUnlimited = $siteCap === null;
+        $serversRemaining = $serversUnlimited ? null : max(0, $serverCap - $workspace->servers->count());
+        $sitesRemaining = $sitesUnlimited ? null : max(0, $siteCap - $workspace->sites->count());
+
         $costSummary = [
             'servers_used' => $workspace->servers->count(),
-            'servers_remaining' => max(0, $workspace->organization->maxServers() - $workspace->servers->count()),
+            'servers_remaining' => $serversRemaining,
+            'servers_remaining_label' => $serversUnlimited
+                ? __('Unlimited in org plan')
+                : __('Remaining in org plan: :count', ['count' => $serversRemaining]),
             'sites_used' => $workspace->sites->count(),
-            'sites_remaining' => max(0, $workspace->organization->maxSites() - $workspace->sites->count()),
+            'sites_remaining' => $sitesRemaining,
+            'sites_remaining_label' => $sitesUnlimited
+                ? __('Unlimited in org plan')
+                : __('Remaining in org plan: :count', ['count' => $sitesRemaining]),
             'variables_count' => $workspace->variables->count(),
             'deploy_runs_count' => $workspace->deployRuns->count(),
         ];

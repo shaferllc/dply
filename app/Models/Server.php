@@ -309,6 +309,16 @@ class Server extends Model
     }
 
     /**
+     * Cache services (Redis/Valkey/Memcached) installed on this server.
+     * Companion to {@see databaseEngines}; together they make up the
+     * engine inventory surfaced in the fleet "Services" disclosure.
+     */
+    public function cacheServices(): HasMany
+    {
+        return $this->hasMany(ServerCacheService::class);
+    }
+
+    /**
      * The engine row marked is_default — the implicit choice for new sites
      * that don't pick an engine explicitly. Null when nothing is installed
      * (cache-only / load-balancer / static-only servers).

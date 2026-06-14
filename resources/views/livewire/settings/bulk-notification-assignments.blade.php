@@ -11,27 +11,22 @@
     @endpush
 
     <div class="space-y-8">
-        <div class="dply-card overflow-hidden">
-            <div class="grid lg:grid-cols-12 gap-8 p-6 sm:p-8">
-                <div class="lg:col-span-4">
-                    <h2 class="text-lg font-semibold text-brand-ink">{{ __('Bulk assign notifications') }}</h2>
-                    <p class="mt-2 text-sm text-brand-moss leading-relaxed">
-                        {{ __('Link channels you can manage to events, then choose servers and sites in your current organization.') }}
-                    </p>
-                </div>
-                <div class="lg:col-span-8 flex flex-wrap items-start justify-end gap-3">
-                    <x-outline-link href="{{ route('docs.index') }}" wire:navigate>
-                        <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
-                        {{ __('Documentation') }}
-                    </x-outline-link>
-                    @if ($currentOrganization)
-                        <x-badge tone="accent" :caps="false" class="text-xs">
-                            {{ __('Organization: :name', ['name' => $currentOrganization->name]) }}
-                        </x-badge>
-                    @endif
-                </div>
-            </div>
-        </div>
+        <x-hero-card
+            :title="__('Bulk assign notifications')"
+            :description="__('Link channels you can manage to events, then choose servers and sites in your current organization.')"
+        >
+            <x-slot:topAction>
+                <x-outline-link href="{{ route('docs.index') }}" wire:navigate>
+                    <x-heroicon-o-document-text class="h-4 w-4 shrink-0 opacity-90" aria-hidden="true" />
+                    {{ __('Documentation') }}
+                </x-outline-link>
+                @if ($currentOrganization)
+                    <x-badge tone="accent" :caps="false" class="text-xs">
+                        {{ __('Organization: :name', ['name' => $currentOrganization->name]) }}
+                    </x-badge>
+                @endif
+            </x-slot:topAction>
+        </x-hero-card>
 
         @if (! $currentOrganization)
             <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">

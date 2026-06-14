@@ -52,9 +52,11 @@
                         @if ($canManage)
                             <div class="mt-3 flex items-center justify-end gap-2">
                                 <x-secondary-button type="button" wire:click="startTierChange" class="text-xs">
+                                    <x-heroicon-o-arrows-up-down class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                     {{ __('Change tier') }}
                                 </x-secondary-button>
-                                <button type="button" wire:click="confirmDelete" class="text-xs font-medium text-red-600 hover:text-red-700">
+                                <button type="button" wire:click="confirmDelete" class="inline-flex items-center gap-1.5 text-xs font-medium text-red-600 hover:text-red-700">
+                                    <x-heroicon-o-trash class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                                     {{ __('Delete') }}
                                 </button>
                             </div>

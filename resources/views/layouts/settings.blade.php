@@ -58,6 +58,7 @@
 
         @auth
             <livewire:settings.connect-provider-modal :key="'global-connect-provider-modal'" />
+            @include('partials.docs-sidebar')
         @endauth
 
         {{ $modals ?? '' }}

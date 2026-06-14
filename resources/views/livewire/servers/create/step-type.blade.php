@@ -39,29 +39,22 @@
 
     <form wire:submit.prevent="next" class="mt-6">
         {{-- Hero: step + intent. --}}
-        <section class="dply-card overflow-hidden">
-            <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-                <div class="lg:col-span-7">
-                    <div class="flex items-start gap-3">
-                        <x-icon-badge size="md">
-                            <x-heroicon-o-server-stack class="h-6 w-6" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0">
-                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Step :n of :total', ['n' => 1, 'total' => $totalSteps]) }}</p>
-                            <h1 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Create a server') }}</h1>
-                            <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
-                                {{ __('Pick how you want to add this server, then give it a memorable name. You can change either choice before the final review.') }}
-                            </p>
-                        </div>
-                    </div>
-                    @if ($dockerHostHinted)
-                        <div class="mt-4 flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-sm leading-relaxed text-sky-900">
-                            <x-heroicon-m-information-circle class="mt-0.5 h-4 w-4 shrink-0 text-sky-600" aria-hidden="true" />
-                            <span>{{ __('Detected a Docker-host launch path. Provider mode is preselected with a Docker host; you can change the host kind on the next step.') }}</span>
-                        </div>
-                    @endif
+        <x-hero-card
+            icon="server-stack"
+            iconSize="md"
+            :eyebrow="__('Step :n of :total', ['n' => 1, 'total' => $totalSteps])"
+            :title="__('Create a server')"
+            :description="__('Pick how you want to add this server, then give it a memorable name. You can change either choice before the final review.')"
+        >
+            @if ($dockerHostHinted)
+                <div class="flex items-start gap-2 rounded-xl border border-sky-200 bg-sky-50/70 px-4 py-3 text-sm leading-relaxed text-sky-900">
+                    <x-heroicon-m-information-circle class="mt-0.5 h-4 w-4 shrink-0 text-sky-600" aria-hidden="true" />
+                    <span>{{ __('Detected a Docker-host launch path. Provider mode is preselected with a Docker host; you can change the host kind on the next step.') }}</span>
                 </div>
-                <dl class="grid grid-cols-2 gap-2 lg:col-span-5">
+            @endif
+
+            <x-slot:stats>
+                <dl class="grid grid-cols-2 gap-2">
                     <div @class([
                         'rounded-2xl border px-4 py-3 shadow-sm',
                         'border-brand-sage/30 bg-brand-sage/8' => $form->mode === 'provider',
@@ -83,8 +76,8 @@
                         <p class="mt-1 text-[11px] text-brand-mist">{{ __('Friendly identifier') }}</p>
                     </div>
                 </dl>
-            </div>
-        </section>
+            </x-slot:stats>
+        </x-hero-card>
 
         <div class="mt-6 space-y-6">
             {{-- Mode selection --}}

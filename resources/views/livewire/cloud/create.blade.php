@@ -10,21 +10,15 @@
         ['label' => __('Deploy'), 'icon' => 'rocket-launch'],
     ]" />
 
-    <header class="relative mt-6 overflow-hidden rounded-3xl border border-brand-ink/10 bg-gradient-to-br from-brand-cream via-white to-brand-sand/25 px-6 py-8 shadow-sm sm:px-10 sm:py-10 dark:border-brand-mist/20 dark:from-zinc-900 dark:via-zinc-900 dark:to-brand-sand/10">
-        <div class="pointer-events-none absolute -end-16 -top-16 h-56 w-56 rounded-full bg-brand-sage/15 blur-3xl dark:bg-brand-sage/10" aria-hidden="true"></div>
-        <div class="pointer-events-none absolute -bottom-20 -start-12 h-48 w-48 rounded-full bg-brand-gold/15 blur-3xl dark:bg-brand-gold/10" aria-hidden="true"></div>
-        <div class="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div class="max-w-2xl">
-                <div class="inline-flex items-center gap-2 rounded-full border border-brand-sage/25 bg-brand-sage/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-brand-forest dark:border-brand-sage/30 dark:bg-brand-sage/15 dark:text-brand-sage">
-                    <x-heroicon-o-cloud class="h-4 w-4" aria-hidden="true" />
-                    {{ __('dply Cloud') }}
-                </div>
-                <h1 class="mt-4 text-3xl font-semibold tracking-tight text-brand-ink sm:text-4xl">{{ __('Deploy an app') }}</h1>
-                <p class="mt-3 max-w-prose text-sm leading-relaxed text-brand-moss sm:text-base">
-                    {{ __('Point dply at a GitHub repository or a pre-built image. We build, ship, and run it on your cloud account — managed TLS, autoscaling, and zero-config health checks.') }}
-                </p>
-            </div>
-            <div class="flex shrink-0 flex-col items-stretch gap-3 sm:items-end">
+    <x-hero-card
+        class="mt-6"
+        icon="cloud"
+        :eyebrow="__('dply Cloud')"
+        :title="__('Deploy an app')"
+        :description="__('Point dply at a GitHub repository or a pre-built image. We build, ship, and run it on your cloud account — managed TLS, autoscaling, and zero-config health checks.')"
+    >
+        <x-slot:topAction>
+            <div class="flex flex-col items-stretch gap-3 sm:items-end">
                 <div role="tablist" aria-label="{{ __('View mode') }}" class="inline-flex self-end rounded-xl border border-brand-ink/10 bg-white/90 p-1 shadow-sm dark:border-brand-mist/25 dark:bg-zinc-800/80">
                     <button
                         type="button"
@@ -66,8 +60,8 @@
                     </span>
                 </div>
             </div>
-        </div>
-    </header>
+        </x-slot:topAction>
+    </x-hero-card>
 
     @if ($connectedBackends->isEmpty() && ! $fakeCloudActive)
         <section class="dply-card overflow-hidden border-amber-200 mt-6">

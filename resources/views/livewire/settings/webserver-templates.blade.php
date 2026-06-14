@@ -29,23 +29,15 @@
             {{-- Hero card. Stat tiles count templates total + templates by
                  the default nginx engine so an admin sees coverage at a
                  glance without scrolling the list. --}}
-            <section class="dply-card overflow-hidden">
-                <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-                    <div class="lg:col-span-7">
-                        <div class="flex items-start gap-3">
-                            <x-icon-badge size="md">
-                                <x-heroicon-o-server class="h-6 w-6" aria-hidden="true" />
-                            </x-icon-badge>
-                            <div class="min-w-0">
-                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Templates') }}</p>
-                                <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Webserver templates') }}</h2>
-                                <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
-                                    {{ __('Reusable config snippets for nginx, Apache, Caddy and friends — with before / inside / after slots so upstreams and sibling server blocks have a real home.') }}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                    <dl class="grid grid-cols-3 gap-2 lg:col-span-5">
+            <x-hero-card
+                :eyebrow="__('Templates')"
+                :title="__('Webserver templates')"
+                :description="__('Reusable config snippets for nginx, Apache, Caddy and friends — with before / inside / after slots so upstreams and sibling server blocks have a real home.')"
+                icon="server"
+                iconSize="md"
+            >
+                <x-slot:stats>
+                    <dl class="grid grid-cols-3 gap-2">
                         <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
                             <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Templates') }}</dt>
                             <dd class="mt-1 flex items-baseline gap-1.5">
@@ -75,8 +67,8 @@
                             <p class="mt-1 truncate text-[11px] text-brand-mist">{{ $editingId ? $label : __('Ready') }}</p>
                         </div>
                     </dl>
-                </div>
-            </section>
+                </x-slot:stats>
+            </x-hero-card>
 
             @if ($testMessage)
                 <div

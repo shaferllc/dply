@@ -220,6 +220,26 @@ return [
             'group' => 'organization',
         ],
         [
+            'route' => 'profile.ssh-keys',
+            'slug' => 'account-ssh-keys',
+            'group' => 'account',
+        ],
+        [
+            'route' => 'profile.security',
+            'slug' => 'account-security',
+            'group' => 'account',
+        ],
+        [
+            'route' => 'profile.backup-configurations',
+            'slug' => 'account-backup-destinations',
+            'group' => 'account',
+        ],
+        [
+            'route' => 'profile.cli',
+            'slug' => 'account-cli',
+            'group' => 'account',
+        ],
+        [
             'route' => 'projects.index',
             'slug' => 'projects-overview',
             'group' => 'organization',

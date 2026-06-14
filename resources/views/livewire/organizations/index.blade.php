@@ -29,63 +29,40 @@
 
         @if ($orgTotal === 0)
             {{-- Hero (empty variant) — same shell so the page never collapses to a bare card. --}}
-            <section class="dply-card overflow-hidden">
-                <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-                    <div class="lg:col-span-7">
-                        <div class="flex items-start gap-3">
-                            <x-icon-badge size="md">
-                                <x-heroicon-o-building-office-2 class="h-6 w-6" aria-hidden="true" />
-                            </x-icon-badge>
-                            <div class="min-w-0">
-                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Workspaces') }}</p>
-                                <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Organizations') }}</h2>
-                                <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
-                                    {{ __("You're not in any organization yet. Spin one up to start grouping servers, teams, and billing.") }}
-                                </p>
-                            </div>
-                        </div>
-                        <div class="mt-4 flex flex-wrap items-center gap-2">
-                            <a
-                                href="{{ route('organizations.create') }}"
-                                wire:navigate
-                                class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
-                            >
-                                <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ __('Create your first organization') }}
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </section>
+            <x-hero-card
+                :eyebrow="__('Workspaces')"
+                :title="__('Organizations')"
+                :description="__('You\'re not in any organization yet. Spin one up to start grouping servers, teams, and billing.')"
+                icon="building-office-2"
+            >
+                <a
+                    href="{{ route('organizations.create') }}"
+                    wire:navigate
+                    class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                >
+                    <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {{ __('Create your first organization') }}
+                </a>
+            </x-hero-card>
         @else
             {{-- Hero: positioning + at-a-glance rollups. --}}
-            <section class="dply-card overflow-hidden">
-                <div class="grid gap-6 p-6 sm:p-8 lg:grid-cols-12 lg:items-center lg:gap-8">
-                    <div class="lg:col-span-7">
-                        <div class="flex items-start gap-3">
-                            <x-icon-badge size="md">
-                                <x-heroicon-o-building-office-2 class="h-6 w-6" aria-hidden="true" />
-                            </x-icon-badge>
-                            <div class="min-w-0">
-                                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('Workspaces') }}</p>
-                                <h2 class="mt-1 text-xl font-semibold tracking-tight text-brand-ink">{{ __('Organizations') }}</h2>
-                                <p class="mt-2 max-w-xl text-sm leading-relaxed text-brand-moss">
-                                    {{ __('Switch workspaces, review usage, and open the organization you need.') }}
-                                </p>
-                            </div>
-                        </div>
-                        <div class="mt-4 flex flex-wrap items-center gap-2">
-                            <a
-                                href="{{ route('organizations.create') }}"
-                                wire:navigate
-                                class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
-                            >
-                                <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                                {{ __('New organization') }}
-                            </a>
-                        </div>
-                    </div>
-                    <dl class="grid grid-cols-3 gap-2 lg:col-span-5">
+            <x-hero-card
+                :eyebrow="__('Workspaces')"
+                :title="__('Organizations')"
+                :description="__('Switch workspaces, review usage, and open the organization you need.')"
+                icon="building-office-2"
+            >
+                <a
+                    href="{{ route('organizations.create') }}"
+                    wire:navigate
+                    class="inline-flex items-center gap-2 rounded-xl bg-brand-ink px-4 py-2 text-sm font-semibold text-brand-cream shadow-md transition-colors hover:bg-brand-forest"
+                >
+                    <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {{ __('New organization') }}
+                </a>
+
+                <x-slot:stats>
+                    <dl class="grid grid-cols-3 gap-2">
                         <div @class([
                             'rounded-2xl border px-4 py-3 shadow-sm',
                             'border-brand-sage/30 bg-brand-sage/8' => $orgTotal > 0,
@@ -115,8 +92,8 @@
                             <p class="mt-1 text-[11px] text-brand-mist">{{ $rollupServers }} {{ trans_choice('server|servers', $rollupServers) }} · {{ $rollupSites }} {{ trans_choice('site|sites', $rollupSites) }}</p>
                         </div>
                     </dl>
-                </div>
-            </section>
+                </x-slot:stats>
+            </x-hero-card>
 
             <div class="mt-6 space-y-6">
                 {{-- Workspace list --}}

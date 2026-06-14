@@ -277,6 +277,57 @@ class Index extends Component
             ->sortKeys();
     }
 
+    /**
+     * Build the per-server "related servers" map for the fleet disclosure.
+     * A peer is related when it shares this server's worker pool, private
+     * network, or project (workspace). The reason shown is the tightest match,
+     * in that priority order, so each peer appears once. Peers are drawn from
+     * the full in-scope set so a server hidden by the active filter still links.
+     *
+     * @param  Collection<int, Server>  $servers   the rows actually rendered
+     * @param  Collection<int, Server>  $candidates the full in-scope fleet
+     * @return array<int|string, list<array{server: Server, reason: string}>>
+     */
+    protected function relatedServersMap(Collection $servers, Collection $candidates): array
+    {
+        $byPool = $candidates->filter(fn (Server $s) => $s->worker_pool_id !== null)->groupBy('worker_pool_id');
+        $byNetwork = $candidates->filter(fn (Server $s) => $s->private_network_id !== null)->groupBy('private_network_id');
+        $byProject = $candidates->filter(fn (Server $s) => $s->workspace_id !== null)->groupBy('workspace_id');
+
+        $map = [];
+        foreach ($servers as $server) {
+            /** @var array<int|string, array{server: Server, reason: string}> $peers */
+            $peers = [];
+
+            // Tightest reason wins: a peer added under "same pool" is not
+            // overwritten by a looser "same project" match later.
+            $collect = function (?Collection $group, string $reason) use (&$peers, $server): void {
+                foreach ($group ?? collect() as $candidate) {
+                    if ($candidate->id === $server->id || isset($peers[$candidate->id])) {
+                        continue;
+                    }
+                    $peers[$candidate->id] = ['server' => $candidate, 'reason' => $reason];
+                }
+            };
+
+            if ($server->worker_pool_id !== null) {
+                $collect($byPool->get($server->worker_pool_id), __('same pool'));
+            }
+            if ($server->private_network_id !== null) {
+                $collect($byNetwork->get($server->private_network_id), __('same VPC'));
+            }
+            if ($server->workspace_id !== null) {
+                $collect($byProject->get($server->workspace_id), __('same project'));
+            }
+
+            if ($peers !== []) {
+                $map[$server->id] = array_values($peers);
+            }
+        }
+
+        return $map;
+    }
+
     protected function baseQuery(): ?Builder
     {
         $org = auth()->user()->currentOrganization();
@@ -335,12 +386,18 @@ class Index extends Component
         $hasServersInScope = $base !== null && $allInScope->isNotEmpty();
         $servers = $base
             ? $this->applyFilters(clone $base)
-                ->with(['sites', 'organization', 'team', 'workspace'])
+                ->with(['sites', 'organization', 'team', 'workspace', 'databaseEngines', 'cacheServices'])
                 ->withCount('sites')
                 ->get()
             : collect();
 
         $groupedServers = $this->groupedServers($servers);
+
+        // Per-server "related servers" map for the fleet disclosure: peers that
+        // share a worker pool, private network, or project. Computed against the
+        // full in-scope set ($allInScope) so a peer hidden by the current filter
+        // still shows. Pure column compares on already-loaded rows — no queries.
+        $relatedServers = $this->relatedServersMap($servers, $allInScope);
 
         // Insights is gated (coming soon). Skip the per-server rollup query
         // entirely when the flag is off — the fleet rows hide the badge too.
@@ -431,6 +488,7 @@ class Index extends Component
             'hasServersInScope' => $hasServersInScope,
             'servers' => $servers,
             'groupedServers' => $groupedServers,
+            'relatedServers' => $relatedServers,
             'insightRollup' => $insightRollup,
             'latestSnapshots' => $latestSnapshots,
             'provisioningDigests' => $provisioningDigests,

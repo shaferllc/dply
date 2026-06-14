@@ -95,7 +95,7 @@
                                             type="button"
                                             wire:click="removeBackend('{{ $backend->id }}')"
                                             wire:confirm="{{ __('Remove this backend? It is drained from the load balancer and its server is destroyed. This cannot be undone.') }}"
-                                            class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
+                                            class="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-700 shadow-sm hover:bg-rose-50"
                                         >
                                             <x-heroicon-o-trash class="h-4 w-4" aria-hidden="true" />
                                             {{ __('Remove') }}
