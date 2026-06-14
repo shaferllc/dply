@@ -232,11 +232,29 @@ class ServerDatabaseProvisioner
         }
 
         if (DatabaseWorkspaceEngines::family($db->engine) === 'postgres') {
-            $userSql = "CREATE USER {$user} WITH PASSWORD '".str_replace("'", "''", $pass)."';";
-            [$out] = $this->remoteExec->postgresRun($server, $userSql, 120);
-            $dbSql = "CREATE DATABASE {$name} OWNER {$user};";
+            $passLit = str_replace("'", "''", $pass);
+            $userLit = str_replace("'", "''", (string) $user);
+            $nameLit = str_replace("'", "''", (string) $name);
 
-            return $out."\n".$this->remoteExec->postgresRun($server, $dbSql, 120)[0];
+            // Role: create if missing, else sync its password. Idempotent so a
+            // repair re-run (the desync recovery path) doesn't error on an
+            // existing role — while postgresRun() still throws on a genuine error.
+            $roleSql = "DO \$do\$ BEGIN "
+                ."IF EXISTS (SELECT FROM pg_roles WHERE rolname = '{$userLit}') THEN "
+                ."ALTER ROLE {$user} WITH LOGIN PASSWORD '{$passLit}'; "
+                ."ELSE CREATE ROLE {$user} WITH LOGIN PASSWORD '{$passLit}'; "
+                ."END IF; END \$do\$;";
+            [$out] = $this->remoteExec->postgresRun($server, $roleSql, 120);
+
+            // CREATE DATABASE can't run inside a DO block / transaction, so guard
+            // it with an existence check rather than catching a duplicate error.
+            $exists = trim((string) ($this->remoteExec->postgresTuples($server, "SELECT 1 FROM pg_database WHERE datname = '{$nameLit}'", 120)[0] ?? ''));
+            $dbOut = '';
+            if ($exists === '') {
+                $dbOut = $this->remoteExec->postgresRun($server, "CREATE DATABASE {$name} OWNER {$user};", 120)[0];
+            }
+
+            return $out."\n".$dbOut;
         }
 
         if ($db->engine === 'mongodb') {

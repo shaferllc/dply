@@ -401,7 +401,20 @@ BASH;
         $cred = $this->adminCredential($server);
         $inner = $this->postgresBashFragment($sql, $cred, tuples: false);
 
-        return $this->execWithCandidatesAndExitCode($server, 'bash -lc '.escapeshellarg($inner), $timeout);
+        [$out, $exit] = $this->execWithCandidatesAndExitCode($server, 'bash -lc '.escapeshellarg($inner), $timeout);
+
+        // Fail loudly. With ON_ERROR_STOP=1 a non-zero exit means the statement
+        // actually failed on the server (role/db missing, perms, auth) — throw so
+        // provisioning can never record success over a rejected statement. Callers
+        // that ran idempotent SQL (DROP ... IF EXISTS, create-if-missing) won't
+        // hit this because those don't error.
+        if ($exit !== null && $exit !== 0) {
+            throw new \RuntimeException(
+                \Illuminate\Support\Str::limit(trim((string) $out), 800) ?: 'PostgreSQL command failed.'
+            );
+        }
+
+        return [$out, $exit];
     }
 
     /**
@@ -419,9 +432,13 @@ BASH;
 
     private function postgresBashFragment(string $sql, ?ServerDatabaseAdminCredential $cred, bool $tuples): string
     {
+        // ON_ERROR_STOP=1 for BOTH paths: a failing statement must set psql's exit
+        // code so {@see postgresRun} can throw. The old `=0` on write ops let a
+        // failed CREATE/ALTER exit 0, which (with callers ignoring the code) is
+        // how provisioning recorded success over a server that rejected the SQL.
         $flags = $tuples
             ? '-t -A -v ON_ERROR_STOP=1'
-            : '-v ON_ERROR_STOP=0';
+            : '-v ON_ERROR_STOP=1';
 
         if (! $cred || $cred->postgres_use_sudo) {
             return 'sudo -u postgres psql '.$flags.' -c '.escapeshellarg($sql).' 2>&1';
