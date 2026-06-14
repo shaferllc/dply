@@ -55,7 +55,8 @@
 
         @include('livewire.servers.partials.server-resource-tabs', ['server' => $server])
 
-        <div class="mt-auto flex items-center justify-end gap-2 pt-1">
+        <div class="mt-auto flex flex-wrap items-center justify-end gap-2 pt-1">
+            @include('livewire.servers.partials.server-deploy-action', ['server' => $server, 'deployTargets' => $deployTargets])
             <a href="{{ route('servers.show', $server) }}" wire:navigate class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-ink px-3 py-1.5 text-xs font-semibold text-brand-cream transition hover:bg-brand-forest">
                 <x-heroicon-m-cog-6-tooth class="h-4 w-4 shrink-0" aria-hidden="true" />
                 {{ __('Manage') }}

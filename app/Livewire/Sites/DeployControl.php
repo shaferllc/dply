@@ -16,6 +16,7 @@ use App\Models\Site;
 use App\Models\SiteDeployment;
 use App\Support\Sites\SiteDeployTimeline;
 use App\Support\Sites\SiteFixers;
+use App\Support\Sites\SiteSyncPeers;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -216,21 +217,7 @@ class DeployControl extends Component
             return collect();
         }
 
-        $repo = trim((string) $this->site->git_repository_url);
-
-        return Site::query()
-            ->where('organization_id', $this->site->organization_id)
-            ->where(function ($w) use ($repo): void {
-                $w->where('id', $this->site->id);
-                if ($repo !== '') {
-                    $w->orWhere('git_repository_url', $repo);
-                } else {
-                    $w->orWhere('server_id', $this->site->server_id);
-                }
-            })
-            ->with('server')
-            ->orderBy('name')
-            ->get();
+        return SiteSyncPeers::forSite($this->site);
     }
 
     /**

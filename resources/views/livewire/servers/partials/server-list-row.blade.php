@@ -116,7 +116,8 @@
             <x-server-metric-pulse :snapshot="$latestSnapshots[$server->id] ?? null" />
         </div>
 
-        <div class="flex shrink-0 items-center gap-2">
+        <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            @include('livewire.servers.partials.server-deploy-action', ['server' => $server, 'deployTargets' => $deployTargets])
             <a href="{{ route('servers.show', $server) }}" wire:navigate class="inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-ink px-3.5 py-2 text-xs font-semibold text-brand-cream transition hover:bg-brand-forest">
                 <x-heroicon-m-cog-6-tooth class="h-4 w-4 shrink-0" aria-hidden="true" />
                 {{ __('Manage') }}

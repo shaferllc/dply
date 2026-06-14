@@ -142,6 +142,20 @@
                         @endforeach
                     </ul>
                 @endif
+
+                {{-- Inline guided fix, hung off the failed phase. Hosts opt in by
+                     passing a $dbFix payload (server + site) — only when this is
+                     the latest, still-failed deploy and the failure matched the
+                     database-connection remediation. --}}
+                @if (($dbFix ?? null) && $st === 'failed')
+                    <div class="mt-3">
+                        @livewire('sites.deploy-database-fix', [
+                            'server' => $dbFix['server'],
+                            'site' => $dbFix['site'],
+                            'deployment' => $deployment,
+                        ], key('deploy-db-fix-'.$deployment->id))
+                    </div>
+                @endif
             </div>
         </li>
     @endforeach

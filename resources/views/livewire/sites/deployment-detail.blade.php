@@ -132,7 +132,7 @@
             @else
                 {{-- Same phase/step timeline the deploy hub's Deploy tab renders, so the two reflect each other. --}}
                 <section class="dply-card overflow-hidden px-6 py-5 sm:px-8">
-                    @include('livewire.sites.partials.deployments._phase-timeline', ['timelinePhases' => $timelinePhases, 'deployment' => $deployment])
+                    @include('livewire.sites.partials.deployments._phase-timeline', ['timelinePhases' => $timelinePhases, 'deployment' => $deployment, 'dbFix' => $dbFix ?? null])
                 </section>
             @endif
 

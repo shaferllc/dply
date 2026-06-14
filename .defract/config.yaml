@@ -1,0 +1,32 @@
+defract:
+  version: '1.0'
+  theme: dark
+  repo:
+    name: dply
+    languages:
+    - javascript
+    - php
+    frameworks: null
+    test_runner: null
+    run_command: npm run dev
+    ci_cd: github-actions
+  defaults:
+    mode: human-in-the-loop
+    branch_strategy: worktree
+    design_tool: pencil
+    auto_push_enabled: false
+    offline_override: false
+    completion_mode: merge
+  agents: null
+  concurrency: null
+  context_monitor:
+    sensitivity: attentive
+    max_nudge_frequency: 120
+    auto_update_artifacts: false
+  design_system: null
+  permissions:
+    tier1_read_inspections: true
+    tier2_scoped_filesystem: true
+    tier3_workflow_writes: true
+  team: null
+  user: null

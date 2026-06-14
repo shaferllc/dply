@@ -76,6 +76,16 @@ class DeploymentDetail extends Component
 
         $runtimeMode = $this->site->runtimeTargetMode();
 
+        // Inline database-connection fix (Q8/Q10): only on the site's latest,
+        // still-failed deployment whose failure matched the guided remediation —
+        // resume-from-phase only makes sense for the live release, and stale
+        // failures must not dangle live fix buttons.
+        $remediation = $this->remediationForDeployment($this->deployment);
+        $isLatest = $this->site->deployments()->latest()->value('id') === $this->deployment->id;
+        $dbFix = ($isLatest && is_array($remediation) && ($remediation['code'] ?? null) === 'database_connection_failed')
+            ? ['server' => $this->server, 'site' => $this->site]
+            : null;
+
         // Build only the chrome this view actually uses — the Deploy sidebar,
         // the workspace breadcrumb trail, and the per-deployment content.
         // (Deliberately NOT SiteSettingsViewData::for(): that assembles ~130
@@ -98,6 +108,7 @@ class DeploymentDetail extends Component
         return view('livewire.sites.deployment-detail', [
             'phaseResults' => $phaseResults,
             'phases' => $phases,
+            'dbFix' => $dbFix,
             // Deploy workspace chrome (sidebar + breadcrumb trail).
             'settingsSidebarItems' => SiteSettingsSidebar::items($this->site, $this->server),
             'settingsBreadcrumbs' => $breadcrumbs,

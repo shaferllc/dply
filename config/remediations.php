@@ -26,6 +26,24 @@ use App\Services\Remediations\Actions\RebuildWebserverConfigAction;
 */
 
 return [
+    // A "guided" remediation: instead of a one-click script, it routes the
+    // operator into state-aware fix flows (attach a database / inject DB_*),
+    // rendered inline under the failed step by the DeployDatabaseFix component.
+    // The signature catches the whole "can't reach/authenticate to the DB"
+    // family across both Postgres and MySQL — connection refused, host not
+    // found, auth failed, and unknown-database — so the next failure isn't left
+    // unrecognized just because it surfaced a different SQLSTATE than 08006.
+    'database_connection_failed' => [
+        'signature' => '/SQLSTATE\[08006\]|SQLSTATE\[08001\]|SQLSTATE\[08004\]|SQLSTATE\[08003\]|SQLSTATE\[28P01\]|SQLSTATE\[3D000\]|SQLSTATE\[HY000\]\s*\[2002\]|connection to server at .* failed|could not connect to server|could not translate host name|password authentication failed|Access denied for user|Unknown database|\[1045\]|\[1049\]|\[2002\]/i',
+        'title' => 'Can’t connect to the database',
+        'explanation' => 'A deploy step couldn’t reach the database. dply can diagnose why and walk you through attaching a database or injecting the connection details.',
+        // No `actions` — `guided` flips this off the top script-panel; the
+        // DeployDatabaseFix Livewire component renders the state-aware fixes
+        // inline under the failed step instead.
+        'guided' => true,
+        'actions' => [],
+    ],
+
     'php_ext_redis_missing' => [
         'signature' => '/Class ["\']Redis["\'] not found|PhpRedisConnector\.php/i',
         'title' => 'PHP Redis extension (phpredis) is missing',
