@@ -6,7 +6,6 @@ namespace App\Livewire\Sites;
 
 use App\Jobs\PushSiteEnvJob;
 use App\Jobs\RecheckRequiredEnvJob;
-use App\Jobs\RunSiteDeploymentJob;
 use App\Jobs\ViewServerEnvJob;
 use App\Livewire\Concerns\ConfirmsActionWithModal;
 use App\Livewire\Concerns\DispatchesToastNotifications;
@@ -26,11 +25,15 @@ use App\Services\Deploy\DeploymentContractBuilder;
 use App\Services\Deploy\DeploymentPreflightValidator;
 use App\Services\Sites\DotEnvFileParser;
 use App\Services\Sites\DotEnvFileWriter;
+use App\Services\Sites\SiteDeployCoordinator;
+use App\Support\Sites\SiteFixers;
 use App\Support\Sites\SiteSettingsViewData;
+use App\Support\Sites\SiteSyncPeers;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
+use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -79,6 +82,11 @@ class DeploymentsList extends Component
     public array $syncSelectedSiteIds = [];
 
     public bool $syncSelectionSeeded = false;
+
+    /** Console-action id + fixer key of a smart-fix running from the deploy panel. */
+    public ?string $fixerRunId = null;
+
+    public ?string $fixerRunKey = null;
 
     public const TAB_OVERVIEW = 'overview';
 
@@ -207,6 +215,19 @@ class DeploymentsList extends Component
         } elseif (! in_array($this->settingsSection, self::SETTINGS_SECTIONS, true)) {
             $this->settingsSection = '';
         }
+
+        $coordinator = app(SiteDeployCoordinator::class);
+
+        // Shared, persisted Sync selection — mirrored with the deploy sidebar.
+        $this->syncSelectedSiteIds = $coordinator->selectedPeerIds($this->site);
+        $this->syncSelectionSeeded = true;
+
+        // Re-attach to an in-flight smart-fix so its state survives a reload.
+        $fixer = $coordinator->inFlightFixer($this->site);
+        if ($fixer !== null) {
+            $this->fixerRunId = (string) $fixer->id;
+            $this->fixerRunKey = SiteFixers::keyForLabel((string) $fixer->label);
+        }
     }
 
     public function setTab(string $tab): void
@@ -218,10 +239,6 @@ class DeploymentsList extends Component
             return;
         }
         $this->tab = $tab;
-        if ($tab === self::TAB_SYNC && ! $this->syncSelectionSeeded) {
-            $this->syncSelectedSiteIds = $this->syncCandidates->pluck('id')->map(fn ($id): string => (string) $id)->all();
-            $this->syncSelectionSeeded = true;
-        }
         if ($tab !== self::TAB_SETTINGS) {
             $this->settingsSection = '';
         }
@@ -230,35 +247,26 @@ class DeploymentsList extends Component
     /**
      * Sites the user can pick to deploy alongside this one — the repo peers
      * (a main site + its worker share a git repository), or same-server siblings
-     * when no repo is set. Always includes this site.
+     * when no repo is set. Always includes this site. Shared with the deploy
+     * sidebar via {@see SiteSyncPeers} so both surfaces agree on the peer set.
      */
     public function getSyncCandidatesProperty(): Collection
     {
-        $repo = trim((string) $this->site->git_repository_url);
+        return SiteSyncPeers::forSite($this->site);
+    }
 
-        return Site::query()
-            ->where('organization_id', $this->site->organization_id)
-            ->where(function ($w) use ($repo): void {
-                $w->where('id', $this->site->id);
-                if ($repo !== '') {
-                    $w->orWhere('git_repository_url', $repo);
-                } else {
-                    $w->orWhere('server_id', $this->site->server_id);
-                }
-            })
-            // Full server (not server:id,name) — SitePolicy/ServerPolicy::update
-            // reads user_id/organization_id/workspace_id to authorize the deploy.
-            // A partial column load nulls those and skips every site as "no
-            // permission" (the deployMultiple footgun).
-            ->with('server')
-            ->orderBy('name')
-            ->get();
+    /** Persist (and mirror to the sidebar) the Sync selection as it changes. */
+    public function updatedSyncSelectedSiteIds(): void
+    {
+        $this->syncSelectedSiteIds = app(SiteDeployCoordinator::class)
+            ->setSelectedPeerIds($this->site, $this->syncSelectedSiteIds);
+        $this->dispatch('site-deploy-changed', siteId: (string) $this->site->id);
     }
 
     /**
-     * Deploy every selected site together (parallel fan-out). Replaces the old
-     * persistent "sync group" — an ad-hoc multi-select per deploy. Each site is
-     * authorized + dispatched exactly like the single Deploy button.
+     * Deploy every selected site together (parallel fan-out) through the shared
+     * {@see SiteDeployCoordinator::sync()} — the same path the sidebar's Sync
+     * drawer uses, so the two can't behave differently.
      */
     public function deployMultiple(): void
     {
@@ -275,29 +283,14 @@ class DeploymentsList extends Component
             return;
         }
 
-        $candidates = $this->syncCandidates->keyBy(fn ($s): string => (string) $s->id);
-        $queued = 0;
-        $skipped = 0;
-        foreach ($ids as $id) {
-            $site = $candidates->get($id);
-            if ($site === null || ! Gate::allows('update', $site)) {
-                $skipped++;
+        $result = app(SiteDeployCoordinator::class)->sync($this->site, $ids, (string) (auth()->id() ?? ''));
 
-                continue;
-            }
-            Cache::put('site-deploy-active:'.$site->id, [
-                'started_at' => now()->toIso8601String(),
-                'deployment_id' => null,
-            ], 600);
-            RunSiteDeploymentJob::dispatch($site, SiteDeployment::TRIGGER_MANUAL);
-            $queued++;
-        }
-
-        $msg = trans_choice('{1}:count deployment queued.|[2,*]:count deployments queued.', $queued, ['count' => $queued]);
-        if ($skipped > 0) {
-            $msg .= ' '.__(':n skipped (no permission).', ['n' => $skipped]);
+        $msg = trans_choice('{1}:count deployment queued.|[2,*]:count deployments queued.', count($result['queued']), ['count' => count($result['queued'])]);
+        if ($result['skipped'] > 0) {
+            $msg .= ' '.__(':n skipped (no permission or already running).', ['n' => $result['skipped']]);
         }
         $this->toastSuccess($msg);
+        $this->dispatch('site-deploy-changed', siteId: (string) $this->site->id);
     }
 
     public function setSection(string $section): void
@@ -339,7 +332,19 @@ class DeploymentsList extends Component
             return;
         }
 
-        RunSiteDeploymentJob::dispatch($this->site, SiteDeployment::TRIGGER_MANUAL);
+        $queued = app(SiteDeployCoordinator::class)->deploy(
+            $this->site,
+            SiteDeployment::TRIGGER_MANUAL,
+            (string) (auth()->id() ?? ''),
+        );
+
+        if (! $queued) {
+            $this->toastError(__('A deploy is already running for this site.'));
+
+            return;
+        }
+
+        $this->dispatch('site-deploy-changed', siteId: (string) $this->site->id);
         $this->toastSuccess(__('Deployment queued.'));
     }
 
@@ -472,7 +477,19 @@ class DeploymentsList extends Component
         unset($meta['deploy_blocked_env']);
         $this->site->forceFill(['meta' => $meta])->save();
 
-        RunSiteDeploymentJob::dispatch($this->site->fresh(), SiteDeployment::TRIGGER_MANUAL);
+        $queued = app(SiteDeployCoordinator::class)->deploy(
+            $this->site,
+            SiteDeployment::TRIGGER_MANUAL,
+            (string) (auth()->id() ?? ''),
+        );
+
+        if (! $queued) {
+            $this->toastError(__('A deploy is already running for this site.'));
+
+            return;
+        }
+
+        $this->dispatch('site-deploy-changed', siteId: (string) $this->site->id);
         $this->toastSuccess(__('Required-env check turned off for this site. Deploy queued — it will run even with missing variables.'));
     }
 
@@ -544,6 +561,68 @@ class DeploymentsList extends Component
             message: __('The app may error at runtime until these are set. The required-env check will be turned off for this site and a deploy will start now.'),
             confirmLabel: __('Deploy anyway'),
         );
+    }
+
+    /**
+     * Run a smart fixer detected from the failed deploy output, from the deploy
+     * panel — the same coordinator path the sidebar uses, so a fix started on
+     * either surface shows on both.
+     */
+    public function runFixer(string $key): void
+    {
+        Gate::authorize('update', $this->site);
+
+        $run = app(SiteDeployCoordinator::class)->runFixer($this->site, $key, (string) (auth()->id() ?? ''));
+        if ($run === null) {
+            $this->toastError(__('A fix is already running — let it finish first.'));
+
+            return;
+        }
+
+        $this->fixerRunId = (string) $run->id;
+        $this->fixerRunKey = $key;
+        $this->dispatch('site-deploy-changed', siteId: (string) $this->site->id);
+    }
+
+    /** Live console-action of the smart-fix run from this panel. */
+    #[Computed]
+    public function fixerRun(): ?ConsoleAction
+    {
+        return $this->fixerRunId ? ConsoleAction::query()->find($this->fixerRunId) : null;
+    }
+
+    /**
+     * Fixer keys already run since the last deploy finished (dropped from the
+     * suggestions list).
+     *
+     * @return list<string>
+     */
+    #[Computed]
+    public function completedFixerKeys(): array
+    {
+        return app(SiteDeployCoordinator::class)->completedFixerKeys($this->site);
+    }
+
+    /** Keep the page in lockstep with the sidebar when either fires a deploy/sync/fix. */
+    #[On('site-deploy-changed')]
+    public function onDeployChanged(?string $siteId = null): void
+    {
+        if ($siteId !== null && $siteId !== (string) $this->site->id) {
+            return;
+        }
+
+        $coordinator = app(SiteDeployCoordinator::class);
+        $this->syncSelectedSiteIds = $coordinator->selectedPeerIds($this->site);
+
+        if ($this->fixerRunId === null) {
+            $fixer = $coordinator->inFlightFixer($this->site);
+            if ($fixer !== null) {
+                $this->fixerRunId = (string) $fixer->id;
+                $this->fixerRunKey = SiteFixers::keyForLabel((string) $fixer->label);
+            }
+        }
+
+        unset($this->fixerRun, $this->completedFixerKeys);
     }
 
     public function render(): View

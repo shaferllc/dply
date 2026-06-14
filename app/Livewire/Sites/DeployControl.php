@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Livewire\Sites;
 
 use App\Actions\Sites\ScheduleSiteDeploy;
-use App\Jobs\RunSiteDeploymentJob;
-use App\Jobs\RunSiteFixerJob;
 use App\Livewire\Concerns\DispatchesToastNotifications;
 use App\Livewire\Concerns\GuardsBilledDeploys;
 use App\Models\ConsoleAction;
@@ -14,26 +12,27 @@ use App\Models\ScheduledDeploy;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
+use App\Services\Sites\DeployStatus;
+use App\Services\Sites\SiteDeployCoordinator;
 use App\Support\Sites\DeployConsoleRows;
 use App\Support\Sites\SiteFixers;
 use App\Support\Sites\SiteSyncPeers;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
  * Persistent "Deploy" button + live console, mounted in the shared breadcrumb
  * chrome so a deploy can be kicked off — and watched — from ANY site-workspace
  * page (not just the Deploy tab). Resolves the current site from the route, so
- * it's self-contained: drop it next to the Documentation link and it works
- * everywhere a site is in scope.
+ * it's self-contained.
  *
- * Mirrors {@see ManagesSiteDeployExecution::deployNow()}:
- * seeds the same Cache deploy-lock marker and dispatches the same job, so this
- * and the Deploy tab share one source of truth for "is a deploy running".
+ * Deploy / Sync / smart-fix all run through {@see SiteDeployCoordinator}, the
+ * same service the main Deploy page ({@see DeploymentsList}) uses, and both
+ * surfaces render from one {@see DeployStatus} snapshot — so they can't drift,
+ * double-fire, or disagree on "is a deploy running". The `site-deploy-changed`
+ * event keeps the two refreshed in lockstep without waiting on the poll tick.
  */
 class DeployControl extends Component
 {
@@ -49,7 +48,7 @@ class DeployControl extends Component
 
     public ?string $fixerRunKey = null;
 
-    /** Peer site ids selected in the Sync drawer to deploy together. */
+    /** Peer site ids selected in the Sync drawer — mirrored with the Deploy page. */
     public array $syncSelected = [];
 
     /** Peer site ids launched in the active sync batch — drives the live console. */
@@ -63,24 +62,139 @@ class DeployControl extends Component
         $this->site = $site instanceof Site ? $site : null;
         $this->server = $server instanceof Server ? $server : $this->site?->server;
 
-        $this->restoreInFlightFixer();
-
-        // Default the Sync selection to every peer (this site + its workers).
-        $this->syncSelected = $this->syncPeers->pluck('id')->map(fn ($id): string => (string) $id)->all();
-
-        // Re-attach to an in-flight sync batch so the combined console (and its
-        // live polling) survives a page reload — same idea as restoreInFlightFixer.
-        $batch = $this->site ? Cache::get('site-sync-batch:'.$this->site->id) : null;
-        if (is_array($batch) && is_array($batch['ids'] ?? null)) {
-            $this->syncedSiteIds = array_values(array_map('strval', $batch['ids']));
+        if ($this->site === null) {
+            return;
         }
+
+        $coordinator = app(SiteDeployCoordinator::class);
+
+        // Re-attach to an in-flight smart-fix so its "Processing…" state + live
+        // output survive a page reload (the job keeps running regardless).
+        $fixer = $coordinator->inFlightFixer($this->site);
+        if ($fixer !== null) {
+            $this->fixerRunId = (string) $fixer->id;
+            $this->fixerRunKey = SiteFixers::keyForLabel((string) $fixer->label);
+        }
+
+        // Shared, persisted Sync selection (mirrored with the Deploy page).
+        $this->syncSelected = $coordinator->selectedPeerIds($this->site);
+
+        // Re-attach to an in-flight sync batch so the combined console survives a reload.
+        $this->syncedSiteIds = $coordinator->syncBatch($this->site)['ids'] ?? [];
+    }
+
+    /** One snapshot both surfaces render from — the single read-side source of truth. */
+    #[Computed]
+    public function status(): ?DeployStatus
+    {
+        return $this->site ? app(SiteDeployCoordinator::class)->status($this->site) : null;
+    }
+
+    #[Computed]
+    public function latestDeployment(): ?SiteDeployment
+    {
+        return $this->status?->latest;
     }
 
     /**
-     * Re-run the exact batch shown in the finished console — one click to ship
-     * the same peers again. deploySelected() reads $syncSelected, so point it at
-     * the current batch and reuse that path (re-dispatch, re-arm polling, etc.).
+     * @return array{started_at?: string, deployment_id?: ?string}|null
      */
+    #[Computed]
+    public function deployLockInfo(): ?array
+    {
+        return $this->status?->lock;
+    }
+
+    #[Computed]
+    public function inProgress(): bool
+    {
+        return $this->status?->inProgress ?? false;
+    }
+
+    /**
+     * @return list<string>
+     */
+    #[Computed]
+    public function completedFixerKeys(): array
+    {
+        return $this->status?->completedFixerKeys ?? [];
+    }
+
+    #[Computed]
+    public function canDeploy(): bool
+    {
+        return $this->site !== null
+            && $this->server !== null
+            && $this->server->isVmHost()
+            && ! $this->site->usesFunctionsRuntime()
+            && ! $this->site->usesEdgeRuntime()
+            && \Illuminate\Support\Facades\Gate::allows('update', $this->site);
+    }
+
+    public function deploy(): void
+    {
+        if (! $this->canDeploy()) {
+            return;
+        }
+        if ($this->blockedByDeployPause($this->site)) {
+            return;
+        }
+
+        \Illuminate\Support\Facades\Gate::authorize('update', $this->site);
+
+        $queued = app(SiteDeployCoordinator::class)->deploy(
+            $this->site,
+            SiteDeployment::TRIGGER_MANUAL,
+            (string) (auth()->id() ?? ''),
+        );
+
+        $this->refreshDeployState();
+
+        if (! $queued) {
+            $this->toastError(__('A deploy is already running for this site.'));
+
+            return;
+        }
+
+        $this->toastSuccess(__('Deployment queued — watch the console.'));
+        $this->dispatch('deploy-console-open');
+        $this->dispatch('site-deploy-changed', siteId: (string) $this->site->id);
+    }
+
+    /**
+     * Queue a deploy for every selected peer the user can update. Routes through
+     * {@see SiteDeployCoordinator::sync()} — the same path the Deploy page's Sync
+     * panel uses.
+     */
+    public function deploySelected(): void
+    {
+        if ($this->site === null) {
+            return;
+        }
+
+        $ids = array_values(array_unique(array_map('strval', $this->syncSelected)));
+        if ($ids === []) {
+            $this->toastError(__('Pick at least one site to deploy.'));
+
+            return;
+        }
+        if ($this->blockedByDeployPause($this->site)) {
+            return;
+        }
+
+        $result = app(SiteDeployCoordinator::class)->sync($this->site, $ids, (string) (auth()->id() ?? ''));
+        $this->syncedSiteIds = $result['queued'];
+        $this->refreshDeployState();
+
+        $msg = trans_choice('{1}:count deployment queued.|[2,*]:count deployments queued.', count($result['queued']), ['count' => count($result['queued'])]);
+        if ($result['skipped'] > 0) {
+            $msg .= ' '.__(':n skipped (no permission or already running).', ['n' => $result['skipped']]);
+        }
+        $this->toastSuccess($msg);
+        $this->dispatch('site-deploy-changed', siteId: (string) $this->site->id);
+    }
+
+    /** Re-run the exact batch shown in the finished console. */
     public function deployAgain(): void
     {
         if ($this->syncedSiteIds === []) {
@@ -93,18 +207,99 @@ class DeployControl extends Component
     /** Clear the active sync batch and return the drawer to peer selection. */
     public function newSync(): void
     {
-        $this->syncedSiteIds = [];
-        if ($this->site) {
-            Cache::forget('site-sync-batch:'.$this->site->id);
+        if ($this->site === null) {
+            return;
         }
-        $this->syncSelected = $this->syncPeers->pluck('id')->map(fn ($id): string => (string) $id)->all();
+        $this->syncedSiteIds = [];
+        app(SiteDeployCoordinator::class)->clearSyncBatch($this->site);
+        $this->syncSelected = app(SiteDeployCoordinator::class)->selectedPeerIds($this->site);
         unset($this->syncRows);
     }
 
+    /** Persist (and mirror) the Sync selection whenever the checkboxes change. */
+    public function updatedSyncSelected(): void
+    {
+        if ($this->site === null) {
+            return;
+        }
+        $this->syncSelected = app(SiteDeployCoordinator::class)->setSelectedPeerIds($this->site, $this->syncSelected);
+        $this->dispatch('site-deploy-changed', siteId: (string) $this->site->id);
+    }
+
     /**
-     * Live per-peer rows for the combined sync console: each launched peer with
-     * its latest deployment, phase timeline, and in-flight state. Server is a
-     * display-only partial load (no auth happens here).
+     * Run a smart fixer detected from the failed deploy output, right from the
+     * console. The fix streams inline; after it finishes, re-deploy.
+     */
+    public function runFixer(string $key): void
+    {
+        if ($this->site === null) {
+            return;
+        }
+        \Illuminate\Support\Facades\Gate::authorize('update', $this->site);
+
+        $run = app(SiteDeployCoordinator::class)->runFixer($this->site, $key, (string) (auth()->id() ?? ''));
+        if ($run === null) {
+            $this->toastError(__('A fix is already running — let it finish first.'));
+
+            return;
+        }
+
+        $this->fixerRunId = (string) $run->id;
+        $this->fixerRunKey = $key;
+        $this->refreshDeployState();
+        $this->dispatch('deploy-console-open');
+        $this->dispatch('site-deploy-changed', siteId: (string) $this->site->id);
+    }
+
+    /** Keep the page + sidebar in lockstep when either fires a deploy/sync/fix. */
+    #[On('site-deploy-changed')]
+    public function onDeployChanged(?string $siteId = null): void
+    {
+        if ($this->site === null) {
+            return;
+        }
+        if ($siteId !== null && $siteId !== (string) $this->site->id) {
+            return;
+        }
+        $this->refreshDeployState();
+    }
+
+    /**
+     * Drop the memoized snapshot (and its derived computeds) and re-read the
+     * mirrored selection / batch / in-flight fixer so the next render reflects
+     * the latest shared state.
+     */
+    protected function refreshDeployState(): void
+    {
+        unset(
+            $this->status,
+            $this->latestDeployment,
+            $this->deployLockInfo,
+            $this->inProgress,
+            $this->completedFixerKeys,
+            $this->syncRows,
+            $this->fixerRun,
+        );
+
+        if ($this->site === null) {
+            return;
+        }
+
+        $coordinator = app(SiteDeployCoordinator::class);
+        $this->syncSelected = $coordinator->selectedPeerIds($this->site);
+        $this->syncedSiteIds = $coordinator->syncBatch($this->site)['ids'] ?? $this->syncedSiteIds;
+
+        if ($this->fixerRunId === null) {
+            $fixer = $coordinator->inFlightFixer($this->site);
+            if ($fixer !== null) {
+                $this->fixerRunId = (string) $fixer->id;
+                $this->fixerRunKey = SiteFixers::keyForLabel((string) $fixer->label);
+            }
+        }
+    }
+
+    /**
+     * Live per-peer rows for the combined sync console.
      *
      * @return list<array<string, mixed>>
      */
@@ -122,11 +317,7 @@ class DeployControl extends Component
     }
 
     /**
-     * Related sites that can be deployed together — this site plus any sharing
-     * its Git repository (or the same server when no repo is set). Mirrors the
-     * Sync tab's candidate query; the FULL server is loaded so the update policy
-     * authorises each peer (a partial server:id,name load nulls the policy
-     * columns and silently skips every site).
+     * Related sites that can ship together — this site plus repo/server peers.
      *
      * @return Collection<int, Site>
      */
@@ -141,169 +332,13 @@ class DeployControl extends Component
     }
 
     /**
-     * Queue a deploy for every selected peer that the user can update. Mirrors
-     * DeploymentsList::deployMultiple — the persistent, deploy-from-anywhere
-     * twin of the Sync tab.
-     */
-    public function deploySelected(): void
-    {
-        $ids = array_values(array_unique(array_map('strval', $this->syncSelected)));
-        if ($ids === []) {
-            $this->toastError(__('Pick at least one site to deploy.'));
-
-            return;
-        }
-
-        $peers = $this->syncPeers->keyBy(fn (Site $s): string => (string) $s->id);
-        $queuedIds = [];
-        $skipped = 0;
-        foreach ($ids as $id) {
-            $peer = $peers->get($id);
-            if ($peer === null || ! Gate::allows('update', $peer)) {
-                $skipped++;
-
-                continue;
-            }
-            Cache::put('site-deploy-active:'.$peer->id, [
-                'started_at' => now()->toIso8601String(),
-                'deployment_id' => null,
-            ], 600);
-            RunSiteDeploymentJob::dispatch($peer->fresh(), SiteDeployment::TRIGGER_MANUAL);
-            $queuedIds[] = (string) $peer->id;
-        }
-
-        // Drive the combined live console for exactly the peers that launched,
-        // and persist the batch so the console survives a page reload.
-        $this->syncedSiteIds = $queuedIds;
-        if ($queuedIds !== [] && $this->site) {
-            Cache::put('site-sync-batch:'.$this->site->id, [
-                'ids' => $queuedIds,
-                'started_at' => now()->toIso8601String(),
-            ], 1800);
-        }
-        unset($this->deployLockInfo, $this->latestDeployment, $this->syncRows);
-
-        $msg = trans_choice('{1}:count deployment queued.|[2,*]:count deployments queued.', count($queuedIds), ['count' => count($queuedIds)]);
-        if ($skipped > 0) {
-            $msg .= ' '.__(':n skipped (no permission).', ['n' => $skipped]);
-        }
-        $this->toastSuccess($msg);
-    }
-
-    /**
-     * Re-attach to a smart-fix that's still queued/running for this site so its
-     * "Processing…" state and live output survive a page reload (the job and its
-     * ConsoleAction keep running in the background regardless of the page).
-     */
-    protected function restoreInFlightFixer(): void
-    {
-        if ($this->site === null) {
-            return;
-        }
-
-        $run = ConsoleAction::query()
-            ->where('subject_type', $this->site->getMorphClass())
-            ->where('subject_id', $this->site->id)
-            ->where('kind', 'site_remediate')
-            ->whereIn('status', [ConsoleAction::STATUS_QUEUED, ConsoleAction::STATUS_RUNNING])
-            ->latest()
-            ->first();
-
-        if ($run === null) {
-            return;
-        }
-
-        $this->fixerRunId = (string) $run->id;
-        $this->fixerRunKey = SiteFixers::keyForLabel((string) $run->label);
-    }
-
-    #[Computed]
-    public function canDeploy(): bool
-    {
-        return $this->site !== null
-            && $this->server !== null
-            && $this->server->isVmHost()
-            && ! $this->site->usesFunctionsRuntime()
-            && ! $this->site->usesEdgeRuntime()
-            && Gate::allows('update', $this->site);
-    }
-
-    /**
-     * @return array{deployment_id?: string}|null
+     * The console-action of the smart-fix currently (or last) run from the
+     * drawer, so its live output can stream inline.
      */
     #[Computed]
-    public function deployLockInfo(): ?array
+    public function fixerRun(): ?ConsoleAction
     {
-        return $this->site ? Cache::get('site-deploy-active:'.$this->site->id) : null;
-    }
-
-    #[Computed]
-    public function latestDeployment(): ?SiteDeployment
-    {
-        return $this->site?->deployments()->latest()->first();
-    }
-
-    /**
-     * Whether the deploy button should show the spinning "Deploying…" state.
-     *
-     * A running/queued deployment always counts. The optimistic deploy lock (set
-     * on click, 600s TTL) only bridges the brief gap before the queued job
-     * creates a deployment row — so it must NOT keep the button spinning after a
-     * failure or when the job never starts. We therefore stop as soon as THIS
-     * run lands a terminal status, and otherwise honour the lock only within the
-     * queue-pickup window. Without this a failed/stuck deploy spins for the full
-     * 600s lock TTL (or forever if the job is killed without recording failure).
-     */
-    #[Computed]
-    public function inProgress(): bool
-    {
-        $latest = $this->latestDeployment;
-
-        if ($latest?->status === SiteDeployment::STATUS_RUNNING) {
-            return true;
-        }
-
-        $lock = $this->deployLockInfo;
-        $startedAt = isset($lock['started_at']) ? Carbon::parse($lock['started_at']) : null;
-        if ($startedAt === null) {
-            return false;
-        }
-
-        $terminalSinceLock = $latest !== null
-            && in_array($latest->status, [
-                SiteDeployment::STATUS_FAILED,
-                SiteDeployment::STATUS_SUCCESS,
-                SiteDeployment::STATUS_SKIPPED,
-            ], true)
-            && $latest->created_at?->greaterThanOrEqualTo($startedAt->subSeconds(2));
-
-        return ! $terminalSinceLock && $startedAt->greaterThan(now()->subSeconds(90));
-    }
-
-    public function deploy(): void
-    {
-        if (! $this->canDeploy()) {
-            return;
-        }
-
-        if ($this->blockedByDeployPause($this->site)) {
-            return;
-        }
-
-        Gate::authorize('update', $this->site);
-
-        Cache::put('site-deploy-active:'.$this->site->id, [
-            'started_at' => now()->toIso8601String(),
-            'deployment_id' => null,
-        ], 600);
-
-        RunSiteDeploymentJob::dispatch($this->site->fresh(), SiteDeployment::TRIGGER_MANUAL);
-
-        // Drop memoized computed props so the button immediately reads "Deploying…".
-        unset($this->deployLockInfo, $this->latestDeployment);
-
-        $this->toastSuccess(__('Deployment queued — watch the console.'));
-        $this->dispatch('deploy-console-open');
+        return $this->fixerRunId ? ConsoleAction::query()->find($this->fixerRunId) : null;
     }
 
     /** The site's pending one-off delayed deploy, shown/cancelable from anywhere. */
@@ -321,7 +356,7 @@ class DeployControl extends Component
         if ($this->blockedByDeployPause($this->site)) {
             return;
         }
-        Gate::authorize('update', $this->site);
+        \Illuminate\Support\Facades\Gate::authorize('update', $this->site);
 
         $scheduled = app(ScheduleSiteDeploy::class)->schedule($this->site, $when, auth()->id());
         if ($scheduled === null) {
@@ -339,91 +374,12 @@ class DeployControl extends Component
         if ($this->site === null) {
             return;
         }
-        Gate::authorize('update', $this->site);
+        \Illuminate\Support\Facades\Gate::authorize('update', $this->site);
 
         app(ScheduleSiteDeploy::class)->cancelPending($this->site);
 
         unset($this->pendingScheduledDeploy);
         $this->toastSuccess(__('Scheduled deploy canceled.'));
-    }
-
-    /**
-     * Run a smart fixer detected from the failed deploy output (e.g. "npm not
-     * found" → Install Node.js & npm), right from the deploy console. The fix
-     * streams to the page-top console banner; after it finishes, re-deploy.
-     */
-    public function runFixer(string $key): void
-    {
-        if ($this->site === null) {
-            return;
-        }
-        Gate::authorize('update', $this->site);
-
-        $spec = SiteFixers::spec($key);
-        if ($spec === null) {
-            return;
-        }
-
-        $run = ConsoleAction::query()->create([
-            'subject_type' => $this->site->getMorphClass(),
-            'subject_id' => $this->site->id,
-            'kind' => 'site_remediate',
-            'status' => ConsoleAction::STATUS_QUEUED,
-            'label' => (string) $spec['label'],
-            'user_id' => auth()->id(),
-            'output' => ['v' => (int) config('console_actions.current_version', 1), 'lines' => []],
-        ]);
-
-        RunSiteFixerJob::dispatch((string) $run->id, (string) $this->site->id, $key);
-
-        $this->fixerRunId = (string) $run->id;
-        $this->fixerRunKey = $key;
-        $this->dispatch('deploy-console-open');
-    }
-
-    /**
-     * The console-action of the smart-fix currently (or last) run from the
-     * drawer, so its live output can stream inline.
-     */
-    #[Computed]
-    public function fixerRun(): ?ConsoleAction
-    {
-        return $this->fixerRunId ? ConsoleAction::query()->find($this->fixerRunId) : null;
-    }
-
-    /**
-     * Fixer keys that have already completed for THIS failed deploy, so they can
-     * be dropped from the "Suggested fixes" list — once a fix has run we don't
-     * need to keep offering it. Scoped to fixes run after the deploy finished so
-     * a recurrence of the same error still surfaces the fix again.
-     *
-     * @return list<string>
-     */
-    #[Computed]
-    public function completedFixerKeys(): array
-    {
-        if ($this->site === null) {
-            return [];
-        }
-
-        $since = $this->latestDeployment?->finished_at ?? $this->latestDeployment?->created_at;
-
-        $query = ConsoleAction::query()
-            ->where('subject_type', $this->site->getMorphClass())
-            ->where('subject_id', $this->site->id)
-            ->where('kind', 'site_remediate')
-            ->where('status', ConsoleAction::STATUS_COMPLETED);
-
-        if ($since !== null) {
-            $query->where('created_at', '>=', $since);
-        }
-
-        return $query->get(['label'])
-            ->map(fn (ConsoleAction $run): ?string => SiteFixers::keyForLabel((string) $run->label))
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
     }
 
     public function render()

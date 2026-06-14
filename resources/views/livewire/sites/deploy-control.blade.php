@@ -19,25 +19,9 @@
             );
             $phases = $latest ? \App\Support\Sites\SiteDeployTimeline::forDeployment($this->site, $latest) : [];
 
-            // Smart-fix detection on the FAILED deploy output (e.g. npm not
-            // found → Install Node.js & npm), so the fix is offered inline.
-            $deployFixers = [];
-            if ($latest && $latest->status === 'failed') {
-                $failOutput = '';
-                foreach ($phases as $ph) {
-                    foreach ($ph['steps'] as $st) {
-                        if (! ($st['ok'] ?? true) && ! ($st['skipped'] ?? false)) {
-                            $failOutput .= ' '.($st['output'] ?? '');
-                        }
-                    }
-                }
-                $alreadyRun = $this->completedFixerKeys;
-                $deployFixers = collect(\App\Support\Sites\SiteFixers::detect($failOutput))
-                    ->reject(fn ($fx) => in_array($fx['key'], $alreadyRun, true))
-                    ->values()
-                    ->all();
-            }
-
+            // Smart-fix in-flight flag drives the live poll below; the fix UI
+            // itself lives in the shared _deploy-fixers partial (rendered on the
+            // Deploy page too) so both surfaces offer identical fixes.
             $fixerRun = $this->fixerRun;
             $fixerInFlight = $fixerRun && $fixerRun->isInFlight();
 
@@ -245,62 +229,13 @@
                                 @endforeach
                             </ol>
 
-                            {{-- Inline smart fixes for a failed deploy. --}}
-                            @if ($deployFixers !== [])
-                                <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
-                                    <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-700">
-                                        <x-heroicon-o-wrench-screwdriver class="h-4 w-4" />
-                                        {{ trans_choice('{1} Suggested fix|[2,*] Suggested fixes', count($deployFixers)) }}
-                                    </p>
-                                    <ul class="mt-2 space-y-2">
-                                        @foreach ($deployFixers as $fx)
-                                            @php $thisRunning = $fixerInFlight && $fixerRunKey === $fx['key']; @endphp
-                                            <li class="flex flex-wrap items-center justify-between gap-2">
-                                                <span class="min-w-0 flex-1 text-xs text-amber-900">{{ $fx['reason'] }}</span>
-                                                <button
-                                                    type="button"
-                                                    wire:click="runFixer(@js($fx['key']))"
-                                                    wire:loading.attr="disabled"
-                                                    wire:target="runFixer"
-                                                    @disabled($fixerInFlight)
-                                                    class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-amber-600 px-2.5 py-1.5 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-amber-700 disabled:opacity-60"
-                                                >
-                                                    @if ($thisRunning)
-                                                        <x-spinner variant="white" size="sm" /> {{ __('Processing…') }}
-                                                    @else
-                                                        <x-heroicon-o-play class="h-4 w-4" /> {{ $fx['label'] }}
-                                                    @endif
-                                                </button>
-                                            </li>
-                                        @endforeach
-                                    </ul>
-                                </div>
-                            @endif
-
-                            {{-- Live output of the fix running from this drawer. --}}
-                            @if ($fixerRun)
-                                <div class="mt-3 overflow-hidden rounded-xl border border-brand-ink/10">
-                                    <div class="flex items-center justify-between gap-2 bg-brand-sand/20 px-3 py-2">
-                                        <span class="flex items-center gap-1.5 text-[11px] font-semibold text-brand-ink">
-                                            @if ($fixerInFlight)
-                                                <x-spinner size="sm" /> {{ $fixerRun->label ?? __('Fix') }} · {{ __('processing…') }}
-                                            @elseif ($fixerRun->status === 'completed')
-                                                <x-heroicon-m-check-circle class="h-4 w-4 text-emerald-600" /> {{ $fixerRun->label ?? __('Fix') }} · {{ __('done') }}
-                                            @else
-                                                <x-heroicon-m-x-circle class="h-4 w-4 text-rose-600" /> {{ $fixerRun->label ?? __('Fix') }} · {{ __('failed') }}
-                                            @endif
-                                        </span>
-                                        @if (! $fixerInFlight && $fixerRun->status === 'completed')
-                                            <button type="button" wire:click="deploy" class="inline-flex items-center gap-1 rounded-lg bg-brand-ink px-2 py-1 text-[10px] font-semibold text-brand-cream hover:bg-brand-forest">
-                                                <x-heroicon-o-rocket-launch class="h-3 w-3" /> {{ __('Deploy now') }}
-                                            </button>
-                                        @endif
-                                    </div>
-                                    @php $fixLines = $fixerRun->lines(); @endphp
-                                    <pre class="max-h-56 overflow-auto bg-brand-ink p-3 font-mono text-[11px] leading-relaxed text-brand-cream/95" x-init="$el.scrollTop = $el.scrollHeight">@forelse ($fixLines as $ln)@if (! empty($ln['source']))<span class="text-brand-sage">[{{ $ln['source'] }}]</span> @endif{{ $ln['line'] ?? '' }}
-@empty{{ __('Queued — starting…') }}@endforelse</pre>
-                                </div>
-                            @endif
+                            @include('livewire.sites.partials._deploy-fixers', [
+                                'latest' => $latest,
+                                'phases' => $phases,
+                                'server' => $server,
+                                'site' => $site,
+                                'deployAction' => 'deploy',
+                            ])
                         @endif
                     </div>
                 </div>
@@ -364,7 +299,7 @@
                                 @foreach ($syncPeers as $peer)
                                     <li>
                                         <label class="flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-brand-sand/30">
-                                            <input type="checkbox" wire:model="syncSelected" value="{{ $peer->id }}" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-sage/40" />
+                                            <input type="checkbox" wire:model.live="syncSelected" value="{{ $peer->id }}" class="h-4 w-4 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-sage/40" />
                                             <div class="min-w-0 flex-1">
                                                 <div class="flex items-center gap-2">
                                                     <span class="truncate text-sm font-semibold text-brand-ink">{{ $peer->name }}</span>
