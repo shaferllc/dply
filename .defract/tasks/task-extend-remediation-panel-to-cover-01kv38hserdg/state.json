@@ -5,7 +5,7 @@
   "phase": 0,
   "totalPhases": 1,
   "createdAt": "2026-06-14T14:28:41Z",
-  "updatedAt": "2026-06-14T14:32:14Z",
+  "updatedAt": "2026-06-14T14:34:24Z",
   "events": [
     {
       "base_branch": "main",
@@ -151,6 +151,20 @@
       "timed_out": false,
       "timestamp": "2026-06-14T14:32:14Z",
       "type": "agent_exited"
+    },
+    {
+      "note": "Implementing phase 1: add composer_install_failed remediation entry + catalog/panel tests.",
+      "phase": 0,
+      "stage": "implementation",
+      "timestamp": "2026-06-14T14:34:23Z",
+      "type": "work_resumed"
+    },
+    {
+      "description": "Starting phase 1: Recognize composer-install failures and offer a guided fix",
+      "percentage": 0,
+      "phase": 1,
+      "timestamp": "2026-06-14T14:34:24Z",
+      "type": "progress_report"
     }
   ],
   "needsArchitecture": false,
@@ -171,22 +185,22 @@
     "scope": "2026-06-14T14:32:11Z"
   },
   "stages": {
-    "review": {
-      "status": "not_started"
-    },
     "scope": {
       "status": "approved",
       "approvedAt": "2026-06-14T14:32:11Z",
       "startedAt": "2026-06-14T14:29:07Z"
     },
-    "design": {
-      "status": "skipped"
+    "review": {
+      "status": "not_started"
     },
     "architecture": {
       "status": "skipped"
     },
     "release": {
       "status": "not_started"
+    },
+    "design": {
+      "status": "skipped"
     },
     "implementation": {
       "status": "in_progress",

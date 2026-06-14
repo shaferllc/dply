@@ -19,6 +19,7 @@ use App\Services\Insights\OrganizationInsightsMetricsService;
 use App\Services\Servers\ServerRemovalAdvisor;
 use App\Support\Servers\ProvisioningDigest;
 use App\Support\Servers\ServerTags;
+use App\Support\Sites\DeployConsoleRows;
 use App\Support\Sites\SiteSyncPeers;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
@@ -27,6 +28,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Pennant\Feature;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -61,6 +63,9 @@ class Index extends Component
     public string $removeMode = 'now';
 
     public string $scheduledRemovalDate = '';
+
+    /** Site ids launched from a fleet card, driving the global deploy console. */
+    public array $watchedSiteIds = [];
 
     public function resetFilters(): void
     {
@@ -285,6 +290,7 @@ class Index extends Component
         Gate::authorize('update', $site);
 
         $this->queueSiteDeploy($site);
+        $this->watchDeploys([(string) $site->id]);
         $this->toastSuccess(__('Deployment queued for :name.', ['name' => $site->name]));
     }
 
@@ -304,8 +310,9 @@ class Index extends Component
             return;
         }
 
-        [$queued, $skipped] = $this->queueDeploys(SiteSyncPeers::forSite($site));
-        $this->reportBatchDeploy($queued, $skipped);
+        [$queuedIds, $skipped] = $this->queueDeploys(SiteSyncPeers::forSite($site));
+        $this->watchDeploys($queuedIds);
+        $this->reportBatchDeploy(count($queuedIds), $skipped);
     }
 
     /** Deploy every deployable site on one server (multi-site card "Deploy all"). */
@@ -328,19 +335,20 @@ class Index extends Component
             return;
         }
 
-        [$queued, $skipped] = $this->queueDeploys($deployable);
-        $this->reportBatchDeploy($queued, $skipped);
+        [$queuedIds, $skipped] = $this->queueDeploys($deployable);
+        $this->watchDeploys($queuedIds);
+        $this->reportBatchDeploy(count($queuedIds), $skipped);
     }
 
     /**
      * Queue deploys for an authorised, deployable subset of the given sites.
      *
      * @param  Collection<int, Site>  $sites
-     * @return array{0:int,1:int} [queued, skipped]
+     * @return array{0:list<string>,1:int} [queuedSiteIds, skipped]
      */
     protected function queueDeploys(Collection $sites): array
     {
-        $queued = 0;
+        $queuedIds = [];
         $skipped = 0;
         foreach ($sites as $site) {
             if (! $this->siteIsDeployable($site)) {
@@ -349,10 +357,10 @@ class Index extends Component
                 continue;
             }
             $this->queueSiteDeploy($site);
-            $queued++;
+            $queuedIds[] = (string) $site->id;
         }
 
-        return [$queued, $skipped];
+        return [$queuedIds, $skipped];
     }
 
     /** Seed the optimistic deploy lock and dispatch the deployment job. */
@@ -363,6 +371,42 @@ class Index extends Component
             'deployment_id' => null,
         ], 600);
         RunSiteDeploymentJob::dispatch($site->fresh(), SiteDeployment::TRIGGER_MANUAL);
+    }
+
+    /**
+     * Point the global deploy console at the sites just launched and open it, so
+     * a deploy kicked off from a fleet card can be watched live without leaving
+     * the page. Mirrors DeployControl's `deploy-console-open` event wiring.
+     *
+     * @param  list<string>  $siteIds
+     */
+    protected function watchDeploys(array $siteIds): void
+    {
+        if ($siteIds === []) {
+            return;
+        }
+
+        $this->watchedSiteIds = array_values(array_map('strval', $siteIds));
+        unset($this->watchedRows, $this->watchedInProgress);
+        $this->dispatch('deploy-console-open');
+    }
+
+    /**
+     * Live per-site rows for the global deploy console — the sites launched from
+     * a fleet card, with their phase timelines and in-flight state.
+     *
+     * @return list<array<string, mixed>>
+     */
+    #[Computed]
+    public function watchedRows(): array
+    {
+        return DeployConsoleRows::forSiteIds($this->watchedSiteIds);
+    }
+
+    #[Computed]
+    public function watchedInProgress(): bool
+    {
+        return DeployConsoleRows::anyInProgress($this->watchedRows);
     }
 
     protected function reportBatchDeploy(int $queued, int $skipped): void

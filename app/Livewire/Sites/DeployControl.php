@@ -14,7 +14,7 @@ use App\Models\ScheduledDeploy;
 use App\Models\Server;
 use App\Models\Site;
 use App\Models\SiteDeployment;
-use App\Support\Sites\SiteDeployTimeline;
+use App\Support\Sites\DeployConsoleRows;
 use App\Support\Sites\SiteFixers;
 use App\Support\Sites\SiteSyncPeers;
 use Illuminate\Support\Carbon;
@@ -111,94 +111,14 @@ class DeployControl extends Component
     #[Computed]
     public function syncRows(): array
     {
-        if ($this->syncedSiteIds === []) {
-            return [];
-        }
-
-        $sites = Site::query()
-            ->whereIn('id', $this->syncedSiteIds)
-            ->with('server:id,name')
-            ->get()
-            ->keyBy(fn (Site $s): string => (string) $s->id);
-
-        $rows = [];
-        foreach ($this->syncedSiteIds as $id) {
-            $peer = $sites->get($id);
-            if ($peer === null) {
-                continue;
-            }
-
-            $latest = $peer->deployments()->latest()->first();
-            $lock = Cache::get('site-deploy-active:'.$peer->id);
-            $lockStarted = ($lock && ! empty($lock['started_at'])) ? Carbon::parse($lock['started_at']) : null;
-
-            $phases = $latest ? SiteDeployTimeline::forDeployment($peer, $latest) : [];
-            $done = 0;
-            $current = null;
-            foreach ($phases as $p) {
-                if (in_array($p['status'], ['success', 'skipped'], true)) {
-                    $done++;
-                } elseif ($p['status'] === 'running' && $current === null) {
-                    $current = $p['label'];
-                }
-            }
-
-            // Every phase has reached a terminal good state (success/skipped) =
-            // the deploy is visibly finished. The worker writes phase_results
-            // before it flips the deployment row to success + sets finished_at,
-            // so without this the "Starting" label and spinner linger for that
-            // whole window (and the lock's 10-min TTL). Treat all-phases-done as
-            // done NOW so the card clears as soon as the work is.
-            $phasesComplete = $phases !== [] && $done === count($phases);
-
-            // Just-queued but the worker hasn't recorded a running deployment yet.
-            $startingFresh = ! $phasesComplete && $lock !== null && (
-                $latest === null
-                || ($latest->status !== SiteDeployment::STATUS_RUNNING
-                    && ($latest->finished_at === null || $lockStarted === null || $lockStarted->greaterThanOrEqualTo($latest->finished_at)))
-            );
-            $running = ! $phasesComplete && $latest?->status === SiteDeployment::STATUS_RUNNING;
-            $inProgress = $running || ($startingFresh && $lockStarted !== null && $lockStarted->greaterThan(now()->subSeconds(90)));
-
-            $rows[] = [
-                'id' => (string) $peer->id,
-                'name' => $peer->name,
-                'server' => $peer->server?->name,
-                'is_self' => (string) $peer->id === (string) $this->site?->id,
-                'is_worker' => $peer->isWorkerSite(),
-                'latest' => $latest,
-                'status' => match (true) {
-                    $startingFresh => 'starting',
-                    // All phases done — show the recorded terminal status, or
-                    // 'success' if the row hasn't been finalised yet.
-                    $phasesComplete => ($latest && $latest->status !== SiteDeployment::STATUS_RUNNING)
-                        ? $latest->status
-                        : 'success',
-                    default => $latest?->status ?? 'queued',
-                },
-                'phases' => $phases,
-                'phase_done' => $done,
-                'phase_total' => count($phases),
-                'current_phase' => $current,
-                'in_progress' => $inProgress,
-                'starting_fresh' => $startingFresh,
-            ];
-        }
-
-        return $rows;
+        return DeployConsoleRows::forSiteIds($this->syncedSiteIds, (string) ($this->site?->id ?? ''));
     }
 
     /** Whether any peer in the active sync batch is still deploying. */
     #[Computed]
     public function syncInProgress(): bool
     {
-        foreach ($this->syncRows as $row) {
-            if ($row['in_progress']) {
-                return true;
-            }
-        }
-
-        return false;
+        return DeployConsoleRows::anyInProgress($this->syncRows);
     }
 
     /**
