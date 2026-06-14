@@ -494,9 +494,33 @@ class AtomicSiteDeployer
 
         $log .= app(SupervisorDeployRestarter::class)->restartAfterDeployIfEnabled($site);
 
+        $healthStart = microtime(true);
         try {
-            $log .= app(AtomicDeployHealthChecker::class)->verify($site, $ssh);
+            $healthLog = app(AtomicDeployHealthChecker::class)->verify($site, $ssh);
+            $log .= $healthLog;
+            // Record a passing (or skipped) Health check phase so the timeline
+            // shows the gate ran. An empty return means it's disabled → record
+            // nothing (no empty row).
+            if ($deployment !== null && trim($healthLog) !== '') {
+                $deployment->recordPhaseResults('health', [[
+                    'label' => __('HTTP health check'),
+                    'ok' => true,
+                    'skipped' => str_contains($healthLog, 'skipped:'),
+                    'output' => trim($healthLog),
+                    'duration_ms' => (int) round((microtime(true) - $healthStart) * 1000),
+                ]]);
+            }
         } catch (\Throwable $e) {
+            // Record a FAILED Health check phase whose output carries the on-box
+            // cause (laravel.log + nginx tail from diagnose()), so the timeline
+            // surfaces WHERE and WHY instead of reading all-green on a failure.
+            $deployment?->recordPhaseResults('health', [[
+                'label' => __('HTTP health check'),
+                'ok' => false,
+                'output' => $e->getMessage(),
+                'duration_ms' => (int) round((microtime(true) - $healthStart) * 1000),
+            ]]);
+
             $meta = is_array($site->meta) ? $site->meta : [];
             $autoRollback = (bool) ($meta['deploy_health_auto_rollback'] ?? config('deploy.health_check_auto_rollback', true));
             if ($autoRollback && $previousActiveRelease !== null) {

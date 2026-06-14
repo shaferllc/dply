@@ -72,6 +72,14 @@ final class SiteDeployTimeline
             $phaseDefs['restart'] = 'Restart';
         }
 
+        // Post-cutover HTTP validation gate. Shown only when this deploy recorded
+        // it (the checker is per-site opt-out, and older deploys predate it), so a
+        // FAILED health check renders as a red phase with the cause — the timeline
+        // no longer reads all-green when the deploy actually failed here.
+        if ($latest !== null && $latest->hasPhase('health')) {
+            $phaseDefs['health'] = 'Health check';
+        }
+
         // The phase currently executing. With incremental per-step recording a
         // phase is recorded WHILE it runs, so prefer the phase that still has a
         // step flagged `running`; only then fall back to the first canonical
