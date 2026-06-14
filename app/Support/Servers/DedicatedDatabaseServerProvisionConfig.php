@@ -94,7 +94,9 @@ final class DedicatedDatabaseServerProvisionConfig
 
     public static function engineSupportsRemoteAccess(string $wizardDatabase): bool
     {
-        return in_array(self::engineFamily($wizardDatabase), ['postgres', 'mysql', 'mariadb'], true);
+        // ClickHouse included so a dedicated logs-store box can be created with
+        // private-network access in one shot. Mongo stays localhost-only.
+        return in_array(self::engineFamily($wizardDatabase), ['postgres', 'mysql', 'mariadb', 'clickhouse'], true);
     }
 
     public static function supportsBootstrapCredentials(string $wizardDatabase): bool
@@ -112,8 +114,23 @@ final class DedicatedDatabaseServerProvisionConfig
         return match (self::engineFamily($this->wizardDatabase)) {
             'postgres' => 5432,
             'mysql', 'mariadb' => 3306,
+            'mongodb' => 27017,
+            'clickhouse' => 8123,
             default => 5432,
         };
+    }
+
+    /**
+     * Ports to open for remote access. ClickHouse needs BOTH its HTTP (8123) and
+     * native (9000) ports for a usable logs store; everything else is single-port.
+     *
+     * @return list<int>
+     */
+    public function remoteAccessPorts(): array
+    {
+        return self::engineFamily($this->wizardDatabase) === 'clickhouse'
+            ? [8123, 9000]
+            : [$this->defaultPort()];
     }
 
     /**
@@ -129,10 +146,11 @@ final class DedicatedDatabaseServerProvisionConfig
             return [];
         }
 
-        $port = $this->defaultPort();
         $lines = [];
         foreach (DedicatedCacheServerProvisionConfig::splitAllowedFrom($this->allowedFrom) as $cidr) {
-            $lines[] = 'ufw allow from '.escapeshellarg($cidr).' to any port '.$port.' proto tcp';
+            foreach ($this->remoteAccessPorts() as $port) {
+                $lines[] = 'ufw allow from '.escapeshellarg($cidr).' to any port '.$port.' proto tcp';
+            }
         }
 
         return $lines;
@@ -165,6 +183,7 @@ final class DedicatedDatabaseServerProvisionConfig
         return match (self::engineFamily($this->wizardDatabase)) {
             'postgres' => $this->postgresBootstrapLines(),
             'mysql', 'mariadb' => $this->mysqlBootstrapLines(),
+            'clickhouse' => $this->clickhouseBootstrapLines(),
             default => [],
         };
     }
@@ -234,6 +253,36 @@ final class DedicatedDatabaseServerProvisionConfig
         $lines[] = 'mysql -e '.escapeshellarg($sql);
 
         return $lines;
+    }
+
+    /**
+     * ClickHouse network bind + initial database/user bootstrap. Binds all
+     * interfaces when remote access is on (the UFW rule is the boundary; see
+     * ufwAllowLines), waits for the server to accept queries, then creates the
+     * database and a password user. Database/user names are pre-validated by
+     * bootstrapLines(); the password is escaped for the SQL string literal and
+     * the whole statement is shell-quoted.
+     *
+     * @return list<string>
+     */
+    private function clickhouseBootstrapLines(): array
+    {
+        $listen = $this->remoteAccess
+            ? "<clickhouse>\n    <listen_host>0.0.0.0</listen_host>\n</clickhouse>\n"
+            : "<clickhouse>\n    <listen_host>127.0.0.1</listen_host>\n    <listen_host>::1</listen_host>\n</clickhouse>\n";
+
+        $passSql = str_replace(['\\', "'"], ['\\\\', "\\'"], $this->password);
+        $sql = "CREATE DATABASE IF NOT EXISTS `{$this->databaseName}`; "
+            ."CREATE USER IF NOT EXISTS `{$this->username}` IDENTIFIED WITH sha256_password BY '{$passSql}'; "
+            ."GRANT ALL ON `{$this->databaseName}`.* TO `{$this->username}`;";
+
+        return [
+            $this->writeFileWithRollback('/etc/clickhouse-server/config.d/99-dply-listen.xml', $listen),
+            'systemctl restart clickhouse-server || true',
+            // Wait for the HTTP/native interface to accept queries before bootstrapping.
+            'for i in $(seq 1 30); do clickhouse-client --query "SELECT 1" >/dev/null 2>&1 && break; sleep 2; done',
+            'clickhouse-client --multiquery --query '.escapeshellarg($sql),
+        ];
     }
 
     private function writeFileWithRollback(string $path, string $content): string

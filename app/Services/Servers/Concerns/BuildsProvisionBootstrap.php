@@ -864,6 +864,10 @@ APACHE,
 
         if (str_starts_with($database, 'postgres')) {
             $checks['postgresql'] = 'systemctl is-active postgresql';
+        } elseif ($database === 'mongodb') {
+            $checks['mongodb'] = 'systemctl is-active mongod';
+        } elseif ($database === 'clickhouse') {
+            $checks['clickhouse'] = 'systemctl is-active clickhouse-server';
         } elseif ($database !== 'none' && $database !== 'sqlite3') {
             $checks['mysql'] = 'systemctl is-active mysql || systemctl is-active mariadb';
         }

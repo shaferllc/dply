@@ -152,7 +152,7 @@ final class DatabaseBackupExporter
     ): void {
         $remotePath = $this->remotePath($server, $db, $backup, $extension);
         $emit->step('db', __('Dumping :name …', ['name' => $db->name]));
-        $bytes = $this->writeDumpToRemotePath($db, $server, $remotePath, $extension);
+        $bytes = $this->writeDumpToRemotePath($db, $server, $remotePath, $extension, $emit);
 
         if ($bytes <= 0) {
             throw new \RuntimeException('Backup produced an empty file.');
@@ -187,7 +187,7 @@ final class DatabaseBackupExporter
 
         $tempPath = '/tmp/dply-db-export-'.$backup->id.'.'.$extension;
         $emit->step('db', __('Dumping :name …', ['name' => $db->name]));
-        $bytes = $this->writeDumpToRemotePath($db, $server, $tempPath, $extension);
+        $bytes = $this->writeDumpToRemotePath($db, $server, $tempPath, $extension, $emit);
 
         if ($bytes <= 0) {
             $this->remoteExec->shellRunWithExit($server, 'rm -f '.escapeshellarg($tempPath), 30);
@@ -271,7 +271,7 @@ final class DatabaseBackupExporter
         }
 
         $emit->step('db', __('Dumping :name …', ['name' => $db->name]));
-        $contents = $this->dumpToString($db, $server, $extension);
+        $contents = $this->dumpToString($db, $server, $extension, $emit);
         $diskName = (string) config('server_database.backup_disk', 'local');
         $relative = 'database-backups/'.$server->id.'/'.$backup->id.'.'.$extension;
         Storage::disk($diskName)->put($relative, $contents);
@@ -287,7 +287,7 @@ final class DatabaseBackupExporter
         ]);
     }
 
-    private function writeDumpToRemotePath(ServerDatabase $db, Server $server, string $remotePath, string $extension): int
+    private function writeDumpToRemotePath(ServerDatabase $db, Server $server, string $remotePath, string $extension, ConsoleEmitter $emit): int
     {
         if ($db->engine === 'sqlite') {
             $maxBytes = (int) config('server_database.sqlite_backup_max_bytes', 256 * 1024 * 1024);
@@ -297,7 +297,12 @@ final class DatabaseBackupExporter
         }
 
         if ($db->engine === 'postgres') {
-            $bytes = $this->remoteExec->pgDumpToPath($server, $db->name, $db->username, $db->password, $remotePath);
+            // Postgres admin fallback is always usable (sudo -u postgres when no
+            // stored superuser credential), so adminAvailable is true.
+            $bytes = $this->dumpToPathWithAdminFallback($db, $server, $remotePath, $emit, 'postgres', true,
+                fn (): int => $this->remoteExec->pgDumpToPath($server, $db->name, $db->username, $db->password, $remotePath),
+                fn (): int => $this->remoteExec->pgDumpAdminToPath($server, $db->name, $remotePath),
+            );
             $this->assertRemoteDumpLooksValid($server, $remotePath, 'postgres');
 
             return $bytes;
@@ -311,13 +316,16 @@ final class DatabaseBackupExporter
             throw new \RuntimeException(__('ClickHouse backups are not supported in this workspace yet.'));
         }
 
-        $bytes = $this->remoteExec->mysqldumpToPath($server, $db->name, $db->username, $db->password, $remotePath);
+        $bytes = $this->dumpToPathWithAdminFallback($db, $server, $remotePath, $emit, 'mysql', $this->hasMysqlRootCredential($server),
+            fn (): int => $this->remoteExec->mysqldumpToPath($server, $db->name, $db->username, $db->password, $remotePath),
+            fn (): int => $this->remoteExec->mysqldumpAdminToPath($server, $db->name, $remotePath),
+        );
         $this->assertRemoteDumpLooksValid($server, $remotePath, 'mysql');
 
         return $bytes;
     }
 
-    private function dumpToString(ServerDatabase $db, Server $server, string $extension): string
+    private function dumpToString(ServerDatabase $db, Server $server, string $extension, ConsoleEmitter $emit): string
     {
         if ($db->engine === 'sqlite') {
             $maxBytes = (int) config('server_database.sqlite_backup_max_bytes', 256 * 1024 * 1024);
@@ -326,10 +334,16 @@ final class DatabaseBackupExporter
         }
 
         $contents = match ($db->engine) {
-            'postgres' => $this->remoteExec->pgDump($server, $db->name, $db->username, $db->password),
+            'postgres' => $this->dumpToStringWithAdminFallback($db, $emit, 'postgres', true,
+                fn (): string => $this->remoteExec->pgDump($server, $db->name, $db->username, $db->password),
+                fn (): string => $this->remoteExec->pgDumpAdmin($server, $db->name),
+            ),
             'mongodb' => $this->remoteExec->mongodump($server, $db->name, $db->username, $db->password),
             'clickhouse' => throw new \RuntimeException(__('ClickHouse backups are not supported in this workspace yet.')),
-            default => $this->remoteExec->mysqldump($server, $db->name, $db->username, $db->password),
+            default => $this->dumpToStringWithAdminFallback($db, $emit, 'mysql', $this->hasMysqlRootCredential($server),
+                fn (): string => $this->remoteExec->mysqldump($server, $db->name, $db->username, $db->password),
+                fn (): string => $this->remoteExec->mysqldumpAdmin($server, $db->name),
+            ),
         };
 
         if (ServerDatabaseDumpOutputValidator::looksLikeFailedDump($db->engine, $contents)) {
@@ -341,6 +355,111 @@ final class DatabaseBackupExporter
         }
 
         return $contents;
+    }
+
+    /**
+     * Run a dump-to-path with the per-database app user, and — if those stored
+     * credentials have drifted from the box and the user is denied — retry with
+     * dply's server admin/root credentials. Keeps scheduled backups working
+     * through a credential rotation that never made it back to the
+     * server_databases row, rather than hard-failing with "Access denied …
+     * (using password: YES)". Any NON-auth failure is rethrown untouched so we
+     * don't mask real problems (missing DB, disk full) behind a pointless retry.
+     *
+     * @param  callable():int  $primary   dump with the app user → byte count
+     * @param  callable():int  $fallback  dump with admin/root creds → byte count
+     */
+    private function dumpToPathWithAdminFallback(ServerDatabase $db, Server $server, string $remotePath, ConsoleEmitter $emit, string $engine, bool $adminAvailable, callable $primary, callable $fallback): int
+    {
+        try {
+            return $primary();
+        } catch (\RuntimeException $e) {
+            // mysqldump/pg_dump redirect their error INTO the dump file
+            // (`> file 2>&1`), so the thrown message is usually empty — read the
+            // file head to learn why it actually failed.
+            $reason = $this->remoteDumpHead($server, $remotePath);
+            $message = $reason !== '' ? $reason : $e->getMessage();
+
+            if (! $adminAvailable || ! $this->looksLikeAuthFailure($engine, $message)) {
+                throw $reason !== '' ? new \RuntimeException('Dump command failed: '.Str::limit($reason, 800), 0, $e) : $e;
+            }
+
+            $emit->step('db', __('App user :user was denied — retrying the dump with the server admin credentials.', [
+                'user' => $db->username ?: '(unknown)',
+            ]));
+
+            return $fallback();
+        }
+    }
+
+    /**
+     * String-output counterpart to {@see dumpToPathWithAdminFallback}: the
+     * stdout dump doesn't throw on auth failure, it returns the error text, so
+     * we detect it from the output and retry with admin credentials.
+     *
+     * @param  callable():string  $primary
+     * @param  callable():string  $fallback
+     */
+    private function dumpToStringWithAdminFallback(ServerDatabase $db, ConsoleEmitter $emit, string $engine, bool $adminAvailable, callable $primary, callable $fallback): string
+    {
+        $out = $primary();
+
+        if (! ServerDatabaseDumpOutputValidator::looksLikeFailedDump($engine, $out)) {
+            return $out;
+        }
+        if (! $adminAvailable || ! $this->looksLikeAuthFailure($engine, $out)) {
+            // Let the caller's existing validation surface a non-auth failure.
+            return $out;
+        }
+
+        $emit->step('db', __('App user :user was denied — retrying the dump with the server admin credentials.', [
+            'user' => $db->username ?: '(unknown)',
+        ]));
+
+        return $fallback();
+    }
+
+    /** Whether a MySQL root credential is on file to fall back to. */
+    private function hasMysqlRootCredential(Server $server): bool
+    {
+        $cred = $this->remoteExec->adminCredential($server);
+
+        return $cred !== null && (string) $cred->mysql_root_password !== '';
+    }
+
+    /** Read the head of a remote dump file to recover the DB error written into it. */
+    private function remoteDumpHead(Server $server, string $remotePath): string
+    {
+        try {
+            [$head] = $this->remoteExec->shellRunWithExit($server, 'head -c 1200 '.escapeshellarg($remotePath).' 2>/dev/null || true', 60);
+
+            return trim((string) $head);
+        } catch (\Throwable) {
+            return '';
+        }
+    }
+
+    /**
+     * Does this dump error look like a credential/authentication rejection (as
+     * opposed to a missing database, permission-on-table, disk, etc.)? Only
+     * those warrant a root-credential retry.
+     */
+    private function looksLikeAuthFailure(string $engine, string $message): bool
+    {
+        $m = mb_strtolower($message);
+
+        if (str_contains($engine, 'postgres')) {
+            return str_contains($m, 'password authentication failed')
+                || str_contains($m, 'authentication failed')
+                || str_contains($m, 'no password supplied')
+                || str_contains($m, 'peer authentication')
+                || (str_contains($m, 'role ') && str_contains($m, 'does not exist'));
+        }
+
+        // mysql / mariadb
+        return str_contains($m, 'access denied')
+            || str_contains($m, 'error: 1045')
+            || str_contains($m, '(using password');
     }
 
     private function assertRemoteDumpLooksValid(Server $server, string $remotePath, string $engine): void

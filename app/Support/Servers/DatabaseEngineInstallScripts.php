@@ -387,6 +387,23 @@ EOF
 systemctl restart mysql 2>/dev/null || systemctl restart mariadb
 echo "remote_access_enabled"
 BASH,
+            // ClickHouse: make the server bind all interfaces so the HTTP (8123)
+            // and native (9000) ports are reachable on the private network — the
+            // network boundary is the UFW/cloud-firewall rule scoped to the
+            // allowed CIDR (synced by ToggleDatabaseEngineRemoteAccessJob), NOT
+            // ClickHouse auth, mirroring the mysql bind-address = 0.0.0.0 model.
+            'clickhouse' => <<<'BASH'
+set -e
+mkdir -p /etc/clickhouse-server/config.d
+cat > /etc/clickhouse-server/config.d/99-dply-listen.xml <<'EOF'
+<clickhouse>
+    <listen_host>0.0.0.0</listen_host>
+</clickhouse>
+EOF
+chown clickhouse:clickhouse /etc/clickhouse-server/config.d/99-dply-listen.xml 2>/dev/null || true
+systemctl restart clickhouse-server
+echo "remote_access_enabled"
+BASH,
             default => throw new \InvalidArgumentException("Remote access not supported for engine: {$engine}"),
         };
     }
@@ -428,11 +445,41 @@ EOF
 systemctl restart mysql 2>/dev/null || systemctl restart mariadb
 echo "remote_access_disabled"
 BASH,
+            'clickhouse' => <<<'BASH'
+set -e
+mkdir -p /etc/clickhouse-server/config.d
+cat > /etc/clickhouse-server/config.d/99-dply-listen.xml <<'EOF'
+<clickhouse>
+    <listen_host>127.0.0.1</listen_host>
+    <listen_host>::1</listen_host>
+</clickhouse>
+EOF
+chown clickhouse:clickhouse /etc/clickhouse-server/config.d/99-dply-listen.xml 2>/dev/null || true
+systemctl restart clickhouse-server
+echo "remote_access_disabled"
+BASH,
             default => throw new \InvalidArgumentException("Remote access not supported for engine: {$engine}"),
         };
     }
 
+    /**
+     * Engine-level remote access (server binds all interfaces; the firewall
+     * scopes the source CIDR). ClickHouse is included — its logs-store use case
+     * is the whole reason. {@see enableRemoteAccessScript}.
+     */
     public static function supportsRemoteAccess(string $engine): bool
+    {
+        return in_array($engine, ['postgres', 'mysql', 'mariadb', 'clickhouse'], true);
+    }
+
+    /**
+     * Per-DATABASE remote access (a single database/user grant scoped to a CIDR
+     * via pg_hba / a host-specific MySQL GRANT). Narrower than the engine-level
+     * toggle: ClickHouse and Mongo expose access at the server level only, so
+     * they're excluded here even though ClickHouse supports the engine-level form.
+     * {@see enableDatabaseRemoteAccessScript}.
+     */
+    public static function supportsPerDatabaseRemoteAccess(string $engine): bool
     {
         return in_array($engine, ['postgres', 'mysql', 'mariadb'], true);
     }

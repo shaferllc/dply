@@ -270,28 +270,36 @@ class SeedProvisionedEnginesForServer
             return;
         }
 
-        $port = DedicatedDatabaseServerProvisionConfig::fromServer($server, $wizardDatabase)->defaultPort();
-        $tag = 'dply-database-'.DedicatedDatabaseServerProvisionConfig::engineFamily($wizardDatabase);
+        $config = DedicatedDatabaseServerProvisionConfig::fromServer($server, $wizardDatabase);
+        $family = DedicatedDatabaseServerProvisionConfig::engineFamily($wizardDatabase);
 
-        $exists = ServerFirewallRule::query()
-            ->where('server_id', $server->id)
-            ->whereJsonContains('tags', $tag)
-            ->exists();
+        // One model rule per opened port so dply's firewall model matches what
+        // ufwAllowLines() actually opened on the box — ClickHouse opens both its
+        // HTTP (8123) and native (9000) ports, so the model must carry both or a
+        // later reconcile would close one.
+        foreach ($config->remoteAccessPorts() as $port) {
+            $tag = 'dply-database-'.$family.'-'.$port;
 
-        if ($exists) {
-            return;
+            $exists = ServerFirewallRule::query()
+                ->where('server_id', $server->id)
+                ->whereJsonContains('tags', $tag)
+                ->exists();
+
+            if ($exists) {
+                continue;
+            }
+
+            ServerFirewallRule::query()->create([
+                'server_id' => $server->id,
+                'name' => sprintf('Database · %s (%d)', $family, $port),
+                'port' => $port,
+                'protocol' => 'tcp',
+                'source' => $source,
+                'action' => 'allow',
+                'enabled' => true,
+                'sort_order' => (int) (ServerFirewallRule::query()->where('server_id', $server->id)->max('sort_order') ?? 0) + 1,
+                'tags' => ['dply-database', $tag],
+            ]);
         }
-
-        ServerFirewallRule::query()->create([
-            'server_id' => $server->id,
-            'name' => sprintf('Database · %s', DedicatedDatabaseServerProvisionConfig::engineFamily($wizardDatabase)),
-            'port' => $port,
-            'protocol' => 'tcp',
-            'source' => $source,
-            'action' => 'allow',
-            'enabled' => true,
-            'sort_order' => (int) (ServerFirewallRule::query()->where('server_id', $server->id)->max('sort_order') ?? 0) + 1,
-            'tags' => ['dply-database', $tag],
-        ]);
     }
 }

@@ -20,6 +20,7 @@
         @endphp
     </head>
     <body class="font-sans antialiased bg-brand-cream text-brand-ink min-h-screen flex flex-col" style="font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;" x-data="toastStore({ position: @js($toastPosition) })">
+        <x-impersonation-banner />
         <div class="flex flex-col flex-1 min-h-0">
             <x-site-header />
 

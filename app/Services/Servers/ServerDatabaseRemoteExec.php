@@ -643,6 +643,107 @@ BASH;
     }
 
     /**
+     * mysqldump using dply's stored ROOT credentials instead of a per-database
+     * app user — the resilient fallback for {@see DatabaseBackupExporter} when
+     * the app user's stored password/username has drifted from the box (the
+     * classic "Access denied for user … (using password: YES)" on an otherwise
+     * healthy database). Same root creds the provisioner and ad-hoc quick
+     * download already use.
+     *
+     * @throws \RuntimeException when no usable root credential is on file, or the dump fails.
+     */
+    public function mysqldumpAdminToPath(Server $server, string $database, string $destPath, int $timeout = 600): int
+    {
+        $cred = $this->adminCredential($server);
+        if (! $cred || ! $cred->mysql_root_password) {
+            throw new \RuntimeException('No MySQL root credential on file for this server to fall back to.');
+        }
+
+        $dir = dirname($destPath);
+        $inner = 'mkdir -p '.escapeshellarg($dir).' && '.
+            'env MYSQL_PWD='.escapeshellarg((string) $cred->mysql_root_password).' mysqldump -u '.escapeshellarg($cred->mysql_root_username ?: 'root').
+            ' --single-transaction --quick --routines=false '.escapeshellarg($database).
+            ' > '.escapeshellarg($destPath).' 2>&1 && stat -c%s '.escapeshellarg($destPath);
+
+        [$out, $exit] = $this->shellRunWithExit($server, $inner, $timeout);
+
+        if ($exit !== null && $exit !== 0) {
+            throw new \RuntimeException(Str::limit(trim($out), 800));
+        }
+
+        return max(0, (int) trim($out));
+    }
+
+    /**
+     * pg_dump using dply's stored superuser credentials (or `sudo -u postgres`
+     * when that's how the box is configured) — the postgres counterpart to
+     * {@see mysqldumpAdminToPath}. Always usable: with no stored credential it
+     * falls back to the same sudo path the provisioner uses.
+     *
+     * @throws \RuntimeException on dump failure.
+     */
+    public function pgDumpAdminToPath(Server $server, string $database, string $destPath, int $timeout = 600): int
+    {
+        $cred = $this->adminCredential($server);
+        $dir = dirname($destPath);
+        $mkdir = 'mkdir -p '.escapeshellarg($dir).' && ';
+        $redirect = ' > '.escapeshellarg($destPath).' 2>&1 && stat -c%s '.escapeshellarg($destPath);
+
+        if (! $cred || $cred->postgres_use_sudo) {
+            $inner = $mkdir.'sudo -u postgres pg_dump '.escapeshellarg($database).$redirect;
+        } else {
+            $user = $cred->postgres_superuser ?: 'postgres';
+            $env = $cred->postgres_password ? 'env PGPASSWORD='.escapeshellarg((string) $cred->postgres_password).' ' : '';
+            $inner = $mkdir.$env.'pg_dump -h 127.0.0.1 -U '.escapeshellarg($user).' '.escapeshellarg($database).$redirect;
+        }
+
+        [$out, $exit] = $this->shellRunWithExit($server, $inner, $timeout);
+
+        if ($exit !== null && $exit !== 0) {
+            throw new \RuntimeException(Str::limit(trim($out), 800));
+        }
+
+        return max(0, (int) trim($out));
+    }
+
+    /**
+     * Stream mysqldump to stdout using dply's stored ROOT credentials — the
+     * string-output counterpart to {@see mysqldumpAdminToPath} (control-plane
+     * dev backups).
+     */
+    public function mysqldumpAdmin(Server $server, string $database, int $timeout = 600): string
+    {
+        $cred = $this->adminCredential($server);
+        if (! $cred || ! $cred->mysql_root_password) {
+            throw new \RuntimeException('No MySQL root credential on file for this server to fall back to.');
+        }
+
+        $inner = 'env MYSQL_PWD='.escapeshellarg((string) $cred->mysql_root_password).' mysqldump -u '.escapeshellarg($cred->mysql_root_username ?: 'root')
+            .' --single-transaction --quick --routines=false '.escapeshellarg($database).' 2>&1';
+
+        return $this->execWithCandidates($server, 'bash -lc '.escapeshellarg($inner), $timeout);
+    }
+
+    /**
+     * Stream pg_dump to stdout using dply's stored superuser credentials (or
+     * `sudo -u postgres`) — the string-output counterpart to {@see pgDumpAdminToPath}.
+     */
+    public function pgDumpAdmin(Server $server, string $database, int $timeout = 600): string
+    {
+        $cred = $this->adminCredential($server);
+
+        if (! $cred || $cred->postgres_use_sudo) {
+            $inner = 'sudo -u postgres pg_dump '.escapeshellarg($database).' 2>&1';
+        } else {
+            $user = $cred->postgres_superuser ?: 'postgres';
+            $env = $cred->postgres_password ? 'env PGPASSWORD='.escapeshellarg((string) $cred->postgres_password).' ' : '';
+            $inner = $env.'pg_dump -h 127.0.0.1 -U '.escapeshellarg($user).' '.escapeshellarg($database).' 2>&1';
+        }
+
+        return $this->execWithCandidates($server, 'bash -lc '.escapeshellarg($inner), $timeout);
+    }
+
+    /**
      * Delete oldest files under a server backup tree until total size is at or below $maxBytes.
      */
     public function pruneRemoteBackupTree(Server $server, string $serverTreeRoot, int $maxBytes, int $timeout = 120): void

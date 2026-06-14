@@ -194,6 +194,15 @@
 
                         {{-- Right: triage --}}
                         <div class="space-y-4 lg:border-l lg:border-brand-ink/10 lg:pl-6">
+                            @if ($selected->user)
+                                <div class="rounded-lg border border-brand-ink/10 bg-brand-cream/40 p-3">
+                                    <p class="text-xs text-brand-moss">{{ __('Reproduce this from the reporter’s view:') }}</p>
+                                    <div class="mt-2">
+                                        <x-impersonate-button :user="$selected->user" :label="__('Impersonate reporter')" />
+                                    </div>
+                                </div>
+                            @endif
+
                             <h3 class="text-xs font-semibold uppercase tracking-wide text-brand-moss">{{ __('Triage') }}</h3>
 
                             <div>

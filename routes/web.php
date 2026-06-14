@@ -436,6 +436,8 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
             Route::livewire('/roadmap', AdminRoadmapIndex::class)->name('roadmap.index');
             Route::livewire('/feedback', AdminFeedbackIndex::class)->name('feedback.index');
             Route::get('/feedback/{report}/screenshot', \App\Http\Controllers\Admin\FeedbackScreenshotController::class)->name('feedback.screenshot');
+            Route::livewire('/users', \App\Livewire\Admin\Users\Index::class)->name('users.index');
+            Route::post('/impersonate/{user}', [\App\Http\Controllers\Admin\ImpersonationController::class, 'start'])->name('impersonate.start');
             Route::livewire('/flags/global', AdminGlobalFlags::class)->name('flags.global');
             Route::livewire('/flags/vm/servers', AdminProductLineFlags::class)->defaults('line', 'vm-servers')->name('flags.vm.servers');
             Route::livewire('/flags/vm/sites', AdminProductLineFlags::class)->defaults('line', 'vm-sites')->name('flags.vm.sites');
