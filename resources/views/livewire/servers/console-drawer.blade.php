@@ -14,6 +14,59 @@
     x-on:livewire:navigated.window="$wire.history?.length && $wire.clearHistory()"
     class="flex h-full min-h-0 flex-col bg-gradient-to-b from-brand-cream/80 to-white"
 >
+    {{-- Live output of a queued one-click action (e.g. "Install PHP Redis") that
+         was streamed into the drawer. Polls while in-flight; stops when done. --}}
+    @if ($watchedAction)
+        @php
+            $wa = $watchedAction;
+            $waStale = $wa->isStale();
+            $waBusy = $wa->isInFlight() && ! $waStale;
+            $waStatus = $waStale ? 'failed' : $wa->status;
+            $waLines = $wa->lines();
+        @endphp
+        <div class="shrink-0 border-b border-brand-ink/10 bg-brand-ink px-3 py-2.5" wire:key="drawer-watched-action-{{ $wa->id }}">
+            @if ($waBusy)
+                <div wire:poll.3s="" class="hidden" aria-hidden="true"></div>
+            @endif
+            <div class="flex items-center justify-between gap-2">
+                <div class="flex min-w-0 items-center gap-2 text-emerald-100">
+                    @if ($waBusy)
+                        <x-spinner variant="forest" size="sm" />
+                    @elseif ($waStatus === 'completed')
+                        <x-heroicon-o-check-circle class="h-4 w-4 text-emerald-300" />
+                    @else
+                        <x-heroicon-o-exclamation-triangle class="h-4 w-4 text-rose-300" />
+                    @endif
+                    <span class="truncate text-xs font-semibold">{{ $wa->label ?? __('Running fix…') }}</span>
+                </div>
+                <button
+                    type="button"
+                    wire:click="clearWatchedAction"
+                    class="shrink-0 rounded p-0.5 text-emerald-200/70 hover:bg-white/10 hover:text-emerald-100"
+                    title="{{ __('Hide') }}"
+                >
+                    <x-heroicon-o-x-mark class="h-4 w-4" />
+                </button>
+            </div>
+            <pre
+                class="mt-2 max-h-44 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-black/40 p-2 font-mono text-[11px] leading-relaxed text-emerald-100"
+                x-data
+                x-init="$el.scrollTop = $el.scrollHeight"
+                x-effect="$el.scrollTop = $el.scrollHeight"
+            >@forelse ($waLines as $entry)@php
+    $tone = match ($entry['level'] ?? null) {
+        'step' => 'text-sky-300',
+        'warn' => 'text-amber-300',
+        'error' => 'text-rose-300',
+        'success' => 'text-emerald-300',
+        default => 'text-emerald-100',
+    };
+    $prefix = ($entry['source'] ?? null) !== null ? '['.$entry['source'].'] ' : '';
+@endphp<span class="{{ $tone }}">{{ $prefix }}{{ $entry['line'] ?? '' }}</span>
+@empty<span class="text-emerald-200/60">{{ $waBusy ? __('Queued — waiting for the worker to start…') : __('No output recorded.') }}</span>@endforelse</pre>
+        </div>
+    @endif
+
     @if (! $server)
         <div class="flex h-full min-h-0 flex-col p-3 sm:p-4">
             <div class="dply-card flex min-h-0 flex-1 flex-col overflow-hidden p-0">

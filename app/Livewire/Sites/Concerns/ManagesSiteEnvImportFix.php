@@ -422,11 +422,22 @@ trait ManagesSiteEnvImportFix
 
         $spec = SiteFixers::spec($key);
         if ($spec === null) {
+            // Don't fail silently — the remediation list can outlive the fixer
+            // registry (e.g. a renamed key after a re-test). Tell the operator.
+            $this->toastWarning(__('That fix is no longer available — re-run “Test site” to refresh the suggestions.'));
+
             return;
         }
 
         $run = $this->seedQueuedConsoleAction('site_remediate', (string) $spec['label']);
         RunSiteFixerJob::dispatch((string) $run->id, (string) $this->site->id, $key);
+
+        // Stream the run live into the global SSH console drawer and pop it open
+        // so the operator can watch the fix execute (these are queued jobs — an
+        // apt/pecl install easily outlasts the inline console's 60s cap).
+        $this->dispatch('console-action-to-drawer', actionId: (string) $run->id)
+            ->to(\App\Livewire\Servers\ConsoleDrawer::class);
+        $this->dispatch('dply-open-console-drawer');
 
         $this->dispatch('dply-console-action-focus');
         $this->watchConsoleAction(

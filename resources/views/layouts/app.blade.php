@@ -139,6 +139,15 @@
                                     this.close();
                                 }
                             });
+                            // Programmatic open — e.g. a one-click "Suggested fix"
+                            // streams its live output into the drawer.
+                            window.addEventListener('dply-open-console-drawer', () => {
+                                if (!this.open) {
+                                    this.open = true;
+                                    localStorage.setItem('dply.consoleDrawer.open', '1');
+                                    this.$nextTick(() => window.dispatchEvent(new CustomEvent('dply-console-drawer-opened')));
+                                }
+                            });
                         },
                         toggle() {
                             this.open = !this.open;
