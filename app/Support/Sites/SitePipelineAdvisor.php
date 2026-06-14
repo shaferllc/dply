@@ -7,6 +7,7 @@ namespace App\Support\Sites;
 use App\Livewire\Sites\Concerns\ManagesSiteDeploySteps;
 use App\Models\Site;
 use App\Models\SiteDeployStep;
+use App\Services\Sites\OctaneRuntimeVerifier;
 
 /**
  * Inspects a site's deploy pipeline against its detected stack and flags the
@@ -108,9 +109,17 @@ final class SitePipelineAdvisor
             // Horizon restart is handled post-cutover by dply's managed restart
             // (guarded on the package + command), so we don't suggest adding an
             // explicit horizon:terminate step anymore.
-            if (! empty($detection['laravel_octane']) && ! $customMatches('octane:reload')) {
+            //
+            // Octane: composer mentioning laravel/octane isn't enough — we only
+            // nudge `octane:reload` once a queued probe has confirmed Octane is
+            // actually installed AND serving this site (octane in composer but
+            // served by FPM would make the step a no-op / failure). The probe
+            // writes that verdict to meta; this render path only reads it.
+            if (! empty($detection['laravel_octane'])
+                && OctaneRuntimeVerifier::verifiedWorking($site)
+                && ! $customMatches('octane:reload')) {
                 $out[] = self::make('octane', __('Reload Octane workers'),
-                    __('Octane is installed but workers aren\'t reloaded on deploy — they serve stale code.'),
+                    __('Octane is installed and serving this site, but workers aren\'t reloaded on deploy — they serve stale code.'),
                     SiteDeployStep::TYPE_CUSTOM, 'php artisan octane:reload', 'medium');
             }
         }

@@ -9,6 +9,7 @@ use App\Models\Site;
 use App\Models\SiteDeployStep;
 use App\Services\ConsoleActions\ConsoleEmitter;
 use App\Services\Deploy\SiteDeployPipelineManager;
+use App\Services\Sites\OctaneRuntimeVerifier;
 use App\Services\SshConnectionFactory;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -64,7 +65,12 @@ class OptimizeSitePipelineJob implements ShouldQueue
             $composer = $this->readJson($conn, $dir.'/composer.json');
             $locks = $this->detectLocks($conn, $dir);
 
-            $needed = $this->plan($pkg, $composer, $locks, $emit);
+            // We're already on the box — verify Octane here rather than trusting
+            // composer.json, refresh the cached verdict the advisor reads, and
+            // only let plan() propose octane:reload when Octane really serves.
+            $octaneOk = $this->verifyOctane($conn, $site, $dir, $composer, $emit);
+
+            $needed = $this->plan($pkg, $composer, $locks, $octaneOk, $emit);
             if ($needed === []) {
                 $this->storePreview($site, []);
                 $emit->success('scan', 'No pipeline changes needed — your pipeline already covers what the repo requires.');
@@ -123,9 +129,10 @@ class OptimizeSitePipelineJob implements ShouldQueue
      * @param  array<string, mixed>|null  $pkg
      * @param  array<string, mixed>|null  $composer
      * @param  list<string>  $locks
+     * @param  bool  $octaneOk  Octane was probed and confirmed installed + serving.
      * @return list<array{type: string, phase: string, command: ?string, label: string}>
      */
-    private function plan(?array $pkg, ?array $composer, array $locks, ConsoleEmitter $emit): array
+    private function plan(?array $pkg, ?array $composer, array $locks, bool $octaneOk, ConsoleEmitter $emit): array
     {
         $needed = [];
 
@@ -165,12 +172,41 @@ class OptimizeSitePipelineJob implements ShouldQueue
             // managed restart (guarded on the package + command existing), so we
             // no longer add an explicit horizon:terminate step — it was redundant
             // and, in the release phase, bounced workers onto the old release.
-            if (isset($require['laravel/octane'])) {
+            // Only when the box-side probe confirmed Octane is installed AND
+            // serving this site — composer alone isn't enough (a require-dev /
+            // FPM-served app would make octane:reload a no-op or failure).
+            if (isset($require['laravel/octane']) && $octaneOk) {
                 $needed[] = ['type' => SiteDeployStep::TYPE_CUSTOM, 'phase' => SiteDeployStep::PHASE_RELEASE, 'command' => 'php artisan octane:reload', 'label' => 'Reload Octane'];
             }
         }
 
         return $needed;
+    }
+
+    /**
+     * Probe Octane on the box (it's already connected), persist the verdict the
+     * advisor reads, and return whether it's installed AND serving. Returns
+     * false (and skips the probe) when composer doesn't declare laravel/octane.
+     *
+     * @param  array<string, mixed>|null  $composer
+     */
+    private function verifyOctane($conn, Site $site, string $dir, ?array $composer, ConsoleEmitter $emit): bool
+    {
+        $require = is_array($composer['require'] ?? null) ? array_change_key_case($composer['require'], CASE_LOWER) : [];
+        if (! isset($require['laravel/octane'])) {
+            return false;
+        }
+
+        $port = $site->octane_port !== null ? (int) $site->octane_port : null;
+        $raw = $conn->exec(OctaneRuntimeVerifier::probeScript($dir, $port), 45);
+        $verdict = OctaneRuntimeVerifier::interpret($raw);
+        OctaneRuntimeVerifier::persist($site, $verdict);
+
+        $emit->step('scan', $verdict['ok']
+            ? 'Octane verified — installed and serving this site.'
+            : 'Octane is in composer but not serving this site — skipping octane:reload ('.$verdict['reason'].').');
+
+        return $verdict['ok'];
     }
 
     /**

@@ -255,6 +255,10 @@
             @endif
 
             @include('partials.docs-sidebar')
+
+            {{-- Global feedback / bug-report sidebar. Reachable from every
+                 authenticated page via the floating "Feedback" launcher. --}}
+            <livewire:feedback.sidebar :key="'global-feedback-sidebar'" />
         @endauth
 
         @include('partials.session-flash-toasts')

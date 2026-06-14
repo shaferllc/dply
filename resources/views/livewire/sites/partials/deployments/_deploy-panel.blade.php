@@ -259,6 +259,14 @@
         </x-modal>
     @endif
 
+    {{-- Verify Octane is actually installed AND serving this site before the
+         advisor is allowed to suggest `octane:reload`. Deferred so it never
+         SSHes from the render path; renders unconditionally (when supported) so
+         the probe still runs when the suppressed Octane step is the only one. --}}
+    @if (method_exists($this, 'ensureOctaneVerificationProbe'))
+        <div wire:init="ensureOctaneVerificationProbe" class="hidden" aria-hidden="true"></div>
+    @endif
+
     {{-- Pipeline suggestions — proactively flag missing-but-needed deploy
          steps (e.g. installs JS deps but never builds them → the live site
          500s on a missing Vite manifest) with one-click "Add to pipeline". --}}

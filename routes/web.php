@@ -36,6 +36,7 @@ use App\Jobs\RunSetupScriptJob;
 use App\Livewire\Admin\AuditLog as AdminAuditLog;
 use App\Livewire\Admin\BetaInvites as AdminBetaInvites;
 use App\Livewire\Admin\ComingSoonAccess as AdminComingSoonAccess;
+use App\Livewire\Admin\Feedback\Index as AdminFeedbackIndex;
 use App\Livewire\Admin\Flags\GlobalFlags as AdminGlobalFlags;
 use App\Livewire\Admin\Flags\ProductLineFlags as AdminProductLineFlags;
 use App\Livewire\Admin\Operations as AdminOperations;
@@ -433,6 +434,8 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
             Route::livewire('/operations', AdminOperations::class)->name('operations');
             Route::livewire('/audit', AdminAuditLog::class)->name('audit');
             Route::livewire('/roadmap', AdminRoadmapIndex::class)->name('roadmap.index');
+            Route::livewire('/feedback', AdminFeedbackIndex::class)->name('feedback.index');
+            Route::get('/feedback/{report}/screenshot', \App\Http\Controllers\Admin\FeedbackScreenshotController::class)->name('feedback.screenshot');
             Route::livewire('/flags/global', AdminGlobalFlags::class)->name('flags.global');
             Route::livewire('/flags/vm/servers', AdminProductLineFlags::class)->defaults('line', 'vm-servers')->name('flags.vm.servers');
             Route::livewire('/flags/vm/sites', AdminProductLineFlags::class)->defaults('line', 'vm-sites')->name('flags.vm.sites');

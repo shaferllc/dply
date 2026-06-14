@@ -11,6 +11,7 @@
     $operationsActive = request()->routeIs('admin.operations');
     $auditActive = request()->routeIs('admin.audit');
     $roadmapActive = request()->routeIs('admin.roadmap.*');
+    $feedbackActive = request()->routeIs('admin.feedback.*');
     $globalFlagsActive = request()->routeIs('admin.flags.global');
     $productLineActive = request()->routeIs('admin.flags.*') && ! $globalFlagsActive;
     $organizationsActive = request()->routeIs('admin.organizations.*');
@@ -21,6 +22,9 @@
     $vmLines = ['vm-servers', 'vm-sites'];
     $newRoadmapSuggestionCount = \App\Models\RoadmapSuggestion::query()
         ->where('status', \App\Models\RoadmapSuggestion::STATUS_NEW)
+        ->count();
+    $newFeedbackCount = \App\Models\FeedbackReport::query()
+        ->where('status', \App\Models\FeedbackReport::STATUS_NEW)
         ->count();
 @endphp
 
@@ -50,6 +54,14 @@
         {{ __('Roadmap') }}
         @if (($newRoadmapSuggestionCount ?? 0) > 0)
             <span class="ms-auto rounded-full bg-brand-rust/15 px-2 py-0.5 text-xs font-semibold text-brand-rust">{{ $newRoadmapSuggestionCount }}</span>
+        @endif
+    </a>
+
+    <a href="{{ route('admin.feedback.index') }}" wire:navigate @class([$navBase, $feedbackActive ? $navOn : $navOff])>
+        <x-heroicon-o-chat-bubble-left-right class="{{ $navIcon }}" />
+        {{ __('Feedback') }}
+        @if (($newFeedbackCount ?? 0) > 0)
+            <span class="ms-auto rounded-full bg-brand-rust/15 px-2 py-0.5 text-xs font-semibold text-brand-rust">{{ $newFeedbackCount }}</span>
         @endif
     </a>
 

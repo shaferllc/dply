@@ -35,6 +35,7 @@ use App\Console\Commands\PruneAppLogsCommand;
 use App\Console\Commands\PruneAuditLogsCommand;
 use App\Console\Commands\PruneBackupDownloadStagingsCommand;
 use App\Console\Commands\PruneErrorEventsCommand;
+use App\Console\Commands\PruneFeedbackAttachmentsCommand;
 use App\Console\Commands\PruneFunctionInvocationsCommand;
 use App\Console\Commands\PruneLocalWorkspaceArtifactsCommand;
 use App\Console\Commands\PruneNotificationInboxItemsCommand;
@@ -221,6 +222,7 @@ final class DplySchedule
             ->withoutOverlapping()
             ->name('prune-quick-downloads');
         $schedule->command(PruneFunctionInvocationsCommand::class)->dailyAt('03:50');
+        $schedule->command(PruneFeedbackAttachmentsCommand::class)->dailyAt('04:25');
         $schedule->command(PruneSiteUptimeCheckResultsCommand::class)->dailyAt('03:55');
         $schedule->command(PruneAppLogsCommand::class)->dailyAt('04:05');
         $schedule->command(ExpirePausedImportMigrationsCommand::class)->hourly();
