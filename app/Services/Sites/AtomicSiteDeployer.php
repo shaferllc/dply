@@ -293,8 +293,9 @@ class AtomicSiteDeployer
 
         // ── SHARED STORAGE ── opt-in (Site.meta['shared_storage']): symlink the
         // release's storage/ at a persistent dir so logs/uploads/keys survive
-        // across releases (parity with the hand-rolled deploy.sh, needed for
-        // dply's own self-deploy). Customer sites keep per-release storage unless
+        // across releases (parity with the retired hand-rolled deploy.sh shell
+        // deployer, needed for dply's own self-deploy). Customer sites keep
+        // per-release storage unless
         // they explicitly opt in. Default target = <project root>/shared/storage.
         $deployMeta = is_array($site->meta) ? $site->meta : [];
         if (! empty($deployMeta['shared_storage'])) {

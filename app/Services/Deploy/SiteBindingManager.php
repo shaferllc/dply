@@ -152,6 +152,7 @@ class SiteBindingManager
             default => $this->attachExisting($site, $type, $params),
         };
 
+        $this->stampSetupProvenance($site, $binding);
         $this->adoptInjectedEnv($site, $binding);
 
         return $binding;
@@ -294,6 +295,31 @@ class SiteBindingManager
     }
 
     // ---- shared helpers ---------------------------------------------------
+
+    /**
+     * Stamp provenance on a resource provisioned while the site is still in its
+     * first-deploy setup. These are REAL infra (a database, a bucket) created
+     * BEFORE any deploy — if the operator abandons setup they become orphans
+     * with no deployed app. The flag + timestamp let a reporter surface them for
+     * review. We only tag the binding config; tearing the resource down is a
+     * separate, explicit action (managed databases are unlinked, never
+     * auto-dropped — see {@see \App\Support\Sites\SiteRelationPurger}).
+     */
+    private function stampSetupProvenance(Site $site, SiteBinding $binding): void
+    {
+        if (! $site->isInFirstDeploySetup()) {
+            return;
+        }
+
+        $cfg = is_array($binding->config) ? $binding->config : [];
+        if (($cfg['provisioned_during_setup'] ?? false) === true) {
+            return;
+        }
+
+        $cfg['provisioned_during_setup'] = true;
+        $cfg['provisioned_during_setup_at'] = now()->toIso8601String();
+        $binding->forceFill(['config' => $cfg])->save();
+    }
 
     /**
      * Guard a driver-style binding (queue/cache/session) against a missing

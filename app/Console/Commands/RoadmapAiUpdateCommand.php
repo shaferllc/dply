@@ -10,9 +10,11 @@ use App\Services\Roadmap\RoadmapAiUpdater;
 use Illuminate\Console\Command;
 
 /**
- * Drives the post-deploy AI roadmap update. deploy.sh calls this with --sync on
- * the web box after the release swap, so the run is deterministic and
- * self-contained (no dependency on a worker draining the queue).
+ * Drives the post-deploy AI roadmap update. Intended to be invoked with --sync on
+ * the web box after a release swap, so the run is deterministic and
+ * self-contained (no dependency on a worker draining the queue). Wire it into the
+ * deploy engine's post-deploy hook, schedule it, or dispatch it onto the queue —
+ * the retired deploy.sh shell deployer used to call it inline.
  *
  *   php artisan dply:roadmap:ai-update --sync                    (run now, in-process)
  *   php artisan dply:roadmap:ai-update --sync --commit=<sha>     (pin the target commit)

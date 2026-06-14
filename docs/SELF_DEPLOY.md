@@ -1,16 +1,23 @@
-# Self-deploy: dply deploys dply (retire `deploy.sh`)
+# Self-deploy: dply deploys dply
 
 Status: design. Goal: dply ships its own control plane (web + workers) through the
 **same managed-site deploy pipeline it gives customers**, so the control plane is
-dogfooded and the hand-maintained `deploy.sh` can be retired.
+fully dogfooded.
+
+> **Update:** the hand-maintained `deploy.sh` shell deployer has already been
+> removed — it is now `commit.sh`, which only commits + pushes. That leaves
+> `AtomicSiteDeployer` (the managed-site engine) as the **only** deployer, so the
+> "retire deploy.sh" goal is met by deletion rather than migration. The three gaps
+> below are still the work needed to make engine self-deploy safe end-to-end.
 
 ## Why
 
-`deploy.sh` works but leaves three things to humans, and all three bit prod on
-2026-06-09 (see the incident memories):
+The old `deploy.sh` left three things to humans, and all three bit prod on
+2026-06-09 (see the incident memories). They remain the gaps the engine path must
+close:
 
-1. **nginx cutover is manual.** `deploy.sh` builds atomic releases and swaps
-   `current` → `releases/<ts>`, but repointing the nginx docroot from the old
+1. **nginx cutover was manual.** The shell deployer built atomic releases and
+   swapped `current` → `releases/<ts>`, but repointing the nginx docroot from the old
    flat `public/` to `current/public/` is a manual step in
    `deploy/ATOMIC_RELEASES.md`. It was never done → prod served 4-day-old code.
 2. **No env source of truth.** web and workers each hand-edit their own
@@ -54,9 +61,9 @@ Adopt the model already committed in `deploy/ENV_SYNC.md`:
 - `deploy/env/{app-only,worker-only}.keys` scope the per-role exceptions;
 - the deploy **renders each box's `shared/.env`** = SHARED ⊕ role-overlay, instead
   of trusting whatever was hand-edited there.
-- `check-env-drift.sh` runs as a **preflight** (already wired into `deploy.sh`;
-  carries over) and as a post-deploy assertion. Strict mode (`DEPLOY_STRICT_ENV=1`)
-  fails the deploy on drift.
+- `check-env-drift.sh` runs as a **preflight** (was wired into the old `deploy.sh`;
+  now operator-run until re-wired into the engine) and as a post-deploy assertion.
+  Strict mode (`DEPLOY_STRICT_ENV=1`) fails the deploy on drift.
 
 ### Fix 3 — APP_KEY (and all secrets) from one store
 - `APP_KEY` and shared secrets come from a **single secret source** (the deploy
@@ -91,8 +98,10 @@ an env change as requiring the same cache rebuild, not just a `.env` write.
 5. **Phase 4 — trigger self-deploy from dply** (a "Deploy control plane" action /
    webhook on push to `main`) using `RunSiteDeploymentJob`, with the drift
    preflight as a gate.
-6. **Phase 5 — delete `deploy.sh`** once Phases 1–4 are proven on a staging
-   control-plane site.
+6. **Phase 5 — done early: `deploy.sh` deploy machinery deleted** (it's now
+   commit-only `commit.sh`). Phases 1–4 remain the work to prove engine self-deploy
+   on a staging control-plane site; until then, deploys run through the engine
+   manually and on-box recovery is the manual path in `deploy/SELF_MANAGE.md`.
 
 ## Open questions
 - Secret store: `.deploy.env` now; do we move `APP_KEY` + provider tokens into a

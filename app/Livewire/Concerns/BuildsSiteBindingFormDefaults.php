@@ -25,7 +25,10 @@ trait BuildsSiteBindingFormDefaults
         return match (true) {
             $type === 'database' && $mode === 'provision' => ['engine' => 'mysql', 'name' => '', 'host' => '127.0.0.1'],
             $type === 'database' => $this->defaultDatabaseAttachBindingForm(),
-            $type === 'redis' => ['target_id' => ''],
+            // use_for_drivers: also wire cache/sessions/queue at this Redis in one
+            // step (default on — it's why you attach Redis). Existing driver
+            // bindings are preserved by the manager.
+            $type === 'redis' => ['target_id' => '', 'use_for_drivers' => true],
             $type === 'queue' => ['driver' => 'database'],
             $type === 'cache' => $this->defaultCacheBindingForm(),
             $type === 'session' => $this->defaultSessionBindingForm(),

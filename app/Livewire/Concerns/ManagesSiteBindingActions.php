@@ -107,6 +107,16 @@ trait ManagesSiteBindingActions
     {
         Gate::authorize('update', $this->site);
 
+        // Auto-provision Redis on connect: when there's no Redis to attach AND
+        // none is installed on the box, kick the install right from the connect
+        // action instead of dead-ending on "nothing reachable" (the operator no
+        // longer has to spot and click the separate Install Redis button). Once
+        // it's running, reconnect attaches it. If Redis IS installed but just
+        // unreachable, fall through so attach surfaces the precise error.
+        if ($this->bindingModalType === 'redis' && $this->maybeAutoInstallRedis($manager)) {
+            return;
+        }
+
         // Carry which row (if any) we're editing so multi-instance types (storage)
         // can update that row instead of rejecting it as a duplicate disk name.
         $params = $this->bindingForm + ['binding_id' => $this->bindingModalBindingId];
@@ -138,6 +148,43 @@ trait ManagesSiteBindingActions
         }
 
         $this->validateBindingConnectivity($binding);
+    }
+
+    /**
+     * If connecting Redis with nothing to attach and nothing installed, kick the
+     * install automatically and report it. Returns true when it handled the save
+     * (caller should stop); false when a Redis is already reachable/installed so
+     * the normal attach path should run.
+     */
+    private function maybeAutoInstallRedis(SiteBindingManager $manager): bool
+    {
+        // An explicit target pick means the operator chose a reachable service.
+        if (trim((string) ($this->bindingForm['target_id'] ?? '')) !== '') {
+            return false;
+        }
+
+        // Something reachable to attach → let the normal path handle it.
+        if ($manager->attachableTargets($this->site, 'redis') !== []) {
+            return false;
+        }
+
+        // A Redis-family service exists on the box but isn't reachable (e.g.
+        // still installing, or a peer needing remote access) → don't double
+        // install; let attach throw its precise, actionable error.
+        $installed = ServerCacheService::query()
+            ->where('server_id', $this->site->server_id)
+            ->whereIn('engine', ServerCacheService::FAMILY_REDIS_ENGINES)
+            ->exists();
+        if ($installed) {
+            return false;
+        }
+
+        // Nothing reachable, nothing installed → auto-provision. installCacheOnServer
+        // creates the pending service, dispatches the install job, closes the
+        // modal, and toasts "Installing…".
+        $this->installCacheOnServer('redis');
+
+        return true;
     }
 
     public function detachBinding(string $bindingId, SiteBindingManager $manager): void

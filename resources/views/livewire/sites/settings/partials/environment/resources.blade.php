@@ -879,6 +879,19 @@
                                 </div>
                             </div>
                         @endif
+
+                        {{-- One-click: also point cache, sessions, and the queue at
+                             this Redis. Creates the cache/queue/session driver
+                             bindings (redis) so the app uses Redis everywhere
+                             without three more trips through the modal. Existing
+                             driver bindings are preserved server-side. --}}
+                        <label class="mt-4 flex items-start gap-2 rounded-lg border border-brand-ink/10 bg-brand-sand/20 px-3 py-2.5 text-xs text-brand-moss">
+                            <input type="checkbox" wire:model="bindingForm.use_for_drivers" class="mt-0.5 rounded border-brand-ink/30 text-brand-forest focus:ring-brand-forest" />
+                            <span>
+                                <span class="block text-sm font-medium text-brand-ink">{{ __('Use Redis for cache, sessions, and the queue') }}</span>
+                                {{ __('Sets CACHE_STORE, SESSION_DRIVER, and QUEUE_CONNECTION to redis. Cache/session/queue you\'ve already configured are left untouched — repoint each one anytime.') }}
+                            </span>
+                        </label>
                     @endif
                 </div>
             @elseif ($bindingModalType === 'mail')
@@ -1170,7 +1183,7 @@
         <div class="flex items-center justify-end gap-2 border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4">
             <x-secondary-button type="button" x-on:click="$dispatch('close')">{{ __('Cancel') }}</x-secondary-button>
             <x-primary-button type="button" wire:click="saveBinding" wire:loading.attr="disabled" wire:target="saveBinding">
-                <span wire:loading.remove wire:target="saveBinding">{{ $bindingModalMode === 'provision' ? __('Provision') : (in_array($bindingModalType, ['cache', 'queue', 'session', 'logging', 'mail', 'broadcasting']) ? __('Save') : __('Attach')) }}</span>
+                <span wire:loading.remove wire:target="saveBinding">{{ $bindingModalType === 'redis' && $bindingTargets === [] ? __('Install & connect') : ($bindingModalMode === 'provision' ? __('Provision') : (in_array($bindingModalType, ['cache', 'queue', 'session', 'logging', 'mail', 'broadcasting']) ? __('Save') : __('Attach'))) }}</span>
                 <span wire:loading wire:target="saveBinding" class="inline-flex items-center gap-1.5"><span class="inline-flex h-4 w-4 items-center justify-center"><x-spinner size="sm" /></span>{{ __('Saving…') }}</span>
             </x-primary-button>
         </div>

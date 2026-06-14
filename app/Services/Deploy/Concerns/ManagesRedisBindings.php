@@ -100,7 +100,7 @@ trait ManagesRedisBindings
             'REDIS_PREFIX' => filled($svc->cache_prefix) ? (string) $svc->cache_prefix : null,
         ], fn ($v) => $v !== null);
 
-        return $this->persist($site, 'redis', [
+        $binding = $this->persist($site, 'redis', [
             'mode' => 'attach_existing',
             'status' => SiteBinding::STATUS_CONFIGURED,
             'name' => (string) $svc->engine.($crossServer ? ' · '.($svcServer->name ?? '') : ''),
@@ -112,6 +112,36 @@ trait ManagesRedisBindings
                 'source_server_id' => $crossServer ? (string) $svc->server_id : null,
             ]),
         ]);
+
+        // One-click "use Redis for cache, sessions, and queue": now that the
+        // Redis binding exists (so the driver dependency check passes), wire the
+        // three driver bindings to redis. Opt-in via the modal checkbox.
+        if (filter_var($params['use_for_drivers'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            $this->applyRedisToDriverBindings($site);
+        }
+
+        return $binding;
+    }
+
+    /**
+     * Point cache, sessions, and the queue at the just-attached Redis by
+     * creating their driver bindings (redis). Each is created only when the site
+     * doesn't already have one of that type, so a cache/session/queue config the
+     * operator set by hand is never clobbered. Each binding's injected env
+     * (CACHE_STORE / SESSION_DRIVER / QUEUE_CONNECTION) is adopted out of the
+     * loose .env so it stays managed rather than duplicated.
+     */
+    private function applyRedisToDriverBindings(Site $site): void
+    {
+        if (! $site->bindings()->where('type', 'cache')->exists()) {
+            $this->adoptInjectedEnv($site, $this->attachCache($site, ['driver' => 'redis']));
+        }
+        if (! $site->bindings()->where('type', 'queue')->exists()) {
+            $this->adoptInjectedEnv($site, $this->attachQueue($site, ['driver' => 'redis']));
+        }
+        if (! $site->bindings()->where('type', 'session')->exists()) {
+            $this->adoptInjectedEnv($site, $this->attachSession($site, ['driver' => 'redis']));
+        }
     }
 
     /**

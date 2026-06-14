@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- Connecting Redis to a site can now wire cache, sessions, and queue in one step and auto-installs Redis when none is available.
 ### Changed
 - Page headers are now consistent across the server, project, and site workspaces, all rendered from a single shared hero card.
 ### Added

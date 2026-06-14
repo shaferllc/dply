@@ -37,6 +37,13 @@
         @php
             $entries = [
                 [
+                    'date'    => 'June 14, 2026',
+                    'tags'    => ['new'],
+                    'title'   => 'One-Click Redis Setup',
+                    'summary' => 'Connecting Redis to a site can now wire cache, sessions, and queue in one step and auto-installs Redis when none is available.',
+                    'items'   => [],
+                ],
+                [
                     'date'    => 'June 13, 2026',
                     'tags'    => ['improved'],
                     'title'   => 'Consistent Workspace Headers',

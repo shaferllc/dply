@@ -131,7 +131,7 @@ dply/
 
 - See `AGENTS.md` for agent/AI collaboration conventions (no `CLAUDE.md` present — `AGENTS.md` is the equivalent).
 - Prod has three separate `.env` files: web app (`shared/.env`), worker (`shared/.env` on worker box), and local dev (`.env`). These drift — `check-env-drift.sh` + `ENV_SYNC.md` document the problem.
-- The app self-deploys itself (`AtomicSiteDeployer`); `deploy.sh` is break-glass only.
+- The app self-deploys itself via `AtomicSiteDeployer` (dashboard Deploy / `dply:site:deploy`), the sole deployer. The old `deploy.sh` shell deployer is retired — it's now `commit.sh`, which only stages, AI-generates a commit message + CHANGELOG entry, commits, and pushes (no deploy).
 - CI runs Pest against PostgreSQL 16; local dev uses SQLite (`database.sqlite`).
 - Feature flags (Pennant) gate nearly every new surface; `pennant:purge` is required when flipping a `workspace.*` default.
 - Local packages at `packages/log-parser` and `packages/nginx-config` are path-symlinked via `composer.json`.

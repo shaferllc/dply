@@ -25,7 +25,7 @@ export LC_ALL=C
 #   ./deploy/check-env-drift.sh            # report drift, exit 0 (warn only)
 #   DEPLOY_STRICT_ENV=1 ./deploy/check-env-drift.sh   # exit 1 if drift found
 #
-# Config (same vars as deploy.sh; .deploy.env is sourced if present):
+# Config (sourced from .deploy.env if present):
 #   DEPLOY_HOST            web/app SSH host                 (required)
 #   DEPLOY_WORKER_HOSTS    space-separated worker SSH hosts (optional)
 #   DEPLOY_APP_DIR         app root on web    (default /var/www/dply)
