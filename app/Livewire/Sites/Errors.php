@@ -51,7 +51,13 @@ class Errors extends Component
     #[Url(as: 'tab', except: 'stream')]
     public string $errorsTab = 'stream';
 
-    /** The reference code (X-Dply-Ref) the operator pasted from a 5xx page. */
+    /**
+     * The reference code (X-Dply-Ref) the operator pasted from a 5xx page, or
+     * arrived with via the deep-link on a captured `http_5xx` error row
+     * (?reference=…) — URL-bound so that link lands with the input prefilled,
+     * ready to resolve.
+     */
+    #[Url(as: 'reference', except: '')]
     public string $referenceQuery = '';
 
     /** ConsoleAction id of the in-flight / last reference lookup, if any. */
