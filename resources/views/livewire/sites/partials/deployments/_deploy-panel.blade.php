@@ -31,9 +31,15 @@
     // Env vars the last deploy was blocked on (recorded by the deploy job's
     // preflight). Non-empty → the deploy stopped early asking for these.
     $blockedEnv = $this->deployBlockedEnvKeys();
+
+    // A smart-fix streaming inline (from the shared _deploy-fixers partial) must
+    // keep the panel polling even when no deploy is running, so its output and
+    // the "Deploy now" follow-up appear live.
+    $fixerInFlight = method_exists($this, 'fixerRun')
+        && ($fr = $this->fixerRun) !== null && $fr->isInFlight();
 @endphp
 
-<div class="space-y-6" @if ($deployInProgress) wire:poll.5s @endif>
+<div class="space-y-6" @if ($deployInProgress || $fixerInFlight) wire:poll.5s @endif>
     {{-- While a queued console action is being watched (e.g. "Optimize pipeline"
          scanning the repo), poll so the deploy hub re-renders on completion: the
          success toast fires and the proposed-changes preview modal below auto-opens
@@ -609,6 +615,16 @@
                     }
                 @endphp
                 @include('livewire.sites.partials.deployments._phase-timeline', ['timelinePhases' => $timelinePhases, 'deployment' => $latest, 'dbFix' => $dbFix])
+
+                {{-- Smart fixes for a failed deploy — same inline fix actions the
+                     deploy sidebar offers, driven by the shared coordinator. --}}
+                @include('livewire.sites.partials._deploy-fixers', [
+                    'latest' => $latest,
+                    'phases' => $timelinePhases,
+                    'server' => $server,
+                    'site' => $site,
+                    'deployAction' => 'deployNow',
+                ])
             @endif
             </div>
         </div>
