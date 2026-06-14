@@ -232,6 +232,49 @@ class DeployDatabaseFix extends Component
         $this->toastConsoleActionQueued();
     }
 
+    /**
+     * Provision/sync the already-attached database resource onto the server: with
+     * the now-idempotent + fail-loud provisioner, this (re)creates the role/db and
+     * sets the stored password, then pushes the env. This is the fix when dply
+     * tracks a resource that was never actually created on the box (or drifted) —
+     * the desync the silent-provisioning bug used to hide.
+     */
+    public function repairResource(): void
+    {
+        $this->authorize('update', $this->site);
+
+        $resourceId = $this->diagnosis()->resourceId;
+        $db = $resourceId !== null
+            ? ServerDatabase::query()->where('server_id', $this->server->id)->whereKey($resourceId)->first()
+            : null;
+
+        if ($db === null) {
+            $this->toastError(__('There’s no attached database to repair.'));
+
+            return;
+        }
+
+        $run = $this->seedConsoleRun('site_db_create', __('Repair :name on the server', ['name' => $db->name]));
+
+        CreateSiteDatabaseJob::dispatch(
+            $db->id,
+            $this->site->id,
+            true,  // writeEnv
+            true,  // pushEnv (Q11)
+            (string) (auth()->id() ?? '') ?: null,
+            (string) $run->id,
+        );
+
+        $this->fixRunId = (string) $run->id;
+        $this->watchConsoleAction(
+            $run,
+            __('Provisioned :name on the server and pushed the connection. Retry the deploy below.', ['name' => $db->name]),
+            __('Could not provision the database on the server.'),
+        );
+        $this->dispatch('dply-console-action-focus');
+        $this->toastConsoleActionQueued();
+    }
+
     public function openInjectModal(): void
     {
         $this->authorize('update', $this->site);

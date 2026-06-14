@@ -36,9 +36,10 @@ class DatabaseConnectionDiagnostic
         $port = $this->cleanScalar($vars['DB_PORT'] ?? null);
 
         $engineFamily = $this->engineFamily($site, $connection, $port);
+        $resource = $this->detectResource($site);
         $state = $this->resolveState($site, $connection, $host);
 
-        [$headline, $detail, $actions] = $this->recommend($subclass, $state, $host);
+        [$headline, $detail, $actions] = $this->recommend($subclass, $state, $host, $resource !== null);
 
         return new DatabaseConnectionDiagnosis(
             subclass: $subclass,
@@ -49,7 +50,25 @@ class DatabaseConnectionDiagnostic
             headline: $headline,
             detail: $detail,
             actions: $actions,
+            resourceId: $resource['id'] ?? null,
+            resourceLabel: $resource['label'] ?? null,
         );
+    }
+
+    /**
+     * The attached, provisionable database resource (a ServerDatabase) for this
+     * site, if any — what a "repair on server" action would create/sync on the box.
+     *
+     * @return array{id: string, label: string}|null
+     */
+    private function detectResource(Site $site): ?array
+    {
+        $db = $site->serverDatabases()->first();
+        if ($db === null) {
+            return null;
+        }
+
+        return ['id' => (string) $db->id, 'label' => $db->name.' ('.$db->engine.')'];
     }
 
     /** Bucket the error text into the connection-failure family. Order = most specific first. */
@@ -148,24 +167,32 @@ class DatabaseConnectionDiagnostic
      *
      * @return array{0: string, 1: string, 2: list<string>}
      */
-    private function recommend(string $subclass, string $state, ?string $host): array
+    private function recommend(string $subclass, string $state, ?string $host, bool $hasResource = false): array
     {
         $hostLabel = $host ?: '127.0.0.1';
 
-        // Binding exists but the connection still failed — Level A can't tell why
-        // (engine down / firewall / drifted host:port), so be honest and route
-        // rather than pretend "attach" or "inject" is the certain fix (Q12).
+        // A database resource is attached but the connection still failed. The
+        // usual cause (proven repeatedly) is that the resource was never actually
+        // provisioned on the box, or its role/password drifted — so lead with
+        // "Repair on server", which (re)creates the role/db with the stored
+        // password. Injecting the .env can't fix a server that has no such role.
         if ($state === DatabaseConnectionDiagnosis::STATE_ATTACHED) {
             $detail = match ($subclass) {
-                DatabaseConnectionDiagnosis::SUBCLASS_AUTH_FAILED => __('A database is attached, but the server rejected the credentials. The stored DB_USERNAME / DB_PASSWORD may have drifted from what’s on the server — re-inject them, or rotate the password from the Database tab.'),
-                DatabaseConnectionDiagnosis::SUBCLASS_UNKNOWN_DB => __('A database is attached, but the database name the app uses doesn’t exist on the server. Check DB_DATABASE, or create the missing database from the Database tab.'),
-                default => __('A database is attached, but the server refused the connection. The most common causes are that the database engine isn’t running, or DB_HOST / DB_PORT drifted. Check the engine on the Database tab, or re-inject the connection details.'),
+                DatabaseConnectionDiagnosis::SUBCLASS_AUTH_FAILED => __('A database is attached, but the server rejected the credentials — the role/password on the server doesn’t match what dply has stored (injecting the .env alone can’t fix that). Repair it on the server to (re)create the role with the stored password.'),
+                DatabaseConnectionDiagnosis::SUBCLASS_UNKNOWN_DB => __('A database is attached, but the database the app uses doesn’t exist on the server. Repair it on the server to create the missing database, or check DB_DATABASE.'),
+                default => __('A database is attached, but the server refused the connection. The engine may not be running, or the database/role was never actually created on the box. Repair it on the server, or check the engine on the Database tab.'),
             };
+
+            // Only offer "repair" when there's a concrete ServerDatabase resource
+            // to provision; a binding-only attachment falls back to routing.
+            $actions = $hasResource
+                ? [DatabaseConnectionDiagnosis::ACTION_REPAIR, DatabaseConnectionDiagnosis::ACTION_OPEN_DATABASE, DatabaseConnectionDiagnosis::ACTION_INJECT]
+                : [DatabaseConnectionDiagnosis::ACTION_OPEN_DATABASE, DatabaseConnectionDiagnosis::ACTION_INJECT];
 
             return [
                 __('A database is attached, but the connection failed'),
                 $detail,
-                [DatabaseConnectionDiagnosis::ACTION_OPEN_DATABASE, DatabaseConnectionDiagnosis::ACTION_INJECT],
+                $actions,
             ];
         }
 

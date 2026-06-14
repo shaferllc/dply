@@ -11,7 +11,6 @@ use App\Support\Admin\PlatformAdmins;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -38,9 +37,13 @@ class Sidebar extends Component
     /** @var array<int, \Livewire\Features\SupportFileUploads\TemporaryUploadedFile> */
     public array $attachments = [];
 
-    /** Hidden fields populated by the Alpine driver right before submit(). */
-    public ?string $screenshotData = null;
+    /**
+     * Streamed screenshot upload (WebP). A real file upload — NOT a base64 string
+     * property — so the multi-100KB image never inflates the component snapshot.
+     */
+    public $screenshotUpload = null;
 
+    /** Small string fields populated by the Alpine driver right before submit(). */
     public ?string $consoleBuffer = null;
 
     public ?string $pageContext = null;
@@ -63,6 +66,7 @@ class Sidebar extends Component
             'severity' => ['nullable', 'string', 'in:'.implode(',', FeedbackReport::severityKeys())],
             'attachments' => ['array', 'max:'.$limits['attachments_max']],
             'attachments.*' => ['image', 'max:'.$limits['attachment_max_kb']],
+            'screenshotUpload' => ['nullable', 'image', 'max:'.$limits['attachment_max_kb']],
         ]);
 
         $user = auth()->user();
@@ -111,7 +115,7 @@ class Sidebar extends Component
 
         $this->notifyAdmins($report);
 
-        $this->reset(['title', 'description', 'attachments', 'screenshotData', 'consoleBuffer', 'pageContext']);
+        $this->reset(['title', 'description', 'attachments', 'screenshotUpload', 'consoleBuffer', 'pageContext']);
         $this->severity = 'normal';
 
         $this->toastSuccess(__('Thanks — report :ref received.', ['ref' => $report->reference]));
@@ -147,30 +151,15 @@ class Sidebar extends Component
 
     private function storeScreenshot(FeedbackReport $report): ?string
     {
-        if (! is_string($this->screenshotData) || ! str_starts_with($this->screenshotData, 'data:image/')) {
+        if (! $this->screenshotUpload) {
             return null;
         }
 
-        $comma = strpos($this->screenshotData, ',');
-        if ($comma === false) {
-            return null;
-        }
-
-        $binary = base64_decode(substr($this->screenshotData, $comma + 1), true);
-        if ($binary === false) {
-            return null;
-        }
-
-        if (strlen($binary) > (int) config('feedback.limits.screenshot_max_bytes')) {
-            return null; // refuse oversized capture rather than store it
-        }
-
-        $ext = str_contains($this->screenshotData, 'image/webp') ? 'webp' : 'png';
-        $path = "reports/{$report->id}/screenshot.{$ext}";
-
-        Storage::disk(config('feedback.disk'))->put($path, $binary);
-
-        return $path;
+        return $this->screenshotUpload->storeAs(
+            "reports/{$report->id}",
+            'screenshot.webp',
+            config('feedback.disk'),
+        );
     }
 
     /**

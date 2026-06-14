@@ -29,6 +29,19 @@
                     @foreach ($d->actions as $action)
                         @php $isPrimary = $action === $primary; @endphp
                         @switch ($action)
+                            @case('repair')
+                                <button type="button" wire:click="repairResource" wire:loading.attr="disabled" wire:target="repairResource"
+                                    @class([
+                                        'inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold shadow-sm transition disabled:opacity-60',
+                                        'bg-brand-ink text-brand-cream hover:bg-brand-forest' => $isPrimary,
+                                        'border border-brand-ink/15 bg-white text-brand-ink hover:bg-brand-sand/40' => ! $isPrimary,
+                                    ])>
+                                    <x-heroicon-o-wrench-screwdriver class="h-4 w-4" aria-hidden="true" />
+                                    {{ __('Repair on server') }}
+                                    @if ($isPrimary)<span class="rounded-full bg-brand-cream/20 px-1.5 py-0.5 text-[10px] uppercase tracking-wide">{{ __('Recommended') }}</span>@endif
+                                </button>
+                                @break
+
                             @case('attach')
                                 <button type="button" wire:click="openAttachModal" wire:loading.attr="disabled"
                                     @class([

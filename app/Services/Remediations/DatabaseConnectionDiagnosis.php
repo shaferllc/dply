@@ -40,6 +40,11 @@ final class DatabaseConnectionDiagnosis
 
     public const ACTION_OPEN_DATABASE = 'open_database';
 
+    // Provision/sync the already-attached database resource ONTO the server
+    // (create the role/db, set the stored password) — the fix when a resource is
+    // tracked but missing/mismatched on the box.
+    public const ACTION_REPAIR = 'repair';
+
     /**
      * @param  list<string>  $actions  ordered guided action keys; first is the recommended/primary fix
      */
@@ -52,6 +57,10 @@ final class DatabaseConnectionDiagnosis
         public readonly string $headline,
         public readonly string $detail,
         public readonly array $actions,
+        // The attached database resource (a ServerDatabase) this diagnosis can
+        // provision/repair on the server, when one is attached.
+        public readonly ?string $resourceId = null,
+        public readonly ?string $resourceLabel = null,
     ) {}
 
     public function recommends(string $action): bool

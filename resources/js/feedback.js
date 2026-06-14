@@ -20,6 +20,7 @@
 
 const CONSOLE_MAX_ENTRIES = 50;
 const CONSOLE_MAX_BYTES = 32 * 1024;
+const SNAPDOM_CDN = 'https://cdn.jsdelivr.net/npm/@zumer/snapdom/dist/snapdom.mjs';
 const SCREENSHOT_CDN = 'https://cdn.jsdelivr.net/npm/modern-screenshot@4/+esm';
 
 // ---------------------------------------------------------------------------
@@ -104,14 +105,23 @@ function stringifyArg(arg) {
 // 2. Screenshot capture (with redaction) + Alpine sidebar driver
 // ---------------------------------------------------------------------------
 
+let snapdomLib = null;
 let screenshotLib = null;
+
+async function loadSnapdom() {
+    if (snapdomLib) {
+        return snapdomLib;
+    }
+    // Loaded from CDN on demand (same pattern as Plotly) so it stays out of the
+    // main bundle. @vite-ignore keeps Vite from trying to resolve the URL.
+    snapdomLib = await import(/* @vite-ignore */ SNAPDOM_CDN);
+    return snapdomLib;
+}
 
 async function loadScreenshotLib() {
     if (screenshotLib) {
         return screenshotLib;
     }
-    // Loaded from CDN on demand (same pattern as Plotly) so it stays out of the
-    // main bundle. @vite-ignore keeps Vite from trying to resolve the URL.
     screenshotLib = await import(/* @vite-ignore */ SCREENSHOT_CDN);
     return screenshotLib;
 }
@@ -141,50 +151,105 @@ function nextFrame() {
     return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 }
 
-export async function captureFeedbackScreenshot() {
-    try {
-        const { domToWebp } = await loadScreenshotLib();
-
-        // Wait for fonts + a couple of frames. The #1 cause of a "blank /
-        // background-only" capture is firing before web fonts and the cloned
-        // <foreignObject> have settled.
-        if (document.fonts && document.fonts.ready) {
-            try {
-                await document.fonts.ready;
-            } catch (_) {
-                /* ignore */
-            }
+async function waitForPaint() {
+    // The #1 cause of a "background-only" capture is firing before web fonts
+    // and layout have settled.
+    if (document.fonts && document.fonts.ready) {
+        try {
+            await document.fonts.ready;
+        } catch (_) {
+            /* ignore */
         }
-        await nextFrame();
+    }
+    await nextFrame();
+}
 
-        const width = document.documentElement.clientWidth || window.innerWidth;
-        // Downscale wide viewports toward ~1600px to bound payload size.
-        const scale = width > 1600 ? 1600 / width : 1;
+// Output bounds. We cap dimensions + quality so the uploaded screenshot stays
+// small (~under a few hundred KB) — both to keep storage lean and, critically,
+// so the payload never bloats the request. Tall pages are cropped, not scaled
+// to nothing.
+const MAX_W = 1600;
+const MAX_H = 2400;
+const WEBP_QUALITY = 0.72;
 
-        const options = {
-            quality: 0.82,
-            scale,
-            width,
-            height: Math.min(
-                document.documentElement.scrollHeight || window.innerHeight,
-                window.innerHeight * 3,
-            ),
-            backgroundColor:
-                getComputedStyle(document.body).backgroundColor || '#ffffff',
-            filter: (node) => !shouldRedact(node),
-            // Inline same-origin resources; don't let one failed asset blank the
-            // whole render or hang forever.
-            fetch: { bypassingCache: true },
-            timeout: 12000,
-        };
+// Primary engine: snapdom. It rasterizes the live DOM by deeply inlining
+// computed styles + fonts, which avoids the blank/background-only <foreignObject>
+// renders that modern-screenshot and html-to-image hit on complex Tailwind pages.
+async function captureCanvasWithSnapdom() {
+    const { snapdom } = await loadSnapdom();
+    const result = await snapdom(document.body, {
+        scale: 1,
+        backgroundColor: getComputedStyle(document.body).backgroundColor || '#ffffff',
+        embedFonts: true,
+        // Deny-by-default: drop sensitive/secret-bearing nodes from the capture.
+        exclude: REDACT_SELECTORS,
+        filter: (node) => !shouldRedact(node),
+    });
 
-        // Warm-up pass: modern-screenshot's first render can come back blank
-        // while it inlines images/fonts into the SVG. The second pass uses the
-        // now-primed cache and is the one we keep.
-        await domToWebp(document.body, options).catch(() => null);
-        await nextFrame();
+    return result.toCanvas();
+}
 
-        return await domToWebp(document.body, options);
+// Fallback engine, in case snapdom ever fails to load/run.
+async function captureCanvasWithModernScreenshot() {
+    const { domToCanvas } = await loadScreenshotLib();
+    const options = {
+        backgroundColor: getComputedStyle(document.body).backgroundColor || '#ffffff',
+        filter: (node) => !shouldRedact(node),
+    };
+
+    // Warm-up pass primes the resource cache; the second pass is the keeper.
+    await domToCanvas(document.body, options).catch(() => null);
+    await nextFrame();
+
+    return domToCanvas(document.body, options);
+}
+
+// Downscale to MAX_W and crop to MAX_H, then encode WebP — bounding the output
+// size regardless of how large/tall the source page was.
+function canvasToCappedWebpBlob(src) {
+    const sw = src.width;
+    const sh = src.height;
+    if (!sw || !sh) {
+        return Promise.resolve(null);
+    }
+
+    const ratio = Math.min(1, MAX_W / sw);
+    const srcCropH = Math.min(sh, Math.round(MAX_H / ratio));
+    const tw = Math.max(1, Math.round(sw * ratio));
+    const th = Math.max(1, Math.round(srcCropH * ratio));
+
+    const out = document.createElement('canvas');
+    out.width = tw;
+    out.height = th;
+    const ctx = out.getContext('2d');
+    ctx.drawImage(src, 0, 0, sw, srcCropH, 0, 0, tw, th);
+
+    return new Promise((resolve) => {
+        out.toBlob((blob) => resolve(blob), 'image/webp', WEBP_QUALITY);
+    });
+}
+
+// Returns a capped WebP Blob of the current page (or null). We upload this as a
+// streamed file rather than a base64 string so it never inflates the Livewire
+// component snapshot (which is copied several times per request).
+export async function captureFeedbackScreenshotBlob() {
+    try {
+        await waitForPaint();
+
+        let canvas = null;
+        try {
+            canvas = await captureCanvasWithSnapdom();
+        } catch (e) {
+            console.warn('snapdom capture failed, falling back:', e);
+        }
+        if (!canvas) {
+            canvas = await captureCanvasWithModernScreenshot();
+        }
+        if (!canvas) {
+            return null;
+        }
+
+        return await canvasToCappedWebpBlob(canvas);
     } catch (e) {
         console.warn('Feedback screenshot capture failed (continuing without it):', e);
         return null;
@@ -225,14 +290,24 @@ export function registerFeedbackSidebar(Alpine) {
             }
             this.busy = true;
             try {
-                let screenshot = null;
                 if (this.includeScreenshot) {
-                    screenshot = await captureFeedbackScreenshot();
+                    const blob = await captureFeedbackScreenshotBlob();
+                    if (blob) {
+                        const file = new File([blob], 'screenshot.webp', { type: 'image/webp' });
+                        // Streamed upload — keeps the (multi-100KB) image OUT of the
+                        // component snapshot. Non-fatal: a failed upload still files
+                        // the report, just without the screenshot.
+                        try {
+                            await new Promise((resolve, reject) => {
+                                this.$wire.upload('screenshotUpload', file, () => resolve(), (e) => reject(e));
+                            });
+                        } catch (e) {
+                            console.warn('Screenshot upload failed, filing report without it:', e);
+                        }
+                    }
                 }
 
-                // Defer-set (false) so we don't trigger a render per call; the
-                // submit() round-trip below carries them all to the server.
-                await this.$wire.set('screenshotData', screenshot, false);
+                // These are small (capped) — fine as deferred string properties.
                 await this.$wire.set(
                     'consoleBuffer',
                     JSON.stringify(window.dplyFeedbackConsole?.snapshot() ?? []),
@@ -241,6 +316,8 @@ export function registerFeedbackSidebar(Alpine) {
                 await this.$wire.set('pageContext', JSON.stringify(collectPageContext()), false);
 
                 await this.$wire.submit();
+            } catch (e) {
+                console.warn('Feedback submit failed:', e);
             } finally {
                 this.busy = false;
             }
