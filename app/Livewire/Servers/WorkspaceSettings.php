@@ -8,10 +8,8 @@ use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
 use App\Livewire\Servers\Concerns\ManagesExtendedServerSettings;
 use App\Livewire\Servers\Concerns\ManagesWorkspaceSettingsForm;
 use App\Livewire\Servers\Concerns\RendersWorkspacePlaceholder;
-use App\Models\NotificationSubscription;
 use App\Models\OutboundWebhookDelivery;
 use App\Models\Server;
-use App\Services\Notifications\AssignableNotificationChannels;
 use App\Services\Servers\ServerCostCard;
 use App\Services\Servers\ServerHealthProbe;
 use App\Services\Servers\ServerRemovalAdvisor;
@@ -222,19 +220,6 @@ class WorkspaceSettings extends Component
                 ->get()
             : collect();
 
-        $serverNotifSubscriptions = collect();
-        $assignableChannels = collect();
-        if ($this->section === 'alerts') {
-            $serverNotifSubscriptions = NotificationSubscription::query()
-                ->where('subscribable_type', Server::class)
-                ->where('subscribable_id', $this->server->id)
-                ->with('channel')
-                ->get();
-            $assignableChannels = AssignableNotificationChannels::forUser(auth()->user(), auth()->user()?->currentOrganization())
-                ->sortBy('label')
-                ->values();
-        }
-
         $costReport = null;
         if ($this->section === 'governance'
             && Feature::active('workspace.server_cost')
@@ -251,8 +236,6 @@ class WorkspaceSettings extends Component
                 ? ServerRemovalAdvisor::summary($this->server)
                 : null,
             'webhookDeliveries' => $webhookDeliveries,
-            'serverNotifSubscriptions' => $serverNotifSubscriptions,
-            'assignableChannels' => $assignableChannels,
             'costReport' => $costReport,
         ]);
     }

@@ -7,7 +7,6 @@
 
 <x-server-workspace-layout :server="$server" active="ssh-access" :title="__('Access graph')" :description="__('Who had SSH access on this server over time — your keys, temporary sessions, and when Dply accessed the server to run jobs.')">
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
-    <x-slot:explainer><p>{{ __('Tracks authorized_keys managed by Dply over time, temporary session grants, and platform SSH sessions when Dply runs installs, deploys, or workspace actions on this server.') }}</p></x-slot:explainer>
 
     <div class="space-y-6">
         <section class="dply-card overflow-hidden">

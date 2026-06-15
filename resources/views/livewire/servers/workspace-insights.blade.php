@@ -15,11 +15,6 @@
 
     @include('livewire.servers.partials.workspace-flashes')
 
-    <x-slot:explainer>
-        <p>{{ __('Insights runs a battery of read-only health checks against the server (config sanity, package versions, log signals, resource pressure) and groups the findings into a prioritized list. Each finding may have an associated "Apply fix" action that dply can run for you over SSH.') }}</p>
-        <p>{{ __('"Run checks now" re-runs the full battery on demand. Otherwise checks run on a slow background cadence so the page stays responsive — opening this tab uses the most recent cached results.') }}</p>
-    </x-slot:explainer>
-
     @if ($server->workspace)
         @feature('surface.projects')
             <section class="dply-card overflow-hidden">

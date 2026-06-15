@@ -66,11 +66,6 @@
 @include('livewire.servers.partials.workspace-flashes')
 @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-<x-explainer>
-    <p>{{ __('Dply wraps framework schedulers in a heartbeat script so we can tell when schedule:run stops firing. Enable monitoring here; use Cron jobs for arbitrary crontab entries and Workers for long-running schedule:work daemons.') }}</p>
-    <p class="mt-2 text-xs"><a href="{{ route('servers.activity', $server) }}?category=background" wire:navigate class="font-semibold text-brand-ink underline">{{ __('View background activity →') }}</a></p>
-</x-explainer>
-
 <section class="dply-card overflow-hidden">
     <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
         <x-icon-badge>

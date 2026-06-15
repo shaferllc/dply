@@ -81,10 +81,6 @@
     </div>
 
     <div class="px-6 py-6 sm:px-7">
-    <x-explainer class="mt-4">
-        <p>{{ __('Each sample runs INFO over SSH, parses the cumulative counters Redis reports, and computes deltas against the previous sample to show throughput and hit-rate over the last sampling window.') }}</p>
-        <p>{{ __('Sampling continues at 10s intervals while this card is open; closing the card pauses sampling and discards the buffer. The first sample shows windowed values as "—" because there\'s nothing to delta against yet.') }}</p>
-    </x-explainer>
 
     {{-- In-body active-load indicator. Two flavors:
            - First load (no $latest yet): big banner + 4-tile skeleton replaces

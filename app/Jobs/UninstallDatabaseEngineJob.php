@@ -14,12 +14,13 @@ use App\Services\Servers\DatabaseEngineAuditLogger;
 use App\Services\Servers\ExecuteRemoteTaskOnServer;
 use App\Support\Servers\DatabaseEngineInstallScripts;
 use App\Support\Servers\ServerDatabaseHostCapabilities;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Str;
 
-class UninstallDatabaseEngineJob implements ShouldQueue
+class UninstallDatabaseEngineJob implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
     use WritesConsoleAction;
@@ -34,6 +35,17 @@ class UninstallDatabaseEngineJob implements ShouldQueue
         if (is_string($q) && $q !== '') {
             $this->onQueue($q);
         }
+    }
+
+    /** One uninstall in flight per engine row (mirrors InstallDatabaseEngineJob). */
+    public function uniqueId(): string
+    {
+        return 'db_engine_uninstall_'.$this->serverDatabaseEngineId;
+    }
+
+    public function uniqueFor(): int
+    {
+        return 60;
     }
 
     protected function consoleSubject(): Model

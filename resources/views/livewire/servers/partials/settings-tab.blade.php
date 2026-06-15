@@ -46,12 +46,6 @@
     @case ('keys')
         @include('livewire.servers.partials.settings.group-keys', $settingsShare)
         @break
-    @case ('alerts')
-        @include('livewire.servers.partials.settings.group-operations', $settingsShare + [
-            'serverNotifSubscriptions' => $serverNotifSubscriptions ?? collect(),
-            'assignableChannels' => $assignableChannels ?? collect(),
-        ])
-        @break
     @case ('inventory')
         @include('livewire.servers.partials.settings.group-inventory', $settingsShare)
         @break

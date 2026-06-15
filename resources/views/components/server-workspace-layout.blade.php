@@ -14,10 +14,6 @@
     'pageHeaderCompact' => false,
     /** Suppress the generic hero-card header when the page renders its own identity card (e.g. the Overview identity-hero). */
     'hideHero' => false,
-    /** Tone for the integrated header explainer ("What is this?") — passed through to x-explainer. */
-    'explainerTone' => 'info',
-    /** Optional custom label/title for the integrated header explainer. */
-    'explainerTitle' => null,
 ])
 
 <x-server-workspace-shell :server="$server" :active="$active" :show-navigation="$showNavigation">
@@ -134,32 +130,6 @@
                     {{ $headerLeading }}
                 </x-slot:leading>
             @endisset
-
-            <x-slot:stats>
-                <dl class="grid grid-cols-3 gap-2">
-                    <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
-                        <dd class="mt-1 text-sm font-semibold text-brand-ink">{{ ucfirst(str_replace('_', ' ', (string) ($server->status ?? '—'))) }}</dd>
-                    </div>
-                    <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Region') }}</dt>
-                        <dd class="mt-1 text-sm font-semibold text-brand-ink">{{ $server->region ?? '—' }}</dd>
-                    </div>
-                    <div class="rounded-2xl border border-brand-ink/10 bg-white px-4 py-3 shadow-sm">
-                        <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('IP') }}</dt>
-                        <dd class="mt-1 text-sm font-semibold text-brand-ink">{{ $server->public_ip_address ?? $server->ip_address ?? '—' }}</dd>
-                    </div>
-                </dl>
-            </x-slot:stats>
-
-            {{-- "What is this?" contextual help, integrated into the header as an
-                 action pill instead of floating as a detached element below the
-                 card. Pages supply the body via <x-slot:explainer>. --}}
-            @if (isset($explainer) && trim((string) $explainer) !== '')
-                <x-explainer :tone="$explainerTone" :title="$explainerTitle">
-                    {{ $explainer }}
-                </x-explainer>
-            @endif
         </x-hero-card>
     @endunless
 

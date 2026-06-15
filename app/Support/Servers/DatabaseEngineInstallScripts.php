@@ -221,8 +221,11 @@ BASH,
      *
      * Writes a LOW-numbered conf.d override (`00-dply-loopback`) so a later
      * remote-access override (`99-dply`, listen `*` / bind `0.0.0.0`) still wins —
-     * both of which already include loopback. Returns '' for engines we don't
-     * enforce here.
+     * both of which already include loopback. postgres/mysql/mariadb rewrite the
+     * bind config; clickhouse/mongodb (whose packaged defaults already bind
+     * loopback) restart + wait for the port, since a missed probe there is
+     * usually a slow bind rather than a bad config. Returns '' for engines we
+     * don't enforce here (e.g. sqlite).
      */
     public static function ensureLoopbackListeningScript(string $engine): string
     {
@@ -251,6 +254,49 @@ EOF
   fi
 done
 systemctl restart mysql 2>/dev/null || systemctl restart mariadb
+echo "loopback_listen_ensured"
+BASH,
+            // ClickHouse normally binds 127.0.0.1/::1 out of the box; a failed
+            // loopback probe usually means the HTTP port (8123) was still warming
+            // up when `is-active` returned. Pin a LOW-numbered loopback override
+            // (a later 99-dply-listen remote-access override with 0.0.0.0 still
+            // wins — and 0.0.0.0 includes loopback), restart, then WAIT for the
+            // port so the job's post-script re-probe isn't racing the bind.
+            $engine === 'clickhouse' => <<<'BASH'
+set -e
+mkdir -p /etc/clickhouse-server/config.d
+cat > /etc/clickhouse-server/config.d/00-dply-loopback.xml <<'EOF'
+<clickhouse>
+    <listen_host>127.0.0.1</listen_host>
+    <listen_host>::1</listen_host>
+</clickhouse>
+EOF
+chown clickhouse:clickhouse /etc/clickhouse-server/config.d/00-dply-loopback.xml 2>/dev/null || true
+systemctl restart clickhouse-server
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  if timeout 2 bash -c '</dev/tcp/127.0.0.1/8123' >/dev/null 2>&1; then break; fi
+  sleep 2
+done
+echo "loopback_listen_ensured"
+BASH,
+            // MongoDB's packaged /etc/mongod.conf ships `net.bindIp: 127.0.0.1`,
+            // so a missed loopback probe is almost always the port still binding
+            // after `is-active`, not a bad config. We deliberately do NOT rewrite
+            // the yaml (indent-sensitive, multiple valid bindIp forms) — only add
+            // 127.0.0.1 when an existing bindIp line excludes it — then restart
+            // and wait for the port. If it still won't bind, the job throws with a
+            // clear "not listening" error for the operator to investigate.
+            $engine === 'mongodb' => <<<'BASH'
+set -e
+CONF=/etc/mongod.conf
+if [ -f "$CONF" ] && grep -qE '^[[:space:]]*bindIp:' "$CONF" && ! grep -E '^[[:space:]]*bindIp:.*127\.0\.0\.1' "$CONF" >/dev/null 2>&1; then
+  sed -i -E 's/^([[:space:]]*bindIp:[[:space:]]*)(.*)$/\1127.0.0.1,\2/' "$CONF"
+fi
+systemctl restart mongod
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  if timeout 2 bash -c '</dev/tcp/127.0.0.1/27017' >/dev/null 2>&1; then break; fi
+  sleep 2
+done
 echo "loopback_listen_ensured"
 BASH,
             default => '',

@@ -79,18 +79,22 @@ return [
             // pushed REDIS_QUEUE=default (see WorkerPoolHorizonConfig) so they
             // keep using 'default' — disjoint from the control plane.
             'queue' => env('REDIS_QUEUE', 'dply'),
-            // Must exceed the Horizon worker `timeout` (see config/horizon.php —
-            // currently 720s). retry_after governs when Redis considers a
-            // reserved job "lost" and re-dispatches it; if it fires before the
-            // worker's own timeout, the job gets picked up by a second worker
-            // and the next attempts++ trips MaxAttemptsExceededException. The
-            // 90s Laravel default is far too low for the SSH-driven jobs in
-            // this app (webserver switch, insight-fix, etc).
-            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 900),
+            // Must exceed BOTH the Horizon worker `timeout` AND the longest job
+            // `$timeout` (see config/horizon.php). retry_after governs when Redis
+            // considers a reserved job "lost" and re-dispatches it; if it fires
+            // before a still-running job finishes, a second worker picks the job
+            // up and re-runs it concurrently — which is how a slow install (e.g.
+            // ClickHouse apt + 777MB unpack) loops "Running apt install …" with
+            // no terminal line, and eventually trips MaxAttemptsExceededException.
+            // A job's own large $timeout OVERRIDES the worker --timeout, so the
+            // bound here is the longest $timeout in app/Jobs (currently 7200s:
+            // RunSetupScriptJob / ExportSiteFileBackupJob), not the worker timeout.
+            // Invariant: longest job $timeout ≤ HORIZON worker timeout < retry_after.
+            'retry_after' => (int) env('REDIS_QUEUE_RETRY_AFTER', 7800),
             // Blocking pop (BLPOP) keeps the connection warm instead of polling
             // + idling, which is what got the socket reset by the remote box.
             // MUST stay below read_timeout — the `queue` connection uses -1, so
-            // any positive value is safe; keep < retry_after (900s) too.
+            // any positive value is safe; keep < retry_after too.
             'block_for' => (int) env('REDIS_QUEUE_BLOCK_FOR', 5),
             'after_commit' => false,
         ],

@@ -1,11 +1,6 @@
 @include('livewire.servers.partials.workspace-flashes')
 @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-<x-explainer>
-    <p>{{ __('This workspace manages long-running supervisord-supervised processes for this server (queue workers, websocket servers, custom long-running PHP/Node binaries). Each daemon is a config file in /etc/supervisor/conf.d that dply rewrites in full on every change; supervisorctl reread + update applies the change.') }}</p>
-    <p>{{ __('State (running / stopped / fatal) is read live via supervisorctl status. The worker health block above rolls up the scheduled health snapshot — refresh it before restarting workers or syncing config when drift is detected.') }}</p>
-</x-explainer>
-
 @if ($contextSiteModel ?? null)
     @php $daemonSuggestions = \App\Support\Sites\SiteDaemonAdvisor::suggestions($contextSiteModel); @endphp
     @if ($daemonSuggestions !== [])

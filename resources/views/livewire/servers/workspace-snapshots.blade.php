@@ -7,14 +7,6 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-slot:explainer>
-        <p>
-            <span class="font-semibold text-brand-ink">{{ __('Snapshots vs Backups:') }}</span>
-            {{ __('Snapshots are full-state, point-in-time captures — a whole-disk server image, a volume, or a cache/database snapshot — that you roll the server back to. They live on your cloud account and are billed by the provider. For granular, portable exports of a single database or a site\'s files to storage you own (and restored by importing), use') }}
-            <a href="{{ route('servers.backups', $server) }}" wire:navigate class="font-semibold text-brand-ink underline hover:no-underline">{{ __('Backups') }}</a>{{ __(' instead.') }}
-        </p>
-    </x-slot:explainer>
-
     <x-server-workspace-tablist :aria-label="__('Snapshot types')">
         <x-server-workspace-tab id="snapshots-tab-images" :active="$snapshots_tab === 'images'" wire:click="setSnapshotsTab('images')">
             <span class="inline-flex items-center gap-1.5">

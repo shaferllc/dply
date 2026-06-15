@@ -4,9 +4,6 @@
     :title="__('Notifications')"
     :description="__('Route notification channels to this server\'s events — one place for every alert the box can raise. The same subscriptions are also editable from each feature\'s own Notifications tab.')"
 >
-    <x-slot:explainer>
-        <p>{{ __('Pick the channels (email, Slack, Discord, webhook…) and the events you care about, then save. Each selected channel is subscribed to each selected event. Granular per-feature control still lives on each workspace tab (Errors, Backups, Certificates, …) — both edit the same subscriptions.') }}</p>
-    </x-slot:explainer>
 
     <div class="space-y-6">
         <x-server-workspace-tablist :aria-label="__('Notifications sections')" scroll class="sm:min-w-0 sm:flex-1">

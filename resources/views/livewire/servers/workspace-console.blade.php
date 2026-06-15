@@ -9,15 +9,9 @@
     active="console"
     :title="__('Console')"
     :description="__('Quick read-only SSH console for inspecting the server. For saved scripts or longer jobs use Run.')"
-    explainer-tone="warn"
 >
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
-
-    <x-slot:explainer>
-        <p>{{ __('A lightweight shell prompt for poking at the server: type a command, hit Enter, output appears below. History is kept per session so you can scroll back through recent runs.') }}</p>
-        <p>{{ __('Each command runs as the dply SSH user with full shell access — same blast radius as the Run page. Output is captured up to 16KB; for streaming/long-running jobs use Run.') }}</p>
-    </x-slot:explainer>
 
     @if ($opsReady)
         {{-- Kick the autocomplete-source SSH probes in the background after first

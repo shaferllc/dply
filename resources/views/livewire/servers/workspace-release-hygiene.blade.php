@@ -24,10 +24,6 @@
 >
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-slot:explainer>
-        <p>{{ __('This page combines Dply release records with an optional SSH scan of on-disk release folders, laravel.log sizes, and queue:failed counts. Use the prune saved command on Run when extra release folders accumulate. After a scan, use View on any log row to tail the last lines over SSH.') }}</p>
-    </x-slot:explainer>
-
     {{-- In-page tabs: pressure overview, atomic release detail, log/failed-job
          sizes, and notification routing for this server's server.release_hygiene.*
          events. Mirrors the security-digest workspace. --}}

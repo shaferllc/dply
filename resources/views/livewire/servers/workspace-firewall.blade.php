@@ -3,16 +3,9 @@
     active="firewall"
     :title="__('Firewall')"
     :description="__('Manage basic UFW access on the host with rules, presets, templates, apply, status, and recent history.')"
-    explainer-tone="warn"
 >
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
-
-    <x-slot:explainer>
-        <p>{{ __('This workspace manages UFW (the Ubuntu firewall) on the server. Dply tracks rules in its own database; "Apply" pushes every enabled panel rule to the host with ufw allow/deny and turns UFW on. Apply is additive — host rules that aren\'t in the panel are left untouched. To get rid of a host rule, use "Import from host" to pull it into the panel, then click Remove (or toggle it off) — Dply will run the matching ufw delete inline.') }}</p>
-        <p>{{ __('Presets are quick-to-apply rule bundles for common app shapes (HTTP only, HTTP+SSH from-anywhere, etc.). Templates are reusable rule sets you save and apply across servers.') }}</p>
-        <p>{{ __('Locking yourself out is a real risk. Apply always re-adds an allow rule for the server\'s SSH port as a safety rail, but you should still keep an explicit SSH allow in the panel — the workspace warns if you\'re about to apply a rule set that doesn\'t include one.') }}</p>
-    </x-slot:explainer>
 
     @if ($opsReady)
         <div class="space-y-6">

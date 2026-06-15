@@ -24,11 +24,6 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-slot:explainer>
-        <p>{{ __('Logs from systemd, nginx/caddy, PHP-FPM, and dply\'s own activity stream — read live from the server over SSH. Use the Viewer tab to tail lines; Overview and Sources summarize what is available on this host.') }}</p>
-        <p>{{ __('Time ranges are server-side filters: "Last 5 minutes" reads only the recent slice of each file; broader ranges page through more of the file. Sources that rotate (e.g. nginx access.log) honor the rotation — older entries roll off naturally.') }}</p>
-    </x-slot:explainer>
-
     <div
         id="dply-server-log-broadcast-context"
         class="hidden"

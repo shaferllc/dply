@@ -123,7 +123,6 @@ return [
     'workspace_tabs' => [
         'connection' => ['label' => 'Connection', 'icon' => 'link'],
         'keys' => ['label' => 'Keys', 'icon' => 'key'],
-        'alerts' => ['label' => 'Alerts', 'icon' => 'bell-alert'],
         'inventory' => ['label' => 'Inventory', 'icon' => 'clipboard-document-list'],
         'governance' => ['label' => 'Cost', 'icon' => 'currency-dollar'],
         'notes' => ['label' => 'Notes', 'icon' => 'document-text'],

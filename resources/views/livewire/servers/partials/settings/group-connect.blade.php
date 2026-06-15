@@ -158,7 +158,7 @@
 
                 <div class="border-t border-brand-ink/10 pt-8">
                     <h3 class="text-base font-semibold text-brand-ink">{{ __('SSH connection') }}</h3>
-                    <p class="mt-1 text-sm text-brand-moss">{{ __('Where Dply reaches this host for deploys and Manage actions.') }}</p>
+                    <p class="mt-1 text-sm text-brand-moss">{{ __('Dply reaches this host for deploys and Manage actions over SSH at the address, port, and user below. (Internal IP is private-networking metadata — it is not the SSH target.)') }}</p>
                     <div class="mt-5 grid gap-5 sm:grid-cols-2">
                         <div>
                             <x-input-label for="settings-ip" value="{{ __('IP address or hostname') }}" />
@@ -207,9 +207,12 @@
                                 class="{{ $monoInputClass }} placeholder:font-sans placeholder:text-brand-mist"
                                 @disabled(! $this->canEditServerSettings)
                             />
-                            @if ($this->canRefreshInternalIp())
-                                <p class="mt-1 text-xs text-brand-mist">{{ __('Re-fetch the private networking address from :provider.', ['provider' => $server->provider?->label() ?? __('the provider')]) }}</p>
-                            @endif
+                            <p class="mt-1 text-xs text-brand-mist">
+                                {{ __('Private-networking address for server-to-server traffic (cache replicas, DB jump host, log drain). Not used for the SSH connection above.') }}
+                                @if ($this->canRefreshInternalIp())
+                                    {{ __('Use Refresh to re-fetch it from :provider.', ['provider' => $server->provider?->label() ?? __('the provider')]) }}
+                                @endif
+                            </p>
                             <x-input-error :messages="$errors->get('settingsInternalIp')" class="mt-2" />
                         </div>
                         <div>
@@ -239,8 +242,56 @@
                     </div>
                 </div>
 
+                {{-- Live connectivity verdict from the operational-SSH probe that
+                     runs on save (and on demand via "Test connection"). --}}
+                @php
+                    $sshProbeStatus = (string) ($server->meta['ssh_operational_status'] ?? '');
+                    $sshProbeTestedAt = $server->meta['ssh_operational_tested_at'] ?? null;
+                    $sshProbeError = (string) ($server->meta['ssh_operational_error'] ?? '');
+                @endphp
+                <div @if ($this->operationalSshProbing) wire:poll.3s="reloadOperationalSshStatus" @endif>
+                    @if ($this->operationalSshProbing)
+                        <div class="flex items-center gap-2 rounded-xl border border-brand-ink/10 bg-brand-sand/30 px-3 py-2 text-sm text-brand-moss">
+                            <x-spinner variant="forest" size="sm" />
+                            {{ __('Testing the SSH connection as :user@:host…', ['user' => $settingsSshUser ?: $server->ssh_user, 'host' => $settingsIpAddress ?: $server->ip_address]) }}
+                        </div>
+                    @elseif ($sshProbeStatus === 'healthy')
+                        <div class="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                            <x-heroicon-m-check-circle class="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                            <span>
+                                {{ __('Connection OK — Dply reached this host on the operational key.') }}
+                                @if ($sshProbeTestedAt)
+                                    <span class="text-emerald-700/80">{{ __('Tested :ago.', ['ago' => \Illuminate\Support\Carbon::parse($sshProbeTestedAt)->diffForHumans()]) }}</span>
+                                @endif
+                            </span>
+                        </div>
+                    @elseif ($sshProbeStatus === 'failing')
+                        <div class="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">
+                            <x-heroicon-m-x-circle class="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                            <span>
+                                {{ __('Connection failed.') }}
+                                @if ($sshProbeError !== '')
+                                    <span class="break-words text-rose-700">{{ $sshProbeError }}</span>
+                                @endif
+                                <span class="text-rose-700/80">{{ __('Check the address, port, and user — or use Repair SSH access below.') }}</span>
+                            </span>
+                        </div>
+                    @endif
+                </div>
+
                 @if ($this->canEditServerSettings)
-                    <div class="flex justify-end border-t border-brand-ink/10 pt-6">
+                    <div class="flex flex-wrap items-center justify-end gap-3 border-t border-brand-ink/10 pt-6">
+                        <button
+                            type="button"
+                            wire:click="testSshConnection"
+                            wire:loading.attr="disabled"
+                            wire:target="testSshConnection"
+                            @disabled($this->operationalSshProbing)
+                            class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            <x-heroicon-o-signal class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ $this->operationalSshProbing ? __('Testing…') : __('Test connection') }}
+                        </button>
                         <x-primary-button type="submit" wire:loading.attr="disabled">{{ __('Save changes') }}</x-primary-button>
                     </div>
                 @endif
@@ -409,14 +460,70 @@
                     </p>
                 </div>
             </div>
-            <div class="flex justify-end px-6 py-5 sm:px-7">
-                <x-primary-button type="button" wire:click="repairSshAccess" wire:loading.attr="disabled" wire:target="repairSshAccess">
-                    <span wire:loading.remove wire:target="repairSshAccess">{{ __('Repair SSH access') }}</span>
-                    <span wire:loading wire:target="repairSshAccess" class="inline-flex items-center gap-2">
-                        <x-spinner variant="forest" size="sm" />
-                        {{ __('Repairing…') }}
-                    </span>
-                </x-primary-button>
+            <div class="px-6 py-5 sm:px-7" @if ($this->operationalSshProbing) wire:poll.3s="reloadOperationalSshStatus" @endif>
+                @php $rs = $this->recoverySshStatus; @endphp
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0 space-y-3">
+                        {{-- Are we on the recovery key right now? --}}
+                        @if ($this->operationalSshProbing)
+                            <span class="inline-flex items-center gap-2 rounded-full border border-brand-ink/10 bg-brand-sand/30 px-3 py-1 text-sm font-medium text-brand-moss">
+                                <x-spinner variant="forest" size="sm" />
+                                {{ __('Testing operational access…') }}
+                            </span>
+                        @elseif ($rs['on_recovery'])
+                            <span class="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-sm font-semibold text-rose-800">
+                                <span class="inline-block h-2 w-2 rounded-full bg-rose-500" aria-hidden="true"></span>
+                                {{ __('Relying on the root recovery key — operational key rejected') }}
+                            </span>
+                        @elseif ($rs['state'] === 'healthy')
+                            <span class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-800">
+                                <span class="inline-block h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true"></span>
+                                {{ __('Operational key healthy — recovery not in use') }}
+                            </span>
+                        @else
+                            <span class="inline-flex items-center gap-2 rounded-full border border-brand-ink/15 bg-white px-3 py-1 text-sm font-medium text-brand-moss">
+                                <span class="inline-block h-2 w-2 rounded-full bg-brand-mist" aria-hidden="true"></span>
+                                {{ __('Operational key not yet tested') }}
+                            </span>
+                        @endif
+
+                        <dl class="grid gap-x-6 gap-y-1 text-xs text-brand-moss sm:grid-cols-2">
+                            @if ($rs['tested_at'])
+                                <div><dt class="inline text-brand-mist">{{ __('Last tested') }}:</dt> <dd class="inline">{{ $rs['tested_at']->timezone(config('app.timezone'))->diffForHumans() }}</dd></div>
+                            @endif
+                            @if ($rs['last_operational_at'])
+                                <div><dt class="inline text-brand-mist">{{ __('Last operational connection') }}:</dt> <dd class="inline">{{ $rs['last_operational_at']->timezone(config('app.timezone'))->diffForHumans() }} <span class="font-mono">({{ $server->ssh_user }})</span></dd></div>
+                            @endif
+                            @if ($rs['last_recovery_at'])
+                                <div><dt class="inline text-brand-mist">{{ __('Last recovery (root) connection') }}:</dt> <dd class="inline">{{ $rs['last_recovery_at']->timezone(config('app.timezone'))->diffForHumans() }}</dd></div>
+                            @endif
+                            @if ($rs['on_recovery'] && $rs['error'])
+                                <div class="sm:col-span-2 break-words text-rose-700">{{ $rs['error'] }}</div>
+                            @endif
+                        </dl>
+                    </div>
+
+                    <div class="flex shrink-0 flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            wire:click="testSshConnection"
+                            wire:loading.attr="disabled"
+                            wire:target="testSshConnection"
+                            @disabled($this->operationalSshProbing)
+                            class="inline-flex items-center gap-2 rounded-xl border border-brand-ink/15 bg-white px-4 py-2 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            <x-heroicon-o-signal class="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {{ $this->operationalSshProbing ? __('Testing…') : __('Test operational access') }}
+                        </button>
+                        <x-primary-button type="button" wire:click="repairSshAccess" wire:loading.attr="disabled" wire:target="repairSshAccess">
+                            <span wire:loading.remove wire:target="repairSshAccess">{{ __('Repair SSH access') }}</span>
+                            <span wire:loading wire:target="repairSshAccess" class="inline-flex items-center gap-2">
+                                <x-spinner variant="forest" size="sm" />
+                                {{ __('Repairing…') }}
+                            </span>
+                        </x-primary-button>
+                    </div>
+                </div>
             </div>
         </div>
     @endif
@@ -433,33 +540,43 @@
             </div>
         </div>
         <div class="px-6 py-6 sm:px-7">
-            <dl class="grid gap-4 sm:grid-cols-2 text-sm">
-                <div>
-                    <dt class="text-brand-mist">{{ __('Created in Dply') }}</dt>
-                    <dd class="mt-0.5 font-medium text-brand-ink">{{ $server->created_at?->timezone(config('app.timezone'))->format('Y-m-d H:i:s') ?? '—' }}</dd>
+            @php
+                $statusReady = $server->status === 'ready';
+                $healthOk = in_array($server->health_status, ['reachable', 'healthy', 'ok'], true);
+                $statusDot = match (true) {
+                    $statusReady && ($server->health_status === null || $healthOk) => 'bg-brand-forest',
+                    $server->health_status !== null && ! $healthOk => 'bg-red-500',
+                    default => 'bg-amber-500',
+                };
+            @endphp
+            <dl class="grid gap-3 sm:grid-cols-2">
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
+                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
+                    <dd class="mt-1 flex items-center gap-2 text-sm font-medium text-brand-ink">
+                        <span class="inline-block h-2 w-2 shrink-0 rounded-full {{ $statusDot }}" aria-hidden="true"></span>
+                        <span>{{ __($server->status) }}@if ($server->health_status) <span class="text-brand-mist">/</span> {{ __($server->health_status) }}@endif</span>
+                    </dd>
                 </div>
-                <div>
-                    <dt class="text-brand-mist">{{ __('Provider') }}</dt>
-                    <dd class="mt-0.5 font-medium text-brand-ink">{{ $providerLine }}</dd>
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
+                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Provider') }}</dt>
+                    <dd class="mt-1 text-sm font-medium text-brand-ink">{{ $providerLine }}</dd>
                 </div>
-                <div>
-                    <dt class="text-brand-mist">{{ __('Region') }}</dt>
-                    <dd class="mt-0.5 font-medium text-brand-ink">{{ $server->region ?: '—' }}</dd>
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
+                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Region') }}</dt>
+                    <dd class="mt-1 text-sm font-medium text-brand-ink">{{ $server->region ?: '—' }}</dd>
                 </div>
-                <div>
-                    <dt class="text-brand-mist">{{ __('Provider server ID') }}</dt>
-                    <dd class="mt-0.5 font-mono text-xs text-brand-ink">{{ $server->provider_id ?: '—' }}</dd>
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
+                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Provider server ID') }}</dt>
+                    <dd class="mt-1 font-mono text-sm text-brand-ink">{{ $server->provider_id ?: '—' }}</dd>
                 </div>
-                <div>
-                    <dt class="text-brand-mist">{{ __('Status') }}</dt>
-                    <dd class="mt-0.5 font-medium text-brand-ink">{{ __($server->status) }} @if ($server->health_status) / {{ __($server->health_status) }} @endif</dd>
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
+                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Created in Dply') }}</dt>
+                    <dd class="mt-1 text-sm font-medium text-brand-ink">{{ $server->created_at?->timezone(config('app.timezone'))->format('Y-m-d H:i:s') ?? '—' }}</dd>
                 </div>
-                @if ($invAt ?? null)
-                    <div>
-                        <dt class="text-brand-mist">{{ __('Inventory last checked') }}</dt>
-                        <dd class="mt-0.5 text-xs text-brand-moss">{{ \Illuminate\Support\Carbon::parse($invAt)->timezone(config('app.timezone'))->toDayDateTimeString() }}</dd>
-                    </div>
-                @endif
+                <div class="rounded-xl border border-brand-ink/10 bg-brand-sand/10 px-4 py-3">
+                    <dt class="text-[11px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Inventory last checked') }}</dt>
+                    <dd class="mt-1 text-sm font-medium text-brand-ink">{{ ($invAt ?? null) ? \Illuminate\Support\Carbon::parse($invAt)->timezone(config('app.timezone'))->toDayDateTimeString() : '—' }}</dd>
+                </div>
             </dl>
         </div>
     </div>

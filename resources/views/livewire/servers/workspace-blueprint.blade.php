@@ -16,10 +16,6 @@
 >
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-slot:explainer>
-        <p>{{ __('Blueprints capture the installed stack (webserver, PHP, database, cache, runtimes) plus server-level firewall and daemon baselines. Applying a blueprint in the create wizard pre-fills Step 3 — firewall and daemon templates are reference-only in v1.') }}</p>
-    </x-slot:explainer>
-
     <div class="space-y-6">
         <section class="dply-card overflow-hidden">
             <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">

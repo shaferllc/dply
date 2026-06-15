@@ -52,7 +52,6 @@
     active="manage"
     :title="__('Manage')"
     :description="__('Live state and actions for the server stack. Each tab is scoped to one subsystem.')"
-    explainer-tone="warn"
 >
     @if ($needsInventoryProbePoll)
         <div
@@ -75,11 +74,6 @@
             'rose' => 'bg-rose-50 text-rose-700 ring-rose-200',
         ];
     @endphp
-
-    <x-slot:explainer>
-        <p>{{ __('The Manage workspace covers server-level operations that don\'t fit other tabs: runtime tools, configuration previews, and dangerous actions (reboot, disable swap, etc.). OS package updates live on Patches when that workspace is enabled.') }}</p>
-        <p>{{ __('Most actions run via SSH and are queued — the page stays responsive while they run. Dangerous actions all confirm first; every one writes to the server\'s audit log.') }}</p>
-    </x-slot:explainer>
 
     <div class="space-y-6">
         @include('livewire.partials.console-action-banner-static', [

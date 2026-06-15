@@ -36,15 +36,6 @@
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     <div class="space-y-6">
-        <x-slot:explainer>
-            @if ($isContainerHost)
-                <p>{{ __('Container apps deployed onto this host. Each row is a Site rooted at a Git repo: dply builds the image, runs it on the host (Docker container or Kubernetes Deployment), and tracks deploys + env per app.') }}</p>
-                <p>{{ __('Adding a container here inspects the repo, queues the first build + deploy, and surfaces progress on this server\'s overview. Removing a container tears down the running workload and the matching dply records.') }}</p>
-            @else
-                <p>{{ __('Sites hosted on this server. Each row is a vhost (nginx/caddy/apache) with its own document root, runtime version (PHP/Node/Python), database bindings, deploy hooks, and SSL certs. Click a row to drop into the site\'s own page where deploys, env vars, and per-site settings live.') }}</p>
-                <p>{{ __('Adding a site here scaffolds the vhost config + filesystem layout on the server and (optionally) creates a database for it. Removing a site offers cascading cleanup: vhost, files, database, deploy keys.') }}</p>
-            @endif
-        </x-slot:explainer>
 
         {{-- Hero: new site/container CTA. --}}
         <section class="dply-card overflow-hidden">

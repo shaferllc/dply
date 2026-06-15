@@ -37,10 +37,6 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-slot:explainer>
-        <p>{{ __('Refresh scan re-runs the inventory probe over SSH. Apt actions queue in the background — output streams in the banner above. Run Refresh scan again after upgrades to update the package list.') }}</p>
-    </x-slot:explainer>
-
     <div class="space-y-6">
         @include('livewire.partials.console-action-banner-static', [
             'run' => $patchConsoleRun,

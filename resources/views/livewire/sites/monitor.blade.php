@@ -47,11 +47,6 @@
         @include('livewire.sites.settings.partials.sidebar')
 
         <main class="min-w-0 space-y-6 lg:col-span-9">
-            <x-explainer tone="info">
-                <p>{{ __('Monitors live on the site and reflect their last check on this page and on any public status page that includes them. Adding or editing a monitor immediately runs a check; "Check now" reruns it on demand.') }}</p>
-                <p>{{ __('HTTP monitors can assert an expected status code, required (or forbidden) body text, and a response-time threshold above which the site reads as degraded. SSL monitors warn before a certificate expires.') }}</p>
-                <p>{{ __('Expand a monitor for its uptime history and incident timeline. Output for the most recent check is shown in the banner below.') }}</p>
-            </x-explainer>
 
             <x-server-workspace-tablist :aria-label="__('Monitor workspace sections')" scroll class="sm:min-w-0 sm:flex-1">
                 <x-server-workspace-tab

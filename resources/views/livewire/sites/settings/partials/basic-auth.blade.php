@@ -31,12 +31,6 @@
     {{-- Webserver apply / sync progress streams to the console banner at the top of
          this page (auto-scrolled into view when you add, remove, or rotate a credential). --}}
 
-    <x-explainer tone="info">
-        <p>{{ __('Choose one staging lock method for this site. HTTP basic auth uses the browser popup and supports multiple users; the password gate shows a styled login form with a cookie (like Edge preview protection).') }}</p>
-        <p>{{ __('Path scope for HTTP basic auth: use / to protect the whole site, or a prefix like /wp-admin. The password gate applies site-wide only in this release.') }}</p>
-        <p>{{ __('Dply only stores password hashes — plaintext is shown once in this UI. Switching methods removes the other method on the next webserver apply.') }}</p>
-    </x-explainer>
-
     @if (! $supportsBA)
         <section class="dply-card overflow-hidden border-amber-200">
             <div class="border-b border-brand-ink/10 bg-amber-50/60 px-6 py-5 sm:px-7">

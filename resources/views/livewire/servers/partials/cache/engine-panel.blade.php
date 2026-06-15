@@ -486,20 +486,6 @@
                             </div>
                         </div>
 
-                        <x-explainer class="mt-6" tone="warn" :title="__('What do these actions do?')">
-                            <ul>
-                                <li><strong>{{ __('Diagnose') }}.</strong> {{ __('Recheck re-runs the per-instance ping. Debug runs systemctl status + port listener + journal. Status / Logs open the per-instance modal.') }}</li>
-                                <li><strong>{{ __('Lifecycle: Restart / Stop / Start') }}.</strong> {{ __('Acts on THIS instance\'s systemd unit only. Other instances on this engine are not affected.') }}</li>
-                                <li><strong>{{ __('Lifecycle: Disable / Enable') }}.</strong> {{ __('Disable = stop now AND remove boot auto-start. Enable = start now AND re-arm boot auto-start. Use these when you want the daemon off (or back on) across reboots without uninstalling.') }}</li>
-                                <li><strong>{{ __('Lifecycle: Flush all keys') }}.</strong> {{ __('Drops every key in this instance — sessions, cache, queued tags, rate-limit counters. Cannot be undone. Sibling instances keep their data.') }}</li>
-                                @if ($isLastInstanceOfEngine)
-                                    <li><strong>{{ __('Cleanup: Uninstall') }}.</strong> {{ __('Last instance of :engine on this server — runs apt purge for the package + data dirs. Other engines on this server are not affected.', ['engine' => $engineLabels[$engine]]) }}</li>
-                                @else
-                                    <li><strong>{{ __('Cleanup: Remove instance') }}.</strong> {{ __(':n other :engine instance(s) still use the package, so apt purge would break them. This affordance only removes the systemd unit + config + data dir for THIS instance.', ['n' => $siblingInstanceCount, 'engine' => $engineLabels[$engine]]) }}</li>
-                                @endif
-                                <li><strong>{{ __('Cleanup: Force remove row') }}.</strong> {{ __('Deletes the dply row only. Does NOT touch the server. Use when uninstall keeps failing or the install never landed on the box.') }}</li>
-                            </ul>
-                        </x-explainer>
                     </div>
 
                     {{-- Connection details: host, port, AUTH password (with

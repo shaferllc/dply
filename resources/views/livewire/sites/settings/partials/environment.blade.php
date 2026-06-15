@@ -340,17 +340,6 @@
          variables list still function; the visible binding card is suppressed. --}}
     @include('livewire.sites.settings.partials.environment.resources', ['bindingModalOnly' => true])
 
-    <x-explainer tone="info">
-        <p>{{ __('Environment variables are written into the site\'s `.env` file on the server. Dply keeps an encrypted cache of the file so this page renders without an SSH round-trip.') }}</p>
-        <p>{{ __('Workflow: paste a block or edit single keys — every change auto-pushes to the server, no manual save needed. Click Sync from server to pull drift caused by out-of-band edits.') }}</p>
-        <p>{{ __('For runtimes without a server file (Docker, Kubernetes, Serverless), the cache IS the source of truth — the deploy job injects values when packaging the runtime.') }}</p>
-        <p>
-            <span class="font-semibold">{{ __('Browser exposure:') }}</span>
-            {{ __('Dply\'s managed webserver config (Nginx, Apache, Caddy, OpenLiteSpeed) denies any HTTP request whose path starts with a dot — so /.env returns 403 even though the file lives in the docroot. /.well-known/ stays allowed for ACME challenges.') }}
-            {{ __('For belt-and-suspenders defense, expand the Advanced disclosure below to relocate the file outside the docroot (e.g. /etc/dply/<slug>.env).') }}
-        </p>
-    </x-explainer>
-
     <x-cli-snippet
         :intro="__('Manage env via CLI when you have many keys at once:')"
         :commands="[

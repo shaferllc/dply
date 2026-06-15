@@ -8,16 +8,9 @@
     active="run"
     :title="__('Run')"
     :description="__('Run server-level commands. Saved commands, ad-hoc shell, and library presets all in one place. Site deploys live on each site’s page.')"
-    explainer-tone="warn"
 >
     @include('livewire.servers.partials.workspace-flashes', ['command_output' => $command_output ?? null])
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
-
-    <x-slot:explainer>
-        <p>{{ __('Run server-level shell commands over SSH from the workspace: ad-hoc one-offs, saved presets, and library snippets (Laravel artisan, php-fpm restart, etc.). Output streams back into the page.') }}</p>
-        <p>{{ __('This is full root-equivalent shell access via the dply SSH key. Treat it like a terminal: command goes in, output comes back, no row-level safety net. Saved commands persist on this server only.') }}</p>
-        <p>{{ __('Site deploys are NOT run from here — each site\'s page has its own deploy button so deploys can run with site-scoped context. The banner below points at the right surfaces.') }}</p>
-    </x-slot:explainer>
 
     @if ($container_scope_id !== '')
         <div class="rounded-2xl border border-brand-gold/40 bg-brand-cream/50 p-4">

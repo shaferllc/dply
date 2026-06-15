@@ -44,14 +44,6 @@
                 </section>
             @endif
 
-            <x-explainer class="mb-2">
-                <p>{{ __('Site dashboard — health at a glance, the most-recent endpoints, and the deploy controls.') }}</p>
-                <p>{{ __('Routing, certificates, environment, redirects, deploy hooks, and destructive actions live in') }}
-                    <a href="{{ route('sites.settings', ['server' => $server, 'site' => $site, 'section' => 'general']) }}" wire:navigate>{{ __('Site settings') }}</a>.
-                    {{ __('Logs, runtime, and SSL are tabs below. Webserver config and Insights have dedicated pages linked above.') }}
-                </p>
-            </x-explainer>
-
             {{-- Hero card: identity + endpoints + primary action ----------------------------------- --}}
             <section class="dply-card overflow-hidden">
                 <div class="flex flex-col gap-4 border-b border-brand-ink/10 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-8">

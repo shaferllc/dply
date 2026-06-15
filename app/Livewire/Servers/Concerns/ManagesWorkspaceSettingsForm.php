@@ -2,10 +2,14 @@
 
 namespace App\Livewire\Servers\Concerns;
 
+use App\Jobs\ProbeServerOperationalSshJob;
 use App\Jobs\RefreshServerPrivateIpJob;
+use App\Models\ServerRemoteAccessEvent;
 use App\Services\Servers\ServerSshAccessRepairer;
 use App\Support\Servers\ServerDateFormatter;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
+use Livewire\Attributes\Computed;
 
 trait ManagesWorkspaceSettingsForm
 {
@@ -24,6 +28,12 @@ trait ManagesWorkspaceSettingsForm
 
     /** Epoch seconds the in-flight refresh was requested; bounds how long the UI polls. */
     public ?int $internalIpRefreshStartedAt = null;
+
+    /** True while a queued operational-SSH probe is in flight; gates UI polling. */
+    public bool $operationalSshProbing = false;
+
+    /** Epoch seconds the in-flight probe was requested; bounds how long the UI polls. */
+    public ?int $operationalSshProbeStartedAt = null;
 
     public string $settingsSshPort = '22';
 
@@ -112,7 +122,117 @@ trait ManagesWorkspaceSettingsForm
         }
 
         $this->syncSettingsFormFromServer();
-        $this->toastSuccess(__('Server information saved.'));
+
+        // Connection details just changed — actively verify Dply can still reach
+        // the host on the operational key so a typo in IP/port/user surfaces here
+        // instead of silently breaking the next deploy. SSH must not run inline,
+        // so this dispatches a probe and the card polls for the result.
+        $this->dispatchOperationalSshProbe();
+
+        $this->toastSuccess(__('Server information saved — testing the SSH connection…'));
+    }
+
+    /**
+     * Manually re-test the operational SSH connection without re-saving the form.
+     * Same probe the save path runs; the connection card reflects the verdict.
+     */
+    public function testSshConnection(): void
+    {
+        $this->authorize('update', $this->server);
+        if ($this->deployerCannotEditServerSettings()) {
+            $this->toastError(__('Deployers cannot test the server connection.'));
+
+            return;
+        }
+
+        $this->dispatchOperationalSshProbe();
+        $this->toastSuccess(__('Testing the SSH connection — the result appears here in a moment.'));
+    }
+
+    /**
+     * Dispatch the operational-SSH probe and arm the polling state. Shared by the
+     * save path and the manual "Test connection" button.
+     */
+    protected function dispatchOperationalSshProbe(): void
+    {
+        ProbeServerOperationalSshJob::dispatch((string) $this->server->id);
+
+        $this->operationalSshProbing = true;
+        $this->operationalSshProbeStartedAt = now()->getTimestamp();
+    }
+
+    /**
+     * Re-pull the server while a connection probe is in flight (polled by the
+     * card's wire:poll). Stops polling once the probe records a fresh
+     * `ssh_operational_tested_at`, or after a 45s safety timeout.
+     */
+    public function reloadOperationalSshStatus(): void
+    {
+        $startedAt = $this->operationalSshProbeStartedAt;
+        $this->server->refresh();
+
+        $testedAtRaw = $this->server->meta['ssh_operational_tested_at'] ?? null;
+        $testedAt = is_string($testedAtRaw)
+            ? (strtotime($testedAtRaw) ?: null)
+            : null;
+
+        $probeReported = $testedAt !== null && $startedAt !== null && $testedAt >= $startedAt;
+        $timedOut = $startedAt !== null && (now()->getTimestamp() - $startedAt) > 45;
+
+        if ($probeReported || $timedOut) {
+            $this->operationalSshProbing = false;
+            $this->operationalSshProbeStartedAt = null;
+
+            if ($timedOut && ! $probeReported) {
+                $this->toastError(__('The connection test timed out before the probe reported back.'));
+            }
+        }
+    }
+
+    /**
+     * Recovery-vs-operational SSH status for the "Repair SSH access" card.
+     *
+     * Combines the active probe verdict (persisted to meta by
+     * {@see ProbeServerOperationalSshJob}) with the passive history of which
+     * credential role last reached the box (from ServerRemoteAccessEvent), so the
+     * card can answer: are we relying on the root recovery key, where access last
+     * happened, and when the operational key was last verified.
+     *
+     * @return array{state: string, on_recovery: bool, tested_at: ?Carbon, error: ?string, last_operational_at: ?Carbon, last_recovery_at: ?Carbon}
+     */
+    #[Computed]
+    public function recoverySshStatus(): array
+    {
+        $meta = $this->server->meta ?? [];
+
+        $state = $meta['ssh_operational_status'] ?? 'unknown';
+        $state = in_array($state, ['healthy', 'failing'], true) ? $state : 'unknown';
+
+        $testedAtRaw = $meta['ssh_operational_tested_at'] ?? null;
+        $error = $meta['ssh_operational_error'] ?? null;
+
+        $lastOperational = ServerRemoteAccessEvent::query()
+            ->where('server_id', $this->server->id)
+            ->where('credential_role', 'operational')
+            ->where('failed', false)
+            ->latest('started_at')
+            ->first()?->started_at;
+
+        $lastRecovery = ServerRemoteAccessEvent::query()
+            ->where('server_id', $this->server->id)
+            ->where('credential_role', 'recovery')
+            ->where('failed', false)
+            ->latest('started_at')
+            ->first()?->started_at;
+
+        return [
+            'state' => $state,
+            'on_recovery' => $state === 'failing',
+            'tested_at' => is_string($testedAtRaw) ? Carbon::parse($testedAtRaw) : null,
+            'error' => (is_string($error) && $error !== '') ? $error : null,
+            'last_operational_at' => $lastOperational,
+            'last_recovery_at' => $lastRecovery,
+        ];
     }
 
     /**

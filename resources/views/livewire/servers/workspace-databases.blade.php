@@ -15,11 +15,6 @@
         <div wire:poll.2s="syncManageRemoteTaskFromCache" class="hidden" aria-hidden="true"></div>
     @endif
 
-    <x-slot:explainer>
-        <p>{{ __('This workspace manages databases on this server — MySQL, MariaDB, PostgreSQL, MongoDB, ClickHouse, and SQLite — plus per-app credentials. Engines install via apt + systemd (or file-based SQLite). For Redis/Valkey caching, use the Caches workspace.') }}</p>
-        <p>{{ __('Engine state is read live via SSH; database + credential rows live in the dply database. The "Discovered on server" panel reconciles both directions: databases the engine knows about that dply hasn\'t recorded yet.') }}</p>
-    </x-slot:explainer>
-
     @if ($opsReady)
         @if (! $capabilitiesLoaded)
             {{-- Probe installed engines off the render path so the workspace paints
@@ -654,10 +649,6 @@
                             <p class="text-xs font-semibold uppercase tracking-[0.18em] text-brand-sage">{{ __('SQL console') }}</p>
                             <h2 class="mt-1 text-lg font-semibold text-brand-ink">{{ __('Run SQL against this database') }}</h2>
                             <p class="mt-1 text-sm leading-6 text-brand-moss">{{ __('Paste a SQL statement (or batch). Output streams back from sqlite3 on the server.') }}</p>
-                            <x-explainer class="mt-3" tone="warn">
-                                <p>{{ __('SQL runs as the engine\'s own DB user via SSH — this is full read + write + DDL access. There\'s no row-level safety net; SELECT and DROP are equally easy to type.') }}</p>
-                                <p>{{ __('The audit log records the verb (SELECT/INSERT/UPDATE/DELETE/DROP/etc.) but not the body of the query, so passwords and key contents never get logged. Output streams back as the engine emits it; there\'s no truncation client-side.') }}</p>
-                            </x-explainer>
                         </div>
                     </div>
 

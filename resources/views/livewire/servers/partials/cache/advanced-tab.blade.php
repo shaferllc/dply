@@ -1,10 +1,6 @@
             <div class="{{ $card }} p-6 sm:p-8">
                 <h2 class="text-base font-semibold text-brand-ink">{{ __('Audit log') }}</h2>
                 <p class="mt-2 text-sm text-brand-moss">{{ __('Recent install / uninstall / restart / stop / start / flush events on cache services for this server.') }}</p>
-                <x-explainer class="mt-3">
-                    <p>{{ __('Every operator action through this workspace writes a row here. Events are also forwarded to the organization-wide audit log when a signed-in user is the actor.') }}</p>
-                    <p>{{ __('Most recent 40 events shown. Event names are stable identifiers (e.g. cache_service_restarted) so they\'re grep-able from the org log; the engine field tells you which cache the event acted on.') }}</p>
-                </x-explainer>
                 <ul class="mt-6 divide-y divide-brand-ink/10 text-sm">
                     @forelse ($cacheAuditEvents as $ev)
                         <li class="py-3">

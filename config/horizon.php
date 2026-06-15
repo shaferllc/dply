@@ -296,10 +296,14 @@ return [
             'maxJobs' => 0,
             'memory' => 128,
             'tries' => 1,
-            // Worker process kill bound. Must be ≥ the longest-running job's $timeout —
-            // currently ApplyInsightFixJob at 700s (apt-security-updates fix can run for
-            // 10 minutes on busy boxes). Override per-environment via HORIZON_*_JOB_TIMEOUT.
-            'timeout' => (int) env('HORIZON_JOB_TIMEOUT', 720),
+            // Worker process kill bound. Must be ≥ the longest-running job's $timeout
+            // (currently 7200s: RunSetupScriptJob / ExportSiteFileBackupJob) AND <
+            // the redis queue retry_after (see config/queue.php). A job's own larger
+            // $timeout overrides the worker --timeout, so a too-low value here does
+            // NOT cap such jobs — it only governs jobs without their own $timeout and
+            // the frozen-job kill bound. Invariant: longest $timeout ≤ this < retry_after.
+            // Override per-environment via HORIZON_*_JOB_TIMEOUT.
+            'timeout' => (int) env('HORIZON_JOB_TIMEOUT', 7320),
             'nice' => 0,
         ],
     ],
@@ -316,7 +320,7 @@ return [
                 'tries' => $horizonWorkerTries,
                 'balanceMaxShift' => $horizonBalanceMaxShift,
                 'balanceCooldown' => $horizonBalanceCooldown,
-                'timeout' => (int) env('HORIZON_PROD_JOB_TIMEOUT', env('HORIZON_JOB_TIMEOUT', 720)),
+                'timeout' => (int) env('HORIZON_PROD_JOB_TIMEOUT', env('HORIZON_JOB_TIMEOUT', 7320)),
             ],
         ],
 
@@ -332,7 +336,7 @@ return [
                 'tries' => $horizonWorkerTries,
                 'balanceMaxShift' => $horizonBalanceMaxShift,
                 'balanceCooldown' => $horizonBalanceCooldown,
-                'timeout' => (int) env('HORIZON_LOCAL_JOB_TIMEOUT', 720),
+                'timeout' => (int) env('HORIZON_LOCAL_JOB_TIMEOUT', 7320),
                 'nice' => 0,
             ],
         ],

@@ -41,10 +41,6 @@
 >
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-slot:explainer>
-        <p>{{ __('Ops teams renew per-server. This page rolls up Dply-managed certificates (Let\'s Encrypt, ZeroSSL, imported) from all sites on the host, sorted by urgency. Bulk renew queues jobs for failed certs and anything expiring within :warning days.', ['warning' => $report['warning_days']]) }}</p>
-    </x-slot:explainer>
-
     {{-- In-page sub-tabs: the certificate inventory vs. notification routing for this
          server's server.cert.* events. Mirrors the system-users page. --}}
     <div class="mb-6 border-b border-brand-ink/10">

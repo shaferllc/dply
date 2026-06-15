@@ -39,10 +39,6 @@
                     icon="exclamation-triangle"
                 />
 
-                <x-explainer tone="info">
-                    <p>{{ __('A dedicated stream of this site’s failed operations — like the logs, but only errors. Dismiss is shared with your team; retry re-runs the original operation where supported, otherwise open the error to act at its source.') }}</p>
-                </x-explainer>
-
                 <x-server-workspace-tablist :aria-label="__('Errors workspace sections')" scroll class="sm:min-w-0 sm:flex-1">
                     <x-server-workspace-tab
                         id="errors-tab-stream"

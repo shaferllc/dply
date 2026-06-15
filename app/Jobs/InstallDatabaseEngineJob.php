@@ -16,6 +16,7 @@ use App\Services\Servers\ServerDatabaseRemoteExec;
 use App\Support\Servers\DatabaseEngineInstallScripts;
 use App\Support\Servers\ServerDatabaseHostCapabilities;
 use App\Support\Servers\ServerResourcePreflight;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Queue\Queueable;
@@ -30,7 +31,7 @@ use Illuminate\Support\Str;
  * Progress streams into a {@see ConsoleAction} on the engine row so the databases workspace
  * banner shows live apt output (same pattern as webserver switch).
  */
-class InstallDatabaseEngineJob implements ShouldQueue
+class InstallDatabaseEngineJob implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
     use WritesConsoleAction;
@@ -45,6 +46,28 @@ class InstallDatabaseEngineJob implements ShouldQueue
         if (is_string($q) && $q !== '') {
             $this->onQueue($q);
         }
+    }
+
+    /**
+     * One install in flight per engine row. Guards the dispatch race (a
+     * double-click, or ErrorRetryRegistry firing alongside a manual retry)
+     * from running two concurrent apt installs on the same box. The row's
+     * STATUS_INSTALLING check in ManagesDatabaseEngineLifecycle is the
+     * canonical UI guard; this is the queue-level backstop.
+     */
+    public function uniqueId(): string
+    {
+        return 'db_engine_install_'.$this->serverDatabaseEngineId;
+    }
+
+    /**
+     * Short lock — just the dispatch window. The job releases the lock when it
+     * finishes; a short TTL means a worker SIGKILL only blocks the next
+     * dispatch briefly rather than for the full job timeout.
+     */
+    public function uniqueFor(): int
+    {
+        return 60;
     }
 
     protected function consoleSubject(): Model
@@ -183,16 +206,20 @@ class InstallDatabaseEngineJob implements ShouldQueue
     }
 
     /**
-     * Ensure the freshly-installed engine accepts TCP on 127.0.0.1:<port>. Only
-     * enforced for the relational engines apps connect to over TCP loopback
-     * (postgres/mysql/mariadb). No-op when already listening — remediation runs
-     * only on failure, so a working config is never touched. Throws (→ FAILED)
-     * when the engine still isn't reachable after remediation.
+     * Ensure the freshly-installed engine accepts TCP on 127.0.0.1:<port> — the
+     * address the deployed app dials. Enforced for every engine apps reach over
+     * TCP loopback: the relational trio (postgres/mysql/mariadb), clickhouse
+     * (8123, the logs-store use case), and mongodb (27017). apt only guarantees
+     * the daemon is up, not that the port is bound — clickhouse in particular can
+     * report `systemctl is-active` while its HTTP port is still warming up.
+     * No-op when already listening — remediation runs only on failure, so a
+     * working config is never touched. Throws (→ FAILED) when the engine still
+     * isn't reachable after remediation. sqlite has no TCP surface and is excluded.
      */
     private function ensureLoopbackListening(ServerDatabaseEngine $row, ExecuteRemoteTaskOnServer $executor, $emit): void
     {
         $engine = $row->engine;
-        if (! in_array($engine, ['postgres', 'mysql', 'mariadb'], true)) {
+        if (! in_array($engine, ['postgres', 'mysql', 'mariadb', 'clickhouse', 'mongodb'], true)) {
             return;
         }
 

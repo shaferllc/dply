@@ -6,10 +6,6 @@
 @endphp
 
 @if ($showExplainer)
-    <x-explainer>
-        <p>{{ __('Picks an engine, runs CREATE DATABASE, then creates a per-database user (defaulting to the same name) and grants it full access on that database only. The credentials are stored encrypted in the dply database — reveal + copy them from the Credentials column on each row.') }}</p>
-        <p>{{ __('Auto-generation: an empty user defaults to the database name. An empty password generates a 32-character symbol-free string. Both are good defaults for app-only use.') }}</p>
-    </x-explainer>
 @endif
 
 <form wire:submit="createDatabase" @class(['grid grid-cols-1 gap-5 sm:grid-cols-2', 'mt-5' => $showExplainer])>

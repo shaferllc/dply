@@ -39,10 +39,6 @@
 >
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-slot:explainer>
-        <p>{{ __('Enable visitor maintenance to suspend every eligible VM site at once with a shared public message. Deploy hooks and settings still work. Manually suspended sites are left unchanged and are not auto-resumed when maintenance ends.') }}</p>
-    </x-slot:explainer>
-
     @php
         $maintTabBase = 'inline-flex items-center gap-1.5 border-b-2 px-1 py-3 text-sm font-medium transition-colors';
         $maintTabOn = 'border-brand-forest text-brand-ink';

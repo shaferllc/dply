@@ -31,22 +31,6 @@
         </p>
     @endif
 
-    <x-explainer>
-        <p>{{ __('"Run now" creates a pending backup row and queues the export job — progress shows up in the lists below as the job completes. Schedules add a managed cron entry that fires the same job on the cadence you set.') }}</p>
-        <p class="mt-2">
-            <span class="font-semibold text-brand-ink">{{ __('Backups vs Snapshots:') }}</span>
-            {{ __('Backups are logical exports — a single database or a site\'s files — sent to storage you own and restored by importing. They\'re small, granular, and portable. For a full point-in-time capture of the whole machine (disk image, volumes, cache state) that you roll the server back to, use') }}
-            <a href="{{ route('servers.snapshots', $server) }}" wire:navigate class="font-semibold text-brand-ink underline hover:no-underline">{{ __('Snapshots') }}</a>{{ __(' instead — those are heavier and billed on your cloud account.') }}
-        </p>
-        @if ($backupConfigurations->isEmpty())
-            <p class="mt-2">
-                {{ __('No backup destinations yet. Add an S3 bucket / Dropbox / Google Drive / SFTP target to send backups somewhere you own — ') }}
-                <button type="button" wire:click="openDestinationModal" class="font-semibold text-brand-ink underline hover:no-underline">{{ __('add one now') }}</button>{{ __('.') }}
-            </p>
-        @endif
-        <p class="mt-2 text-xs"><a href="{{ route('servers.activity', $server) }}?category=background" wire:navigate class="font-semibold text-brand-ink underline">{{ __('View background activity →') }}</a></p>
-    </x-explainer>
-
     {{-- At-a-glance health strip — last 7 days for completed/failed counts. --}}
     <section class="dply-card overflow-hidden">
         <div class="border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
