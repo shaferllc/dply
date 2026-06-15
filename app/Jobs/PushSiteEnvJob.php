@@ -135,7 +135,10 @@ class PushSiteEnvJob implements ShouldBeUnique, ShouldQueue
             // Pull-and-forget any customer-held identity stashed for this apply.
             // It lives in the cache (transient) keyed by a token carried in the
             // payload — never the raw key — and is dropped the instant it is read.
-            $ephemeralIdentity = $this->ephemeralIdentityToken !== null
+            // isset() (not !== null): a payload serialized before this property
+            // existed leaves the typed property uninitialized on unserialize —
+            // reading it with !== null would fatal. isset() degrades to "no identity".
+            $ephemeralIdentity = isset($this->ephemeralIdentityToken)
                 ? Cache::pull(self::EPHEMERAL_IDENTITY_CACHE_PREFIX.$this->ephemeralIdentityToken)
                 : null;
 
