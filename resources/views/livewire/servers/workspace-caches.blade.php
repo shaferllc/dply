@@ -38,10 +38,10 @@
         aria-hidden="true"
     ></div>
 
-    <x-explainer>
+    <x-slot:explainer>
         <p>{{ __('This workspace manages cache engines installed on this server via apt + systemd — Redis, Valkey, Memcached, KeyDB, and Dragonfly. Multiple engines can run side-by-side (e.g. Redis for queues, Memcached for app cache).') }}</p>
         <p>{{ __('It is independent of how apps deployed here are configured to use cache: this page installs and operates the server, not your app\'s client code. The engine badges are read live from the server; install state lives in the dply database.') }}</p>
-    </x-explainer>
+    </x-slot:explainer>
 
     {{-- Top-of-page console banner — Debug, Restart/Stop/Start/Disable/Enable
          and the rest stream into the shared ConsoleAction partial here so it

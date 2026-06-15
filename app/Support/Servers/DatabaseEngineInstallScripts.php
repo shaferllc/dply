@@ -93,8 +93,6 @@ if [ "$RAM_MB" -gt 0 ] && [ "$RAM_MB" -lt 4096 ]; then
     <mark_cache_size>268435456</mark_cache_size>
     <uncompressed_cache_size>0</uncompressed_cache_size>
     <max_concurrent_queries>16</max_concurrent_queries>
-    <background_pool_size>4</background_pool_size>
-    <background_schedule_pool_size>4</background_schedule_pool_size>
     <profiles>
         <default>
             <max_memory_usage>${CH_MAX_BYTES}</max_memory_usage>

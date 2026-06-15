@@ -31,10 +31,10 @@
         @include('livewire.servers.partials.workspace-ops-not-ready', ['server' => $server])
     @endif
 
-    <x-explainer>
+    <x-slot:explainer>
         <p>{{ __('This workspace inventories the PHP versions installed on this server, lets you set the default CLI version, and review FPM + ini configuration. Inventory is read live from the box via SSH on each render; default-version changes happen through update-alternatives.') }}</p>
         <p>{{ __('Adding/removing PHP versions runs apt against the upstream Sury/Ondrej PPA. Existing sites pin to a specific version in their FPM pool, so changing the server default doesn\'t move sites — that\'s a per-site setting on the Sites workspace.') }}</p>
-    </x-explainer>
+    </x-slot:explainer>
 
     {{-- Console banner — install/uninstall/patch/refresh-inventory, config load/save,
          and set-default actions stream into the shared ConsoleAction partial. --}}

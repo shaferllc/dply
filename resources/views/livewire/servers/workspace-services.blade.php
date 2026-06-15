@@ -43,10 +43,10 @@
         ];
     @endphp
 
-    <x-explainer>
+    <x-slot:explainer>
         <p>{{ __('Inventory of the systemd units on this server, surfaced live from systemctl list-units. Restart, stop, start, and enable/disable map to the matching systemctl verbs and run as root over SSH.') }}</p>
         <p>{{ __('Custom services are systemd unit files dply tracks specifically — they show up as actionable rows. Stock units (sshd, networkd, etc.) are visible but actions are gated to the ones dply considers safe to mutate.') }}</p>
-    </x-explainer>
+    </x-slot:explainer>
 
     @if ($server->workspace)
         @feature('surface.projects')

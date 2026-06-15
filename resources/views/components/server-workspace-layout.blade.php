@@ -14,6 +14,10 @@
     'pageHeaderCompact' => false,
     /** Suppress the generic hero-card header when the page renders its own identity card (e.g. the Overview identity-hero). */
     'hideHero' => false,
+    /** Tone for the integrated header explainer ("What is this?") — passed through to x-explainer. */
+    'explainerTone' => 'info',
+    /** Optional custom label/title for the integrated header explainer. */
+    'explainerTitle' => null,
 ])
 
 <x-server-workspace-shell :server="$server" :active="$active" :show-navigation="$showNavigation">
@@ -147,6 +151,15 @@
                     </div>
                 </dl>
             </x-slot:stats>
+
+            {{-- "What is this?" contextual help, integrated into the header as an
+                 action pill instead of floating as a detached element below the
+                 card. Pages supply the body via <x-slot:explainer>. --}}
+            @if (isset($explainer) && trim((string) $explainer) !== '')
+                <x-explainer :tone="$explainerTone" :title="$explainerTitle">
+                    {{ $explainer }}
+                </x-explainer>
+            @endif
         </x-hero-card>
     @endunless
 

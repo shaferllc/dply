@@ -30,9 +30,9 @@
 >
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-explainer>
+    <x-slot:explainer>
         <p>{{ __('Multi-site VMs hide coupling until something breaks. Shared Host Radar attributes live process load to each site, maps shared stack dependencies from your bindings, and correlates deploys with CPU spikes.') }}</p>
-    </x-explainer>
+    </x-slot:explainer>
 
     @if ($soloTenant)
         <section class="dply-card overflow-hidden">

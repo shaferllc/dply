@@ -36,7 +36,7 @@
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
     <div class="space-y-6">
-        <x-explainer>
+        <x-slot:explainer>
             @if ($isContainerHost)
                 <p>{{ __('Container apps deployed onto this host. Each row is a Site rooted at a Git repo: dply builds the image, runs it on the host (Docker container or Kubernetes Deployment), and tracks deploys + env per app.') }}</p>
                 <p>{{ __('Adding a container here inspects the repo, queues the first build + deploy, and surfaces progress on this server\'s overview. Removing a container tears down the running workload and the matching dply records.') }}</p>
@@ -44,7 +44,7 @@
                 <p>{{ __('Sites hosted on this server. Each row is a vhost (nginx/caddy/apache) with its own document root, runtime version (PHP/Node/Python), database bindings, deploy hooks, and SSL certs. Click a row to drop into the site\'s own page where deploys, env vars, and per-site settings live.') }}</p>
                 <p>{{ __('Adding a site here scaffolds the vhost config + filesystem layout on the server and (optionally) creates a database for it. Removing a site offers cascading cleanup: vhost, files, database, deploy keys.') }}</p>
             @endif
-        </x-explainer>
+        </x-slot:explainer>
 
         {{-- Hero: new site/container CTA. --}}
         <section class="dply-card overflow-hidden">
@@ -220,6 +220,7 @@
                         @php
                             $primaryDomain = $s->domains->sortByDesc('is_primary')->first();
                             $displayHost = $primaryDomain?->hostname ?? $s->name;
+                            $siteInitial = (string) str($s->isCustom() ? $s->name : $displayHost)->substr(0, 1)->upper();
                             $statusOk = $s->isReadyForTraffic();
                             $sslOn = $s->ssl_status === \App\Models\Site::SSL_ACTIVE;
                             $gitRef = $s->git_repository_url;
@@ -256,6 +257,13 @@
                                 wire:navigate
                                 class="flex min-w-0 flex-1 items-center justify-between gap-4 py-4 pr-6 transition-colors hover:bg-brand-sand/15 sm:pr-7 {{ $bulkActionsEnabled && ! $isContainerHost ? 'pl-4 sm:pl-5' : 'px-6 sm:px-7' }}"
                             >
+                                <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-brand-ink/10 bg-brand-sand/40 text-sm font-semibold text-brand-moss">
+                                    @if ($s->logoUrl())
+                                        <img src="{{ $s->logoUrl() }}" alt="" class="h-full w-full object-cover" />
+                                    @else
+                                        {{ $siteInitial !== '' ? $siteInitial : '•' }}
+                                    @endif
+                                </span>
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                                         <span class="truncate text-sm font-semibold text-brand-ink">{{ $s->isCustom() ? $s->name : $displayHost }}</span>

@@ -15,10 +15,10 @@
         <div wire:poll.2s="syncManageRemoteTaskFromCache" class="hidden" aria-hidden="true"></div>
     @endif
 
-    <x-explainer>
+    <x-slot:explainer>
         <p>{{ __('This workspace manages databases on this server — MySQL, MariaDB, PostgreSQL, MongoDB, ClickHouse, and SQLite — plus per-app credentials. Engines install via apt + systemd (or file-based SQLite). For Redis/Valkey caching, use the Caches workspace.') }}</p>
         <p>{{ __('Engine state is read live via SSH; database + credential rows live in the dply database. The "Discovered on server" panel reconciles both directions: databases the engine knows about that dply hasn\'t recorded yet.') }}</p>
-    </x-explainer>
+    </x-slot:explainer>
 
     @if ($opsReady)
         @if (! $capabilitiesLoaded)

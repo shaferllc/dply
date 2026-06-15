@@ -50,9 +50,9 @@
 >
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-explainer>
+    <x-slot:explainer>
         <p>{{ __('When enabled, deploy jobs for every site on this server are skipped with a clear log message during deny windows. Hooks and API deploys respect the same policy. Concurrent deploys per site remain limited to one via the existing deploy lock.') }}</p>
-    </x-explainer>
+    </x-slot:explainer>
 
     {{-- Status banner — visible above every tab so the live state is always in view. --}}
     <div @class(['flex flex-wrap items-center justify-between gap-3 rounded-2xl px-5 py-3.5 text-sm ring-1', $overallTone])>

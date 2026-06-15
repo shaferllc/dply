@@ -5,10 +5,10 @@
     :description="__('Every deployment recorded for sites on this server, newest first.')"
     :pageHeaderToolbar="true"
 >
-    <x-explainer>
+    <x-slot:explainer>
         <p>{{ __('A roll-up of every deployment across the sites hosted on this server — newest first. Each row links through to the full deploy detail (phases, output, timing) on its site.') }}</p>
         <p>{{ __('Records are written as deploys run; running deploys appear live and settle to success or failed when they finish. Filter by status to find what stalled.') }}</p>
-    </x-explainer>
+    </x-slot:explainer>
 
     <section class="dply-card mt-6 overflow-hidden">
         <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-8">

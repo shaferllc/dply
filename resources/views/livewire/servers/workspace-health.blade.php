@@ -14,9 +14,9 @@
 
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-explainer>
+    <x-slot:explainer>
         <p>{{ __('The health cockpit rolls up guest metrics, atomic release counts, recent failed deploys, certificate expiry, and inactive supervisor programs. It is read-only — use the linked workspace tabs to fix issues.') }}</p>
-    </x-explainer>
+    </x-slot:explainer>
 
     <div class="space-y-6">
         <x-server-workspace-tablist :aria-label="__('Health workspace sections')" scroll class="sm:min-w-0 sm:flex-1">

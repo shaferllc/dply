@@ -20,10 +20,10 @@
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-explainer tone="info">
+    <x-slot:explainer>
         <p>{{ __('Each row is a Linux user the server already has in /etc/passwd. The site count shows how many Dply-managed sites are currently set to run as that user — those sites must be reassigned before you can remove the account.') }}</p>
         <p>{{ __('root, dply, and the configured deploy user are protected — Dply refuses to remove them. UID below 1000 (system accounts) is also blocked.') }}</p>
-    </x-explainer>
+    </x-slot:explainer>
 
     @if (! $opsReady)
         <section class="dply-card overflow-hidden border-amber-200">

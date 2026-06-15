@@ -60,9 +60,9 @@
 >
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])
 
-    <x-explainer>
+    <x-slot:explainer>
         <p>{{ __('Counts Failed password / Invalid user lines in auth.log, reads fail2ban jail stats, checks UFW status, and samples sshd -T for password/root settings. For full log tailing, use Logs.') }}</p>
-    </x-explainer>
+    </x-slot:explainer>
 
     {{-- In-page tabs: posture overview, auth/brute-force detail, host hardening,
          and notification routing for this server's server.security_digest.* events.

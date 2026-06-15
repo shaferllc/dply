@@ -32,10 +32,10 @@
     :title="__('Activity')"
     :description="__('Audit events for this server and its sites — who did what, when, and what changed.')"
 >
-    <x-explainer>
+    <x-slot:explainer>
         <p>{{ __('Every mutating action across this workspace writes one row to the audit log: firewall edits, cron saves, SSH key changes, insight fixes, deploys. This page is a read-only view of that log scoped to this server (and its sites).') }}</p>
         <p>{{ __('No collector, no queue — events are written from inline calls to audit_log() at the moment each action runs, and rolled up here on read.') }}</p>
-    </x-explainer>
+    </x-slot:explainer>
 
     <x-server-workspace-tablist :aria-label="__('Activity sections')">
         <x-server-workspace-tab id="activity-tab-feed" :active="$tab === 'feed'" wire:click="setTab('feed')" icon="heroicon-o-list-bullet">

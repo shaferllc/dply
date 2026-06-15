@@ -247,7 +247,13 @@ class WorkspaceOverview extends Component
         // "last deploy: 3m ago". Cap at 5 — the dedicated Sites tab owns the
         // full list.
         $sitesPreview = $this->server->sites()
-            ->select(['id', 'name', 'status', 'server_id', 'updated_at'])
+            ->select([
+                'id', 'name', 'status', 'type', 'runtime', 'runtime_version',
+                'ssl_status', 'server_id', 'updated_at', 'last_deploy_at',
+            ])
+            // Eager-load domains so each row can resolve primaryDomain()/a visit
+            // link without an N+1 (primaryDomain() reads the in-memory collection).
+            ->with('domains:id,site_id,hostname,is_primary')
             ->orderByDesc('updated_at')
             ->limit(5)
             ->get();
@@ -255,7 +261,7 @@ class WorkspaceOverview extends Component
             ? collect()
             : SiteDeployment::query()
                 ->whereIn('site_id', $sitesPreview->pluck('id'))
-                ->select(['id', 'site_id', 'status', 'created_at', 'finished_at'])
+                ->select(['id', 'site_id', 'status', 'trigger', 'git_sha', 'created_at', 'started_at', 'finished_at'])
                 ->orderByDesc('created_at')
                 ->get()
                 ->groupBy('site_id')
