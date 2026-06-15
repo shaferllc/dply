@@ -36,6 +36,74 @@
                             </span>
                         @endif
                     </div>
+
+                    {{-- Installed runtime, incorporated into the identity line rather
+                         than a standalone card: database / language / webserver / cache. --}}
+                    @php
+                        $hasRuntimeChips = ! $isDedicatedServiceRoleHost && (
+                            $installedStack->database
+                            || $installedStack->phpVersion
+                            || $installedStack->webserver
+                            || ($installedStack->cacheService && $installedStack->cacheService !== 'none')
+                        );
+                    @endphp
+                    @if ($hasRuntimeChips)
+                        <div class="mt-3 flex flex-wrap items-center gap-1.5">
+                            @if ($installedStack->database)
+                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-2 py-0.5 text-xs font-medium text-brand-ink">
+                                    {{ str($installedStack->database)->headline() }}@if ($installedStack->databaseVersion)<span class="ml-1 font-mono text-[11px] text-brand-moss">{{ $installedStack->databaseVersion }}</span>@endif
+                                </span>
+                            @endif
+                            @if ($installedStack->phpVersion)
+                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-2 py-0.5 text-xs font-medium text-brand-ink">
+                                    PHP <span class="ml-1 font-mono text-[11px] text-brand-moss">{{ $installedStack->phpVersion }}</span>
+                                </span>
+                            @endif
+                            @if ($installedStack->webserver)
+                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-2 py-0.5 text-xs font-medium text-brand-ink">
+                                    {{ str($installedStack->webserver)->headline() }}
+                                </span>
+                            @endif
+                            @if ($installedStack->cacheService && $installedStack->cacheService !== 'none')
+                                <span class="inline-flex items-center rounded-md border border-brand-ink/10 bg-brand-sand/40 px-2 py-0.5 text-xs font-medium text-brand-ink">
+                                    {{ str($installedStack->cacheService)->headline() }}
+                                </span>
+                            @endif
+                            @if ($installedStack->lowMemoryMode)
+                                <span class="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800" title="{{ __('Provisioned in low-memory mode — substituted lighter services where possible.') }}">
+                                    <x-heroicon-m-exclamation-triangle class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                    {{ __('Low-memory mode') }}
+                                </span>
+                            @endif
+                            @feature('workspace.services')
+                                <a href="{{ route('servers.services', $server) }}" wire:navigate class="inline-flex items-center gap-1 text-xs font-semibold text-brand-forest transition hover:text-brand-sage hover:underline">
+                                    {{ __('Services') }}
+                                    <x-heroicon-m-arrow-up-right class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                </a>
+                            @endfeature
+                        </div>
+                        @if ($installedStack->lowMemoryMode)
+                            <p class="mt-2 rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs leading-relaxed text-amber-900">
+                                @if ($installedStackDiverges)
+                                    {{ __('Low-memory mode: :memMb MB RAM is under the 1 GB threshold, so SQLite was installed instead of :requested. Re-provision on a 2 GB+ droplet for a full database server — see journey for details.', [
+                                        'memMb' => $installedStack->totalMemoryMb ?: '<1024',
+                                        'requested' => str($server->meta['database'] ?? 'a database server')->headline(),
+                                    ]) }}
+                                @else
+                                    {{ __('Low-memory mode: :memMb MB RAM is under the 1 GB threshold, so lighter services were substituted. Re-provision on a 2 GB+ droplet for the full stack — see journey for details.', [
+                                        'memMb' => $installedStack->totalMemoryMb ?: '<1024',
+                                    ]) }}
+                                @endif
+                            </p>
+                        @elseif ($installedStackDiverges)
+                            <p class="mt-2 rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2 text-xs leading-relaxed text-amber-900">
+                                {{ __('Wizard requested :requested but :installed was installed instead. See journey for context.', [
+                                    'requested' => $server->meta['database'] ?? '—',
+                                    'installed' => $installedStack->database ?? '—',
+                                ]) }}
+                            </p>
+                        @endif
+                    @endif
                 </div>
             </div>
         </div>
@@ -78,5 +146,22 @@
                 @endif
             </dl>
         </div>
+    </div>
+
+    {{-- Merged: workspace summary tiles live in the same card as the identity,
+         so the overview opens with a single header card instead of two. --}}
+    @unless ($isDedicatedServiceRoleHost)
+        <div class="border-t border-brand-ink/10 bg-brand-sand/25 p-6 sm:p-8">
+            <div class="mb-3 flex items-center gap-2">
+                <x-heroicon-o-squares-2x2 class="h-4 w-4 text-brand-mist" aria-hidden="true" />
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-mist">{{ __('Workspace summary') }}</p>
+            </div>
+            @include('livewire.servers.partials.overview._summary-tiles-grid')
+        </div>
+    @endunless
+
+    {{-- Merged: live system load (CPU / memory / disk) lives in the header card too. --}}
+    <div class="border-t border-brand-ink/10 p-6 sm:p-8">
+        @include('livewire.servers.partials.overview._live-metrics-body')
     </div>
 </section>

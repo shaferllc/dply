@@ -74,19 +74,9 @@
         @if ($setupIncomplete)
             @include('livewire.servers.partials.overview._setup-hero')
         @else
-            @include('livewire.servers.partials.overview._identity-hero')
-
-            @include('livewire.servers.partials.overview._onboarding-checklist')
-
-            @include('livewire.servers.partials.overview._ssh-key-reminder')
-
-            {{-- Container launch progress partial. --}}
-            @include('livewire.servers.partials._container-launch-progress')
-
-            @include('livewire.servers.partials.overview._first-site-cta')
-
-            {{-- Health label/meta — shared by the workspace summary tiles and the
-                 dedicated database tile pack, so it's computed once at this scope. --}}
+            {{-- Health label/meta — shared by the summary tiles (merged into the
+                 identity-hero card) and the dedicated database tile pack, so it's
+                 computed once before either renders. --}}
             @php
                 $healthValue = match ($healthSummary['status']) {
                     \App\Models\Server::HEALTH_REACHABLE => __('Reachable'),
@@ -98,17 +88,22 @@
                     : __('No checks yet');
             @endphp
 
-            @include('livewire.servers.partials.overview._workspace-summary-tiles')
+            @include('livewire.servers.partials.overview._identity-hero')
 
-            @include('livewire.servers.partials.overview._live-metrics')
+            @include('livewire.servers.partials.overview._onboarding-checklist')
+
+            @include('livewire.servers.partials.overview._ssh-key-reminder')
+
+            {{-- Container launch progress partial. --}}
+            @include('livewire.servers.partials._container-launch-progress')
+
+            @include('livewire.servers.partials.overview._first-site-cta')
 
             @include('livewire.servers.partials.overview._cache-tile-pack')
 
             @include('livewire.servers.partials.overview._database-tile-pack')
 
             @include('livewire.servers.partials.overview._sites-preview')
-
-            @include('livewire.servers.partials.overview._installed-runtime')
 
             @include('livewire.servers.partials.overview._secondary-shortcuts')
         @endif

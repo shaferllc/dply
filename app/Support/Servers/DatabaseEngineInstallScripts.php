@@ -50,7 +50,7 @@ apt-get install -y gnupg curl ca-certificates
 if [ -f /etc/os-release ]; then
   . /etc/os-release
   if [ "${ID}" = "ubuntu" ] && [ -n "${VERSION_CODENAME}" ]; then
-    curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
+    curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | gpg --batch --yes --no-tty --dearmor -o /usr/share/keyrings/mongodb-server-7.0.gpg
     echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu ${VERSION_CODENAME}/mongodb-org/7.0 multiverse" > /etc/apt/sources.list.d/mongodb-org-7.0.list
     apt-get update -y
     apt-get install -y mongodb-org || true
@@ -65,7 +65,7 @@ export DEBIAN_FRONTEND=noninteractive
 set -e
 apt-get update -y
 apt-get install -y apt-transport-https ca-certificates curl gnupg
-curl -fsSL 'https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key' | gpg --dearmor -o /usr/share/keyrings/clickhouse-keyring.gpg
+curl -fsSL 'https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key' | gpg --batch --yes --no-tty --dearmor -o /usr/share/keyrings/clickhouse-keyring.gpg
 echo "deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg] https://packages.clickhouse.com/deb stable main" > /etc/apt/sources.list.d/clickhouse.list
 apt-get update -y
 printf '%s\n%s\n' '#!/bin/sh' 'exit 101' > /usr/sbin/policy-rc.d
@@ -570,7 +570,7 @@ BASH;
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get install -y gnupg curl ca-certificates lsb-release
-curl -fsSL https://packagecloud.io/timescale/timescaledb/gpgkey | gpg --dearmor -o /usr/share/keyrings/timescaledb.gpg
+curl -fsSL https://packagecloud.io/timescale/timescaledb/gpgkey | gpg --batch --yes --no-tty --dearmor -o /usr/share/keyrings/timescaledb.gpg
 ARCH=$(dpkg --print-architecture)
 CODENAME=$(lsb_release -cs 2>/dev/null || echo jammy)
 echo "deb [signed-by=/usr/share/keyrings/timescaledb.gpg arch=${ARCH}] https://packagecloud.io/timescale/timescaledb/ubuntu/ ${CODENAME} main" > /etc/apt/sources.list.d/timescaledb.list

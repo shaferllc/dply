@@ -71,7 +71,7 @@ class MiseInstallScriptBuilder
         $aptSteps = [
             'echo "[dply] installing mise via apt"',
             'install -m 0755 -d /etc/apt/keyrings',
-            'curl -fsSL https://mise.jdx.dev/gpg-key.pub | gpg --dearmor -o /etc/apt/keyrings/mise-archive-keyring.gpg',
+            'curl -fsSL https://mise.jdx.dev/gpg-key.pub | gpg --batch --yes --no-tty --dearmor -o /etc/apt/keyrings/mise-archive-keyring.gpg',
             'chmod a+r /etc/apt/keyrings/mise-archive-keyring.gpg',
             'echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=$(dpkg --print-architecture)] https://mise.jdx.dev/deb stable main" > /etc/apt/sources.list.d/mise.list',
             'dply_wait_for_apt_locks',
