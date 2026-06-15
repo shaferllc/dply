@@ -352,8 +352,15 @@ return [
         'wordpress' => ['webserver_config'],
         'basic-auth' => ['basic_auth_sync', 'webserver_config'],
         'webserver-config' => ['webserver_config'],
-        'environment' => ['env_sync', 'env_push', 'env_scan', 'binding_connectivity_fix', 'mail_test'],
-        'resources' => ['bindings_reachable', 'binding_validate', 'binding_connectivity_fix', 'mail_test', 'broadcasting_test'],
+        // `site_remediate`/`site_test`/`binding_validate` are included so the
+        // standalone Environment page's top-level static banner surfaces the
+        // suggested-fix (runRemediation) run. Those fixes also stream into the
+        // SSH console drawer, but that drawer is feature-gated off by default —
+        // without these kinds the run has nowhere to show on this page (the
+        // in-partial console-banner suppresses itself when section ===
+        // 'environment'). Keep in sync with the in-partial $envConsoleRun set.
+        'environment' => ['env_sync', 'env_push', 'env_scan', 'binding_connectivity_fix', 'mail_test', 'site_remediate', 'site_test', 'binding_validate'],
+        'resources' => ['bindings_reachable', 'binding_validate', 'binding_connectivity_fix', 'mail_test', 'broadcasting_test', 'site_remediate'],
     ],
 
     /*

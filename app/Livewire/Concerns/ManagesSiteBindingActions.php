@@ -148,6 +148,15 @@ trait ManagesSiteBindingActions
         }
 
         $this->validateBindingConnectivity($binding);
+
+        // Connecting Redis must "just work": the app now dials phpredis (and may
+        // use redis for cache/sessions/queue), so guarantee the PHP redis client
+        // extension exists on the box rather than letting it 500 at runtime with
+        // `Class "Redis" not found`. Dispatched after the connectivity probe so
+        // it's the run the page-top banner surfaces; no-ops when already present.
+        if ($binding->type === 'redis' && method_exists($this, 'ensurePhpRedisExtension')) {
+            $this->ensurePhpRedisExtension($binding);
+        }
     }
 
     /**

@@ -33,7 +33,10 @@
                 {{ __('Show dismissed') }}
             </label>
             @if ($this->openCount > 0)
-                <button type="button" wire:click="dismissAll" wire:confirm="{{ __('Dismiss all open errors?') }}"
+                {{-- Branded confirm modal (ConfirmsActionWithModal on both host
+                     components) instead of the native browser confirm(). --}}
+                <button type="button"
+                    wire:click="openConfirmActionModal('dismissAll', [], @js(__('Dismiss all open errors?')), @js(__('This dismisses every open error in this list. You can re-show dismissed errors with the filter. This does not fix the underlying issues.')), @js(__('Dismiss all')), false)"
                     class="rounded-lg border border-brand-ink/15 bg-white px-2.5 py-1 text-xs font-semibold text-brand-moss hover:bg-brand-sand/40">
                     {{ __('Dismiss all') }}
                 </button>

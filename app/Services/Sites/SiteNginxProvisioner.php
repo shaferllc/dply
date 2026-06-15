@@ -92,9 +92,22 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         // so it must exist (and php-fpm reloaded) before nginx reloads onto it.
         $this->ensurePhpFpmPool($site, $ssh, $emit);
 
+        // Read the on-box vhost once: the guard uses it to spot foreign edits,
+        // and the TLS preflight uses it to salvage a still-valid certificate.
+        $currentVhost = $this->readRemoteFile($server, $ssh, $confFile);
+
+        // TLS preflight: never write a vhost that points ssl_certificate at a
+        // file that isn't on the box. nginx -t hard-fails on a missing cert, and
+        // because the apply symlinks before testing, that would leave the box
+        // unable to reload at all. When the generated paths are missing but the
+        // cert nginx is currently serving exists (e.g. a shared *.zone wildcard
+        // a testing hostname rides), carry those working paths forward instead
+        // of swapping a working cert for a per-host path certbot never created.
+        $config = $this->reconcileTlsCertPaths($site, $server, $ssh, $config, $currentVhost, $emit);
+
         // Read-back guard: parse what's on the box and warn (or abort, per
         // config) before an overwrite silently discards manual vhost edits.
-        $this->guardAgainstForeignOverwrite($server, $ssh, $confFile, $config, $emit);
+        $this->guardAgainstForeignOverwrite($server, $ssh, $confFile, $config, $emit, $currentVhost);
 
         // Vhost write only emits when content actually changed; an apply that
         // didn't touch anything the vhost references (e.g. a sync that found
@@ -128,6 +141,13 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
         }
 
         if (! preg_match('/DPLY_NGINX_EXIT:0\s*$/', $out)) {
+            // Atomic apply: a failed nginx -t must not leave the broken vhost
+            // enabled, or every future reload on this box fails too. Restore the
+            // previous vhost (or drop the file + symlink for a brand-new site)
+            // and reload back onto the known-good config before surfacing the
+            // error.
+            $this->rollbackVhost($server, $ssh, $confFile, $linkFile, $currentVhost, $emit);
+
             throw new \RuntimeException('Nginx test or reload failed. Output: '.Str::limit($out, 2000));
         }
 
@@ -152,13 +172,13 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
      *
      * @param  Server  $server
      */
-    protected function guardAgainstForeignOverwrite($server, SshConnection $ssh, string $confFile, string $incoming, ConsoleEmitter $emit): void
+    protected function guardAgainstForeignOverwrite($server, SshConnection $ssh, string $confFile, string $incoming, ConsoleEmitter $emit, ?string $current = null): void
     {
         if ($this->guard->mode() === NginxConfigGuard::MODE_OFF) {
             return;
         }
 
-        $current = $this->readRemoteFile($server, $ssh, $confFile);
+        $current ??= $this->readRemoteFile($server, $ssh, $confFile);
         $foreign = $this->guard->foreignDirectives($current, $incoming);
         if ($foreign === []) {
             return;
@@ -181,6 +201,188 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
                 $emit->warn($line, 'nginx');
             }
         }
+    }
+
+    /**
+     * Roll back a failed apply so the box is never left with a broken vhost
+     * enabled (which would make every later reload on this box fail too).
+     * Restores the previous file content, or removes the file + its sites-enabled
+     * symlink when the site had no prior vhost, then best-effort reloads nginx
+     * back onto the known-good config.
+     */
+    protected function rollbackVhost(Server $server, SshConnection $ssh, string $confFile, string $linkFile, ?string $previousVhost, ConsoleEmitter $emit): void
+    {
+        $emit->warn('nginx -t failed — rolling back to the previous working vhost', 'nginx');
+
+        if ($previousVhost !== null) {
+            $this->writeSystemFile($ssh, $confFile, $previousVhost);
+        } else {
+            $ssh->exec($this->privilegedCommand($server, sprintf(
+                'rm -f %s %s',
+                escapeshellarg($linkFile),
+                escapeshellarg($confFile),
+            )), 30);
+        }
+
+        // Re-sync on-disk state: reload onto the restored config. Best-effort —
+        // the running nginx never picked up the bad config (the test failed), so
+        // this just brings the file/symlink state back in line.
+        $ssh->exec(sprintf(
+            '(%s) 2>&1; printf "\nDPLY_NGINX_RB_EXIT:%%s" "$?"',
+            $this->privilegedCommand($server, NginxServiceScript::testAndReloadOrStartScript()),
+        ), 60);
+    }
+
+    /**
+     * If the generated vhost references ssl_certificate material that is not on
+     * the box, but the live vhost points at cert files that ARE present, rewrite
+     * the generated config to reuse those present paths. Prevents an overwrite
+     * from swapping a working (often shared-wildcard) cert for a per-host path
+     * certbot never created. Throws if no usable cert exists either way, leaving
+     * the current vhost untouched rather than writing one nginx will reject.
+     *
+     * Pure-builder TLS path selection can't see the disk; this is the one place
+     * with both the generated config and an SSH connection, so the on-disk truth
+     * check lives here.
+     */
+    protected function reconcileTlsCertPaths(Site $site, Server $server, SshConnection $ssh, string $incoming, ?string $current, ConsoleEmitter $emit): string
+    {
+        $incomingPair = $this->extractCertPair($incoming);
+        if ($incomingPair === null) {
+            return $incoming; // no TLS block — nothing to reconcile
+        }
+
+        $present = $this->filesPresentOnBox($server, $ssh, [$incomingPair['cert'], $incomingPair['key']]);
+        if (($present[$incomingPair['cert']] ?? false) && ($present[$incomingPair['key']] ?? false)) {
+            return $incoming; // generated cert paths exist on disk — all good
+        }
+
+        // Salvage 1: the cert the live vhost is already serving (re-applies).
+        $currentPair = $this->extractCertPair((string) $current);
+        if ($currentPair !== null) {
+            $curPresent = $this->filesPresentOnBox($server, $ssh, [$currentPair['cert'], $currentPair['key']]);
+            if (($curPresent[$currentPair['cert']] ?? false) && ($curPresent[$currentPair['key']] ?? false)) {
+                $emit->warn(sprintf(
+                    'generated cert %s is not on the server; reusing the live cert %s',
+                    $incomingPair['cert'],
+                    $currentPair['cert'],
+                ), 'nginx');
+
+                return $this->swapCertPair($incoming, $currentPair);
+            }
+        }
+
+        // Salvage 2: the covering per-server wildcard cert on disk (first apply
+        // of a testing-hostname site, where there's no live vhost to copy from
+        // but the shared *.zone cert is already installed).
+        $wildcardPair = $this->coveringWildcardCertPair($site);
+        if ($wildcardPair !== null) {
+            $wcPresent = $this->filesPresentOnBox($server, $ssh, [$wildcardPair['cert'], $wildcardPair['key']]);
+            if (($wcPresent[$wildcardPair['cert']] ?? false) && ($wcPresent[$wildcardPair['key']] ?? false)) {
+                $emit->warn(sprintf(
+                    'generated cert %s is not on the server; reusing the covering wildcard cert %s',
+                    $incomingPair['cert'],
+                    $wildcardPair['cert'],
+                ), 'nginx');
+
+                return $this->swapCertPair($incoming, $wildcardPair);
+            }
+        }
+
+        throw new \RuntimeException(sprintf(
+            'Refusing to write the vhost: ssl_certificate %s is not on the server and no valid certificate was found to substitute. The existing vhost was left untouched — install the certificate (or the covering wildcard), then re-apply.',
+            $incomingPair['cert'],
+        ));
+    }
+
+    /**
+     * Extract the ssl_certificate / ssl_certificate_key paths from a vhost.
+     * `ssl_certificate\s+` never matches the `ssl_certificate_key` line (no
+     * whitespace after "ssl_certificate" there), so the two stay distinct.
+     *
+     * @return array{cert: string, key: string}|null
+     */
+    protected function extractCertPair(string $config): ?array
+    {
+        if (! preg_match('/^\s*ssl_certificate\s+(\S+?);/m', $config, $c)) {
+            return null;
+        }
+        if (! preg_match('/^\s*ssl_certificate_key\s+(\S+?);/m', $config, $k)) {
+            return null;
+        }
+
+        return ['cert' => $c[1], 'key' => $k[1]];
+    }
+
+    /**
+     * Replace every ssl_certificate(_key) value in $config with the given pair.
+     * Cert paths live under /etc/letsencrypt and contain no regex/replacement
+     * metacharacters, so a literal preg_replace is safe.
+     *
+     * @param  array{cert: string, key: string}  $pair
+     */
+    protected function swapCertPair(string $config, array $pair): string
+    {
+        $config = (string) preg_replace('/^(\s*ssl_certificate)\s+\S+?;/m', '$1 '.$pair['cert'].';', $config);
+
+        return (string) preg_replace('/^(\s*ssl_certificate_key)\s+\S+?;/m', '$1 '.$pair['key'].';', $config);
+    }
+
+    /**
+     * Stat a set of paths on the box in one round trip.
+     *
+     * @param  list<string>  $paths
+     * @return array<string, bool>
+     */
+    protected function filesPresentOnBox(Server $server, SshConnection $ssh, array $paths): array
+    {
+        $paths = array_values(array_unique(array_filter($paths)));
+        if ($paths === []) {
+            return [];
+        }
+
+        $checks = implode("\n", array_map(
+            fn (string $p): string => sprintf('test -f %1$s && echo "OK %1$s" || echo "NO %1$s"', escapeshellarg($p)),
+            $paths,
+        ));
+        $out = $ssh->exec($this->privilegedCommand($server, $checks), 30);
+
+        // Fail open: a path is "missing" only when the box EXPLICITLY reports
+        // `NO <path>`. Unrecognized output (a mocked/fake shell, a transport
+        // hiccup) is treated as present so this preflight never aborts a deploy
+        // on ambiguity — nginx -t and the rollback stay the real safety gates.
+        $present = [];
+        foreach ($paths as $p) {
+            $present[$p] = ! (bool) preg_match('/^NO '.preg_quote($p, '/').'$/m', $out);
+        }
+
+        return $present;
+    }
+
+    /**
+     * The on-disk cert/key pair for the per-server wildcard that covers this
+     * site's testing hostname, or null when the site isn't wildcard-covered.
+     * Mirrors {@see OpenLiteSpeedTlsPaths::letsEncryptDirectoryName}'s wildcard
+     * branch: certbot stores the shared cert under /etc/letsencrypt/live/<zone>/.
+     *
+     * @return array{cert: string, key: string}|null
+     */
+    protected function coveringWildcardCertPair(Site $site): ?array
+    {
+        $wildcard = $site->coveringServerWildcard();
+        if ($wildcard === null) {
+            return null;
+        }
+
+        $dir = strtolower(trim((string) ($wildcard->live_directory ?: $site->testingZone())));
+        if ($dir === '') {
+            return null;
+        }
+
+        return [
+            'cert' => '/etc/letsencrypt/live/'.$dir.'/fullchain.pem',
+            'key' => '/etc/letsencrypt/live/'.$dir.'/privkey.pem',
+        ];
     }
 
     /**
