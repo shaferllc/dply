@@ -221,6 +221,65 @@ class Server extends Model
     }
 
     /**
+     * True when THIS server is the very machine the current process is running
+     * on — i.e. a deploy targeting it would SSH back into localhost. Matched by
+     * comparing the server's public/private IPs against the box's own network
+     * interfaces (exact match, so a customer's remote server can never trip it).
+     *
+     * Used to make a control-plane SELF-deploy safe: the deploy's
+     * `horizon:terminate` runs on the target box, so when the target IS the box
+     * running the deploy queue, an inline restart bounces the Horizon executing
+     * this (and every concurrent) deploy job. {@see App\Services\Sites\SiteDeployPipelineRunner}
+     */
+    public function isLocalDeployHost(): bool
+    {
+        $targets = array_values(array_filter([
+            $this->ip_address,
+            $this->private_ip_address,
+        ]));
+        if ($targets === []) {
+            return false;
+        }
+
+        return (bool) array_intersect($targets, self::localIpAddresses());
+    }
+
+    /**
+     * IPv4/IPv6 addresses bound to this box's network interfaces. Cached for the
+     * process lifetime (a host's addresses don't change under a running worker).
+     *
+     * @return list<string>
+     */
+    private static function localIpAddresses(): array
+    {
+        static $cached = null;
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        $ips = [];
+        if (function_exists('net_get_interfaces')) {
+            $interfaces = @net_get_interfaces();
+            if (is_array($interfaces)) {
+                foreach ($interfaces as $interface) {
+                    foreach (($interface['unicast'] ?? []) as $unicast) {
+                        if (! empty($unicast['address'])) {
+                            $ips[] = (string) $unicast['address'];
+                        }
+                    }
+                }
+            }
+        }
+
+        $resolved = @gethostbynamel((string) gethostname());
+        if (is_array($resolved)) {
+            $ips = array_merge($ips, $resolved);
+        }
+
+        return $cached = array_values(array_unique(array_filter($ips)));
+    }
+
+    /**
      * The worker pool this server belongs to (clones + their source), if any.
      * See {@see WorkerPool}.
      */

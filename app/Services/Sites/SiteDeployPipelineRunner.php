@@ -113,9 +113,32 @@ class SiteDeployPipelineRunner
         }
 
         if ($site->resolvedLaravelPackageFlag('horizon')) {
-            // horizon:terminate; its supervisor/systemd unit (Restart=always) relaunches it on the new code.
-            $parts[] = '{ [ -f artisan ] && php artisan list 2>/dev/null | grep -q "horizon:terminate" '
-                .'&& { echo "[dply] horizon:terminate"; php artisan horizon:terminate 2>&1 || echo "[dply] horizon:terminate skipped/failed (continuing)"; }; } || true';
+            // A SELF-deploy is one whose target IS the box running this deploy
+            // job, so `horizon:terminate` would bounce the Horizon executing it.
+            // Matched purely by local-IP identity ({@see Server::isLocalDeployHost()})
+            // — exact, so a customer's remote server can never trip it.
+            $server = $site->server;
+            $isSelfDeploy = $server !== null && $server->isLocalDeployHost();
+
+            if ($isSelfDeploy) {
+                // SELF-deploy: terminating Horizon inline would SIGKILL this very
+                // deploy job (and any concurrent one) — it runs on the Horizon we'd
+                // bounce. Hand the restart to a DETACHED drain-aware command that
+                // waits for in-flight deploys to finish first, then terminates.
+                // Falls back to the inline terminate only if the command isn't on
+                // the box yet (the deploy that first ships it still runs old code).
+                $parts[] = 'if [ -f artisan ] && php artisan list 2>/dev/null | grep -q "dply:self-horizon-restart"; then '
+                    .'echo "[dply] self-deploy: deferring Horizon restart until in-flight deploys drain"; '
+                    .'setsid nohup php artisan dply:self-horizon-restart >> /tmp/dply-self-horizon-restart.log 2>&1 </dev/null & '
+                    .'elif [ -f artisan ] && php artisan list 2>/dev/null | grep -q "horizon:terminate"; then '
+                    .'echo "[dply] self-deploy: drain command unavailable — inline horizon:terminate (legacy)"; '
+                    .'php artisan horizon:terminate 2>&1 || true; '
+                    .'fi';
+            } else {
+                // horizon:terminate; its supervisor/systemd unit (Restart=always) relaunches it on the new code.
+                $parts[] = '{ [ -f artisan ] && php artisan list 2>/dev/null | grep -q "horizon:terminate" '
+                    .'&& { echo "[dply] horizon:terminate"; php artisan horizon:terminate 2>&1 || echo "[dply] horizon:terminate skipped/failed (continuing)"; }; } || true';
+            }
             $labels[] = 'Horizon';
         }
 
