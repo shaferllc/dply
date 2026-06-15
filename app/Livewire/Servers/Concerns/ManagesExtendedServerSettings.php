@@ -4,7 +4,6 @@ namespace App\Livewire\Servers\Concerns;
 
 use App\Services\Servers\ProviderCostUnavailableException;
 use App\Services\Servers\ServerProviderCostEstimator;
-use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -28,11 +27,6 @@ trait ManagesExtendedServerSettings
      * @var array{plan: string, provider_label: string, monthly: float, hourly: float, currency: string, fetched_at: string, mtd: float, ytd: float, runtime_hours_month: float, runtime_hours_year: float}|null
      */
     public ?array $lastPulledCostEstimate = null;
-
-    public string $settingsWebhookUrl = '';
-
-    /** Plaintext only when user changes it; empty means leave stored secret */
-    public string $settingsWebhookSecret = '';
 
     public string $settingsInventoryDepth = 'basic';
 
@@ -170,39 +164,6 @@ trait ManagesExtendedServerSettings
         ]));
     }
 
-    public function saveServerWebhooks(): void
-    {
-        $this->authorize('update', $this->server);
-        if ($this->deployerCannotEditServerSettings()) {
-            $this->toastError(__('Deployers cannot change server settings.'));
-
-            return;
-        }
-
-        $this->validate([
-            'settingsWebhookUrl' => ['nullable', 'string', 'max:2048'],
-            'settingsWebhookSecret' => ['nullable', 'string', 'max:512'],
-        ]);
-
-        $meta = $this->server->meta ?? [];
-        $url = trim($this->settingsWebhookUrl);
-        if ($url === '') {
-            unset($meta['server_event_webhook_url']);
-            unset($meta['server_event_webhook_secret']);
-        } else {
-            $meta['server_event_webhook_url'] = $url;
-            if ($this->settingsWebhookSecret !== '') {
-                $meta['server_event_webhook_secret'] = Crypt::encryptString($this->settingsWebhookSecret);
-            }
-        }
-
-        $this->server->update(['meta' => $meta]);
-        $this->server->refresh();
-        $this->settingsWebhookSecret = '';
-        $this->syncExtendedServerSettingsFromServer();
-        $this->toastSuccess(__('Webhook settings saved.'));
-    }
-
     public function saveInventoryDepthPreference(): void
     {
         $this->authorize('update', $this->server);
@@ -295,9 +256,6 @@ trait ManagesExtendedServerSettings
 
         $pulled = $m['cost_pulled_estimate'] ?? null;
         $this->lastPulledCostEstimate = is_array($pulled) ? $pulled : null;
-
-        $this->settingsWebhookUrl = (string) ($m['server_event_webhook_url'] ?? '');
-        $this->settingsWebhookSecret = '';
 
         $depth = (string) ($m['inventory_scan_depth'] ?? 'basic');
         $allowedDepth = array_keys(config('server_settings.inventory_scan_depths', ['basic' => '']));

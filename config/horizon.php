@@ -60,18 +60,23 @@ $horizonWorkerTries = max(1, (int) env('HORIZON_TRIES', 1));
 
 // Total worker ceiling for the supervisor. Under the 'auto' balancer Horizon
 // scales the pool between minProcesses (kept warm PER watched queue) and
-// maxProcesses (the SUPERVISOR-WIDE total). With this many watched queues a flat
-// ceiling of 10 can't staff every list, so the lower-priority queues starve under
-// load. Default the cap to ~3 processes per watched queue (never below 10) so the
-// pool can fan out across all of them, while staying fully overridable per box via
-// HORIZON_MAX_PROCESSES. The floor also guarantees minProcesses can be honoured for
-// every queue (count * minProcesses) before any extra headroom is added.
+// maxProcesses (the SUPERVISOR-WIDE total). HORIZON_MAX_PROCESSES, when set, is
+// the AUTHORITATIVE cap: we only floor it to >= the queue count (so every queue
+// can be staffed) and >= 10 — NEVER up to count*minProcesses. The old count*min
+// floor let a large per-queue min silently override the operator's cap (e.g. 6
+// queues * min 9 forced max to 54, ignoring HORIZON_MAX_PROCESSES=16 and pinning
+// the box at 54 always-on workers). When the cap is unset, default to ~3 per queue
+// so the pool can still fan out across all of them.
 $horizonQueueCount = max(1, count($horizonWorkerQueues));
-$horizonMaxProcessesFloor = max(10, $horizonQueueCount * $horizonMinProcesses);
+$horizonMaxProcessesFloor = max(10, $horizonQueueCount);
 $horizonMaxProcesses = max(
     $horizonMaxProcessesFloor,
-    (int) env('HORIZON_MAX_PROCESSES', max($horizonMaxProcessesFloor, $horizonQueueCount * 3))
+    (int) env('HORIZON_MAX_PROCESSES', $horizonQueueCount * 3)
 );
+// minProcesses is applied PER watched queue, so keep it consistent with the cap:
+// min * queueCount must fit under maxProcesses, else Horizon is handed a min it
+// can never honour and just runs at the ceiling. Clamp to maxProcesses/queueCount.
+$horizonMinProcesses = min($horizonMinProcesses, max(1, intdiv($horizonMaxProcesses, $horizonQueueCount)));
 // How aggressively 'auto' rebalances: how many processes it may add/remove per
 // scaling decision (balanceMaxShift) and how long it waits between decisions
 // (balanceCooldown, seconds). Higher shift + lower cooldown = the pool reaches its

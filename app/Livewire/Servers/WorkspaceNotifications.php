@@ -6,6 +6,7 @@ namespace App\Livewire\Servers;
 
 use App\Livewire\Concerns\CreatesNotificationChannelInline;
 use App\Livewire\Servers\Concerns\InteractsWithServerWorkspace;
+use App\Livewire\Servers\Concerns\ManagesServerWebhook;
 use App\Livewire\Sites\Settings;
 use App\Models\NotificationChannel;
 use App\Models\NotificationWebhookDestination;
@@ -15,6 +16,7 @@ use App\Support\NotificationSubscriptionMatrix;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
@@ -37,15 +39,18 @@ use Livewire\Component;
  * keys (server.systemd.u.*) are not config-listed, so this page never touches them —
  * they stay owned by the Services tab.
  *
- * Integration (outbound) webhooks have no per-server scope in the data model
- * (org-level, optionally site-scoped), so they're managed in Organization →
- * Automation; this page surfaces the organization-wide destinations read-only.
+ * The Webhooks tab carries two things: the per-server signed outbound webhook
+ * (URL + secret + deliveries log, owned by {@see ManagesServerWebhook} — this
+ * was the former Settings → Webhook tab) and, below it, the read-only list of
+ * organization-wide integration destinations (Slack/Discord/Teams), which have
+ * no per-server scope and are managed under Organization → Automation.
  */
 #[Layout('layouts.app')]
 class WorkspaceNotifications extends Component
 {
     use CreatesNotificationChannelInline;
     use InteractsWithServerWorkspace;
+    use ManagesServerWebhook;
 
     /** @var list<string> */
     public const NOTIF_TABS = ['subscriptions', 'webhooks'];
@@ -66,6 +71,18 @@ class WorkspaceNotifications extends Component
     {
         $this->bootWorkspace($server);
         $this->loadServerNotificationPreferences();
+        $this->syncServerWebhookFromServer();
+    }
+
+    /**
+     * Whether the current user may edit server-scoped settings (the per-server
+     * webhook form gates on this). Deployers are read-only. Mirrors the same
+     * computed on {@see WorkspaceSettings}.
+     */
+    #[Computed]
+    public function canEditServerSettings(): bool
+    {
+        return ! (bool) Auth::user()?->currentOrganization()?->userIsDeployer(Auth::user());
     }
 
     public function setNotificationsTab(string $tab): void
@@ -204,6 +221,10 @@ class WorkspaceNotifications extends Component
             'assignableNotificationChannels' => $this->assignableChannels(),
             'eventCategories' => $this->eventCategories(),
             'organizationWebhookDestinations' => $this->organizationWebhookDestinations(),
+            // Only query the deliveries log when its tab is showing.
+            'webhookDeliveries' => $this->notifTab === 'webhooks'
+                ? $this->recentWebhookDeliveries()
+                : new Collection,
         ]);
     }
 }

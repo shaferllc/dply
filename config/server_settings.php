@@ -119,7 +119,6 @@ return [
         'inventory' => ['label' => 'Inventory', 'icon' => 'clipboard-document-list'],
         'governance' => ['label' => 'Cost', 'icon' => 'currency-dollar'],
         'notes' => ['label' => 'Notes', 'icon' => 'document-text'],
-        'webhook' => ['label' => 'Webhook', 'icon' => 'bolt'],
         'export' => ['label' => 'Export', 'icon' => 'arrow-down-tray'],
         'danger' => ['label' => 'Danger', 'icon' => 'exclamation-triangle'],
     ],

@@ -83,15 +83,19 @@
 
         {{-- Integration (outbound) webhooks — org-scoped, managed in Organization → Automation --}}
         @if ($notifTab === 'webhooks')
-        <section class="dply-card overflow-hidden">
+        {{-- Per-server signed outbound webhook (relocated here from the former
+             Settings → Webhook tab) + its deliveries log. --}}
+        @include('livewire.servers.partials.notifications._outbound-webhook')
+
+        <section class="dply-card mt-6 overflow-hidden">
             <div class="flex flex-col gap-4 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-7">
                 <div class="flex min-w-0 items-start gap-3">
                     <x-icon-badge>
                         <x-heroicon-o-arrow-up-right class="h-5 w-5" aria-hidden="true" />
                     </x-icon-badge>
                     <div class="min-w-0">
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Outbound') }}</p>
-                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Integration webhooks') }}</h2>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Organization') }}</p>
+                        <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Organization webhook destinations') }}</h2>
                         <p class="mt-1 text-sm leading-relaxed text-brand-moss max-w-2xl">
                             {{ __('Organization-wide outbound webhook destinations (Slack / Discord / Teams). These apply to every server in the organization and are configured under Organization → Automation. Server events route a limited set today (e.g. Insights alerts).') }}
                         </p>

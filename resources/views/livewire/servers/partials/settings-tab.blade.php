@@ -57,9 +57,6 @@
     @case ('notes')
         @include('livewire.servers.partials.settings.group-reference', $settingsShare)
         @break
-    @case ('webhook')
-        @include('livewire.servers.partials.settings.group-webhook', $settingsShare + ['webhookDeliveries' => $webhookDeliveries ?? collect()])
-        @break
     @case ('export')
         @include('livewire.servers.partials.settings.group-export', $settingsShare)
         @break
