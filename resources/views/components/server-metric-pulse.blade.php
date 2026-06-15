@@ -11,9 +11,6 @@
     $mem = isset($payload['mem_pct']) && is_numeric($payload['mem_pct']) ? (float) $payload['mem_pct'] : null;
     $disk = isset($payload['disk_pct']) && is_numeric($payload['disk_pct']) ? (float) $payload['disk_pct'] : null;
 
-    {{-- Quiet by default: healthy metrics are borderless muted text so the row
-         stays calm. Only a warning/critical reading earns a tinted background,
-         drawing the eye straight to the server that needs attention. --}}
     $statusColor = function (?float $value, float $warn = 85.0, float $critical = 95.0): string {
         if ($value === null) {
             return 'text-brand-mist';
