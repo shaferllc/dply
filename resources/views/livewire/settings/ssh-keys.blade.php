@@ -213,12 +213,12 @@
                             </div>
                             <div class="flex flex-wrap items-center justify-end gap-2">
                                 @if ($reachableServers > 0)
-                                    <x-secondary-button size="xs" type="button" wire:click="startDeploy('{{ $key->id }}')">
+                                    <x-secondary-button size="xs" type="button" wire:click="startDeploy(@js($key->id))">
                                         <x-heroicon-o-paper-airplane class="h-4 w-4 shrink-0" aria-hidden="true" />
                                         {{ __('Deploy') }}
                                     </x-secondary-button>
                                 @endif
-                                <x-secondary-button size="xs" type="button" wire:click="startEdit('{{ $key->id }}')">
+                                <x-secondary-button size="xs" type="button" wire:click="startEdit(@js($key->id))">
                                     <x-heroicon-o-pencil-square class="h-4 w-4 shrink-0" aria-hidden="true" />
                                     {{ __('Edit') }}
                                 </x-secondary-button>
