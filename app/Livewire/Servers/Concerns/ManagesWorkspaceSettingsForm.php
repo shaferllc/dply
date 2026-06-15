@@ -47,8 +47,6 @@ trait ManagesWorkspaceSettingsForm
 
     public string $settingsDateFormat = 'absolute_utc';
 
-    public string $settingsNotes = '';
-
     public function saveServerSettingsInfo(): void
     {
         $this->authorize('update', $this->server);
@@ -403,28 +401,6 @@ trait ManagesWorkspaceSettingsForm
         $this->toastSuccess(__('OS label updated to match the last inventory scan.'));
     }
 
-    public function saveServerNotes(): void
-    {
-        $this->authorize('update', $this->server);
-        if ($this->deployerCannotEditServerSettings()) {
-            $this->toastError(__('Deployers cannot change server settings.'));
-
-            return;
-        }
-
-        $this->validate(['settingsNotes' => ['nullable', 'string', 'max:10000']]);
-
-        $meta = $this->server->meta ?? [];
-        $meta['notes'] = trim($this->settingsNotes) ?: null;
-        if ($meta['notes'] === null) {
-            unset($meta['notes']);
-        }
-        $this->server->update(['meta' => $meta]);
-        $this->server->refresh();
-        $this->syncSettingsFormFromServer();
-        $this->toastSuccess(__('Notes saved.'));
-    }
-
     protected function deployerCannotEditServerSettings(): bool
     {
         return ! $this->canRunInventoryProbe();
@@ -447,6 +423,5 @@ trait ManagesWorkspaceSettingsForm
         $this->settingsWorkspaceId = $s->workspace_id;
         $this->settingsTimezone = (string) ($meta['timezone'] ?? 'UTC');
         $this->settingsDateFormat = ServerDateFormatter::resolveKey($s);
-        $this->settingsNotes = (string) ($meta['notes'] ?? '');
     }
 }

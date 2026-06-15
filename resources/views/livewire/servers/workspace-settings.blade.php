@@ -33,10 +33,5 @@
             'serverId' => $server->id,
             'deletionSummary' => $deletionSummary,
         ])
-
-        {{-- Inline channel-create modal. Triggered from the Add subscription
-             form's "Create new channel" link; auto-selects the new channel
-             on success via the notification-channel-created Livewire event. --}}
-        @include('livewire.partials.create-notification-channel-modal')
     </x-slot>
 </x-server-workspace-layout>

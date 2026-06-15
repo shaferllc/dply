@@ -90,6 +90,8 @@
 
             @include('livewire.servers.partials.overview._identity-hero')
 
+            @include('livewire.servers.partials.overview._pinned-notes')
+
             @include('livewire.servers.partials.overview._onboarding-checklist')
 
             @include('livewire.servers.partials.overview._ssh-key-reminder')

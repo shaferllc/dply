@@ -2,15 +2,9 @@
 
 namespace App\Livewire\Servers\Concerns;
 
-use App\Models\NotificationChannel;
-use App\Models\NotificationSubscription;
-use App\Models\Server;
-use App\Services\Notifications\AssignableNotificationChannels;
 use App\Services\Servers\ProviderCostUnavailableException;
 use App\Services\Servers\ServerProviderCostEstimator;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -25,26 +19,7 @@ trait ManagesExtendedServerSettings
 
     public string $settingsMaintenanceNote = '';
 
-    public string $settingsNotifRoutingNote = '';
-
-    public bool $settingsNotifHealthAlerts = true;
-
-    /** Channel selected in the "add subscription" form on the Alerts tab. */
-    public string $notifAddChannelId = '';
-
-    /**
-     * Event keys ticked in the "add subscription" form. Restricted to server-scoped
-     * notification keys (matches WorkspaceOverview's quick-add validation).
-     *
-     * @var list<string>
-     */
-    public array $notifAddEventKeys = [];
-
     public string $settingsCostMonthlyNote = '';
-
-    public string $settingsCostRenewalDate = '';
-
-    public string $settingsCostProviderUrl = '';
 
     /**
      * Most recent provider cost lookup, surfaced inline so the user can see
@@ -53,20 +28,6 @@ trait ManagesExtendedServerSettings
      * @var array{plan: string, provider_label: string, monthly: float, hourly: float, currency: string, fetched_at: string, mtd: float, ytd: float, runtime_hours_month: float, runtime_hours_year: float}|null
      */
     public ?array $lastPulledCostEstimate = null;
-
-    public string $settingsEnvType = '';
-
-    public string $settingsDataRegion = '';
-
-    public string $settingsComplianceNote = '';
-
-    public string $settingsBackupStrategy = '';
-
-    public string $settingsBackupRpo = '';
-
-    public string $settingsBackupRto = '';
-
-    public string $settingsBackupRunbookUrl = '';
 
     public string $settingsWebhookUrl = '';
 
@@ -115,141 +76,6 @@ trait ManagesExtendedServerSettings
         $this->toastSuccess(__('Maintenance window saved. Disruptive actions (firewall apply, supervisor restart-all) will warn outside this window.'));
     }
 
-    public function addServerNotificationSubscription(): void
-    {
-        $this->authorize('update', $this->server);
-        if ($this->deployerCannotEditServerSettings()) {
-            $this->toastError(__('Deployers cannot change server settings.'));
-
-            return;
-        }
-
-        $this->validate([
-            'notifAddChannelId' => ['required', 'string', 'exists:notification_channels,id'],
-            'notifAddEventKeys' => ['required', 'array', 'min:1'],
-            'notifAddEventKeys.*' => ['string', 'in:server.automatic_updates,server.ssh_login,server.insights_alerts,server.monitoring,server.shared_host_alerts'],
-        ], [], [
-            'notifAddChannelId' => __('channel'),
-            'notifAddEventKeys' => __('notification types'),
-        ]);
-
-        $org = Auth::user()?->currentOrganization();
-        $allowed = AssignableNotificationChannels::forUser(Auth::user(), $org)
-            ->pluck('id')
-            ->map(fn ($id) => (string) $id)
-            ->all();
-
-        if (! in_array($this->notifAddChannelId, $allowed, true)) {
-            $this->addError('notifAddChannelId', __('Channel is not assignable to this server.'));
-
-            return;
-        }
-
-        $channel = NotificationChannel::query()->findOrFail($this->notifAddChannelId);
-        Gate::authorize('manageNotificationChannels', $channel->owner);
-
-        $created = 0;
-        $createdKeys = [];
-        foreach ($this->notifAddEventKeys as $eventKey) {
-            $row = NotificationSubscription::firstOrCreate([
-                'notification_channel_id' => $channel->id,
-                'subscribable_type' => Server::class,
-                'subscribable_id' => $this->server->id,
-                'event_key' => $eventKey,
-            ]);
-            if ($row->wasRecentlyCreated) {
-                $created++;
-                $createdKeys[] = $eventKey;
-            }
-        }
-
-        if ($created > 0 && $this->server->organization) {
-            audit_log(
-                $this->server->organization,
-                Auth::user(),
-                'server.notifications.subscription_added',
-                $this->server,
-                null,
-                [
-                    'channel_id' => (string) $channel->id,
-                    'channel_label' => $channel->label,
-                    'event_keys' => $createdKeys,
-                    'count' => $created,
-                ],
-            );
-        }
-
-        $this->notifAddChannelId = '';
-        $this->notifAddEventKeys = [];
-        $this->toastSuccess(__('Added :count subscription(s) routing this server\'s events to :channel.', [
-            'count' => $created,
-            'channel' => $channel->label,
-        ]));
-    }
-
-    public function removeServerNotificationSubscription(string $subscriptionId): void
-    {
-        $this->authorize('update', $this->server);
-        if ($this->deployerCannotEditServerSettings()) {
-            $this->toastError(__('Deployers cannot change server settings.'));
-
-            return;
-        }
-
-        $sub = NotificationSubscription::query()
-            ->where('subscribable_type', Server::class)
-            ->where('subscribable_id', $this->server->id)
-            ->whereKey($subscriptionId)
-            ->first();
-        if ($sub === null) {
-            return;
-        }
-
-        // Only allow removal when the user can manage the underlying channel — otherwise
-        // an org member could detach a team-managed channel without permission.
-        $channel = $sub->channel;
-        if ($channel instanceof NotificationChannel) {
-            Gate::authorize('manageNotificationChannels', $channel->owner);
-        }
-
-        $snapshot = [
-            'channel_id' => (string) $sub->notification_channel_id,
-            'channel_label' => $channel?->label,
-            'event_key' => $sub->event_key,
-        ];
-        $sub->delete();
-
-        if ($this->server->organization) {
-            audit_log(
-                $this->server->organization,
-                Auth::user(),
-                'server.notifications.subscription_removed',
-                $this->server,
-                $snapshot,
-                null,
-            );
-        }
-
-        $this->toastSuccess(__('Subscription removed.'));
-    }
-
-    public function dismissLegacyRoutingNotes(): void
-    {
-        $this->authorize('update', $this->server);
-        if ($this->deployerCannotEditServerSettings()) {
-            $this->toastError(__('Deployers cannot change server settings.'));
-
-            return;
-        }
-
-        $meta = $this->server->meta ?? [];
-        unset($meta['notif_routing_note'], $meta['notif_health_alerts']);
-        $this->server->update(['meta' => $meta]);
-        $this->server->refresh();
-        $this->syncExtendedServerSettingsFromServer();
-        $this->toastSuccess(__('Legacy notes dismissed.'));
-    }
-
     public function saveCostLifecycle(): void
     {
         $this->authorize('update', $this->server);
@@ -261,18 +87,12 @@ trait ManagesExtendedServerSettings
 
         $this->validate([
             'settingsCostMonthlyNote' => ['nullable', 'string', 'max:2000'],
-            'settingsCostRenewalDate' => ['nullable', 'date'],
-            'settingsCostProviderUrl' => ['nullable', 'string', 'max:2048'],
         ]);
 
         $meta = $this->server->meta ?? [];
         $meta['cost_monthly_note'] = trim($this->settingsCostMonthlyNote) !== '' ? trim($this->settingsCostMonthlyNote) : null;
-        $meta['cost_renewal_date'] = $this->settingsCostRenewalDate !== '' ? $this->settingsCostRenewalDate : null;
-        $meta['cost_provider_console_url'] = trim($this->settingsCostProviderUrl) !== '' ? trim($this->settingsCostProviderUrl) : null;
-        foreach (['cost_monthly_note', 'cost_renewal_date', 'cost_provider_console_url'] as $k) {
-            if (($meta[$k] ?? null) === null) {
-                unset($meta[$k]);
-            }
+        if (($meta['cost_monthly_note'] ?? null) === null) {
+            unset($meta['cost_monthly_note']);
         }
 
         // Persist the most recent provider-pull estimate (catalog rate, MTD,
@@ -348,77 +168,6 @@ trait ManagesExtendedServerSettings
         $this->toastSuccess(__('Pulled :provider catalog price. Review and click Save cost notes to keep it.', [
             'provider' => $estimate['provider_label'],
         ]));
-    }
-
-    public function saveComplianceSettings(): void
-    {
-        $this->authorize('update', $this->server);
-        if ($this->deployerCannotEditServerSettings()) {
-            $this->toastError(__('Deployers cannot change server settings.'));
-
-            return;
-        }
-
-        $allowedEnv = array_keys(config('server_settings.environment_types', []));
-        $this->validate([
-            'settingsEnvType' => ['required', 'string', 'in:'.implode(',', $allowedEnv)],
-            'settingsDataRegion' => ['nullable', 'string', 'max:255'],
-            'settingsComplianceNote' => ['nullable', 'string', 'max:5000'],
-        ]);
-
-        $meta = $this->server->meta ?? [];
-        $meta['env_type'] = $this->settingsEnvType;
-        $meta['data_region_label'] = trim($this->settingsDataRegion) !== '' ? trim($this->settingsDataRegion) : null;
-        $meta['compliance_note'] = trim($this->settingsComplianceNote) !== '' ? trim($this->settingsComplianceNote) : null;
-        foreach (['data_region_label', 'compliance_note'] as $k) {
-            if (($meta[$k] ?? null) === null) {
-                unset($meta[$k]);
-            }
-        }
-
-        $this->server->update(['meta' => $meta]);
-        $this->server->refresh();
-        $this->syncExtendedServerSettingsFromServer();
-        $this->toastSuccess(__('Environment & compliance saved.'));
-    }
-
-    public function saveBackupDrHints(): void
-    {
-        $this->authorize('update', $this->server);
-        if ($this->deployerCannotEditServerSettings()) {
-            $this->toastError(__('Deployers cannot change server settings.'));
-
-            return;
-        }
-
-        $this->validate([
-            'settingsBackupStrategy' => ['nullable', 'string', 'max:5000'],
-            'settingsBackupRpo' => ['nullable', 'string', 'max:500'],
-            'settingsBackupRto' => ['nullable', 'string', 'max:500'],
-            'settingsBackupRunbookUrl' => ['nullable', 'string', 'max:2048'],
-        ]);
-
-        $meta = $this->server->meta ?? [];
-        foreach (
-            [
-                'backup_strategy_note' => $this->settingsBackupStrategy,
-                'backup_rpo_note' => $this->settingsBackupRpo,
-                'backup_rto_note' => $this->settingsBackupRto,
-                'backup_runbook_url' => $this->settingsBackupRunbookUrl,
-            ] as $key => $val
-        ) {
-            $t = trim($val);
-            if ($t === '') {
-                unset($meta[$key]);
-            } else {
-                $meta[$key] = $t;
-            }
-        }
-
-        $this->server->update(['meta' => $meta]);
-        $this->server->refresh();
-        $this->syncExtendedServerSettingsFromServer();
-        $this->toastSuccess(__('Backup & DR hints saved.'));
     }
 
     public function saveServerWebhooks(): void
@@ -542,27 +291,10 @@ trait ManagesExtendedServerSettings
         $this->settingsMaintenanceEnd = (string) ($m['maintenance_end'] ?? '');
         $this->settingsMaintenanceNote = (string) ($m['maintenance_note'] ?? '');
 
-        $this->settingsNotifRoutingNote = (string) ($m['notif_routing_note'] ?? '');
-        $this->settingsNotifHealthAlerts = (bool) ($m['notif_health_alerts'] ?? true);
-
         $this->settingsCostMonthlyNote = (string) ($m['cost_monthly_note'] ?? '');
-        $this->settingsCostRenewalDate = (string) ($m['cost_renewal_date'] ?? '');
-        $this->settingsCostProviderUrl = (string) ($m['cost_provider_console_url'] ?? '');
 
         $pulled = $m['cost_pulled_estimate'] ?? null;
         $this->lastPulledCostEstimate = is_array($pulled) ? $pulled : null;
-
-        $this->settingsEnvType = (string) ($m['env_type'] ?? 'other');
-        if ($this->settingsEnvType === '') {
-            $this->settingsEnvType = 'other';
-        }
-        $this->settingsDataRegion = (string) ($m['data_region_label'] ?? '');
-        $this->settingsComplianceNote = (string) ($m['compliance_note'] ?? '');
-
-        $this->settingsBackupStrategy = (string) ($m['backup_strategy_note'] ?? '');
-        $this->settingsBackupRpo = (string) ($m['backup_rpo_note'] ?? '');
-        $this->settingsBackupRto = (string) ($m['backup_rto_note'] ?? '');
-        $this->settingsBackupRunbookUrl = (string) ($m['backup_runbook_url'] ?? '');
 
         $this->settingsWebhookUrl = (string) ($m['server_event_webhook_url'] ?? '');
         $this->settingsWebhookSecret = '';

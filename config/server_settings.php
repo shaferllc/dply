@@ -73,13 +73,6 @@ return [
         'sun' => 'Sunday',
     ],
 
-    'environment_types' => [
-        'production' => 'Production',
-        'staging' => 'Staging',
-        'development' => 'Development',
-        'other' => 'Other',
-    ],
-
     'inventory_scan_depths' => [
         'basic' => 'Basic (OS, apt, packages preview)',
         'extended' => 'Extended (+ disk, memory, uptime, fail2ban status)',

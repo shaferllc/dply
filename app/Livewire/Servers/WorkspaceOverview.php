@@ -493,8 +493,19 @@ class WorkspaceOverview extends Component
             ];
         }
 
+        // Pinned operator notes surface here so runbook/context lives where the
+        // operator lands, not buried in Settings → Notes. Cap at 3 — the notes
+        // tab owns the full list.
+        $pinnedNotes = $this->server->notes()
+            ->where('pinned', true)
+            ->with('creator:id,name')
+            ->orderByDesc('updated_at')
+            ->limit(3)
+            ->get();
+
         return view('livewire.servers.workspace-overview', [
             'siteCount' => $sites->count(),
+            'pinnedNotes' => $pinnedNotes,
             'deployingCount' => $deployingCount,
             'latestDeployment' => $latestDeployment,
             'databaseSummary' => $databaseSummary,

@@ -526,6 +526,17 @@ class Server extends Model
         return $this->hasMany(ServerSystemUser::class)->orderBy('username');
     }
 
+    /**
+     * Free-form operator notes (runbooks, customer IDs, context). Pinned first,
+     * then most-recently-touched. Pinned notes surface on the server overview.
+     */
+    public function notes(): HasMany
+    {
+        return $this->hasMany(ServerNote::class)
+            ->orderByDesc('pinned')
+            ->orderByDesc('updated_at');
+    }
+
     public function sshKeyAuditEvents(): HasMany
     {
         return $this->hasMany(ServerSshKeyAuditEvent::class)->orderByDesc('created_at');
