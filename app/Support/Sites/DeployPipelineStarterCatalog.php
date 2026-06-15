@@ -178,23 +178,27 @@ final class DeployPipelineStarterCatalog
         $strategy = $this->strategyFor($key);
 
         if ($strategy === 'atomic') {
-            $path = $site->isLaravelFrameworkDetected() ? '/up' : '/';
-
             return [
                 'deploy_strategy' => 'atomic',
                 'releases_to_keep' => 5,
                 'deploy_health_enabled' => true,
                 'deploy_health_auto_rollback' => true,
-                'deploy_health_path' => $path,
+                // Probe the homepage, not /up: a bare health route 200s while the
+                // real, Vite-rendering pages 500 (the checker always probes '/'
+                // anyway). Keep a real route so the app's layout/assets are exercised.
+                'deploy_health_path' => '/',
             ];
         }
 
+        // Simple/flat deploys are HTTP-smoke-tested too — a flat overwrite can
+        // 500 just as easily; it can't auto-rollback (no previous release symlink),
+        // so the gate detects + fails the deploy rather than silently going green.
         return [
             'deploy_strategy' => 'simple',
             'releases_to_keep' => null,
-            'deploy_health_enabled' => false,
+            'deploy_health_enabled' => true,
             'deploy_health_auto_rollback' => false,
-            'deploy_health_path' => '/up',
+            'deploy_health_path' => '/',
         ];
     }
 

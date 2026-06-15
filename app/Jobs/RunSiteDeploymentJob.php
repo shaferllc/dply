@@ -18,9 +18,11 @@ use App\Services\Notifications\NotificationPublisher;
 use App\Services\Notifications\ServerDeployPolicyNotificationDispatcher;
 use App\Services\Secrets\EphemeralSecretIdentityContext;
 use App\Services\Servers\ServerDeployPolicyGuard;
+use App\Services\Sites\AtomicDeployHealthChecker;
 use App\Services\Sites\Backends\CanarySiteDeployer;
 use App\Services\Sites\Backends\RollingSiteDeployer;
 use App\Services\Sites\RequiredEnvEvaluator;
+use App\Services\SshConnection;
 use App\Support\DeployLogRedactor;
 use App\Support\ProductLine\ProductLineKillSwitches;
 use Illuminate\Bus\Queueable;
@@ -256,6 +258,47 @@ class RunSiteDeploymentJob implements ShouldQueue
                     ));
                 }
                 $redacted = $this->withEphemeralLog($ephemeralLog, DeployLogRedactor::redact($result['output']));
+
+                // UNIVERSAL post-cutover HTTP health gate. The atomic deployer
+                // already smoke-tests inline (with auto-rollback) and records the
+                // 'health' phase; every OTHER VM path (simple/flat) otherwise
+                // reaches success WITHOUT one — so a render-time 500 went green.
+                // Run the same gate here for those paths before the deploy can be
+                // called a success. A flat deploy can't roll back (no previous
+                // release symlink), so this DETECTS and fails the deploy rather
+                // than silently succeeding. The checker honors
+                // meta.deploy_health_enabled and self-skips when there's no
+                // hostname, so this is a safe no-op where it shouldn't run.
+                if ($this->site->server?->isVmHost()
+                    && filled($this->site->server?->ssh_private_key)
+                    && ! $deployment->hasPhase('health')) {
+                    $healthStart = microtime(true);
+                    try {
+                        $healthLog = app(AtomicDeployHealthChecker::class)
+                            ->verify($this->site, new SshConnection($this->site->server));
+                        if (trim($healthLog) !== '') {
+                            $deployment->recordPhaseResults('health', [[
+                                'label' => __('HTTP health check'),
+                                'ok' => true,
+                                'skipped' => str_contains($healthLog, 'skipped:'),
+                                'output' => trim($healthLog),
+                                'duration_ms' => (int) round((microtime(true) - $healthStart) * 1000),
+                            ]]);
+                            $redacted .= "\n".DeployLogRedactor::redact($healthLog);
+                        }
+                    } catch (\Throwable $healthError) {
+                        $deployment->recordPhaseResults('health', [[
+                            'label' => __('HTTP health check'),
+                            'ok' => false,
+                            'output' => $healthError->getMessage(),
+                            'duration_ms' => (int) round((microtime(true) - $healthStart) * 1000),
+                        ]]);
+                        // Re-throw → the catch below marks the deployment FAILED
+                        // with the diagnostic and does NOT advance last_deploy_at.
+                        throw $healthError;
+                    }
+                }
+
                 $deployment->update([
                     'status' => SiteDeployment::STATUS_SUCCESS,
                     'git_sha' => $result['sha'],

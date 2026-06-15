@@ -28,13 +28,14 @@ final class AtomicDeployHealthChecker
             return '';
         }
 
-        // Probe a real primary domain, else the testing hostname (*.on-dply.com).
-        // With neither there's nothing to smoke-test yet — skip, don't fail.
-        $domain = $site->primaryDomain();
-        $hostHeader = $domain !== null && trim($domain->hostname) !== ''
-            ? strtolower(trim($domain->hostname))
-            : strtolower(trim($site->testingHostname()));
-        if ($hostHeader === '') {
+        // Probe EVERY live surface — the primary domain(s) AND the testing
+        // hostname (*.on-dply.<tld>). Probing only the first let a 500 on the
+        // OTHER surface (e.g. the testing host while a primary domain exists, or
+        // vice versa) sail through as a green deploy — exactly how a homepage 500
+        // got past the gate. With no hostname at all there's nothing to
+        // smoke-test yet — skip, don't fail.
+        $hosts = $this->hostnamesToProbe($site);
+        if ($hosts === []) {
             return "\n--- deploy health check ---\nskipped: site has no hostname to probe yet.\n";
         }
 
@@ -44,7 +45,14 @@ final class AtomicDeployHealthChecker
         // 500s). An explicit deploy_health_expect_status keeps exact-match mode.
         $explicitExpect = isset($meta['deploy_health_expect_status']) && is_numeric($meta['deploy_health_expect_status']);
         $expect = $explicitExpect ? (int) $meta['deploy_health_expect_status'] : 0;
-        $path = $this->normalizePath((string) ($meta['deploy_health_path'] ?? '/'));
+
+        // ALWAYS probe the homepage '/', plus any configured health path. A site
+        // whose meta still carries deploy_health_path='/up' (Laravel's bare health
+        // route) would otherwise pass while every real, Vite-rendering page 500s —
+        // the exact gap that let a homepage 500 through. Probing '/' too closes it
+        // with no per-site backfill.
+        $configuredPath = $this->normalizePath((string) ($meta['deploy_health_path'] ?? '/'));
+        $paths = array_values(array_unique(['/', $configuredPath]));
         $attempts = max(1, min(30, (int) ($meta['deploy_health_attempts'] ?? 5)));
         $delayMs = max(0, min(10000, (int) ($meta['deploy_health_delay_ms'] ?? 1000)));
 
@@ -62,6 +70,83 @@ final class AtomicDeployHealthChecker
             $targetHost = '127.0.0.1';
         }
 
+        $log = "\n--- deploy health check ---\n";
+        $log .= 'Probing '.count($hosts).' hostname(s) × '.count($paths).' path(s): '
+            .implode(', ', $hosts).' @ '.implode(', ', $paths)."\n";
+
+        // Every host × path must pass; the first 5xx fails the whole deploy so a
+        // broken surface can't hide behind a healthy sibling (or behind /up).
+        foreach ($hosts as $hostHeader) {
+            foreach ($paths as $probePath) {
+                $result = $this->probeHost($ssh, $hostHeader, $probePath, $scheme, $targetHost, $attempts, $delayMs, $explicitExpect, $expect);
+                $log .= $result['log'];
+
+                if (! $result['ok']) {
+                    $lastRaw = $result['lastRaw'];
+                    $lastCode = preg_match('/^\d{3}$/', $lastRaw) ? $lastRaw : '';
+                    $gotStr = $lastCode !== '' ? 'HTTP '.$lastCode : ($lastRaw !== '' ? $lastRaw : '(no response)');
+                    $expectMsg = $explicitExpect ? __('expected HTTP :e', ['e' => $expect]) : __('expected a non-5xx response');
+                    $url = $scheme.'://'.$hostHeader.$probePath;
+
+                    // The thrown message carries the REAL cause pulled off the box
+                    // (laravel.log tail, nginx error log, php-fpm state) so the deploy
+                    // failure record shows *why* it 500'd — not just "got 500".
+                    throw new \RuntimeException(
+                        __('Deploy health check failed for :host after :n attempts — last response was :got (:expect).', [
+                            'host' => $hostHeader.$probePath,
+                            'n' => $attempts,
+                            'got' => $gotStr,
+                            'expect' => $expectMsg,
+                        ])."\n\n".$this->diagnose($ssh, $site, $url, $hostHeader, $targetHost, $scheme === 'https' ? 443 : 80)
+                    );
+                }
+            }
+        }
+
+        return $log;
+    }
+
+    /**
+     * The distinct live hostnames to smoke-test: the primary domain plus the
+     * testing hostname (both, when both exist). Lowercased + de-duplicated.
+     *
+     * @return list<string>
+     */
+    private function hostnamesToProbe(Site $site): array
+    {
+        $candidates = [];
+
+        $domain = $site->primaryDomain();
+        if ($domain !== null && trim((string) $domain->hostname) !== '') {
+            $candidates[] = strtolower(trim((string) $domain->hostname));
+        }
+
+        $testing = strtolower(trim($site->testingHostname()));
+        if ($testing !== '') {
+            $candidates[] = $testing;
+        }
+
+        return array_values(array_unique(array_filter($candidates)));
+    }
+
+    /**
+     * Probe a single hostname against the box over loopback, retrying up to
+     * $attempts. Returns whether it passed, the per-host log lines, and the last
+     * raw curl output (for the failure diagnostic).
+     *
+     * @return array{ok: bool, log: string, lastRaw: string}
+     */
+    private function probeHost(
+        SshConnection $ssh,
+        string $hostHeader,
+        string $path,
+        string $scheme,
+        string $targetHost,
+        int $attempts,
+        int $delayMs,
+        bool $explicitExpect,
+        int $expect,
+    ): array {
         $url = $scheme.'://'.$hostHeader.$path;
 
         $curl = 'curl -sS -L -k --max-time 25 -o /dev/null -w \'%{http_code}\''
@@ -69,9 +154,8 @@ final class AtomicDeployHealthChecker
             .' --resolve '.escapeshellarg($hostHeader.':443:'.$targetHost)
             .' '.escapeshellarg($url).' 2>&1';
 
-        $log = "\n--- deploy health check ---\n";
-        $log .= 'GET '.$url.' (resolve '.$hostHeader.' → '.$targetHost.", follow redirects)\n";
-        $log .= ($explicitExpect ? 'Expect HTTP '.$expect : 'Expect a non-5xx response')
+        $log = 'GET '.$url.' (resolve '.$hostHeader.' → '.$targetHost.", follow redirects)\n";
+        $log .= ($explicitExpect ? '  expect HTTP '.$expect : '  expect a non-5xx response')
             .', up to '.$attempts." attempt(s)\n";
 
         $lastRaw = '';
@@ -84,12 +168,12 @@ final class AtomicDeployHealthChecker
             // Default: pass on any non-5xx (the app rendered). Explicit: exact match.
             $ok = $explicitExpect ? ($code === $expect) : ($code >= 100 && $code < 500);
             if ($ok) {
-                $log .= 'attempt '.$i.': HTTP '.$code." (ok)\n";
+                $log .= '  attempt '.$i.': HTTP '.$code." (ok)\n";
 
-                return $log;
+                return ['ok' => true, 'log' => $log, 'lastRaw' => $lastRaw];
             }
 
-            $log .= 'attempt '.$i.': got '.($raw !== '' ? $raw : '(empty)')
+            $log .= '  attempt '.$i.': got '.($raw !== '' ? $raw : '(empty)')
                 .($explicitExpect ? " (expected {$expect})" : ' (5xx / no response)')."\n";
 
             if ($i < $attempts && $delayMs > 0) {
@@ -97,24 +181,7 @@ final class AtomicDeployHealthChecker
             }
         }
 
-        // Never make the operator guess: report the ACTUAL status received, and
-        // pull the real cause off the server — the response body (a Laravel 500
-        // carries the exception; a 502 means PHP-FPM is down), the PHP-FPM unit
-        // state, and the tail of the nginx + PHP-FPM error logs.
-        $lastCode = preg_match('/^\d{3}$/', $lastRaw) ? $lastRaw : '';
-        $gotStr = $lastCode !== '' ? 'HTTP '.$lastCode : ($lastRaw !== '' ? $lastRaw : '(no response)');
-        $expectMsg = $explicitExpect ? __('expected HTTP :e', ['e' => $expect]) : __('expected a non-5xx response');
-
-        // The thrown message carries the REAL cause pulled off the box (laravel.log
-        // tail, nginx error log, php-fpm state) so the deploy failure record shows
-        // *why* it 500'd — not just "got 500".
-        throw new \RuntimeException(
-            __('Deploy health check failed after :n attempts — last response was :got (:expect).', [
-                'n' => $attempts,
-                'got' => $gotStr,
-                'expect' => $expectMsg,
-            ])."\n\n".$this->diagnose($ssh, $site, $url, $hostHeader, $targetHost, $scheme === 'https' ? 443 : 80)
-        );
+        return ['ok' => false, 'log' => $log, 'lastRaw' => $lastRaw];
     }
 
     /**
