@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\Sites\Concerns;
 
+use App\Jobs\DetectSiteCloudflareTlsJob;
 use App\Jobs\ExecuteSiteCertificateJob;
 use App\Jobs\ScanServerLiveCertsJob;
 use App\Models\SiteCertificate;
@@ -58,6 +59,12 @@ trait ManagesSiteCertificates
 
     /** Operator override to request SSL anyway when the domain isn't reachable yet (DNS propagating). */
     public bool $quick_ssl_force = false;
+
+    /** Async Cloudflare-edge TLS probe in flight (see {@see DetectSiteCloudflareTlsJob}). */
+    public bool $cloudflare_tls_checking = false;
+
+    /** `checked_at` observed when the probe was dispatched, so a poll can tell when a fresh result lands. */
+    public ?string $cloudflare_tls_requested_at = null;
 
     /**
      * Live Caddy-managed certificates read from the box. Caddy obtains and
@@ -322,6 +329,80 @@ trait ManagesSiteCertificates
     public function siteUsesCaddyAutoHttps(): bool
     {
         return $this->site->webserver() === 'caddy' && ! $this->server->hasEdgeProxy();
+    }
+
+    /**
+     * Lazy (wire:init) trigger that probes the primary domain for Cloudflare-edge
+     * TLS. Re-probes at most hourly; otherwise the cached meta result drives the
+     * "Managed by Cloudflare" panel with no network call.
+     */
+    public function loadCloudflareTlsStatus(): void
+    {
+        if (! $this->siteSupportsCloudflareTlsDetection()) {
+            return;
+        }
+
+        $checkedAt = $this->site->cloudflareTlsCheckedAt();
+        if ($checkedAt !== null && CarbonImmutable::parse($checkedAt)->gt(now()->subHour())) {
+            return;
+        }
+
+        $this->dispatchCloudflareTlsProbe();
+    }
+
+    /** Operator-triggered re-probe (Rescan button on the panel). */
+    public function refreshCloudflareTlsStatus(): void
+    {
+        $this->authorize('update', $this->site);
+
+        if (! $this->siteSupportsCloudflareTlsDetection()) {
+            return;
+        }
+
+        $this->dispatchCloudflareTlsProbe();
+    }
+
+    /** Driven by wire:poll while a probe is in flight; resolves once meta updates. */
+    public function pollCloudflareTlsStatus(): void
+    {
+        if (! $this->cloudflare_tls_checking) {
+            return;
+        }
+
+        $this->site->refresh();
+        $checkedAt = $this->site->cloudflareTlsCheckedAt();
+
+        // A result is fresh once checked_at advances past what we saw at dispatch.
+        if ($checkedAt !== null && $checkedAt !== $this->cloudflare_tls_requested_at) {
+            $this->cloudflare_tls_checking = false;
+        }
+    }
+
+    private function dispatchCloudflareTlsProbe(): void
+    {
+        $this->cloudflare_tls_requested_at = $this->site->cloudflareTlsCheckedAt();
+        $this->cloudflare_tls_checking = true;
+        DetectSiteCloudflareTlsJob::dispatch($this->site->id);
+    }
+
+    /**
+     * Only VM sites with a real (non-testing) customer domain can sit behind
+     * Cloudflare, so detection is a no-op everywhere else.
+     */
+    private function siteSupportsCloudflareTlsDetection(): bool
+    {
+        if ($this->site->usesEdgeRuntime() || $this->site->isCustom()) {
+            return false;
+        }
+
+        $host = strtolower(trim((string) optional($this->site->primaryDomain())->hostname));
+        if ($host === '') {
+            return false;
+        }
+
+        $testingZone = $this->site->testingZone();
+
+        return $testingZone === null || ! str_ends_with($host, '.'.$testingZone);
     }
 
     /**

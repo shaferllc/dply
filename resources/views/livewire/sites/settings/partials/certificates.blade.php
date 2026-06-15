@@ -45,6 +45,58 @@
     };
 @endphp
 
+{{-- Always-on trigger: probe the primary domain for Cloudflare-edge TLS so the
+     panel below can appear without the operator doing anything. Polls only while
+     a probe is in flight. --}}
+<div
+    wire:init="loadCloudflareTlsStatus"
+    @if ($cloudflare_tls_checking) wire:poll.3s="pollCloudflareTlsStatus" @endif
+></div>
+
+@if ($site->cloudflareTerminatesTls())
+    {{-- =================================================================
+         CLOUDFLARE-MANAGED TLS. The primary domain is proxied through
+         Cloudflare (orange cloud), which terminates TLS at its edge with
+         its own certificate. dply doesn't need to issue or renew an origin
+         cert for visitors to get HTTPS, so we say so here. The normal
+         request-a-certificate UI stays below for operators who want an
+         origin cert to enable Cloudflare's Full (Strict) SSL mode.
+         ================================================================= --}}
+    <section class="{{ $card }} mb-6 overflow-hidden">
+        <div class="flex flex-wrap items-start justify-between gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
+            <div class="flex min-w-0 items-start gap-3">
+                <x-icon-badge>
+                    <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
+                </x-icon-badge>
+                <div class="min-w-0">
+                    <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Managed by Cloudflare') }}</p>
+                    <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('TLS terminated at Cloudflare’s edge') }}</h2>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
+                        {{ __('This site’s domain is proxied through Cloudflare, which serves HTTPS with its own edge certificate. dply doesn’t need to issue or renew an origin certificate for visitors to reach the site securely.') }}
+                        @if ($site->cloudflareTlsCheckedAt())
+                            <span class="ml-1 text-brand-mist">· {{ __('Checked :time', ['time' => \Illuminate\Support\Carbon::parse($site->cloudflareTlsCheckedAt())->diffForHumans()]) }}</span>
+                        @endif
+                    </p>
+                    <p class="mt-2 max-w-2xl text-xs leading-relaxed text-brand-mist">
+                        {{ __('Want end-to-end encryption? Request a certificate below and switch Cloudflare’s SSL/TLS mode to Full (Strict) so it validates the origin cert too.') }}
+                    </p>
+                </div>
+            </div>
+            <button
+                type="button"
+                wire:click="refreshCloudflareTlsStatus"
+                wire:loading.attr="disabled"
+                wire:target="refreshCloudflareTlsStatus"
+                class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-brand-ink/15 bg-white px-3 py-1.5 text-xs font-medium text-brand-ink hover:bg-brand-sand/40 disabled:opacity-60"
+            >
+                <span wire:loading.remove wire:target="refreshCloudflareTlsStatus" class="inline-flex"><x-heroicon-o-arrow-path class="h-4 w-4" /></span>
+                <span wire:loading wire:target="refreshCloudflareTlsStatus" class="inline-flex"><x-heroicon-o-arrow-path class="h-4 w-4 animate-spin" /></span>
+                {{ __('Recheck') }}
+            </button>
+        </div>
+    </section>
+@endif
+
 @if ($this->siteUsesCaddyAutoHttps())
     {{-- =================================================================
          CADDY-MANAGED TLS. Caddy terminates TLS with built-in automatic
@@ -155,17 +207,24 @@
     </section>
 @endif
 
-<section class="{{ $card }}">
+@php $cloudflareOptionalCert = $site->cloudflareTerminatesTls(); @endphp
+<section @class([$card, 'opacity-70 transition-opacity hover:opacity-100 focus-within:opacity-100' => $cloudflareOptionalCert])>
     <form wire:submit="createCertificateRequest">
         <div class="flex items-start gap-3 border-b border-brand-ink/10 bg-brand-sand/20 px-6 py-5 sm:px-7">
             <x-icon-badge>
                 <x-heroicon-o-shield-check class="h-5 w-5" aria-hidden="true" />
             </x-icon-badge>
             <div class="min-w-0">
-                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('SSL') }}</p>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">
+                    {{ __('SSL') }}@if ($cloudflareOptionalCert) <span class="ml-1 text-brand-mist">· {{ __('Optional') }}</span>@endif
+                </p>
                 <h2 class="mt-0.5 text-base font-semibold text-brand-ink">{{ __('Request or install certificates') }}</h2>
                 <p class="mt-1 max-w-2xl text-sm leading-relaxed text-brand-moss">
-                    {{ __('Create certificates against explicit customer or preview scopes so Dply never guesses which domains should receive SSL.') }}
+                    @if ($cloudflareOptionalCert)
+                        {{ __('Not required while Cloudflare terminates TLS — only needed if you want an origin certificate for Cloudflare’s Full (Strict) SSL mode.') }}
+                    @else
+                        {{ __('Create certificates against explicit customer or preview scopes so Dply never guesses which domains should receive SSL.') }}
+                    @endif
                 </p>
             </div>
         </div>
@@ -283,7 +342,11 @@
         </div>
 
         <div class="flex justify-end border-t border-brand-ink/10 bg-brand-sand/25 px-6 py-4 sm:px-7">
-            <x-primary-button type="submit">{{ __('Save certificate request') }}</x-primary-button>
+            @if ($cloudflareOptionalCert)
+                <x-secondary-button type="submit">{{ __('Save certificate request') }}</x-secondary-button>
+            @else
+                <x-primary-button type="submit">{{ __('Save certificate request') }}</x-primary-button>
+            @endif
         </div>
     </form>
 </section>

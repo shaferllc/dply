@@ -68,6 +68,19 @@ test('warnings alone do not block the write', function () {
     guard()->assertSafeToWrite($vars); // does not throw
 });
 
+test('APP_DEBUG=true in production warns but does not block the write', function () {
+    // Debug-in-prod is a security foot-gun, but the app still boots and serves
+    // every request — so it is a (loud) warning the operator can override, not a
+    // request-path danger that refuses the push.
+    $vars = ['APP_KEY' => appKey(), 'APP_ENV' => 'production', 'APP_DEBUG' => 'true'];
+
+    $findings = (new \App\Services\Sites\SiteEnvValidator)->validate($vars);
+    expect(collect($findings)->firstWhere('key', 'APP_DEBUG')['level'] ?? null)->toBe('warn');
+
+    expect(guard()->dangers($vars))->toBe([]);
+    guard()->assertSafeToWrite($vars); // does not throw
+});
+
 test('the live boot test throws when the app fails to boot', function () {
     $ssh = \Mockery::mock(SshConnection::class);
     $ssh->shouldReceive('exec')->once()->andReturn(

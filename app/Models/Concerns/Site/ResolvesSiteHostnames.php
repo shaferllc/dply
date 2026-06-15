@@ -81,6 +81,51 @@ trait ResolvesSiteHostnames
         return is_string($status) ? $status : null;
     }
 
+    /**
+     * Last Cloudflare-edge TLS probe result (see {@see \App\Jobs\DetectSiteCloudflareTlsJob}).
+     *
+     * @return array<string, mixed>
+     */
+    public function cloudflareTlsMeta(): array
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+
+        return is_array($meta['cloudflare_tls'] ?? null) ? $meta['cloudflare_tls'] : [];
+    }
+
+    /**
+     * True when the last probe found this site's primary domain fronted by
+     * Cloudflare's edge (TLS terminated there) — so dply needn't issue or renew
+     * an origin certificate for it.
+     */
+    public function cloudflareTerminatesTls(): bool
+    {
+        return (bool) ($this->cloudflareTlsMeta()['terminating'] ?? false);
+    }
+
+    public function cloudflareTlsCheckedAt(): ?string
+    {
+        $at = $this->cloudflareTlsMeta()['checked_at'] ?? null;
+
+        return is_string($at) && $at !== '' ? $at : null;
+    }
+
+    /**
+     * Persist a Cloudflare-edge TLS probe result into meta.
+     */
+    public function setCloudflareTlsResult(bool $terminating, string $hostname, ?string $server, ?string $cfRay): void
+    {
+        $meta = is_array($this->meta) ? $this->meta : [];
+        $meta['cloudflare_tls'] = [
+            'terminating' => $terminating,
+            'hostname' => $hostname,
+            'server' => $server,
+            'cf_ray' => $cfRay,
+            'checked_at' => now()->toIso8601String(),
+        ];
+        $this->update(['meta' => $meta]);
+    }
+
     public function primaryPreviewDomain(): ?SitePreviewDomain
     {
         $this->loadMissing('previewDomains');

@@ -73,10 +73,16 @@ class SiteEnvValidator
         }
 
         // Debug in production is the classic foot-gun: stack traces + env dumps
-        // leak to the public.
+        // leak to the public. But it is a SECURITY warning, not a danger: the app
+        // boots and serves every request fine with APP_DEBUG=true — it just
+        // over-shares on errors. "danger" is reserved for env that breaks the
+        // request path (empty APP_KEY, null broadcaster creds, …) and hard-blocks
+        // the write; debug-in-prod is a deliberate, reversible operator choice
+        // (e.g. briefly turning it on to diagnose a 500), so it must warn, not
+        // refuse. Keep the wording loud so it still stands out in the push report.
         if ($this->isTruthy($get('APP_DEBUG'))) {
             $findings[] = $isProd
-                ? $this->danger('APP_DEBUG', __('APP_DEBUG is true while APP_ENV is production — this exposes stack traces and secrets to visitors. Set it to false.'))
+                ? $this->warn('APP_DEBUG', __('APP_DEBUG is true while APP_ENV is production — this exposes stack traces and secrets to visitors. Turn it on only to debug, then set it back to false.'))
                 : $this->warn('APP_DEBUG', __('APP_DEBUG is true — fine for local, but make sure it is false in production.'));
         }
 
