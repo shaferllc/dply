@@ -55,6 +55,7 @@
     active="overview"
     :title="__('Overview')"
     :show-navigation="! $setupIncomplete"
+    :hide-hero="! $setupIncomplete"
 >
     @include('livewire.servers.partials.workspace-flashes')
     @include('livewire.servers.partials.workspace-scheduled-removal', ['server' => $server])

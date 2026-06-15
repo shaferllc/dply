@@ -247,28 +247,58 @@
 
     @include('livewire.sites.settings.partials.environment.import-modal')
 
-    @include('livewire.sites.settings.partials.environment.configuration-check')
+    {{-- One consolidated "Needs attention" panel instead of a stack of separate
+         bordered cards (console-run status, config-check warnings, missing-var
+         gate, gate-off reminder). Each surfaces as a divided row inside a single
+         card so the page reads as alerts → content, not five windows.
+         $consoleRunInline is passed only by the standalone Environment page,
+         which renders its console run here rather than as a top-level banner. --}}
+    @php
+        $consoleRunInline = $consoleRunInline ?? false;
+        $attentionConsoleRun = $consoleRunInline ? ($sectionConsoleActionRun ?? $envConsoleRun ?? null) : null;
+        $hasConfigWarnings = $envWarnings !== [];
+        $hasSuppressedConfigOnly = $envWarnings === [] && $suppressedEnvWarningCount > 0 && $canIgnoreEnvWarnings;
+        $hasMissingVars = $supportsEnvPush && $envAdvanced && $missingEnv !== [] && ! $envGateOff;
+        $hasGateOff = $supportsEnvPush && $envGateOff;
+        $showAttention = $attentionConsoleRun !== null
+            || $hasConfigWarnings || $hasSuppressedConfigOnly || $hasMissingVars || $hasGateOff;
+    @endphp
+
+    @if ($showAttention)
+        <section class="dply-card overflow-hidden">
+            <div class="flex items-center gap-2 border-b border-brand-ink/10 bg-brand-sand/20 px-5 py-3">
+                <x-heroicon-o-bell-alert class="h-4 w-4 text-brand-sage" aria-hidden="true" />
+                <h2 class="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-sage">{{ __('Needs attention') }}</h2>
+            </div>
+            <div class="divide-y divide-brand-ink/10">
+                @if ($attentionConsoleRun)
+                    <div
+                        id="site-console-action-banner"
+                        x-data="{}"
+                        x-on:dply-console-action-focus.window="$nextTick(() => { const el = document.getElementById('site-console-action-banner'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); })"
+                    >
+                        @include('livewire.partials.console-action-banner-static', [
+                            'run' => $attentionConsoleRun,
+                            'kindLabels' => (array) config('console_actions.kinds', []),
+                            'embedded' => true,
+                        ])
+                    </div>
+                @endif
+
+                @include('livewire.sites.settings.partials.environment.configuration-check')
+
+                @include('livewire.sites.settings.partials.environment.missing-vars')
+            </div>
+        </section>
+    @endif
 
     @include('livewire.sites.settings.partials.environment.suggested-fixes')
 
     @include('livewire.sites.settings.partials.environment.console-banner')
 
-    <x-explainer tone="info">
-        <p>{{ __('Environment variables are written into the site\'s `.env` file on the server. Dply keeps an encrypted cache of the file so this page renders without an SSH round-trip.') }}</p>
-        <p>{{ __('Workflow: paste a block or edit single keys — every change auto-pushes to the server, no manual save needed. Click Sync from server to pull drift caused by out-of-band edits.') }}</p>
-        <p>{{ __('For runtimes without a server file (Docker, Kubernetes, Serverless), the cache IS the source of truth — the deploy job injects values when packaging the runtime.') }}</p>
-        <p>
-            <span class="font-semibold">{{ __('Browser exposure:') }}</span>
-            {{ __('Dply\'s managed webserver config (Nginx, Apache, Caddy, OpenLiteSpeed) denies any HTTP request whose path starts with a dot — so /.env returns 403 even though the file lives in the docroot. /.well-known/ stays allowed for ACME challenges.') }}
-            {{ __('For belt-and-suspenders defense, expand the Advanced disclosure below to relocate the file outside the docroot (e.g. /etc/dply/<slug>.env).') }}
-        </p>
-    </x-explainer>
-
     @include('livewire.sites.settings.partials.environment.docroot-warning')
 
     @include('livewire.sites.settings.partials.environment.parse-errors')
-
-    @include('livewire.sites.settings.partials.environment.missing-vars')
 
     @include('livewire.sites.settings.partials.environment.add-env-modal')
 
@@ -309,6 +339,17 @@
          in the DOM (modal-only) so the inline binding-group actions in the
          variables list still function; the visible binding card is suppressed. --}}
     @include('livewire.sites.settings.partials.environment.resources', ['bindingModalOnly' => true])
+
+    <x-explainer tone="info">
+        <p>{{ __('Environment variables are written into the site\'s `.env` file on the server. Dply keeps an encrypted cache of the file so this page renders without an SSH round-trip.') }}</p>
+        <p>{{ __('Workflow: paste a block or edit single keys — every change auto-pushes to the server, no manual save needed. Click Sync from server to pull drift caused by out-of-band edits.') }}</p>
+        <p>{{ __('For runtimes without a server file (Docker, Kubernetes, Serverless), the cache IS the source of truth — the deploy job injects values when packaging the runtime.') }}</p>
+        <p>
+            <span class="font-semibold">{{ __('Browser exposure:') }}</span>
+            {{ __('Dply\'s managed webserver config (Nginx, Apache, Caddy, OpenLiteSpeed) denies any HTTP request whose path starts with a dot — so /.env returns 403 even though the file lives in the docroot. /.well-known/ stays allowed for ACME challenges.') }}
+            {{ __('For belt-and-suspenders defense, expand the Advanced disclosure below to relocate the file outside the docroot (e.g. /etc/dply/<slug>.env).') }}
+        </p>
+    </x-explainer>
 
     <x-cli-snippet
         :intro="__('Manage env via CLI when you have many keys at once:')"

@@ -41,23 +41,10 @@
                     <div wire:poll.3s="resolveWatchedConsoleAction" class="hidden" aria-hidden="true"></div>
                 @endif
 
-                @if ($sectionConsoleActionKinds !== [])
-                    <div
-                        id="site-console-action-banner"
-                        x-data="{}"
-                        x-on:dply-console-action-focus.window="$nextTick(() => {
-                            const el = document.getElementById('site-console-action-banner');
-                            if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
-                        })"
-                    >
-                        @include('livewire.partials.console-action-banner-static', [
-                            'run' => $sectionConsoleActionRun,
-                            'kindLabels' => (array) config('console_actions.kinds', []),
-                        ])
-                    </div>
-                @endif
-
-                @include('livewire.sites.settings.partials.environment')
+                {{-- The console-run banner is rendered inside the env partial's
+                     consolidated "Needs attention" panel (consoleRunInline), so
+                     it's no longer a separate top-level card here. --}}
+                @include('livewire.sites.settings.partials.environment', ['consoleRunInline' => true])
             </main>
         </div>
     </div>

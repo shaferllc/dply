@@ -80,7 +80,16 @@
 
             $busyRow = $run->isInFlight() && ! $stale;
             $lines = $run->lines();
-            $defaultExpanded = $busyRow || $effectiveStatus === 'failed';
+            // Only auto-expand the output drawer when there's something to show —
+            // a failed run with zero captured lines (e.g. a queue worker that
+            // never picked the job up) otherwise opens an empty "No output
+            // recorded." box that's pure noise.
+            $defaultExpanded = $busyRow || ($effectiveStatus === 'failed' && ! empty($lines));
+
+            // Embedded mode: render flush (no own border / rounding / shadow /
+            // margin) so the banner reads as a row inside a parent card such as
+            // the Environment page's "Needs attention" group.
+            $embedded = $embedded ?? false;
 
             // Long failure messages (e.g. cutover diagnostics dumping
             // `systemctl status` + journal + on-disk configs) make the banner
@@ -132,7 +141,11 @@
         @endphp
 
         <div
-            class="mb-2 overflow-hidden rounded-xl border {{ $banner }} text-sm shadow-sm w-full"
+            @class([
+                'overflow-hidden text-sm w-full',
+                $banner,
+                'mb-2 rounded-xl border shadow-sm' => ! $embedded,
+            ])
             role="status"
             aria-live="polite"
             wire:key="console-action-run-{{ $run->id }}"
@@ -200,15 +213,17 @@
                             {{ __('Open') }}
                         </button>
                     @endif
-                    <button
-                        type="button"
-                        x-on:click="expanded = !expanded"
-                        class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-current/20 bg-white px-2.5 py-1.5 text-xs font-medium shadow-sm hover:bg-white/80"
-                        x-bind:aria-expanded="expanded.toString()"
-                    >
-                        <x-heroicon-o-chevron-down class="h-3.5 w-3.5 transition-transform" x-bind:class="expanded ? 'rotate-180' : ''" />
-                        <span x-text="expanded ? @js(__('Hide output')) : @js(__('View output'))"></span>
-                    </button>
+                    @if ($busyRow || $hasLines)
+                        <button
+                            type="button"
+                            x-on:click="expanded = !expanded"
+                            class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-current/20 bg-white px-2.5 py-1.5 text-xs font-medium shadow-sm hover:bg-white/80"
+                            x-bind:aria-expanded="expanded.toString()"
+                        >
+                            <x-heroicon-o-chevron-down class="h-3.5 w-3.5 transition-transform" x-bind:class="expanded ? 'rotate-180' : ''" />
+                            <span x-text="expanded ? @js(__('Hide output')) : @js(__('View output'))"></span>
+                        </button>
+                    @endif
                 </div>
             </div>
 

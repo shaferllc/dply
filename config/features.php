@@ -107,6 +107,25 @@ return [
         'dragonfly' => env('FEATURE_CACHE_DRAGONFLY', false),
     ],
 
+    /*
+    | Database engines offered for install on BYO servers. MySQL, PostgreSQL,
+    | and SQLite are always available; the engines below start as "coming
+    | soon" until their install + operate path is validated. When a flag is
+    | off the engine shows a Soon badge + teaser in the Databases workspace
+    | and is filtered out of the server-create database picker. Resolved
+    | per-org by the hybrid resolver, so platform admin can flip them on
+    | per-org or platform-wide from /admin/flags. Gating keys are consumed by
+    | App\Support\Servers\DatabaseEngineAvailability (`database.{engine}`).
+    */
+    'database' => [
+        // exit: ship once MariaDB variant install + engine-switch validated on three OSes
+        'mariadb' => env('FEATURE_DATABASE_MARIADB', false),
+        // exit: ship once MongoDB install + connection snippet validated on three OSes
+        'mongodb' => env('FEATURE_DATABASE_MONGODB', false),
+        // GA: columnar OLAP install + remote access validated; default-on
+        'clickhouse' => env('FEATURE_DATABASE_CLICKHOUSE', true),
+    ],
+
 
     /*
     | Server-workspace tabs that are NOT in the MVP 14. Each maps to a

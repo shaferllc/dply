@@ -42,8 +42,9 @@
         @php
             $heroProvider = $server->provider->label();
             $heroRegion = $server->region ?: '—';
-            $heroIp = $server->ip_address ?? '—';
+            $heroIp = $server->public_ip_address ?? $server->ip_address ?? '—';
             $heroSize = $server->size ?? '—';
+            $heroStatus = ucfirst(str_replace('_', ' ', (string) ($server->status ?? '—')));
         @endphp
         <div class="lg:col-span-5">
             <dl class="divide-y divide-brand-ink/10 overflow-hidden rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
@@ -60,6 +61,10 @@
                         <dt class="text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Size') }}</dt>
                         <dd class="mt-1 truncate font-mono text-sm font-semibold text-brand-ink" title="{{ $heroSize }}">{{ $heroSize }}</dd>
                     </div>
+                </div>
+                <div class="flex items-baseline justify-between gap-4 px-3 py-2.5 sm:px-4">
+                    <dt class="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('Status') }}</dt>
+                    <dd class="text-right text-sm font-semibold text-brand-ink">{{ $heroStatus }}</dd>
                 </div>
                 <div class="flex items-baseline justify-between gap-4 px-3 py-2.5 sm:px-4">
                     <dt class="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">{{ __('IP') }}</dt>
