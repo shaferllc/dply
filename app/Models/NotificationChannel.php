@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Jobs\SendNotificationChannelTestEmailJob;
 use App\Mail\NotificationChannelMail;
 use Database\Factories\NotificationChannelFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
@@ -227,17 +228,12 @@ class NotificationChannel extends Model
             return ['ok' => false, 'message' => __('Valid email address is required.')];
         }
 
-        $subject = __('[:app] Notification channel test', ['app' => config('app.name')]);
-
+        // Dispatch rather than Mail::to(...)->queue(): the facade resolves the
+        // default mailer eagerly (building its transport) even when only queueing,
+        // so a misconfigured mailer would crash this web request. The job defers
+        // all mailer resolution to the worker. See SendNotificationChannelTestEmailJob.
         try {
-            Mail::to($to)->queue(new NotificationChannelMail(
-                heading: __('Notification channel test'),
-                bodyLines: [
-                    __('This confirms the “:label” channel can receive :app alerts.', ['label' => $this->label, 'app' => config('app.name')]),
-                    __('Triggered by :actor.', ['actor' => $actorLabel]),
-                ],
-                subjectLine: $subject,
-            ));
+            SendNotificationChannelTestEmailJob::dispatch($to, (string) $this->label, $actorLabel);
         } catch (\Throwable $e) {
             return ['ok' => false, 'message' => $e->getMessage()];
         }

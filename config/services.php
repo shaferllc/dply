@@ -24,7 +24,10 @@ return [
 
     'cloudflare' => [
         'account_id' => env('CLOUDFLARE_ACCOUNT_ID'),
-        'key' => env('CLOUDFLARE_API_KEY'),
+        // Accept either name: the mail transport key was historically provisioned
+        // as CLOUDFLARE_KEY in env, while this config read only CLOUDFLARE_API_KEY —
+        // the mismatch left services.cloudflare.key null and crashed CloudflareTransport.
+        'key' => env('CLOUDFLARE_API_KEY', env('CLOUDFLARE_KEY')),
     ],
 
     'ses' => [
