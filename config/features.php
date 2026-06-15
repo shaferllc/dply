@@ -107,25 +107,6 @@ return [
         'dragonfly' => env('FEATURE_CACHE_DRAGONFLY', false),
     ],
 
-    /*
-    | Database engines offered for install on BYO servers. MySQL, PostgreSQL,
-    | and SQLite are always available; the rest start as "coming soon" until
-    | their install + operate path is validated. When a flag is off the engine
-    | shows a Soon badge + teaser in the Databases workspace and MariaDB
-    | variants are filtered out of the server-create database picker.
-    */
-    'database' => [
-        // exit: ship once MariaDB install + MySQL-family workspace validated on three OSes
-        'mariadb' => env('FEATURE_DATABASE_MARIADB', false),
-        // MongoDB install path is now wired into the server-create picker +
-        // provision stack, but stays default-off until validated on three OSes.
-        // Flip FEATURE_DATABASE_MONGODB=true per deployment to offer it.
-        'mongodb' => env('FEATURE_DATABASE_MONGODB', false),
-        // ClickHouse install path wired in (primary driver: self-hosting the dply
-        // logs store). Default-off pending three-OS validation; set
-        // FEATURE_DATABASE_CLICKHOUSE=true per deployment to offer it.
-        'clickhouse' => env('FEATURE_DATABASE_CLICKHOUSE', false),
-    ],
 
     /*
     | Server-workspace tabs that are NOT in the MVP 14. Each maps to a

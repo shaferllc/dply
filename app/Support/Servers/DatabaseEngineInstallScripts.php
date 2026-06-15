@@ -78,6 +78,34 @@ mkdir -p /etc/systemd/system/clickhouse-server.service.d
 printf '[Service]\nTimeoutStartSec=300\n' > /etc/systemd/system/clickhouse-server.service.d/dply.conf
 systemctl daemon-reload
 systemctl enable clickhouse-server
+# Memory-aware tuning. ClickHouse's defaults (cap = 0.9 * RAM, multi-GB caches)
+# can OOM a small or shared app box. When total RAM is modest, cap CH so it
+# coexists with whatever else runs on the box; bigger/dedicated boxes keep the
+# stock defaults so a real log store isn't hobbled.
+RAM_MB=$(awk '/MemTotal/{printf "%d", $2/1024}' /proc/meminfo 2>/dev/null || echo 0)
+if [ "$RAM_MB" -gt 0 ] && [ "$RAM_MB" -lt 4096 ]; then
+  CH_MAX_BYTES=$(( RAM_MB * 1024 * 1024 / 2 ))
+  CH_SPILL_BYTES=$(( CH_MAX_BYTES / 2 ))
+  mkdir -p /etc/clickhouse-server/config.d
+  cat > /etc/clickhouse-server/config.d/99-dply-low-memory.xml <<EOF
+<clickhouse>
+    <max_server_memory_usage>${CH_MAX_BYTES}</max_server_memory_usage>
+    <mark_cache_size>268435456</mark_cache_size>
+    <uncompressed_cache_size>0</uncompressed_cache_size>
+    <max_concurrent_queries>16</max_concurrent_queries>
+    <background_pool_size>4</background_pool_size>
+    <background_schedule_pool_size>4</background_schedule_pool_size>
+    <profiles>
+        <default>
+            <max_memory_usage>${CH_MAX_BYTES}</max_memory_usage>
+            <max_bytes_before_external_group_by>${CH_SPILL_BYTES}</max_bytes_before_external_group_by>
+            <max_bytes_before_external_sort>${CH_SPILL_BYTES}</max_bytes_before_external_sort>
+        </default>
+    </profiles>
+</clickhouse>
+EOF
+  chown clickhouse:clickhouse /etc/clickhouse-server/config.d/99-dply-low-memory.xml 2>/dev/null || true
+fi
 if ! systemctl start clickhouse-server; then
   systemctl reset-failed clickhouse-server >/dev/null 2>&1 || true
   sleep 3
