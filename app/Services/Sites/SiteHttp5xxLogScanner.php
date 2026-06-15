@@ -114,6 +114,13 @@ final class SiteHttp5xxLogScanner
      * Read-only, self-contained. Reads only the tail of the access log (current +
      * one rotation), filters to 5xx lines, and hands back at most $max of the most
      * recent. Every step degrades to "no output" rather than a non-zero exit.
+     *
+     * PHP-FPM runs as root and opens its per-pool access log `root:root 0600`, so
+     * the operational SSH user cannot read it directly — without the sudo attempt
+     * every 5xx silently vanishes and the Errors stream stays empty. We try
+     * passwordless `sudo` first, then fall back to a plain read (file already
+     * readable, or no sudo on the box). Both paths suppress errors, so the script
+     * still degrades to "no output".
      */
     private function script(Site $site, int $cutoff, int $max): string
     {
@@ -126,7 +133,7 @@ final class SiteHttp5xxLogScanner
 set +e
 for f in {$access} {$access}.1; do
   [ -f "\$f" ] || continue
-  tail -n {$rawTail} "\$f" 2>/dev/null
+  { sudo -n tail -n {$rawTail} "\$f" 2>/dev/null || tail -n {$rawTail} "\$f" 2>/dev/null; }
 done | grep -E ' status=5[0-9][0-9]\$' 2>/dev/null | tail -n {$max}
 exit 0
 BASH;

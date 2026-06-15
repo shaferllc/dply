@@ -11,18 +11,21 @@
     $mem = isset($payload['mem_pct']) && is_numeric($payload['mem_pct']) ? (float) $payload['mem_pct'] : null;
     $disk = isset($payload['disk_pct']) && is_numeric($payload['disk_pct']) ? (float) $payload['disk_pct'] : null;
 
+    {{-- Quiet by default: healthy metrics are borderless muted text so the row
+         stays calm. Only a warning/critical reading earns a tinted background,
+         drawing the eye straight to the server that needs attention. --}}
     $statusColor = function (?float $value, float $warn = 85.0, float $critical = 95.0): string {
         if ($value === null) {
-            return 'bg-brand-mist/40 text-brand-moss';
+            return 'text-brand-mist';
         }
         if ($value >= $critical) {
-            return 'bg-red-100 text-red-900 ring-red-200';
+            return 'bg-red-100 text-red-900';
         }
         if ($value >= $warn) {
-            return 'bg-amber-100 text-amber-900 ring-amber-200';
+            return 'bg-amber-100 text-amber-900';
         }
 
-        return 'bg-emerald-50 text-emerald-900 ring-emerald-200';
+        return 'text-brand-moss';
     };
 
     $hasAny = $cpu !== null || $mem !== null || $disk !== null;
@@ -38,16 +41,16 @@
 @else
     <div {{ $attributes->class(['inline-flex items-center gap-1.5 font-mono tabular-nums', $stale ? 'opacity-60' : '']) }}
          title="{{ $sampleAge !== null ? __('Sampled :ago', ['ago' => $snapshot->captured_at->diffForHumans()]) : '' }}">
-        <span class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold ring-1 {{ $statusColor($cpu) }}">
-            <span class="text-[8px] font-bold uppercase tracking-wider opacity-70">{{ __('CPU') }}</span>
+        <span class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold {{ $statusColor($cpu) }}">
+            <span class="text-[8px] font-bold uppercase tracking-wider opacity-60">{{ __('CPU') }}</span>
             <span>{{ $cpu !== null ? number_format($cpu, 0).'%' : '—' }}</span>
         </span>
-        <span class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold ring-1 {{ $statusColor($mem) }}">
-            <span class="text-[8px] font-bold uppercase tracking-wider opacity-70">{{ __('MEM') }}</span>
+        <span class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold {{ $statusColor($mem) }}">
+            <span class="text-[8px] font-bold uppercase tracking-wider opacity-60">{{ __('MEM') }}</span>
             <span>{{ $mem !== null ? number_format($mem, 0).'%' : '—' }}</span>
         </span>
-        <span class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold ring-1 {{ $statusColor($disk) }}">
-            <span class="text-[8px] font-bold uppercase tracking-wider opacity-70">{{ __('DISK') }}</span>
+        <span class="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold {{ $statusColor($disk) }}">
+            <span class="text-[8px] font-bold uppercase tracking-wider opacity-60">{{ __('DISK') }}</span>
             <span>{{ $disk !== null ? number_format($disk, 0).'%' : '—' }}</span>
         </span>
     </div>

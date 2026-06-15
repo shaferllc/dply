@@ -273,7 +273,7 @@ REF={$ref}
 LINE=""
 for f in {$fpmAccess} {$fpmAccess}.1; do
   [ -f "\$f" ] || continue
-  M="\$(grep -F "ref=\${REF} " "\$f" 2>/dev/null | tail -n 1)"
+  M="\$({ sudo -n grep -F "ref=\${REF} " "\$f" 2>/dev/null || grep -F "ref=\${REF} " "\$f" 2>/dev/null; } | tail -n 1)"
   [ -n "\$M" ] && LINE="\$M"
 done
 
@@ -305,14 +305,16 @@ if [ -n "\$PATTERNS" ]; then
   GREPF="\$(mktemp)"
   printf '%b' "\$PATTERNS" | sort -u | grep -v '^$' > "\$GREPF"
   for f in {$laravel} {$fpmError} {$webError}; do
-    [ -f "\$f" ] || continue
+    { sudo -n test -f "\$f" 2>/dev/null || [ -f "\$f" ]; } || continue
     # A Laravel log entry is multi-line: a "[YYYY-MM-DD HH:MM:SS] …" header
     # followed by the message and the full "#0 … #N {main}" stack trace, none
     # of which carry their own timestamp. Grepping by timestamp alone would
     # capture only the header, so walk the file with awk: when a header line
     # matches one of our time patterns, print the WHOLE entry (header through
     # the line before the next "[YYYY-…" header), capped at {$cap} lines total.
-    H="\$(tail -n 8000 "\$f" 2>/dev/null | awk -v capn={$cap} '
+    # FPM/webserver error logs are root-owned; try sudo first, then a plain
+    # read (already-readable file, e.g. the dply-owned laravel.log, or no sudo).
+    H="\$({ sudo -n tail -n 8000 "\$f" 2>/dev/null || tail -n 8000 "\$f" 2>/dev/null; } | awk -v capn={$cap} '
       BEGIN { while ((getline p < "'"\$GREPF"'") > 0) if (p != "") want[p]=1 }
       /^\\[[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/ {
         inb=0
