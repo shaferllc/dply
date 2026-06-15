@@ -75,6 +75,48 @@ trait CreatesNotificationChannelInline
 
     public string $new_webhook_url = '';
 
+    /** Id of the channel a test notification is currently in flight for (UI spinner). */
+    public ?string $testingChannelId = null;
+
+    /**
+     * Send a test notification to one of the assignable channels listed in the
+     * subscription matrix, so operators can confirm a channel is wired up before
+     * routing real events to it. Mirrors {@see ManagesNotificationChannels::sendTest},
+     * but resolves the channel by id and gates on the channel policy so it works for
+     * personal, organization, and team-owned channels alike (the matrix mixes all three).
+     */
+    public function sendTestChannelNotification(string|int $id): void
+    {
+        $channel = NotificationChannel::findOrFail($id);
+        Gate::authorize('update', $channel);
+
+        $this->testingChannelId = (string) $channel->id;
+        $result = $channel->sendTest(Auth::user());
+        $this->testingChannelId = null;
+
+        $org = match (true) {
+            $channel->owner instanceof Organization => $channel->owner,
+            $channel->owner instanceof Team => $channel->owner->organization,
+            default => Auth::user()?->currentOrganization(),
+        };
+        if ($org !== null) {
+            audit_log($org, Auth::user(), 'notification_channel.test_sent', $channel, null, [
+                'channel_id' => (string) $channel->id,
+                'type' => $channel->type,
+                'label' => $channel->label,
+                'result' => $result['ok'] ? 'success' : 'failed',
+                'message' => isset($result['message']) ? (string) $result['message'] : null,
+                'surface' => 'subscription_matrix',
+            ]);
+        }
+
+        if ($result['ok']) {
+            $this->toastSuccess($result['message']);
+        } else {
+            $this->toastError($result['message']);
+        }
+    }
+
     /**
      * Subject the new channel attaches to. Defaults to the signed-in user
      * (personal channels). Hosts can override to return an Organization / Team

@@ -2,8 +2,10 @@
 
 namespace App\Livewire\Servers\Concerns;
 
+use App\Livewire\Servers\WorkspaceNotifications;
 use App\Models\OutboundWebhookDelivery;
 use App\Services\Webhooks\OutboundWebhookDispatcher;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
 
@@ -11,7 +13,7 @@ use Illuminate\Support\Facades\Crypt;
  * Per-server outbound webhook: a single signed (HMAC-SHA256) URL that receives
  * server-scoped events, plus the test-fire + resend + deliveries-log controls.
  *
- * Lives on {@see \App\Livewire\Servers\WorkspaceNotifications} so all of a
+ * Lives on {@see WorkspaceNotifications} so all of a
  * server's outbound event delivery (channel subscriptions, integration
  * webhooks, this signed endpoint) sits in one place. It was previously a
  * Settings → Webhook sub-tab; that URL now redirects here.
@@ -129,9 +131,9 @@ trait ManagesServerWebhook
      * the deliveries log; "would send" rows are included so an operator can
      * audit what would fire before wiring up a URL.
      *
-     * @return \Illuminate\Support\Collection<int, OutboundWebhookDelivery>
+     * @return Collection<int, OutboundWebhookDelivery>
      */
-    protected function recentWebhookDeliveries(): \Illuminate\Support\Collection
+    protected function recentWebhookDeliveries(): Collection
     {
         return OutboundWebhookDelivery::query()
             ->where('server_id', $this->server->id)

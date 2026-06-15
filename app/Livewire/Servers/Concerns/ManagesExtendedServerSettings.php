@@ -190,7 +190,7 @@ trait ManagesExtendedServerSettings
     {
         $this->authorize('view', $this->server);
         $this->server->refresh();
-        $this->server->load(['sites.domains', 'organization', 'workspace']);
+        $this->server->load(['sites.domains', 'organization', 'workspace', 'notes.creator', 'notes.editor']);
 
         $payload = [
             'exported_at' => now()->toIso8601String(),
@@ -214,6 +214,16 @@ trait ManagesExtendedServerSettings
                 'name' => $s->name,
                 'domains' => $s->domains->pluck('domain')->all(),
             ])->values()->all(),
+            // The manifest exists for runbooks/handoffs, so the operator notes are
+            // its core content. Ordered pinned-first by the notes() relation.
+            'notes' => $this->server->notes->map(fn ($note) => [
+                'body' => $note->body,
+                'pinned' => $note->pinned,
+                'created_by' => $note->creator?->name,
+                'updated_by' => $note->editor?->name,
+                'created_at' => $note->created_at?->toIso8601String(),
+                'updated_at' => $note->updated_at?->toIso8601String(),
+            ])->values()->all(),
         ];
 
         $filename = 'server-'.$this->server->id.'-manifest.json';
@@ -229,17 +239,44 @@ trait ManagesExtendedServerSettings
     }
 
     /**
+     * The meta subset that is safe to put in a downloadable manifest.
+     *
+     * This is an ALLOWLIST, not a blocklist: only keys known to be non-sensitive
+     * operator configuration are exported. Everything else in meta — secrets,
+     * tokens, provisioning diagnostics, provider cluster ids, and the webhook URL
+     * (which can itself embed a secret path) — is excluded BY DEFAULT, so a newly
+     * added meta key can never silently leak into a file the user downloads and
+     * hands off. Add a key here only after confirming it carries no secret.
+     *
      * @param  array<string, mixed>  $meta
      * @return array<string, mixed>
      */
     protected function manifestSafeMeta(array $meta): array
     {
-        unset(
-            $meta['manage_internal_db_password'],
-            $meta['server_event_webhook_secret'],
-        );
+        $allowed = [
+            // Identity / classification
+            'host_kind',
+            'server_role',
+            'tags',
+            'os_version',
+            'inventory_os_detected_key',
+            // Display preferences
+            'timezone',
+            'date_format',
+            // Maintenance window
+            'maintenance_days',
+            'maintenance_start',
+            'maintenance_end',
+            'maintenance_note',
+            // Cost note the operator typed (the pulled estimate snapshot is excluded)
+            'cost_monthly_note',
+            // Operational config
+            'inventory_scan_depth',
+            'php_fpm_pool',
+            'self_managed',
+        ];
 
-        return $meta;
+        return array_intersect_key($meta, array_flip($allowed));
     }
 
     protected function syncExtendedServerSettingsFromServer(): void
