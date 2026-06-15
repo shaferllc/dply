@@ -422,7 +422,10 @@ class RunSiteDeploymentJob implements ShouldQueue
      */
     private function pullEphemeralIdentity(): ?string
     {
-        if ($this->ephemeralIdentityToken === null) {
+        // isset() (not === null) so a stale queue payload serialized before this
+        // property existed — which leaves the typed property uninitialized on
+        // unserialize, not null — degrades gracefully instead of fatally.
+        if (! isset($this->ephemeralIdentityToken)) {
             return null;
         }
 
