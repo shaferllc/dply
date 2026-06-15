@@ -85,7 +85,10 @@ class LookupSiteErrorReferenceJob implements ShouldQueue
                     'level' => $primary['level'] ?? __('ERROR'),
                     'message' => $primary['message'] ?? '',
                 ]));
-                foreach (array_slice($primary['trace'] ?? [], 0, 20) as $traceLine) {
+                // Emit the entire parsed stack trace — operators need the full
+                // frame list to diagnose, and the console banner is scrollable
+                // with a copy-all button, so there's no reason to truncate it.
+                foreach ($primary['trace'] ?? [] as $traceLine) {
                     $emit->info($traceLine);
                 }
             }

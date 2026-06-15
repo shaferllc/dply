@@ -171,7 +171,7 @@ final class SiteShowViewData
         if ($site->usesEdgeRuntime()) {
             $siteHeaderBreadcrumbs[] = ['label' => __('Infrastructure'), 'href' => route('infrastructure.index'), 'icon' => 'rectangle-group'];
             $siteHeaderBreadcrumbs[] = ['label' => __('Edge'), 'href' => route('edge.index'), 'icon' => 'globe-alt'];
-            $siteHeaderBreadcrumbs[] = ['label' => $site->name, 'icon' => 'globe-alt'];
+            $siteHeaderBreadcrumbs[] = ['label' => $site->name, 'icon' => 'globe-alt', 'avatar' => $site->name ?: (string) $site->id, 'avatar_image' => $site->logoUrl()];
         } else {
             $siteHeaderBreadcrumbs[] = ['label' => __('Servers'), 'href' => route('servers.index'), 'icon' => 'server-stack'];
             if ($server->workspace) {
@@ -185,10 +185,14 @@ final class SiteShowViewData
                 'label' => $server->name,
                 'href' => route('servers.overview', $server),
                 'icon' => 'server-stack',
+                'avatar' => $server->name ?: (string) $server->id,
+                'avatar_image' => $server->logoUrl(),
             ];
             $siteHeaderBreadcrumbs[] = [
                 'label' => $site->name,
                 'icon' => 'globe-alt',
+                'avatar' => $site->name ?: (string) $site->id,
+                'avatar_image' => $site->logoUrl(),
             ];
         }
 

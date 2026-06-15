@@ -372,8 +372,17 @@ class SiteDeployPipelineRunner
             // early (composer install must still run), so we guard with an if.
             if (! $usesComposer) {
                 $prefix .= '[ -f package.json ] || { echo "[dply] no package.json — skipping frontend build"; exit 0; }; ';
+                // Opt-out: a package.json with {"dply": {"build": false}} skips
+                // both the npm install and the asset build. Read without node
+                // (which may not be installed yet) by flattening whitespace and
+                // matching the dply block — keeps the opt-out honored even on a
+                // box that has no Node toolchain at all.
+                $prefix .= 'if [ -f package.json ] && tr -d " \\t\\n\\r" < package.json 2>/dev/null | grep -q \'"dply":{[^{}]*"build":false\'; then '
+                    .'echo "[dply] package.json opts out of the build (dply.build=false) — skipping install & build"; exit 0; '
+                    .'fi; ';
             }
             $prefix .= 'if [ -f package.json ]; then '
+                // 1) Try mise (present on dply-provisioned boxes) to get node@lts.
                 .'command -v npm >/dev/null 2>&1 || { '
                 .'echo "[dply] node/npm not found — installing node@lts via mise…"; '
                 .'if command -v mise >/dev/null 2>&1; then '
@@ -381,8 +390,25 @@ class SiteDeployPipelineRunner
                 .'eval "$(mise env -s bash 2>/dev/null)" 2>/dev/null || true; '
                 .'export PATH="$HOME/.local/share/mise/shims:$PATH"; '
                 .'fi; }; '
-                .'command -v npm >/dev/null 2>&1 || { echo "[dply] npm unavailable — install Node on the server, then redeploy."; exit 1; }; '
-                .'fi; ';
+                // 2) Still missing (BYO box without mise) — install Node LTS from
+                //    NodeSource, mirroring the on-demand composer install above.
+                .'command -v npm >/dev/null 2>&1 || { '
+                .'echo "[dply] installing Node LTS via NodeSource…"; '
+                .'if [ "$(id -u)" = 0 ]; then '
+                .'curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - >/dev/null 2>&1 && apt-get install -y --no-install-recommends nodejs >/dev/null 2>&1 || true; '
+                .'elif command -v sudo >/dev/null 2>&1; then '
+                .'curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash - >/dev/null 2>&1 && sudo apt-get install -y --no-install-recommends nodejs >/dev/null 2>&1 || true; '
+                .'fi; }; ';
+            // 3) Still no npm. For a Node-only step (npm_ci / npm_run) warn and
+            //    SKIP the build rather than failing the whole deploy — the app
+            //    ships without rebuilt assets and the operator can install Node
+            //    and redeploy. For a combined composer+node custom step we must
+            //    NOT exit here (that would skip composer too); let the command
+            //    run and surface the npm failure on its own.
+            if (! $usesComposer) {
+                $prefix .= 'command -v npm >/dev/null 2>&1 || { echo "[dply] npm unavailable and auto-install failed — skipping frontend build (install Node on the server and redeploy to build assets)."; exit 0; }; ';
+            }
+            $prefix .= 'fi; ';
         }
 
         return $prefix.'} && ';

@@ -272,19 +272,32 @@ final class SiteDeployTimeline
             }
 
             $hasPending = false;
+            $hasOk = false;
             foreach ($steps as $step) {
                 if (($step['pending'] ?? false) === true) {
                     $hasPending = true;
 
                     continue;
                 }
-                if (($step['skipped'] ?? false) !== true && ($step['ok'] ?? false) !== true) {
+                if (($step['skipped'] ?? false) === true) {
+                    continue;
+                }
+                if (($step['ok'] ?? false) !== true) {
                     return 'failed';
                 }
+                $hasOk = true;
             }
 
-            // No failures yet, but steps are still queued → the phase is running.
-            return $hasPending ? 'running' : 'success';
+            // Still-queued steps → the phase is running. Otherwise: a phase whose
+            // every step was SKIPPED (e.g. the no-op Activate on a flat deploy)
+            // is 'skipped', NOT 'success' — a green "done" check on a phase that
+            // never actually ran reads as completed, and worse, completed out of
+            // order (Activate is last but skips early on simple deploys).
+            if ($hasPending) {
+                return 'running';
+            }
+
+            return $hasOk ? 'success' : 'skipped';
         }
 
         if ($running && $isRunningPhase) {

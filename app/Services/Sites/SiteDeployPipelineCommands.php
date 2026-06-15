@@ -18,9 +18,11 @@ final class SiteDeployPipelineCommands
             SiteDeployStep::TYPE_COMPOSER_INSTALL => 'composer install --no-dev --no-interaction --prefer-dist --no-ansi',
             SiteDeployStep::TYPE_NPM_CI => 'npm ci --no-audit --no-fund',
             SiteDeployStep::TYPE_NPM_INSTALL => 'npm install --no-audit --no-fund',
+            // `--if-present` makes a missing script (e.g. no "build" in
+            // package.json) a clean no-op instead of a deploy-failing error.
             SiteDeployStep::TYPE_NPM_RUN => $custom !== ''
-                ? 'npm run '.escapeshellarg($custom)
-                : 'npm run build',
+                ? 'npm run '.escapeshellarg($custom).' --if-present'
+                : 'npm run build --if-present',
             SiteDeployStep::TYPE_YARN_INSTALL => 'yarn install --frozen-lockfile',
             SiteDeployStep::TYPE_PNPM_INSTALL => 'pnpm install --frozen-lockfile',
             SiteDeployStep::TYPE_BUN_INSTALL => 'bun install --frozen-lockfile',

@@ -31,7 +31,7 @@ final class EdgeProvisioningViewData
                 ['label' => __('Dashboard'), 'href' => route('dashboard'), 'icon' => 'home'],
                 ['label' => __('Infrastructure'), 'href' => route('infrastructure.index'), 'icon' => 'rectangle-group'],
                 ['label' => __('Edge'), 'href' => route('edge.index'), 'icon' => 'globe-alt'],
-                ['label' => $site->name, 'icon' => 'globe-alt'],
+                ['label' => $site->name, 'icon' => 'globe-alt', 'avatar' => $site->name ?: (string) $site->id, 'avatar_image' => $site->logoUrl()],
             ],
         ]);
     }

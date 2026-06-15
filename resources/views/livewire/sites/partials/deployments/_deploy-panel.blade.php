@@ -48,9 +48,10 @@
     @if ($watchedConsoleRunId)
         <div wire:poll.3s="resolveWatchedConsoleAction" class="hidden" aria-hidden="true"></div>
     @endif
-    @if ($latest && $latest->status === 'failed')
-        @include('livewire.sites.partials.deployments._remediation-panel', ['deployment' => $latest])
-    @endif
+    {{-- The recognized-failure card used to sit HERE at the top, duplicating the
+         error that's already shown in context at the bottom of the panel (the
+         failed phase + raw output in the timeline). It now renders ONCE, down by
+         the timeline, so the failure + its fix live in a single place. --}}
 
     {{-- Resume-from-phase: the deploy failed AFTER staging a release but BEFORE
          cutover (a build step or a migration broke), so the prior release is
@@ -615,6 +616,16 @@
                     }
                 @endphp
                 @include('livewire.sites.partials.deployments._phase-timeline', ['timelinePhases' => $timelinePhases, 'deployment' => $latest, 'dbFix' => $dbFix])
+
+                {{-- Recognized-failure remediation (curated RemediationCatalog
+                     match, e.g. "Rebuild webserver config" for a 502) — rendered
+                     here, with the error it explains, instead of a duplicate card
+                     at the top of the panel. --}}
+                @if ($latest && $latest->status === 'failed')
+                    <div class="mt-4">
+                        @include('livewire.sites.partials.deployments._remediation-panel', ['deployment' => $latest])
+                    </div>
+                @endif
 
                 {{-- Smart fixes for a failed deploy — same inline fix actions the
                      deploy sidebar offers, driven by the shared coordinator. --}}

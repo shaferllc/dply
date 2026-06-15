@@ -28,8 +28,12 @@ use Throwable;
  */
 final class SiteErrorReferenceResolver
 {
-    /** Hard caps so a lookup can never stream an unbounded log back. */
-    private const TRACE_LINE_CAP = 150;
+    /**
+     * Hard cap so a lookup can never stream an unbounded log back, but high
+     * enough to carry a complete multi-line stack trace (a Laravel exception
+     * dump is ~90-100 frames) plus a few correlated entries.
+     */
+    private const TRACE_LINE_CAP = 2000;
 
     public function __construct(
         private readonly SshConnectionFactory $sshFactory,
@@ -302,7 +306,20 @@ if [ -n "\$PATTERNS" ]; then
   printf '%b' "\$PATTERNS" | sort -u | grep -v '^$' > "\$GREPF"
   for f in {$laravel} {$fpmError} {$webError}; do
     [ -f "\$f" ] || continue
-    H="\$(tail -n 4000 "\$f" 2>/dev/null | grep -F -f "\$GREPF" 2>/dev/null | head -n {$cap})"
+    # A Laravel log entry is multi-line: a "[YYYY-MM-DD HH:MM:SS] …" header
+    # followed by the message and the full "#0 … #N {main}" stack trace, none
+    # of which carry their own timestamp. Grepping by timestamp alone would
+    # capture only the header, so walk the file with awk: when a header line
+    # matches one of our time patterns, print the WHOLE entry (header through
+    # the line before the next "[YYYY-…" header), capped at {$cap} lines total.
+    H="\$(tail -n 8000 "\$f" 2>/dev/null | awk -v capn={$cap} '
+      BEGIN { while ((getline p < "'"\$GREPF"'") > 0) if (p != "") want[p]=1 }
+      /^\\[[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/ {
+        inb=0
+        for (p in want) { if (index(\$0, p)) { inb=1; break } }
+      }
+      inb { print; c++; if (c >= capn) exit }
+    ')"
     if [ -n "\$H" ]; then
       echo "── \$f ──"
       printf '%s\\n' "\$H"
