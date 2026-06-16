@@ -25,25 +25,14 @@
             <x-livewire-validation-errors />
 
             {{-- Header: identity, status, tier/price, peak usage. --}}
-            <section class="dply-card overflow-hidden" @if ($app->status === \App\Models\RealtimeApp::STATUS_PROVISIONING) wire:poll.5s @endif>
-                <div class="flex flex-wrap items-start justify-between gap-4 p-6 sm:p-8">
-                    <div class="flex items-start gap-3">
-                        <x-icon-badge size="md">
-                            <x-heroicon-o-signal class="h-6 w-6" aria-hidden="true" />
-                        </x-icon-badge>
-                        <div class="min-w-0">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <h2 class="truncate text-xl font-semibold tracking-tight text-brand-ink">{{ $app->name }}</h2>
-                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset {{ $statusTone[$app->status] ?? 'bg-brand-sand/55 text-brand-moss ring-brand-ink/10' }}">
-                                    {{ ucfirst($app->status) }}
-                                </span>
-                            </div>
-                            <p class="mt-1 font-mono text-xs text-brand-moss">{{ $app->host() }}</p>
-                            @if ($app->status === \App\Models\RealtimeApp::STATUS_FAILED && $app->error_message)
-                                <p class="mt-2 rounded-md bg-red-50 px-2 py-1 text-xs text-red-700">{{ $app->error_message }}</p>
-                            @endif
-                        </div>
-                    </div>
+            <x-hero-card
+                icon="signal"
+                iconSize="md"
+                :title="$app->name"
+                :description="$app->host()"
+                @if ($app->status === \App\Models\RealtimeApp::STATUS_PROVISIONING) wire:poll.5s @endif
+            >
+                <x-slot:topAction>
                     <div class="text-right">
                         <p class="text-sm font-semibold text-brand-forest">{{ $tier['label'] }} · {{ $money($app->priceCents()) }}/{{ __('mo') }}</p>
                         <p class="mt-0.5 text-xs text-brand-moss">
@@ -62,8 +51,15 @@
                             </div>
                         @endif
                     </div>
-                </div>
-            </section>
+                </x-slot:topAction>
+
+                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset {{ $statusTone[$app->status] ?? 'bg-brand-sand/55 text-brand-moss ring-brand-ink/10' }}">
+                    {{ ucfirst($app->status) }}
+                </span>
+                @if ($app->status === \App\Models\RealtimeApp::STATUS_FAILED && $app->error_message)
+                    <p class="rounded-md bg-red-50 px-2 py-1 text-xs text-red-700">{{ $app->error_message }}</p>
+                @endif
+            </x-hero-card>
 
             {{-- Live stats: polls the relay while active so the current connection
                  count stays fresh; the peak high-water mark is persisted. --}}

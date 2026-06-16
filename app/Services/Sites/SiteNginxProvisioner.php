@@ -341,8 +341,14 @@ class SiteNginxProvisioner extends AbstractSiteWebserverProvisioner implements S
             return [];
         }
 
+        // The OK/NO marker must echo the RAW path, not the escapeshellarg'd
+        // (single-quoted) form used for `test -f`. The presence regex below
+        // matches `^NO <raw-path>$`; emitting `NO '<path>'` with literal quotes
+        // never matches, so every path would fail open to "present" and silently
+        // disable the TLS cert salvage (the missing cert then only surfaces at
+        // nginx -t, which hard-fails and rolls the whole apply back).
         $checks = implode("\n", array_map(
-            fn (string $p): string => sprintf('test -f %1$s && echo "OK %1$s" || echo "NO %1$s"', escapeshellarg($p)),
+            fn (string $p): string => sprintf('test -f %1$s && echo "OK %2$s" || echo "NO %2$s"', escapeshellarg($p), $p),
             $paths,
         ));
         $out = $ssh->exec($this->privilegedCommand($server, $checks), 30);

@@ -178,44 +178,46 @@
             </div>
         @endif
 
-        <x-page-header
+        @php
+            $summaryStats = [
+                ['icon' => 'heroicon-o-server-stack', 'label' => __('Servers'), 'value' => $summary['total'], 'tone' => 'text-brand-sage'],
+                ['icon' => 'heroicon-o-check-circle', 'label' => __('Ready'), 'value' => $summary['ready'], 'tone' => 'text-brand-sage'],
+                ['icon' => 'heroicon-o-exclamation-triangle', 'label' => __('Attention'), 'value' => $summary['attention'], 'tone' => $summary['attention'] > 0 ? 'text-amber-500' : 'text-brand-mist'],
+                ['icon' => 'heroicon-o-globe-alt', 'label' => __('Sites'), 'value' => $summary['sites'], 'tone' => 'text-brand-sage'],
+            ];
+        @endphp
+        <x-hero-card
+            icon="server-stack"
+            iconSize="md"
+            :eyebrow="__('Fleet')"
             :title="__('Servers')"
             :description="__('Provision hosts, watch readiness, and drill into each machine from one fleet view.')"
-            flush
-            compact
-            toolbar
         >
-            <x-slot name="leading">
-                <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-brand-ink/10 bg-white shadow-sm">
-                    <x-heroicon-o-server-stack class="h-7 w-7 text-brand-ink" aria-hidden="true" />
-                </span>
-            </x-slot>
-            <x-slot name="actions">
-                @can('create', App\Models\Server::class)
-                    @if (multi_surface_active())
-                        <a
-                            href="{{ route('launches.create') }}"
-                            wire:navigate
-                            class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest"
-                        >
-                            <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Open launchpad') }}
-                        </a>
-                    @else
-                        <a
-                            href="{{ route('servers.create') }}"
-                            wire:navigate
-                            class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest"
-                        >
-                            <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
-                            {{ __('Create a server') }}
-                        </a>
-                    @endif
-                @endcan
+            @can('create', App\Models\Server::class)
+                @if (multi_surface_active())
+                    <a
+                        href="{{ route('launches.create') }}"
+                        wire:navigate
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest"
+                    >
+                        <x-heroicon-o-rocket-launch class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {{ __('Open launchpad') }}
+                    </a>
+                @else
+                    <a
+                        href="{{ route('servers.create') }}"
+                        wire:navigate
+                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-ink px-5 py-2.5 text-sm font-semibold text-brand-cream shadow-md shadow-brand-ink/15 transition-colors hover:bg-brand-forest"
+                    >
+                        <x-heroicon-o-plus class="h-4 w-4 shrink-0" aria-hidden="true" />
+                        {{ __('Create a server') }}
+                    </a>
+                @endif
+            @endcan
 
-                {{-- Secondary actions collapse into one menu so the top bar stays
-                     a single primary CTA + overflow, not a wall of equal buttons. --}}
-                <x-dropdown align="right" width="w-64">
+            {{-- Secondary actions collapse into one menu so the top bar stays
+                 a single primary CTA + overflow, not a wall of equal buttons. --}}
+            <x-dropdown align="right" width="w-64">
                     <x-slot name="trigger">
                         <button type="button" class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-brand-ink/15 bg-white px-4 py-2.5 text-sm font-semibold text-brand-ink shadow-sm transition hover:bg-brand-sand/40">
                             <x-heroicon-o-ellipsis-horizontal class="h-4 w-4 shrink-0 text-brand-moss" aria-hidden="true" />
@@ -246,8 +248,21 @@
                         </a>
                     </x-slot>
                 </x-dropdown>
-            </x-slot>
-        </x-page-header>
+
+            <x-slot:stats>
+                <dl class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    @foreach ($summaryStats as $stat)
+                        <div class="rounded-xl border border-brand-ink/10 bg-white px-3 py-2 shadow-sm sm:min-w-[6.5rem]">
+                            <dt class="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-mist">
+                                <x-dynamic-component :component="$stat['icon']" class="h-3.5 w-3.5 shrink-0 {{ $stat['tone'] }}" aria-hidden="true" />
+                                <span class="truncate">{{ $stat['label'] }}</span>
+                            </dt>
+                            <dd class="mt-0.5 font-mono text-lg font-semibold tabular-nums leading-none text-brand-ink">{{ $stat['value'] }}</dd>
+                        </div>
+                    @endforeach
+                </dl>
+            </x-slot:stats>
+        </x-hero-card>
 
         @feature('surface.fleet')
             @php
@@ -284,29 +299,9 @@
             </nav>
         @endfeature
 
-        @php
-            $summaryStats = [
-                ['icon' => 'heroicon-o-server-stack', 'label' => __('Servers'), 'value' => $summary['total'], 'tone' => 'text-brand-sage'],
-                ['icon' => 'heroicon-o-check-circle', 'label' => __('Ready'), 'value' => $summary['ready'], 'tone' => 'text-brand-sage'],
-                ['icon' => 'heroicon-o-exclamation-triangle', 'label' => __('Attention'), 'value' => $summary['attention'], 'tone' => $summary['attention'] > 0 ? 'text-amber-500' : 'text-brand-mist'],
-                ['icon' => 'heroicon-o-globe-alt', 'label' => __('Sites'), 'value' => $summary['sites'], 'tone' => 'text-brand-sage'],
-            ];
-        @endphp
-        <div class="dply-card overflow-hidden">
-            <dl class="grid grid-cols-2 divide-y divide-brand-ink/10 sm:grid-cols-4 sm:divide-x sm:divide-y-0">
-                @foreach ($summaryStats as $stat)
-                    <div class="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
-                        <dt class="flex min-w-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-brand-moss">
-                            <x-dynamic-component :component="$stat['icon']" class="h-4 w-4 shrink-0 {{ $stat['tone'] }}" aria-hidden="true" />
-                            <span class="truncate">{{ $stat['label'] }}</span>
-                        </dt>
-                        <dd class="text-xl font-semibold tabular-nums leading-none text-brand-ink">{{ $stat['value'] }}</dd>
-                    </div>
-                @endforeach
-            </dl>
-
-            @if ($hasServersInScope)
-                <div class="flex flex-wrap items-center gap-2 border-t border-brand-ink/10 bg-brand-sand/20 px-4 py-3 sm:px-5">
+        @if ($hasServersInScope)
+            <div class="dply-card overflow-hidden">
+                <div class="flex flex-wrap items-center gap-2 px-4 py-3 sm:px-5">
                     <div class="min-w-[14rem] flex-1">
                         <label for="servers_search" class="sr-only">{{ __('Search') }}</label>
                         <x-text-input id="servers_search" type="search" wire:model.live.debounce.300ms="search" class="mt-0 w-full" placeholder="{{ __('Search servers, IPs, or providers…') }}" autocomplete="off" />
@@ -363,8 +358,8 @@
                         {{ __('Reset') }}
                     </button>
                 </div>
-            @endif
-        </div>
+            </div>
+        @endif
 
         @unless ($hasProviderCredentials)
             <section class="dply-card overflow-hidden border-amber-200">
