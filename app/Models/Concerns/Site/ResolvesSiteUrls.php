@@ -93,12 +93,43 @@ trait ResolvesSiteUrls
 
         $hostname = $this->testingHostname();
         if ($hostname !== '') {
-            return 'http://'.$hostname;
+            return $this->urlSchemeForHostname($hostname).'://'.$hostname;
         }
 
-        return ($this->primaryDomain()?->hostname)
-            ? 'http://'.$this->primaryDomain()->hostname
+        $primary = $this->primaryDomain()?->hostname;
+
+        return $primary
+            ? $this->urlSchemeForHostname($primary).'://'.$primary
             : null;
+    }
+
+    /**
+     * Scheme to advertise for a public site hostname. dply provisions SSL for
+     * every managed hostname and forces an HTTP→HTTPS redirect, so a provisioned
+     * site's canonical URL is https. Hardcoding http:// made "visit"/preview
+     * links land on the redirect — and an http:// preview opened from the https
+     * console reads as broken (mixed-content block / bare nginx error). Fall back
+     * to http only while SSL isn't active yet.
+     */
+    protected function urlSchemeForHostname(?string $hostname): string
+    {
+        $hostname = strtolower(trim((string) $hostname));
+        if ($hostname === '') {
+            return 'http';
+        }
+
+        // Managed preview hostname (e.g. *.on-dply.cc) — the preview-domain row
+        // tracks SSL + redirect state for that exact host.
+        $preview = $this->primaryPreviewDomain();
+        if ($preview !== null && strtolower((string) $preview->hostname) === $hostname) {
+            return ((bool) $preview->https_redirect || (string) $preview->ssl_status === 'active')
+                ? 'https'
+                : 'http';
+        }
+
+        // Custom domain — SSL is tracked at the site level (site_domains rows
+        // carry no per-host cert state).
+        return (string) $this->ssl_status === 'active' ? 'https' : 'http';
     }
 
     /**

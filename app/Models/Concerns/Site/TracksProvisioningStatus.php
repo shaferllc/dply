@@ -159,12 +159,22 @@ trait TracksProvisioningStatus
     {
         $readyUrl = $this->provisioningMeta()['ready_url'] ?? null;
         if (is_string($readyUrl) && $readyUrl !== '') {
+            // Stored ready_urls predate SSL provisioning and can be http:// even
+            // though the host now serves https and forces a redirect. Upgrade the
+            // scheme so visit/preview links hit the live https URL directly.
+            $host = parse_url($readyUrl, PHP_URL_HOST);
+            if (is_string($host) && $host !== ''
+                && str_starts_with($readyUrl, 'http://')
+                && $this->urlSchemeForHostname($host) === 'https') {
+                return 'https://'.substr($readyUrl, strlen('http://'));
+            }
+
             return $readyUrl;
         }
 
         $hostname = $this->provisionedHostname();
 
-        return $hostname ? 'http://'.$hostname : null;
+        return $hostname ? $this->urlSchemeForHostname($hostname).'://'.$hostname : null;
     }
 
     public function isProvisioning(): bool
