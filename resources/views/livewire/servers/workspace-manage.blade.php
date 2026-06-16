@@ -81,25 +81,6 @@
             'kindLabels' => (array) config('console_actions.kinds', []),
         ])
 
-        <x-server-workspace-tablist :aria-label="__('Manage categories')">
-            @foreach ($manageTabs as $slug => $meta)
-                @php
-                    $tabIcon = ! empty($meta['icon']) ? 'heroicon-o-'.$meta['icon'] : null;
-                @endphp
-                <x-server-workspace-tab
-                    as="a"
-                    :id="'manage-tab-'.$slug"
-                    href="{{ route('servers.manage', ['server' => $server, 'section' => $slug]) }}"
-                    wire:navigate
-                    :active="$section === $slug"
-                    :icon="$tabIcon"
-                    :variant="$slug === 'danger' ? 'danger' : 'default'"
-                >
-                    {{ __($meta['label']) }}
-                </x-server-workspace-tab>
-            @endforeach
-        </x-server-workspace-tablist>
-
         <div class="relative space-y-6">
         @if ($isDeployer)
             <section class="dply-card overflow-hidden border-amber-200">
@@ -131,33 +112,11 @@
             </section>
         @endif
 
-        @switch ($section)
-            @case ('overview')
-                @include('livewire.servers.partials.manage.group-overview', $manageShare)
-                @break
-            {{-- 'services' section removed — see config/server_manage.php
-                 :: workspace_tabs. WorkspaceManage::mount() now redirects
-                 stale ?section=services URLs to the standalone Services
-                 page so deep links don't 404. --}}
-            @case ('web')
-                {{-- Banner for webserver_switch + edge_proxy is hoisted to the top
-                     of the Manage workspace so it surfaces from every tab, not
-                     just /manage/web. See $manageConsoleRun above. --}}
-                @include('livewire.servers.partials.manage.group-web', $manageShare)
-                @break
-            @case ('updates')
-                @include('livewire.servers.partials.manage.group-updates', $manageShare)
-                @break
-            @case ('tools')
-                @include('livewire.servers.partials.manage.group-tools', $manageShare)
-                @break
-            @case ('configuration')
-                @include('livewire.servers.partials.manage.group-configuration', $manageShare)
-                @break
-            @case ('danger')
-                @include('livewire.servers.partials.manage.group-danger', $manageShare)
-                @break
-        @endswitch
+        {{-- The Manage workspace was dissolved; this base component is now only
+             reachable as the flag-off fallback for /manage/updates (when the
+             patch advisor feature is off, so there is no Patches page to absorb
+             it). Every other former section redirects in mount(). --}}
+        @include('livewire.servers.partials.manage.group-updates', $manageShare)
         </div>
     </div>
 

@@ -53,6 +53,7 @@ return [
         ['key' => 'edge-proxy', 'route' => 'servers.edge-proxy', 'icon' => 'arrow-path-rounded-square', 'label' => 'Edge proxy', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes'], 'soon_badge' => true],
         ['key' => 'php', 'route' => 'servers.php', 'icon' => 'command-line', 'label' => 'PHP', 'group' => 'stacks', 'requires_any_tags' => ['php'], 'except_host_kinds' => ['kubernetes']],
         ['key' => 'services', 'route' => 'servers.services', 'icon' => 'rectangle-stack', 'label' => 'Services', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.services'],
+        ['key' => 'tools', 'route' => 'servers.tools', 'icon' => 'wrench-screwdriver', 'label' => 'Tools', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'webserver', 'route' => 'servers.webserver', 'icon' => 'globe-alt', 'label' => 'Webserver', 'group' => 'stacks', 'except_host_kinds' => ['kubernetes']],
         // background (alphabetical by label)
         ['key' => 'backups', 'route' => 'servers.backups', 'preview_route' => 'servers.backups', 'icon' => 'archive-box', 'label' => 'Backups', 'group' => 'background', 'requires_any_tags' => ['mysql', 'postgres'], 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.backups', 'preview_feature' => 'workspace.backups_preview'],
@@ -75,7 +76,10 @@ return [
         ['key' => 'files', 'route' => 'servers.files', 'preview_route' => 'servers.files', 'icon' => 'folder', 'label' => 'Files', 'group' => 'admin', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.files', 'preview_feature' => 'workspace.files_preview'],
         ['key' => 'logs', 'route' => 'servers.logs', 'icon' => 'clipboard-document-list', 'label' => 'Logs', 'group' => 'admin', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'maintenance', 'route' => 'servers.maintenance', 'preview_route' => 'servers.maintenance', 'icon' => 'wrench', 'label' => 'Maintenance', 'group' => 'admin', 'except_host_kinds' => ['kubernetes'], 'feature' => 'workspace.server_maintenance', 'preview_feature' => 'workspace.server_maintenance_preview'],
-        ['key' => 'manage', 'route' => 'servers.manage', 'icon' => 'wrench-screwdriver', 'label' => 'Manage', 'group' => 'admin', 'except_host_kinds' => ['kubernetes']],
+        // 'manage' nav entry retired: the Manage workspace was dissolved. Tools is
+        // now its own Stacks entry (servers.tools); Updates lives on Patches,
+        // reboot/stuck-task on Tools, and the host state strip on Overview. The
+        // servers.manage route stays registered as a back-compat redirector.
         ['key' => 'notifications', 'route' => 'servers.notifications', 'icon' => 'bell', 'label' => 'Notifications', 'group' => 'admin', 'except_host_kinds' => ['kubernetes']],
         ['key' => 'settings', 'route' => 'servers.settings', 'icon' => 'cog-8-tooth', 'label' => 'Settings', 'group' => 'admin'],
     ],
@@ -106,7 +110,7 @@ return [
         // different group than its base config entry; `overrides[key].label`
         // swaps the displayed label.
         'redis' => [
-            'keys' => ['overview', 'caches', 'console', 'health', 'monitor', 'activity', 'logs', 'snapshots', 'firewall', 'networking', 'ssh', 'cron', 'files', 'manage', 'settings'],
+            'keys' => ['overview', 'caches', 'console', 'health', 'monitor', 'activity', 'logs', 'snapshots', 'firewall', 'networking', 'ssh', 'cron', 'files', 'tools', 'settings'],
             'overrides' => [
                 'caches' => ['label' => 'Redis', 'group' => 'overview'],
                 'logs' => ['group' => 'monitor'],
@@ -115,7 +119,7 @@ return [
             ],
         ],
         'valkey' => [
-            'keys' => ['overview', 'caches', 'console', 'health', 'monitor', 'activity', 'logs', 'snapshots', 'firewall', 'networking', 'ssh', 'cron', 'files', 'manage', 'settings'],
+            'keys' => ['overview', 'caches', 'console', 'health', 'monitor', 'activity', 'logs', 'snapshots', 'firewall', 'networking', 'ssh', 'cron', 'files', 'tools', 'settings'],
             'overrides' => [
                 'caches' => ['label' => 'Valkey', 'group' => 'overview'],
                 'logs' => ['group' => 'monitor'],
@@ -124,7 +128,7 @@ return [
             ],
         ],
         'load_balancer' => [
-            'keys' => ['overview', 'load-balancers', 'console', 'health', 'monitor', 'activity', 'logs', 'firewall', 'networking', 'ssh', 'cron', 'manage', 'settings'],
+            'keys' => ['overview', 'load-balancers', 'console', 'health', 'monitor', 'activity', 'logs', 'firewall', 'networking', 'ssh', 'cron', 'tools', 'settings'],
             'overrides' => [
                 'load-balancers' => ['label' => 'Load balancer', 'group' => 'overview'],
                 'logs' => ['group' => 'monitor'],
@@ -132,7 +136,7 @@ return [
             ],
         ],
         'database' => [
-            'keys' => ['overview', 'databases', 'console', 'health', 'monitor', 'activity', 'logs', 'backups', 'firewall', 'networking', 'load-balancers', 'ssh', 'cron', 'files', 'manage', 'settings'],
+            'keys' => ['overview', 'databases', 'console', 'health', 'monitor', 'activity', 'logs', 'backups', 'firewall', 'networking', 'load-balancers', 'ssh', 'cron', 'files', 'tools', 'settings'],
             'overrides' => [
                 'databases' => ['label' => 'Database', 'group' => 'overview'],
                 'logs' => ['group' => 'monitor'],
@@ -148,7 +152,7 @@ return [
             // webserver, backups, snapshots, load balancers). `services` is
             // included so the systemd inventory (incl. the per-site Horizon
             // unit + queue workers) is reachable on worker hosts.
-            'keys' => ['overview', 'sites', 'worker-pool', 'daemons', 'services', 'schedule', 'cron', 'console', 'php', 'health', 'monitor', 'activity', 'logs', 'firewall', 'networking', 'ssh', 'files', 'manage', 'settings'],
+            'keys' => ['overview', 'sites', 'worker-pool', 'daemons', 'services', 'schedule', 'cron', 'console', 'php', 'health', 'monitor', 'activity', 'logs', 'firewall', 'networking', 'ssh', 'files', 'tools', 'settings'],
             'overrides' => [
                 'daemons' => ['label' => 'Workers', 'group' => 'overview'],
                 'worker-pool' => ['group' => 'overview'],

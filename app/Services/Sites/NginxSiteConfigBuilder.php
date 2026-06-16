@@ -104,7 +104,16 @@ class NginxSiteConfigBuilder
         }
 
         if ($site->isSuspended()) {
-            return $this->suspendedBlock($site, $basename, $names);
+            // Serve the suspended page on :443 too (with the site's existing
+            // cert) so HTTPS visitors — and Cloudflare Full/Strict origins,
+            // which connect to the origin over TLS — get the suspended page
+            // instead of a 52x "origin down" error. Listen-port mode stays
+            // HTTP-only.
+            $suspended = $this->suspendedBlock($site, $basename, $names);
+
+            return $listenPort !== null
+                ? $this->rewriteForListenPort($suspended, $listenPort)
+                : $this->appendTlsServerBlocks($site, $suspended);
         }
 
         // Worker-host sites never serve the deployed app — the code must not be

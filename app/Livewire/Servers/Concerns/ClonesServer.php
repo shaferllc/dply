@@ -118,6 +118,6 @@ trait ClonesServer
         $this->clone_open = false;
         $this->dispatch('close-modal', 'clone-server-modal');
         $this->toastSuccess(__('Clone queued. Track progress on the new server\'s page.'));
-        $this->redirect(route('servers.manage', ['server' => $clone, 'section' => 'overview']), navigate: true);
+        $this->redirect(route('servers.overview', ['server' => $clone]), navigate: true);
     }
 }

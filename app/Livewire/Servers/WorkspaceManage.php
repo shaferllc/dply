@@ -56,45 +56,64 @@ class WorkspaceManage extends Component
 
     public function mount(Server $server, ?string $section = null): void
     {
-        if ($section === null) {
-            $this->redirect(route('servers.manage', ['server' => $server, 'section' => 'overview']), navigate: true);
+        // The Manage workspace was dissolved into peer surfaces. Real /manage hits
+        // (base class only) redirect to wherever each former sub-tab now lives.
+        // Subclasses — WorkspaceTools (section 'tools') and WorkspaceWebserver
+        // (section 'web') — call parent::mount() with a fixed section and skip all
+        // of this, dropping straight through to the boot path below.
+        if (static::class === self::class) {
+            // Overview state moved onto the standalone Overview page; the no-section
+            // landing follows it there.
+            if ($section === null || $section === 'overview') {
+                $this->redirect(route('servers.overview', ['server' => $server]), navigate: true);
 
-            return;
-        }
+                return;
+            }
 
-        // 'web' was promoted to its own top-level sidebar entry (servers.webserver) so
-        // operators get to the picker / cascade modal / switch history without
-        // drilling through Manage. Old deep links + bookmarks redirect.
-        // Note: this redirect runs only when WorkspaceWebserver inherits via parent::mount();
-        // since WorkspaceWebserver's mount() passes 'web' explicitly, the check below
-        // is the back-compat path for direct /manage/web URLs only — by the time the
-        // child class is mounted, the route has already routed to /webserver.
-        if ($section === 'web' && static::class === self::class) {
-            $this->redirect(route('servers.webserver', ['server' => $server]), navigate: true);
+            // Tools is now its own peer workspace (servers.tools).
+            if ($section === 'tools') {
+                $this->redirect(route('servers.tools', ['server' => $server]), navigate: true);
 
-            return;
-        }
+                return;
+            }
 
-        // 'services' was retired from the Manage workspace_tabs because the
-        // standalone /services page is the canonical surface. Redirect deep
-        // links instead of 404-ing — bookmarks and any cached external URLs
-        // (digest emails, etc.) keep working.
-        if ($section === 'services') {
-            $this->redirect(route('servers.services', ['server' => $server]), navigate: true);
+            // Danger's reboot + stuck-task cleanup ride along on the Tools page now
+            // (they reuse the same action stack); reboot also lives on Patches.
+            if ($section === 'danger') {
+                $this->redirect(route('servers.tools', ['server' => $server]), navigate: true);
 
-            return;
-        }
+                return;
+            }
 
-        if ($section === 'updates' && Feature::active('workspace.patch_advisor')) {
-            $this->redirect(route('servers.patches', $server), navigate: true);
+            // 'web' was promoted to servers.webserver; '/manage/web' is a deep-link
+            // back-compat path only (the child class routes straight to /webserver).
+            if ($section === 'web') {
+                $this->redirect(route('servers.webserver', ['server' => $server]), navigate: true);
 
-            return;
-        }
+                return;
+            }
 
-        if ($section === 'configuration') {
-            $this->redirect(route('servers.configuration', ['server' => $server]), navigate: true);
+            // 'services' / 'configuration' are standalone peer surfaces.
+            if ($section === 'services') {
+                $this->redirect(route('servers.services', ['server' => $server]), navigate: true);
 
-            return;
+                return;
+            }
+
+            if ($section === 'configuration') {
+                $this->redirect(route('servers.configuration', ['server' => $server]), navigate: true);
+
+                return;
+            }
+
+            // Updates is absorbed by Patches when the patch advisor is on (the
+            // default). When the flag is off there is no Patches page, so '/manage/
+            // updates' still renders the Updates partial below as a fallback.
+            if ($section === 'updates' && Feature::active('workspace.patch_advisor')) {
+                $this->redirect(route('servers.patches', $server), navigate: true);
+
+                return;
+            }
         }
 
         // Subclasses (currently WorkspaceWebserver) get a small section allowlist

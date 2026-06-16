@@ -172,6 +172,7 @@ use App\Livewire\Servers\WorkspaceSecurityDigestPreview;
 use App\Livewire\Servers\WorkspaceServices;
 use App\Livewire\Servers\WorkspaceSettings;
 use App\Livewire\Servers\WorkspaceSharedHost;
+use App\Livewire\Servers\WorkspaceTools;
 use App\Livewire\Servers\WorkspaceSharedHostPreview;
 use App\Livewire\Servers\WorkspaceSites;
 use App\Livewire\Servers\WorkspaceSnapshots;
@@ -966,6 +967,10 @@ Route::middleware(['auth', 'verified', 'org'])->group(function () {
         Route::livewire('servers/{server}/cli', WorkspaceCli::class)->name('servers.cli');
     });
     Route::livewire('servers/{server}/cli-preview', WorkspaceCliPreview::class)->name('servers.cli-preview');
+    // Tools — promoted from the dissolved Manage > Tools sub-tab to its own
+    // peer workspace. servers.manage stays registered below purely as a
+    // back-compat redirector for old /manage deep links + bookmarks.
+    Route::livewire('servers/{server}/tools', WorkspaceTools::class)->name('servers.tools');
     Route::livewire('servers/{server}/manage/{section?}', WorkspaceManage::class)->name('servers.manage');
     Route::livewire('servers/{server}/settings/{section?}', WorkspaceSettings::class)->name('servers.settings');
 
