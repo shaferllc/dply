@@ -142,8 +142,12 @@ return [
         'server_blueprint_preview' => env('FEATURE_WORKSPACE_SERVER_BLUEPRINT_PREVIEW', true),
         // exit: ship once server webserver diff + rollback validated on nginx + caddy
         'webserver_config_diff' => env('FEATURE_WORKSPACE_WEBSERVER_CONFIG_DIFF', true),
-        // exit: ship once server maintenance suspend/resume validated on three VM hosts
-        'server_maintenance' => env('FEATURE_WORKSPACE_SERVER_MAINTENANCE', true),
+        // Defaulted OFF: suspend/resume churn caused repeated orphan-vhost outages
+        // (tracely.cloud 403s). Held behind the coming-soon teaser below until
+        // suspend/resume is validated on three VM hosts AND the orphan-vhost
+        // prune auto-heal is deployed to prod. Flip back on (env or /admin/flags)
+        // to restore the live workspace.
+        'server_maintenance' => env('FEATURE_WORKSPACE_SERVER_MAINTENANCE', false),
         // exit: ship alongside server maintenance GA; teaser only when server maintenance is off
         'server_maintenance_preview' => env('FEATURE_WORKSPACE_SERVER_MAINTENANCE_PREVIEW', true),
         // exit: ship once patch advisor rollup validated against inventory probe on three Debian/Ubuntu hosts
