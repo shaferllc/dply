@@ -25,6 +25,7 @@ use Laravel\Pennant\Feature;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Lazy;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
@@ -54,6 +55,7 @@ class WorkspaceMaintenance extends Component
     public bool $comingSoonPreview = false;
 
     /** In-page sub-tab: 'window', 'operations', 'schedule', or 'notifications'. */
+    #[Url(as: 'tab', except: 'window', history: true)]
     public string $maintenance_tab = 'window';
 
     public string $maintenance_until_local = '';
@@ -89,6 +91,10 @@ class WorkspaceMaintenance extends Component
 
         $this->bootWorkspace($server);
         $this->loadPreferredMaintenanceSchedule();
+
+        // A ?tab= value from the URL bypasses setMaintenanceTab()'s allowlist;
+        // clamp unknown values back to the default so every panel isn't hidden.
+        $this->setMaintenanceTab($this->maintenance_tab);
 
         $maintenance = app(ServerMaintenanceWindow::class);
         $maintenance->refreshExpired($server, auth()->user());
